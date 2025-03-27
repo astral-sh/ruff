@@ -32,7 +32,7 @@ call((yield from x))
 
 # Named expression
 call(x := 1)
-call(x := 1 for x in iter)
+call(x := 1 for i in iter)
 
 # Starred expressions
 call(*x and y)

@@ -228,7 +228,7 @@ AIR302_args.py:67:9: AIR302 `sla` is removed in Airflow 3.0
 
 AIR302_args.py:89:15: AIR302 `filename_template` is removed in Airflow 3.0
    |
-88 | # deprecated filename_template arugment in FileTaskHandler
+88 | # deprecated filename_template argument in FileTaskHandler
 89 | S3TaskHandler(filename_template="/tmp/test")
    |               ^^^^^^^^^^^^^^^^^ AIR302
 90 | HdfsTaskHandler(filename_template="/tmp/test")
@@ -237,7 +237,7 @@ AIR302_args.py:89:15: AIR302 `filename_template` is removed in Airflow 3.0
 
 AIR302_args.py:90:17: AIR302 `filename_template` is removed in Airflow 3.0
    |
-88 | # deprecated filename_template arugment in FileTaskHandler
+88 | # deprecated filename_template argument in FileTaskHandler
 89 | S3TaskHandler(filename_template="/tmp/test")
 90 | HdfsTaskHandler(filename_template="/tmp/test")
    |                 ^^^^^^^^^^^^^^^^^ AIR302

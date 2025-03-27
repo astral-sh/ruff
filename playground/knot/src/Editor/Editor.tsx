@@ -12,6 +12,7 @@ import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
 type Props = {
   visible: boolean;
+  fileName: string;
   source: string;
   diagnostics: Diagnostic[];
   theme: Theme;
@@ -27,6 +28,7 @@ type MonacoEditorState = {
 export default function Editor({
   visible,
   source,
+  fileName,
   theme,
   diagnostics,
   workspace,
@@ -79,7 +81,7 @@ export default function Editor({
         scrollBeyondLastLine: false,
         contextmenu: false,
       }}
-      language={"python"}
+      path={fileName}
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
       value={source}

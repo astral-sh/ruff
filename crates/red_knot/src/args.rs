@@ -50,6 +50,8 @@ pub(crate) struct CheckCommand {
 
     /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
     ///
+    /// If not specified, Red Knot will look at the `VIRTUAL_ENV` environment variable.
+    ///
     /// Red Knot will search in the path's `site-packages` directories for type information and
     /// third-party imports.
     ///

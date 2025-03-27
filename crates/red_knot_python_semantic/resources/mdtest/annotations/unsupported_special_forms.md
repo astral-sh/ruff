@@ -29,8 +29,6 @@ def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.
     # TODO: should understand the annotation
     reveal_type(kwargs)  # revealed: dict
 
-    # TODO: not an error; remove once `call` is implemented for `Callable`
-    # error: [call-non-callable]
     return callback(42, *args, **kwargs)
 
 class Foo:
@@ -43,18 +41,22 @@ class Foo:
 One thing that is supported is error messages for using special forms in type expressions.
 
 ```py
-from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate
+from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec
 
 def _(
     a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a type expression"
     b: TypeGuard,  # error: [invalid-type-form] "`typing.TypeGuard` requires exactly one argument when used in a type expression"
     c: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a type expression"
     d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
+    e: ParamSpec,
 ) -> None:
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
     reveal_type(d)  # revealed: Unknown
+
+    def foo(a_: e) -> None:
+        reveal_type(a_)  # revealed: @Todo(Support for `typing.ParamSpec` instances in type expressions)
 ```
 
 ## Inheritance

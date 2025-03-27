@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
 use ruff_python_ast as ast;
@@ -52,10 +54,42 @@ impl<'db> Definition<'db> {
     }
 }
 
+/// One or more [`Definition`]s.
+#[derive(Debug, Default, PartialEq, Eq, salsa::Update)]
+pub struct Definitions<'db>(smallvec::SmallVec<[Definition<'db>; 1]>);
+
+impl<'db> Definitions<'db> {
+    pub(crate) fn single(definition: Definition<'db>) -> Self {
+        Self(smallvec::smallvec![definition])
+    }
+
+    pub(crate) fn push(&mut self, definition: Definition<'db>) {
+        self.0.push(definition);
+    }
+}
+
+impl<'db> Deref for Definitions<'db> {
+    type Target = [Definition<'db>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a Definitions<'db> {
+    type Item = &'a Definition<'db>;
+    type IntoIter = std::slice::Iter<'a, Definition<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum DefinitionNodeRef<'a> {
     Import(ImportDefinitionNodeRef<'a>),
     ImportFrom(ImportFromDefinitionNodeRef<'a>),
+    ImportStar(StarImportDefinitionNodeRef<'a>),
     For(ForStmtDefinitionNodeRef<'a>),
     Function(&'a ast::StmtFunctionDef),
     Class(&'a ast::StmtClassDef),
@@ -178,10 +212,22 @@ impl<'a> From<MatchPatternDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
     }
 }
 
+impl<'a> From<StarImportDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
+    fn from(node: StarImportDefinitionNodeRef<'a>) -> Self {
+        Self::ImportStar(node)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportDefinitionNodeRef<'a> {
     pub(crate) alias: &'a ast::Alias,
     pub(crate) is_reexported: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct StarImportDefinitionNodeRef<'a> {
+    pub(crate) node: &'a ast::StmtImportFrom,
+    pub(crate) symbol_id: ScopedSymbolId,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -253,6 +299,7 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias: AstNodeRef::new(parsed, alias),
                 is_reexported,
             }),
+
             DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef {
                 node,
                 alias_index,
@@ -262,6 +309,13 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias_index,
                 is_reexported,
             }),
+            DefinitionNodeRef::ImportStar(star_import) => {
+                let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
+                DefinitionKind::StarImport(StarImportDefinitionKind {
+                    node: AstNodeRef::new(parsed, node),
+                    symbol_id,
+                })
+            }
             DefinitionNodeRef::Function(function) => {
                 DefinitionKind::Function(AstNodeRef::new(parsed, function))
             }
@@ -376,6 +430,19 @@ impl<'db> DefinitionNodeRef<'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
+
+            // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
+            // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
+            Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
+                .names
+                .iter()
+                .find(|alias| &alias.name == "*")
+                .expect(
+                    "The `StmtImportFrom` node of a `StarImportDefinitionKind` instance \
+                    should always have at least one `alias` with the name `*`.",
+                )
+                .into(),
+
             Self::Function(node) => node.into(),
             Self::Class(node) => node.into(),
             Self::TypeAlias(node) => node.into(),
@@ -463,6 +530,7 @@ impl DefinitionCategory {
 pub enum DefinitionKind<'db> {
     Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
+    StarImport(StarImportDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
     TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
@@ -492,6 +560,13 @@ impl DefinitionKind<'_> {
         }
     }
 
+    pub(crate) const fn as_star_import(&self) -> Option<&StarImportDefinitionKind> {
+        match self {
+            DefinitionKind::StarImport(import) => Some(import),
+            _ => None,
+        }
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the symbol being defined i.e.,
@@ -502,6 +577,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias().range(),
             DefinitionKind::ImportFrom(import) => import.alias().range(),
+            DefinitionKind::StarImport(import) => import.alias().range(),
             DefinitionKind::Function(function) => function.name.range(),
             DefinitionKind::Class(class) => class.name.range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.name.range(),
@@ -531,6 +607,7 @@ impl DefinitionKind<'_> {
             | DefinitionKind::TypeAlias(_)
             | DefinitionKind::Import(_)
             | DefinitionKind::ImportFrom(_)
+            | DefinitionKind::StarImport(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_) => DefinitionCategory::DeclarationAndBinding,
@@ -589,7 +666,36 @@ impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
+pub struct StarImportDefinitionKind {
+    node: AstNodeRef<ast::StmtImportFrom>,
+    symbol_id: ScopedSymbolId,
+}
+
+impl StarImportDefinitionKind {
+    pub(crate) fn import(&self) -> &ast::StmtImportFrom {
+        self.node.node()
+    }
+
+    pub(crate) fn alias(&self) -> &ast::Alias {
+        // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
+        // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
+        self.node
+            .node()
+            .names
+            .iter()
+            .find(|alias| &alias.name == "*")
+            .expect(
+                "The `StmtImportFrom` node of a `StarImportDefinitionKind` instance \
+                should always have at least one `alias` with the name `*`.",
+            )
+    }
+
+    pub(crate) fn symbol_id(&self) -> ScopedSymbolId {
+        self.symbol_id
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct MatchPatternDefinitionKind {
     pattern: AstNodeRef<ast::Pattern>,
     identifier: AstNodeRef<ast::Identifier>,

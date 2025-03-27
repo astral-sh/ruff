@@ -5,8 +5,6 @@ import ShareButton from "./ShareButton";
 import { Theme } from "./theme";
 import VersionTag from "./VersionTag";
 
-export type Tab = "Source" | "Settings";
-
 export default function Header({
   edit,
   theme,
@@ -102,14 +100,14 @@ function Logo({
           className={className}
         >
           <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
+            fillRule="evenodd"
+            clipRule="evenodd"
             d="M431.998 9.98526C431.998 4.47055 436.469 0 441.984 0H522.013C527.528 0 531.998 4.47056 531.998 9.98526V100H485.998V70H477.998V100H431.998V9.98526ZM493.998 46V38H469.998V46H493.998Z"
             fill="#30173D"
           />
           <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
+            fillRule="evenodd"
+            clipRule="evenodd"
             d="M0 9.98526C0 4.47055 4.47055 0 9.98526 0H90.0147C95.5294 0 99.9999 4.47056 99.9999 9.98526V100H54V70H46V100H0V9.98526ZM62 46V38H38V46H62Z"
             fill="#30173D"
           />
@@ -122,8 +120,8 @@ function Logo({
             fill="#30173D"
           />
           <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
+            fillRule="evenodd"
+            clipRule="evenodd"
             d="M423.998 9.98526C423.998 4.47055 419.528 0 414.013 0H323.998V100H369.998V70H377.998V100H423.998V62H403.998V54H414.013C419.528 54 423.998 49.5294 423.998 44.0147V9.98526ZM385.998 38V46H361.998V38H385.998Z"
             fill="#30173D"
           />

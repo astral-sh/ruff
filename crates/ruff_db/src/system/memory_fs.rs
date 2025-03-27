@@ -7,8 +7,8 @@ use filetime::FileTime;
 use rustc_hash::FxHashMap;
 
 use crate::system::{
-    walk_directory, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata, Result,
-    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
+    file_time_now, walk_directory, DirectoryEntry, FileType, GlobError, GlobErrorKind, Metadata,
+    Result, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
 };
 
 use super::walk_directory::{
@@ -163,7 +163,7 @@ impl MemoryFileSystem {
 
         let file = get_or_create_file(&mut by_path, &normalized)?;
         file.content = content.to_string();
-        file.last_modified = now();
+        file.last_modified = file_time_now();
 
         Ok(())
     }
@@ -215,7 +215,7 @@ impl MemoryFileSystem {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(File {
                     content: content.to_string(),
-                    last_modified: now(),
+                    last_modified: file_time_now(),
                 });
             }
             std::collections::hash_map::Entry::Occupied(mut entry) => {
@@ -310,7 +310,7 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
         let normalized = self.normalize_path(path.as_ref());
 
-        get_or_create_file(&mut by_path, &normalized)?.last_modified = now();
+        get_or_create_file(&mut by_path, &normalized)?.last_modified = file_time_now();
 
         Ok(())
     }
@@ -486,7 +486,7 @@ fn create_dir_all(
         path.push(component);
         let entry = paths.entry(path.clone()).or_insert_with(|| {
             Entry::Directory(Directory {
-                last_modified: now(),
+                last_modified: file_time_now(),
             })
         });
 
@@ -513,7 +513,7 @@ fn get_or_create_file<'a>(
     let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
         Entry::File(File {
             content: String::new(),
-            last_modified: now(),
+            last_modified: file_time_now(),
         })
     });
 
@@ -693,30 +693,6 @@ enum WalkerState {
 
     /// Traverse into the directory with the given path at the given depth.
     Nested { path: SystemPathBuf, depth: usize },
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn now() -> FileTime {
-    FileTime::now()
-}
-
-#[cfg(target_arch = "wasm32")]
-fn now() -> FileTime {
-    // Copied from FileTime::from_system_time()
-    let time = web_time::SystemTime::now();
-
-    time.duration_since(web_time::UNIX_EPOCH)
-        .map(|d| FileTime::from_unix_time(d.as_secs() as i64, d.subsec_nanos()))
-        .unwrap_or_else(|e| {
-            let until_epoch = e.duration();
-            let (sec_offset, nanos) = if until_epoch.subsec_nanos() == 0 {
-                (0, 0)
-            } else {
-                (-1, 1_000_000_000 - until_epoch.subsec_nanos())
-            };
-
-            FileTime::from_unix_time(-(until_epoch.as_secs() as i64) + sec_offset, nanos)
-        })
 }
 
 #[cfg(test)]

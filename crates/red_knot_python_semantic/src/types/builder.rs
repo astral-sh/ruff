@@ -110,25 +110,14 @@ impl<'db> UnionBuilder<'db> {
                         return self.collapse_to_object();
                     }
                 }
-                match to_remove[..] {
-                    [] => self.elements.push(to_add),
-                    [index] => self.elements[index] = to_add,
-                    _ => {
-                        let mut current_index = 0;
-                        let mut to_remove = to_remove.into_iter();
-                        let mut next_to_remove_index = to_remove.next();
-                        self.elements.retain(|_| {
-                            let retain = if Some(current_index) == next_to_remove_index {
-                                next_to_remove_index = to_remove.next();
-                                false
-                            } else {
-                                true
-                            };
-                            current_index += 1;
-                            retain
-                        });
-                        self.elements.push(to_add);
+                if let Some((&first, rest)) = to_remove.split_first() {
+                    self.elements[first] = to_add;
+                    // We iterate in descending order to keep remaining indices valid after `swap_remove`.
+                    for &index in rest.iter().rev() {
+                        self.elements.swap_remove(index);
                     }
+                } else {
+                    self.elements.push(to_add);
                 }
             }
         }

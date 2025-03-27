@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
-snapshot_kind: text
 ---
 AIR302_class_attribute.py:24:21: AIR302 `airflow.Dataset` is removed in Airflow 3.0
    |
@@ -10,7 +9,7 @@ AIR302_class_attribute.py:24:21: AIR302 `airflow.Dataset` is removed in Airflow 
 25 | dataset_from_root.iter_datasets()
 26 | dataset_from_root.iter_dataset_aliases()
    |
-   = help: Use `airflow.sdk.definitions.asset.Asset` instead
+   = help: Use `airflow.sdk.Asset` instead
 
 AIR302_class_attribute.py:25:19: AIR302 `iter_datasets` is removed in Airflow 3.0
    |
@@ -41,7 +40,7 @@ AIR302_class_attribute.py:29:31: AIR302 `airflow.datasets.Dataset` is removed in
 30 | dataset_to_test_method_call.iter_datasets()
 31 | dataset_to_test_method_call.iter_dataset_aliases()
    |
-   = help: Use `airflow.sdk.definitions.asset.Asset` instead
+   = help: Use `airflow.sdk.Asset` instead
 
 AIR302_class_attribute.py:30:29: AIR302 `iter_datasets` is removed in Airflow 3.0
    |
@@ -73,7 +72,7 @@ AIR302_class_attribute.py:33:29: AIR302 `airflow.datasets.DatasetAlias` is remov
 34 | alias_to_test_method_call.iter_datasets()
 35 | alias_to_test_method_call.iter_dataset_aliases()
    |
-   = help: Use `airflow.sdk.definitions.asset.AssetAlias` instead
+   = help: Use `airflow.sdk.AssetAlias` instead
 
 AIR302_class_attribute.py:34:27: AIR302 `iter_datasets` is removed in Airflow 3.0
    |
@@ -104,7 +103,7 @@ AIR302_class_attribute.py:37:27: AIR302 `airflow.datasets.DatasetAny` is removed
 38 | any_to_test_method_call.iter_datasets()
 39 | any_to_test_method_call.iter_dataset_aliases()
    |
-   = help: Use `airflow.sdk.definitions.asset.AssetAny` instead
+   = help: Use `airflow.sdk.AssetAny` instead
 
 AIR302_class_attribute.py:38:25: AIR302 `iter_datasets` is removed in Airflow 3.0
    |

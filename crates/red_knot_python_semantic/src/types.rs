@@ -1,10 +1,12 @@
-use std::hash::Hash;
+use std::collections::HashMap;
+use std::slice::Iter;
 use std::str::FromStr;
 
 use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE};
+use itertools::EitherOrBoth;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
@@ -30,13 +32,13 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
-use crate::types::call::{Bindings, CallArguments};
+use crate::types::call::{Bindings, CallArgumentTypes};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
-use crate::types::signatures::{Parameter, ParameterKind, Parameters};
+use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{Class, ClassLiteralType, InstanceType, KnownClass, KnownInstanceType};
 
@@ -631,10 +633,14 @@ impl<'db> Type<'db> {
                 KnownClass::Slice.to_instance(db).is_subtype_of(db, target)
             }
 
+            (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
+                self_function_literal
+                    .into_callable_type(db)
+                    .is_subtype_of(db, target)
+            }
+
             // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
             // so it also, for now, just delegates to its instance fallback.
-            // This will change in a way similar to the `LiteralString`/`StringLiteral()` case above
-            // when we add support for `typing.Callable`.
             (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
                 .to_instance(db)
                 .is_subtype_of(db, target),
@@ -654,12 +660,18 @@ impl<'db> Type<'db> {
                     .is_subtype_of(db, target)
             }
 
+            (
+                Type::Callable(CallableType::General(self_callable)),
+                Type::Callable(CallableType::General(other_callable)),
+            ) => self_callable.is_subtype_of(db, other_callable),
+
             (Type::Callable(CallableType::General(_)), _) => {
-                // TODO: Implement subtyping for general callable types
+                // TODO: Implement subtyping between general callable types and other types like
+                // function literals, bound methods, class literals, `type[]`, etc.)
                 false
             }
 
-            // A fully static heterogenous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
+            // A fully static heterogeneous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
             // of the element-type at the same index in `B`. (Now say that 5 times fast.)
             //
@@ -679,7 +691,7 @@ impl<'db> Type<'db> {
             // Other than the special tuple-to-tuple case handled, above,
             // tuple subtyping delegates to `Instance(tuple)` in the same way as the literal types.
             //
-            // All heterogenous tuple types are subtypes of `Instance(<tuple>)`:
+            // All heterogeneous tuple types are subtypes of `Instance(<tuple>)`:
             // `Instance(<some class T>)` expresses "the set of all possible instances of the class `T`";
             // consequently, `Instance(<tuple>)` expresses "the set of all possible instances of the class `tuple`".
             // This type can be spelled in type annotations as `tuple[object, ...]` (since `tuple` is covariant).
@@ -879,6 +891,24 @@ impl<'db> Type<'db> {
                 }
             }
 
+            // TODO: ditto for avoiding false positives when checking function calls with `Sized` parameters.
+            (lhs, Type::Instance(InstanceType { class }))
+                if class.is_known(db, KnownClass::Sized) =>
+            {
+                matches!(
+                    lhs.to_meta_type(db).member(db, "__len__"),
+                    SymbolAndQualifiers {
+                        symbol: Symbol::Type(..),
+                        ..
+                    }
+                )
+            }
+
+            (
+                Type::Callable(CallableType::General(self_callable)),
+                Type::Callable(CallableType::General(target_callable)),
+            ) => self_callable.is_assignable_to(db, target_callable),
+
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
@@ -898,6 +928,10 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to(db, right)
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
+            (
+                Type::Callable(CallableType::General(left)),
+                Type::Callable(CallableType::General(right)),
+            ) => left.is_equivalent_to(db, right),
             _ => self == other && self.is_fully_static(db) && other.is_fully_static(db),
         }
     }
@@ -1117,7 +1151,7 @@ impl<'db> Type<'db> {
             }
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
-            // so although the type is dynamic we can still determine disjointness in some situations
+            // so although the type is dynamic we can still determine disjointedness in some situations
             (Type::SubclassOf(subclass_of_ty), other)
             | (other, Type::SubclassOf(subclass_of_ty)) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => {
@@ -1272,7 +1306,7 @@ impl<'db> Type<'db> {
 
             (Type::Callable(CallableType::General(_)), _)
             | (_, Type::Callable(CallableType::General(_))) => {
-                // TODO: Implement disjointness for general callable types
+                // TODO: Implement disjointedness for general callable types
                 false
             }
         }
@@ -1689,7 +1723,7 @@ impl<'db> Type<'db> {
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
-                .try_call(db, &CallArguments::positional([self, instance, owner]))
+                .try_call(db, CallArgumentTypes::positional([self, instance, owner]))
                 .map(|bindings| {
                     if descr_get_boundness == Boundness::Bound {
                         bindings.return_type(db)
@@ -2028,28 +2062,28 @@ impl<'db> Type<'db> {
                     InstanceFallbackShadowsNonDataDescriptor::No,
                 );
 
-                let custom_getattr_result =
-                    || {
-                        // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
-                        // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
-                        if self.into_instance().is_some_and(|instance| {
-                            instance.class.is_known(db, KnownClass::ModuleType)
-                        }) {
-                            return Symbol::Unbound.into();
-                        }
+                let custom_getattr_result = || {
+                    // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
+                    // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
+                    if self
+                        .into_instance()
+                        .is_some_and(|instance| instance.class.is_known(db, KnownClass::ModuleType))
+                    {
+                        return Symbol::Unbound.into();
+                    }
 
-                        self.try_call_dunder(
-                            db,
-                            "__getattr__",
-                            &CallArguments::positional([Type::StringLiteral(
-                                StringLiteralType::new(db, Box::from(name.as_str())),
-                            )]),
-                        )
-                        .map(|outcome| Symbol::bound(outcome.return_type(db)))
-                        // TODO: Handle call errors here.
-                        .unwrap_or(Symbol::Unbound)
-                        .into()
-                    };
+                    self.try_call_dunder(
+                        db,
+                        "__getattr__",
+                        CallArgumentTypes::positional([Type::StringLiteral(
+                            StringLiteralType::new(db, Box::from(name.as_str())),
+                        )]),
+                    )
+                    .map(|outcome| Symbol::bound(outcome.return_type(db)))
+                    // TODO: Handle call errors here.
+                    .unwrap_or(Symbol::Unbound)
+                    .into()
+                };
 
                 match result {
                     member @ SymbolAndQualifiers {
@@ -2162,7 +2196,7 @@ impl<'db> Type<'db> {
                         }
                     };
 
-                    match self.try_call_dunder(db, "__bool__", &CallArguments::none()) {
+                    match self.try_call_dunder(db, "__bool__", CallArgumentTypes::none()) {
                         Ok(outcome) => {
                             let return_type = outcome.return_type(db);
                             if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
@@ -2300,7 +2334,7 @@ impl<'db> Type<'db> {
             return usize_len.try_into().ok().map(Type::IntLiteral);
         }
 
-        let return_ty = match self.try_call_dunder(db, "__len__", &CallArguments::none()) {
+        let return_ty = match self.try_call_dunder(db, "__len__", CallArgumentTypes::none()) {
             Ok(bindings) => bindings.return_type(db),
             Err(CallDunderError::PossiblyUnbound(bindings)) => bindings.return_type(db),
 
@@ -2323,6 +2357,10 @@ impl<'db> Type<'db> {
     /// [`CallErrorKind::NotCallable`].
     fn signatures(self, db: &'db dyn Db) -> Signatures<'db> {
         match self {
+            Type::Callable(CallableType::General(callable)) => Signatures::single(
+                CallableSignature::single(self, callable.signature(db).clone()),
+            ),
+
             Type::Callable(CallableType::BoundMethod(bound_method)) => {
                 let signature = bound_method.function(db).signature(db);
                 let signature = CallableSignature::single(self, signature.clone())
@@ -2350,42 +2388,23 @@ impl<'db> Type<'db> {
                     [
                         Signature::new(
                             Parameters::new([
-                                Parameter::new(
-                                    Some(Type::none(db)),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("instance")),
-                                        default_ty: None,
-                                    },
-                                ),
-                                Parameter::new(
-                                    Some(KnownClass::Type.to_instance(db)),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("owner")),
-                                        default_ty: None,
-                                    },
-                                ),
+                                Parameter::positional_only(Some(Name::new_static("instance")))
+                                    .with_annotated_type(Type::none(db)),
+                                Parameter::positional_only(Some(Name::new_static("owner")))
+                                    .with_annotated_type(KnownClass::Type.to_instance(db)),
                             ]),
                             None,
                         ),
                         Signature::new(
                             Parameters::new([
-                                Parameter::new(
-                                    Some(not_none),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("instance")),
-                                        default_ty: None,
-                                    },
-                                ),
-                                Parameter::new(
-                                    Some(UnionType::from_elements(
+                                Parameter::positional_only(Some(Name::new_static("instance")))
+                                    .with_annotated_type(not_none),
+                                Parameter::positional_only(Some(Name::new_static("owner")))
+                                    .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [KnownClass::Type.to_instance(db), Type::none(db)],
-                                    )),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("owner")),
-                                        default_ty: Some(Type::none(db)),
-                                    },
-                                ),
+                                    ))
+                                    .with_default_type(Type::none(db)),
                             ]),
                             None,
                         ),
@@ -2407,56 +2426,27 @@ impl<'db> Type<'db> {
                     [
                         Signature::new(
                             Parameters::new([
-                                Parameter::new(
-                                    Some(KnownClass::FunctionType.to_instance(db)),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("self")),
-                                        default_ty: None,
-                                    },
-                                ),
-                                Parameter::new(
-                                    Some(Type::none(db)),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("instance")),
-                                        default_ty: None,
-                                    },
-                                ),
-                                Parameter::new(
-                                    Some(KnownClass::Type.to_instance(db)),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("owner")),
-                                        default_ty: None,
-                                    },
-                                ),
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(KnownClass::FunctionType.to_instance(db)),
+                                Parameter::positional_only(Some(Name::new_static("instance")))
+                                    .with_annotated_type(Type::none(db)),
+                                Parameter::positional_only(Some(Name::new_static("owner")))
+                                    .with_annotated_type(KnownClass::Type.to_instance(db)),
                             ]),
                             None,
                         ),
                         Signature::new(
                             Parameters::new([
-                                Parameter::new(
-                                    Some(KnownClass::FunctionType.to_instance(db)),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("self")),
-                                        default_ty: None,
-                                    },
-                                ),
-                                Parameter::new(
-                                    Some(not_none),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("instance")),
-                                        default_ty: None,
-                                    },
-                                ),
-                                Parameter::new(
-                                    Some(UnionType::from_elements(
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(KnownClass::FunctionType.to_instance(db)),
+                                Parameter::positional_only(Some(Name::new_static("instance")))
+                                    .with_annotated_type(not_none),
+                                Parameter::positional_only(Some(Name::new_static("owner")))
+                                    .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [KnownClass::Type.to_instance(db), Type::none(db)],
-                                    )),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("owner")),
-                                        default_ty: Some(Type::none(db)),
-                                    },
-                                ),
+                                    ))
+                                    .with_default_type(Type::none(db)),
                             ]),
                             None,
                         ),
@@ -2465,10 +2455,89 @@ impl<'db> Type<'db> {
                 Signatures::single(signature)
             }
 
-            Type::FunctionLiteral(function_type) => Signatures::single(CallableSignature::single(
-                self,
-                function_type.signature(db).clone(),
-            )),
+            Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                Some(
+                    KnownFunction::IsEquivalentTo
+                    | KnownFunction::IsSubtypeOf
+                    | KnownFunction::IsAssignableTo
+                    | KnownFunction::IsDisjointFrom
+                    | KnownFunction::IsGradualEquivalentTo,
+                ) => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("a")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only(Some(Name::new_static("b")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(KnownClass::Bool.to_instance(db)),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
+                Some(
+                    KnownFunction::IsFullyStatic
+                    | KnownFunction::IsSingleton
+                    | KnownFunction::IsSingleValued,
+                ) => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
+                                "a",
+                            )))
+                            .type_form()
+                            .with_annotated_type(Type::any())]),
+                            Some(KnownClass::Bool.to_instance(db)),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
+                Some(KnownFunction::AssertType) => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_only(Some(Name::new_static("type")))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(Type::none(db)),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
+                Some(KnownFunction::Cast) => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_or_keyword(Name::new_static("typ"))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::positional_or_keyword(Name::new_static("val"))
+                                    .with_annotated_type(Type::any()),
+                            ]),
+                            Some(Type::any()),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
+                _ => Signatures::single(CallableSignature::single(
+                    self,
+                    function_type.signature(db).clone(),
+                )),
+            },
 
             Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
                 Some(KnownClass::Bool) => {
@@ -2479,13 +2548,11 @@ impl<'db> Type<'db> {
                     let signature = CallableSignature::single(
                         self,
                         Signature::new(
-                            Parameters::new([Parameter::new(
-                                Some(Type::any()),
-                                ParameterKind::PositionalOnly {
-                                    name: Some(Name::new_static("o")),
-                                    default_ty: Some(Type::BooleanLiteral(false)),
-                                },
-                            )]),
+                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
+                                "o",
+                            )))
+                            .with_annotated_type(Type::any())
+                            .with_default_type(Type::BooleanLiteral(false))]),
                             Some(KnownClass::Bool.to_instance(db)),
                         ),
                     );
@@ -2504,38 +2571,21 @@ impl<'db> Type<'db> {
                         self,
                         [
                             Signature::new(
-                                Parameters::new([Parameter::new(
-                                    Some(Type::any()),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("o")),
-                                        default_ty: Some(Type::string_literal(db, "")),
-                                    },
-                                )]),
+                                Parameters::new([Parameter::positional_only(Some(
+                                    Name::new_static("o"),
+                                ))
+                                .with_annotated_type(Type::any())
+                                .with_default_type(Type::string_literal(db, ""))]),
                                 Some(KnownClass::Str.to_instance(db)),
                             ),
                             Signature::new(
                                 Parameters::new([
-                                    Parameter::new(
-                                        Some(Type::any()), // TODO: ReadableBuffer
-                                        ParameterKind::PositionalOnly {
-                                            name: Some(Name::new_static("o")),
-                                            default_ty: None,
-                                        },
-                                    ),
-                                    Parameter::new(
-                                        Some(KnownClass::Str.to_instance(db)),
-                                        ParameterKind::PositionalOnly {
-                                            name: Some(Name::new_static("encoding")),
-                                            default_ty: None,
-                                        },
-                                    ),
-                                    Parameter::new(
-                                        Some(KnownClass::Str.to_instance(db)),
-                                        ParameterKind::PositionalOnly {
-                                            name: Some(Name::new_static("errors")),
-                                            default_ty: None,
-                                        },
-                                    ),
+                                    Parameter::positional_only(Some(Name::new_static("o")))
+                                        .with_annotated_type(Type::any()), // TODO: ReadableBuffer
+                                    Parameter::positional_only(Some(Name::new_static("encoding")))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                    Parameter::positional_only(Some(Name::new_static("errors")))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
                                 ]),
                                 Some(KnownClass::Str.to_instance(db)),
                             ),
@@ -2556,38 +2606,20 @@ impl<'db> Type<'db> {
                         self,
                         [
                             Signature::new(
-                                Parameters::new([Parameter::new(
-                                    Some(Type::any()),
-                                    ParameterKind::PositionalOnly {
-                                        name: Some(Name::new_static("o")),
-                                        default_ty: None,
-                                    },
-                                )]),
+                                Parameters::new([Parameter::positional_only(Some(
+                                    Name::new_static("o"),
+                                ))
+                                .with_annotated_type(Type::any())]),
                                 Some(KnownClass::Type.to_instance(db)),
                             ),
                             Signature::new(
                                 Parameters::new([
-                                    Parameter::new(
-                                        Some(Type::any()),
-                                        ParameterKind::PositionalOnly {
-                                            name: Some(Name::new_static("o")),
-                                            default_ty: None,
-                                        },
-                                    ),
-                                    Parameter::new(
-                                        Some(Type::any()),
-                                        ParameterKind::PositionalOnly {
-                                            name: Some(Name::new_static("bases")),
-                                            default_ty: None,
-                                        },
-                                    ),
-                                    Parameter::new(
-                                        Some(Type::any()),
-                                        ParameterKind::PositionalOnly {
-                                            name: Some(Name::new_static("dict")),
-                                            default_ty: None,
-                                        },
-                                    ),
+                                    Parameter::positional_only(Some(Name::new_static("o")))
+                                        .with_annotated_type(Type::any()),
+                                    Parameter::positional_only(Some(Name::new_static("bases")))
+                                        .with_annotated_type(Type::any()),
+                                    Parameter::positional_only(Some(Name::new_static("dict")))
+                                        .with_annotated_type(Type::any()),
                                 ]),
                                 Some(KnownClass::Type.to_instance(db)),
                             ),
@@ -2668,282 +2700,11 @@ impl<'db> Type<'db> {
     fn try_call(
         self,
         db: &'db dyn Db,
-        arguments: &CallArguments<'_, 'db>,
+        mut argument_types: CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db);
-        let mut bindings = Bindings::bind(db, &signatures, arguments)?;
-        for binding in &mut bindings {
-            // For certain known callables, we have special-case logic to determine the return type
-            // in a way that isn't directly expressible in the type system. Each special case
-            // listed here should have a corresponding clause above in `signatures`.
-            let binding_type = binding.callable_type;
-            let Some((overload_index, overload)) = binding.matching_overload_mut() else {
-                continue;
-            };
-
-            match binding_type {
-                Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
-                    if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                        && function.decorators(db).len() == 1
-                    {
-                        if let Some(owner) = arguments.second_argument() {
-                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, owner),
-                            )));
-                        } else if let Some(instance) = arguments.first_argument() {
-                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, instance.to_meta_type(db)),
-                            )));
-                        }
-                    } else if let Some(first) = arguments.first_argument() {
-                        if first.is_none(db) {
-                            overload.set_return_type(Type::FunctionLiteral(function));
-                        } else {
-                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, first),
-                            )));
-                        }
-                    }
-                }
-
-                Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
-                    if let Some(function_ty @ Type::FunctionLiteral(function)) =
-                        arguments.first_argument()
-                    {
-                        if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                            && function.decorators(db).len() == 1
-                        {
-                            if let Some(owner) = arguments.third_argument() {
-                                overload.set_return_type(Type::Callable(
-                                    CallableType::BoundMethod(BoundMethodType::new(
-                                        db, function, owner,
-                                    )),
-                                ));
-                            } else if let Some(instance) = arguments.second_argument() {
-                                overload.set_return_type(Type::Callable(
-                                    CallableType::BoundMethod(BoundMethodType::new(
-                                        db,
-                                        function,
-                                        instance.to_meta_type(db),
-                                    )),
-                                ));
-                            }
-                        } else {
-                            match (arguments.second_argument(), arguments.third_argument()) {
-                                (Some(instance), _) if instance.is_none(db) => {
-                                    overload.set_return_type(function_ty);
-                                }
-
-                                (
-                                    Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                                        type_alias,
-                                    ))),
-                                    Some(Type::ClassLiteral(ClassLiteralType { class })),
-                                ) if class.is_known(db, KnownClass::TypeAliasType)
-                                    && function.name(db) == "__name__" =>
-                                {
-                                    overload.set_return_type(Type::string_literal(
-                                        db,
-                                        type_alias.name(db),
-                                    ));
-                                }
-
-                                (
-                                    Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))),
-                                    Some(Type::ClassLiteral(ClassLiteralType { class })),
-                                ) if class.is_known(db, KnownClass::TypeVar)
-                                    && function.name(db) == "__name__" =>
-                                {
-                                    overload.set_return_type(Type::string_literal(
-                                        db,
-                                        typevar.name(db),
-                                    ));
-                                }
-
-                                (Some(_), _)
-                                    if function
-                                        .has_known_class_decorator(db, KnownClass::Property) =>
-                                {
-                                    overload.set_return_type(todo_type!("@property"));
-                                }
-
-                                (Some(instance), _) => {
-                                    overload.set_return_type(Type::Callable(
-                                        CallableType::BoundMethod(BoundMethodType::new(
-                                            db, function, instance,
-                                        )),
-                                    ));
-                                }
-
-                                (None, _) => {}
-                            }
-                        }
-                    }
-                }
-
-                Type::FunctionLiteral(function_type) => match function_type.known(db) {
-                    Some(KnownFunction::IsEquivalentTo) => {
-                        if let [ty_a, ty_b] = overload.parameter_types() {
-                            overload.set_return_type(Type::BooleanLiteral(
-                                ty_a.is_equivalent_to(db, *ty_b),
-                            ));
-                        }
-                    }
-
-                    Some(KnownFunction::IsSubtypeOf) => {
-                        if let [ty_a, ty_b] = overload.parameter_types() {
-                            overload.set_return_type(Type::BooleanLiteral(
-                                ty_a.is_subtype_of(db, *ty_b),
-                            ));
-                        }
-                    }
-
-                    Some(KnownFunction::IsAssignableTo) => {
-                        if let [ty_a, ty_b] = overload.parameter_types() {
-                            overload.set_return_type(Type::BooleanLiteral(
-                                ty_a.is_assignable_to(db, *ty_b),
-                            ));
-                        }
-                    }
-
-                    Some(KnownFunction::IsDisjointFrom) => {
-                        if let [ty_a, ty_b] = overload.parameter_types() {
-                            overload.set_return_type(Type::BooleanLiteral(
-                                ty_a.is_disjoint_from(db, *ty_b),
-                            ));
-                        }
-                    }
-
-                    Some(KnownFunction::IsGradualEquivalentTo) => {
-                        if let [ty_a, ty_b] = overload.parameter_types() {
-                            overload.set_return_type(Type::BooleanLiteral(
-                                ty_a.is_gradual_equivalent_to(db, *ty_b),
-                            ));
-                        }
-                    }
-
-                    Some(KnownFunction::IsFullyStatic) => {
-                        if let [ty] = overload.parameter_types() {
-                            overload.set_return_type(Type::BooleanLiteral(ty.is_fully_static(db)));
-                        }
-                    }
-
-                    Some(KnownFunction::IsSingleton) => {
-                        if let [ty] = overload.parameter_types() {
-                            overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
-                        }
-                    }
-
-                    Some(KnownFunction::IsSingleValued) => {
-                        if let [ty] = overload.parameter_types() {
-                            overload.set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
-                        }
-                    }
-
-                    Some(KnownFunction::Len) => {
-                        if let [first_arg] = overload.parameter_types() {
-                            if let Some(len_ty) = first_arg.len(db) {
-                                overload.set_return_type(len_ty);
-                            }
-                        };
-                    }
-
-                    Some(KnownFunction::Repr) => {
-                        if let [first_arg] = overload.parameter_types() {
-                            overload.set_return_type(first_arg.repr(db));
-                        };
-                    }
-
-                    Some(KnownFunction::Cast) => {
-                        // TODO: Use `.parameter_types()` exclusively when overloads are supported.
-                        if let Some(casted_ty) = arguments.first_argument() {
-                            if let [_, _] = overload.parameter_types() {
-                                overload.set_return_type(casted_ty);
-                            }
-                        };
-                    }
-
-                    Some(KnownFunction::Overload) => {
-                        overload.set_return_type(todo_type!("overload(..) return type"));
-                    }
-
-                    Some(KnownFunction::GetattrStatic) => {
-                        let [instance_ty, attr_name, default] = overload.parameter_types() else {
-                            continue;
-                        };
-
-                        let Some(attr_name) = attr_name.into_string_literal() else {
-                            continue;
-                        };
-
-                        let default = if default.is_unknown() {
-                            Type::Never
-                        } else {
-                            *default
-                        };
-
-                        let union_with_default = |ty| UnionType::from_elements(db, [ty, default]);
-
-                        // TODO: we could emit a diagnostic here (if default is not set)
-                        overload.set_return_type(
-                            match instance_ty.static_member(db, attr_name.value(db)) {
-                                Symbol::Type(ty, Boundness::Bound) => {
-                                    if instance_ty.is_fully_static(db) {
-                                        ty
-                                    } else {
-                                        // Here, we attempt to model the fact that an attribute lookup on
-                                        // a non-fully static type could fail. This is an approximation,
-                                        // as there are gradual types like `tuple[Any]`, on which a lookup
-                                        // of (e.g. of the `index` method) would always succeed.
-
-                                        union_with_default(ty)
-                                    }
-                                }
-                                Symbol::Type(ty, Boundness::PossiblyUnbound) => {
-                                    union_with_default(ty)
-                                }
-                                Symbol::Unbound => default,
-                            },
-                        );
-                    }
-
-                    _ => {}
-                },
-
-                Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
-                    Some(KnownClass::Bool) => {
-                        overload.set_return_type(
-                            arguments
-                                .first_argument()
-                                .map(|arg| arg.bool(db).into_type(db))
-                                .unwrap_or(Type::BooleanLiteral(false)),
-                        );
-                    }
-
-                    Some(KnownClass::Str) if overload_index == 0 => {
-                        overload.set_return_type(
-                            arguments
-                                .first_argument()
-                                .map(|arg| arg.str(db))
-                                .unwrap_or_else(|| Type::string_literal(db, "")),
-                        );
-                    }
-
-                    Some(KnownClass::Type) if overload_index == 0 => {
-                        if let Some(arg) = arguments.first_argument() {
-                            overload.set_return_type(arg.to_meta_type(db));
-                        }
-                    }
-
-                    _ => {}
-                },
-
-                // Not a special case
-                _ => {}
-            }
-        }
-
-        Ok(bindings)
+        Bindings::match_parameters(signatures, &mut argument_types)
+            .check_types(db, &mut argument_types)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -2954,7 +2715,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        arguments: &CallArguments<'_, 'db>,
+        mut argument_types: CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match self
             .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NoInstanceFallback)
@@ -2962,7 +2723,8 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::bind(db, &signatures, arguments)?;
+                let bindings = Bindings::match_parameters(signatures, &mut argument_types)
+                    .check_types(db, &mut argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -2998,19 +2760,19 @@ impl<'db> Type<'db> {
             self.try_call_dunder(
                 db,
                 "__getitem__",
-                &CallArguments::positional([KnownClass::Int.to_instance(db)]),
+                CallArgumentTypes::positional([KnownClass::Int.to_instance(db)]),
             )
             .map(|dunder_getitem_outcome| dunder_getitem_outcome.return_type(db))
         };
 
         let try_call_dunder_next_on_iterator = |iterator: Type<'db>| {
             iterator
-                .try_call_dunder(db, "__next__", &CallArguments::none())
+                .try_call_dunder(db, "__next__", CallArgumentTypes::none())
                 .map(|dunder_next_outcome| dunder_next_outcome.return_type(db))
         };
 
         let dunder_iter_result = self
-            .try_call_dunder(db, "__iter__", &CallArguments::none())
+            .try_call_dunder(db, "__iter__", CallArgumentTypes::none())
             .map(|dunder_iter_outcome| dunder_iter_outcome.return_type(db));
 
         match dunder_iter_result {
@@ -3094,11 +2856,11 @@ impl<'db> Type<'db> {
     ///     pass
     /// ```
     fn try_enter(self, db: &'db dyn Db) -> Result<Type<'db>, ContextManagerError<'db>> {
-        let enter = self.try_call_dunder(db, "__enter__", &CallArguments::none());
+        let enter = self.try_call_dunder(db, "__enter__", CallArgumentTypes::none());
         let exit = self.try_call_dunder(
             db,
             "__exit__",
-            &CallArguments::positional([Type::none(db), Type::none(db), Type::none(db)]),
+            CallArgumentTypes::positional([Type::none(db), Type::none(db), Type::none(db)]),
         );
 
         // TODO: Make use of Protocols when we support it (the manager be assignable to `contextlib.AbstractContextManager`).
@@ -3318,9 +3080,29 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => Ok(*self),
 
-            Type::Instance(_) => Ok(todo_type!(
-                "Invalid or unsupported `Instance` in `Type::to_type_expression`"
-            )),
+            Type::Instance(InstanceType { class }) => match class.known(db) {
+                Some(KnownClass::TypeVar) => Ok(todo_type!(
+                    "Support for `typing.TypeVar` instances in type expressions"
+                )),
+                Some(KnownClass::ParamSpec) => Ok(todo_type!(
+                    "Support for `typing.ParamSpec` instances in type expressions"
+                )),
+                Some(KnownClass::TypeVarTuple) => Ok(todo_type!(
+                    "Support for `typing.TypeVarTuple` instances in type expressions"
+                )),
+                Some(KnownClass::NewType) => Ok(todo_type!(
+                    "Support for `typing.NewType` instances in type expressions"
+                )),
+                Some(KnownClass::GenericAlias) => Ok(todo_type!(
+                    "Support for `typing.GenericAlias` instances in type expressions"
+                )),
+                _ => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
+                        *self
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
+            },
 
             Type::Intersection(_) => Ok(todo_type!("Type::Intersection.in_type_expression")),
         }
@@ -3867,7 +3649,7 @@ impl<'db> IterationError<'db> {
 
             Self::IterCallError(_, dunder_iter_bindings) => dunder_iter_bindings
                 .return_type(db)
-                .try_call_dunder(db, "__next__", &CallArguments::none())
+                .try_call_dunder(db, "__next__", CallArgumentTypes::none())
                 .map(|dunder_next_outcome| Some(dunder_next_outcome.return_type(db)))
                 .unwrap_or_else(|dunder_next_call_error| dunder_next_call_error.return_type(db)),
 
@@ -3920,7 +3702,7 @@ impl<'db> IterationError<'db> {
                     because its `__iter__` attribute has type `{dunder_iter_type}`, \
                     which is not callable",
                 iterable_type = iterable_type.display(db),
-                dunder_iter_type = bindings.callable_type.display(db),
+                dunder_iter_type = bindings.callable_type().display(db),
             )),
             Self::IterCallError(CallErrorKind::PossiblyNotCallable, bindings) if bindings.is_single() => {
                 report_not_iterable(format_args!(
@@ -3928,7 +3710,7 @@ impl<'db> IterationError<'db> {
                         because its `__iter__` attribute (with type `{dunder_iter_type}`) \
                         may not be callable",
                     iterable_type = iterable_type.display(db),
-                    dunder_iter_type = bindings.callable_type.display(db),
+                    dunder_iter_type = bindings.callable_type().display(db),
                 ));
             }
             Self::IterCallError(CallErrorKind::PossiblyNotCallable, bindings) => {
@@ -3937,7 +3719,7 @@ impl<'db> IterationError<'db> {
                         because its `__iter__` attribute (with type `{dunder_iter_type}`) \
                         may not be callable",
                     iterable_type = iterable_type.display(db),
-                    dunder_iter_type = bindings.callable_type.display(db),
+                    dunder_iter_type = bindings.callable_type().display(db),
                 ));
             }
             Self::IterCallError(CallErrorKind::BindingError, bindings) if bindings.is_single() => report_not_iterable(format_args!(
@@ -3951,7 +3733,7 @@ impl<'db> IterationError<'db> {
                     because its `__iter__` method (with type `{dunder_iter_type}`) \
                     may have an invalid signature (expected `def __iter__(self): ...`)",
                 iterable_type = iterable_type.display(db),
-                dunder_iter_type = bindings.callable_type.display(db),
+                dunder_iter_type = bindings.callable_type().display(db),
             )),
 
             Self::IterReturnsInvalidIterator {
@@ -4022,7 +3804,7 @@ impl<'db> IterationError<'db> {
                         and its `__getitem__` attribute has type `{dunder_getitem_type}`, \
                         which is not callable",
                     iterable_type = iterable_type.display(db),
-                    dunder_getitem_type = bindings.callable_type.display(db),
+                    dunder_getitem_type = bindings.callable_type().display(db),
                 )),
                 CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings) if bindings.is_single() => report_not_iterable(format_args!(
                     "Object of type `{iterable_type}` may not be iterable \
@@ -4037,7 +3819,7 @@ impl<'db> IterationError<'db> {
                             and its `__getitem__` attribute (with type `{dunder_getitem_type}`) \
                             may not be callable",
                         iterable_type = iterable_type.display(db),
-                        dunder_getitem_type = bindings.callable_type.display(db),
+                        dunder_getitem_type = bindings.callable_type().display(db),
                     ));
                 }
                 CallDunderError::CallError(CallErrorKind::BindingError, bindings) if bindings.is_single() => report_not_iterable(format_args!(
@@ -4057,7 +3839,7 @@ impl<'db> IterationError<'db> {
                         (expected a signature at least as permissive as \
                         `def __getitem__(self, key: int): ...`)",
                     iterable_type = iterable_type.display(db),
-                    dunder_getitem_type = bindings.callable_type.display(db),
+                    dunder_getitem_type = bindings.callable_type().display(db),
                 )),
             }
 
@@ -4078,7 +3860,7 @@ impl<'db> IterationError<'db> {
                         its `__getitem__` attribute has type `{dunder_getitem_type}`, \
                         which is not callable",
                     iterable_type = iterable_type.display(db),
-                    dunder_getitem_type = bindings.callable_type.display(db),
+                    dunder_getitem_type = bindings.callable_type().display(db),
                 )),
                 CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings) if bindings.is_single() => report_not_iterable(format_args!(
                     "Object of type `{iterable_type}` may not be iterable \
@@ -4092,7 +3874,7 @@ impl<'db> IterationError<'db> {
                             because it has no `__iter__` method and its `__getitem__` attribute \
                             (with type `{dunder_getitem_type}`) may not be callable",
                         iterable_type = iterable_type.display(db),
-                        dunder_getitem_type = bindings.callable_type.display(db),
+                        dunder_getitem_type = bindings.callable_type().display(db),
                     ));
                 }
                 CallDunderError::CallError(CallErrorKind::BindingError, bindings) if bindings.is_single() => report_not_iterable(format_args!(
@@ -4112,7 +3894,7 @@ impl<'db> IterationError<'db> {
                         (expected a signature at least as permissive as \
                         `def __getitem__(self, key: int): ...`)",
                     iterable_type = iterable_type.display(db),
-                    dunder_getitem_type = bindings.callable_type.display(db),
+                    dunder_getitem_type = bindings.callable_type().display(db),
                 )),
             }
         }
@@ -4342,10 +4124,8 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
     ///
-    /// Returns `None` if the function is overloaded. This powers the `CallableTypeFromFunction`
-    /// special form from the `knot_extensions` module.
+    /// This powers the `CallableTypeFromFunction` special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        // TODO: Add support for overloaded callables
         Type::Callable(CallableType::General(GeneralCallableType::new(
             db,
             self.signature(db).clone(),
@@ -4398,7 +4178,8 @@ impl<'db> FunctionType<'db> {
     fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
-        let definition = semantic_index(db, scope.file(db)).definition(function_stmt_node);
+        let definition =
+            semantic_index(db, scope.file(db)).expect_single_definition(function_stmt_node);
         Signature::from_function(db, definition, function_stmt_node)
     }
 
@@ -4437,6 +4218,10 @@ pub enum KnownFunction {
     Cast,
     /// `typing(_extensions).overload`
     Overload,
+
+    /// `abc.abstractmethod`
+    #[strum(serialize = "abstractmethod")]
+    AbstractMethod,
 
     /// `inspect.getattr_static`
     GetattrStatic,
@@ -4493,6 +4278,9 @@ impl KnownFunction {
             | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
+            Self::AbstractMethod => {
+                matches!(module, KnownModule::Abc)
+            }
             Self::GetattrStatic => module.is_inspect(),
             Self::IsAssignableTo
             | Self::IsDisjointFrom
@@ -4503,35 +4291,6 @@ impl KnownFunction {
             | Self::IsSingleton
             | Self::IsSubtypeOf
             | Self::StaticAssert => module.is_knot_extensions(),
-        }
-    }
-
-    /// Return the [`ParameterExpectations`] for this function.
-    const fn parameter_expectations(self) -> ParameterExpectations {
-        match self {
-            Self::IsFullyStatic | Self::IsSingleton | Self::IsSingleValued => {
-                ParameterExpectations::SingleTypeExpression
-            }
-
-            Self::IsEquivalentTo
-            | Self::IsSubtypeOf
-            | Self::IsAssignableTo
-            | Self::IsDisjointFrom
-            | Self::IsGradualEquivalentTo => ParameterExpectations::TwoTypeExpressions,
-
-            Self::AssertType => ParameterExpectations::ValueExpressionAndTypeExpression,
-            Self::Cast => ParameterExpectations::TypeExpressionAndValueExpression,
-
-            Self::IsInstance
-            | Self::IsSubclass
-            | Self::Len
-            | Self::Repr
-            | Self::Overload
-            | Self::Final
-            | Self::NoTypeCheck
-            | Self::RevealType
-            | Self::GetattrStatic
-            | Self::StaticAssert => ParameterExpectations::AllValueExpressions,
         }
     }
 }
@@ -4595,42 +4354,469 @@ impl<'db> GeneralCallableType<'db> {
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
     pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_equivalent_to_impl(db, other, |self_type, other_type| {
+            self_type
+                .unwrap_or(Type::unknown())
+                .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
+        })
+    }
+
+    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_equivalent_to_impl(db, other, |self_type, other_type| {
+            match (self_type, other_type) {
+                (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
+                // We need the catch-all case here because it's not guaranteed that this is a fully
+                // static type.
+                _ => false,
+            }
+        })
+    }
+
+    /// Implementation for the [`is_equivalent_to`] and [`is_gradual_equivalent_to`] for callable
+    /// types.
+    ///
+    /// [`is_equivalent_to`]: Self::is_equivalent_to
+    /// [`is_gradual_equivalent_to`]: Self::is_gradual_equivalent_to
+    fn is_equivalent_to_impl<F>(self, db: &'db dyn Db, other: Self, check_types: F) -> bool
+    where
+        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
+    {
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
-
-        if self_signature.parameters().len() != other_signature.parameters().len() {
-            return false;
-        }
-
-        // Check gradual equivalence between the two optional types. In the context of a callable
-        // type, the `None` type represents an `Unknown` type.
-        let are_optional_types_gradually_equivalent =
-            |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
-                self_type
-                    .unwrap_or(Type::unknown())
-                    .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
-            };
-
-        if !are_optional_types_gradually_equivalent(
-            self_signature.return_ty,
-            other_signature.return_ty,
-        ) {
-            return false;
-        }
 
         // N.B. We don't need to explicitly check for the use of gradual form (`...`) in the
         // parameters because it is internally represented by adding `*Any` and `**Any` to the
         // parameter list.
-        self_signature
-            .parameters()
-            .iter()
-            .zip(other_signature.parameters().iter())
-            .all(|(self_param, other_param)| {
-                are_optional_types_gradually_equivalent(
-                    self_param.annotated_type(),
-                    other_param.annotated_type(),
+        let self_parameters = self_signature.parameters();
+        let other_parameters = other_signature.parameters();
+
+        if self_parameters.len() != other_parameters.len() {
+            return false;
+        }
+
+        if !check_types(self_signature.return_ty, other_signature.return_ty) {
+            return false;
+        }
+
+        for (self_parameter, other_parameter) in self_parameters.iter().zip(other_parameters) {
+            match (self_parameter.kind(), other_parameter.kind()) {
+                (
+                    ParameterKind::PositionalOnly {
+                        default_type: self_default,
+                        ..
+                    },
+                    ParameterKind::PositionalOnly {
+                        default_type: other_default,
+                        ..
+                    },
+                ) if self_default.is_some() == other_default.is_some() => {}
+
+                (
+                    ParameterKind::PositionalOrKeyword {
+                        name: self_name,
+                        default_type: self_default,
+                    },
+                    ParameterKind::PositionalOrKeyword {
+                        name: other_name,
+                        default_type: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {}
+
+                (
+                    ParameterKind::KeywordOnly {
+                        name: self_name,
+                        default_type: self_default,
+                    },
+                    ParameterKind::KeywordOnly {
+                        name: other_name,
+                        default_type: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
+
+                _ => return false,
+            }
+
+            if !check_types(
+                self_parameter.annotated_type(),
+                other_parameter.annotated_type(),
+            ) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Return `true` if `self` is assignable to `other`.
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_assignable_to_impl(db, other, |type1, type2| {
+            // In the context of a callable type, the `None` variant represents an `Unknown` type.
+            type1
+                .unwrap_or(Type::unknown())
+                .is_assignable_to(db, type2.unwrap_or(Type::unknown()))
+        })
+    }
+
+    /// Return `true` if `self` is a subtype of `other`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` or `other` is not a fully static type.
+    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_assignable_to_impl(db, other, |type1, type2| {
+            // SAFETY: Subtype relation is only checked for fully static types.
+            type1.unwrap().is_subtype_of(db, type2.unwrap())
+        })
+    }
+
+    /// Implementation for the [`is_assignable_to`] and [`is_subtype_of`] for callable types.
+    ///
+    /// [`is_assignable_to`]: Self::is_assignable_to
+    /// [`is_subtype_of`]: Self::is_subtype_of
+    fn is_assignable_to_impl<F>(self, db: &'db dyn Db, other: Self, check_types: F) -> bool
+    where
+        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
+    {
+        /// A helper struct to zip two slices of parameters together that provides control over the
+        /// two iterators individually. It also keeps track of the current parameter in each
+        /// iterator.
+        struct ParametersZip<'a, 'db> {
+            current_self: Option<&'a Parameter<'db>>,
+            current_other: Option<&'a Parameter<'db>>,
+            iter_self: Iter<'a, Parameter<'db>>,
+            iter_other: Iter<'a, Parameter<'db>>,
+        }
+
+        impl<'a, 'db> ParametersZip<'a, 'db> {
+            /// Move to the next parameter in both the `self` and `other` parameter iterators,
+            /// [`None`] if both iterators are exhausted.
+            fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
+                match (self.next_self(), self.next_other()) {
+                    (Some(self_param), Some(other_param)) => {
+                        Some(EitherOrBoth::Both(self_param, other_param))
+                    }
+                    (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
+                    (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
+                    (None, None) => None,
+                }
+            }
+
+            /// Move to the next parameter in the `self` parameter iterator, [`None`] if the
+            /// iterator is exhausted.
+            fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
+                self.current_self = self.iter_self.next();
+                self.current_self
+            }
+
+            /// Move to the next parameter in the `other` parameter iterator, [`None`] if the
+            /// iterator is exhausted.
+            fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
+                self.current_other = self.iter_other.next();
+                self.current_other
+            }
+
+            /// Peek at the next parameter in the `other` parameter iterator without consuming it.
+            fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
+                self.iter_other.clone().next()
+            }
+
+            /// Consumes the `ParametersZip` and returns a two-element tuple containing the
+            /// remaining parameters in the `self` and `other` iterators respectively.
+            ///
+            /// The returned iterators starts with the current parameter, if any, followed by the
+            /// remaining parameters in the respective iterators.
+            fn into_remaining(
+                self,
+            ) -> (
+                impl Iterator<Item = &'a Parameter<'db>>,
+                impl Iterator<Item = &'a Parameter<'db>>,
+            ) {
+                (
+                    self.current_self.into_iter().chain(self.iter_self),
+                    self.current_other.into_iter().chain(self.iter_other),
                 )
-            })
+            }
+        }
+
+        let self_signature = self.signature(db);
+        let other_signature = other.signature(db);
+
+        // Return types are covariant.
+        if !check_types(self_signature.return_ty, other_signature.return_ty) {
+            return false;
+        }
+
+        if self_signature.parameters().is_gradual() || other_signature.parameters().is_gradual() {
+            // If either of the parameter lists contains a gradual form (`...`), then it is
+            // assignable / subtype to and from any other callable type.
+            return true;
+        }
+
+        let mut parameters = ParametersZip {
+            current_self: None,
+            current_other: None,
+            iter_self: self_signature.parameters().iter(),
+            iter_other: other_signature.parameters().iter(),
+        };
+
+        loop {
+            let Some(next_parameter) = parameters.next() else {
+                // All parameters have been checked or both the parameter lists were empty. In
+                // either case, `self` is a subtype of `other`.
+                return true;
+            };
+
+            match next_parameter {
+                EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
+                    ParameterKind::PositionalOnly { default_type, .. }
+                    | ParameterKind::PositionalOrKeyword { default_type, .. }
+                    | ParameterKind::KeywordOnly { default_type, .. } => {
+                        // For `self <: other` to be valid, if there are no more parameters in
+                        // `other`, then the non-variadic parameters in `self` must have a default
+                        // value.
+                        if default_type.is_none() {
+                            return false;
+                        }
+                    }
+                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
+                        // Variadic parameters don't have any restrictions in this context, so
+                        // we'll just continue to the next parameter set.
+                    }
+                },
+
+                EitherOrBoth::Right(_) => {
+                    // If there are more parameters in `other` than in `self`, then `self` is not a
+                    // subtype of `other`.
+                    return false;
+                }
+
+                EitherOrBoth::Both(self_parameter, other_parameter) => {
+                    match (self_parameter.kind(), other_parameter.kind()) {
+                        (
+                            ParameterKind::PositionalOnly {
+                                default_type: self_default,
+                                ..
+                            }
+                            | ParameterKind::PositionalOrKeyword {
+                                default_type: self_default,
+                                ..
+                            },
+                            ParameterKind::PositionalOnly {
+                                default_type: other_default,
+                                ..
+                            },
+                        ) => {
+                            if self_default.is_none() && other_default.is_some() {
+                                return false;
+                            }
+                            if !check_types(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (
+                            ParameterKind::PositionalOrKeyword {
+                                name: self_name,
+                                default_type: self_default,
+                            },
+                            ParameterKind::PositionalOrKeyword {
+                                name: other_name,
+                                default_type: other_default,
+                            },
+                        ) => {
+                            if self_name != other_name {
+                                return false;
+                            }
+                            // The following checks are the same as positional-only parameters.
+                            if self_default.is_none() && other_default.is_some() {
+                                return false;
+                            }
+                            if !check_types(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (ParameterKind::Variadic { .. }, ParameterKind::PositionalOnly { .. }) => {
+                            if !check_types(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+
+                            // We've reached a variadic parameter in `self` which means there can
+                            // be no more positional parameters after this in a valid AST. But, the
+                            // current parameter in `other` is a positional-only which means there
+                            // can be more positional parameters after this which could be either
+                            // more positional-only parameters, standard parameters or a variadic
+                            // parameter.
+                            //
+                            // So, any remaining positional parameters in `other` would need to be
+                            // checked against the variadic parameter in `self`. This loop does
+                            // that by only moving the `other` iterator forward.
+                            loop {
+                                let Some(other_parameter) = parameters.peek_other() else {
+                                    break;
+                                };
+                                if !matches!(
+                                    other_parameter.kind(),
+                                    ParameterKind::PositionalOnly { .. }
+                                        | ParameterKind::Variadic { .. }
+                                ) {
+                                    // Any other parameter kind cannot be checked against a
+                                    // variadic parameter and is deferred to the next iteration.
+                                    break;
+                                }
+                                if !check_types(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                ) {
+                                    return false;
+                                }
+                                parameters.next_other();
+                            }
+                        }
+
+                        (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
+                            if !check_types(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (
+                            _,
+                            ParameterKind::KeywordOnly { .. }
+                            | ParameterKind::KeywordVariadic { .. },
+                        ) => {
+                            // Keyword parameters are not considered in this loop as the order of
+                            // parameters is not important for them and so they are checked by
+                            // doing name-based lookups.
+                            break;
+                        }
+
+                        _ => return false,
+                    }
+                }
+            }
+        }
+
+        // At this point, the remaining parameters in `other` are keyword-only or keyword variadic.
+        // But, `self` could contain any unmatched positional parameters.
+        let (self_parameters, other_parameters) = parameters.into_remaining();
+
+        // Collect all the keyword-only parameters and the unmatched standard parameters.
+        let mut self_keywords = HashMap::new();
+
+        // Type of the variadic keyword parameter in `self`.
+        //
+        // This is a nested option where the outer option represents the presence of a keyword
+        // variadic parameter in `self` and the inner option represents the annotated type of the
+        // keyword variadic parameter.
+        let mut self_keyword_variadic: Option<Option<Type<'db>>> = None;
+
+        for self_parameter in self_parameters {
+            match self_parameter.kind() {
+                ParameterKind::KeywordOnly { name, .. }
+                | ParameterKind::PositionalOrKeyword { name, .. } => {
+                    self_keywords.insert(name.clone(), self_parameter);
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    self_keyword_variadic = Some(self_parameter.annotated_type());
+                }
+                ParameterKind::PositionalOnly { .. } => {
+                    // These are the unmatched positional-only parameters in `self` from the
+                    // previous loop. They cannot be matched against any parameter in `other` which
+                    // only contains keyword-only and keyword-variadic parameters so the subtype
+                    // relation is invalid.
+                    return false;
+                }
+                ParameterKind::Variadic { .. } => {}
+            }
+        }
+
+        for other_parameter in other_parameters {
+            match other_parameter.kind() {
+                ParameterKind::KeywordOnly {
+                    name: other_name,
+                    default_type: other_default,
+                } => {
+                    if let Some(self_parameter) = self_keywords.remove(other_name) {
+                        match self_parameter.kind() {
+                            ParameterKind::PositionalOrKeyword {
+                                default_type: self_default,
+                                ..
+                            }
+                            | ParameterKind::KeywordOnly {
+                                default_type: self_default,
+                                ..
+                            } => {
+                                if self_default.is_none() && other_default.is_some() {
+                                    return false;
+                                }
+                                if !check_types(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                ) {
+                                    return false;
+                                }
+                            }
+                            _ => unreachable!(
+                                "`self_keywords` should only contain keyword-only or standard parameters"
+                            ),
+                        }
+                    } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
+                        if !check_types(
+                            other_parameter.annotated_type(),
+                            self_keyword_variadic_type,
+                        ) {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    let Some(self_keyword_variadic_type) = self_keyword_variadic else {
+                        // For a `self <: other` relationship, if `other` has a keyword variadic
+                        // parameter, `self` must also have a keyword variadic parameter.
+                        return false;
+                    };
+                    if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
+                        return false;
+                    }
+                }
+                _ => {
+                    // This can only occur in case of a syntax error.
+                    return false;
+                }
+            }
+        }
+
+        // If there are still unmatched keyword parameters from `self`, then they should be
+        // optional otherwise the subtype relation is invalid.
+        for (_, self_parameter) in self_keywords {
+            if self_parameter.default_type().is_none() {
+                return false;
+            }
+        }
+
+        true
     }
 }
 
@@ -4671,69 +4857,6 @@ pub enum CallableType<'db> {
     /// type. We currently add this as a separate variant because `FunctionType.__get__`
     /// is an overloaded method and we do not support `@overload` yet.
     WrapperDescriptorDunderGet,
-}
-
-/// Describes whether the parameters in a function expect value expressions or type expressions.
-///
-/// Whether a specific parameter in the function expects a type expression can be queried
-/// using [`ParameterExpectations::expectation_at_index`].
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-enum ParameterExpectations {
-    /// All parameters in the function expect value expressions
-    #[default]
-    AllValueExpressions,
-    /// The first parameter in the function expects a type expression
-    SingleTypeExpression,
-    /// The first two parameters in the function expect type expressions
-    TwoTypeExpressions,
-    /// The first parameter in the function expects a value expression,
-    /// and the second expects a type expression
-    ValueExpressionAndTypeExpression,
-    /// The first parameter in the function expects a type expression,
-    /// and the second expects a value expression
-    TypeExpressionAndValueExpression,
-}
-
-impl ParameterExpectations {
-    /// Query whether the parameter at `parameter_index` expects a value expression or a type expression
-    fn expectation_at_index(self, parameter_index: usize) -> ParameterExpectation {
-        match self {
-            Self::AllValueExpressions => ParameterExpectation::ValueExpression,
-            Self::SingleTypeExpression | Self::TypeExpressionAndValueExpression => {
-                if parameter_index == 0 {
-                    ParameterExpectation::TypeExpression
-                } else {
-                    ParameterExpectation::ValueExpression
-                }
-            }
-            Self::TwoTypeExpressions => {
-                if parameter_index < 2 {
-                    ParameterExpectation::TypeExpression
-                } else {
-                    ParameterExpectation::ValueExpression
-                }
-            }
-            Self::ValueExpressionAndTypeExpression => {
-                if parameter_index == 1 {
-                    ParameterExpectation::TypeExpression
-                } else {
-                    ParameterExpectation::ValueExpression
-                }
-            }
-        }
-    }
-}
-
-/// Whether a single parameter in a given function expects a value expression or a [type expression]
-///
-/// [type expression]: https://typing.readthedocs.io/en/latest/spec/annotations.html#type-and-annotation-expressions
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
-enum ParameterExpectation {
-    /// The parameter expects a value expression
-    #[default]
-    ValueExpression,
-    /// The parameter expects a type expression
-    TypeExpression,
 }
 
 #[salsa::interned(debug)]
@@ -4798,10 +4921,9 @@ impl<'db> TypeAliasType<'db> {
     #[salsa::tracked]
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
-
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        let definition = semantic_index(db, scope.file(db)).definition(type_alias_stmt_node);
-
+        let definition =
+            semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node);
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
 }
@@ -5535,6 +5657,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsInstance
                 | KnownFunction::IsSubclass => KnownModule::Builtins,
 
+                KnownFunction::AbstractMethod => KnownModule::Abc,
+
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
                 KnownFunction::Cast
@@ -5563,8 +5687,8 @@ pub(crate) mod tests {
 
             let function_node = function_body_scope.node(&db).expect_function();
 
-            let function_definition =
-                semantic_index(&db, function_body_scope.file(&db)).definition(function_node);
+            let function_definition = semantic_index(&db, function_body_scope.file(&db))
+                .expect_single_definition(function_node);
 
             assert_eq!(
                 KnownFunction::try_from_definition_and_name(&db, function_definition, function_name),

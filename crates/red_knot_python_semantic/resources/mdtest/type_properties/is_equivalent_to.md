@@ -118,4 +118,126 @@ class R: ...
 static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
 ```
 
+## Callable
+
+### Equivalent
+
+For an equivalence relationship, the default value does not necessarily need to be the same but if
+the parameter in one of the callable has a default value then the corresponding parameter in the
+other callable should also have a default value.
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_equivalent_to, static_assert
+from typing import Callable
+
+def f1(a: int = 1) -> None: ...
+def f2(a: int = 2) -> None: ...
+
+static_assert(is_equivalent_to(CallableTypeFromFunction[f1], CallableTypeFromFunction[f2]))
+```
+
+The names of the positional-only, variadic and keyword-variadic parameters does not need to be the
+same.
+
+```py
+def f3(a1: int, /, *args1: int, **kwargs2: int) -> None: ...
+def f4(a2: int, /, *args2: int, **kwargs1: int) -> None: ...
+
+static_assert(is_equivalent_to(CallableTypeFromFunction[f3], CallableTypeFromFunction[f4]))
+```
+
+Putting it all together, the following two callables are equivalent:
+
+```py
+def f5(a1: int, /, b: float, c: bool = False, *args1: int, d: int = 1, e: str, **kwargs1: float) -> None: ...
+def f6(a2: int, /, b: float, c: bool = True, *args2: int, d: int = 2, e: str, **kwargs2: float) -> None: ...
+
+static_assert(is_equivalent_to(CallableTypeFromFunction[f5], CallableTypeFromFunction[f6]))
+```
+
+### Not equivalent
+
+There are multiple cases when two callable types are not equivalent which are enumerated below.
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_equivalent_to, static_assert
+from typing import Callable
+```
+
+When the number of parameters is different:
+
+```py
+def f1(a: int) -> None: ...
+def f2(a: int, b: int) -> None: ...
+
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f1], CallableTypeFromFunction[f2]))
+```
+
+When either of the callable types uses a gradual form for the parameters:
+
+```py
+static_assert(not is_equivalent_to(Callable[..., None], Callable[[int], None]))
+static_assert(not is_equivalent_to(Callable[[int], None], Callable[..., None]))
+```
+
+When the return types are not equivalent or absent in one or both of the callable types:
+
+```py
+def f3(): ...
+def f4() -> None: ...
+
+static_assert(not is_equivalent_to(Callable[[], int], Callable[[], None]))
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f3], CallableTypeFromFunction[f3]))
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f3], CallableTypeFromFunction[f4]))
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f4], CallableTypeFromFunction[f3]))
+```
+
+When the parameter names are different:
+
+```py
+def f5(a: int) -> None: ...
+def f6(b: int) -> None: ...
+
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f5], CallableTypeFromFunction[f6]))
+```
+
+When only one of the callable types has parameter names:
+
+```py
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f5], Callable[[int], None]))
+```
+
+When the parameter kinds are different:
+
+```py
+def f7(a: int, /) -> None: ...
+def f8(a: int) -> None: ...
+
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f7], CallableTypeFromFunction[f8]))
+```
+
+When the annotated types of the parameters are not equivalent or absent in one or both of the
+callable types:
+
+```py
+def f9(a: int) -> None: ...
+def f10(a: str) -> None: ...
+def f11(a) -> None: ...
+
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f9], CallableTypeFromFunction[f10]))
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f10], CallableTypeFromFunction[f11]))
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f11], CallableTypeFromFunction[f10]))
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f11], CallableTypeFromFunction[f11]))
+```
+
+When the default value for a parameter is present only in one of the callable type:
+
+```py
+def f12(a: int) -> None: ...
+def f13(a: int = 2) -> None: ...
+
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f12], CallableTypeFromFunction[f13]))
+static_assert(not is_equivalent_to(CallableTypeFromFunction[f13], CallableTypeFromFunction[f12]))
+```
+
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent

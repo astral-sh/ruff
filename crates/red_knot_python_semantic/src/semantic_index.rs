@@ -14,7 +14,7 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::attribute_assignment::AttributeAssignments;
 use crate::semantic_index::builder::SemanticIndexBuilder;
-use crate::semantic_index::definition::{Definition, DefinitionNodeKey};
+use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
@@ -29,6 +29,7 @@ pub mod definition;
 pub mod expression;
 mod narrowing_constraints;
 pub(crate) mod predicate;
+mod re_exports;
 pub mod symbol;
 mod use_def;
 mod visibility_constraints;
@@ -136,7 +137,7 @@ pub(crate) struct SemanticIndex<'db> {
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
 
     /// Map from a node creating a definition to its definition.
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
@@ -235,8 +236,8 @@ impl<'db> SemanticIndex<'db> {
 
     /// Returns an iterator over the descendent scopes of `scope`.
     #[allow(unused)]
-    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendentsIter {
-        DescendentsIter::new(self, scope)
+    pub(crate) fn descendent_scopes(&self, scope: FileScopeId) -> DescendantsIter {
+        DescendantsIter::new(self, scope)
     }
 
     /// Returns an iterator over the direct child scopes of `scope`.
@@ -250,13 +251,37 @@ impl<'db> SemanticIndex<'db> {
         AncestorsIter::new(self, scope)
     }
 
-    /// Returns the [`Definition`] salsa ingredient for `definition_key`.
+    /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
+    ///
+    /// There will only ever be >1 `Definition` associated with a `definition_key`
+    /// if the definition is created by a wildcard (`*`) import.
     #[track_caller]
-    pub(crate) fn definition(
+    pub(crate) fn definitions(
         &self,
         definition_key: impl Into<DefinitionNodeKey>,
+    ) -> &Definitions<'db> {
+        &self.definitions_by_node[&definition_key.into()]
+    }
+
+    /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
+    ///
+    /// ## Panics
+    ///
+    /// If the number of definitions associated with the key is not exactly 1 and
+    /// the `debug_assertions` feature is enabled, this method will panic.
+    #[track_caller]
+    pub(crate) fn expect_single_definition(
+        &self,
+        definition_key: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
-        self.definitions_by_node[&definition_key.into()]
+        let definitions = self.definitions(definition_key);
+        debug_assert_eq!(
+            definitions.len(),
+            1,
+            "Expected exactly one definition to be associated with AST node {definition_key:?} but found {}",
+            definitions.len()
+        );
+        definitions[0]
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
@@ -280,7 +305,8 @@ impl<'db> SemanticIndex<'db> {
             .copied()
     }
 
-    /// Returns the id of the scope that `node` creates. This is different from [`Definition::scope`] which
+    /// Returns the id of the scope that `node` creates.
+    /// This is different from [`definition::Definition::scope`] which
     /// returns the scope in which that definition is defined in.
     #[track_caller]
     pub(crate) fn node_scope(&self, node: NodeWithScopeRef) -> FileScopeId {
@@ -339,55 +365,55 @@ impl<'a> Iterator for AncestorsIter<'a> {
 
 impl FusedIterator for AncestorsIter<'_> {}
 
-pub struct DescendentsIter<'a> {
+pub struct DescendantsIter<'a> {
     next_id: FileScopeId,
-    descendents: std::slice::Iter<'a, Scope>,
+    descendants: std::slice::Iter<'a, Scope>,
 }
 
-impl<'a> DescendentsIter<'a> {
+impl<'a> DescendantsIter<'a> {
     fn new(symbol_table: &'a SemanticIndex, scope_id: FileScopeId) -> Self {
         let scope = &symbol_table.scopes[scope_id];
-        let scopes = &symbol_table.scopes[scope.descendents()];
+        let scopes = &symbol_table.scopes[scope.descendants()];
 
         Self {
             next_id: scope_id + 1,
-            descendents: scopes.iter(),
+            descendants: scopes.iter(),
         }
     }
 }
 
-impl<'a> Iterator for DescendentsIter<'a> {
+impl<'a> Iterator for DescendantsIter<'a> {
     type Item = (FileScopeId, &'a Scope);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let descendent = self.descendents.next()?;
+        let descendant = self.descendants.next()?;
         let id = self.next_id;
         self.next_id = self.next_id + 1;
 
-        Some((id, descendent))
+        Some((id, descendant))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        self.descendents.size_hint()
+        self.descendants.size_hint()
     }
 }
 
-impl FusedIterator for DescendentsIter<'_> {}
+impl FusedIterator for DescendantsIter<'_> {}
 
-impl ExactSizeIterator for DescendentsIter<'_> {}
+impl ExactSizeIterator for DescendantsIter<'_> {}
 
 pub struct ChildrenIter<'a> {
     parent: FileScopeId,
-    descendents: DescendentsIter<'a>,
+    descendants: DescendantsIter<'a>,
 }
 
 impl<'a> ChildrenIter<'a> {
     fn new(module_symbol_table: &'a SemanticIndex, parent: FileScopeId) -> Self {
-        let descendents = DescendentsIter::new(module_symbol_table, parent);
+        let descendants = DescendantsIter::new(module_symbol_table, parent);
 
         Self {
             parent,
-            descendents,
+            descendants,
         }
     }
 }
@@ -396,7 +422,7 @@ impl<'a> Iterator for ChildrenIter<'a> {
     type Item = (FileScopeId, &'a Scope);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.descendents
+        self.descendants
             .find(|(_, scope)| scope.parent() == Some(self.parent))
     }
 }
@@ -1155,9 +1181,9 @@ def x():
 
         let index = semantic_index(&db, file);
 
-        let descendents = index.descendent_scopes(FileScopeId::global());
+        let descendants = index.descendent_scopes(FileScopeId::global());
         assert_eq!(
-            scope_names(descendents, &db, file),
+            scope_names(descendants, &db, file),
             vec!["Test", "foo", "bar", "baz", "x"]
         );
 
