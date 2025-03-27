@@ -381,6 +381,15 @@ pub(crate) fn lint_stdin(
             SourceType::Python(source_type) => source_type,
 
             SourceType::Toml(source_type) if source_type.is_pyproject() => {
+                if !settings
+                    .linter
+                    .rules
+                    .iter_enabled()
+                    .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+                {
+                    return Ok(Diagnostics::default());
+                }
+
                 let path = path.unwrap();
                 let source_file =
                     SourceFileBuilder::new(path.to_string_lossy(), contents.clone()).finish();

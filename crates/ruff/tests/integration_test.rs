@@ -2306,6 +2306,25 @@ fn pyproject_toml_stdin_no_applicable_rules_selected() {
 }
 
 #[test]
+fn pyproject_toml_stdin_no_applicable_rules_selected_2() {
+    let mut cmd = RuffCheck::default()
+        .args(["--stdin-filename", "pyproject.toml", "--select", "F401"])
+        .build();
+
+    assert_cmd_snapshot!(
+        cmd.pass_stdin("[project"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
+
+#[test]
 fn pyproject_toml_stdin_no_errors() {
     let mut cmd = RuffCheck::default()
         .args(["--stdin-filename", "pyproject.toml"])
