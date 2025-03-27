@@ -490,7 +490,7 @@ impl<'db> Class<'db> {
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
         name: &str,
-    ) -> Option<Type<'db>> {
+    ) -> Symbol<'db> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
@@ -499,24 +499,37 @@ impl<'db> Class<'db> {
 
         let attribute_assignments = attribute_assignments(db, class_body_scope);
 
-        let attribute_assignments = attribute_assignments
+        let Some(attribute_assignments) = attribute_assignments
             .as_deref()
-            .and_then(|assignments| assignments.get(name))?;
+            .and_then(|assignments| assignments.get(name))
+        else {
+            return Symbol::Unbound;
+        };
 
-        let mut assigned = false;
+        let mut is_attribute_bound = Truthiness::AlwaysFalse;
 
         for attribute_assignment in attribute_assignments {
             let scope = attribute_assignment.assignment.scope(db);
             let use_def = use_def_map(db, scope);
             let table = instance_attribute_table(db, scope);
             let symbol = table.symbol_id_by_name(name).unwrap();
-            if use_def
-                .is_attribute_assignment_visible(db, symbol, attribute_assignment.definition_id)
-                .is_always_false()
-            {
-                continue;
+            match use_def.is_attribute_assignment_visible(
+                db,
+                symbol,
+                attribute_assignment,
+                class_body_scope,
+            ) {
+                Truthiness::AlwaysTrue => {
+                    is_attribute_bound = Truthiness::AlwaysTrue;
+                }
+                Truthiness::Ambiguous if is_attribute_bound.is_always_false() => {
+                    is_attribute_bound = Truthiness::Ambiguous;
+                }
+                Truthiness::Ambiguous => {}
+                Truthiness::AlwaysFalse => {
+                    continue;
+                }
             }
-            assigned = true;
 
             match &attribute_assignment.assignment {
                 AttributeAssignment::Annotated { annotation } => {
@@ -529,7 +542,15 @@ impl<'db> Class<'db> {
                     let annotation_ty = infer_expression_type(db, *annotation);
 
                     // TODO: check if there are conflicting declarations
-                    return Some(annotation_ty);
+                    match is_attribute_bound {
+                        Truthiness::AlwaysTrue => {
+                            return Symbol::bound(annotation_ty);
+                        }
+                        Truthiness::Ambiguous => {
+                            return Symbol::possibly_unbound(annotation_ty);
+                        }
+                        Truthiness::AlwaysFalse => unreachable!("If the attribute assignments are all invisible, inference of their types should be skipped"),
+                    }
                 }
                 AttributeAssignment::Unannotated { value } => {
                     // We found an un-annotated attribute assignment of the form:
@@ -578,10 +599,10 @@ impl<'db> Class<'db> {
             }
         }
 
-        if assigned {
-            Some(union_of_inferred_types.build())
-        } else {
-            None
+        match is_attribute_bound {
+            Truthiness::AlwaysTrue => Symbol::bound(union_of_inferred_types.build()),
+            Truthiness::Ambiguous => Symbol::possibly_unbound(union_of_inferred_types.build()),
+            Truthiness::AlwaysFalse => Symbol::Unbound,
         }
     }
 
@@ -609,13 +630,14 @@ impl<'db> Class<'db> {
 
                     let bindings = use_def.public_bindings(symbol_id);
                     let inferred = symbol_from_bindings(db, bindings);
-                    let has_binding = !inferred.is_unbound();
+                    let has_binding: bool = !inferred.is_unbound();
 
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
                         if let Some(implicit_ty) =
                             Self::implicit_instance_attribute(db, body_scope, name)
+                                .ignore_possibly_unbound()
                         {
                             if declaredness == Boundness::Bound {
                                 // If a symbol is definitely declared, and we see
@@ -650,6 +672,7 @@ impl<'db> Class<'db> {
                         } else {
                             if let Some(implicit_ty) =
                                 Self::implicit_instance_attribute(db, body_scope, name)
+                                    .ignore_possibly_unbound()
                             {
                                 Symbol::Type(
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
@@ -670,9 +693,7 @@ impl<'db> Class<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_instance_attribute(db, body_scope, name)
-                        .map_or(Symbol::Unbound, Symbol::bound)
-                        .into()
+                    Self::implicit_instance_attribute(db, body_scope, name).into()
                 }
                 Err((declared, _conflicting_declarations)) => {
                     // There are conflicting declarations for this attribute in the class body.
@@ -683,9 +704,7 @@ impl<'db> Class<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, body_scope, name)
-                .map_or(Symbol::Unbound, Symbol::bound)
-                .into()
+            Self::implicit_instance_attribute(db, body_scope, name).into()
         }
     }
 

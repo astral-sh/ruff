@@ -59,6 +59,10 @@ impl<'db> Symbol<'db> {
         Symbol::Type(ty.into(), Boundness::Bound)
     }
 
+    pub(crate) fn possibly_unbound(ty: impl Into<Type<'db>>) -> Self {
+        Symbol::Type(ty.into(), Boundness::PossiblyUnbound)
+    }
+
     /// Constructor that creates a [`Symbol`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
     #[allow(unused_variables)] // Only unused in release builds
