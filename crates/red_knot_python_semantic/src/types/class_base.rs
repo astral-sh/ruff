@@ -69,13 +69,14 @@ impl<'db> ClassBase<'db> {
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
+            Type::PropertyInstance(_) => None,
             Type::Never
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
             | Type::BoundMethod(_)
-            | Type::MethodWrapperDunderGet(_)
-            | Type::WrapperDescriptorDunderGet
+            | Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)
