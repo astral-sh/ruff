@@ -79,6 +79,7 @@ impl SemanticSyntaxChecker {
         Self::debug_shadowing(stmt, ctx);
     }
 
+    /// Check for [`SemanticSyntaxErrorKind::WriteToDebug`] in `stmt`.
     fn debug_shadowing<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -563,13 +564,17 @@ pub enum SemanticSyntaxErrorKind {
     /// [Python reference]: https://docs.python.org/3/reference/compound_stmts.html#irrefutable-case-blocks
     IrrefutableCasePattern(IrrefutablePatternKind),
 
-    /// Represents a write to `__debug__` (either an `ExprContext::Store` or `ExprContext::Del`).
+    /// Represents a write to `__debug__`. This includes simple assignments and deletions as well
+    /// other kinds of statements that can introduce bindings, such as type parameters in functions,
+    /// classes, and aliases, `match` arms, and imports, among others.
     ///
     /// ## Examples
     ///
     /// ```python
     /// del __debug__
     /// __debug__ = False
+    /// def f(__debug__): ...
+    /// class C[__debug__]: ...
     /// ```
     ///
     /// See [BPO 45000] for more information.
