@@ -564,6 +564,9 @@ impl<'db> Type<'db> {
             (Type::Never, _) => true,
             (_, Type::Never) => false,
 
+            // Everything is a subtype of `object`.
+            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
+
             (Type::Union(union), _) => union
                 .elements(db)
                 .iter()
@@ -573,14 +576,6 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
-
-            // `object` is the only type that can be known to be a supertype of any intersection,
-            // even an intersection with no positive elements
-            (Type::Intersection(_), Type::Instance(InstanceType { class }))
-                if class.is_object(db) =>
-            {
-                true
-            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
