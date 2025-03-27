@@ -73,14 +73,14 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                // test_err single_starred_assignment_target
-                // *a = (1,)
-
-                // test_ok single_starred_assignment_target
-                // (*a,) = (1,)
-                // *a, = (1,)
-                // [*a] = (1,)
                 if let [Expr::Starred(ast::ExprStarred { range, .. })] = targets.as_slice() {
+                    // test_ok single_starred_assignment_target
+                    // (*a,) = (1,)
+                    // *a, = (1,)
+                    // [*a] = (1,)
+
+                    // test_err single_starred_assignment_target
+                    // *a = (1,)
                     Self::add_error(
                         ctx,
                         SemanticSyntaxErrorKind::SingleStarredAssignment,
