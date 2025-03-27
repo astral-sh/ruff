@@ -5580,7 +5580,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 return self.infer_explicit_class_specialization(
                     subscript,
                     value_ty,
-                    &generic_context,
+                    generic_context,
                     slice,
                 );
             }
@@ -5594,7 +5594,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-        generic_context: &GenericContext<'db>,
+        generic_context: GenericContext<'db>,
         slice_node: &ast::Expr,
     ) -> Type<'db> {
         let mut call_argument_types = match slice_node {

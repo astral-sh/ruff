@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use ruff_python_ast as ast;
 
 use crate::semantic_index::SemanticIndex;
@@ -11,9 +9,9 @@ use crate::types::{
 use crate::Db;
 
 /// A list of formal type variables for a generic function, class, or type alias.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[salsa::tracked(debug)]
 pub struct GenericContext<'db> {
-    variables: Arc<[TypeVarInstance<'db>]>,
+    variables: Box<[TypeVarInstance<'db>]>,
 }
 
 impl<'db> GenericContext<'db> {
@@ -26,7 +24,7 @@ impl<'db> GenericContext<'db> {
             .iter()
             .filter_map(|type_param| Self::variable_from_type_param(db, index, type_param))
             .collect();
-        Self { variables }
+        Self::new(db, variables)
     }
 
     fn variable_from_type_param(
@@ -50,9 +48,9 @@ impl<'db> GenericContext<'db> {
         }
     }
 
-    pub(crate) fn signature(&self, db: &'db dyn Db) -> Signature<'db> {
+    pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let parameters = Parameters::new(
-            self.variables
+            self.variables(db)
                 .iter()
                 .map(|typevar| Self::parameter_from_typevar(db, *typevar)),
         );
