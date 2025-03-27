@@ -139,11 +139,9 @@ impl SemanticSyntaxChecker {
                 // from __debug__ import Some
                 // from x import __debug__ as debug
                 for name in names {
-                    if name.asname.is_none() {
-                        Self::check_identifier(&name.name, ctx);
-                    }
-                    if let Some(name) = &name.asname {
-                        Self::check_identifier(name, ctx);
+                    match &name.asname {
+                        Some(asname) => Self::check_identifier(asname, ctx),
+                        None => Self::check_identifier(&name.name, ctx),
                     }
                 }
             }
