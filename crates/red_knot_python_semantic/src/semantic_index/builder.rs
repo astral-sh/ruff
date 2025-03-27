@@ -28,7 +28,7 @@ use crate::semantic_index::predicate::{
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId,
     SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
@@ -72,8 +72,6 @@ pub(super) struct SemanticIndexBuilder<'db> {
     current_assignments: Vec<CurrentAssignment<'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'db>>,
-    /// The name of the first function parameter of the innermost function that we're currently visiting.
-    current_first_parameter_name: Option<&'db str>,
 
     /// Per-scope contexts regarding nested `try`/`except` statements
     try_node_context_stack_manager: TryNodeContextStackManager,
@@ -105,7 +103,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             scope_stack: Vec::new(),
             current_assignments: vec![],
             current_match_case: None,
-            current_first_parameter_name: None,
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
@@ -156,19 +153,34 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// Returns the scope ID of the surrounding class body scope if the current scope
     /// is a method inside a class body. Returns `None` otherwise, e.g. if the current
     /// scope is a function body outside of a class, or if the current scope is not a
-    /// function body.
-    fn is_method_of_class(&self) -> Option<FileScopeId> {
+    /// function body or its nested scope.
+    fn class_scope_of_method(&self, first_parameter_name: Option<&str>) -> Option<FileScopeId> {
         let mut scopes_rev = self.scope_stack.iter().rev();
-        let current = scopes_rev.next()?;
-        let parent = scopes_rev.next()?;
-
-        match (
-            self.scopes[current.file_scope_id].kind(),
-            self.scopes[parent.file_scope_id].kind(),
-        ) {
-            (ScopeKind::Function, ScopeKind::Class) => Some(parent.file_scope_id),
-            _ => None,
+        while let Some(current) = scopes_rev.next() {
+            let current_scope = &self.scopes[current.file_scope_id];
+            if let Some(maybe_method) = current_scope.node().as_function() {
+                if maybe_method
+                    .parameters
+                    .args
+                    .first()
+                    .is_some_and(|param| Some(param.name().id().as_str()) == first_parameter_name)
+                {
+                    // The current scope is a function (method) that the attribute assignment appears.
+                    // We will identify the class scope in which it is defined.
+                    // If there is a non-eager scope between the function and the class scope,
+                    // the function is not associated with the class.
+                    for parent in scopes_rev.by_ref() {
+                        let parent_scope = &self.scopes[parent.file_scope_id];
+                        if parent_scope.kind().is_class() {
+                            return Some(parent.file_scope_id);
+                        } else if !parent_scope.is_eager() {
+                            return None;
+                        }
+                    }
+                }
+            }
         }
+        None
     }
 
     /// Push a new loop, returning the outer loop, if any.
@@ -571,21 +583,16 @@ impl<'db> SemanticIndexBuilder<'db> {
         attr: &'db ast::Identifier,
         attribute_assignment: AttributeAssignment<'db>,
     ) {
-        if let Some(class_body_scope) = self.is_method_of_class() {
-            // We only care about attribute assignments to the first parameter of a method,
-            // i.e. typically `self` or `cls`.
-            let accessed_object_refers_to_first_parameter =
-                object.as_name_expr().map(|name| name.id.as_str())
-                    == self.current_first_parameter_name;
-
-            if accessed_object_refers_to_first_parameter {
-                self.attribute_assignments
-                    .entry(class_body_scope)
-                    .or_default()
-                    .entry(attr.id().clone())
-                    .or_default()
-                    .push(attribute_assignment);
-            }
+        // We only care about attribute assignments to the first parameter of a method,
+        // i.e. typically `self` or `cls`.
+        let first_parameter_name = object.as_name_expr().map(|name| name.id().as_str());
+        if let Some(class_body_scope) = self.class_scope_of_method(first_parameter_name) {
+            self.attribute_assignments
+                .entry(class_body_scope)
+                .or_default()
+                .entry(attr.id().clone())
+                .or_default()
+                .push(attribute_assignment);
         }
     }
 
@@ -752,11 +759,12 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
         // nodes are evaluated in the inner scope.
-        self.add_standalone_expression(&generator.iter);
+        let iterable = self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
         self.push_scope(scope);
 
         self.push_assignment(CurrentAssignment::Comprehension {
+            iterable,
             node: generator,
             first: true,
         });
@@ -768,10 +776,11 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
 
         for generator in generators_iter {
-            self.add_standalone_expression(&generator.iter);
+            let iterable = self.add_standalone_expression(&generator.iter);
             self.visit_expr(&generator.iter);
 
             self.push_assignment(CurrentAssignment::Comprehension {
+                iterable,
                 node: generator,
                 first: false,
             });
@@ -914,15 +923,6 @@ where
 
                         builder.declare_parameters(parameters);
 
-                        let mut first_parameter_name = parameters
-                            .iter_non_variadic_params()
-                            .next()
-                            .map(|first_param| first_param.parameter.name.id().as_str());
-                        std::mem::swap(
-                            &mut builder.current_first_parameter_name,
-                            &mut first_parameter_name,
-                        );
-
                         // TODO: Fix how we determine the public types of symbols in a
                         // function-like scope: https://github.com/astral-sh/ruff/issues/15777
                         //
@@ -949,7 +949,6 @@ where
                             }
                         }
 
-                        builder.current_first_parameter_name = first_parameter_name;
                         builder.pop_scope()
                     },
                 );
@@ -1768,7 +1767,7 @@ where
                             // implemented.
                             self.add_definition(symbol, named);
                         }
-                        Some(CurrentAssignment::Comprehension { node, first }) => {
+                        Some(CurrentAssignment::Comprehension { node, first, .. }) => {
                             self.add_definition(
                                 symbol,
                                 ComprehensionDefinitionNodeRef {
@@ -1998,6 +1997,14 @@ where
                             unpack,
                         },
                     );
+                } else if let Some(CurrentAssignment::Comprehension { iterable, .. }) =
+                    self.current_assignment()
+                {
+                    self.register_attribute_assignment(
+                        object,
+                        attr,
+                        AttributeAssignment::Iterable { iterable },
+                    );
                 }
 
                 walk_expr(self, expr);
@@ -2075,6 +2082,7 @@ enum CurrentAssignment<'a> {
     },
     Named(&'a ast::ExprNamed),
     Comprehension {
+        iterable: Expression<'a>,
         node: &'a ast::Comprehension,
         first: bool,
     },

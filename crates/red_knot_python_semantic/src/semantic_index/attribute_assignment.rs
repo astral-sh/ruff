@@ -20,6 +20,7 @@ pub(crate) enum AttributeAssignment<'db> {
 
     /// An attribute assignment where the right-hand side is an iterable, for example
     /// `for self.x in <iterable>`.
+    /// This is also used for comprehensions, e.g. `[... for self.x in <iterable>]`.
     Iterable { iterable: Expression<'db> },
 
     /// An attribute assignment where the expression to be assigned is a context manager, for example
