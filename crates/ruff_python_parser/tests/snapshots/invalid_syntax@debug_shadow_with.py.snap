@@ -1,0 +1,89 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_with.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..39,
+        body: [
+            With(
+                StmtWith {
+                    range: 0..38,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 5..33,
+                            context_expr: Call(
+                                ExprCall {
+                                    range: 5..20,
+                                    func: Name(
+                                        ExprName {
+                                            range: 5..9,
+                                            id: Name("open"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: Arguments {
+                                        range: 9..20,
+                                        args: [
+                                            StringLiteral(
+                                                ExprStringLiteral {
+                                                    range: 10..19,
+                                                    value: StringLiteralValue {
+                                                        inner: Single(
+                                                            StringLiteral {
+                                                                range: 10..19,
+                                                                value: "foo.txt",
+                                                                flags: StringLiteralFlags {
+                                                                    quote_style: Double,
+                                                                    prefix: Empty,
+                                                                    triple_quoted: false,
+                                                                },
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 24..33,
+                                        id: Name("__debug__"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 35..38,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 35..38,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | with open("foo.txt") as __debug__: ...
+  |                         ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |

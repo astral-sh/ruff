@@ -1,0 +1,99 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_type_alias.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..95,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..26,
+                    name: Name(
+                        ExprName {
+                            range: 5..14,
+                            id: Name("__debug__"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Subscript(
+                        ExprSubscript {
+                            range: 17..26,
+                            value: Name(
+                                ExprName {
+                                    range: 17..21,
+                                    id: Name("list"),
+                                    ctx: Load,
+                                },
+                            ),
+                            slice: Name(
+                                ExprName {
+                                    range: 22..25,
+                                    id: Name("int"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 67..94,
+                    name: Name(
+                        ExprName {
+                            range: 72..77,
+                            id: Name("Debug"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 77..88,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 78..87,
+                                        name: Identifier {
+                                            id: Name("__debug__"),
+                                            range: 78..87,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 91..94,
+                            id: Name("str"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | type __debug__ = list[int]  # visited as an Expr but still flagged
+  |      ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+2 | type Debug[__debug__] = str
+  |
+
+
+  |
+1 | type __debug__ = list[int]  # visited as an Expr but still flagged
+2 | type Debug[__debug__] = str
+  |            ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |

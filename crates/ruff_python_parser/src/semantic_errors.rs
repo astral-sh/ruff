@@ -75,6 +75,146 @@ impl SemanticSyntaxChecker {
             }
             _ => {}
         }
+
+        Self::debug_shadowing(stmt, ctx);
+    }
+
+    fn debug_shadowing<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                name,
+                type_params,
+                parameters,
+                ..
+            }) => {
+                // test_err debug_shadow_function
+                // def __debug__(): ...  # function name
+                // def f[__debug__](): ...  # type parameter name
+                // def f(__debug__): ...  # parameter name
+                if name == "__debug__" {
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                        name.range,
+                    );
+                }
+                if let Some(type_params) = type_params {
+                    for type_param in type_params.iter() {
+                        if type_param.name() == "__debug__" {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                                type_param.name().range,
+                            );
+                        }
+                    }
+                }
+                for parameter in parameters {
+                    if parameter.name() == "__debug__" {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                            parameter.name().range,
+                        );
+                    }
+                }
+            }
+            Stmt::ClassDef(ast::StmtClassDef {
+                name, type_params, ..
+            }) => {
+                // test_err debug_shadow_class
+                // class __debug__: ...  # class name
+                // class C[__debug__]: ...  # type parameter name
+                if name == "__debug__" {
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                        name.range,
+                    );
+                }
+                if let Some(type_params) = type_params {
+                    for type_param in type_params.iter() {
+                        if type_param.name() == "__debug__" {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                                type_param.name().range,
+                            );
+                        }
+                    }
+                }
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                type_params: Some(type_params),
+                ..
+            }) => {
+                // test_err debug_shadow_type_alias
+                // type __debug__ = list[int]  # visited as an Expr but still flagged
+                // type Debug[__debug__] = str
+                for type_param in type_params.iter() {
+                    if type_param.name() == "__debug__" {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                            type_param.name().range,
+                        );
+                    }
+                }
+            }
+            Stmt::Import(ast::StmtImport { names, .. })
+            | Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => {
+                // test_err debug_shadow_import
+                // import __debug__
+                // import debug as __debug__
+                // from x import __debug__
+                // from x import debug as __debug__
+
+                // test_ok debug_rename_import
+                // import __debug__ as debug
+                // from __debug__ import Some
+                // from x import __debug__ as debug
+                for name in names {
+                    if *name.name == *"__debug__" && name.asname.is_none() {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                            name.range,
+                        );
+                    }
+                    if let Some(name) = &name.asname {
+                        if *name == *"__debug__" {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                                name.range,
+                            );
+                        }
+                    }
+                }
+            }
+            Stmt::Try(ast::StmtTry { handlers, .. }) => {
+                // test_err debug_shadow_try
+                // try: ...
+                // except Exception as __debug__: ...
+                for handler in handlers
+                    .iter()
+                    .filter_map(ast::ExceptHandler::as_except_handler)
+                {
+                    if let Some(name) = &handler.name {
+                        if name == "__debug__" {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
+                                name.range,
+                            );
+                        }
+                    }
+                }
+            }
+            // test_err debug_shadow_with
+            // with open("foo.txt") as __debug__: ...
+            _ => {}
+        }
     }
 
     fn duplicate_type_parameter_name<Ctx: SemanticSyntaxContext>(
@@ -213,7 +353,7 @@ impl SemanticSyntaxChecker {
                 id,
                 ctx: expr_ctx,
             }) => {
-                // test_err write_to_debug
+                // test_err write_to_debug_expr
                 // del __debug__
                 // del x, y, __debug__, z
                 // __debug__ = 1
@@ -549,6 +689,16 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
             SemanticSyntaxChecker::add_error(
                 self.ctx,
                 SemanticSyntaxErrorKind::MultipleCaseAssignment(ident.id.clone()),
+                ident.range(),
+            );
+        }
+        // test_err debug_shadow_match
+        // match x:
+        //     case __debug__: ...
+        if ident.id == "__debug__" {
+            SemanticSyntaxChecker::add_error(
+                self.ctx,
+                SemanticSyntaxErrorKind::WriteToDebug(WriteToDebugKind::Store),
                 ident.range(),
             );
         }
