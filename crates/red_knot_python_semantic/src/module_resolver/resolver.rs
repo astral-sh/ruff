@@ -133,6 +133,32 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
     Program::get(db).search_paths(db).iter(db)
 }
 
+/// Locate a virtual environment by searching the file system.
+///
+/// Searches for a `.venv` directory in the current or any parent directory. If the current
+/// directory is itself a virtual environment (or a subdirectory of a virtual environment), the
+/// containing virtual environment is returned.
+fn virtualenv_from_working_dir() -> Option<SystemPathBuf> {
+    let current_dir = std::env::current_dir().ok()?;
+
+    for dir in current_dir.ancestors() {
+        // If we're _within_ a virtualenv, return it.
+        if dir.join("pyvenv.cfg").is_file() {
+            return SystemPathBuf::from_path_buf(dir.to_path_buf()).ok();
+        }
+
+        // Otherwise, search for a `.venv` directory.
+        let dot_venv = dir.join(".venv");
+        if dot_venv.is_dir() {
+            if !dot_venv.join("pyvenv.cfg").is_file() {
+                return None;
+            }
+            return SystemPathBuf::from_path_buf(dot_venv).ok();
+        }
+    }
+    None
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct SearchPaths {
     /// Search paths that have been statically determined purely from reading Ruff's configuration settings.
@@ -232,15 +258,29 @@ impl SearchPaths {
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
 
-            PythonPath::Discover(sys_prefix) => {
-                match VirtualEnvironment::new(sys_prefix, SysPrefixPathOrigin::LocalVenv, system) {
-                    Ok(venv) => venv
-                        .site_packages_directories(system)
-                        .unwrap_or_else(|_| vec![]),
-                    Err(error) => {
-                        tracing::debug!("{}", error);
-                        vec![]
+            PythonPath::Discover => {
+                let sys_prefix = virtualenv_from_working_dir();
+                if let Some(sys_prefix) = &sys_prefix {
+                    match VirtualEnvironment::new(
+                        sys_prefix,
+                        SysPrefixPathOrigin::LocalVenv,
+                        system,
+                    ) {
+                        Ok(venv) => venv
+                            .site_packages_directories(system)
+                            .unwrap_or_else(|_| vec![]),
+                        Err(error) => {
+                            tracing::debug!(
+                                "Error with virtual environment at {}: {}",
+                                sys_prefix,
+                                error
+                            );
+                            vec![]
+                        }
                     }
+                } else {
+                    tracing::debug!("No virtual environment found");
+                    vec![]
                 }
             }
 

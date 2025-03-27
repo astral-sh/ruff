@@ -145,7 +145,7 @@ pub enum PythonPath {
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     SysPrefix(SystemPathBuf, SysPrefixPathOrigin),
 
-    Discover(SystemPathBuf),
+    Discover,
 
     /// Resolved site packages paths.
     ///
@@ -161,23 +161,5 @@ impl PythonPath {
 
     pub fn from_cli_flag(path: SystemPathBuf) -> Self {
         Self::SysPrefix(path, SysPrefixPathOrigin::PythonCliFlag)
-    }
-
-    pub fn from_local_venv() -> Option<Self> {
-        let current_dir = std::env::current_dir().ok()?;
-
-        for dir in current_dir.ancestors() {
-            let dot_venv = dir.join(".venv");
-            if dot_venv.is_dir() {
-                if !dot_venv.join("pyvenv.cfg").is_file() {
-                    return None;
-                }
-                return SystemPathBuf::from_path_buf(dot_venv)
-                    .map(Self::Discover)
-                    .ok();
-            }
-        }
-
-        None
     }
 }
