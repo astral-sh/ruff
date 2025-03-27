@@ -260,9 +260,9 @@ impl SearchPaths {
 
             PythonPath::Discover => {
                 let sys_prefix = virtualenv_from_working_dir();
-                if let Some(sys_prefix) = &sys_prefix {
+                if let Some(sys_prefix) = sys_prefix {
                     match VirtualEnvironment::new(
-                        sys_prefix,
+                        sys_prefix.clone(),
                         SysPrefixPathOrigin::LocalVenv,
                         system,
                     ) {
