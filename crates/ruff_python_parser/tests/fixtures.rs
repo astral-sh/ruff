@@ -42,7 +42,7 @@ fn test_valid_syntax(input_path: &Path) {
     let options = extract_options(&source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
     });
-    let parsed = parse_unchecked(&source, options);
+    let parsed = parse_unchecked(&source, options.clone());
 
     if parsed.has_syntax_errors() {
         let line_index = LineIndex::from_source_text(&source);
@@ -136,7 +136,7 @@ fn test_invalid_syntax(input_path: &Path) {
     let options = extract_options(&source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
     });
-    let parsed = parse_unchecked(&source, options);
+    let parsed = parse_unchecked(&source, options.clone());
 
     validate_tokens(parsed.tokens(), source.text_len(), input_path);
     validate_ast(parsed.syntax(), source.text_len(), input_path);
