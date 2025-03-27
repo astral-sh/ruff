@@ -218,7 +218,6 @@ A similar case can work in a non-stub file, if forward references are stringifie
 
 ```py
 class Base[T]: ...
-
 class Sub(Base["Sub"]): ...
 
 reveal_type(Sub)  # revealed: Literal[Sub]
