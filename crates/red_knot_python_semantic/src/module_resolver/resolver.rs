@@ -11,7 +11,7 @@ use ruff_python_ast::PythonVersion;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
-use crate::site_packages::{SysPrefixPathOrigin, VirtualEnvironment};
+use crate::site_packages::{SitePackagesDiscoveryError, SysPrefixPathOrigin, VirtualEnvironment};
 use crate::{Program, PythonPath, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
@@ -133,21 +133,11 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
     Program::get(db).search_paths(db).iter(db)
 }
 
-/// Locate a virtual environment by searching the file system.
-///
-/// Searches for a `.venv` directory in the current or any parent directory. If the current
-/// directory is itself a virtual environment (or a subdirectory of a virtual environment), the
-/// containing virtual environment is returned.
-fn virtualenv_from_working_dir() -> Option<SystemPathBuf> {
+/// Searches for a `.venv` directory in the current or any parent directory
+fn virtual_env_from_working_dir() -> Option<SystemPathBuf> {
     let current_dir = std::env::current_dir().ok()?;
 
     for dir in current_dir.ancestors() {
-        // If we're _within_ a virtualenv, return it.
-        if dir.join("pyvenv.cfg").is_file() {
-            return SystemPathBuf::from_path_buf(dir.to_path_buf()).ok();
-        }
-
-        // Otherwise, search for a `.venv` directory.
         let dot_venv = dir.join(".venv");
         if dot_venv.is_dir() {
             if !dot_venv.join("pyvenv.cfg").is_file() {
@@ -259,24 +249,29 @@ impl SearchPaths {
             }
 
             PythonPath::Discover => {
-                let sys_prefix = virtualenv_from_working_dir();
-                if let Some(sys_prefix) = sys_prefix {
+                tracing::debug!("Discovering virtual environment");
+                let virtual_env_path = virtual_env_from_working_dir();
+                if let Some(virtual_env_path) = virtual_env_path {
+                    tracing::debug!("Found `.venv` folder at '{}'", virtual_env_path);
+
+                    let handle_invalid_virtual_env = |error: SitePackagesDiscoveryError| {
+                        tracing::debug!(
+                            "Ignoring automatically detected virtual environment at '{}': {}",
+                            virtual_env_path,
+                            error
+                        );
+                        vec![]
+                    };
+
                     match VirtualEnvironment::new(
-                        sys_prefix.clone(),
+                        virtual_env_path.clone(),
                         SysPrefixPathOrigin::LocalVenv,
                         system,
                     ) {
                         Ok(venv) => venv
                             .site_packages_directories(system)
-                            .unwrap_or_else(|_| vec![]),
-                        Err(error) => {
-                            tracing::debug!(
-                                "Ignoring automatically detected virtual environment at '{}': {}",
-                                sys_prefix,
-                                error
-                            );
-                            vec![]
-                        }
+                            .unwrap_or_else(handle_invalid_virtual_env),
+                        Err(error) => handle_invalid_virtual_env(error),
                     }
                 } else {
                     tracing::debug!("No virtual environment found");
