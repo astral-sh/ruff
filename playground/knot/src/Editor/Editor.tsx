@@ -81,6 +81,7 @@ export default function Editor({
         scrollBeyondLastLine: false,
         contextmenu: false,
       }}
+      language={fileName.endsWith(".pyi") ? "python" : undefined}
       path={fileName}
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
