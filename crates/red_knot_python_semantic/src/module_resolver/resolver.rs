@@ -271,7 +271,7 @@ impl SearchPaths {
                             .unwrap_or_else(|_| vec![]),
                         Err(error) => {
                             tracing::debug!(
-                                "Error with virtual environment at {}: {}",
+                                "Ignoring automatically detected virtual environment at '{}': {}",
                                 sys_prefix,
                                 error
                             );
