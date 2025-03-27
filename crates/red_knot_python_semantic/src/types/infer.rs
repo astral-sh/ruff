@@ -83,7 +83,7 @@ use crate::types::{
     TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
     UnionType,
 };
-use crate::types::{CallableType, GeneralCallableType, Signature};
+use crate::types::{CallableType, FunctionDecorators, GeneralCallableType, Signature};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -1362,18 +1362,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
-        // Check if the function is decorated with the `no_type_check` decorator
-        // and, if so, suppress any errors that come after the decorators.
         let mut decorator_tys = Vec::with_capacity(decorator_list.len());
+        let mut function_decorators = FunctionDecorators::empty();
 
         for decorator in decorator_list {
             let ty = self.infer_decorator(decorator);
-            decorator_tys.push(ty);
 
             if let Type::FunctionLiteral(function) = ty {
                 if function.is_known(self.db(), KnownFunction::NoTypeCheck) {
+                    // If the function is decorated with the `no_type_check` decorator,
+                    // we need to suppress any errors that come after the decorators.
                     self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                    function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
+                } else if function.is_known(self.db(), KnownFunction::Overload) {
+                    function_decorators |= FunctionDecorators::OVERLOAD;
+                } else {
+                    decorator_tys.push(ty);
                 }
+            } else if let Type::ClassLiteral(class) = ty {
+                if class.class.is_known(self.db(), KnownClass::Classmethod) {
+                    function_decorators |= FunctionDecorators::CLASSMETHOD;
+                } else {
+                    decorator_tys.push(ty);
+                }
+            } else {
+                decorator_tys.push(ty);
             }
         }
 
@@ -1406,18 +1419,38 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Function(function))
             .to_scope_id(self.db(), self.file());
 
-        let function_ty = Type::FunctionLiteral(FunctionType::new(
+        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
             &name.id,
             function_kind,
             body_scope,
-            decorator_tys.into_boxed_slice(),
+            function_decorators,
         ));
+
+        for decorator_ty in decorator_tys.iter().rev() {
+            if let Type::ClassLiteral(class) = decorator_ty {
+                if class.class.is_known(self.db(), KnownClass::Property) {
+                    inferred_ty = todo_type!("@property");
+                    break;
+                }
+            }
+
+            if let Type::FunctionLiteral(function) = decorator_ty {
+                if function.is_known(self.db(), KnownFunction::Overload) {
+                    continue;
+                }
+            }
+
+            inferred_ty = decorator_ty
+                .try_call(self.db(), CallArgumentTypes::positional([inferred_ty]))
+                .map(|bindings| bindings.return_type(self.db()))
+                .unwrap_or(Type::unknown());
+        }
 
         self.add_declaration_with_binding(
             function.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(function_ty),
+            &DeclaredAndInferredType::AreTheSame(inferred_ty),
         );
     }
 

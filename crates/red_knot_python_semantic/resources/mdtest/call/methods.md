@@ -422,11 +422,15 @@ class C:
 # TODO: We do not support decorators yet (only limited special cases). Eventually,
 # these should all return `str`:
 
-reveal_type(C.f1(1))  # revealed: @Todo(return type of decorated function)
-reveal_type(C().f1(1))  # revealed: @Todo(return type of decorated function)
+# TODO: Should be `str`, once we support generics
+reveal_type(C.f1(1))  # revealed: Unknown
+# TODO: Should be `str`, once we support generics
+reveal_type(C().f1(1))  # revealed: Unknown
 
-reveal_type(C.f2(1))  # revealed: @Todo(return type of decorated function)
-reveal_type(C().f2(1))  # revealed: @Todo(return type of decorated function)
+# TODO: Should be `str`, once we support generics
+reveal_type(C.f2(1))  # revealed: Unknown
+# TODO: Should be `str`, once we support generics
+reveal_type(C().f2(1))  # revealed: Unknown
 ```
 
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods

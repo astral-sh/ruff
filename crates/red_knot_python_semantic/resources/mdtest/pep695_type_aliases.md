@@ -13,7 +13,7 @@ python-version = "3.12"
 type IntOrStr = int | str
 
 reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
-reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
+reveal_type(IntOrStr.__name__)  # revealed: @Todo(@property)
 
 x: IntOrStr = 1
 

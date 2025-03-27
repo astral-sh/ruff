@@ -990,25 +990,4 @@ mod tests {
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);
     }
-
-    #[test]
-    fn external_signature_decorated() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def deco(func): ...
-
-            @deco
-            def f(a: int) -> int: ...
-            ",
-        )
-        .unwrap();
-        let func = get_function_f(&db, "/src/a.py");
-
-        let expected_sig = Signature::todo("return type of decorated function");
-
-        // With no decorators, internal and external signature are the same
-        assert_eq!(func.signature(&db), &expected_sig);
-    }
 }

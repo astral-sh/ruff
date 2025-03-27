@@ -506,8 +506,7 @@ class C:
     @property
     def name(self) -> str:
         return self._name or "Unset"
-    # TODO: No diagnostic should be emitted here
-    # error: [unresolved-attribute] "Type `Literal[name]` has no attribute `setter`"
+
     @name.setter
     def name(self, value: str | None) -> None:
         self._value = value
@@ -517,20 +516,17 @@ c = C()
 reveal_type(c._name)  # revealed: str | None
 
 # TODO: Should be `str`
-reveal_type(c.name)  # revealed: <bound method `name` of `C`>
+reveal_type(c.name)  # revealed: @Todo(@property)
 
 # Should be `builtins.property`
-reveal_type(C.name)  # revealed: Literal[name]
+reveal_type(C.name)  # revealed: @Todo(@property)
 
 # TODO: These should not emit errors
-# error: [invalid-assignment]
 c.name = "new"
 
-# error: [invalid-assignment]
 c.name = None
 
-# TODO: this should be an error, but with a proper error message
-# error: [invalid-assignment] "Implicit shadowing of function `name`; annotate to make it explicit if this is intentional"
+# TODO: this should be an error
 c.name = 42
 ```
 

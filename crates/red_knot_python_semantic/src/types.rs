@@ -4094,6 +4094,18 @@ impl From<bool> for Truthiness {
     }
 }
 
+bitflags! {
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, Hash)]
+    pub struct FunctionDecorators: u8 {
+        /// `@classmethod`
+        const CLASSMETHOD = 1 << 0;
+        /// `@no_type_check`
+        const NO_TYPE_CHECK = 1 << 1;
+        /// `@overload`
+        const OVERLOAD = 1 << 2;
+    }
+}
+
 #[salsa::interned(debug)]
 pub struct FunctionType<'db> {
     /// name of the function at definition
@@ -4105,24 +4117,14 @@ pub struct FunctionType<'db> {
 
     body_scope: ScopeId<'db>,
 
-    /// types of all decorators on this function
-    decorators: Box<[Type<'db>]>,
+    /// special decorators that were applied to this function
+    decorators: FunctionDecorators,
 }
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
-    pub fn has_known_class_decorator(self, db: &dyn Db, decorator: KnownClass) -> bool {
-        self.decorators(db).iter().any(|d| {
-            d.into_class_literal()
-                .is_some_and(|c| c.class.is_known(db, decorator))
-        })
-    }
-
-    pub fn has_known_function_decorator(self, db: &dyn Db, decorator: KnownFunction) -> bool {
-        self.decorators(db).iter().any(|d| {
-            d.into_function_literal()
-                .is_some_and(|f| f.is_known(db, decorator))
-        })
+    pub fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
+        self.decorators(db).contains(decorator)
     }
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
@@ -4151,18 +4153,8 @@ impl<'db> FunctionType<'db> {
     pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let internal_signature = self.internal_signature(db);
 
-        let decorators = self.decorators(db);
-        let mut decorators = decorators.iter();
-
-        if let Some(d) = decorators.next() {
-            if d.into_class_literal()
-                .is_some_and(|c| c.class.is_known(db, KnownClass::Classmethod))
-                && decorators.next().is_none()
-            {
-                internal_signature
-            } else {
-                Signature::todo("return type of decorated function")
-            }
+        if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+            Signature::todo("return type of overloaded function")
         } else {
             internal_signature
         }
