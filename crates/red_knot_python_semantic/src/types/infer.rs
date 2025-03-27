@@ -53,11 +53,10 @@ use crate::semantic_index::definition::{
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
-use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::{semantic_index, EagerBindingsResult, SemanticIndex};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -4139,8 +4138,6 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             let current_file = self.file();
 
-            let mut in_eager_context = scope.is_eager(db);
-
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             // Note that we skip the scope containing the use that we are resolving, since we
@@ -4158,7 +4155,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                         .parent()
                         .is_some_and(|parent| parent == enclosing_scope_file_id);
                 if !enclosing_scope_id.is_function_like(db) && !is_immediately_enclosing_scope {
-                    in_eager_context &= enclosing_scope_id.is_eager(db);
                     continue;
                 }
 
@@ -4169,23 +4165,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
                 if !self.is_deferred() {
-                    if let Some(bindings) = self.index.eager_bindings(
+                    match self.index.eager_bindings(
                         enclosing_scope_file_id,
                         symbol_name,
                         file_scope_id,
                     ) {
-                        return symbol_from_bindings(db, bindings).into();
-                    }
-
-                    // There are no visible bindings here.
-                    // Don't fall back to non-eager symbol resolution.
-                    if in_eager_context {
-                        in_eager_context &= enclosing_scope_id.is_eager(db);
-                        continue;
+                        EagerBindingsResult::Found(bindings) => {
+                            return symbol_from_bindings(db, bindings).into();
+                        }
+                        // There are no visible bindings here.
+                        // Don't fall back to non-eager symbol resolution.
+                        EagerBindingsResult::NotFound => {
+                            continue;
+                        }
+                        EagerBindingsResult::NoLongerInEagerContext => {}
                     }
                 }
 
-                in_eager_context &= enclosing_scope_id.is_eager(db);
                 let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
                 let Some(enclosing_symbol) = enclosing_symbol_table.symbol_by_name(symbol_name)
                 else {
@@ -4210,17 +4206,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
 
                     if !self.is_deferred() {
-                        if let Some(bindings) = self.index.eager_bindings(
+                        match self.index.eager_bindings(
                             FileScopeId::global(),
                             symbol_name,
                             file_scope_id,
                         ) {
-                            return symbol_from_bindings(db, bindings).into();
-                        }
-
-                        // There are no visible bindings here.
-                        if in_eager_context {
-                            return Symbol::Unbound.into();
+                            EagerBindingsResult::Found(bindings) => {
+                                return symbol_from_bindings(db, bindings).into();
+                            }
+                            // There are no visible bindings here.
+                            EagerBindingsResult::NotFound => {
+                                return Symbol::Unbound.into();
+                            }
+                            EagerBindingsResult::NoLongerInEagerContext => {}
                         }
                     }
 
