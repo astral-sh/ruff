@@ -257,6 +257,13 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
+    #[track_caller]
+    fn expect_expr_name_symbol(&self, symbol: &str) -> ScopedSymbolId {
+        self.symbols()
+            .symbol_id_by_name(symbol)
+            .expect("We should always have a symbol for every `Name` node")
+    }
+
     fn evaluate_expr_name(
         &mut self,
         expr_name: &ast::ExprName,
@@ -264,22 +271,15 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     ) -> NarrowingConstraints<'db> {
         let ast::ExprName { id, .. } = expr_name;
 
-        let symbol = self
-            .symbols()
-            .symbol_id_by_name(id)
-            .expect("Should always have a symbol for every Name node");
-        let mut constraints = NarrowingConstraints::default();
+        let symbol = self.expect_expr_name_symbol(id);
 
-        constraints.insert(
-            symbol,
-            if is_positive {
-                Type::AlwaysFalsy.negate(self.db)
-            } else {
-                Type::AlwaysTruthy.negate(self.db)
-            },
-        );
+        let ty = if is_positive {
+            Type::AlwaysFalsy.negate(self.db)
+        } else {
+            Type::AlwaysTruthy.negate(self.db)
+        };
 
-        constraints
+        NarrowingConstraints::from_iter([(symbol, ty)])
     }
 
     fn evaluate_expr_compare(
@@ -338,10 +338,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     id,
                     ctx: _,
                 }) => {
-                    let symbol = self
-                        .symbols()
-                        .symbol_id_by_name(id)
-                        .expect("Should always have a symbol for every Name node");
+                    let symbol = self.expect_expr_name_symbol(id);
 
                     match if is_positive { *op } else { op.negate() } {
                         ast::CmpOp::IsNot => {
@@ -408,10 +405,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         .into_class_literal()
                         .is_some_and(|c| c.class().is_known(self.db, KnownClass::Type))
                     {
-                        let symbol = self
-                            .symbols()
-                            .symbol_id_by_name(id)
-                            .expect("Should always have a symbol for every Name node");
+                        let symbol = self.expect_expr_name_symbol(id);
                         constraints.insert(symbol, Type::instance(rhs_class));
                     }
                 }
@@ -445,7 +439,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     return None;
                 };
 
-                let symbol = self.symbols().symbol_id_by_name(id).unwrap();
+                let symbol = self.expect_expr_name_symbol(id);
 
                 let class_info_ty =
                     inference.expression_type(class_info.scoped_expression_id(self.db, scope));
@@ -453,9 +447,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 function
                     .generate_constraint(self.db, class_info_ty)
                     .map(|constraint| {
-                        let mut constraints = NarrowingConstraints::default();
-                        constraints.insert(symbol, constraint.negate_if(self.db, !is_positive));
-                        constraints
+                        NarrowingConstraints::from_iter([(
+                            symbol,
+                            constraint.negate_if(self.db, !is_positive),
+                        )])
                     })
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
@@ -474,31 +469,19 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn get_subject_symbol(&self, subject: Expression<'db>) -> Option<ScopedSymbolId> {
-        let ast::ExprName { id, .. } = subject.node_ref(self.db).as_name_expr()?;
-        let symbol = self
-            .symbols()
-            .symbol_id_by_name(id)
-            .expect("We should always have a symbol for every `Name` node");
-
-        Some(symbol)
-    }
-
     fn evaluate_match_pattern_singleton(
         &mut self,
         subject: Expression<'db>,
         singleton: ast::Singleton,
     ) -> Option<NarrowingConstraints<'db>> {
-        let symbol = self.get_subject_symbol(subject)?;
+        let symbol = self.expect_expr_name_symbol(&subject.node_ref(self.db).as_name_expr()?.id);
 
         let ty = match singleton {
             ast::Singleton::None => Type::none(self.db),
             ast::Singleton::True => Type::BooleanLiteral(true),
             ast::Singleton::False => Type::BooleanLiteral(false),
         };
-        let mut constraints = NarrowingConstraints::default();
-        constraints.insert(symbol, ty);
-        Some(constraints)
+        Some(NarrowingConstraints::from_iter([(symbol, ty)]))
     }
 
     fn evaluate_match_pattern_class(
@@ -506,12 +489,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         cls: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let symbol = self.get_subject_symbol(subject)?;
+        let symbol = self.expect_expr_name_symbol(&subject.node_ref(self.db).as_name_expr()?.id);
         let ty = infer_same_file_expression_type(self.db, cls).to_instance(self.db)?;
 
-        let mut constraints = NarrowingConstraints::default();
-        constraints.insert(symbol, ty);
-        Some(constraints)
+        Some(NarrowingConstraints::from_iter([(symbol, ty)]))
     }
 
     fn evaluate_match_pattern_value(
@@ -519,12 +500,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
         value: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let symbol = self.get_subject_symbol(subject)?;
+        let symbol = self.expect_expr_name_symbol(&subject.node_ref(self.db).as_name_expr()?.id);
         let ty = infer_same_file_expression_type(self.db, value);
-        let mut constraints = NarrowingConstraints::default();
-        constraints.insert(symbol, ty);
-
-        Some(constraints)
+        Some(NarrowingConstraints::from_iter([(symbol, ty)]))
     }
 
     fn evaluate_bool_op(
