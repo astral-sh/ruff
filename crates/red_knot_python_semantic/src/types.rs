@@ -4983,6 +4983,10 @@ impl<'db> UnionType<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
 
+    pub fn filter(&self, db: &'db dyn Db, filter_fn: impl FnMut(&&Type<'db>) -> bool) -> Type<'db> {
+        Self::from_elements(db, self.elements(db).iter().filter(filter_fn))
+    }
+
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,

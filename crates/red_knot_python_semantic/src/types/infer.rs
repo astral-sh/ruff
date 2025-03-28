@@ -1266,10 +1266,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             {
                 return;
             }
-            for invalid in self.return_types_and_ranges.iter().filter(|ty_range| {
-                !ty_range.ty.is_assignable_to(self.db(), declared_ty)
-                    && !ty_range.ty.is_notimplemented(self.db())
-            }) {
+
+            for invalid in self
+                .return_types_and_ranges
+                .iter()
+                .copied()
+                .filter_map(|ty_range| match ty_range.ty {
+                    // We skip `is_assignable_to` checks for `NotImplemented`,
+                    // so we remove it beforehand.
+                    Type::Union(union) => Some(TypeAndRange {
+                        ty: union.filter(self.db(), |ty| !ty.is_notimplemented(self.db())),
+                        range: ty_range.range,
+                    }),
+                    ty if ty.is_notimplemented(self.db()) => None,
+                    _ => Some(ty_range),
+                })
+                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
+            {
                 report_invalid_return_type(
                     &self.context,
                     invalid.range,

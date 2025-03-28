@@ -304,4 +304,11 @@ def f(x: int) -> int | str:
         return NotImplemented
     else:
         return "test"
+
+def f(cond: bool) -> str:
+    return "hello" if cond else NotImplemented
+
+def f(cond: bool) -> int:
+    # error: [invalid-return-type] "Object of type `Literal["hello"]` is not assignable to return type `int`"
+    return "hello" if cond else NotImplemented
 ```
