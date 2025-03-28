@@ -494,7 +494,7 @@ impl<'db> Parameters<'db> {
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
     }
 
-    /// Return a new Parameters type with the first parameter removed if it is a `self` parameter.
+    /// Return a new Parameters type with the first parameter.
     pub(crate) fn without_self_parameter(self) -> Self {
         if let Some(first_param) = self.get(0) {
             return if first_param.name().map(ruff_python_ast::name::Name::as_str) == Some("self") {
