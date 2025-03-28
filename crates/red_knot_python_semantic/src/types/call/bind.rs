@@ -19,7 +19,7 @@ use crate::types::diagnostic::{
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, CallableType, ClassLiteralType, FunctionDecorators, KnownClass,
-    KnownFunction, KnownInstanceType, UnionType,
+    KnownFunction, UnionType,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
