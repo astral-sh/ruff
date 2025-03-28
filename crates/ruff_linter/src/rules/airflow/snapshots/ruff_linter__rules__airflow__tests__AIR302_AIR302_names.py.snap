@@ -64,7 +64,7 @@ AIR302_names.py:121:39: AIR302 `airflow.PY312` is removed in Airflow 3.0
     |
     = help: Use `sys.version_info` instead
 
-AIR302_names.py:122:1: AIR302 `airflow.Dataset` is removed in Airflow 3.0
+AIR302_names.py:122:1: AIR302 [*] Use `airflow.sdk.Asset` instead
     |
 120 | # airflow root
 121 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
@@ -74,6 +74,20 @@ AIR302_names.py:122:1: AIR302 `airflow.Dataset` is removed in Airflow 3.0
 124 | # airflow.api_connexion.security
     |
     = help: Use `airflow.sdk.Asset` instead
+
+ℹ Safe fix
+116 116 | from airflow.utils.trigger_rule import TriggerRule
+117 117 | from airflow.www.auth import has_access, has_access_dataset
+118 118 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
+    119 |+from airflow.sdk import Asset
+119 120 | 
+120 121 | # airflow root
+121 122 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+122     |-DatasetFromRoot()
+    123 |+Asset()
+123 124 | 
+124 125 | # airflow.api_connexion.security
+125 126 | requires_access, requires_access_dataset
 
 AIR302_names.py:125:1: AIR302 `airflow.api_connexion.security.requires_access` is removed in Airflow 3.0
     |
@@ -85,7 +99,7 @@ AIR302_names.py:125:1: AIR302 `airflow.api_connexion.security.requires_access` i
     |
     = help: Use `airflow.api_connexion.security.requires_access_*` instead
 
-AIR302_names.py:125:18: AIR302 [*] Use `airflow.api_connexion.security`.`requires_access_asset` instead
+AIR302_names.py:125:18: AIR302 [*] Use `airflow.api_connexion.security.requires_access_asset` instead
     |
 124 | # airflow.api_connexion.security
 125 | requires_access, requires_access_dataset
@@ -207,7 +221,7 @@ AIR302_names.py:136:1: AIR302 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is
 138 | # airflow.datasets
     |
 
-AIR302_names.py:139:1: AIR302 `airflow.datasets.Dataset` is removed in Airflow 3.0
+AIR302_names.py:139:1: AIR302 [*] Use `airflow.sdk.Asset` instead
     |
 138 | # airflow.datasets
 139 | Dataset()
@@ -216,6 +230,24 @@ AIR302_names.py:139:1: AIR302 `airflow.datasets.Dataset` is removed in Airflow 3
 141 | DatasetAliasEvent()
     |
     = help: Use `airflow.sdk.Asset` instead
+
+ℹ Safe fix
+116 116 | from airflow.utils.trigger_rule import TriggerRule
+117 117 | from airflow.www.auth import has_access, has_access_dataset
+118 118 | from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
+    119 |+from airflow.sdk import Asset
+119 120 | 
+120 121 | # airflow root
+121 122 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
+--------------------------------------------------------------------------------
+136 137 | AWSAthenaHook()
+137 138 | 
+138 139 | # airflow.datasets
+139     |-Dataset()
+    140 |+Asset()
+140 141 | DatasetAlias()
+141 142 | DatasetAliasEvent()
+142 143 | DatasetAll()
 
 AIR302_names.py:140:1: AIR302 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
     |
