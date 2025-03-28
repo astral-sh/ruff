@@ -20,6 +20,23 @@ pub struct TextDocument {
     /// The latest version of the document, set by the LSP client. The server will panic in
     /// debug mode if we attempt to update the document with an 'older' version.
     version: DocumentVersion,
+    /// The language ID of the document as provided by the client.
+    language_id: Option<LanguageId>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum LanguageId {
+    Python,
+    Other,
+}
+
+impl From<&str> for LanguageId {
+    fn from(language_id: &str) -> Self {
+        match language_id {
+            "python" => Self::Python,
+            _ => Self::Other,
+        }
+    }
 }
 
 impl TextDocument {
@@ -29,7 +46,14 @@ impl TextDocument {
             contents,
             index,
             version,
+            language_id: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_language_id(mut self, language_id: &str) -> Self {
+        self.language_id = Some(LanguageId::from(language_id));
+        self
     }
 
     pub fn into_contents(self) -> String {
@@ -46,6 +70,10 @@ impl TextDocument {
 
     pub fn version(&self) -> DocumentVersion {
         self.version
+    }
+
+    pub fn language_id(&self) -> Option<LanguageId> {
+        self.language_id
     }
 
     pub fn apply_changes(
@@ -66,7 +94,6 @@ impl TextDocument {
             return;
         }
 
-        let old_contents = self.contents().to_string();
         let mut new_contents = self.contents().to_string();
         let mut active_index = self.index().clone();
 
@@ -87,15 +114,11 @@ impl TextDocument {
                 new_contents = change;
             }
 
-            if new_contents != old_contents {
-                active_index = LineIndex::from_source_text(&new_contents);
-            }
+            active_index = LineIndex::from_source_text(&new_contents);
         }
 
         self.modify_with_manual_index(|contents, version, index| {
-            if contents != &new_contents {
-                *index = active_index;
-            }
+            *index = active_index;
             *contents = new_contents;
             *version = new_version;
         });
@@ -123,5 +146,77 @@ impl TextDocument {
         let old_version = self.version;
         func(&mut self.contents, &mut self.version, &mut self.index);
         debug_assert!(self.version >= old_version);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{PositionEncoding, TextDocument};
+    use lsp_types::{Position, TextDocumentContentChangeEvent};
+
+    #[test]
+    fn redo_edit() {
+        let mut document = TextDocument::new(
+            r#""""
+测试comment
+一些测试内容
+"""
+import click
+
+
+@click.group()
+def interface():
+    pas
+"#
+            .to_string(),
+            0,
+        );
+
+        // Add an `s`, remove it again (back to the original code), and then re-add the `s`
+        document.apply_changes(
+            vec![
+                TextDocumentContentChangeEvent {
+                    range: Some(lsp_types::Range::new(
+                        Position::new(9, 7),
+                        Position::new(9, 7),
+                    )),
+                    range_length: Some(0),
+                    text: "s".to_string(),
+                },
+                TextDocumentContentChangeEvent {
+                    range: Some(lsp_types::Range::new(
+                        Position::new(9, 7),
+                        Position::new(9, 8),
+                    )),
+                    range_length: Some(1),
+                    text: String::new(),
+                },
+                TextDocumentContentChangeEvent {
+                    range: Some(lsp_types::Range::new(
+                        Position::new(9, 7),
+                        Position::new(9, 7),
+                    )),
+                    range_length: Some(0),
+                    text: "s".to_string(),
+                },
+            ],
+            1,
+            PositionEncoding::UTF16,
+        );
+
+        assert_eq!(
+            &document.contents,
+            r#""""
+测试comment
+一些测试内容
+"""
+import click
+
+
+@click.group()
+def interface():
+    pass
+"#
+        );
     }
 }
