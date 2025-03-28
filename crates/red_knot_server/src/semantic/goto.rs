@@ -8,9 +8,10 @@ use red_knot_python_semantic::types::{
 };
 use red_knot_python_semantic::{Db, HasType, SemanticModel};
 use ruff_db::files::{File, FileRange};
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub(crate) fn go_to_type_definition(
@@ -18,8 +19,8 @@ pub(crate) fn go_to_type_definition(
     file: File,
     offset: TextSize,
 ) -> Option<RangeInfo<NavigationTargets>> {
-    let root = parsed_module(db.upcast(), file);
-    let goto_target = find_goto_target(root.syntax().into(), offset)?;
+    let parsed = parsed_module(db.upcast(), file);
+    let goto_target = find_goto_target(parsed, offset)?;
 
     let model = SemanticModel::new(db, file);
 
@@ -175,8 +176,21 @@ impl Ranged for GotoTarget<'_> {
     }
 }
 
-pub(crate) fn find_goto_target(root: AnyNodeRef, offset: TextSize) -> Option<GotoTarget> {
-    let covering_node = covering_node(root, TextRange::empty(offset));
+pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Option<GotoTarget> {
+    let token = parsed.tokens().at_offset(offset).find(|token| {
+        matches!(
+            token.kind(),
+            TokenKind::Name
+                | TokenKind::String
+                | TokenKind::Complex
+                | TokenKind::Float
+                | TokenKind::Int
+        )
+    })?;
+    let covering_node = covering_node(parsed.syntax().into(), token.range())
+        .find(|node| node.is_identifier() || node.is_expression())
+        .ok()?;
+
     tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
     match covering_node.node() {
@@ -218,6 +232,7 @@ pub(crate) fn find_goto_target(root: AnyNodeRef, offset: TextSize) -> Option<Got
                 None
             }
         },
+
         // AnyNodeRef::Keyword(keyword) => Some(GotoTarget::KeywordArgument(keyword)),
         node => node.as_expr_ref().map(GotoTarget::Expression),
     }
@@ -411,46 +426,7 @@ impl HasNavigationTargets for KnownInstanceType<'_> {
             }
 
             // TODO: Track the definition of `KnownInstance` and navigate to their definition.
-            KnownInstanceType::Annotated
-            | KnownInstanceType::Literal
-            | KnownInstanceType::LiteralString
-            | KnownInstanceType::Optional
-            | KnownInstanceType::Union
-            | KnownInstanceType::NoReturn
-            | KnownInstanceType::Never
-            | KnownInstanceType::Any
-            | KnownInstanceType::Tuple
-            | KnownInstanceType::List
-            | KnownInstanceType::Dict
-            | KnownInstanceType::Set
-            | KnownInstanceType::FrozenSet
-            | KnownInstanceType::ChainMap
-            | KnownInstanceType::Counter
-            | KnownInstanceType::DefaultDict
-            | KnownInstanceType::Deque
-            | KnownInstanceType::OrderedDict
-            | KnownInstanceType::Protocol
-            | KnownInstanceType::Type
-            | KnownInstanceType::TypeAliasType(_)
-            | KnownInstanceType::Unknown
-            | KnownInstanceType::AlwaysTruthy
-            | KnownInstanceType::AlwaysFalsy
-            | KnownInstanceType::Not
-            | KnownInstanceType::Intersection
-            | KnownInstanceType::TypeOf
-            | KnownInstanceType::CallableTypeFromFunction
-            | KnownInstanceType::TypingSelf
-            | KnownInstanceType::Final
-            | KnownInstanceType::ClassVar
-            | KnownInstanceType::Callable
-            | KnownInstanceType::Concatenate
-            | KnownInstanceType::Unpack
-            | KnownInstanceType::Required
-            | KnownInstanceType::NotRequired
-            | KnownInstanceType::TypeAlias
-            | KnownInstanceType::TypeGuard
-            | KnownInstanceType::TypeIs
-            | KnownInstanceType::ReadOnly => NavigationTargets::empty(),
+            _ => NavigationTargets::empty(),
         }
     }
 }
@@ -460,7 +436,9 @@ mod tests {
     use crate::semantic::goto::go_to_type_definition;
     use crate::tests::TestDb;
     use insta::assert_snapshot;
-    use red_knot_python_semantic::{Program, ProgramSettings, PythonPath, SearchPathSettings};
+    use red_knot_python_semantic::{
+        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+    };
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span, SubDiagnostic,
@@ -646,6 +624,33 @@ mod tests {
         3 |
         4 |             a
           |             ^
+          |
+        "###);
+    }
+    #[test]
+    fn goto_type_of_expression_with_literal_node() {
+        let test = goto_test(
+            r#"
+            a: str = "te<CURSOR>st"
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+           --> stdlib/builtins.pyi:443:7
+            |
+        441 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        442 |
+        443 | class str(Sequence[str]):
+            |       ^^^
+        444 |     @overload
+        445 |     def __new__(cls, object: object = ...) -> Self: ...
+            |
+        info: Source
+         --> /main.py:2:22
+          |
+        2 |             a: str = "test"
+          |                      ^^^^^^
           |
         "###);
     }
@@ -878,19 +883,20 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r###"
         info: lint:goto-type-definition: Type definition
-         --> /main.py:2:19
+         --> /main.py:2:17
           |
-        2 |             class X:
-          |                   ^
-        3 |                 def foo(a, b): ...
+        2 |             def foo(a, b): ...
+          |                 ^^^
+        3 |
+        4 |             foo()
           |
         info: Source
-         --> /main.py:7:13
+         --> /main.py:4:13
           |
-        5 |             x = X()
-        6 |
-        7 |             x.foo()
-          |             ^
+        2 |             def foo(a, b): ...
+        3 |
+        4 |             foo()
+          |             ^^^
           |
         "###);
     }
@@ -913,7 +919,7 @@ f(**kwargs<CURSOR>)
             &db,
             ProgramSettings {
                 python_version: PythonVersion::latest(),
-                python_platform: Default::default(),
+                python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings {
                     extra_paths: vec![],
                     src_roots: vec![SystemPathBuf::from("/")],
@@ -983,7 +989,7 @@ f(**kwargs<CURSOR>)
                             .format(DiagnosticFormat::Full),
                         &mut buf,
                     )
-                    .unwrap()
+                    .unwrap();
             }
 
             source.printed();

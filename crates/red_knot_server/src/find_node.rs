@@ -5,6 +5,8 @@ use ruff_python_ast::{AnyNodeRef, Keyword};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 use std::fmt::Formatter;
+// What we want is a `find_node_at` function that returns the node that fully encloses offset.
+// It may return two nodes if the offset falls exactly between two nodes.
 
 /// Returns the node with a minimal range that fully contains `range`.
 ///
@@ -90,7 +92,7 @@ pub(crate) fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode 
             source_order::walk_keyword(self, keyword);
 
             if let Some(arg) = keyword.arg.as_ref() {
-                self.visit_identifier(arg)
+                self.visit_identifier(arg);
             }
         }
     }
@@ -126,6 +128,25 @@ impl<'a> CoveringNode<'a> {
 
     pub(crate) fn ancestors(&self) -> impl DoubleEndedIterator<Item = AnyNodeRef<'a>> + '_ {
         std::iter::once(self.node).chain(self.ancestors.iter().rev().copied())
+    }
+
+    /// Finds the first node that fully covers the range and fulfills the given predicate.
+    pub(crate) fn find(mut self, f: impl Fn(AnyNodeRef<'a>) -> bool) -> Result<Self, Self> {
+        if f(self.node) {
+            return Ok(self);
+        }
+
+        match self.ancestors.iter().rposition(|node| f(*node)) {
+            Some(index) => {
+                let node = { self.ancestors.drain(index..).next().unwrap() };
+
+                Ok(Self {
+                    node,
+                    ancestors: self.ancestors,
+                })
+            }
+            None => Err(self),
+        }
     }
 }
 

@@ -63,7 +63,6 @@
 //! [lexical analysis]: https://en.wikipedia.org/wiki/Lexical_analysis
 //! [parsing]: https://en.wikipedia.org/wiki/Parsing
 //! [lexer]: crate::lexer
-
 use std::iter::FusedIterator;
 use std::ops::Deref;
 
@@ -558,6 +557,52 @@ impl Tokens {
         }
     }
 
+    /// Searches the token(s) at `offset`.
+    ///
+    /// Returns [`TokenAt::Between`] if `offset` points directly inbetween two tokens
+    /// (the left token ends at `offset` and the right token starts at `offset`).
+    pub fn at_offset(&self, offset: TextSize) -> TokenAt {
+        match self.binary_search_by_key(&offset, ruff_text_size::Ranged::start) {
+            // The token at `index` starts exactly at `offset.
+            // ```python
+            // object.attribute
+            //        ^ OFFSET
+            // ```
+            Ok(index) => {
+                let token = self[index];
+                // `token` starts exactly at `offset`. Test if the offset is right between
+                // `token` and the previous token (if there's any)
+                if let Some(previous) = index.checked_sub(1).map(|idx| self[idx]) {
+                    if previous.end() == offset {
+                        return TokenAt::Between(previous, token);
+                    }
+                }
+
+                TokenAt::Single(token)
+            }
+
+            // No token found that starts exactly at the given offset.But it's possible that
+            // the token starting before `offset` fully encloses `offset` (it's end range ends after `offset`).
+            // ```python
+            // object.attribute
+            //   ^ OFFSET
+            // # or
+            // if True:
+            //     print("test")
+            //  ^ OFFSET
+            // ```
+            Err(index) => {
+                if let Some(previous) = index.checked_sub(1).map(|idx| self[idx]) {
+                    if previous.range().contains_inclusive(offset) {
+                        return TokenAt::Single(previous);
+                    }
+                }
+
+                TokenAt::None
+            }
+        }
+    }
+
     /// Returns a slice of tokens after the given [`TextSize`] offset.
     ///
     /// If the given offset is between two tokens, the returned slice will start from the following
@@ -609,6 +654,36 @@ impl Deref for Tokens {
         &self.raw
     }
 }
+
+/// One challenge here is how to we keep the spine to the root.
+pub enum TokenAt {
+    /// There's no node at the given offset
+    None,
+
+    /// A single node fully encloses the offset.
+    Single(Token),
+
+    /// The offset falls exactly between two nodes. E.g. `CURSOR` in `call<CURSOR>(arguments)` is
+    /// positioned exactly between the callee and the arguments.
+    Between(Token, Token),
+}
+
+impl Iterator for TokenAt {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match std::mem::replace(self, TokenAt::None) {
+            TokenAt::None => None,
+            TokenAt::Single(token) => Some(token),
+            TokenAt::Between(first, second) => {
+                *self = TokenAt::Single(second);
+                Some(first)
+            }
+        }
+    }
+}
+
+impl FusedIterator for TokenAt {}
 
 impl From<&Tokens> for CommentRanges {
     fn from(tokens: &Tokens) -> Self {
