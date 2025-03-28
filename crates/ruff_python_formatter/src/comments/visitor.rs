@@ -53,7 +53,7 @@ impl<'a, 'builder> CommentsVisitor<'a, 'builder> {
 
     pub(super) fn visit(mut self, root: AnyNodeRef<'a>) {
         if self.enter_node(root).is_traverse() {
-            root.visit_preorder(&mut self);
+            root.visit_source_order(&mut self);
         }
 
         self.leave_node(root);

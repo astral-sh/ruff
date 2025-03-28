@@ -6027,7 +6027,7 @@ impl AnyNodeRef<'_> {
 }
 
 impl<'a> AnyNodeRef<'a> {
-    pub fn visit_preorder<'b, V>(self, visitor: &mut V)
+    pub fn visit_source_order<'b, V>(self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
         'a: 'b,

@@ -481,7 +481,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     - `impl<'a> From<&'a TypeParamTypeVarTuple> for AnyNodeRef<'a>`
     - `impl Ranged for AnyNodeRef<'_>`
     - `fn AnyNodeRef::as_ptr(&self) -> std::ptr::NonNull<()>`
-    - `fn AnyNodeRef::visit_preorder(self, visitor &mut impl SourceOrderVisitor)`
+    - `fn AnyNodeRef::visit_source_order(self, visitor &mut impl SourceOrderVisitor)`
     """
 
     out.append("""
@@ -564,7 +564,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl<'a> AnyNodeRef<'a> {
-            pub fn visit_preorder<'b, V>(self, visitor: &mut V)
+            pub fn visit_source_order<'b, V>(self, visitor: &mut V)
             where
                 V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
                 'a: 'b,
