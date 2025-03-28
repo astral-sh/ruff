@@ -589,6 +589,31 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
+    fn predicate_kind(&mut self, pattern: &ast::Pattern) -> PatternPredicateKind<'db> {
+        match pattern {
+            ast::Pattern::MatchValue(pattern) => {
+                let value = self.add_standalone_expression(&pattern.value);
+                PatternPredicateKind::Value(value)
+            }
+            ast::Pattern::MatchSingleton(singleton) => {
+                PatternPredicateKind::Singleton(singleton.value)
+            }
+            ast::Pattern::MatchClass(pattern) => {
+                let cls = self.add_standalone_expression(&pattern.cls);
+                PatternPredicateKind::Class(cls)
+            }
+            ast::Pattern::MatchOr(pattern) => {
+                let predicates = pattern
+                    .patterns
+                    .iter()
+                    .map(|pattern| self.predicate_kind(pattern))
+                    .collect();
+                PatternPredicateKind::Or(predicates)
+            }
+            _ => PatternPredicateKind::Unsupported,
+        }
+    }
+
     fn add_pattern_narrowing_constraint(
         &mut self,
         subject: Expression<'db>,
@@ -606,22 +631,8 @@ impl<'db> SemanticIndexBuilder<'db> {
         //
         // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
 
+        let kind = self.predicate_kind(pattern);
         let guard = guard.map(|guard| self.add_standalone_expression(guard));
-
-        let kind = match pattern {
-            ast::Pattern::MatchValue(pattern) => {
-                let value = self.add_standalone_expression(&pattern.value);
-                PatternPredicateKind::Value(value, guard)
-            }
-            ast::Pattern::MatchSingleton(singleton) => {
-                PatternPredicateKind::Singleton(singleton.value, guard)
-            }
-            ast::Pattern::MatchClass(pattern) => {
-                let cls = self.add_standalone_expression(&pattern.cls);
-                PatternPredicateKind::Class(cls, guard)
-            }
-            _ => PatternPredicateKind::Unsupported,
-        };
 
         let pattern_predicate = PatternPredicate::new(
             self.db,
@@ -629,6 +640,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.current_scope(),
             subject,
             kind,
+            guard,
             countme::Count::default(),
         );
         let predicate = Predicate {

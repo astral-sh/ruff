@@ -114,3 +114,49 @@ match x:
 
 reveal_type(x)  # revealed: object
 ```
+
+## Or patterns
+
+```py
+def get_object() -> object:
+    return object()
+
+x = get_object()
+
+reveal_type(x)  # revealed: object
+
+match x:
+    case "foo" | 42 | None:
+        reveal_type(x)  # revealed: Literal["foo", 42] | None
+    case "foo" | tuple():
+        reveal_type(x)  # revealed: Literal["foo"] | tuple
+    case True | False:
+        reveal_type(x)  # revealed: bool
+    case 3.14 | 2.718 | 1.414:
+        reveal_type(x)  # revealed: float
+
+reveal_type(x)  # revealed: object
+```
+
+## Or patterns with guard
+
+```py
+def get_object() -> object:
+    return object()
+
+x = get_object()
+
+reveal_type(x)  # revealed: object
+
+match x:
+    case "foo" | 42 | None if reveal_type(x):  # revealed: Literal["foo", 42] | None
+        pass
+    case "foo" | tuple() if reveal_type(x):  # revealed: Literal["foo"] | tuple
+        pass
+    case True | False if reveal_type(x):  # revealed: bool
+        pass
+    case 3.14 | 2.718 | 1.414 if reveal_type(x):  # revealed: float
+        pass
+
+reveal_type(x)  # revealed: object
+```
