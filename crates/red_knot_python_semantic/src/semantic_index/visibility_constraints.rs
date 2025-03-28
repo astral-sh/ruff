@@ -181,7 +181,7 @@ use rustc_hash::FxHashMap;
 use crate::semantic_index::predicate::{
     PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
-use crate::types::{infer_expression_type, Truthiness};
+use crate::types::{infer_expression_type, Truthiness, Type};
 use crate::Db;
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -579,8 +579,32 @@ impl VisibilityConstraints {
                         Truthiness::Ambiguous
                     }
                 }
-                PatternPredicateKind::Singleton(..)
-                | PatternPredicateKind::Class(..)
+                PatternPredicateKind::Singleton(singleton, guard) => {
+                    let subject_expression = inner.subject(db);
+                    let subject_ty = infer_expression_type(db, subject_expression);
+
+                    if subject_ty.is_single_valued(db) {
+                        let truthiness = Truthiness::from(match singleton {
+                            ruff_python_ast::Singleton::None => subject_ty.is_none(db),
+                            ruff_python_ast::Singleton::True => {
+                                subject_ty.is_equivalent_to(db, Type::BooleanLiteral(true))
+                            }
+                            ruff_python_ast::Singleton::False => {
+                                subject_ty.is_equivalent_to(db, Type::BooleanLiteral(false))
+                            }
+                        });
+
+                        if truthiness.is_always_true() && guard.is_some() {
+                            // Fall back to ambiguous, the guard might change the result.
+                            Truthiness::Ambiguous
+                        } else {
+                            truthiness
+                        }
+                    } else {
+                        Truthiness::Ambiguous
+                    }
+                }
+                PatternPredicateKind::Class(..)
                 | PatternPredicateKind::Or(..)
                 | PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
             },
