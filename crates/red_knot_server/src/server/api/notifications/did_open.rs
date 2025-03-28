@@ -1,5 +1,5 @@
 use lsp_types::notification::DidOpenTextDocument;
-use lsp_types::DidOpenTextDocumentParams;
+use lsp_types::{DidOpenTextDocumentParams, TextDocumentItem};
 
 use red_knot_project::watch::ChangeEvent;
 use ruff_db::Db;
@@ -22,14 +22,22 @@ impl SyncNotificationHandler for DidOpenTextDocumentHandler {
         session: &mut Session,
         _notifier: Notifier,
         _requester: &mut Requester,
-        params: DidOpenTextDocumentParams,
+        DidOpenTextDocumentParams {
+            text_document:
+                TextDocumentItem {
+                    uri,
+                    text,
+                    version,
+                    language_id,
+                },
+        }: DidOpenTextDocumentParams,
     ) -> Result<()> {
-        let Ok(path) = url_to_any_system_path(&params.text_document.uri) else {
+        let Ok(path) = url_to_any_system_path(&uri) else {
             return Ok(());
         };
 
-        let document = TextDocument::new(params.text_document.text, params.text_document.version);
-        session.open_text_document(params.text_document.uri, document);
+        let document = TextDocument::new(text, version).with_language_id(&language_id);
+        session.open_text_document(uri, document);
 
         match path {
             AnySystemPath::System(path) => {
