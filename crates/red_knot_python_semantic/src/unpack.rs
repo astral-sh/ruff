@@ -108,10 +108,11 @@ pub(crate) enum UnpackKind {
     Assign,
 }
 
+/// The position of the target element in an unpacking.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update)]
 pub(crate) enum UnpackPosition {
-    /// The unpacking is the first element in the unpacking list
+    /// The target element is in the first position of the unpacking.
     First,
-    /// All subsequent unpackings
-    Subsequent,
+    /// The target element is in the position other than the first position of the unpacking.
+    Other,
 }
