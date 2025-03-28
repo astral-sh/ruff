@@ -651,9 +651,6 @@ jobs:
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
-      - name: "Install Rust toolchain"
-        run: rustup show
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Cache pre-commit"
