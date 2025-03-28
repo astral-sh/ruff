@@ -92,7 +92,7 @@ the latest release.
 
 ```console
 $ docker run -v .:/io -u "$(id -u):$(id -g)" --rm ghcr.io/astral-sh/ruff check
-$ docker run -v .:/io -u "$(id -u):$(id -g)" --rm ghcr.io/astral-sh/ruff:0.3.0 check
+$ docker run -v .:/io -u "$(id -u):$(id -g)" --rm ghcr.io/astral-sh/ruff:0.11.2 check
 
 $ # Or, for Podman on SELinux.
 $ docker run -v .:/io:Z -u "$(id -u):$(id -g)" --rm ghcr.io/astral-sh/ruff check
