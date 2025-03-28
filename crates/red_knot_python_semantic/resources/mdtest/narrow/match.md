@@ -82,8 +82,8 @@ match x:
         reveal_type(x)  # revealed: Literal[42]
     case 6.0:
         reveal_type(x)  # revealed: float
-    case 1 + 1j:
-        reveal_type(x)  # revealed: int | float | complex
+    case 1j:
+        reveal_type(x)  # revealed: complex
     case b"foo":
         reveal_type(x)  # revealed: Literal[b"foo"]
 
@@ -107,7 +107,7 @@ match x:
         pass
     case 6.0 if reveal_type(x):  # revealed: float
         pass
-    case 1 + 1j if reveal_type(x):  # revealed: int | float | complex
+    case 1j if reveal_type(x):  # revealed: complex
         pass
     case b"foo" if reveal_type(x):  # revealed: Literal[b"foo"]
         pass
