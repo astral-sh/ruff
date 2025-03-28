@@ -57,10 +57,10 @@ pub(crate) enum PredicateNode<'db> {
 /// Pattern kinds for which we support type narrowing and/or static visibility analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update)]
 pub(crate) enum PatternPredicateKind<'db> {
-    Singleton(Singleton, Option<Expression<'db>>),
-    Value(Expression<'db>, Option<Expression<'db>>),
-    Or(Vec<PatternPredicateKind<'db>>, Option<Expression<'db>>),
-    Class(Expression<'db>, Option<Expression<'db>>),
+    Singleton(Singleton),
+    Value(Expression<'db>),
+    Or(Vec<PatternPredicateKind<'db>>),
+    Class(Expression<'db>),
     Unsupported,
 }
 
@@ -74,6 +74,8 @@ pub(crate) struct PatternPredicate<'db> {
 
     #[return_ref]
     pub(crate) kind: PatternPredicateKind<'db>,
+
+    pub(crate) guard: Option<Expression<'db>>,
 
     count: countme::Count<PatternPredicate<'static>>,
 }

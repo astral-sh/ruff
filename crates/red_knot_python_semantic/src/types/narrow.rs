@@ -231,16 +231,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         subject: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
         match pattern_predicate_kind {
-            PatternPredicateKind::Singleton(singleton, _guard) => {
+            PatternPredicateKind::Singleton(singleton) => {
                 self.evaluate_match_pattern_singleton(subject, *singleton)
             }
-            PatternPredicateKind::Class(cls, _guard) => {
-                self.evaluate_match_pattern_class(subject, *cls)
-            }
-            PatternPredicateKind::Value(expr, _guard) => {
-                self.evaluate_match_pattern_value(subject, *expr)
-            }
-            PatternPredicateKind::Or(predicates, _guard) => {
+            PatternPredicateKind::Class(cls) => self.evaluate_match_pattern_class(subject, *cls),
+            PatternPredicateKind::Value(expr) => self.evaluate_match_pattern_value(subject, *expr),
+            PatternPredicateKind::Or(predicates) => {
                 self.evaluate_match_pattern_or(subject, predicates)
             }
             PatternPredicateKind::Unsupported => None,

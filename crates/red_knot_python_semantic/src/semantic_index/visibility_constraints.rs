@@ -560,7 +560,7 @@ impl VisibilityConstraints {
                 ty.bool(db).negate_if(!predicate.is_positive)
             }
             PredicateNode::Pattern(inner) => match inner.kind(db) {
-                PatternPredicateKind::Value(value, guard) => {
+                PatternPredicateKind::Value(value) => {
                     let subject_expression = inner.subject(db);
                     let subject_ty = infer_expression_type(db, subject_expression);
                     let value_ty = infer_expression_type(db, *value);
@@ -569,7 +569,7 @@ impl VisibilityConstraints {
                         let truthiness =
                             Truthiness::from(subject_ty.is_equivalent_to(db, value_ty));
 
-                        if truthiness.is_always_true() && guard.is_some() {
+                        if truthiness.is_always_true() && inner.guard(db).is_some() {
                             // Fall back to ambiguous, the guard might change the result.
                             Truthiness::Ambiguous
                         } else {
