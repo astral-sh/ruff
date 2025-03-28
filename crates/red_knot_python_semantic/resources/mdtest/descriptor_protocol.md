@@ -506,20 +506,19 @@ class C:
     @property
     def name(self) -> str:
         return self._name or "Unset"
-
-    @name.setter
-    def name(self, value: str | None) -> None:
-        self._value = value
+    # @name.setter
+    # def name(self, value: str | None) -> None:
+    #     self._value = value
 
 c = C()
 
 reveal_type(c._name)  # revealed: str | None
 
 # TODO: Should be `str`
-reveal_type(c.name)  # revealed: @Todo(@property)
+reveal_type(c.name)  # revealed: str
 
 # Should be `builtins.property`
-reveal_type(C.name)  # revealed: @Todo(@property)
+reveal_type(C.name)  # revealed: property
 
 # TODO: These should not emit errors
 c.name = "new"
@@ -583,7 +582,7 @@ reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: Literal[f]
 reveal_type(f.__get__.__hash__)  # revealed: <bound method `__hash__` of `MethodWrapperType`>
 
 # Attribute access on the wrapper-descriptor falls back to `WrapperDescriptorType`:
-reveal_type(wrapper_descriptor.__qualname__)  # revealed: @Todo(@property)
+reveal_type(wrapper_descriptor.__qualname__)  # revealed: str
 ```
 
 We can also bind the free function `f` to an instance of a class `C`:

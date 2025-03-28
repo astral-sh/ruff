@@ -13,7 +13,7 @@ python-version = "3.12"
 type IntOrStr = int | str
 
 reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
-reveal_type(IntOrStr.__name__)  # revealed: @Todo(@property)
+reveal_type(IntOrStr.__name__)  # revealed: str
 
 x: IntOrStr = 1
 
@@ -31,7 +31,7 @@ type IntOrStr = int | str
 # TODO: This should either fall back to the specified type from typeshed,
 # which is `Any`, or be the actual type of the runtime value expression
 # `int | str`, i.e. `types.UnionType`.
-reveal_type(IntOrStr.__value__)  # revealed: @Todo(@property)
+reveal_type(IntOrStr.__value__)  # revealed: Any
 ```
 
 ## Invalid assignment
@@ -74,7 +74,7 @@ type ListOrSet[T] = list[T] | set[T]
 
 # TODO: Should be `tuple[typing.TypeVar | typing.ParamSpec | typing.TypeVarTuple, ...]`,
 # as specified in the `typeshed` stubs.
-reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(@property)
+reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(full tuple[...] support)
 ```
 
 ## `TypeAliasType` properties

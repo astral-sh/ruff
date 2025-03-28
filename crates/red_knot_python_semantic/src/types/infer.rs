@@ -1428,12 +1428,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         ));
 
         for decorator_ty in decorator_tys.iter().rev() {
-            if let Type::ClassLiteral(class) = decorator_ty {
-                if class.class.is_known(self.db(), KnownClass::Property) {
-                    inferred_ty = todo_type!("@property");
-                    break;
-                }
-            }
+            // if let Type::ClassLiteral(class) = decorator_ty {
+            //     if class.class.is_known(self.db(), KnownClass::Property) {
+            //         inferred_ty = todo_type!("@property");
+            //         break;
+            //     }
+            // }
 
             if let Type::FunctionLiteral(function) = decorator_ty {
                 if function.is_known(self.db(), KnownFunction::Overload) {
