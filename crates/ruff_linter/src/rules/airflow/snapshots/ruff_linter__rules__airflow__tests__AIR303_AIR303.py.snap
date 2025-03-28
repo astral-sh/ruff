@@ -98,7 +98,7 @@ AIR303.py:220:1: AIR303 `airflow.sensors.s3_key_sensor.S3KeySensor` is moved int
 221 | S3ToRedshiftOperator()
 222 | S3ToRedshiftTransfer()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `S3KeySensor` instead.
+    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.sensors.s3.S3KeySensor` instead.
 
 AIR303.py:221:1: AIR303 `airflow.operators.s3_to_redshift_operator.S3ToRedshiftOperator` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -349,7 +349,7 @@ AIR303.py:247:1: AIR303 `airflow.operators.sql.SQLCheckOperator` is moved into `
     |
     = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
 
-AIR303.py:248:1: AIR303 `airflow.operators.sql.SQLColumnCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR303.py:248:1: AIR303 [*] `airflow.operators.sql.SQLColumnCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 246 | SQLCheckOperator2()
 247 | SQLCheckOperator3()
@@ -359,6 +359,24 @@ AIR303.py:248:1: AIR303 `airflow.operators.sql.SQLColumnCheckOperator` is moved 
 250 | SQLIntervalCheckOperator2()
     |
     = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql.SQLColumnCheckOperator` instead.
+
+ℹ Safe fix
+207 207 | from airflow.triggers.file import FileTrigger
+208 208 | from airflow.triggers.temporal import DateTimeTrigger
+209 209 | from airflow.www.security import FabAirflowSecurityManagerOverride
+    210 |+from airflow.providers.common.sql.operators.sql import SQLColumnCheckOperator
+210 211 | 
+211 212 | # apache-airflow-providers-amazon
+212 213 | provide_bucket_name()
+--------------------------------------------------------------------------------
+245 246 | SQLCheckOperator()
+246 247 | SQLCheckOperator2()
+247 248 | SQLCheckOperator3()
+248     |-SQLColumnCheckOperator2()
+    249 |+SQLColumnCheckOperator()
+249 250 | SQLIntervalCheckOperator()
+250 251 | SQLIntervalCheckOperator2()
+251 252 | SQLIntervalCheckOperator3()
 
 AIR303.py:249:1: AIR303 `airflow.operators.check_operator.SQLIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -518,7 +536,7 @@ AIR303.py:271:1: AIR303 `airflow.hooks.druid_hook.DruidDbApiHook` is moved into 
 272 | DruidHook()
 273 | DruidCheckOperator()
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `DruidDbApiHook` instead.
+    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidDbApiHook` instead.
 
 AIR303.py:272:1: AIR303 `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` provider in Airflow 3.0;
     |
@@ -528,9 +546,9 @@ AIR303.py:272:1: AIR303 `airflow.hooks.druid_hook.DruidHook` is moved into `apac
     | ^^^^^^^^^ AIR303
 273 | DruidCheckOperator()
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `DruidHook` instead.
+    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidHook` instead.
 
-AIR303.py:273:1: AIR303 `airflow.operators.druid_check_operator.DruidCheckOperator` is moved into `apache-druid` provider in Airflow 3.0;
+AIR303.py:273:1: AIR303 `airflow.operators.druid_check_operator.DruidCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 271 | DruidDbApiHook()
 272 | DruidHook()
@@ -539,7 +557,7 @@ AIR303.py:273:1: AIR303 `airflow.operators.druid_check_operator.DruidCheckOperat
 274 |
 275 | # apache-airflow-providers-apache-hdfs
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `DruidCheckOperator` instead.
+    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
 
 AIR303.py:276:1: AIR303 `airflow.hooks.webhdfs_hook.WebHDFSHook` is moved into `apache-hdfs` provider in Airflow 3.0;
     |
@@ -690,7 +708,7 @@ AIR303.py:291:1: AIR303 `airflow.operators.hive_to_samba_operator.HiveToSambaOpe
 292 | S3ToHiveOperator()
 293 | S3ToHiveTransfer()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `HiveToSambaOperator` instead.
+    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.hive_to_samba.HiveToSambaOperator` instead.
 
 AIR303.py:292:1: AIR303 `airflow.operators.s3_to_hive_operator.S3ToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -1013,7 +1031,7 @@ AIR303.py:328:1: AIR303 `airflow.kubernetes.pod_generator.merge_objects` is move
     |
     = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.merge_objects` instead.
 
-AIR303.py:329:1: AIR303 `airflow.kubernetes.pod.Port` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR303.py:329:1: AIR303 [*] `airflow.kubernetes.pod.Port` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
 327 | label_safe_datestring_to_datetime()
 328 | merge_objects()
@@ -1024,7 +1042,25 @@ AIR303.py:329:1: AIR303 `airflow.kubernetes.pod.Port` is moved into `cncf-kubern
     |
     = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1ContainerPort` instead.
 
-AIR303.py:330:1: AIR303 `airflow.kubernetes.pod.Resources` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+ℹ Safe fix
+207 207 | from airflow.triggers.file import FileTrigger
+208 208 | from airflow.triggers.temporal import DateTimeTrigger
+209 209 | from airflow.www.security import FabAirflowSecurityManagerOverride
+    210 |+from kubernetes.client.models import V1ContainerPort
+210 211 | 
+211 212 | # apache-airflow-providers-amazon
+212 213 | provide_bucket_name()
+--------------------------------------------------------------------------------
+326 327 | get_logs_task_metadata()
+327 328 | label_safe_datestring_to_datetime()
+328 329 | merge_objects()
+329     |-Port()
+    330 |+V1ContainerPort()
+330 331 | Resources()
+331 332 | PodRuntimeInfoEnv()
+332 333 | PodGeneratorDeprecated()
+
+AIR303.py:330:1: AIR303 [*] `airflow.kubernetes.pod.Resources` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
 328 | merge_objects()
 329 | Port()
@@ -1035,7 +1071,25 @@ AIR303.py:330:1: AIR303 `airflow.kubernetes.pod.Resources` is moved into `cncf-k
     |
     = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1ResourceRequirements` instead.
 
-AIR303.py:331:1: AIR303 `airflow.kubernetes.pod_runtime_info_env.PodRuntimeInfoEnv` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+ℹ Safe fix
+207 207 | from airflow.triggers.file import FileTrigger
+208 208 | from airflow.triggers.temporal import DateTimeTrigger
+209 209 | from airflow.www.security import FabAirflowSecurityManagerOverride
+    210 |+from kubernetes.client.models import V1ResourceRequirements
+210 211 | 
+211 212 | # apache-airflow-providers-amazon
+212 213 | provide_bucket_name()
+--------------------------------------------------------------------------------
+327 328 | label_safe_datestring_to_datetime()
+328 329 | merge_objects()
+329 330 | Port()
+330     |-Resources()
+    331 |+V1ResourceRequirements()
+331 332 | PodRuntimeInfoEnv()
+332 333 | PodGeneratorDeprecated()
+333 334 | Volume()
+
+AIR303.py:331:1: AIR303 [*] `airflow.kubernetes.pod_runtime_info_env.PodRuntimeInfoEnv` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
 329 | Port()
 330 | Resources()
@@ -1045,6 +1099,24 @@ AIR303.py:331:1: AIR303 `airflow.kubernetes.pod_runtime_info_env.PodRuntimeInfoE
 333 | Volume()
     |
     = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1EnvVar` instead.
+
+ℹ Safe fix
+207 207 | from airflow.triggers.file import FileTrigger
+208 208 | from airflow.triggers.temporal import DateTimeTrigger
+209 209 | from airflow.www.security import FabAirflowSecurityManagerOverride
+    210 |+from kubernetes.client.models import V1EnvVar
+210 211 | 
+211 212 | # apache-airflow-providers-amazon
+212 213 | provide_bucket_name()
+--------------------------------------------------------------------------------
+328 329 | merge_objects()
+329 330 | Port()
+330 331 | Resources()
+331     |-PodRuntimeInfoEnv()
+    332 |+V1EnvVar()
+332 333 | PodGeneratorDeprecated()
+333 334 | Volume()
+334 335 | VolumeMount()
 
 AIR303.py:332:1: AIR303 `airflow.kubernetes.pod_generator.PodGeneratorDeprecated` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1057,7 +1129,7 @@ AIR303.py:332:1: AIR303 `airflow.kubernetes.pod_generator.PodGeneratorDeprecated
     |
     = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.PodGenerator` instead.
 
-AIR303.py:333:1: AIR303 `airflow.kubernetes.volume.Volume` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+AIR303.py:333:1: AIR303 [*] `airflow.kubernetes.volume.Volume` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
 331 | PodRuntimeInfoEnv()
 332 | PodGeneratorDeprecated()
@@ -1068,7 +1140,25 @@ AIR303.py:333:1: AIR303 `airflow.kubernetes.volume.Volume` is moved into `cncf-k
     |
     = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1Volume` instead.
 
-AIR303.py:334:1: AIR303 `airflow.kubernetes.volume_mount.VolumeMount` is moved into `cncf-kubernetes` provider in Airflow 3.0;
+ℹ Safe fix
+207 207 | from airflow.triggers.file import FileTrigger
+208 208 | from airflow.triggers.temporal import DateTimeTrigger
+209 209 | from airflow.www.security import FabAirflowSecurityManagerOverride
+    210 |+from kubernetes.client.models import V1Volume
+210 211 | 
+211 212 | # apache-airflow-providers-amazon
+212 213 | provide_bucket_name()
+--------------------------------------------------------------------------------
+330 331 | Resources()
+331 332 | PodRuntimeInfoEnv()
+332 333 | PodGeneratorDeprecated()
+333     |-Volume()
+    334 |+V1Volume()
+334 335 | VolumeMount()
+335 336 | Secret()
+336 337 | 
+
+AIR303.py:334:1: AIR303 [*] `airflow.kubernetes.volume_mount.VolumeMount` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
 332 | PodGeneratorDeprecated()
 333 | Volume()
@@ -1077,6 +1167,24 @@ AIR303.py:334:1: AIR303 `airflow.kubernetes.volume_mount.VolumeMount` is moved i
 335 | Secret()
     |
     = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1VolumeMount` instead.
+
+ℹ Safe fix
+207 207 | from airflow.triggers.file import FileTrigger
+208 208 | from airflow.triggers.temporal import DateTimeTrigger
+209 209 | from airflow.www.security import FabAirflowSecurityManagerOverride
+    210 |+from kubernetes.client.models import V1VolumeMount
+210 211 | 
+211 212 | # apache-airflow-providers-amazon
+212 213 | provide_bucket_name()
+--------------------------------------------------------------------------------
+331 332 | PodRuntimeInfoEnv()
+332 333 | PodGeneratorDeprecated()
+333 334 | Volume()
+334     |-VolumeMount()
+    335 |+V1VolumeMount()
+335 336 | Secret()
+336 337 | 
+337 338 | add_pod_suffix()
 
 AIR303.py:335:1: AIR303 `airflow.kubernetes.secret.Secret` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
