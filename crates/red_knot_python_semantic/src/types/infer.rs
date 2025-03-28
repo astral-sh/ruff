@@ -6769,7 +6769,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     argument_type
                 }
             },
-            KnownInstanceType::CallableTypeFromFunction => match arguments_slice {
+            KnownInstanceType::CallableTypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {
                     self.context.report_lint(
                         &INVALID_TYPE_FORM,
@@ -6783,19 +6783,26 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 _ => {
                     let argument_type = self.infer_expression(arguments_slice);
-                    let Some(function_type) = argument_type.into_function_literal() else {
+                    let signatures = argument_type.signatures(db);
+
+                    // TODO overloads
+                    let Some(signature) = signatures.iter().flatten().next() else {
                         self.context.report_lint(
                             &INVALID_TYPE_FORM,
                             arguments_slice,
                             format_args!(
-                                "Expected the first argument to `{}` to be a function literal, but got `{}`",
+                                "Expected the first argument to `{}` to be a callable object, but got an object of type `{}`",
                                 known_instance.repr(db),
                                 argument_type.display(db)
                             ),
                         );
                         return Type::unknown();
                     };
-                    function_type.into_callable_type(db)
+
+                    Type::Callable(CallableType::General(GeneralCallableType::new(
+                        db,
+                        signature.clone(),
+                    )))
                 }
             },
 

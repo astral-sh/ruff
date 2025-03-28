@@ -1515,8 +1515,8 @@ pub enum KnownInstanceType<'db> {
     Intersection,
     /// The symbol `knot_extensions.TypeOf`
     TypeOf,
-    /// The symbol `knot_extensions.CallableTypeFromFunction`
-    CallableTypeFromFunction,
+    /// The symbol `knot_extensions.CallableTypeOf`
+    CallableTypeOf,
 
     // Various special forms, special aliases and type qualifiers that we don't yet understand
     // (all currently inferred as TODO in most contexts):
@@ -1579,7 +1579,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Not
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeFromFunction => Truthiness::AlwaysTrue,
+            | Self::CallableTypeOf => Truthiness::AlwaysTrue,
         }
     }
 
@@ -1626,7 +1626,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Not => "knot_extensions.Not",
             Self::Intersection => "knot_extensions.Intersection",
             Self::TypeOf => "knot_extensions.TypeOf",
-            Self::CallableTypeFromFunction => "knot_extensions.CallableTypeFromFunction",
+            Self::CallableTypeOf => "knot_extensions.CallableTypeOf",
         }
     }
 
@@ -1670,7 +1670,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeOf => KnownClass::SpecialForm,
             Self::Not => KnownClass::SpecialForm,
             Self::Intersection => KnownClass::SpecialForm,
-            Self::CallableTypeFromFunction => KnownClass::SpecialForm,
+            Self::CallableTypeOf => KnownClass::SpecialForm,
             Self::Unknown => KnownClass::Object,
             Self::AlwaysTruthy => KnownClass::Object,
             Self::AlwaysFalsy => KnownClass::Object,
@@ -1735,7 +1735,7 @@ impl<'db> KnownInstanceType<'db> {
             "Not" => Self::Not,
             "Intersection" => Self::Intersection,
             "TypeOf" => Self::TypeOf,
-            "CallableTypeFromFunction" => Self::CallableTypeFromFunction,
+            "CallableTypeOf" => Self::CallableTypeOf,
             _ => return None,
         };
 
@@ -1792,7 +1792,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Not
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeFromFunction => module.is_knot_extensions(),
+            | Self::CallableTypeOf => module.is_knot_extensions(),
         }
     }
 }
