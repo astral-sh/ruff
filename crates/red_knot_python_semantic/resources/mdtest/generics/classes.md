@@ -13,8 +13,6 @@ class C[T]: ...
 A class that inherits from a generic class, and fills its type parameters with typevars, is generic:
 
 ```py
-# TODO: no error
-# error: [non-subscriptable]
 class D[U](C[U]): ...
 ```
 
@@ -22,8 +20,6 @@ A class that inherits from a generic class, but fills its type parameters with c
 _not_ generic:
 
 ```py
-# TODO: no error
-# error: [non-subscriptable]
 class E(C[int]): ...
 ```
 
@@ -57,7 +53,7 @@ class D(C[T]): ...
 
 (Examples `E` and `F` from above do not have analogues in the legacy syntax.)
 
-## Inferring generic class parameters
+## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
 
@@ -65,15 +61,76 @@ The type parameter can be specified explicitly:
 class C[T]:
     x: T
 
-# TODO: no error
 # TODO: revealed: C[int]
-# error: [non-subscriptable]
 reveal_type(C[int]())  # revealed: C
 ```
+
+The specialization must match the generic types:
+
+```py
+# error: [too-many-positional-arguments] "Too many positional arguments to class `C`: expected 1, got 2"
+reveal_type(C[int, int]())  # revealed: Unknown
+```
+
+If the type variable has an upper bound, the specialized type must satisfy that bound:
+
+```py
+class Bounded[T: int]: ...
+class BoundedByUnion[T: int | str]: ...
+class IntSubclass(int): ...
+
+# TODO: revealed: Bounded[int]
+reveal_type(Bounded[int]())  # revealed: Bounded
+
+# TODO: revealed: Bounded[IntSubclass]
+reveal_type(Bounded[IntSubclass]())  # revealed: Bounded
+
+# error: [invalid-argument-type] "Object of type `str` cannot be assigned to parameter 1 (`T`) of class `Bounded`; expected type `int`"
+reveal_type(Bounded[str]())  # revealed: Unknown
+
+# error:  [invalid-argument-type] "Object of type `int | str` cannot be assigned to parameter 1 (`T`) of class `Bounded`; expected type `int`"
+reveal_type(Bounded[int | str]())  # revealed: Unknown
+
+# TODO: revealed: BoundedByUnion[int]
+reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion
+
+# TODO: revealed: BoundedByUnion[IntSubclass]
+reveal_type(BoundedByUnion[IntSubclass]())  # revealed: BoundedByUnion
+
+# TODO: revealed: BoundedByUnion[str]
+reveal_type(BoundedByUnion[str]())  # revealed: BoundedByUnion
+
+# TODO: revealed: BoundedByUnion[int | str]
+reveal_type(BoundedByUnion[int | str]())  # revealed: BoundedByUnion
+```
+
+If the type variable is constrained, the specialized type must satisfy those constraints:
+
+```py
+class Constrained[T: (int, str)]: ...
+
+# TODO: revealed: Constrained[int]
+reveal_type(Constrained[int]())  # revealed: Constrained
+
+# TODO: error: [invalid-argument-type]
+# TODO: revealed: Unknown
+reveal_type(Constrained[IntSubclass]())  # revealed: Constrained
+
+# TODO: revealed: Constrained[str]
+reveal_type(Constrained[str]())  # revealed: Constrained
+
+# error: [invalid-argument-type] "Object of type `object` cannot be assigned to parameter 1 (`T`) of class `Constrained`; expected type `int | str`"
+reveal_type(Constrained[object]())  # revealed: Unknown
+```
+
+## Inferring generic class parameters
 
 We can infer the type parameter from a type context:
 
 ```py
+class C[T]:
+    x: T
+
 c: C[int] = C()
 # TODO: revealed: C[int]
 reveal_type(c)  # revealed: C
@@ -131,16 +188,11 @@ propagate through:
 class Base[T]:
     x: T | None = None
 
-# TODO: no error
-# error: [non-subscriptable]
 class Sub[U](Base[U]): ...
 
-# TODO: no error
 # TODO: revealed: int | None
-# error: [non-subscriptable]
 reveal_type(Base[int].x)  # revealed: T | None
 # TODO: revealed: int | None
-# error: [non-subscriptable]
 reveal_type(Sub[int].x)  # revealed: T | None
 ```
 
@@ -155,8 +207,6 @@ Here, `Sub` is not a generic class, since it fills its superclass's type paramet
 
 ```pyi
 class Base[T]: ...
-# TODO: no error
-# error: [non-subscriptable]
 class Sub(Base[Sub]): ...
 
 reveal_type(Sub)  # revealed: Literal[Sub]
@@ -168,9 +218,6 @@ A similar case can work in a non-stub file, if forward references are stringifie
 
 ```py
 class Base[T]: ...
-
-# TODO: no error
-# error: [non-subscriptable]
 class Sub(Base["Sub"]): ...
 
 reveal_type(Sub)  # revealed: Literal[Sub]
@@ -183,8 +230,6 @@ In a non-stub file, without stringified forward references, this raises a `NameE
 ```py
 class Base[T]: ...
 
-# TODO: the unresolved-reference error is correct, the non-subscriptable is not
-# error: [non-subscriptable]
 # error: [unresolved-reference]
 class Sub(Base[Sub]): ...
 ```

@@ -61,6 +61,7 @@ use crate::symbol::{
     typing_extensions_symbol, Boundness, LookupError,
 };
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
+use crate::types::class::{ClassLiteralType, MetaclassErrorKind};
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -73,17 +74,17 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
+use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MetaclassCandidate, Parameter, ParameterForm, Parameters, SliceLiteralType, SubclassOfType,
-    Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
-    UnionType,
+    todo_type, Class, DynamicType, FunctionType, InstanceType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, Parameter,
+    ParameterForm, Parameters, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
+    Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
-use crate::types::{CallableType, GeneralCallableType, Signature};
+use crate::types::{CallableSignature, CallableType, GeneralCallableType, Signature, Signatures};
 use crate::unpack::Unpack;
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -1633,6 +1634,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_decorator(decorator);
         }
 
+        let generic_context = type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(self.db(), self.index, type_params)
+        });
+
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class_node))
@@ -1640,7 +1645,13 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let class = Class::new(self.db(), &name.id, body_scope, maybe_known_class);
+        let class = Class::new(
+            self.db(),
+            &name.id,
+            generic_context,
+            body_scope,
+            maybe_known_class,
+        );
         let class_ty = Type::class_literal(class);
 
         self.add_declaration_with_binding(
@@ -5557,9 +5568,53 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = subscript;
 
+        // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
+        // subscript inference logic and treat this as an explicit specialization.
+        // TODO: Move this logic into a custom callable, and update `find_name_in_mro` to return
+        // this callable as the `__class_getitem__` method on `type`. That probably requires
+        // updating all of the subscript logic below to use custom callables for all of the _other_
+        // special cases, too.
         let value_ty = self.infer_expression(value);
+        if let Type::ClassLiteral(ClassLiteralType { class }) = value_ty {
+            if let Some(generic_context) = class.generic_context(self.db()) {
+                return self.infer_explicit_class_specialization(
+                    subscript,
+                    value_ty,
+                    &generic_context,
+                    slice,
+                );
+            }
+        }
+
         let slice_ty = self.infer_expression(slice);
         self.infer_subscript_expression_types(value, value_ty, slice_ty)
+    }
+
+    fn infer_explicit_class_specialization(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_context: &GenericContext<'db>,
+        slice_node: &ast::Expr,
+    ) -> Type<'db> {
+        let mut call_argument_types = match slice_node {
+            ast::Expr::Tuple(tuple) => CallArgumentTypes::positional(
+                tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
+            ),
+            _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
+        };
+        let signatures = Signatures::single(CallableSignature::single(
+            value_ty,
+            generic_context.signature(self.db()),
+        ));
+        if let Err(CallError(_, bindings)) =
+            Bindings::match_parameters(signatures, &mut call_argument_types)
+                .check_types(self.db(), &mut call_argument_types)
+        {
+            bindings.report_diagnostics(&self.context, subscript.into());
+            return Type::unknown();
+        }
+        value_ty
     }
 
     fn infer_subscript_expression_types(
@@ -5789,9 +5844,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    if matches!(value_ty, Type::ClassLiteral(class_literal) if class_literal.class().is_known(self.db(), KnownClass::Type))
-                    {
-                        return KnownClass::GenericAlias.to_instance(self.db());
+                    if let Type::ClassLiteral(ClassLiteralType { class }) = value_ty {
+                        if class.is_known(self.db(), KnownClass::Type) {
+                            return KnownClass::GenericAlias.to_instance(self.db());
+                        }
+
+                        if class.generic_context(self.db()).is_some() {
+                            // TODO: specialize the generic class using these explicit type
+                            // variable assignments
+                            return value_ty;
+                        }
                     }
 
                     report_non_subscriptable(
@@ -5814,6 +5876,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                         // TODO: proper support for generic classes
                         // For now, just infer `Sequence`, if we see something like `Sequence[str]`. This allows us
                         // to look up attributes on generic base classes, even if we don't understand generics yet.
+                        // Note that this isn't handled by the clause up above for generic classes
+                        // that use legacy type variables and an explicit `Generic` base class.
+                        // Once we handle legacy typevars, this special case will be removed in
+                        // favor of the specialization logic above.
                         value_ty
                     }
                     _ => Type::unknown(),

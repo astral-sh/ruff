@@ -49,6 +49,7 @@ mod class_base;
 mod context;
 mod diagnostic;
 mod display;
+mod generics;
 mod infer;
 mod mro;
 mod narrow;
@@ -5479,6 +5480,10 @@ impl<'db> TupleType<'db> {
 
     pub fn len(&self, db: &'db dyn Db) -> usize {
         self.elements(db).len()
+    }
+
+    pub fn iter(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> + 'db + '_ {
+        self.elements(db).iter().copied()
     }
 }
 
