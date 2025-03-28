@@ -145,6 +145,8 @@ pub enum PythonPath {
     /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     SysPrefix(SystemPathBuf, SysPrefixPathOrigin),
 
+    Discover,
+
     /// Resolved site packages paths.
     ///
     /// This variant is mainly intended for testing where we want to skip resolving `site-packages`

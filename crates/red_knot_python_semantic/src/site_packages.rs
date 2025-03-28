@@ -459,6 +459,7 @@ pub enum SysPrefixPathOrigin {
     PythonCliFlag,
     VirtualEnvVar,
     Derived,
+    LocalVenv,
 }
 
 impl Display for SysPrefixPathOrigin {
@@ -467,6 +468,7 @@ impl Display for SysPrefixPathOrigin {
             Self::PythonCliFlag => f.write_str("`--python` argument"),
             Self::VirtualEnvVar => f.write_str("`VIRTUAL_ENV` environment variable"),
             Self::Derived => f.write_str("derived `sys.prefix` path"),
+            Self::LocalVenv => f.write_str("local virtual environment"),
         }
     }
 }
