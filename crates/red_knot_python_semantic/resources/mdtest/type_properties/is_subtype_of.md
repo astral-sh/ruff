@@ -11,9 +11,9 @@ See the [typing documentation] for more information.
 
 - `bool` is a subtype of `int`. This is modeled after Python's runtime behavior, where `int` is a
     supertype of `bool` (present in `bool`s bases and MRO).
-- `int` is not a subtype of `float`/`complex`, although this is muddied by the
-    [special case for float and complex] where annotations of `float` and `complex` are interpreted
-    as `int | float` and `int | float | complex`, respectively.
+- `int` is not a subtype of `float`/`complex`, although this is muddied by the \[special case for
+    float and complex\] where annotations of `float` and `complex` are interpreted as `int | float`
+    and `int | float | complex`, respectively.
 
 ```py
 from knot_extensions import is_subtype_of, static_assert, TypeOf
@@ -1029,6 +1029,30 @@ static_assert(is_subtype_of(CallableTypeFromFunction[mixed], CallableTypeFromFun
 static_assert(not is_subtype_of(CallableTypeFromFunction[empty], CallableTypeFromFunction[mixed]))
 ```
 
+#### Object
+
+```py
+from knot_extensions import CallableTypeFromFunction, is_subtype_of, static_assert, TypeOf
+from typing import Callable
+
+def f1(a: int, b: str, /, *c: float, d: int = 1, **e: float) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeFromFunction[f1], object))
+static_assert(not is_subtype_of(object, CallableTypeFromFunction[f1]))
+
+def _(
+    f3: Callable[[int, str], None],
+) -> None:
+    static_assert(is_subtype_of(TypeOf[f3], object))
+    static_assert(not is_subtype_of(object, TypeOf[f3]))
+
+class C:
+    def foo(self) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[C.foo], object))
+static_assert(not is_subtype_of(object, TypeOf[C.foo]))
+```
+
 ### Classes with __call__
 
 #### Normal instance method
@@ -1045,5 +1069,4 @@ static_assert(is_subtype_of(A, Callable[[int], int]))
 static_assert(not is_subtype_of(Callable[[int], int], A))
 ```
 
-[special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence

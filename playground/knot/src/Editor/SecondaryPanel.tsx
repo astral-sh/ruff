@@ -134,30 +134,53 @@ function RunWithPyiodide({
 
   if (output == null) {
     const handleRun = () => {
-      let stdout = "";
+      let combined_output = "";
 
-      pyodide.setStdout({
-        batched(output) {
-          stdout += output + "\n";
-        },
-      });
+      const outputHandler = (output: string) => {
+        combined_output += output + "\n";
+      };
+
+      pyodide.setStdout({ batched: outputHandler });
+      pyodide.setStderr({ batched: outputHandler });
 
       const main = files.selected == null ? "" : files.contents[files.selected];
 
+      let fileName = "main.py";
       for (const file of files.index) {
         pyodide.FS.writeFile(file.name, files.contents[file.id]);
+
+        if (file.id === files.selected) {
+          fileName = file.name;
+        }
       }
+
+      const dict = pyodide.globals.get("dict");
+      const globals = dict();
 
       try {
         // Patch up reveal types
         pyodide.runPython(`
         import builtins
-        builtins.reveal_type = print`);
 
-        pyodide.runPython(main);
-        setOutput(stdout);
+        def reveal_type(obj):
+          import typing
+          print(f"Runtime value is '{obj}'")
+          return typing.reveal_type(obj)
+
+        builtins.reveal_type = reveal_type`);
+
+        pyodide.runPython(main, {
+          globals,
+          locals: globals,
+          filename: fileName,
+        });
+
+        setOutput(combined_output);
       } catch (e) {
         setOutput(`Failed to run Python script: ${e}`);
+      } finally {
+        globals.destroy();
+        dict.destroy();
       }
     };
     return (
