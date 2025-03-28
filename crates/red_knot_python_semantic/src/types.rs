@@ -716,12 +716,12 @@ impl<'db> Type<'db> {
             }
 
             // This branch checks if we have a class literal with __call__ method(s) is it a subtype of a callable type?
-            (Type::Instance(InstanceType { class }), Type::Callable(_)) => {
-                let call_symbol = class.class_member(db, "__call__");
-                if call_symbol.symbol.is_unbound() {
+            (Type::ClassLiteral(ClassLiteralType { class }), Type::Callable(_)) => {
+                let call_symbol = class.class_member(db, "__call__").symbol;
+                if call_symbol.is_unbound() {
                     false
                 } else {
-                    match call_symbol.symbol {
+                    match call_symbol {
                         Symbol::Type(Type::FunctionLiteral(call_function), _) => {
                             let callable_type =
                                 call_function.into_callable_type_without_self_parameter(db);
