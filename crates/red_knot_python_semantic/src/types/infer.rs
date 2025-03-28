@@ -6769,7 +6769,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     argument_type
                 }
             },
-            KnownInstanceType::CallableTypeFromFunction => match arguments_slice {
+            KnownInstanceType::CallableTypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {
                     self.context.report_lint(
                         &INVALID_TYPE_FORM,
@@ -6791,7 +6791,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             &INVALID_TYPE_FORM,
                             arguments_slice,
                             format_args!(
-                                "Expected the first argument to `{}` to be a callable type, but got an object of type `{}`",
+                                "Expected the first argument to `{}` to be a callable object, but got an object of type `{}`",
                                 known_instance.repr(db),
                                 argument_type.display(db)
                             ),

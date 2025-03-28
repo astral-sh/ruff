@@ -398,16 +398,16 @@ def f(x: TypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
 
-## `CallableTypeFromFunction`
+## `CallableTypeOf`
 
-The `CallableTypeFromFunction` special form can be used to extract the `Callable` structural
-supertype of a callable type. This can be used to get the externally visibly signature of the
-object, which can then be used to test various type properties.
+The `CallableTypeOf` special form can be used to extract the `Callable` structural type inhabited by
+a given callable object. This can be used to get the externally visibly signature of the object,
+which can then be used to test various type properties.
 
 It accepts a single type parameter which is expected to be a callable object.
 
 ```py
-from knot_extensions import CallableTypeFromFunction
+from knot_extensions import CallableTypeOf
 
 def f1():
     return
@@ -418,14 +418,14 @@ def f2() -> int:
 def f3(x: int, y: str) -> None:
     return
 
-# error: [invalid-type-form] "Special form `knot_extensions.CallableTypeFromFunction` expected exactly one type parameter"
-c1: CallableTypeFromFunction[f1, f2]
+# error: [invalid-type-form] "Special form `knot_extensions.CallableTypeOf` expected exactly one type parameter"
+c1: CallableTypeOf[f1, f2]
 
-# error: [invalid-type-form] "Expected the first argument to `knot_extensions.CallableTypeFromFunction` to be a callable type, but got an object of type `Literal["foo"]`"
-c2: CallableTypeFromFunction["foo"]
+# error: [invalid-type-form] "Expected the first argument to `knot_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
+c2: CallableTypeOf["foo"]
 
-# error: [invalid-type-form] "`knot_extensions.CallableTypeFromFunction` requires exactly one argument when used in a type expression"
-def f(x: CallableTypeFromFunction) -> None:
+# error: [invalid-type-form] "`knot_extensions.CallableTypeOf` requires exactly one argument when used in a type expression"
+def f(x: CallableTypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
 
@@ -440,11 +440,11 @@ class Foo:
         return "foo"
 
 def _(
-    c1: CallableTypeFromFunction[f1],
-    c2: CallableTypeFromFunction[f2],
-    c3: CallableTypeFromFunction[f3],
-    c4: CallableTypeFromFunction[Foo],
-    c5: CallableTypeFromFunction[Foo(42).__call__],
+    c1: CallableTypeOf[f1],
+    c2: CallableTypeOf[f2],
+    c3: CallableTypeOf[f3],
+    c4: CallableTypeOf[Foo],
+    c5: CallableTypeOf[Foo(42).__call__],
 ) -> None:
     reveal_type(c1)  # revealed: () -> Unknown
     reveal_type(c2)  # revealed: () -> int

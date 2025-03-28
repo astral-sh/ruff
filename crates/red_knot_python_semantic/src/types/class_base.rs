@@ -103,7 +103,7 @@ impl<'db> ClassBase<'db> {
                 | KnownInstanceType::Not
                 | KnownInstanceType::Intersection
                 | KnownInstanceType::TypeOf
-                | KnownInstanceType::CallableTypeFromFunction
+                | KnownInstanceType::CallableTypeOf
                 | KnownInstanceType::AlwaysTruthy
                 | KnownInstanceType::AlwaysFalsy => None,
                 KnownInstanceType::Unknown => Some(Self::unknown()),
