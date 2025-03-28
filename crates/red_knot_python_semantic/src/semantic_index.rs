@@ -318,16 +318,18 @@ impl<'db> SemanticIndex<'db> {
                 return EagerBindingsResult::NoLongerInEagerContext;
             }
         }
-        match (|| {
-            let symbol_id = self.symbol_tables[enclosing_scope].symbol_id_by_name(symbol)?;
-            let key = EagerBindingsKey {
-                enclosing_scope,
-                enclosing_symbol: symbol_id,
-                nested_scope,
-            };
-            let id = self.eager_bindings.get(&key)?;
-            self.use_def_maps[enclosing_scope].eager_bindings(*id)
-        })() {
+        let Some(symbol_id) = self.symbol_tables[enclosing_scope].symbol_id_by_name(symbol) else {
+            return EagerBindingsResult::NotFound;
+        };
+        let key = EagerBindingsKey {
+            enclosing_scope,
+            enclosing_symbol: symbol_id,
+            nested_scope,
+        };
+        let Some(id) = self.eager_bindings.get(&key) else {
+            return EagerBindingsResult::NotFound;
+        };
+        match self.use_def_maps[enclosing_scope].eager_bindings(*id) {
             Some(bindings) => EagerBindingsResult::Found(bindings),
             None => EagerBindingsResult::NotFound,
         }
