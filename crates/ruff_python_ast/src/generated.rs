@@ -5050,6 +5050,17 @@ impl<'a> From<ModRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_mod_ref(self) -> Option<ModRef<'a>> {
+        match self {
+            Self::ModModule(node) => Some(ModRef::Module(node)),
+            Self::ModExpression(node) => Some(ModRef::Expression(node)),
+
+            _ => None,
+        }
+    }
+}
+
 impl<'a> From<&'a Stmt> for AnyNodeRef<'a> {
     fn from(node: &'a Stmt) -> AnyNodeRef<'a> {
         match node {
@@ -5110,6 +5121,40 @@ impl<'a> From<StmtRef<'a>> for AnyNodeRef<'a> {
             StmtRef::Break(node) => AnyNodeRef::StmtBreak(node),
             StmtRef::Continue(node) => AnyNodeRef::StmtContinue(node),
             StmtRef::IpyEscapeCommand(node) => AnyNodeRef::StmtIpyEscapeCommand(node),
+        }
+    }
+}
+
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_stmt_ref(self) -> Option<StmtRef<'a>> {
+        match self {
+            Self::StmtFunctionDef(node) => Some(StmtRef::FunctionDef(node)),
+            Self::StmtClassDef(node) => Some(StmtRef::ClassDef(node)),
+            Self::StmtReturn(node) => Some(StmtRef::Return(node)),
+            Self::StmtDelete(node) => Some(StmtRef::Delete(node)),
+            Self::StmtTypeAlias(node) => Some(StmtRef::TypeAlias(node)),
+            Self::StmtAssign(node) => Some(StmtRef::Assign(node)),
+            Self::StmtAugAssign(node) => Some(StmtRef::AugAssign(node)),
+            Self::StmtAnnAssign(node) => Some(StmtRef::AnnAssign(node)),
+            Self::StmtFor(node) => Some(StmtRef::For(node)),
+            Self::StmtWhile(node) => Some(StmtRef::While(node)),
+            Self::StmtIf(node) => Some(StmtRef::If(node)),
+            Self::StmtWith(node) => Some(StmtRef::With(node)),
+            Self::StmtMatch(node) => Some(StmtRef::Match(node)),
+            Self::StmtRaise(node) => Some(StmtRef::Raise(node)),
+            Self::StmtTry(node) => Some(StmtRef::Try(node)),
+            Self::StmtAssert(node) => Some(StmtRef::Assert(node)),
+            Self::StmtImport(node) => Some(StmtRef::Import(node)),
+            Self::StmtImportFrom(node) => Some(StmtRef::ImportFrom(node)),
+            Self::StmtGlobal(node) => Some(StmtRef::Global(node)),
+            Self::StmtNonlocal(node) => Some(StmtRef::Nonlocal(node)),
+            Self::StmtExpr(node) => Some(StmtRef::Expr(node)),
+            Self::StmtPass(node) => Some(StmtRef::Pass(node)),
+            Self::StmtBreak(node) => Some(StmtRef::Break(node)),
+            Self::StmtContinue(node) => Some(StmtRef::Continue(node)),
+            Self::StmtIpyEscapeCommand(node) => Some(StmtRef::IpyEscapeCommand(node)),
+
+            _ => None,
         }
     }
 }
@@ -5192,6 +5237,47 @@ impl<'a> From<ExprRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_expr_ref(self) -> Option<ExprRef<'a>> {
+        match self {
+            Self::ExprBoolOp(node) => Some(ExprRef::BoolOp(node)),
+            Self::ExprNamed(node) => Some(ExprRef::Named(node)),
+            Self::ExprBinOp(node) => Some(ExprRef::BinOp(node)),
+            Self::ExprUnaryOp(node) => Some(ExprRef::UnaryOp(node)),
+            Self::ExprLambda(node) => Some(ExprRef::Lambda(node)),
+            Self::ExprIf(node) => Some(ExprRef::If(node)),
+            Self::ExprDict(node) => Some(ExprRef::Dict(node)),
+            Self::ExprSet(node) => Some(ExprRef::Set(node)),
+            Self::ExprListComp(node) => Some(ExprRef::ListComp(node)),
+            Self::ExprSetComp(node) => Some(ExprRef::SetComp(node)),
+            Self::ExprDictComp(node) => Some(ExprRef::DictComp(node)),
+            Self::ExprGenerator(node) => Some(ExprRef::Generator(node)),
+            Self::ExprAwait(node) => Some(ExprRef::Await(node)),
+            Self::ExprYield(node) => Some(ExprRef::Yield(node)),
+            Self::ExprYieldFrom(node) => Some(ExprRef::YieldFrom(node)),
+            Self::ExprCompare(node) => Some(ExprRef::Compare(node)),
+            Self::ExprCall(node) => Some(ExprRef::Call(node)),
+            Self::ExprFString(node) => Some(ExprRef::FString(node)),
+            Self::ExprStringLiteral(node) => Some(ExprRef::StringLiteral(node)),
+            Self::ExprBytesLiteral(node) => Some(ExprRef::BytesLiteral(node)),
+            Self::ExprNumberLiteral(node) => Some(ExprRef::NumberLiteral(node)),
+            Self::ExprBooleanLiteral(node) => Some(ExprRef::BooleanLiteral(node)),
+            Self::ExprNoneLiteral(node) => Some(ExprRef::NoneLiteral(node)),
+            Self::ExprEllipsisLiteral(node) => Some(ExprRef::EllipsisLiteral(node)),
+            Self::ExprAttribute(node) => Some(ExprRef::Attribute(node)),
+            Self::ExprSubscript(node) => Some(ExprRef::Subscript(node)),
+            Self::ExprStarred(node) => Some(ExprRef::Starred(node)),
+            Self::ExprName(node) => Some(ExprRef::Name(node)),
+            Self::ExprList(node) => Some(ExprRef::List(node)),
+            Self::ExprTuple(node) => Some(ExprRef::Tuple(node)),
+            Self::ExprSlice(node) => Some(ExprRef::Slice(node)),
+            Self::ExprIpyEscapeCommand(node) => Some(ExprRef::IpyEscapeCommand(node)),
+
+            _ => None,
+        }
+    }
+}
+
 impl<'a> From<&'a ExceptHandler> for AnyNodeRef<'a> {
     fn from(node: &'a ExceptHandler) -> AnyNodeRef<'a> {
         match node {
@@ -5204,6 +5290,16 @@ impl<'a> From<ExceptHandlerRef<'a>> for AnyNodeRef<'a> {
     fn from(node: ExceptHandlerRef<'a>) -> AnyNodeRef<'a> {
         match node {
             ExceptHandlerRef::ExceptHandler(node) => AnyNodeRef::ExceptHandlerExceptHandler(node),
+        }
+    }
+}
+
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_except_handler_ref(self) -> Option<ExceptHandlerRef<'a>> {
+        match self {
+            Self::ExceptHandlerExceptHandler(node) => Some(ExceptHandlerRef::ExceptHandler(node)),
+
+            _ => None,
         }
     }
 }
@@ -5222,6 +5318,17 @@ impl<'a> From<FStringElementRef<'a>> for AnyNodeRef<'a> {
         match node {
             FStringElementRef::Expression(node) => AnyNodeRef::FStringExpressionElement(node),
             FStringElementRef::Literal(node) => AnyNodeRef::FStringLiteralElement(node),
+        }
+    }
+}
+
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_f_string_element_ref(self) -> Option<FStringElementRef<'a>> {
+        match self {
+            Self::FStringExpressionElement(node) => Some(FStringElementRef::Expression(node)),
+            Self::FStringLiteralElement(node) => Some(FStringElementRef::Literal(node)),
+
+            _ => None,
         }
     }
 }
@@ -5256,6 +5363,23 @@ impl<'a> From<PatternRef<'a>> for AnyNodeRef<'a> {
     }
 }
 
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_pattern_ref(self) -> Option<PatternRef<'a>> {
+        match self {
+            Self::PatternMatchValue(node) => Some(PatternRef::MatchValue(node)),
+            Self::PatternMatchSingleton(node) => Some(PatternRef::MatchSingleton(node)),
+            Self::PatternMatchSequence(node) => Some(PatternRef::MatchSequence(node)),
+            Self::PatternMatchMapping(node) => Some(PatternRef::MatchMapping(node)),
+            Self::PatternMatchClass(node) => Some(PatternRef::MatchClass(node)),
+            Self::PatternMatchStar(node) => Some(PatternRef::MatchStar(node)),
+            Self::PatternMatchAs(node) => Some(PatternRef::MatchAs(node)),
+            Self::PatternMatchOr(node) => Some(PatternRef::MatchOr(node)),
+
+            _ => None,
+        }
+    }
+}
+
 impl<'a> From<&'a TypeParam> for AnyNodeRef<'a> {
     fn from(node: &'a TypeParam) -> AnyNodeRef<'a> {
         match node {
@@ -5272,6 +5396,18 @@ impl<'a> From<TypeParamRef<'a>> for AnyNodeRef<'a> {
             TypeParamRef::TypeVar(node) => AnyNodeRef::TypeParamTypeVar(node),
             TypeParamRef::TypeVarTuple(node) => AnyNodeRef::TypeParamTypeVarTuple(node),
             TypeParamRef::ParamSpec(node) => AnyNodeRef::TypeParamParamSpec(node),
+        }
+    }
+}
+
+impl<'a> AnyNodeRef<'a> {
+    pub fn as_type_param_ref(self) -> Option<TypeParamRef<'a>> {
+        match self {
+            Self::TypeParamTypeVar(node) => Some(TypeParamRef::TypeVar(node)),
+            Self::TypeParamTypeVarTuple(node) => Some(TypeParamRef::TypeVarTuple(node)),
+            Self::TypeParamParamSpec(node) => Some(TypeParamRef::ParamSpec(node)),
+
+            _ => None,
         }
     }
 }

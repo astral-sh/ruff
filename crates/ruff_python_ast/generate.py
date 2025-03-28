@@ -525,6 +525,23 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
             }
         """)
 
+        # `as_*` methods to convert from `AnyNodeRef` to e.g. `ExprRef`
+        out.append(f"""
+            impl<'a> AnyNodeRef<'a> {{
+                pub fn as_{to_snake_case(group.ref_enum_ty)}(self) -> Option<{group.ref_enum_ty}<'a>> {{
+                    match self {{
+        """)
+        for node in group.nodes:
+            out.append(
+                f"Self::{node.name}(node) => Some({group.ref_enum_ty}::{node.variant}(node)),"
+            )
+        out.append("""
+                        _ => None,
+                    }
+                }
+            }
+        """)
+
     for node in ast.all_nodes:
         out.append(f"""
             impl<'a> From<&'a {node.ty}> for AnyNodeRef<'a> {{
