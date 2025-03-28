@@ -51,11 +51,10 @@ use crate::semantic_index::definition::{
     ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
-use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::{semantic_index, EagerBindingsResult, SemanticIndex};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -4131,8 +4130,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
+                // There is one exception to this rule: type parameter scopes can see
+                // names defined in an immediately-enclosing class scope.
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
-                if !enclosing_scope_id.is_function_like(db) {
+                let is_immediately_enclosing_scope = scope.is_type_parameter(db)
+                    && scope
+                        .scope(db)
+                        .parent()
+                        .is_some_and(|parent| parent == enclosing_scope_file_id);
+                if !enclosing_scope_id.is_function_like(db) && !is_immediately_enclosing_scope {
                     continue;
                 }
 
@@ -4143,12 +4149,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
                 if !self.is_deferred() {
-                    if let Some(bindings) = self.index.eager_bindings(
+                    match self.index.eager_bindings(
                         enclosing_scope_file_id,
                         symbol_name,
                         file_scope_id,
                     ) {
-                        return symbol_from_bindings(db, bindings).into();
+                        EagerBindingsResult::Found(bindings) => {
+                            return symbol_from_bindings(db, bindings).into();
+                        }
+                        // There are no visible bindings here.
+                        // Don't fall back to non-eager symbol resolution.
+                        EagerBindingsResult::NotFound => {
+                            continue;
+                        }
+                        EagerBindingsResult::NoLongerInEagerContext => {}
                     }
                 }
 
@@ -4176,12 +4190,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
 
                     if !self.is_deferred() {
-                        if let Some(bindings) = self.index.eager_bindings(
+                        match self.index.eager_bindings(
                             FileScopeId::global(),
                             symbol_name,
                             file_scope_id,
                         ) {
-                            return symbol_from_bindings(db, bindings).into();
+                            EagerBindingsResult::Found(bindings) => {
+                                return symbol_from_bindings(db, bindings).into();
+                            }
+                            // There are no visible bindings here.
+                            EagerBindingsResult::NotFound => {
+                                return Symbol::Unbound.into();
+                            }
+                            EagerBindingsResult::NoLongerInEagerContext => {}
                         }
                     }
 

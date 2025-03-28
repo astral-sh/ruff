@@ -256,11 +256,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             }
 
             for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
-                // Skip this symbol if this enclosing scope doesn't contain any bindings for
-                // it, or if the nested scope _does_.
-                if nested_symbol.is_bound() {
-                    continue;
-                }
+                // Skip this symbol if this enclosing scope doesn't contain any bindings for it.
+                // Note that even if this symbol is bound in the popped scope,
+                // it may refer to the enclosing scope bindings
+                // so we also need to snapshot the bindings of the enclosing scope.
+
                 let Some(enclosing_symbol_id) =
                     enclosing_symbol_table.symbol_id_by_name(nested_symbol.name())
                 else {
