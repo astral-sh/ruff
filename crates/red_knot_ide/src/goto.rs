@@ -229,7 +229,6 @@ pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Optio
             }
         },
 
-        // AnyNodeRef::Keyword(keyword) => Some(GotoTarget::KeywordArgument(keyword)),
         node => node.as_expr_ref().map(GotoTarget::Expression),
     }
 }
@@ -701,6 +700,84 @@ f(**kwargs<CURSOR>)
         3 |
         4 |             foo()
           |             ^^^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_narrowing() {
+        let test = goto_test(
+            r#"
+            def foo(a: str | None, b):
+                if a is not None:
+                    print(a<CURSOR>)
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+           --> stdlib/builtins.pyi:443:7
+            |
+        441 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        442 |
+        443 | class str(Sequence[str]):
+            |       ^^^
+        444 |     @overload
+        445 |     def __new__(cls, object: object = ...) -> Self: ...
+            |
+        info: Source
+         --> /main.py:4:27
+          |
+        2 |             def foo(a: str | None, b):
+        3 |                 if a is not None:
+        4 |                     print(a)
+          |                           ^
+          |
+        "###);
+    }
+
+    #[test]
+    fn goto_type_none() {
+        let test = goto_test(
+            r#"
+            def foo(a: str | None, b):
+                a<CURSOR>
+            "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r###"
+        info: lint:goto-type-definition: Type definition
+           --> stdlib/builtins.pyi:443:7
+            |
+        441 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        442 |
+        443 | class str(Sequence[str]):
+            |       ^^^
+        444 |     @overload
+        445 |     def __new__(cls, object: object = ...) -> Self: ...
+            |
+        info: Source
+         --> /main.py:3:17
+          |
+        2 |             def foo(a: str | None, b):
+        3 |                 a
+          |                 ^
+          |
+        info: lint:goto-type-definition: Type definition
+           --> stdlib/types.pyi:677:11
+            |
+        675 | if sys.version_info >= (3, 10):
+        676 |     @final
+        677 |     class NoneType:
+            |           ^^^^^^^^
+        678 |         def __bool__(self) -> Literal[False]: ...
+            |
+        info: Source
+         --> /main.py:3:17
+          |
+        2 |             def foo(a: str | None, b):
+        3 |                 a
+          |                 ^
           |
         "###);
     }
