@@ -129,7 +129,6 @@ match x:
     case "foo" | 42 | None:
         reveal_type(x)  # revealed: Literal["foo", 42] | None
     case "foo" | tuple():
-        # kill lamumbo
         reveal_type(x)  # revealed: Literal["foo"] | tuple
     case True | False:
         reveal_type(x)  # revealed: bool
