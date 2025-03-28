@@ -225,13 +225,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn evaluate_pattern_predicate(
+    fn evaluate_pattern_predicate_kind(
         &mut self,
-        pattern: PatternPredicate<'db>,
+        pattern_predicate_kind: &PatternPredicateKind<'db>,
+        subject: Expression<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
-        let subject = pattern.subject(self.db);
-
-        match pattern.kind(self.db) {
+        match pattern_predicate_kind {
             PatternPredicateKind::Singleton(singleton, _guard) => {
                 self.evaluate_match_pattern_singleton(subject, *singleton)
             }
@@ -241,9 +240,20 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             PatternPredicateKind::Value(expr, _guard) => {
                 self.evaluate_match_pattern_value(subject, *expr)
             }
-            // TODO: support more pattern kinds
+            PatternPredicateKind::Or(predicates, _guard) => {
+                self.evaluate_match_pattern_or(subject, predicates)
+            }
             PatternPredicateKind::Unsupported => None,
         }
+    }
+
+    fn evaluate_pattern_predicate(
+        &mut self,
+        pattern: PatternPredicate<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let subject = pattern.subject(self.db);
+
+        self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject)
     }
 
     fn symbols(&self) -> Arc<SymbolTable> {
@@ -503,6 +513,22 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         let symbol = self.expect_expr_name_symbol(&subject.node_ref(self.db).as_name_expr()?.id);
         let ty = infer_same_file_expression_type(self.db, value);
         Some(NarrowingConstraints::from_iter([(symbol, ty)]))
+    }
+
+    fn evaluate_match_pattern_or(
+        &mut self,
+        subject: Expression<'db>,
+        predicates: &Vec<PatternPredicateKind<'db>>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let db = self.db;
+
+        predicates
+            .iter()
+            .filter_map(|predicate| self.evaluate_pattern_predicate_kind(predicate, subject))
+            .reduce(|mut constraints, constraints_| {
+                merge_constraints_or(&mut constraints, &constraints_, db);
+                constraints
+            })
     }
 
     fn evaluate_bool_op(

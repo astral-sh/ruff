@@ -589,6 +589,39 @@ impl<'db> SemanticIndexBuilder<'db> {
         }
     }
 
+    fn predicate_kind(
+        &mut self,
+        pattern: &ast::Pattern,
+        guard: Option<&ast::Expr>,
+    ) -> PatternPredicateKind<'db> {
+        let guard = guard.map(|guard| self.add_standalone_expression(guard));
+        match pattern {
+            ast::Pattern::MatchValue(pattern) => {
+                let value = self.add_standalone_expression(&pattern.value);
+                PatternPredicateKind::Value(value, guard)
+            }
+            ast::Pattern::MatchSingleton(singleton) => {
+                PatternPredicateKind::Singleton(singleton.value, guard)
+            }
+            ast::Pattern::MatchClass(pattern) => {
+                let cls = self.add_standalone_expression(&pattern.cls);
+                PatternPredicateKind::Class(cls, guard)
+            }
+            ast::Pattern::MatchOr(pattern) => {
+                let predicates = pattern
+                    .patterns
+                    .iter()
+                    .map(|pattern| {
+                        // the guard will be handled by the outer PatternPredicateKind::Or
+                        self.predicate_kind(pattern, None)
+                    })
+                    .collect();
+                PatternPredicateKind::Or(predicates, guard)
+            }
+            _ => PatternPredicateKind::Unsupported,
+        }
+    }
+
     fn add_pattern_narrowing_constraint(
         &mut self,
         subject: Expression<'db>,
@@ -606,22 +639,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         //
         // See the comment in TypeInferenceBuilder::infer_match_pattern for more details.
 
-        let guard = guard.map(|guard| self.add_standalone_expression(guard));
-
-        let kind = match pattern {
-            ast::Pattern::MatchValue(pattern) => {
-                let value = self.add_standalone_expression(&pattern.value);
-                PatternPredicateKind::Value(value, guard)
-            }
-            ast::Pattern::MatchSingleton(singleton) => {
-                PatternPredicateKind::Singleton(singleton.value, guard)
-            }
-            ast::Pattern::MatchClass(pattern) => {
-                let cls = self.add_standalone_expression(&pattern.cls);
-                PatternPredicateKind::Class(cls, guard)
-            }
-            _ => PatternPredicateKind::Unsupported,
-        };
+        let kind = self.predicate_kind(pattern, guard);
 
         let pattern_predicate = PatternPredicate::new(
             self.db,

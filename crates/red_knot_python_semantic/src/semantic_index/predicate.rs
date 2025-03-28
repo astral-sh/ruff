@@ -59,6 +59,7 @@ pub(crate) enum PredicateNode<'db> {
 pub(crate) enum PatternPredicateKind<'db> {
     Singleton(Singleton, Option<Expression<'db>>),
     Value(Expression<'db>, Option<Expression<'db>>),
+    Or(Vec<PatternPredicateKind<'db>>, Option<Expression<'db>>),
     Class(Expression<'db>, Option<Expression<'db>>),
     Unsupported,
 }

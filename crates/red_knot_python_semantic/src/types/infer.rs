@@ -2119,6 +2119,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 self.infer_standalone_expression(cls);
             }
+            ast::Pattern::MatchOr(match_or) => {
+                for pattern in &match_or.patterns {
+                    self.infer_match_pattern(pattern);
+                }
+            }
             _ => {
                 self.infer_nested_match_pattern(pattern);
             }

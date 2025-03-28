@@ -581,6 +581,7 @@ impl VisibilityConstraints {
                 }
                 PatternPredicateKind::Singleton(..)
                 | PatternPredicateKind::Class(..)
+                | PatternPredicateKind::Or(..)
                 | PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
             },
         }
