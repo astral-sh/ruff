@@ -862,6 +862,9 @@ pub enum KnownClass {
     // Exposed as `types.EllipsisType` on Python >=3.10;
     // backported as `builtins.ellipsis` by typeshed on Python <=3.9
     EllipsisType,
+    // Exposed as `types.NotImplementedType` on Python >=3.10;
+    // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
+    NotImplementedType,
 }
 
 impl<'db> KnownClass {
@@ -929,6 +932,10 @@ impl<'db> KnownClass {
             | Self::Sized
             | Self::Enum
             | Self::Super
+            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
+            // and raises a `TypeError` in Python >=3.14
+            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
+            | Self::NotImplementedType
             | Self::Classmethod => Truthiness::Ambiguous,
         }
     }
@@ -993,6 +1000,13 @@ impl<'db> KnownClass {
                 } else {
                     "ellipsis"
                 }
+            }
+            Self::NotImplementedType => {
+                // Exposed as `types.NotImplementedType` on Python >=3.10;
+                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
+                // TODO: Currently, types.NotImplementedType is a type alias of `builtins._NotImplementedType`
+                // TypeAlias is not fully supported yet, so we use `_NotImplementedType` here for now
+                "_NotImplementedType"
             }
         }
     }
@@ -1167,6 +1181,11 @@ impl<'db> KnownClass {
                     KnownModule::Builtins
                 }
             }
+            Self::NotImplementedType => {
+                // TODO: Currently, types.NotImplementedType is a type alias of `builtins._NotImplementedType`
+                // TypeAlias is not fully supported yet, so we use `_NotImplementedType` here for now
+                KnownModule::Builtins
+            }
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
@@ -1182,7 +1201,8 @@ impl<'db> KnownClass {
             | Self::NoDefaultType
             | Self::VersionInfo
             | Self::EllipsisType
-            | Self::TypeAliasType => true,
+            | Self::TypeAliasType
+            | Self::NotImplementedType => true,
 
             Self::Bool
             | Self::Object
@@ -1231,13 +1251,13 @@ impl<'db> KnownClass {
     ///
     /// A singleton class is a class where it is known that only one instance can ever exist at runtime.
     pub(super) const fn is_singleton(self) -> bool {
-        // TODO there are other singleton types (NotImplementedType -- any others?)
         match self {
             Self::NoneType
             | Self::EllipsisType
             | Self::NoDefaultType
             | Self::VersionInfo
-            | Self::TypeAliasType => true,
+            | Self::TypeAliasType
+            | Self::NotImplementedType => true,
 
             Self::Bool
             | Self::Object
@@ -1340,6 +1360,15 @@ impl<'db> KnownClass {
             "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
                 Self::EllipsisType
             }
+            "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
+                Self::NotImplementedType
+            }
+            // TODO: It should be changed to `NotImplementedType` when we have support for TypeAlias
+            "_NotImplementedType"
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
+            {
+                Self::NotImplementedType
+            }
             _ => return None,
         };
 
@@ -1385,6 +1414,7 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::Enum
             | Self::Super
+            | Self::NotImplementedType
             | Self::WrapperDescriptorType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm

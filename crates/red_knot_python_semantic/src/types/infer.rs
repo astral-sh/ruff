@@ -1266,11 +1266,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             {
                 return;
             }
-            for invalid in self
-                .return_types_and_ranges
-                .iter()
-                .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
-            {
+            for invalid in self.return_types_and_ranges.iter().filter(|ty_range| {
+                !ty_range.ty.is_assignable_to(self.db(), declared_ty)
+                    && !ty_range.ty.is_notimplemented(self.db())
+            }) {
                 report_invalid_return_type(
                     &self.context,
                     invalid.range,
