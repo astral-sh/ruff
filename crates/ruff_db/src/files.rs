@@ -1,12 +1,6 @@
 use std::fmt;
 use std::sync::Arc;
 
-use crate::file_revision::FileRevision;
-use crate::files::file_root::FileRoots;
-use crate::files::private::FileStatus;
-use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
-use crate::vendored::{VendoredPath, VendoredPathBuf};
-use crate::{vendored, Db, FxDashMap};
 use countme::Count;
 use dashmap::mapref::entry::Entry;
 pub use file_root::{FileRoot, FileRootKind};
@@ -16,6 +10,13 @@ use ruff_python_ast::PySourceType;
 use ruff_text_size::{Ranged, TextRange};
 use salsa::plumbing::AsId;
 use salsa::{Durability, Setter};
+
+use crate::file_revision::FileRevision;
+use crate::files::file_root::FileRoots;
+use crate::files::private::FileStatus;
+use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use crate::vendored::{VendoredPath, VendoredPathBuf};
+use crate::{vendored, Db, FxDashMap};
 
 mod file_root;
 mod path;

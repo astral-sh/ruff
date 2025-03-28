@@ -250,6 +250,7 @@ impl SubDiagnostic {
     /// If a sub-diagnostic has not been marked as printed before being
     /// dropped, then its `Drop` implementation will panic in debug mode.
     pub fn printed(&mut self) {
+        #[cfg(debug_assertions)]
         {
             self.inner.printed = true;
         }

@@ -2,7 +2,7 @@ use red_knot_python_semantic::Db as SemanticDb;
 use ruff_db::{Db as SourceDb, Upcast};
 
 #[salsa::db]
-pub trait Db: SemanticDb + Upcast<dyn SourceDb> {}
+pub trait Db: SemanticDb + Upcast<dyn SemanticDb> + Upcast<dyn SourceDb> {}
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -90,6 +90,16 @@ pub(crate) mod tests {
             self
         }
         fn upcast_mut(&mut self) -> &mut (dyn SourceDb + 'static) {
+            self
+        }
+    }
+
+    impl Upcast<dyn SemanticDb> for TestDb {
+        fn upcast(&self) -> &(dyn SemanticDb + 'static) {
+            self
+        }
+
+        fn upcast_mut(&mut self) -> &mut dyn SemanticDb {
             self
         }
     }

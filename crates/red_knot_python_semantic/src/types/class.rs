@@ -153,7 +153,7 @@ impl<'db> Class<'db> {
         self.body_scope(db).node(db).expect_class()
     }
 
-    /// Returns the file range of the classe's name.
+    /// Returns the file range of the class's name.
     pub fn focus_range(self, db: &dyn Db) -> FileRange {
         FileRange::new(self.file(db), self.node(db).name.range)
     }

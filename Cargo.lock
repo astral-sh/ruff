@@ -2507,10 +2507,15 @@ dependencies = [
 name = "red_knot_ide"
 version = "0.0.0"
 dependencies = [
+ "insta",
  "red_knot_python_semantic",
  "red_knot_vendored",
  "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
  "salsa",
+ "smallvec",
  "tracing",
 ]
 
@@ -2593,18 +2598,17 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "crossbeam",
- "insta",
  "jod-thread",
  "libc",
  "lsp-server",
  "lsp-types",
+ "red_knot_ide",
  "red_knot_project",
  "red_knot_python_semantic",
  "red_knot_vendored",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_ast",
- "ruff_python_parser",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash 2.1.1",
@@ -2612,7 +2616,6 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
- "smallvec",
  "tracing",
  "tracing-subscriber",
 ]

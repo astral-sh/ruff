@@ -1,20 +1,13 @@
-use crate::document::{FileRangeExt, ToRangeExt};
 use crate::find_node::covering_node;
-use crate::system::file_to_url;
-use crate::PositionEncoding;
-use lsp_types::Location;
-use red_knot_python_semantic::types::{
-    ClassLiteralType, FunctionType, InstanceType, KnownInstanceType, ModuleLiteralType, Type,
-};
-use red_knot_python_semantic::{Db, HasType, SemanticModel};
+use crate::{Db, HasNavigationTargets, NavigationTargets, RangeInfo};
+use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{parsed_module, ParsedModule};
-use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-pub(crate) fn go_to_type_definition(
+pub fn go_to_type_definition(
     db: &dyn Db,
     file: File,
     offset: TextSize,
@@ -22,7 +15,7 @@ pub(crate) fn go_to_type_definition(
     let parsed = parsed_module(db.upcast(), file);
     let goto_target = find_goto_target(parsed, offset)?;
 
-    let model = SemanticModel::new(db, file);
+    let model = SemanticModel::new(db.upcast(), file);
 
     let ty = match goto_target {
         GotoTarget::Expression(expression) => expression.inferred_type(&model),
@@ -57,7 +50,10 @@ pub(crate) fn go_to_type_definition(
         | GotoTarget::TypeParamTypeVarTupleName(_) => return None,
     };
 
-    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+    tracing::debug!(
+        "Inferred type of covering node is {}",
+        ty.display(db.upcast())
+    );
 
     Some(RangeInfo {
         range: FileRange::new(file, goto_target.range()),
@@ -238,203 +234,11 @@ pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Optio
     }
 }
 
-/// Information associated with a text range.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub(crate) struct RangeInfo<T> {
-    pub range: FileRange,
-    pub info: T,
-}
-
-/// Target to which the editor can navigate to.
-#[derive(Debug, Clone)]
-pub(crate) struct NavigationTarget {
-    file: File,
-
-    /// The range that should be focused when navigating to the target.
-    ///
-    /// This is typically not the full range of the node. For example, it's the range of the class's name in a class definition.
-    ///
-    /// The `focus_range` must be fully covered by `full_range`.
-    focus_range: TextRange,
-
-    /// The range covering the entire target.
-    full_range: TextRange,
-}
-
-impl NavigationTarget {
-    pub(crate) fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location> {
-        FileRange::new(self.file, self.focus_range).to_location(db, encoding)
-    }
-
-    pub(crate) fn to_link(
-        &self,
-        db: &dyn Db,
-        src: Option<FileRange>,
-        encoding: PositionEncoding,
-    ) -> Option<lsp_types::LocationLink> {
-        let uri = file_to_url(db, self.file)?;
-        let source = source_text(db.upcast(), self.file);
-        let index = line_index(db.upcast(), self.file);
-
-        let target_range = self.full_range.to_range(&source, &index, encoding);
-        let selection_range = self.focus_range.to_range(&source, &index, encoding);
-
-        let src = src.map(|src| {
-            let source = source_text(db.upcast(), src.file());
-            let index = line_index(db.upcast(), src.file());
-
-            src.range().to_range(&source, &index, encoding)
-        });
-
-        Some(lsp_types::LocationLink {
-            target_uri: uri,
-            target_range,
-            target_selection_range: selection_range,
-            origin_selection_range: src,
-        })
-    }
-}
-
-#[derive(Debug, Clone)]
-pub(crate) struct NavigationTargets(smallvec::SmallVec<[NavigationTarget; 1]>);
-
-impl NavigationTargets {
-    fn single(target: NavigationTarget) -> Self {
-        Self(smallvec::smallvec![target])
-    }
-
-    fn empty() -> Self {
-        Self(smallvec::SmallVec::new())
-    }
-
-    fn is_empty(&self) -> bool {
-        self.0.is_empty()
-    }
-
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-impl IntoIterator for NavigationTargets {
-    type Item = NavigationTarget;
-    type IntoIter = smallvec::IntoIter<[NavigationTarget; 1]>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl FromIterator<NavigationTarget> for NavigationTargets {
-    fn from_iter<T: IntoIterator<Item = NavigationTarget>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
-    }
-}
-
-trait HasNavigationTargets {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets;
-}
-
-impl HasNavigationTargets for Type<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        match self {
-            Type::FunctionLiteral(function) => function.navigation_targets(db),
-            Type::ModuleLiteral(module) => module.navigation_targets(db),
-            Type::Union(union) => union
-                .iter(db)
-                .flat_map(|target| target.navigation_targets(db))
-                .collect(),
-            Type::ClassLiteral(class) => class.navigation_targets(db),
-            Type::Instance(instance) => instance.navigation_targets(db),
-            Type::KnownInstance(instance) => instance.navigation_targets(db),
-            Type::StringLiteral(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_) => self.to_meta_type(db).navigation_targets(db),
-
-            Type::Dynamic(_)
-            | Type::SubclassOf(_)
-            | Type::Never
-            | Type::Callable(_)
-            | Type::Intersection(_)
-            | Type::Tuple(_) => NavigationTargets::empty(),
-        }
-    }
-}
-
-impl HasNavigationTargets for FunctionType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let function_range = self.focus_range(db);
-        NavigationTargets::single(NavigationTarget {
-            file: function_range.file(),
-            focus_range: function_range.range(),
-            full_range: self.full_range(db).range(),
-        })
-    }
-}
-
-impl HasNavigationTargets for ClassLiteralType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let class = self.class();
-        let class_range = class.focus_range(db);
-        NavigationTargets::single(NavigationTarget {
-            file: class_range.file(),
-            focus_range: class_range.range(),
-            full_range: class.full_range(db).range(),
-        })
-    }
-}
-
-impl HasNavigationTargets for InstanceType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let class = self.class();
-        let class_range = class.focus_range(db);
-        NavigationTargets::single(NavigationTarget {
-            file: class_range.file(),
-            focus_range: class_range.range(),
-            full_range: class.full_range(db).range(),
-        })
-    }
-}
-
-impl HasNavigationTargets for ModuleLiteralType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let file = self.module(db).file();
-
-        NavigationTargets::single(NavigationTarget {
-            file,
-            focus_range: TextRange::default(),
-            full_range: TextRange::default(),
-        })
-    }
-}
-
-impl HasNavigationTargets for KnownInstanceType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        match self {
-            KnownInstanceType::TypeVar(var) => {
-                let range = var.range(db);
-                NavigationTargets::single(NavigationTarget {
-                    file: range.file(),
-                    focus_range: range.range(),
-                    full_range: range.range(),
-                })
-            }
-
-            // TODO: Track the definition of `KnownInstance` and navigate to their definition.
-            _ => NavigationTargets::empty(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::semantic::goto::go_to_type_definition;
-    use crate::tests::TestDb;
+
+    use crate::db::tests::TestDb;
+    use crate::go_to_type_definition;
     use insta::assert_snapshot;
     use red_knot_python_semantic::{
         Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,

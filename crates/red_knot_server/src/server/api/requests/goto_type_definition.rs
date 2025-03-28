@@ -2,13 +2,14 @@ use std::borrow::Cow;
 
 use lsp_types::request::{GotoTypeDefinition, GotoTypeDefinitionParams};
 use lsp_types::{GotoDefinitionResponse, Url};
+use red_knot_ide::go_to_type_definition;
 use red_knot_project::ProjectDatabase;
 use ruff_db::source::{line_index, source_text};
 
-use crate::document::PositionExt;
+use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::client::Notifier;
-use crate::{semantic::goto, DocumentSnapshot};
+use crate::DocumentSnapshot;
 
 pub(crate) struct GotoTypeDefinitionRequestHandler;
 
@@ -27,8 +28,6 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
         _notifier: Notifier,
         params: GotoTypeDefinitionParams,
     ) -> crate::server::Result<Option<GotoDefinitionResponse>> {
-        // We get the request. Now the first thing we have to do is get what's underneath the cursor.
-
         let Some(file) = snapshot.file(&db) else {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
@@ -42,7 +41,7 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
             snapshot.encoding(),
         );
 
-        let Some(range_info) = goto::go_to_type_definition(&db, file, offset) else {
+        let Some(range_info) = go_to_type_definition(&db, file, offset) else {
             return Ok(None);
         };
 

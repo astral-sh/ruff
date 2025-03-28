@@ -12,13 +12,19 @@ license = { workspace = true }
 
 [dependencies]
 ruff_db = { workspace = true }
+ruff_python_ast = { workspace = true }
+ruff_python_parser = { workspace = true }
+ruff_text_size = { workspace = true }
 red_knot_python_semantic = { workspace = true }
 
 salsa = { workspace = true }
+smallvec = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
 red_knot_vendored = { workspace = true }
+
+insta = { workspace = true }
 
 [lints]
 workspace = true

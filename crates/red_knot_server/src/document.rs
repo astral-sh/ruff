@@ -1,9 +1,11 @@
 //! Types and utilities for working with text, modifying source files, and `Ruff <-> LSP` type conversion.
 
+mod location;
 mod notebook;
 mod range;
 mod text_document;
 
+pub(crate) use location::ToLink;
 use lsp_types::{PositionEncodingKind, Url};
 pub use notebook::NotebookDocument;
 pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, ToRangeExt};
