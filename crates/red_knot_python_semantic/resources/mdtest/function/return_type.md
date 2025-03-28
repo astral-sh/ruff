@@ -269,3 +269,39 @@ def f(cond: bool) -> int:
     if cond:
         return 2
 ```
+
+## NotImplement
+
+`NotImplement` is a special symbol in Python. It is commonly used to control the fallback behavior
+of special dunder methods.\
+You can find more details in the
+[documentation](https://docs.python.org/3/library/numbers.html#implementing-the-arithmetic-operations).
+
+```py
+from __future__ import annotations
+
+class A:
+    def __add__(self, o: A) -> A:
+        return NotImplemented
+```
+
+However, as shown below, `NotImplemented` should not cause issues with the declared return type.
+
+```py
+def f() -> int:
+    return NotImplemented
+
+def f(cond: bool) -> int:
+    if cond:
+        return 1
+    else:
+        return NotImplemented
+
+def f(x: int) -> int | str:
+    if x < 0:
+        return -1
+    elif x == 0:
+        return NotImplemented
+    else:
+        return "test"
+```
