@@ -540,21 +540,19 @@ impl<'a> SemanticModel<'a> {
             return ReadResult::NotFound;
         };
 
-        if name_expr.is_none() {
-            return ReadResult::NotFound;
-        }
-
         name_segments.reverse();
         let full_name = name_segments.join(".");
 
-        let ancestor_scope_ids: Vec<_> = self.scopes.ancestor_ids(self.scope_id).collect();
-        let mut binding_ids: Vec<(BindingId, ScopeId)> = vec![];
-
-        for scope_id in ancestor_scope_ids {
-            for binding_id in self.scopes[scope_id].get_all(name_expr.unwrap().id.as_str()) {
-                binding_ids.push((binding_id, scope_id));
-            }
-        }
+        let binding_ids: Vec<_> = self
+            .scopes
+            .ancestor_ids(self.scope_id)
+            .flat_map(|scope_id| {
+                self.scopes[scope_id]
+                    .get_all(name_expr.unwrap().id.as_str())
+                    .into_iter()
+                    .map(move |binding_id| (binding_id, scope_id))
+            })
+            .collect();
 
         for (binding_id, scope_id) in &binding_ids {
             if let BindingKind::SubmoduleImport(binding_kind) = &self.binding(*binding_id).kind {
