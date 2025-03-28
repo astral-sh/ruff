@@ -84,7 +84,7 @@ use crate::types::{
     UnionType,
 };
 use crate::types::{CallableType, GeneralCallableType, Signature};
-use crate::unpack::Unpack;
+use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
@@ -1823,10 +1823,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             todo_type!("async `with` statement")
         } else {
             match with_item.target() {
-                TargetKind::Sequence(unpack) => {
+                TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
-                    if with_item.is_first() {
+                    if unpack_position == UnpackPosition::First {
                         self.context.extend(unpacked);
                     }
                     unpacked.expression_type(name_ast_id)
@@ -2627,11 +2627,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_standalone_expression(value);
 
         let mut target_ty = match assignment.target() {
-            TargetKind::Sequence(unpack) => {
+            TargetKind::Sequence(unpack_position, unpack) => {
                 let unpacked = infer_unpack_types(self.db(), unpack);
                 // Only copy the diagnostics if this is the first assignment to avoid duplicating the
                 // unpack assignments.
-                if assignment.is_first() {
+                if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked);
                 }
 
@@ -2929,9 +2929,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             todo_type!("async iterables/iterators")
         } else {
             match for_stmt.target() {
-                TargetKind::Sequence(unpack) => {
+                TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
-                    if for_stmt.is_first() {
+                    if unpack_position == UnpackPosition::First {
                         self.context.extend(unpacked);
                     }
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());

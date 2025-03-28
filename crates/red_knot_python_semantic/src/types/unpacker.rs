@@ -8,7 +8,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
 use crate::types::{infer_expression_types, todo_type, Type, TypeCheckDiagnostics};
-use crate::unpack::UnpackValue;
+use crate::unpack::{UnpackKind, UnpackValue};
 use crate::Db;
 
 use super::context::{InferContext, WithDiagnostics};
@@ -45,30 +45,27 @@ impl<'db> Unpacker<'db> {
         let value_type = infer_expression_types(self.db(), value.expression())
             .expression_type(value.scoped_expression_id(self.db(), self.scope));
 
-        let value_type = match value {
-            UnpackValue::Assign(expression) => {
+        let value_type = match value.kind() {
+            UnpackKind::Assign => {
                 if self.context.in_stub()
-                    && expression.node_ref(self.db()).is_ellipsis_literal_expr()
+                    && value
+                        .expression()
+                        .node_ref(self.db())
+                        .is_ellipsis_literal_expr()
                 {
                     Type::unknown()
                 } else {
                     value_type
                 }
             }
-            UnpackValue::Iterable(_) => value_type.try_iterate(self.db()).unwrap_or_else(|err| {
+            UnpackKind::Iterable => value_type.try_iterate(self.db()).unwrap_or_else(|err| {
                 err.report_diagnostic(&self.context, value_type, value.as_any_node_ref(self.db()));
                 err.fallback_element_type(self.db())
             }),
-            UnpackValue::ContextManager(_) => {
-                value_type.try_enter(self.db()).unwrap_or_else(|err| {
-                    err.report_diagnostic(
-                        &self.context,
-                        value_type,
-                        value.as_any_node_ref(self.db()),
-                    );
-                    err.fallback_enter_type(self.db())
-                })
-            }
+            UnpackKind::ContextManager => value_type.try_enter(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, value_type, value.as_any_node_ref(self.db()));
+                err.fallback_enter_type(self.db())
+            }),
         };
 
         self.unpack_inner(target, value.as_any_node_ref(self.db()), value_type);

@@ -8,7 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
-use crate::unpack::Unpack;
+use crate::unpack::{Unpack, UnpackPosition};
 use crate::Db;
 
 /// A definition of a symbol.
@@ -239,27 +239,24 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<Unpack<'a>>,
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
     pub(crate) value: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
-    pub(crate) first: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct WithItemDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<Unpack<'a>>,
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
     pub(crate) context_expr: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
-    pub(crate) first: bool,
     pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ForStmtDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<Unpack<'a>>,
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
     pub(crate) iterable: &'a ast::Expr,
     pub(crate) name: &'a ast::ExprName,
-    pub(crate) first: bool,
     pub(crate) is_async: bool,
 }
 
@@ -332,12 +329,10 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack,
                 value,
                 name,
-                first,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 target: TargetKind::from(unpack),
                 value: AstNodeRef::new(parsed.clone(), value),
                 name: AstNodeRef::new(parsed, name),
-                first,
             }),
             DefinitionNodeRef::AnnotatedAssignment(assign) => {
                 DefinitionKind::AnnotatedAssignment(AstNodeRef::new(parsed, assign))
@@ -349,13 +344,11 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack,
                 iterable,
                 name,
-                first,
                 is_async,
             }) => DefinitionKind::For(ForStmtDefinitionKind {
                 target: TargetKind::from(unpack),
                 iterable: AstNodeRef::new(parsed.clone(), iterable),
                 name: AstNodeRef::new(parsed, name),
-                first,
                 is_async,
             }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
@@ -382,13 +375,11 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack,
                 context_expr,
                 name,
-                first,
                 is_async,
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
                 target: TargetKind::from(unpack),
                 context_expr: AstNodeRef::new(parsed.clone(), context_expr),
                 name: AstNodeRef::new(parsed, name),
-                first,
                 is_async,
             }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
@@ -451,7 +442,6 @@ impl<'db> DefinitionNodeRef<'db> {
                 value: _,
                 unpack: _,
                 name,
-                first: _,
             }) => name.into(),
             Self::AnnotatedAssignment(node) => node.into(),
             Self::AugmentedAssignment(node) => node.into(),
@@ -459,7 +449,6 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack: _,
                 iterable: _,
                 name,
-                first: _,
                 is_async: _,
             }) => name.into(),
             Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => target.into(),
@@ -469,7 +458,6 @@ impl<'db> DefinitionNodeRef<'db> {
             Self::WithItem(WithItemDefinitionNodeRef {
                 unpack: _,
                 context_expr: _,
-                first: _,
                 is_async: _,
                 name,
             }) => name.into(),
@@ -652,14 +640,14 @@ impl DefinitionKind<'_> {
 
 #[derive(Copy, Clone, Debug, PartialEq, Hash)]
 pub(crate) enum TargetKind<'db> {
-    Sequence(Unpack<'db>),
+    Sequence(UnpackPosition, Unpack<'db>),
     Name,
 }
 
-impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
-    fn from(value: Option<Unpack<'db>>) -> Self {
+impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
+    fn from(value: Option<(UnpackPosition, Unpack<'db>)>) -> Self {
         match value {
-            Some(unpack) => TargetKind::Sequence(unpack),
+            Some((unpack_position, unpack)) => TargetKind::Sequence(unpack_position, unpack),
             None => TargetKind::Name,
         }
     }
@@ -780,7 +768,6 @@ pub struct AssignmentDefinitionKind<'db> {
     target: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
     name: AstNodeRef<ast::ExprName>,
-    first: bool,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
@@ -795,10 +782,6 @@ impl<'db> AssignmentDefinitionKind<'db> {
     pub(crate) fn name(&self) -> &ast::ExprName {
         self.name.node()
     }
-
-    pub(crate) fn is_first(&self) -> bool {
-        self.first
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -806,7 +789,6 @@ pub struct WithItemDefinitionKind<'db> {
     target: TargetKind<'db>,
     context_expr: AstNodeRef<ast::Expr>,
     name: AstNodeRef<ast::ExprName>,
-    first: bool,
     is_async: bool,
 }
 
@@ -823,10 +805,6 @@ impl<'db> WithItemDefinitionKind<'db> {
         self.name.node()
     }
 
-    pub(crate) const fn is_first(&self) -> bool {
-        self.first
-    }
-
     pub(crate) const fn is_async(&self) -> bool {
         self.is_async
     }
@@ -837,7 +815,6 @@ pub struct ForStmtDefinitionKind<'db> {
     target: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
     name: AstNodeRef<ast::ExprName>,
-    first: bool,
     is_async: bool,
 }
 
@@ -852,10 +829,6 @@ impl<'db> ForStmtDefinitionKind<'db> {
 
     pub(crate) fn name(&self) -> &ast::ExprName {
         self.name.node()
-    }
-
-    pub(crate) const fn is_first(&self) -> bool {
-        self.first
     }
 
     pub(crate) const fn is_async(&self) -> bool {
