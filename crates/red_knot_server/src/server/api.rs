@@ -1,8 +1,8 @@
-use lsp_server as server;
-
 use crate::server::schedule::Task;
 use crate::session::Session;
 use crate::system::{url_to_any_system_path, AnySystemPath};
+use lsp_server as server;
+use lsp_types::notification::Notification;
 
 mod diagnostics;
 mod notifications;
@@ -52,6 +52,11 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
         notification::DidCloseNotebookHandler::METHOD => {
             local_notification_task::<notification::DidCloseNotebookHandler>(notif)
         }
+        lsp_types::notification::SetTrace::METHOD => {
+            tracing::trace!("Ignoring `setTrace` notification");
+            return Task::nothing();
+        },
+
         method => {
             tracing::warn!("Received notification {method} which does not have a handler.");
             return Task::nothing();
