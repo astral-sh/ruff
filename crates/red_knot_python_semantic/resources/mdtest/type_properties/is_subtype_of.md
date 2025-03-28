@@ -1066,6 +1066,7 @@ class A:
         return a
 
 static_assert(is_subtype_of(A, Callable[[int], int]))
+static_assert(not is_subtype_of(A, Callable[[], int]))
 static_assert(not is_subtype_of(Callable[[int], int], A))
 ```
 
