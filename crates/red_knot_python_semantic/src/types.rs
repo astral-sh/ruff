@@ -710,7 +710,7 @@ impl<'db> Type<'db> {
                 self_subclass_ty.is_subtype_of(db, target_subclass_ty)
             }
 
-            // This branch checks if we have a class literal with __call__ method(s) is it a subtype of a callable type?
+            // An instance type with `__call__` method can be a subtype of Callable
             (Type::Instance(InstanceType { class }), Type::Callable(_)) => {
                 let call_symbol = class.class_member(db, "__call__").symbol;
                 if call_symbol.is_unbound() {
