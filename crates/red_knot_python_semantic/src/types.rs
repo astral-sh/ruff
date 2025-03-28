@@ -716,7 +716,7 @@ impl<'db> Type<'db> {
             }
 
             // This branch checks if we have a class literal with __call__ method(s) is it a subtype of a callable type?
-            (Type::ClassLiteral(ClassLiteralType { class }), Type::Callable(_)) => {
+            (Type::Instance(InstanceType { class }), Type::Callable(_)) => {
                 let call_symbol = class.class_member(db, "__call__");
                 if call_symbol.symbol.is_unbound() {
                     false
@@ -930,10 +930,6 @@ impl<'db> Type<'db> {
                 Type::Callable(CallableType::General(self_callable)),
                 Type::Callable(CallableType::General(target_callable)),
             ) => self_callable.is_assignable_to(db, target_callable),
-
-            (Type::Instance(InstanceType { class: self_class }), Type::Callable(_)) => {
-                Type::ClassLiteral(ClassLiteralType { class: self_class }).is_subtype_of(db, target)
-            }
 
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),

@@ -1041,11 +1041,8 @@ class A:
     def __call__(self, a: int) -> int:
         return a
 
-static_assert(is_subtype_of(TypeOf[A], Callable[[int], int]))
-static_assert(not is_subtype_of(Callable[[int], int], TypeOf[A]))
-
-static_assert(is_assignable_to(A, Callable[[int], int]))
-static_assert(not is_assignable_to(Callable[[int], int], A))
+static_assert(is_subtype_of(A, Callable[[int], int]))
+static_assert(not is_subtype_of(Callable[[int], int], A))
 ```
 
 [special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
