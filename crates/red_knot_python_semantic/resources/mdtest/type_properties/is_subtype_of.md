@@ -11,9 +11,9 @@ See the [typing documentation] for more information.
 
 - `bool` is a subtype of `int`. This is modeled after Python's runtime behavior, where `int` is a
     supertype of `bool` (present in `bool`s bases and MRO).
-- `int` is not a subtype of `float`/`complex`, although this is muddied by the \[special case for
-    float and complex\] where annotations of `float` and `complex` are interpreted as `int | float`
-    and `int | float | complex`, respectively.
+- `int` is not a subtype of `float`/`complex`, although this is muddied by the
+    [special case for float and complex] where annotations of `float` and `complex` are interpreted
+    as `int | float` and `int | float | complex`, respectively.
 
 ```py
 from knot_extensions import is_subtype_of, static_assert, TypeOf
@@ -1070,4 +1070,5 @@ static_assert(not is_subtype_of(A, Callable[[], int]))
 static_assert(not is_subtype_of(Callable[[int], int], A))
 ```
 
+[special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
