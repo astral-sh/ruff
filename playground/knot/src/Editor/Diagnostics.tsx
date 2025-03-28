@@ -84,7 +84,7 @@ function Items({
           <li key={`${diagnostic.text_range()?.start ?? 0}-${id ?? index}`}>
             <button
               onClick={() => onGoTo(startLine, startColumn)}
-              className="w-full text-start cursor-pointer"
+              className="w-full text-start cursor-pointer select-text"
             >
               {diagnostic.message()}
               <span className="text-gray-500">

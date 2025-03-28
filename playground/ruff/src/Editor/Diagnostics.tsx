@@ -6,6 +6,7 @@ import { useMemo } from "react";
 interface Props {
   diagnostics: Diagnostic[];
   theme: Theme;
+
   onGoTo(line: number, column: number): void;
 }
 
@@ -79,7 +80,7 @@ function Items({
                   diagnostic.start_location.column,
                 )
               }
-              className="w-full text-start"
+              className="w-full text-start cursor-pointer select-text"
             >
               {diagnostic.message}{" "}
               <span className="text-gray-500">
