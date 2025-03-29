@@ -714,6 +714,15 @@ pub trait Imported<'a> {
     /// Returns the member name of the imported symbol. For a straight import, this is equivalent
     /// to the qualified name; for a `from` import, this is the name of the imported symbol.
     fn member_name(&self) -> Cow<'a, str>;
+
+    /// Returns the source module of the imported symbol.
+    ///
+    /// For example:
+    ///
+    /// - `import foo` returns `["foo"]`
+    /// - `import foo.bar` returns `["foo","bar"]`
+    /// - `from foo import bar` returns `["foo"]`
+    fn source_name(&self) -> &[&'a str];
 }
 
 impl<'a> Imported<'a> for Import<'a> {
@@ -730,6 +739,10 @@ impl<'a> Imported<'a> for Import<'a> {
     /// For example, given `import foo`, returns `"foo"`.
     fn member_name(&self) -> Cow<'a, str> {
         Cow::Owned(self.qualified_name().to_string())
+    }
+
+    fn source_name(&self) -> &[&'a str] {
+        self.qualified_name.segments()
     }
 }
 
@@ -748,6 +761,10 @@ impl<'a> Imported<'a> for SubmoduleImport<'a> {
     fn member_name(&self) -> Cow<'a, str> {
         Cow::Owned(self.qualified_name().to_string())
     }
+
+    fn source_name(&self) -> &[&'a str] {
+        self.qualified_name.segments()
+    }
 }
 
 impl<'a> Imported<'a> for FromImport<'a> {
@@ -764,6 +781,10 @@ impl<'a> Imported<'a> for FromImport<'a> {
     /// For example, given `from foo import bar`, returns `"bar"`.
     fn member_name(&self) -> Cow<'a, str> {
         Cow::Borrowed(self.qualified_name.segments()[self.qualified_name.segments().len() - 1])
+    }
+
+    fn source_name(&self) -> &[&'a str] {
+        self.module_name()
     }
 }
 
@@ -797,6 +818,14 @@ impl<'ast> Imported<'ast> for AnyImport<'_, 'ast> {
             Self::Import(import) => import.member_name(),
             Self::SubmoduleImport(import) => import.member_name(),
             Self::FromImport(import) => import.member_name(),
+        }
+    }
+
+    fn source_name(&self) -> &[&'ast str] {
+        match self {
+            Self::Import(import) => import.source_name(),
+            Self::SubmoduleImport(import) => import.source_name(),
+            Self::FromImport(import) => import.source_name(),
         }
     }
 }
