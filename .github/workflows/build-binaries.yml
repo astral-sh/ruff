@@ -28,7 +28,7 @@ permissions: {}
 env:
   PACKAGE_NAME: ruff
   MODULE_NAME: ruff
-  PYTHON_VERSION: "3.11"
+  PYTHON_VERSION: "3.13"
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always

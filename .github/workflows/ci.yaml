@@ -18,7 +18,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.13"
 
 jobs:
   determine_changes:
@@ -748,7 +748,8 @@ jobs:
 
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          # installation fails on 3.13 and newer
+          python-version: "3.12"
 
       - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
         name: Download development ruff binary
