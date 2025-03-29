@@ -302,7 +302,6 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         pattern: PatternPredicate<'db>,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
-
         self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject)
     }
 
