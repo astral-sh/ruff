@@ -165,3 +165,49 @@ match x:
 
 reveal_type(x)  # revealed: object
 ```
+
+## Narrowing due to guard
+
+```py
+def get_object() -> object:
+    return object()
+
+x = get_object()
+
+reveal_type(x)  # revealed: object
+
+match x:
+    case str() | float() if type(x) is str:
+        reveal_type(x)  #  revealed: str
+    case "foo" | 42 | None if isinstance(x, int):
+        reveal_type(x)  #  revealed: Literal[42]
+    case False if x:
+        reveal_type(x)  #  revealed: Never
+    case "foo" if x := "bar":
+        reveal_type(x)  # revealed: Literal["bar"]
+
+reveal_type(x)  # revealed: object
+```
+
+## Guard and reveal_type in guard
+
+```py
+def get_object() -> object:
+    return object()
+
+x = get_object()
+
+reveal_type(x)  # revealed: object
+
+match x:
+    case str() | float() if type(x) is str and reveal_type(x):  # revealed: str
+        pass
+    case "foo" | 42 | None if isinstance(x, int) and reveal_type(x):  #  revealed: Literal[42]
+        pass
+    case False if x and reveal_type(x):  #  revealed: Never
+        pass
+    case "foo" if (x := "bar") and reveal_type(x):  #  revealed: Literal["bar"]
+        pass
+
+reveal_type(x)  # revealed: object
+```
