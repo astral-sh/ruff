@@ -29,11 +29,11 @@ impl FormatNodeRule<ExprListComp> for FormatExprListComp {
             f,
             [parenthesized(
                 "[",
-                &group(&format_args![
-                    group(&elt.format()),
-                    soft_line_break_or_space(),
-                    joined
-                ]),
+                &group(&width_limit_if_flat(
+                    &format_args!(group(&elt.format()), soft_line_break_or_space(), &joined),
+                    f.options().list_comprehension_flat_width_limit().into(),
+                    true,
+                )),
                 "]"
             )
             .with_dangling_comments(dangling)]

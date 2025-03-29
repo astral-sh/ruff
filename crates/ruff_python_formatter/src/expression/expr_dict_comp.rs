@@ -38,21 +38,25 @@ impl FormatNodeRule<ExprDictComp> for FormatExprDictComp {
             f,
             [parenthesized(
                 "{",
-                &group(&format_with(|f| {
-                    write!(f, [group(&key.format()), token(":")])?;
+                &group(&width_limit_if_flat(
+                    &format_with(|f| {
+                        write!(f, [group(&key.format()), token(":")])?;
 
-                    if key_value_comments.is_empty() {
-                        space().fmt(f)?;
-                    } else {
-                        dangling_comments(key_value_comments).fmt(f)?;
-                    }
+                        if key_value_comments.is_empty() {
+                            space().fmt(f)?;
+                        } else {
+                            dangling_comments(key_value_comments).fmt(f)?;
+                        }
 
-                    write!(f, [value.format(), soft_line_break_or_space()])?;
+                        write!(f, [value.format(), soft_line_break_or_space()])?;
 
-                    f.join_with(soft_line_break_or_space())
-                        .entries(generators.iter().formatted())
-                        .finish()
-                })),
+                        f.join_with(soft_line_break_or_space())
+                            .entries(generators.iter().formatted())
+                            .finish()
+                    }),
+                    f.options().dict_comprehension_flat_width_limit().into(),
+                    true,
+                )),
                 "}"
             )
             .with_dangling_comments(open_parenthesis_comments)]
