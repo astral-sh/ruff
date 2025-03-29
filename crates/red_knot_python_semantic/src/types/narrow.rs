@@ -371,6 +371,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         ast::CmpOp::Eq if lhs_ty.is_literal_string() => {
                             constraints.insert(symbol, rhs_ty);
                         }
+                        ast::CmpOp::In => {
+                            if let Type::Tuple(tuple) = rhs_ty {
+                                let mut builder = UnionBuilder::new(self.db);
+                                for element in tuple.elements(self.db) {
+                                    builder = builder.add(*element);
+                                }
+                                let ty = builder.build();
+                                constraints.insert(symbol, ty);
+                            }
+                        }
                         _ => {
                             // TODO other comparison types
                         }
