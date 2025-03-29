@@ -10,7 +10,7 @@ use crate::types::class_base::ClassBase;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     CallableType, ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
-    Type, UnionType,
+    Type, UnionType, WrapperDescriptorDunderGetOf,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -76,6 +76,7 @@ impl Display for DisplayRepresentation<'_> {
                 };
                 f.write_str(representation)
             }
+            Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())
             }
@@ -107,8 +108,12 @@ impl Display for DisplayRepresentation<'_> {
                     function = function.name(self.db)
                 )
             }
-            Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
-                f.write_str("<wrapper-descriptor `__get__` of `function` objects>")
+            Type::Callable(CallableType::WrapperDescriptorDunderGet(origin)) => {
+                let object = match origin {
+                    WrapperDescriptorDunderGetOf::FunctionType => "function",
+                    WrapperDescriptorDunderGetOf::Property => "property",
+                };
+                write!(f, "<wrapper-descriptor `__get__` of `{object}` objects>")
             }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),

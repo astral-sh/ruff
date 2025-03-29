@@ -7,15 +7,15 @@ use ruff_db::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{binding_type, KnownFunction, Type, TypeCheckDiagnostic, TypeCheckDiagnostics};
+use super::{binding_type, Type, TypeCheckDiagnostic, TypeCheckDiagnostics};
 
-use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::ScopeId;
 use crate::{
     lint::{LintId, LintMetadata},
     suppression::suppressions,
     Db,
 };
+use crate::{semantic_index::semantic_index, types::FunctionDecorators};
 
 /// Context for inferring the types of a single file.
 ///
@@ -182,13 +182,7 @@ impl<'db> InferContext<'db> {
 
                 // Iterate over all functions and test if any is decorated with `@no_type_check`.
                 function_scope_tys.any(|function_ty| {
-                    function_ty
-                        .decorators(self.db)
-                        .iter()
-                        .filter_map(|decorator| decorator.into_function_literal())
-                        .any(|decorator_ty| {
-                            decorator_ty.is_known(self.db, KnownFunction::NoTypeCheck)
-                        })
+                    function_ty.has_known_decorator(self.db, FunctionDecorators::NO_TYPE_CHECK)
                 })
             }
             InNoTypeCheck::Yes => true,

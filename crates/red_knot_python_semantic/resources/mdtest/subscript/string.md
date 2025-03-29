@@ -22,7 +22,7 @@ reveal_type(b)  # revealed: Unknown
 def _(n: int):
     a = "abcde"[n]
     # TODO: Support overloads... Should be `str`
-    reveal_type(a)  # revealed: @Todo(return type of decorated function)
+    reveal_type(a)  # revealed: @Todo(return type of overloaded function)
 ```
 
 ## Slices
@@ -76,11 +76,11 @@ def _(m: int, n: int, s2: str):
 
     substring1 = s[m:n]
     # TODO: Support overloads... Should be `LiteralString`
-    reveal_type(substring1)  # revealed: @Todo(return type of decorated function)
+    reveal_type(substring1)  # revealed: @Todo(return type of overloaded function)
 
     substring2 = s2[0:5]
     # TODO: Support overloads... Should be `str`
-    reveal_type(substring2)  # revealed: @Todo(return type of decorated function)
+    reveal_type(substring2)  # revealed: @Todo(return type of overloaded function)
 ```
 
 ## Unsupported slice types

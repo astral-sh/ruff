@@ -77,11 +77,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (_, Type::Callable(CallableType::MethodWrapperDunderGet(_))) => Ordering::Greater,
 
         (
-            Type::Callable(CallableType::WrapperDescriptorDunderGet),
-            Type::Callable(CallableType::WrapperDescriptorDunderGet),
-        ) => Ordering::Equal,
-        (Type::Callable(CallableType::WrapperDescriptorDunderGet), _) => Ordering::Less,
-        (_, Type::Callable(CallableType::WrapperDescriptorDunderGet)) => Ordering::Greater,
+            Type::Callable(CallableType::WrapperDescriptorDunderGet(left)),
+            Type::Callable(CallableType::WrapperDescriptorDunderGet(right)),
+        ) => left.cmp(right),
+        (Type::Callable(CallableType::WrapperDescriptorDunderGet(..)), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::WrapperDescriptorDunderGet(..))) => Ordering::Greater,
 
         (Type::Callable(CallableType::General(_)), Type::Callable(CallableType::General(_))) => {
             Ordering::Equal
@@ -269,6 +269,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::KnownInstance(_), _) => Ordering::Less,
         (_, Type::KnownInstance(_)) => Ordering::Greater,
+
+        (Type::PropertyInstance(_), _) => Ordering::Less,
+        (_, Type::PropertyInstance(_)) => Ordering::Greater,
 
         (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(*left, *right),
         (Type::Dynamic(_), _) => Ordering::Less,
