@@ -559,55 +559,57 @@ impl VisibilityConstraints {
                 let ty = infer_expression_type(db, test_expr);
                 ty.bool(db).negate_if(!predicate.is_positive)
             }
-            PredicateNode::Pattern(inner) => match inner.kind(db) {
-                PatternPredicateKind::Value(value) => {
-                    let subject_expression = inner.subject(db);
-                    let subject_ty = infer_expression_type(db, subject_expression);
-                    let value_ty = infer_expression_type(db, *value);
+            PredicateNode::Pattern(inner) => {
+                match inner.kind(db) {
+                    PatternPredicateKind::Value(value) => {
+                        let subject_expression = inner.subject(db);
+                        let subject_ty = infer_expression_type(db, subject_expression);
+                        let value_ty = infer_expression_type(db, *value);
 
-                    if subject_ty.is_single_valued(db) {
-                        let truthiness =
-                            Truthiness::from(subject_ty.is_equivalent_to(db, value_ty));
+                        if subject_ty.is_single_valued(db) {
+                            let truthiness =
+                                Truthiness::from(subject_ty.is_equivalent_to(db, value_ty));
 
-                        if truthiness.is_always_true() && inner.guard(db).is_some() {
-                            // Fall back to ambiguous, the guard might change the result.
-                            Truthiness::Ambiguous
-                        } else {
-                            truthiness
-                        }
-                    } else {
-                        Truthiness::Ambiguous
-                    }
-                }
-                PatternPredicateKind::Singleton(singleton, guard) => {
-                    let subject_expression = inner.subject(db);
-                    let subject_ty = infer_expression_type(db, subject_expression);
-
-                    if subject_ty.is_single_valued(db) {
-                        let truthiness = Truthiness::from(match singleton {
-                            ruff_python_ast::Singleton::None => subject_ty.is_none(db),
-                            ruff_python_ast::Singleton::True => {
-                                subject_ty.is_equivalent_to(db, Type::BooleanLiteral(true))
+                            if truthiness.is_always_true() && inner.guard(db).is_some() {
+                                // Fall back to ambiguous, the guard might change the result.
+                                Truthiness::Ambiguous
+                            } else {
+                                truthiness
                             }
-                            ruff_python_ast::Singleton::False => {
-                                subject_ty.is_equivalent_to(db, Type::BooleanLiteral(false))
-                            }
-                        });
-
-                        if truthiness.is_always_true() && guard.is_some() {
-                            // Fall back to ambiguous, the guard might change the result.
-                            Truthiness::Ambiguous
                         } else {
-                            truthiness
+                            Truthiness::Ambiguous
                         }
-                    } else {
-                        Truthiness::Ambiguous
                     }
+                    PatternPredicateKind::Singleton(singleton) => {
+                        let subject_expression = inner.subject(db);
+                        let subject_ty = infer_expression_type(db, subject_expression);
+
+                        if subject_ty.is_single_valued(db) {
+                            let truthiness = Truthiness::from(match singleton {
+                                ruff_python_ast::Singleton::None => subject_ty.is_none(db),
+                                ruff_python_ast::Singleton::True => {
+                                    subject_ty.is_equivalent_to(db, Type::BooleanLiteral(true))
+                                }
+                                ruff_python_ast::Singleton::False => {
+                                    subject_ty.is_equivalent_to(db, Type::BooleanLiteral(false))
+                                }
+                            });
+
+                            if truthiness.is_always_true() && inner.guard(db).is_some() {
+                                // Fall back to ambiguous, the guard might change the result.
+                                Truthiness::Ambiguous
+                            } else {
+                                truthiness
+                            }
+                        } else {
+                            Truthiness::Ambiguous
+                        }
+                    }
+                    PatternPredicateKind::Class(..)
+                    | PatternPredicateKind::Or(..)
+                    | PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
                 }
-                PatternPredicateKind::Class(..)
-                | PatternPredicateKind::Or(..)
-                | PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
-            },
+            }
         }
     }
 }
