@@ -184,6 +184,9 @@ use crate::semantic_index::predicate::{
 use crate::types::{infer_expression_type, Truthiness, Type};
 use crate::Db;
 
+use super::expression::Expression;
+use super::predicate::PatternPredicate;
+
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
 /// is just like a boolean formula, but with `Ambiguous` as a third potential result. See the
 /// module documentation for more details.)
@@ -553,63 +556,99 @@ impl VisibilityConstraints {
         }
     }
 
+    fn analyze_single_pattern_predicate_kind<'db>(
+        db: &'db dyn Db,
+        predicate_kind: &PatternPredicateKind<'db>,
+        subject: Expression<'db>,
+    ) -> Truthiness {
+        match predicate_kind {
+            PatternPredicateKind::Value(value) => {
+                let subject_ty = infer_expression_type(db, subject);
+                let value_ty = infer_expression_type(db, *value);
+
+                if subject_ty.is_single_valued(db) {
+                    Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
+                } else {
+                    Truthiness::Ambiguous
+                }
+            }
+            PatternPredicateKind::Singleton(singleton) => {
+                let subject_ty = infer_expression_type(db, subject);
+
+                if subject_ty.is_single_valued(db) {
+                    Truthiness::from(match singleton {
+                        ruff_python_ast::Singleton::None => subject_ty.is_none(db),
+                        ruff_python_ast::Singleton::True => {
+                            subject_ty.is_equivalent_to(db, Type::BooleanLiteral(true))
+                        }
+                        ruff_python_ast::Singleton::False => {
+                            subject_ty.is_equivalent_to(db, Type::BooleanLiteral(false))
+                        }
+                    })
+                } else {
+                    Truthiness::Ambiguous
+                }
+            }
+            PatternPredicateKind::Or(predicates) => {
+                use std::ops::ControlFlow;
+                let (ControlFlow::Break(truthiness) | ControlFlow::Continue(truthiness)) =
+                    predicates
+                        .iter()
+                        .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject))
+                        // this is just a "max", but with a slight optimization: `AlwaysTrue` is the "greatest" possible element, so we short-circuit if we get there
+                        .try_fold(Truthiness::AlwaysFalse, |acc, next| match (acc, next) {
+                            (Truthiness::AlwaysTrue, _) | (_, Truthiness::AlwaysTrue) => {
+                                ControlFlow::Break(Truthiness::AlwaysTrue)
+                            }
+                            (Truthiness::Ambiguous, _) | (_, Truthiness::Ambiguous) => {
+                                ControlFlow::Continue(Truthiness::Ambiguous)
+                            }
+                            (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {
+                                ControlFlow::Continue(Truthiness::AlwaysFalse)
+                            }
+                        });
+                truthiness
+            }
+            PatternPredicateKind::Class(class_expr) => {
+                let subject_ty = infer_expression_type(db, subject);
+                let class_ty = infer_expression_type(db, *class_expr).to_instance(db);
+
+                class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
+                    if subject_ty.is_subtype_of(db, class_ty) {
+                        Truthiness::AlwaysTrue
+                    } else if subject_ty.is_disjoint_from(db, class_ty) {
+                        Truthiness::AlwaysFalse
+                    } else {
+                        Truthiness::Ambiguous
+                    }
+                })
+            }
+            PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
+        }
+    }
+
+    fn analyze_single_pattern_predicate(db: &dyn Db, predicate: PatternPredicate) -> Truthiness {
+        let truthiness = Self::analyze_single_pattern_predicate_kind(
+            db,
+            predicate.kind(db),
+            predicate.subject(db),
+        );
+
+        if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
+            // Fall back to ambiguous, the guard might change the result.
+            Truthiness::Ambiguous
+        } else {
+            truthiness
+        }
+    }
+
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
                 let ty = infer_expression_type(db, test_expr);
                 ty.bool(db).negate_if(!predicate.is_positive)
             }
-            PredicateNode::Pattern(inner) => {
-                match inner.kind(db) {
-                    PatternPredicateKind::Value(value) => {
-                        let subject_expression = inner.subject(db);
-                        let subject_ty = infer_expression_type(db, subject_expression);
-                        let value_ty = infer_expression_type(db, *value);
-
-                        if subject_ty.is_single_valued(db) {
-                            let truthiness =
-                                Truthiness::from(subject_ty.is_equivalent_to(db, value_ty));
-
-                            if truthiness.is_always_true() && inner.guard(db).is_some() {
-                                // Fall back to ambiguous, the guard might change the result.
-                                Truthiness::Ambiguous
-                            } else {
-                                truthiness
-                            }
-                        } else {
-                            Truthiness::Ambiguous
-                        }
-                    }
-                    PatternPredicateKind::Singleton(singleton) => {
-                        let subject_expression = inner.subject(db);
-                        let subject_ty = infer_expression_type(db, subject_expression);
-
-                        if subject_ty.is_single_valued(db) {
-                            let truthiness = Truthiness::from(match singleton {
-                                ruff_python_ast::Singleton::None => subject_ty.is_none(db),
-                                ruff_python_ast::Singleton::True => {
-                                    subject_ty.is_equivalent_to(db, Type::BooleanLiteral(true))
-                                }
-                                ruff_python_ast::Singleton::False => {
-                                    subject_ty.is_equivalent_to(db, Type::BooleanLiteral(false))
-                                }
-                            });
-
-                            if truthiness.is_always_true() && inner.guard(db).is_some() {
-                                // Fall back to ambiguous, the guard might change the result.
-                                Truthiness::Ambiguous
-                            } else {
-                                truthiness
-                            }
-                        } else {
-                            Truthiness::Ambiguous
-                        }
-                    }
-                    PatternPredicateKind::Class(..)
-                    | PatternPredicateKind::Or(..)
-                    | PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
-                }
-            }
+            PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
         }
     }
 }

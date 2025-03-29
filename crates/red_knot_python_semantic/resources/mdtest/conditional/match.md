@@ -44,6 +44,53 @@ def _(target: int):
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
 
+## Class match
+
+```py
+from typing import final
+
+class Foo:
+    pass
+
+class FooSub(Foo):
+    pass
+
+class Bar:
+    pass
+
+@final
+class Baz:
+    pass
+
+def _(target: FooSub):
+    y = 1
+    y = 2
+
+    match target:
+        case Foo():
+            y = 3
+        case Bar():
+            y = 4
+        case Baz():
+            y = 5
+
+    reveal_type(y)  # revealed: Literal[3]
+
+def _(target: FooSub | str):
+    y = 1
+    y = 2
+
+    match target:
+        case Foo():
+            y = 3
+        case Bar():
+            y = 4
+        case Baz():
+            y = 4
+
+    reveal_type(y)  # revealed: Literal[2, 3, 4]
+```
+
 ## Guard with object that implements `__bool__` incorrectly
 
 ```py
