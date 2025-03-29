@@ -1,11 +1,15 @@
 mod db;
 mod find_node;
 mod goto;
+mod hover;
+mod markup;
 
 use std::ops::{Deref, DerefMut};
 
 pub use db::Db;
 pub use goto::goto_type_definition;
+pub use hover::hover;
+pub use markup::MarkupKind;
 use red_knot_python_semantic::types::{
     Class, ClassBase, ClassLiteralType, FunctionType, InstanceType, IntersectionType,
     KnownInstanceType, ModuleLiteralType, Type,

@@ -1,5 +1,6 @@
 use crate::find_node::covering_node;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
+use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{parsed_module, ParsedModule};
@@ -16,31 +17,7 @@ pub fn goto_type_definition(
     let goto_target = find_goto_target(parsed, offset)?;
 
     let model = SemanticModel::new(db.upcast(), file);
-
-    let ty = match goto_target {
-        GotoTarget::Expression(expression) => expression.inferred_type(&model),
-        GotoTarget::FunctionDef(function) => function.inferred_type(&model),
-        GotoTarget::ClassDef(class) => class.inferred_type(&model),
-        GotoTarget::Parameter(parameter) => parameter.inferred_type(&model),
-        GotoTarget::Alias(alias) => alias.inferred_type(&model),
-        GotoTarget::ExceptVariable(except) => except.inferred_type(&model),
-        GotoTarget::KeywordArgument(argument) => {
-            // TODO: Pyright resolves the declared type of the matching parameter. This seems more accurate
-            // than using the inferred value.
-            argument.value.inferred_type(&model)
-        }
-        // TODO: Support identifier targets
-        GotoTarget::PatternMatchRest(_)
-        | GotoTarget::PatternKeywordArgument(_)
-        | GotoTarget::PatternMatchStarName(_)
-        | GotoTarget::PatternMatchAsName(_)
-        | GotoTarget::ImportedModule(_)
-        | GotoTarget::TypeParamTypeVarName(_)
-        | GotoTarget::TypeParamParamSpecName(_)
-        | GotoTarget::TypeParamTypeVarTupleName(_)
-        | GotoTarget::NonLocal { .. }
-        | GotoTarget::Globals { .. } => return None,
-    };
+    let ty = goto_target.inferred_type(&model)?;
 
     tracing::debug!(
         "Inferred type of covering node is {}",
@@ -147,6 +124,37 @@ pub(crate) enum GotoTarget<'a> {
     Globals {
         identifier: &'a ast::Identifier,
     },
+}
+
+impl<'db> GotoTarget<'db> {
+    pub(crate) fn inferred_type(self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
+        let ty = match self {
+            GotoTarget::Expression(expression) => expression.inferred_type(model),
+            GotoTarget::FunctionDef(function) => function.inferred_type(model),
+            GotoTarget::ClassDef(class) => class.inferred_type(model),
+            GotoTarget::Parameter(parameter) => parameter.inferred_type(model),
+            GotoTarget::Alias(alias) => alias.inferred_type(model),
+            GotoTarget::ExceptVariable(except) => except.inferred_type(model),
+            GotoTarget::KeywordArgument(argument) => {
+                // TODO: Pyright resolves the declared type of the matching parameter. This seems more accurate
+                // than using the inferred value.
+                argument.value.inferred_type(model)
+            }
+            // TODO: Support identifier targets
+            GotoTarget::PatternMatchRest(_)
+            | GotoTarget::PatternKeywordArgument(_)
+            | GotoTarget::PatternMatchStarName(_)
+            | GotoTarget::PatternMatchAsName(_)
+            | GotoTarget::ImportedModule(_)
+            | GotoTarget::TypeParamTypeVarName(_)
+            | GotoTarget::TypeParamParamSpecName(_)
+            | GotoTarget::TypeParamTypeVarTupleName(_)
+            | GotoTarget::NonLocal { .. }
+            | GotoTarget::Globals { .. } => return None,
+        };
+
+        Some(ty)
+    }
 }
 
 impl Ranged for GotoTarget<'_> {

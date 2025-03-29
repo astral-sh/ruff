@@ -32,6 +32,10 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
                 BackgroundSchedule::LatencySensitive,
             )
         }
+        request::HoverRequestHandler::METHOD => background_request_task::<
+            request::HoverRequestHandler,
+        >(req, BackgroundSchedule::LatencySensitive),
+
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
             return Task::nothing();

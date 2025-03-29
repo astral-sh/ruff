@@ -28,7 +28,12 @@ pub(crate) trait PositionExt {
 }
 
 pub(crate) trait ToRangeExt {
-    fn to_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> types::Range;
+    fn to_lsp_range(
+        &self,
+        text: &str,
+        index: &LineIndex,
+        encoding: PositionEncoding,
+    ) -> types::Range;
     fn to_notebook_range(
         &self,
         text: &str,
@@ -92,7 +97,12 @@ impl RangeExt for lsp_types::Range {
 }
 
 impl ToRangeExt for TextRange {
-    fn to_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> types::Range {
+    fn to_lsp_range(
+        &self,
+        text: &str,
+        index: &LineIndex,
+        encoding: PositionEncoding,
+    ) -> types::Range {
         types::Range {
             start: source_location_to_position(&offset_to_source_location(
                 self.start(),
@@ -222,7 +232,7 @@ impl FileRangeExt for FileRange {
         let source = source_text(db.upcast(), file);
         let line_index = line_index(db.upcast(), file);
 
-        let range = self.range().to_range(&source, &line_index, encoding);
+        let range = self.range().to_lsp_range(&source, &line_index, encoding);
         Some(Location { uri, range })
     }
 }

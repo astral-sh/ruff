@@ -7,9 +7,9 @@ use std::panic::PanicInfo;
 
 use lsp_server::Message;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, MessageType,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
-    TypeDefinitionProviderCapability, Url,
+    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
+    MessageType, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+    TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url,
 };
 
 use self::connection::{Connection, ConnectionInitializer};
@@ -221,6 +221,7 @@ impl Server {
                 },
             )),
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
+            hover_provider: Some(HoverProviderCapability::Simple(true)),
             ..Default::default()
         }
     }
