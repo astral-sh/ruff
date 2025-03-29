@@ -59,6 +59,10 @@ impl<'db> Symbol<'db> {
         Symbol::Type(ty.into(), Boundness::Bound)
     }
 
+    pub(crate) fn possibly_unbound(ty: impl Into<Type<'db>>) -> Self {
+        Symbol::Type(ty.into(), Boundness::PossiblyUnbound)
+    }
+
     /// Constructor that creates a [`Symbol`] with a [`crate::types::TodoType`] type
     /// and boundness [`Boundness::Bound`].
     #[allow(unused_variables)] // Only unused in release builds
@@ -655,6 +659,7 @@ fn symbol_from_bindings_impl<'db>(
     let unbound_visibility = match bindings_with_constraints.peek() {
         Some(BindingWithConstraints {
             binding,
+            definition_id: _,
             visibility_constraint,
             narrowing_constraint: _,
         }) if binding.map_or(true, is_non_exported) => {
@@ -666,6 +671,7 @@ fn symbol_from_bindings_impl<'db>(
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
              binding,
+             definition_id: _,
              narrowing_constraint,
              visibility_constraint,
          }| {

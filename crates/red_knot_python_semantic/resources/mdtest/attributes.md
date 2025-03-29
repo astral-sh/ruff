@@ -41,8 +41,7 @@ reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
-# We probably don't want to emit a diagnostic for this being possibly undeclared/unbound.
-# mypy and pyright do not show an error here.
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
@@ -339,8 +338,12 @@ class C:
         for self.z in NonIterable():
             pass
 
+# TODO: this attribute should always be considered bound
+# error: [possibly-unbound-attribute]
 reveal_type(C().x)  # revealed: Unknown | int
 
+# TODO: same here
+# error: [possibly-unbound-attribute]
 reveal_type(C().y)  # revealed: Unknown | str
 ```
 
@@ -428,9 +431,13 @@ class C:
 
 c_instance = C()
 
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a1)  # revealed: str | None
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a2)  # revealed: str | None
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b1)  # revealed: Unknown | Literal[1]
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b2)  # revealed: Unknown | Literal[1]
 ```
 
@@ -539,10 +546,48 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# TODO: Ideally, this would result in a `unresolved-attribute` error. But mypy and pyright
-# do not support this either (for conditions that can only be resolved to `False` in type
-# inference), so it does not seem to be particularly important.
-reveal_type(C().x)  # revealed: str
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
+```
+
+```py
+class C:
+    def __init__(self, cond: bool) -> None:
+        if True:
+            self.x = 1
+        else:
+            self.x = "a"
+
+        if False:
+            self.y = 2
+
+        if cond:
+            return
+
+        self.z = 3
+
+        self.w = 4
+        self.w = 5
+
+    def set_z(self, z: str) -> None:
+        self.z = z
+
+reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C().y)  # revealed: Unknown
+reveal_type(C().z)  # revealed: Unknown | Literal[3] | str
+# error: [possibly-unbound-attribute]
+reveal_type(C().w)  # revealed: Unknown | Literal[5]
+```
+
+```py
+class C:
+    def f(self, cond: bool):
+        if cond:
+            self.x = 1
+
+# error: [possibly-unbound-attribute]
+reveal_type(C().x)  # revealed: Unknown | Literal[1]
 ```
 
 #### Diagnostics are reported for the right-hand side of attribute assignments
@@ -1047,11 +1092,10 @@ def _(flag: bool):
             if flag:
                 self.x = 1
 
-    # Emitting a diagnostic in a case like this is not something we support, and it's unclear
-    # if we ever will (or want to)
+    # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 
-    # Same here
+    # error: [possibly-unbound-attribute]
     Foo().x = 2
 ```
 
