@@ -1491,6 +1491,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::LiteralMembership) {
                 pylint::rules::literal_membership(checker, compare);
             }
+            if checker.enabled(Rule::InEmptyCollection) {
+                pylint::rules::in_empty_collection(checker, compare);
+            }
             if checker.enabled(Rule::ComparisonOfConstant) {
                 pylint::rules::comparison_of_constant(checker, left, ops, comparators);
             }
