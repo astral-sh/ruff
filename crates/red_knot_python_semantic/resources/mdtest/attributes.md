@@ -402,9 +402,7 @@ class C:
 
 c_instance = C()
 
-# TODO: Should be `Unknown | int`
-# error: [unresolved-attribute]
-reveal_type(c_instance.a)  # revealed: Unknown
+reveal_type(c_instance.a)  # revealed: Unknown | int
 ```
 
 #### Conditionally declared / bound attributes
@@ -1656,9 +1654,37 @@ class C:
             self.x: str = value
         set_attribute("a")
 
-# TODO: ideally, this would be `str`. Mypy supports this, pyright does not.
+reveal_type(C().x)  # revealed: str
+```
+
+### Assignment to `self` from nested comprehension
+
+```py
+class C:
+    def __init__(self) -> None:
+        [... for self.x in [1]]
+
+reveal_type(C().x)  # revealed: Unknown | @Todo(generics)
+```
+
+### Assignment to `self` from nested class
+
+```py
+class C:
+    def __init__(self) -> None:
+        class D:
+            self.x: int = 1
+            def f(_):
+                self.y: int = 1
+
+    def g(self):
+        def h(self):
+            self.z: int = 1
+
+reveal_type(C().x)  # revealed: int
+reveal_type(C().y)  # revealed: int
 # error: [unresolved-attribute]
-reveal_type(C().x)  # revealed: Unknown
+C().z
 ```
 
 ### Accessing attributes on `Never`
