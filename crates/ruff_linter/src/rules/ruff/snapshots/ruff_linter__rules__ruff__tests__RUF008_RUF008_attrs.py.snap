@@ -2,42 +2,42 @@
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 snapshot_kind: text
 ---
-RUF008_attrs.py:13:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008_attrs.py:14:34: RUF008 Do not use mutable default values for dataclass attributes
    |
-11 | @define
-12 | class A:
-13 |     mutable_default: list[int] = []
+12 | @define
+13 | class A:
+14 |     mutable_default: list[int] = []
    |                                  ^^ RUF008
-14 |     immutable_annotation: typing.Sequence[int] = []
-15 |     without_annotation = []
+15 |     immutable_annotation: typing.Sequence[int] = []
+16 |     without_annotation = []
+   |
+   
+RUF008_attrs.py:25:34: RUF008 Do not use mutable default values for dataclass attributes
+   |
+23 | @frozen
+24 | class B:
+25 |     mutable_default: list[int] = []
+   |                                  ^^ RUF008
+26 |     immutable_annotation: Sequence[int] = []
+27 |     without_annotation = []
    |
 
-RUF008_attrs.py:23:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008_attrs.py:36:34: RUF008 Do not use mutable default values for dataclass attributes
    |
-21 | @frozen
-22 | class B:
-23 |     mutable_default: list[int] = []
+34 | @attr.s
+35 | class C:
+36 |     mutable_default: list[int] = []
    |                                  ^^ RUF008
-24 |     immutable_annotation: Sequence[int] = []
-25 |     without_annotation = []
+37 |     immutable_annotation: Sequence[int] = []
+38 |     without_annotation = []
    |
 
-RUF008_attrs.py:33:34: RUF008 Do not use mutable default values for dataclass attributes
+RUF008_attrs.py:46:34: RUF008 Do not use mutable default values for dataclass attributes
    |
-31 | @attr.s
-32 | class C:
-33 |     mutable_default: list[int] = []
+44 | @s
+45 | class D:
+46 |     mutable_default: list[int] = []
    |                                  ^^ RUF008
-34 |     immutable_annotation: Sequence[int] = []
-35 |     without_annotation = []
-   |
-
-RUF008_attrs.py:42:34: RUF008 Do not use mutable default values for dataclass attributes
-   |
-40 | @s
-41 | class D:
-42 |     mutable_default: list[int] = []
-   |                                  ^^ RUF008
-43 |     immutable_annotation: Sequence[int] = []
-44 |     without_annotation = []
+47 |     immutable_annotation: Sequence[int] = []
+48 |     without_annotation = []
    |
