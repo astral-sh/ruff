@@ -1053,5 +1053,22 @@ static_assert(is_subtype_of(TypeOf[C.foo], object))
 static_assert(not is_subtype_of(object, TypeOf[C.foo]))
 ```
 
+### Classes with __call__
+
+#### Normal instance method
+
+```py
+from typing import Callable
+from knot_extensions import TypeOf, is_subtype_of, static_assert, is_assignable_to
+
+class A:
+    def __call__(self, a: int) -> int:
+        return a
+
+static_assert(is_subtype_of(A, Callable[[int], int]))
+static_assert(not is_subtype_of(A, Callable[[], int]))
+static_assert(not is_subtype_of(Callable[[int], int], A))
+```
+
 [special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence

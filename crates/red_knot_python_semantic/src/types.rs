@@ -710,6 +710,28 @@ impl<'db> Type<'db> {
                 self_subclass_ty.is_subtype_of(db, target_subclass_ty)
             }
 
+            // An instance type with `__call__` method can be a subtype of Callable
+            (Type::Instance(InstanceType { class }), Type::Callable(_)) => {
+                let call_symbol = class.class_member(db, "__call__").symbol;
+                if call_symbol.is_unbound() {
+                    false
+                } else {
+                    match call_symbol {
+                        Symbol::Type(Type::FunctionLiteral(call_function), _) => {
+                            let callable_type =
+                                call_function.into_callable_type_without_self_parameter(db);
+                            match callable_type {
+                                Type::Callable(CallableType::General(_)) => {
+                                    callable_type.is_subtype_of(db, target)
+                                }
+                                _ => false,
+                            }
+                        }
+                        _ => false,
+                    }
+                }
+            }
+
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
@@ -4132,6 +4154,15 @@ impl<'db> FunctionType<'db> {
         Type::Callable(CallableType::General(GeneralCallableType::new(
             db,
             self.signature(db).clone(),
+        )))
+    }
+
+    pub(crate) fn into_callable_type_without_self_parameter(self, db: &'db dyn Db) -> Type<'db> {
+        let signature = self.signature(db);
+        let new_parameters = signature.parameters().clone().without_self_parameter();
+        Type::Callable(CallableType::General(GeneralCallableType::new(
+            db,
+            Signature::new(new_parameters, signature.return_ty),
         )))
     }
 

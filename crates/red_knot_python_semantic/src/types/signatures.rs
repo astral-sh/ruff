@@ -493,6 +493,19 @@ impl<'db> Parameters<'db> {
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
     }
+
+    /// Return a new Parameters type with the first parameter.
+    pub(crate) fn without_self_parameter(self) -> Self {
+        if let Some(first_param) = self.get(0) {
+            return if first_param.name().map(ruff_python_ast::name::Name::as_str) == Some("self") {
+                let new_parameters = self.as_slice()[1..].to_vec();
+                Parameters::new(new_parameters)
+            } else {
+                self
+            };
+        }
+        self
+    }
 }
 
 impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
