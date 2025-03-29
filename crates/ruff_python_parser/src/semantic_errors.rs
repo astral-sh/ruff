@@ -73,6 +73,22 @@ impl SemanticSyntaxChecker {
                     Self::duplicate_type_parameter_name(type_params, ctx);
                 }
             }
+            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                if let [Expr::Starred(ast::ExprStarred { range, .. })] = targets.as_slice() {
+                    // test_ok single_starred_assignment_target
+                    // (*a,) = (1,)
+                    // *a, = (1,)
+                    // [*a] = (1,)
+
+                    // test_err single_starred_assignment_target
+                    // *a = (1,)
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::SingleStarredAssignment,
+                        *range,
+                    );
+                }
+            }
             _ => {}
         }
 
@@ -437,6 +453,9 @@ impl Display for SemanticSyntaxError {
                     f.write_str("wildcard makes remaining patterns unreachable")
                 }
             },
+            SemanticSyntaxErrorKind::SingleStarredAssignment => {
+                f.write_str("starred assignment target must be in a list or tuple")
+            }
             SemanticSyntaxErrorKind::WriteToDebug(kind) => match kind {
                 WriteToDebugKind::Store => f.write_str("cannot assign to `__debug__`"),
                 WriteToDebugKind::Delete(python_version) => {
@@ -521,6 +540,23 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [Python reference]: https://docs.python.org/3/reference/compound_stmts.html#irrefutable-case-blocks
     IrrefutableCasePattern(IrrefutablePatternKind),
+
+    /// Represents a single starred assignment target outside of a tuple or list.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// *a = (1,)  # SyntaxError
+    /// ```
+    ///
+    /// A starred assignment target can only occur within a tuple or list:
+    ///
+    /// ```python
+    /// b, *a = 1, 2, 3
+    /// (*a,) = 1, 2, 3
+    /// [*a] = 1, 2, 3
+    /// ```
+    SingleStarredAssignment,
 
     /// Represents a write to `__debug__`. This includes simple assignments and deletions as well
     /// other kinds of statements that can introduce bindings, such as type parameters in functions,
