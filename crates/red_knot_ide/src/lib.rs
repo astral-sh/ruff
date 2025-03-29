@@ -21,6 +21,12 @@ pub struct RangedValue<T> {
     pub value: T,
 }
 
+impl<T> RangedValue<T> {
+    pub fn file_range(&self) -> FileRange {
+        self.range
+    }
+}
+
 impl<T> Deref for RangedValue<T> {
     type Target = T;
 

@@ -2,6 +2,7 @@ import { Icons, Theme } from "shared";
 import classNames from "classnames";
 import { useState } from "react";
 import { FileId } from "../Playground";
+import { type FileHandle } from "red_knot_wasm";
 
 export interface Props {
   // The file names
@@ -195,4 +196,9 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
       )}
     </button>
   );
+}
+
+export function isPythonFile(handle: FileHandle): boolean {
+  const extension = handle?.path().toLowerCase().split(".").pop() ?? "";
+  return ["py", "pyi", "pyw"].includes(extension);
 }
