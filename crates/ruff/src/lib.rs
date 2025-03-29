@@ -112,7 +112,7 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     file == Path::new("-")
 }
 
-/// Returns the default set of files if none are provided, otherwise returns `None`.
+/// Returns the default set of files if none are provided, otherwise returns provided files.
 fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     if files.is_empty() {
         if is_stdin {
