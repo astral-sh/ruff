@@ -2504,6 +2504,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "red_knot_ide"
+version = "0.0.0"
+dependencies = [
+ "red_knot_python_semantic",
+ "red_knot_vendored",
+ "ruff_db",
+ "salsa",
+ "tracing",
+]
+
+[[package]]
 name = "red_knot_project"
 version = "0.0.0"
 dependencies = [
@@ -2514,6 +2525,7 @@ dependencies = [
  "notify",
  "pep440_rs",
  "rayon",
+ "red_knot_ide",
  "red_knot_python_semantic",
  "red_knot_vendored",
  "ruff_cache",
