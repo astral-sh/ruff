@@ -1,0 +1,84 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/debug_rename_import.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..86,
+        body: [
+            Import(
+                StmtImport {
+                    range: 0..25,
+                    names: [
+                        Alias {
+                            range: 7..25,
+                            name: Identifier {
+                                id: Name("__debug__"),
+                                range: 7..16,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("debug"),
+                                    range: 20..25,
+                                },
+                            ),
+                        },
+                    ],
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 26..52,
+                    module: Some(
+                        Identifier {
+                            id: Name("__debug__"),
+                            range: 31..40,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 48..52,
+                            name: Identifier {
+                                id: Name("Some"),
+                                range: 48..52,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 53..85,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 58..59,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 67..85,
+                            name: Identifier {
+                                id: Name("__debug__"),
+                                range: 67..76,
+                            },
+                            asname: Some(
+                                Identifier {
+                                    id: Name("debug"),
+                                    range: 80..85,
+                                },
+                            ),
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```
