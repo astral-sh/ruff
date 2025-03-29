@@ -827,6 +827,9 @@ pub enum KnownClass {
     BaseException,
     BaseExceptionGroup,
     Classmethod,
+    Super,
+    // enum
+    Enum,
     // Types
     GenericAlias,
     ModuleType,
@@ -924,6 +927,8 @@ impl<'db> KnownClass {
             | Self::Deque
             | Self::Float
             | Self::Sized
+            | Self::Enum
+            | Self::Super
             | Self::Classmethod => Truthiness::Ambiguous,
         }
     }
@@ -970,6 +975,8 @@ impl<'db> KnownClass {
             Self::Deque => "deque",
             Self::Sized => "Sized",
             Self::OrderedDict => "OrderedDict",
+            Self::Enum => "Enum",
+            Self::Super => "super",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -1120,8 +1127,10 @@ impl<'db> KnownClass {
             | Self::Classmethod
             | Self::Slice
             | Self::Range
+            | Self::Super
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
+            Self::Enum => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
@@ -1212,6 +1221,8 @@ impl<'db> KnownClass {
             | Self::ParamSpec
             | Self::TypeVarTuple
             | Self::Sized
+            | Self::Enum
+            | Self::Super
             | Self::NewType => false,
         }
     }
@@ -1265,6 +1276,8 @@ impl<'db> KnownClass {
             | Self::ParamSpec
             | Self::TypeVarTuple
             | Self::Sized
+            | Self::Enum
+            | Self::Super
             | Self::NewType => false,
         }
     }
@@ -1318,6 +1331,8 @@ impl<'db> KnownClass {
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
             "Sized" => Self::Sized,
+            "Enum" => Self::Enum,
+            "super" => Self::Super,
             "_version_info" => Self::VersionInfo,
             "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
                 Self::EllipsisType
@@ -1368,6 +1383,8 @@ impl<'db> KnownClass {
             | Self::FunctionType
             | Self::MethodType
             | Self::MethodWrapperType
+            | Self::Enum
+            | Self::Super
             | Self::WrapperDescriptorType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
@@ -1498,8 +1515,8 @@ pub enum KnownInstanceType<'db> {
     Intersection,
     /// The symbol `knot_extensions.TypeOf`
     TypeOf,
-    /// The symbol `knot_extensions.CallableTypeFromFunction`
-    CallableTypeFromFunction,
+    /// The symbol `knot_extensions.CallableTypeOf`
+    CallableTypeOf,
 
     // Various special forms, special aliases and type qualifiers that we don't yet understand
     // (all currently inferred as TODO in most contexts):
@@ -1562,7 +1579,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Not
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeFromFunction => Truthiness::AlwaysTrue,
+            | Self::CallableTypeOf => Truthiness::AlwaysTrue,
         }
     }
 
@@ -1609,7 +1626,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Not => "knot_extensions.Not",
             Self::Intersection => "knot_extensions.Intersection",
             Self::TypeOf => "knot_extensions.TypeOf",
-            Self::CallableTypeFromFunction => "knot_extensions.CallableTypeFromFunction",
+            Self::CallableTypeOf => "knot_extensions.CallableTypeOf",
         }
     }
 
@@ -1653,7 +1670,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeOf => KnownClass::SpecialForm,
             Self::Not => KnownClass::SpecialForm,
             Self::Intersection => KnownClass::SpecialForm,
-            Self::CallableTypeFromFunction => KnownClass::SpecialForm,
+            Self::CallableTypeOf => KnownClass::SpecialForm,
             Self::Unknown => KnownClass::Object,
             Self::AlwaysTruthy => KnownClass::Object,
             Self::AlwaysFalsy => KnownClass::Object,
@@ -1718,7 +1735,7 @@ impl<'db> KnownInstanceType<'db> {
             "Not" => Self::Not,
             "Intersection" => Self::Intersection,
             "TypeOf" => Self::TypeOf,
-            "CallableTypeFromFunction" => Self::CallableTypeFromFunction,
+            "CallableTypeOf" => Self::CallableTypeOf,
             _ => return None,
         };
 
@@ -1775,7 +1792,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Not
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeFromFunction => module.is_knot_extensions(),
+            | Self::CallableTypeOf => module.is_knot_extensions(),
         }
     }
 }

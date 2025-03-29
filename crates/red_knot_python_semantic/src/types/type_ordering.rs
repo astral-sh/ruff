@@ -230,8 +230,8 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (KnownInstanceType::TypeOf, _) => Ordering::Less,
                 (_, KnownInstanceType::TypeOf) => Ordering::Greater,
 
-                (KnownInstanceType::CallableTypeFromFunction, _) => Ordering::Less,
-                (_, KnownInstanceType::CallableTypeFromFunction) => Ordering::Greater,
+                (KnownInstanceType::CallableTypeOf, _) => Ordering::Less,
+                (_, KnownInstanceType::CallableTypeOf) => Ordering::Greater,
 
                 (KnownInstanceType::Unpack, _) => Ordering::Less,
                 (_, KnownInstanceType::Unpack) => Ordering::Greater,

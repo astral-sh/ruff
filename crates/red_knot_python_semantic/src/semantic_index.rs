@@ -124,6 +124,12 @@ pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     FileScopeId::global().to_scope_id(db, file)
 }
 
+pub(crate) enum EagerBindingsResult<'map, 'db> {
+    Found(BindingWithConstraintsIterator<'map, 'db>),
+    NotFound,
+    NoLongerInEagerContext,
+}
+
 /// The symbol tables and use-def maps for all scopes in a file.
 #[derive(Debug, Update)]
 pub(crate) struct SemanticIndex<'db> {
@@ -319,21 +325,40 @@ impl<'db> SemanticIndex<'db> {
         self.has_future_annotations
     }
 
-    /// Returns an iterator of bindings for a particular nested eager scope reference.
+    /// Returns
+    /// * `NoLongerInEagerContext` if the nested scope is no longer in an eager context
+    ///   (that is, not every scope that will be traversed is eager).
+    /// *  an iterator of bindings for a particular nested eager scope reference if the bindings exist.
+    /// * `NotFound` if the bindings do not exist in the nested eager scope.
     pub(crate) fn eager_bindings(
         &self,
         enclosing_scope: FileScopeId,
         symbol: &str,
         nested_scope: FileScopeId,
-    ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
-        let symbol_id = self.symbol_tables[enclosing_scope].symbol_id_by_name(symbol)?;
+    ) -> EagerBindingsResult<'_, 'db> {
+        for (ancestor_scope_id, ancestor_scope) in self.ancestor_scopes(nested_scope) {
+            if ancestor_scope_id == enclosing_scope {
+                break;
+            }
+            if !ancestor_scope.is_eager() {
+                return EagerBindingsResult::NoLongerInEagerContext;
+            }
+        }
+        let Some(symbol_id) = self.symbol_tables[enclosing_scope].symbol_id_by_name(symbol) else {
+            return EagerBindingsResult::NotFound;
+        };
         let key = EagerBindingsKey {
             enclosing_scope,
             enclosing_symbol: symbol_id,
             nested_scope,
         };
-        let id = self.eager_bindings.get(&key)?;
-        self.use_def_maps[enclosing_scope].eager_bindings(*id)
+        let Some(id) = self.eager_bindings.get(&key) else {
+            return EagerBindingsResult::NotFound;
+        };
+        match self.use_def_maps[enclosing_scope].eager_bindings(*id) {
+            Some(bindings) => EagerBindingsResult::Found(bindings),
+            None => EagerBindingsResult::NotFound,
+        }
     }
 }
 

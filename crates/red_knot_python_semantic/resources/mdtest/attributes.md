@@ -1709,6 +1709,37 @@ reveal_type(C.a_type)  # revealed: type
 reveal_type(C.a_none)  # revealed: None
 ```
 
+## Enum classes
+
+Enums are not supported yet; attribute access on an enum class is inferred as `Todo`.
+
+```py
+import enum
+
+reveal_type(enum.Enum.__members__)  # revealed: @Todo(Attribute access on enum classes)
+
+class Foo(enum.Enum):
+    BAR = 1
+
+reveal_type(Foo.BAR)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Foo.BAR.value)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes)
+```
+
+## `super()`
+
+`super()` is not supported yet, but we do not emit false positives on `super()` calls.
+
+```py
+class Foo:
+    def bar(self) -> int:
+        return 42
+
+class Bar(Foo):
+    def bar(self) -> int:
+        return super().bar()
+```
+
 ## References
 
 Some of the tests in the *Class and instance variables* section draw inspiration from

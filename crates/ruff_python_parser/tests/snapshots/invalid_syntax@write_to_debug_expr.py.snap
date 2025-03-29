@@ -1,0 +1,205 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/write_to_debug_expr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..83,
+        body: [
+            Delete(
+                StmtDelete {
+                    range: 0..13,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 4..13,
+                                id: Name("__debug__"),
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Delete(
+                StmtDelete {
+                    range: 14..36,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 18..19,
+                                id: Name("x"),
+                                ctx: Del,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 21..22,
+                                id: Name("y"),
+                                ctx: Del,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 24..33,
+                                id: Name("__debug__"),
+                                ctx: Del,
+                            },
+                        ),
+                        Name(
+                            ExprName {
+                                range: 35..36,
+                                id: Name("z"),
+                                ctx: Del,
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 37..50,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 37..46,
+                                id: Name("__debug__"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 49..50,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 51..82,
+                    targets: [
+                        Tuple(
+                            ExprTuple {
+                                range: 51..69,
+                                elts: [
+                                    Name(
+                                        ExprName {
+                                            range: 51..52,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 54..55,
+                                            id: Name("y"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 57..66,
+                                            id: Name("__debug__"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    Name(
+                                        ExprName {
+                                            range: 68..69,
+                                            id: Name("z"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                ctx: Store,
+                                parenthesized: false,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            range: 72..82,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 72..73,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 75..76,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 78..79,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 81..82,
+                                        value: Int(
+                                            4,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | del __debug__
+  |     ^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.13 (syntax was removed in 3.9)
+2 | del x, y, __debug__, z
+3 | __debug__ = 1
+  |
+
+
+  |
+1 | del __debug__
+2 | del x, y, __debug__, z
+  |           ^^^^^^^^^ Syntax Error: cannot delete `__debug__` on Python 3.13 (syntax was removed in 3.9)
+3 | __debug__ = 1
+4 | x, y, __debug__, z = 1, 2, 3, 4
+  |
+
+
+  |
+1 | del __debug__
+2 | del x, y, __debug__, z
+3 | __debug__ = 1
+  | ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+4 | x, y, __debug__, z = 1, 2, 3, 4
+  |
+
+
+  |
+2 | del x, y, __debug__, z
+3 | __debug__ = 1
+4 | x, y, __debug__, z = 1, 2, 3, 4
+  |       ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |

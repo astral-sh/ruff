@@ -2018,6 +2018,10 @@ impl<'db> Type<'db> {
                 Symbol::bound(Type::IntLiteral(segment.into())).into()
             }
 
+            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Super) => {
+                SymbolAndQualifiers::todo("super() support")
+            }
+
             Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
                 Symbol::bound(self).into()
             }
@@ -2103,6 +2107,10 @@ impl<'db> Type<'db> {
 
                 if name == "__mro__" {
                     return class_attr_plain;
+                }
+
+                if self.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
+                    return SymbolAndQualifiers::todo("Attribute access on enum classes");
                 }
 
                 let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
@@ -3013,7 +3021,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::TypeIs
                 | KnownInstanceType::TypeGuard
                 | KnownInstanceType::Unpack
-                | KnownInstanceType::CallableTypeFromFunction => Err(InvalidTypeExpressionError {
+                | KnownInstanceType::CallableTypeOf => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![
                         InvalidTypeExpression::RequiresOneArgument(*self)
                     ],
@@ -4119,7 +4127,7 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
     ///
-    /// This powers the `CallableTypeFromFunction` special form from the `knot_extensions` module.
+    /// This powers the `CallableTypeOf` special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
         Type::Callable(CallableType::General(GeneralCallableType::new(
             db,
