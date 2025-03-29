@@ -16,6 +16,7 @@ mod tests {
     #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR301.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_args.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_names.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR302_names_try.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_class_attribute.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_airflow_plugin.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR302_context.py"))]

@@ -277,6 +277,7 @@ mkdirs
 
 #  airflow.utils.helpers
 chain
+chain_linear
 cross_downstream
 
 # airflow.utils.state
