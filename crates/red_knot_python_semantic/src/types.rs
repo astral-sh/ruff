@@ -315,6 +315,14 @@ impl<'db> Type<'db> {
             .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
     }
 
+    pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
+        self.into_instance().is_some_and(|instance| {
+            instance
+                .class()
+                .is_known(db, KnownClass::NotImplementedType)
+        })
+    }
+
     pub fn is_object(&self, db: &'db dyn Db) -> bool {
         self.into_instance()
             .is_some_and(|instance| instance.class().is_object(db))
@@ -4973,6 +4981,10 @@ impl<'db> UnionType<'db> {
         transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
+    }
+
+    pub fn filter(&self, db: &'db dyn Db, filter_fn: impl FnMut(&&Type<'db>) -> bool) -> Type<'db> {
+        Self::from_elements(db, self.elements(db).iter().filter(filter_fn))
     }
 
     pub(crate) fn map_with_boundness(
