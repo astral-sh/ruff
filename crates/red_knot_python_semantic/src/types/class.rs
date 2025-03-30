@@ -862,8 +862,6 @@ pub enum KnownClass {
     // Exposed as `types.EllipsisType` on Python >=3.10;
     // backported as `builtins.ellipsis` by typeshed on Python <=3.9
     EllipsisType,
-    // Exposed as `types.NotImplementedType` on Python >=3.10;
-    // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
     NotImplementedType,
 }
 
@@ -1001,13 +999,7 @@ impl<'db> KnownClass {
                     "ellipsis"
                 }
             }
-            Self::NotImplementedType => {
-                // Exposed as `types.NotImplementedType` on Python >=3.10;
-                // backported as `builtins._NotImplementedType` by typeshed on Python <=3.9
-                // TODO: Currently, types.NotImplementedType is a type alias of `builtins._NotImplementedType`
-                // TypeAlias is not fully supported yet, so we use `_NotImplementedType` here for now
-                "_NotImplementedType"
-            }
+            Self::NotImplementedType => "_NotImplementedType",
         }
     }
 
@@ -1181,11 +1173,7 @@ impl<'db> KnownClass {
                     KnownModule::Builtins
                 }
             }
-            Self::NotImplementedType => {
-                // TODO: Currently, types.NotImplementedType is a type alias of `builtins._NotImplementedType`
-                // TypeAlias is not fully supported yet, so we use `_NotImplementedType` here for now
-                KnownModule::Builtins
-            }
+            Self::NotImplementedType => KnownModule::Builtins,
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
@@ -1361,12 +1349,6 @@ impl<'db> KnownClass {
                 Self::EllipsisType
             }
             "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
-                Self::NotImplementedType
-            }
-            // TODO: It should be changed to `NotImplementedType` when we have support for TypeAlias
-            "_NotImplementedType"
-                if Program::get(db).python_version(db) >= PythonVersion::PY310 =>
-            {
                 Self::NotImplementedType
             }
             _ => return None,
