@@ -70,6 +70,13 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (_, Type::Callable(CallableType::BoundMethod(_))) => Ordering::Greater,
 
         (
+            Type::Callable(CallableType::Specialized(left)),
+            Type::Callable(CallableType::Specialized(right)),
+        ) => left.cmp(right),
+        (Type::Callable(CallableType::Specialized(_)), _) => Ordering::Less,
+        (_, Type::Callable(CallableType::Specialized(_))) => Ordering::Greater,
+
+        (
             Type::Callable(CallableType::MethodWrapperDunderGet(left)),
             Type::Callable(CallableType::MethodWrapperDunderGet(right)),
         ) => left.cmp(right),

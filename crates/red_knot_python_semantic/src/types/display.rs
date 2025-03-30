@@ -100,6 +100,13 @@ impl Display for DisplayRepresentation<'_> {
                     instance = bound_method.self_instance(self.db).display(self.db)
                 )
             }
+            Type::Callable(CallableType::Specialized(specialized)) => {
+                write!(
+                    f,
+                    "<specialization of {callable}>",
+                    callable = specialized.callable_type(self.db).display(self.db),
+                )
+            }
             Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
                 write!(
                     f,

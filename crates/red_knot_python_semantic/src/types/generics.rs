@@ -86,7 +86,7 @@ impl<'db> GenericContext<'db> {
 
 /// An assignment of a specific type to each type variable in a generic scope.
 #[salsa::tracked(debug)]
-pub(crate) struct Specialization<'db> {
+pub struct Specialization<'db> {
     generic_context: GenericContext<'db>,
     types: Box<[Type<'db>]>,
 }

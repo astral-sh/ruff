@@ -35,6 +35,7 @@ use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
 use crate::types::call::{Bindings, CallArgumentTypes};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
+use crate::types::generics::Specialization;
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -641,6 +642,10 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .is_subtype_of(db, target),
 
+            (Type::Callable(CallableType::Specialized(specialized)), _) => {
+                specialized.callable_type(db).is_subtype_of(db, target)
+            }
+
             // The same reasoning applies for these special callable types:
             (Type::Callable(CallableType::BoundMethod(_)), _) => KnownClass::MethodType
                 .to_instance(db)
@@ -1048,6 +1053,7 @@ impl<'db> Type<'db> {
                 | Type::FunctionLiteral(..)
                 | Type::Callable(
                     CallableType::BoundMethod(..)
+                    | CallableType::Specialized(..)
                     | CallableType::MethodWrapperDunderGet(..)
                     | CallableType::WrapperDescriptorDunderGet,
                 )
@@ -1062,6 +1068,7 @@ impl<'db> Type<'db> {
                 | Type::FunctionLiteral(..)
                 | Type::Callable(
                     CallableType::BoundMethod(..)
+                    | CallableType::Specialized(..)
                     | CallableType::MethodWrapperDunderGet(..)
                     | CallableType::WrapperDescriptorDunderGet,
                 )
@@ -1236,6 +1243,11 @@ impl<'db> Type<'db> {
                 !KnownClass::FunctionType.is_subclass_of(db, class)
             }
 
+            (Type::Callable(CallableType::Specialized(specialized)), Type::Instance(_))
+            | (Type::Instance(_), Type::Callable(CallableType::Specialized(specialized))) => {
+                specialized.callable_type(db).is_disjoint_from(db, other)
+            }
+
             (
                 Type::Callable(CallableType::BoundMethod(_)),
                 Type::Instance(InstanceType { class }),
@@ -1359,6 +1371,9 @@ impl<'db> Type<'db> {
                 .iter()
                 .all(|elem| elem.is_fully_static(db)),
             Type::Callable(CallableType::General(callable)) => callable.is_fully_static(db),
+            Type::Callable(CallableType::Specialized(specialized)) => {
+                specialized.callable_type(db).is_fully_static(db)
+            }
         }
     }
 
@@ -1397,6 +1412,9 @@ impl<'db> Type<'db> {
                 // there could be any number of distinct objects that are all callable with that
                 // signature.
                 false
+            }
+            Type::Callable(CallableType::Specialized(specialized)) => {
+                specialized.callable_type(db).is_singleton(db)
             }
             Type::Instance(InstanceType { class }) => {
                 class.known(db).is_some_and(KnownClass::is_singleton)
@@ -1446,6 +1464,10 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(..)
             | Type::SliceLiteral(..)
             | Type::KnownInstance(..) => true,
+
+            Type::Callable(CallableType::Specialized(specialized)) => {
+                specialized.callable_type(db).is_single_valued(db)
+            }
 
             Type::SubclassOf(..) => {
                 // TODO: Same comment as above for `is_singleton`
@@ -1563,6 +1585,11 @@ impl<'db> Type<'db> {
                     .find_name_in_mro(db, name)
             }
 
+            Type::Callable(CallableType::Specialized(specialized)) => {
+                // XXX: specialize the result
+                specialized.callable_type(db).find_name_in_mro(db, name)
+            }
+
             Type::FunctionLiteral(_)
             | Type::Callable(_)
             | Type::ModuleLiteral(_)
@@ -1638,6 +1665,10 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::BoundMethod(_)) => KnownClass::MethodType
                 .to_instance(db)
                 .instance_member(db, name),
+            Type::Callable(CallableType::Specialized(specialized)) => {
+                // XXX: specialize the result
+                specialized.callable_type(db).instance_member(db, name)
+            }
             Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
                 KnownClass::MethodWrapperType
                     .to_instance(db)
@@ -1992,6 +2023,12 @@ impl<'db> Type<'db> {
                         })
                 }
             },
+            Type::Callable(CallableType::Specialized(specialized)) => {
+                // XXX: specialize the result
+                specialized
+                    .callable_type(db)
+                    .member_lookup_with_policy(db, name, policy)
+            }
             Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
                 KnownClass::MethodWrapperType
                     .to_instance(db)
@@ -3168,6 +3205,10 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::BoundMethod(_)) => {
                 KnownClass::MethodType.to_class_literal(db)
             }
+            Type::Callable(CallableType::Specialized(specialized)) => {
+                // XXX: specialize the result
+                specialized.callable_type(db).to_meta_type(db)
+            }
             Type::Callable(CallableType::MethodWrapperDunderGet(_)) => {
                 KnownClass::MethodWrapperType.to_class_literal(db)
             }
@@ -4313,6 +4354,18 @@ pub struct BoundMethodType<'db> {
     self_instance: Type<'db>,
 }
 
+/// Represents the specialization of a callable that has access to generic typevars, either because
+/// it is itself a generic function, or because it appears in the body of a generic class.
+#[salsa::tracked(debug)]
+pub struct SpecializedCallable<'db> {
+    /// The callable that has been specialized. (Note that this is not [`CallableType`] since there
+    /// are other types that are callable.)
+    pub(crate) callable_type: Type<'db>,
+
+    /// The specialization of any generic typevars that are visible to the callable.
+    pub(crate) specialization: Specialization<'db>,
+}
+
 /// This type represents a general callable type that are used to represent `typing.Callable`
 /// and `lambda` expressions.
 #[salsa::interned(debug)]
@@ -4842,6 +4895,11 @@ pub enum CallableType<'db> {
     /// and return a `Callable[[int], str]`. One drawback would be that we could not show
     /// the bound instance when that type is displayed.
     BoundMethod(BoundMethodType<'db>),
+
+    /// Represents the specialization of a callable that has access to generic typevars, either
+    /// because it is itself a generic function, or because it appears in the body of a generic
+    /// class.
+    Specialized(SpecializedCallable<'db>),
 
     /// Represents the callable `f.__get__` where `f` is a function.
     ///
