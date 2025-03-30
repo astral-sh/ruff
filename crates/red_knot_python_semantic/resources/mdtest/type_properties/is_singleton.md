@@ -99,8 +99,8 @@ static_assert(is_singleton(types.EllipsisType))
 
 ### All Python versions
 
-Just like `Ellipsis`, the type of `NotImplemented` was not exposed on Python \<3.10.\
-However, we still recognize the type as a singleton in all Python versions.
+Just like `Ellipsis`, the type of `NotImplemented` was not exposed on Python \<3.10. However, we
+still recognize the type as a singleton in all Python versions.
 
 ```toml
 [environment]
