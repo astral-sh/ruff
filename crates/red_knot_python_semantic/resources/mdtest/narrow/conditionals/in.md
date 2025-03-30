@@ -25,6 +25,14 @@ def _(x: object):
         reveal_type(x)  # revealed: ~A & ~B
 ```
 
+```py
+def _(x: Literal["a", "b", "c", 1]):
+    if x in ("a", "b", "c"):
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
+    else:
+        reveal_type(x)  # revealed: Literal[1]
+```
+
 ### `in` for tuples of `str`
 
 ```py
