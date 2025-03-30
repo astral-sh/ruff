@@ -25,11 +25,27 @@ def _(x: object):
         reveal_type(x)  # revealed: ~A & ~B
 ```
 
+### `in` for mixed tuples
+
+```py
+from typing import Literal
+
+def _(x: Literal[1, 2, "a", "b"]):
+    if x in (1,):
+        reveal_type(x)  # revealed: Literal[1]
+    elif x in (2, "a"):
+        reveal_type(x)  # revealed: Literal[2, "a"]
+    elif x not in (3,):
+        reveal_type(x)  # revealed: Literal["b"]
+    else:
+        reveal_type(x)  # revealed: Never
+```
+
 ```py
 from typing import Literal
 
 def _(x: Literal["a", "b", "c", 1]):
-    if x in ("a", "b", "c"):
+    if x in ("a", "b", "c", "d"):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: Literal[1]
