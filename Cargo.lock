@@ -3193,6 +3193,7 @@ name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.9.0",
+ "insta",
  "is-macro",
  "ruff_cache",
  "ruff_index",
@@ -3205,6 +3206,7 @@ dependencies = [
  "schemars",
  "serde",
  "smallvec",
+ "test-case",
 ]
 
 [[package]]
