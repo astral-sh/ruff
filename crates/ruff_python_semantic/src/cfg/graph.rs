@@ -1,5 +1,6 @@
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::Stmt;
+use ruff_text_size::{Ranged, TextRange};
 use smallvec::{smallvec, SmallVec};
 
 /// Returns the control flow graph associated to an array of statements
@@ -41,6 +42,11 @@ impl<'stmt> CFG<'stmt> {
         self.blocks[block].stmts
     }
 
+    /// Returns the range of the statements comprising the basic block at the given index
+    pub fn range(&self, block: BlockId) -> TextRange {
+        self.blocks[block].range()
+    }
+
     /// Returns the [`Edges`] going out of the basic block at the given index
     pub fn outgoing(&self, block: BlockId) -> &Edges {
         &self.blocks[block].out
@@ -68,6 +74,19 @@ struct BlockData<'stmt> {
     stmts: &'stmt [Stmt],
     out: Edges,
     parents: SmallVec<[BlockId; 2]>,
+}
+
+impl Ranged for BlockData<'_> {
+    fn range(&self) -> TextRange {
+        let Some(first) = self.stmts.first() else {
+            return TextRange::default();
+        };
+        let Some(last) = self.stmts.last() else {
+            return TextRange::default();
+        };
+
+        TextRange::new(first.start(), last.end())
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -110,6 +129,16 @@ impl Edges {
 
     fn is_empty(&self) -> bool {
         self.targets.is_empty()
+    }
+
+    pub fn filter_targets_by_conditions<'a, T: FnMut(&Condition) -> bool + 'a>(
+        &'a self,
+        mut predicate: T,
+    ) -> impl Iterator<Item = BlockId> + 'a {
+        self.conditions()
+            .zip(self.targets())
+            .filter(move |(cond, _)| predicate(cond))
+            .map(|(_, block)| block)
     }
 }
 
