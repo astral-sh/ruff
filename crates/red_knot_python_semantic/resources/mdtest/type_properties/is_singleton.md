@@ -115,7 +115,7 @@ static_assert(is_singleton(NotImplemented.__class__))
 
 ### Python 3.10+
 
-On Python 3.10+, the standard library exposes the type of `NotImplemented` as\
+On Python 3.10+, the standard library exposes the type of `NotImplemented` as
 `types.NotImplementedType`. We also recognize this as a singleton type when it is referenced
 directly:
 

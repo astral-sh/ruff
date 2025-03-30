@@ -270,11 +270,10 @@ def f(cond: bool) -> int:
         return 2
 ```
 
-## NotImplement
+## NotImplemented
 
-`NotImplement` is a special symbol in Python. It is commonly used to control the fallback behavior
-of special dunder methods.\
-You can find more details in the
+`NotImplemented` is a special symbol in Python. It is commonly used to control the fallback behavior
+of special dunder methods. You can find more details in the
 [documentation](https://docs.python.org/3/library/numbers.html#implementing-the-arithmetic-operations).
 
 ```py
