@@ -1,8 +1,8 @@
-use lsp_server as server;
-
 use crate::server::schedule::Task;
 use crate::session::Session;
 use crate::system::{url_to_any_system_path, AnySystemPath};
+use lsp_server as server;
+use lsp_types::notification::Notification;
 
 mod diagnostics;
 mod notifications;
@@ -52,6 +52,11 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
         notification::DidCloseNotebookHandler::METHOD => {
             local_notification_task::<notification::DidCloseNotebookHandler>(notif)
         }
+        lsp_types::notification::SetTrace::METHOD => {
+            tracing::trace!("Ignoring `setTrace` notification");
+            return Task::nothing();
+        },
+
         method => {
             tracing::warn!("Received notification {method} which does not have a handler.");
             return Task::nothing();
@@ -69,6 +74,7 @@ fn _local_request_task<'a, R: traits::SyncRequestHandler>(
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::local(|session, notifier, requester, responder| {
+        let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
         let result = R::run(session, notifier, requester, params);
         respond::<R>(id, result, &responder);
     }))
@@ -98,6 +104,7 @@ fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
         };
 
         Box::new(move |notifier, responder| {
+            let _span = tracing::trace_span!("request", %id, method = R::METHOD).entered();
             let result = R::run_with_snapshot(snapshot, db, notifier, params);
             respond::<R>(id, result, &responder);
         })
@@ -109,6 +116,7 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::local(move |session, notifier, requester, _| {
+        let _span = tracing::trace_span!("notification", method = N::METHOD).entered();
         if let Err(err) = N::run(session, notifier, requester, params) {
             tracing::error!("An error occurred while running {id}: {err}");
             show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
@@ -128,6 +136,7 @@ fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationH
             return Box::new(|_, _| {});
         };
         Box::new(move |notifier, _| {
+            let _span = tracing::trace_span!("notification", method = N::METHOD).entered();
             if let Err(err) = N::run_with_snapshot(snapshot, notifier, params) {
                 tracing::error!("An error occurred while running {id}: {err}");
                 show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
@@ -174,7 +183,7 @@ fn respond<Req>(
     Req: traits::RequestHandler,
 {
     if let Err(err) = &result {
-        tracing::error!("An error occurred with result ID {id}: {err}");
+        tracing::error!("An error occurred with request ID {id}: {err}");
         show_err_msg!("Ruff encountered a problem. Check the logs for more details.");
     }
     if let Err(err) = responder.respond(id, result) {

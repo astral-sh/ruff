@@ -9,7 +9,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
-use crate::unpack::Unpack;
+use crate::unpack::{Unpack, UnpackPosition};
 use crate::Db;
 
 /// A definition of a symbol.
@@ -240,10 +240,9 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<Unpack<'a>>,
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
     pub(crate) value: Expression<'a>,
     pub(crate) target: &'a ast::Expr,
-    pub(crate) first: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -256,20 +255,18 @@ pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct WithItemDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<Unpack<'a>>,
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
     pub(crate) context_expr: Expression<'a>,
     pub(crate) target: &'a ast::Expr,
-    pub(crate) first: bool,
     pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ForStmtDefinitionNodeRef<'a> {
-    pub(crate) unpack: Option<Unpack<'a>>,
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
     pub(crate) iterable: Expression<'a>,
-    pub(crate) node: &'a ast::StmtFor,
     pub(crate) target: &'a ast::Expr,
-    pub(crate) first: bool,
+    pub(crate) is_async: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -341,12 +338,10 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack,
                 value,
                 target,
-                first,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 target_kind: TargetKind::from(unpack),
                 value,
                 target: AstNodeRef::new(parsed, target),
-                first,
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
                 node: _,
@@ -365,14 +360,12 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack,
                 iterable,
                 target,
-                node,
-                first,
+                is_async,
             }) => DefinitionKind::For(ForStmtDefinitionKind {
                 target_kind: TargetKind::from(unpack),
                 iterable,
                 target: AstNodeRef::new(parsed, target),
-                first,
-                is_async: node.is_async,
+                is_async,
             }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
                 iterable,
@@ -398,13 +391,11 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack,
                 context_expr,
                 target,
-                first,
                 is_async,
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
                 target_kind: TargetKind::from(unpack),
                 context_expr,
                 target: AstNodeRef::new(parsed, target),
-                first,
                 is_async,
             }),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
@@ -467,16 +458,14 @@ impl<'db> DefinitionNodeRef<'db> {
                 value: _,
                 unpack: _,
                 target,
-                first: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
             Self::For(ForStmtDefinitionNodeRef {
-                node: _,
                 target,
                 iterable: _,
                 unpack: _,
-                first: _,
+                is_async: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => target.into(),
             Self::VariadicPositionalParameter(node) => node.into(),
@@ -485,7 +474,6 @@ impl<'db> DefinitionNodeRef<'db> {
             Self::WithItem(WithItemDefinitionNodeRef {
                 context_expr: _,
                 unpack: _,
-                first: _,
                 is_async: _,
                 target,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
@@ -668,14 +656,14 @@ impl DefinitionKind<'_> {
 
 #[derive(Copy, Clone, Debug, PartialEq, Hash)]
 pub(crate) enum TargetKind<'db> {
-    Sequence(Unpack<'db>),
+    Sequence(UnpackPosition, Unpack<'db>),
     Name,
 }
 
-impl<'db> From<Option<Unpack<'db>>> for TargetKind<'db> {
-    fn from(value: Option<Unpack<'db>>) -> Self {
+impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
+    fn from(value: Option<(UnpackPosition, Unpack<'db>)>) -> Self {
         match value {
-            Some(unpack) => TargetKind::Sequence(unpack),
+            Some((unpack_position, unpack)) => TargetKind::Sequence(unpack_position, unpack),
             None => TargetKind::Name,
         }
     }
@@ -796,7 +784,6 @@ pub struct AssignmentDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     value: Expression<'db>,
     target: AstNodeRef<ast::Expr>,
-    first: bool,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
@@ -804,13 +791,11 @@ impl<'db> AssignmentDefinitionKind<'db> {
         target_kind: TargetKind<'db>,
         value: Expression<'db>,
         target: AstNodeRef<ast::Expr>,
-        first: bool,
     ) -> Self {
         Self {
             target_kind,
             value,
             target,
-            first,
         }
     }
 
@@ -824,10 +809,6 @@ impl<'db> AssignmentDefinitionKind<'db> {
 
     pub(crate) fn target(&self) -> &ast::Expr {
         self.target.node()
-    }
-
-    pub(crate) fn is_first(&self) -> bool {
-        self.first
     }
 }
 
@@ -869,7 +850,6 @@ pub struct WithItemDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     context_expr: Expression<'db>,
     target: AstNodeRef<ast::Expr>,
-    first: bool,
     is_async: bool,
 }
 
@@ -878,14 +858,12 @@ impl<'db> WithItemDefinitionKind<'db> {
         target_kind: TargetKind<'db>,
         context_expr: Expression<'db>,
         target: AstNodeRef<ast::Expr>,
-        first: bool,
         is_async: bool,
     ) -> Self {
         Self {
             target_kind,
             context_expr,
             target,
-            first,
             is_async,
         }
     }
@@ -902,10 +880,6 @@ impl<'db> WithItemDefinitionKind<'db> {
         self.target.node()
     }
 
-    pub(crate) const fn is_first(&self) -> bool {
-        self.first
-    }
-
     pub(crate) const fn is_async(&self) -> bool {
         self.is_async
     }
@@ -916,7 +890,6 @@ pub struct ForStmtDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     iterable: Expression<'db>,
     target: AstNodeRef<ast::Expr>,
-    first: bool,
     is_async: bool,
 }
 
@@ -925,14 +898,12 @@ impl<'db> ForStmtDefinitionKind<'db> {
         target_kind: TargetKind<'db>,
         iterable: Expression<'db>,
         target: AstNodeRef<ast::Expr>,
-        first: bool,
         is_async: bool,
     ) -> Self {
         Self {
             target_kind,
             iterable,
             target,
-            first,
             is_async,
         }
     }
@@ -947,10 +918,6 @@ impl<'db> ForStmtDefinitionKind<'db> {
 
     pub(crate) fn target(&self) -> &ast::Expr {
         self.target.node()
-    }
-
-    pub(crate) const fn is_first(&self) -> bool {
-        self.first
     }
 
     pub(crate) const fn is_async(&self) -> bool {

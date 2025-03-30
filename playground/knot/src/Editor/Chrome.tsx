@@ -220,7 +220,9 @@ function useCheckResult(
 
     const currentHandle = files.handles[files.selected];
 
-    if (currentHandle == null) {
+    const extension =
+      currentHandle?.path()?.toLowerCase().split(".").pop() ?? "";
+    if (currentHandle == null || !["py", "pyi", "pyw"].includes(extension)) {
       return {
         diagnostics: [],
         error: null,

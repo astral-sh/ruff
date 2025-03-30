@@ -25,7 +25,7 @@ env:
 jobs:
   mypy_primer:
     name: Run mypy_primer
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-22.04-16
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -45,7 +45,7 @@ jobs:
 
       - name: Install mypy_primer
         run: |
-          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support"
+          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support-v2"
 
       - name: Run mypy_primer
         shell: bash
@@ -68,7 +68,7 @@ jobs:
             --type-checker knot \
             --old base_commit \
             --new "$GITHUB_SHA" \
-            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow|isort|itsdangerous|rich|packaging|pybind11|pyinstrument)$' \
+            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow|isort|itsdangerous|rich|packaging|pybind11|pyinstrument|typeshed-stats)$' \
             --output concise \
             --debug > mypy_primer.diff || [ $? -eq 1 ]
 

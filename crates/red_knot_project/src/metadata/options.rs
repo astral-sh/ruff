@@ -121,7 +121,7 @@ impl Options {
                         .ok()
                         .map(PythonPath::from_virtual_env_var)
                 })
-                .unwrap_or_else(|| PythonPath::KnownSitePackages(vec![])),
+                .unwrap_or(PythonPath::Discover),
         }
     }
 

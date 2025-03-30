@@ -551,14 +551,12 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
-                if self.settings.preview.is_enabled() =>
-            {
-                self.semantic_errors.borrow_mut().push(error);
+            | SemanticSyntaxErrorKind::SingleStarredAssignment
+            | SemanticSyntaxErrorKind::WriteToDebug(_) => {
+                if self.settings.preview.is_enabled() {
+                    self.semantic_errors.borrow_mut().push(error);
+                }
             }
-            SemanticSyntaxErrorKind::ReboundComprehensionVariable
-            | SemanticSyntaxErrorKind::DuplicateTypeParameter
-            | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
-            | SemanticSyntaxErrorKind::IrrefutableCasePattern(_) => {}
         }
     }
 }

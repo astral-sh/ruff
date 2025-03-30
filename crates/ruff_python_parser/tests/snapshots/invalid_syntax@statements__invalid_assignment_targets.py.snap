@@ -1690,3 +1690,15 @@ Module(
 42 | (x, foo(), y) = (42, 42, 42)
    |     ^^^^^ Syntax Error: Invalid assignment target
    |
+
+
+## Semantic Syntax Errors
+
+   |
+37 | None = 42
+38 | ... = 42
+39 | *foo() = 42
+   | ^^^^^^ Syntax Error: starred assignment target must be in a list or tuple
+40 | [x, foo(), y] = [42, 42, 42]
+41 | [[a, b], [[42]], d] = [[1, 2], [[3]], 4]
+   |

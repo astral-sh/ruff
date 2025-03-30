@@ -134,13 +134,14 @@ function RunWithPyiodide({
 
   if (output == null) {
     const handleRun = () => {
-      let stdout = "";
+      let combined_output = "";
 
-      pyodide.setStdout({
-        batched(output) {
-          stdout += output + "\n";
-        },
-      });
+      const outputHandler = (output: string) => {
+        combined_output += output + "\n";
+      };
+
+      pyodide.setStdout({ batched: outputHandler });
+      pyodide.setStderr({ batched: outputHandler });
 
       const main = files.selected == null ? "" : files.contents[files.selected];
 
@@ -163,7 +164,7 @@ function RunWithPyiodide({
 
         def reveal_type(obj):
           import typing
-          print(f"Runtime value is: \`{obj}\`")
+          print(f"Runtime value is '{obj}'")
           return typing.reveal_type(obj)
 
         builtins.reveal_type = reveal_type`);
@@ -174,7 +175,7 @@ function RunWithPyiodide({
           filename: fileName,
         });
 
-        setOutput(stdout);
+        setOutput(combined_output);
       } catch (e) {
         setOutput(`Failed to run Python script: ${e}`);
       } finally {

@@ -52,11 +52,10 @@ use crate::semantic_index::definition::{
     WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
-use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
-use crate::semantic_index::SemanticIndex;
+use crate::semantic_index::{semantic_index, EagerBindingsResult, SemanticIndex};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -86,7 +85,7 @@ use crate::types::{
     UnionType,
 };
 use crate::types::{CallableType, GeneralCallableType, Signature};
-use crate::unpack::Unpack;
+use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
@@ -1267,9 +1266,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             {
                 return;
             }
+
             for invalid in self
                 .return_types_and_ranges
                 .iter()
+                .copied()
+                .filter_map(|ty_range| match ty_range.ty {
+                    // We skip `is_assignable_to` checks for `NotImplemented`,
+                    // so we remove it beforehand.
+                    Type::Union(union) => Some(TypeAndRange {
+                        ty: union.filter(self.db(), |ty| !ty.is_notimplemented(self.db())),
+                        range: ty_range.range,
+                    }),
+                    ty if ty.is_notimplemented(self.db()) => None,
+                    _ => Some(ty_range),
+                })
                 .filter(|ty_range| !ty_range.ty.is_assignable_to(self.db(), declared_ty))
             {
                 report_invalid_return_type(
@@ -1825,10 +1836,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             todo_type!("async `with` statement")
         } else {
             match with_item.target_kind() {
-                TargetKind::Sequence(unpack) => {
+                TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
                     let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
-                    if with_item.is_first() {
+                    if unpack_position == UnpackPosition::First {
                         self.context.extend(unpacked);
                     }
                     unpacked.expression_type(target_ast_id)
@@ -2119,6 +2130,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_nested_match_pattern(&keyword.pattern);
                 }
                 self.infer_standalone_expression(cls);
+            }
+            ast::Pattern::MatchOr(match_or) => {
+                for pattern in &match_or.patterns {
+                    self.infer_match_pattern(pattern);
+                }
             }
             _ => {
                 self.infer_nested_match_pattern(pattern);
@@ -2624,11 +2640,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value_ty = self.infer_standalone_expression(value);
 
         let mut target_ty = match assignment.target_kind() {
-            TargetKind::Sequence(unpack) => {
+            TargetKind::Sequence(unpack_position, unpack) => {
                 let unpacked = infer_unpack_types(self.db(), unpack);
                 // Only copy the diagnostics if this is the first assignment to avoid duplicating the
                 // unpack assignments.
-                if assignment.is_first() {
+                if unpack_position == UnpackPosition::First {
                     self.context.extend(unpacked);
                 }
 
@@ -2919,9 +2935,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             todo_type!("async iterables/iterators")
         } else {
             match for_stmt.target_kind() {
-                TargetKind::Sequence(unpack) => {
+                TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
-                    if for_stmt.is_first() {
+                    if unpack_position == UnpackPosition::First {
                         self.context.extend(unpacked);
                     }
                     let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
@@ -4120,8 +4136,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Class scopes are not visible to nested scopes, and we need to handle global
                 // scope differently (because an unbound name there falls back to builtins), so
                 // check only function-like scopes.
+                // There is one exception to this rule: type parameter scopes can see
+                // names defined in an immediately-enclosing class scope.
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
-                if !enclosing_scope_id.is_function_like(db) {
+                let is_immediately_enclosing_scope = scope.is_type_parameter(db)
+                    && scope
+                        .scope(db)
+                        .parent()
+                        .is_some_and(|parent| parent == enclosing_scope_file_id);
+                if !enclosing_scope_id.is_function_like(db) && !is_immediately_enclosing_scope {
                     continue;
                 }
 
@@ -4132,12 +4155,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
                 if !self.is_deferred() {
-                    if let Some(bindings) = self.index.eager_bindings(
+                    match self.index.eager_bindings(
                         enclosing_scope_file_id,
                         symbol_name,
                         file_scope_id,
                     ) {
-                        return symbol_from_bindings(db, bindings).into();
+                        EagerBindingsResult::Found(bindings) => {
+                            return symbol_from_bindings(db, bindings).into();
+                        }
+                        // There are no visible bindings here.
+                        // Don't fall back to non-eager symbol resolution.
+                        EagerBindingsResult::NotFound => {
+                            continue;
+                        }
+                        EagerBindingsResult::NoLongerInEagerContext => {}
                     }
                 }
 
@@ -4165,12 +4196,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
 
                     if !self.is_deferred() {
-                        if let Some(bindings) = self.index.eager_bindings(
+                        match self.index.eager_bindings(
                             FileScopeId::global(),
                             symbol_name,
                             file_scope_id,
                         ) {
-                            return symbol_from_bindings(db, bindings).into();
+                            EagerBindingsResult::Found(bindings) => {
+                                return symbol_from_bindings(db, bindings).into();
+                            }
+                            // There are no visible bindings here.
+                            EagerBindingsResult::NotFound => {
+                                return Symbol::Unbound.into();
+                            }
+                            EagerBindingsResult::NoLongerInEagerContext => {}
                         }
                     }
 
@@ -6737,7 +6775,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     argument_type
                 }
             },
-            KnownInstanceType::CallableTypeFromFunction => match arguments_slice {
+            KnownInstanceType::CallableTypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {
                     self.context.report_lint(
                         &INVALID_TYPE_FORM,
@@ -6751,19 +6789,26 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 _ => {
                     let argument_type = self.infer_expression(arguments_slice);
-                    let Some(function_type) = argument_type.into_function_literal() else {
+                    let signatures = argument_type.signatures(db);
+
+                    // TODO overloads
+                    let Some(signature) = signatures.iter().flatten().next() else {
                         self.context.report_lint(
                             &INVALID_TYPE_FORM,
                             arguments_slice,
                             format_args!(
-                                "Expected the first argument to `{}` to be a function literal, but got `{}`",
+                                "Expected the first argument to `{}` to be a callable object, but got an object of type `{}`",
                                 known_instance.repr(db),
                                 argument_type.display(db)
                             ),
                         );
                         return Type::unknown();
                     };
-                    function_type.into_callable_type(db)
+
+                    Type::Callable(CallableType::General(GeneralCallableType::new(
+                        db,
+                        signature.clone(),
+                    )))
                 }
             },
 

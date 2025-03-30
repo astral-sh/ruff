@@ -315,6 +315,14 @@ impl<'db> Type<'db> {
             .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
     }
 
+    pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
+        self.into_instance().is_some_and(|instance| {
+            instance
+                .class()
+                .is_known(db, KnownClass::NotImplementedType)
+        })
+    }
+
     pub fn is_object(&self, db: &'db dyn Db) -> bool {
         self.into_instance()
             .is_some_and(|instance| instance.class().is_object(db))
@@ -564,6 +572,9 @@ impl<'db> Type<'db> {
             (Type::Never, _) => true,
             (_, Type::Never) => false,
 
+            // Everything is a subtype of `object`.
+            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
+
             (Type::Union(union), _) => union
                 .elements(db)
                 .iter()
@@ -573,14 +584,6 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
-
-            // `object` is the only type that can be known to be a supertype of any intersection,
-            // even an intersection with no positive elements
-            (Type::Intersection(_), Type::Instance(InstanceType { class }))
-                if class.is_object(db) =>
-            {
-                true
-            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -2023,6 +2026,10 @@ impl<'db> Type<'db> {
                 Symbol::bound(Type::IntLiteral(segment.into())).into()
             }
 
+            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Super) => {
+                SymbolAndQualifiers::todo("super() support")
+            }
+
             Type::IntLiteral(_) if matches!(name_str, "real" | "numerator") => {
                 Symbol::bound(self).into()
             }
@@ -2108,6 +2115,10 @@ impl<'db> Type<'db> {
 
                 if name == "__mro__" {
                     return class_attr_plain;
+                }
+
+                if self.is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) {
+                    return SymbolAndQualifiers::todo("Attribute access on enum classes");
                 }
 
                 let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
@@ -3018,7 +3029,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::TypeIs
                 | KnownInstanceType::TypeGuard
                 | KnownInstanceType::Unpack
-                | KnownInstanceType::CallableTypeFromFunction => Err(InvalidTypeExpressionError {
+                | KnownInstanceType::CallableTypeOf => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![
                         InvalidTypeExpression::RequiresOneArgument(*self)
                     ],
@@ -4132,7 +4143,7 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
     ///
-    /// This powers the `CallableTypeFromFunction` special form from the `knot_extensions` module.
+    /// This powers the `CallableTypeOf` special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
         Type::Callable(CallableType::General(GeneralCallableType::new(
             db,
@@ -4978,6 +4989,10 @@ impl<'db> UnionType<'db> {
         transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
+    }
+
+    pub fn filter(&self, db: &'db dyn Db, filter_fn: impl FnMut(&&Type<'db>) -> bool) -> Type<'db> {
+        Self::from_elements(db, self.elements(db).iter().filter(filter_fn))
     }
 
     pub(crate) fn map_with_boundness(

@@ -154,6 +154,10 @@ x = 1
 [reveal_type(x) for a in range(1)]
 
 x = 2
+
+# error: [unresolved-reference]
+[y for a in range(1)]
+y = 1
 ```
 
 ### Set comprehensions
@@ -165,6 +169,10 @@ x = 1
 {reveal_type(x) for a in range(1)}
 
 x = 2
+
+# error: [unresolved-reference]
+{y for a in range(1)}
+y = 1
 ```
 
 ### Dict comprehensions
@@ -176,6 +184,10 @@ x = 1
 {a: reveal_type(x) for a in range(1)}
 
 x = 2
+
+# error: [unresolved-reference]
+{a: y for a in range(1)}
+y = 1
 ```
 
 ### Generator expressions
@@ -187,6 +199,10 @@ x = 1
 list(reveal_type(x) for a in range(1))
 
 x = 2
+
+# error: [unresolved-reference]
+list(y for a in range(1))
+y = 1
 ```
 
 `evaluated_later.py`:
@@ -262,6 +278,14 @@ def _():
             [reveal_type(x) for a in range(1)]
 
     x = 2
+
+x = 1
+
+def _():
+    class C:
+        # revealed: Unknown | Literal[1]
+        [reveal_type(x) for _ in [1]]
+        x = 2
 ```
 
 ### Eager scope within a lazy scope

@@ -72,7 +72,6 @@ python-version = "3.9"
 ```
 
 ```py
-import sys
 from knot_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(Ellipsis.__class__))
@@ -94,4 +93,43 @@ import types
 from knot_extensions import static_assert, is_singleton
 
 static_assert(is_singleton(types.EllipsisType))
+```
+
+## `builtins.NotImplemented` / `types.NotImplementedType`
+
+### All Python versions
+
+Just like `Ellipsis`, the type of `NotImplemented` was not exposed on Python \<3.10. However, we
+still recognize the type as a singleton in all Python versions.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from knot_extensions import is_singleton, static_assert
+
+static_assert(is_singleton(NotImplemented.__class__))
+```
+
+### Python 3.10+
+
+On Python 3.10+, the standard library exposes the type of `NotImplemented` as
+`types.NotImplementedType`. We also recognize this as a singleton type when it is referenced
+directly:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import types
+from knot_extensions import static_assert, is_singleton
+
+# TODO: types.NotImplementedType is a TypeAlias of builtins._NotImplementedType
+# Once TypeAlias support is added, it should satisfy `is_singleton`
+reveal_type(types.NotImplementedType)  # revealed: Unknown | Literal[_NotImplementedType]
+static_assert(not is_singleton(types.NotImplementedType))
 ```

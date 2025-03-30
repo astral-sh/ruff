@@ -104,6 +104,7 @@ impl ModuleKind {
 #[strum(serialize_all = "snake_case")]
 pub enum KnownModule {
     Builtins,
+    Enum,
     Types,
     #[strum(serialize = "_typeshed")]
     Typeshed,
@@ -121,6 +122,7 @@ impl KnownModule {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Builtins => "builtins",
+            Self::Enum => "enum",
             Self::Types => "types",
             Self::Typing => "typing",
             Self::Typeshed => "_typeshed",
@@ -163,6 +165,10 @@ impl KnownModule {
 
     pub const fn is_inspect(self) -> bool {
         matches!(self, Self::Inspect)
+    }
+
+    pub const fn is_enum(self) -> bool {
+        matches!(self, Self::Enum)
     }
 }
 

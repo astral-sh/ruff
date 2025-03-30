@@ -481,7 +481,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
     - `impl<'a> From<&'a TypeParamTypeVarTuple> for AnyNodeRef<'a>`
     - `impl Ranged for AnyNodeRef<'_>`
     - `fn AnyNodeRef::as_ptr(&self) -> std::ptr::NonNull<()>`
-    - `fn AnyNodeRef::visit_preorder(self, visitor &mut impl SourceOrderVisitor)`
+    - `fn AnyNodeRef::visit_source_order(self, visitor &mut impl SourceOrderVisitor)`
     """
 
     out.append("""
@@ -520,6 +520,23 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
                 f"{group.ref_enum_ty}::{node.variant}(node) => AnyNodeRef::{node.name}(node),"
             )
         out.append("""
+                    }
+                }
+            }
+        """)
+
+        # `as_*` methods to convert from `AnyNodeRef` to e.g. `ExprRef`
+        out.append(f"""
+            impl<'a> AnyNodeRef<'a> {{
+                pub fn as_{to_snake_case(group.ref_enum_ty)}(self) -> Option<{group.ref_enum_ty}<'a>> {{
+                    match self {{
+        """)
+        for node in group.nodes:
+            out.append(
+                f"Self::{node.name}(node) => Some({group.ref_enum_ty}::{node.variant}(node)),"
+            )
+        out.append("""
+                        _ => None,
                     }
                 }
             }
@@ -564,7 +581,7 @@ def write_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl<'a> AnyNodeRef<'a> {
-            pub fn visit_preorder<'b, V>(self, visitor: &mut V)
+            pub fn visit_source_order<'b, V>(self, visitor: &mut V)
             where
                 V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
                 'a: 'b,

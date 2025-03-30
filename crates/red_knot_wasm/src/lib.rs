@@ -214,6 +214,10 @@ impl FileHandle {
     pub fn js_to_string(&self) -> String {
         format!("file(id: {:?}, path: {})", self.file, self.path)
     }
+
+    pub fn path(&self) -> String {
+        self.path.to_string()
+    }
 }
 
 #[wasm_bindgen]
