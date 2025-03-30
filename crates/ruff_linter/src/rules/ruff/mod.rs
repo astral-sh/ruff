@@ -315,6 +315,16 @@ mod tests {
     }
 
     #[test]
+    fn ruff_noqa_filedirective_unused() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_6.py"),
+            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA]),
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn ruff_per_file_ignores() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
