@@ -1,9 +1,9 @@
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::Stmt;
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 
 /// Returns the control flow graph associated to an array of statements
-pub fn build_cfg<'stmt>(stmts: &'stmt [Stmt]) -> CFG<'stmt> {
+pub fn build_cfg(stmts: &[Stmt]) -> CFG<'_> {
     let mut builder = CFGBuilder::with_capacity(stmts.len());
     builder.process_stmts(stmts);
     builder.finish()
@@ -12,36 +12,46 @@ pub fn build_cfg<'stmt>(stmts: &'stmt [Stmt]) -> CFG<'stmt> {
 /// Control flow graph
 #[derive(Debug)]
 pub struct CFG<'stmt> {
+    /// Basic blocks - the nodes of the control flow graph
     blocks: IndexVec<BlockId, BlockData<'stmt>>,
+    /// Entry point to the control flow graph
     initial: BlockId,
+    /// Terminal node - will always be empty
     terminal: BlockId,
 }
 
 impl<'stmt> CFG<'stmt> {
+    /// Index of entry point to the control flow graph
     pub fn initial(&self) -> BlockId {
         self.initial
     }
 
+    /// Index of terminal node
     pub fn terminal(&self) -> BlockId {
         self.terminal
     }
 
+    /// Number of basic blocks, or nodes, in the graph
     pub fn num_blocks(&self) -> usize {
         self.blocks.len()
     }
 
+    /// Returns the statements comprising the basic block at the given index
     pub fn stmts(&self, block: BlockId) -> &'stmt [Stmt] {
         self.blocks[block].stmts
     }
 
+    /// Returns the [`Edges`] going out of the basic block at the given index
     pub fn outgoing(&self, block: BlockId) -> &Edges {
         &self.blocks[block].out
     }
 
+    /// Returns an iterator over the indices of the direct predecessors of the block at the given index
     pub fn predecessors(&self, block: BlockId) -> impl ExactSizeIterator<Item = BlockId> + '_ {
         self.blocks[block].parents.iter().copied()
     }
 
+    /// Returns the [`BlockKind`] of the block at the given index
     pub(crate) fn kind(&self, block: BlockId) -> BlockKind {
         self.blocks[block].kind
     }
@@ -64,7 +74,9 @@ struct BlockData<'stmt> {
 pub(crate) enum BlockKind {
     #[default]
     Generic,
+    /// Entry point of the control flow graph
     Start,
+    /// Terminal node for the control flow graph
     Terminal,
 }
 
@@ -78,12 +90,26 @@ pub struct Edges {
 }
 
 impl Edges {
+    /// Creates an unconditional edge to the target block
+    fn always(target: BlockId) -> Self {
+        Self {
+            conditions: smallvec![Condition::Always],
+            targets: smallvec![target],
+        }
+    }
+
+    /// Returns iterator over indices of blocks targeted by given edges
     pub fn targets(&self) -> impl ExactSizeIterator<Item = BlockId> + '_ {
         self.targets.iter().copied()
     }
 
+    /// Returns iterator over [`Condition`]s which must be satisfied to traverse corresponding edge
     pub fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition> {
         self.conditions.iter()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.targets.is_empty()
     }
 }
 
@@ -104,6 +130,7 @@ struct CFGBuilder<'stmt> {
 }
 
 impl<'stmt> CFGBuilder<'stmt> {
+    /// Returns [`CFGBuilder`] with vector of blocks initialized at given capacity and with both initial and terminal blocks populated.
     fn with_capacity(capacity: usize) -> Self {
         let mut blocks = IndexVec::with_capacity(capacity);
         let initial = blocks.push(BlockData {
@@ -126,19 +153,101 @@ impl<'stmt> CFGBuilder<'stmt> {
         }
     }
 
+    /// Runs the core logic for the builder.
     fn process_stmts(&mut self, stmts: &'stmt [Stmt]) {
-        todo!()
+        let start = 0;
+        for stmt in stmts {
+            let cache_exit = self.exit();
+            match stmt {
+                Stmt::FunctionDef(_)
+                | Stmt::ClassDef(_)
+                | Stmt::Assign(_)
+                | Stmt::AugAssign(_)
+                | Stmt::AnnAssign(_)
+                | Stmt::TypeAlias(_)
+                | Stmt::Import(_)
+                | Stmt::ImportFrom(_)
+                | Stmt::Global(_)
+                | Stmt::Nonlocal(_)
+                | Stmt::Expr(_)
+                | Stmt::Pass(_)
+                | Stmt::Delete(_)
+                | Stmt::IpyEscapeCommand(_) => {}
+                // Loops
+                Stmt::While(_) => {}
+                Stmt::For(_) => {}
+
+                // Switch statements
+                Stmt::If(_) => {}
+                Stmt::Match(_) => {}
+
+                // Exception handling statements
+                Stmt::Try(_) => {}
+                Stmt::With(_) => {}
+
+                // Jumps
+                Stmt::Return(_) => {}
+                Stmt::Break(_) => {}
+                Stmt::Continue(_) => {}
+                Stmt::Raise(_) => {}
+
+                // An `assert` is a mixture of a switch and a jump.
+                Stmt::Assert(_) => {}
+            }
+            // Restore exit
+            self.update_exit(cache_exit);
+        }
+        // Push remaining statements
+        if start < stmts.len() {
+            self.set_stmts(&stmts[start..]);
+        }
+        // Add edge to exit if not already present
+        if self.cfg.blocks[self.current].out.is_empty() {
+            let edges = Edges::always(self.exit());
+            self.set_edges(edges);
+        }
+        self.move_to(self.exit());
     }
 
+    /// Returns finished control flow graph
     fn finish(self) -> CFG<'stmt> {
         self.cfg
     }
 
-    fn current(&self) -> BlockId {
-        self.current
-    }
-
+    /// Current exit block, which may change during construction
     fn exit(&self) -> BlockId {
         self.exit
+    }
+
+    /// Point the current exit to block at provided index
+    fn update_exit(&mut self, new_exit: BlockId) {
+        self.exit = new_exit;
+    }
+
+    /// Moves current block to provided index
+    fn move_to(&mut self, block: BlockId) {
+        self.current = block;
+    }
+
+    /// Populates the current basic block with the given set of statements.
+    ///
+    /// This should only be called once on any given block.
+    fn set_stmts(&mut self, stmts: &'stmt [Stmt]) {
+        debug_assert!(
+            self.cfg.blocks[self.current].stmts.is_empty(),
+            "Attempting to set statements on an already populated basic block."
+        );
+        self.cfg.blocks[self.current].stmts = stmts;
+    }
+
+    /// Draws provided edges out of the current basic block.
+    ///
+    /// This should only be called once on any given block.
+    fn set_edges(&mut self, edges: Edges) {
+        debug_assert!(
+            self.cfg.blocks[self.current].out.is_empty(),
+            "Attempting to set edges on a basic block that already has an outgoing edge."
+        );
+        self.cfg.blocks[self.current].out = edges;
     }
 }
