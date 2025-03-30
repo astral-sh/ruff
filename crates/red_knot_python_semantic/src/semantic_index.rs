@@ -12,7 +12,6 @@ use salsa::Update;
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
-use crate::semantic_index::attribute_assignment::AttributeAssignments;
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
@@ -23,7 +22,6 @@ use crate::semantic_index::use_def::{EagerBindingsKey, ScopedEagerBindingsId, Us
 use crate::Db;
 
 pub mod ast_ids;
-pub mod attribute_assignment;
 mod builder;
 pub mod definition;
 pub mod expression;
@@ -67,21 +65,6 @@ pub(crate) fn symbol_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<Sym
     index.symbol_table(scope.file_scope_id(db))
 }
 
-/// Returns the instance attribute table for a specific `scope`.
-#[salsa::tracked]
-pub(crate) fn instance_attribute_table<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-) -> Arc<SymbolTable> {
-    let file = scope.file(db);
-    let _span =
-        tracing::trace_span!("instance_attribute_table", scope=?scope.as_id(), file=%file.path(db))
-            .entered();
-    let index = semantic_index(db, file);
-
-    index.instance_attribute_table(scope.file_scope_id(db))
-}
-
 /// Returns the set of modules that are imported anywhere in `file`.
 ///
 /// This set only considers `import` statements, not `from...import` statements, because:
@@ -113,22 +96,30 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
 }
 
 /// Returns all attribute assignments for a specific class body scope.
-///
-/// Using [`attribute_assignments`] over [`semantic_index`] has the advantage that
-/// Salsa can avoid invalidating dependent queries if this scope's instance attributes
-/// are unchanged.
-#[salsa::tracked]
-pub(crate) fn attribute_assignments<'db>(
+pub(crate) fn attribute_assignments<'db, 's>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
-) -> Option<Arc<AttributeAssignments<'db>>> {
+    name: &'s str,
+) -> impl Iterator<Item = BindingWithConstraints<'db, 'db>> + use<'s, 'db> {
     let file = class_body_scope.file(db);
     let index = semantic_index(db, file);
+    let class_scope_id = class_body_scope.file_scope_id(db);
 
-    index
-        .attribute_assignments
-        .get(&class_body_scope.file_scope_id(db))
-        .cloned()
+    DescendantsIter::new(index, class_scope_id)
+        .filter_map(move |(file_scope_id, maybe_method)| {
+            if maybe_method
+                .parent()
+                .is_none_or(|parent| parent != class_scope_id)
+            {
+                return None;
+            }
+            maybe_method.node().as_function()?;
+            let attribute_table = index.instance_attribute_table(file_scope_id);
+            let symbol = attribute_table.symbol_id_by_name(name)?;
+            let use_def = &index.use_def_maps[file_scope_id];
+            Some(use_def.attribute_assignments(symbol))
+        })
+        .flatten()
 }
 
 /// Returns the module global scope of `file`.
@@ -180,10 +171,6 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
-
-    /// Maps from class body scopes to attribute assignments that were found
-    /// in methods of that class.
-    attribute_assignments: FxHashMap<FileScopeId, Arc<AttributeAssignments<'db>>>,
 
     /// Map of all of the eager bindings that appear in this file.
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
@@ -1147,7 +1134,7 @@ class C[T]:
         let ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(num),
             ..
-        }) = assignment.value()
+        }) = &**assignment.value().node_ref(&db)
         else {
             panic!("should be a number literal")
         };

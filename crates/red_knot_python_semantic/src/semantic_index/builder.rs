@@ -15,14 +15,13 @@ use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
-use crate::semantic_index::attribute_assignment::{
-    AttributeAssignment, AttributeAssignmentWithDefinitionId, AttributeAssignments,
-};
 use crate::semantic_index::definition::{
-    AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef, Definition, DefinitionCategory,
-    DefinitionNodeKey, DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef,
-    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
-    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    AnnotatedAssignmentDefinitionKind, AnnotatedAssignmentDefinitionNodeRef,
+    AssignmentDefinitionKind, AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef,
+    Definition, DefinitionCategory, DefinitionKind, DefinitionNodeKey, DefinitionNodeRef,
+    Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionKind, ForStmtDefinitionNodeRef,
+    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    StarImportDefinitionNodeRef, TargetKind, WithItemDefinitionKind, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
@@ -34,7 +33,7 @@ use crate::semantic_index::symbol::{
     SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
-    EagerBindingsKey, FlowSnapshot, ScopedDefinitionId, ScopedEagerBindingsId, UseDefMapBuilder,
+    EagerBindingsKey, FlowSnapshot, ScopedEagerBindingsId, UseDefMapBuilder,
 };
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
@@ -95,7 +94,6 @@ pub(super) struct SemanticIndexBuilder<'db> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    attribute_assignments: FxHashMap<FileScopeId, AttributeAssignments<'db>>,
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
 }
 
@@ -126,8 +124,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             expressions_by_node: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
-
-            attribute_assignments: FxHashMap::default(),
 
             eager_bindings: FxHashMap::default(),
         };
@@ -457,9 +453,23 @@ impl<'db> SemanticIndexBuilder<'db> {
         (definition, num_definitions)
     }
 
-    fn add_attribute_definition(&mut self, symbol: ScopedSymbolId) -> ScopedDefinitionId {
-        let use_def = self.current_use_def_map_mut();
-        use_def.record_attribute_binding(symbol)
+    fn add_attribute_definition(
+        &mut self,
+        symbol: ScopedSymbolId,
+        definition_kind: DefinitionKind<'db>,
+    ) -> Definition {
+        let definition = Definition::new(
+            self.db,
+            self.file,
+            self.current_scope(),
+            symbol,
+            definition_kind,
+            false,
+            countme::Count::default(),
+        );
+        self.current_use_def_map_mut()
+            .record_attribute_binding(symbol, definition);
+        definition
     }
 
     fn record_expression_narrowing_constraint(
@@ -593,9 +603,9 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         object: &ast::Expr,
         attr: &'db ast::Identifier,
-        attribute_assignment: AttributeAssignment<'db>,
+        definition_kind: DefinitionKind<'db>,
     ) {
-        if let Some(class_body_scope) = self.is_method_of_class() {
+        if self.is_method_of_class().is_some() {
             // We only care about attribute assignments to the first parameter of a method,
             // i.e. typically `self` or `cls`.
             let accessed_object_refers_to_first_parameter =
@@ -604,17 +614,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
             if accessed_object_refers_to_first_parameter {
                 let symbol = self.add_attribute(attr.id().clone());
-                let definition_id = self.add_attribute_definition(symbol);
-                let attribute_assignment = AttributeAssignmentWithDefinitionId {
-                    assignment: attribute_assignment,
-                    definition_id,
-                };
-                self.attribute_assignments
-                    .entry(class_body_scope)
-                    .or_default()
-                    .entry(attr.id().clone())
-                    .or_default()
-                    .push(attribute_assignment);
+                self.add_attribute_definition(symbol, definition_kind);
             }
         }
     }
@@ -908,11 +908,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            attribute_assignments: self
-                .attribute_assignments
-                .into_iter()
-                .map(|(k, v)| (k, Arc::new(v)))
-                .collect(),
             eager_bindings: self.eager_bindings,
         }
     }
@@ -1178,23 +1173,12 @@ where
                                 )),
                             })
                         }
-                        ast::Expr::Name(_) => Some(CurrentAssignment::Assign {
-                            node,
-                            unpack: None,
-                            first: false,
-                        }),
-                        ast::Expr::Attribute(ast::ExprAttribute {
-                            value: object,
-                            attr,
-                            ..
-                        }) => {
-                            self.register_attribute_assignment(
-                                object,
-                                attr,
-                                AttributeAssignment::Unannotated { value },
-                            );
-
-                            None
+                        ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+                            Some(CurrentAssignment::Assign {
+                                node,
+                                unpack: None,
+                                first: false,
+                            })
                         }
                         _ => None,
                     };
@@ -1214,7 +1198,6 @@ where
             ast::Stmt::AnnAssign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
                 self.visit_expr(&node.annotation);
-                let annotation = self.add_standalone_type_expression(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
                 }
@@ -1226,20 +1209,6 @@ where
                 ) {
                     self.push_assignment(node.into());
                     self.visit_expr(&node.target);
-
-                    if let ast::Expr::Attribute(ast::ExprAttribute {
-                        value: object,
-                        attr,
-                        ..
-                    }) = &*node.target
-                    {
-                        self.register_attribute_assignment(
-                            object,
-                            attr,
-                            AttributeAssignment::Annotated { annotation },
-                        );
-                    }
-
                     self.pop_assignment();
                 } else {
                     self.visit_expr(&node.target);
@@ -1428,24 +1397,14 @@ where
                                     )),
                                 })
                             }
-                            ast::Expr::Name(_) => Some(CurrentAssignment::WithItem {
-                                item,
-                                is_async: *is_async,
-                                unpack: None,
-                                // `false` is arbitrary here---we don't actually use it other than in the actual unpacks
-                                first: false,
-                            }),
-                            ast::Expr::Attribute(ast::ExprAttribute {
-                                value: object,
-                                attr,
-                                ..
-                            }) => {
-                                self.register_attribute_assignment(
-                                    object,
-                                    attr,
-                                    AttributeAssignment::ContextManager { context_manager },
-                                );
-                                None
+                            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+                                Some(CurrentAssignment::WithItem {
+                                    item,
+                                    is_async: *is_async,
+                                    unpack: None,
+                                    // `false` is arbitrary here---we don't actually use it other than in the actual unpacks
+                                    first: false,
+                                })
                             }
                             _ => None,
                         };
@@ -1498,25 +1457,11 @@ where
                             countme::Count::default(),
                         )),
                     }),
-                    ast::Expr::Name(_) => Some(CurrentAssignment::For {
+                    ast::Expr::Name(_) | ast::Expr::Attribute(_) => Some(CurrentAssignment::For {
                         node: for_stmt,
                         unpack: None,
                         first: false,
                     }),
-                    ast::Expr::Attribute(ast::ExprAttribute {
-                        value: object,
-                        attr,
-                        ..
-                    }) => {
-                        self.register_attribute_assignment(
-                            object,
-                            attr,
-                            AttributeAssignment::Iterable {
-                                iterable: iter_expr,
-                            },
-                        );
-                        None
-                    }
                     _ => None,
                 };
 
@@ -1739,7 +1684,7 @@ where
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
-        let expression_id = self.current_ast_ids().record_expression(expr);
+        self.current_ast_ids().record_expression(expr);
 
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
@@ -1768,18 +1713,29 @@ where
                             first,
                             unpack,
                         }) => {
+                            let value = self.add_standalone_expression(&node.value);
                             self.add_definition(
                                 symbol,
                                 AssignmentDefinitionNodeRef {
                                     unpack,
-                                    value: &node.value,
-                                    name: name_node,
+                                    value,
+                                    target: expr,
                                     first,
                                 },
                             );
                         }
                         Some(CurrentAssignment::AnnAssign(ann_assign)) => {
-                            self.add_definition(symbol, ann_assign);
+                            let annotation =
+                                self.add_standalone_type_expression(&ann_assign.annotation);
+                            self.add_definition(
+                                symbol,
+                                AnnotatedAssignmentDefinitionNodeRef {
+                                    node: ann_assign,
+                                    annotation,
+                                    value: ann_assign.value.as_deref(),
+                                    target: expr,
+                                },
+                            );
                         }
                         Some(CurrentAssignment::AugAssign(aug_assign)) => {
                             self.add_definition(symbol, aug_assign);
@@ -1789,14 +1745,15 @@ where
                             first,
                             unpack,
                         }) => {
+                            let iterable = self.add_standalone_expression(&node.iter);
                             self.add_definition(
                                 symbol,
                                 ForStmtDefinitionNodeRef {
                                     unpack,
+                                    iterable,
                                     first,
-                                    iterable: &node.iter,
-                                    name: name_node,
-                                    is_async: node.is_async,
+                                    node,
+                                    target: expr,
                                 },
                             );
                         }
@@ -1823,12 +1780,13 @@ where
                             is_async,
                             unpack,
                         }) => {
+                            let context_expr = self.add_standalone_expression(&item.context_expr);
                             self.add_definition(
                                 symbol,
                                 WithItemDefinitionNodeRef {
                                     unpack,
-                                    context_expr: &item.context_expr,
-                                    name: name_node,
+                                    context_expr,
+                                    target: expr,
                                     first,
                                     is_async,
                                 },
@@ -2013,29 +1971,108 @@ where
                 ctx: ExprContext::Store,
                 range: _,
             }) => {
-                if let Some(
-                    CurrentAssignment::Assign {
-                        unpack: Some(unpack),
-                        ..
+                match self.current_assignment() {
+                    Some(CurrentAssignment::Assign { node, unpack, .. }) => {
+                        let value = self.add_standalone_expression(&node.value);
+                        let assignment = AssignmentDefinitionKind::new(
+                            TargetKind::from(unpack),
+                            value,
+                            // SAFETY: `expr` belongs to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            unsafe {
+                                AstNodeRef::new(self.module.clone(), expr)
+                            },
+                            false,
+                        );
+                        self.register_attribute_assignment(
+                            object,
+                            attr,
+                            DefinitionKind::Assignment(assignment),
+                        );
                     }
-                    | CurrentAssignment::For {
-                        unpack: Some(unpack),
-                        ..
+                    Some(CurrentAssignment::AnnAssign(ann_assign)) => {
+                        let annotation =
+                            self.add_standalone_type_expression(&ann_assign.annotation);
+                        let assignment = AnnotatedAssignmentDefinitionKind::new(
+                            annotation,
+                            ann_assign.value.as_deref().map(|value| {
+                                // SAFETY: `value` belongs to the `self.module` tree
+                                #[allow(unsafe_code)]
+                                unsafe {
+                                    AstNodeRef::new(self.module.clone(), value)
+                                }
+                            }),
+                            // SAFETY: `expr` belongs to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            unsafe {
+                                AstNodeRef::new(self.module.clone(), expr)
+                            },
+                        );
+                        self.register_attribute_assignment(
+                            object,
+                            attr,
+                            DefinitionKind::AnnotatedAssignment(assignment),
+                        );
                     }
-                    | CurrentAssignment::WithItem {
-                        unpack: Some(unpack),
+                    Some(CurrentAssignment::For {
+                        node,
+                        unpack,
+                        first,
                         ..
-                    },
-                ) = self.current_assignment()
-                {
-                    self.register_attribute_assignment(
-                        object,
-                        attr,
-                        AttributeAssignment::Unpack {
-                            attribute_expression_id: expression_id,
-                            unpack,
-                        },
-                    );
+                    }) => {
+                        let iterable = self.add_standalone_expression(&node.iter);
+                        let assignment = ForStmtDefinitionKind::new(
+                            TargetKind::from(unpack),
+                            iterable,
+                            // SAFETY: `expr` belongs to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            unsafe {
+                                AstNodeRef::new(self.module.clone(), expr)
+                            },
+                            first,
+                            false,
+                        );
+                        self.register_attribute_assignment(
+                            object,
+                            attr,
+                            DefinitionKind::For(assignment),
+                        );
+                    }
+                    Some(CurrentAssignment::WithItem {
+                        item,
+                        unpack,
+                        first,
+                        is_async,
+                        ..
+                    }) => {
+                        let context_expr = self.add_standalone_expression(&item.context_expr);
+                        let assignment = WithItemDefinitionKind::new(
+                            TargetKind::from(unpack),
+                            context_expr,
+                            // SAFETY: `expr` belongs to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            unsafe {
+                                AstNodeRef::new(self.module.clone(), expr)
+                            },
+                            first,
+                            is_async,
+                        );
+                        self.register_attribute_assignment(
+                            object,
+                            attr,
+                            DefinitionKind::WithItem(assignment),
+                        );
+                    }
+                    Some(CurrentAssignment::Comprehension { .. }) => {
+                        // TODO:
+                    }
+                    Some(CurrentAssignment::AugAssign(_)) => {
+                        // TODO:
+                    }
+                    Some(CurrentAssignment::Named(_)) => {
+                        // TODO:
+                    }
+                    None => {}
                 }
 
                 walk_expr(self, expr);

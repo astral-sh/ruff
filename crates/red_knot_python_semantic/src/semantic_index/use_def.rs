@@ -265,7 +265,6 @@ use self::symbol_state::{
     SymbolDeclarations, SymbolState,
 };
 use crate::semantic_index::ast_ids::ScopedUseId;
-use crate::semantic_index::attribute_assignment::AttributeAssignmentWithDefinitionId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::narrowing_constraints::{
     NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
@@ -409,12 +408,12 @@ impl<'db> UseDefMap<'db> {
     pub(crate) fn is_attribute_assignment_visible(
         &self,
         db: &dyn crate::Db,
-        symbol: ScopedSymbolId,
-        attribute_assignment: &AttributeAssignmentWithDefinitionId,
+        binding: &BindingWithConstraints<'_, 'db>,
         class_body_scope: ScopeId,
     ) -> Truthiness {
+        let definition = binding.binding.as_ref().unwrap();
         // The attribute assignment inherits the visibility of the method which contains it
-        let maybe_method_scope = attribute_assignment.assignment.scope(db);
+        let maybe_method_scope = definition.scope(db);
         let is_method_visible = if let Some(method_def) = maybe_method_scope.node(db).as_function()
         {
             let class_map = use_def_map(db, class_body_scope);
@@ -438,18 +437,10 @@ impl<'db> UseDefMap<'db> {
             Truthiness::AlwaysFalse
         };
 
-        let id = attribute_assignment.definition_id;
-        let visibility = self
-            .attribute_assignments(symbol)
-            .find_map(|bind| (id == bind.definition_id).then_some(bind.visibility_constraint));
-        let Some(visibility) = visibility else {
-            // Overwritten (e.g. `self.x = 1; self.x = 2`)
-            return Truthiness::AlwaysFalse;
-        };
         is_method_visible.and(self.visibility_constraints.evaluate(
             db,
             &self.predicates,
-            visibility,
+            binding.visibility_constraint,
         ))
     }
 
@@ -523,7 +514,6 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             .next()
             .map(|live_binding| BindingWithConstraints {
                 binding: self.all_definitions[live_binding.binding],
-                definition_id: live_binding.binding,
                 narrowing_constraint: ConstraintsIterator {
                     predicates,
                     constraint_ids: narrowing_constraints
@@ -538,7 +528,6 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: Option<Definition<'db>>,
-    pub(crate) definition_id: ScopedDefinitionId,
     pub(crate) narrowing_constraint: ConstraintsIterator<'map, 'db>,
     pub(crate) visibility_constraint: ScopedVisibilityConstraintId,
 }
@@ -693,12 +682,11 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_attribute_binding(
         &mut self,
         symbol: ScopedSymbolId,
-    ) -> ScopedDefinitionId {
-        // We only need `ScopedDefinitionId`, so push an empty definition.
-        let definition_id = self.all_definitions.push(None);
+        definition: Definition<'db>,
+    ) {
+        let def_id = self.all_definitions.push(Some(definition));
         let attribute_state = &mut self.instance_attribute_states[symbol];
-        attribute_state.record_binding(definition_id, self.scope_start_visibility);
-        definition_id
+        attribute_state.record_binding(def_id, self.scope_start_visibility);
     }
 
     pub(super) fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
