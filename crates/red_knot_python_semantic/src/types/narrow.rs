@@ -288,22 +288,42 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         NarrowingConstraints::from_iter([(symbol, ty)])
     }
 
-    fn evaluate_expr_in(&mut self, ty: Type<'db>) -> Type<'db> {
+    fn evaluate_expr_in(
+        &mut self,
+        lhs_ty: Type<'db>,
+        rhs_ty: Type<'db>,
+        is_positive: bool,
+    ) -> Type<'db> {
         let mut builder = UnionBuilder::new(self.db);
-        match ty {
-            Type::Tuple(tuple) => {
-                for element in tuple.elements(self.db) {
+
+        let negate_if = |ty: Type<'db>| if is_positive { ty } else { ty.negate(self.db) };
+
+        match (lhs_ty, rhs_ty) {
+            (_, Type::Tuple(rhs_tuple)) => {
+                for element in rhs_tuple.elements(self.db) {
                     builder = builder.add(*element);
                 }
+                let ty = builder.build();
+                negate_if(ty)
             }
-            Type::StringLiteral(string_literal) => {
+
+            // Don't narrow at all. Since we don't narrow, we shouldn't negate.
+            (Type::Instance(instance_type), Type::StringLiteral(_))
+                if instance_type.class().is_known(self.db, KnownClass::Str) =>
+            {
+                builder = builder.add(KnownClass::Str.to_instance(self.db));
+                builder.build()
+            }
+
+            (_, Type::StringLiteral(string_literal)) => {
                 for element in string_literal.iter_each_char(self.db) {
                     builder = builder.add(Type::StringLiteral(element));
                 }
+                let ty = builder.build();
+                negate_if(ty)
             }
-            _ => {}
+            _ => builder.build(),
         }
-        builder.build()
     }
 
     fn evaluate_expr_compare(
@@ -390,12 +410,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             constraints.insert(symbol, rhs_ty);
                         }
                         ast::CmpOp::In => {
-                            let ty = self.evaluate_expr_in(rhs_ty);
+                            let ty = self.evaluate_expr_in(lhs_ty, rhs_ty, true);
                             constraints.insert(symbol, ty);
                         }
                         ast::CmpOp::NotIn => {
-                            let ty = self.evaluate_expr_in(rhs_ty);
-                            constraints.insert(symbol, ty.negate(self.db));
+                            let ty = self.evaluate_expr_in(lhs_ty, rhs_ty, false);
+                            constraints.insert(symbol, ty);
                         }
                         _ => {
                             // TODO other comparison types
