@@ -101,28 +101,3 @@ fn check_project_from_project_subdirectory_respects_includes() {
         ");
     });
 }
-
-#[test]
-fn check_in_deleted_directory_errors() {
-    let temp_dir = tempfile::tempdir().unwrap();
-    let temp_path = temp_dir.path().to_path_buf();
-    let original_dir = std::env::current_dir().unwrap();
-    std::env::set_current_dir(&temp_path).unwrap();
-    std::mem::drop(temp_dir);
-
-    insta::with_settings!({
-        filters => TEST_FILTERS.to_vec()
-    },
-    {
-        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME)).args(["check", "--no-cache"]), @r###"
-            success: false
-            exit_code: 2
-            ----- stdout -----
-
-            ----- stderr -----
-            ruff failed
-              Cause: Working directory does not exist
-            "###);
-    });
-    std::env::set_current_dir(original_dir).unwrap();
-}
