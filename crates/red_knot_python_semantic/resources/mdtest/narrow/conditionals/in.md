@@ -26,6 +26,8 @@ def _(x: object):
 ```
 
 ```py
+from typing import Literal
+
 def _(x: Literal["a", "b", "c", 1]):
     if x in ("a", "b", "c"):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
@@ -48,6 +50,7 @@ def _(x: str):
 ```py
 def _(x: str):
     if x in "abc":
+        # TODO: this should probably be str
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
 ```
 
@@ -59,4 +62,14 @@ def _(x: Literal["a", "b", "c", "d"]):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: Literal["d"]
+```
+
+```py
+from typing import Literal
+
+def _(x: Literal["a", "b", "c", "e"]):
+    if x in "abcd":
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
+    else:
+        reveal_type(x)  # revealed: Literal["e"]
 ```
