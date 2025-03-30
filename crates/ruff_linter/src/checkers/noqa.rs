@@ -147,9 +147,7 @@ pub(crate) fn check_noqa(
                             break;
                         }
 
-                        if !seen_codes.insert(original_code) {
-                            duplicated_codes.push(original_code);
-                        } else {
+                        if seen_codes.insert(original_code) {
                             let is_code_used = if is_file_level {
                                 diagnostics
                                     .iter()
@@ -172,6 +170,8 @@ pub(crate) fn check_noqa(
                             } else {
                                 unknown_codes.push(original_code);
                             }
+                        } else {
+                            duplicated_codes.push(original_code);
                         }
                     }
 
