@@ -110,10 +110,20 @@ pub(crate) fn check_noqa(
         && !exemption.includes(Rule::UnusedNOQA)
         && !per_file_ignores.contains(Rule::UnusedNOQA)
     {
-        for line in noqa_directives.lines() {
-            match &line.directive {
+        let directives = noqa_directives
+            .lines()
+            .iter()
+            .map(|line| (&line.directive, &line.matches, false))
+            .chain(
+                file_noqa_directives
+                    .lines()
+                    .iter()
+                    .map(|line| (&line.parsed_file_exemption, &line.matches, true)),
+            );
+        for (directive, matches, is_file_level) in directives {
+            match directive {
                 Directive::All(directive) => {
-                    if line.matches.is_empty() {
+                    if matches.is_empty() {
                         let edit = delete_comment(directive.range(), locator);
                         let mut diagnostic =
                             Diagnostic::new(UnusedNOQA { codes: None }, directive.range());
@@ -139,15 +149,21 @@ pub(crate) fn check_noqa(
 
                         if !seen_codes.insert(original_code) {
                             duplicated_codes.push(original_code);
-                        } else if line.matches.iter().any(|match_| *match_ == code)
-                            || settings
+                        } else {
+                            let is_code_used = if is_file_level {
+                                diagnostics
+                                    .iter()
+                                    .any(|diag| diag.kind.rule().noqa_code() == code)
+                            } else {
+                                matches.iter().any(|match_| *match_ == code)
+                            } || settings
                                 .external
                                 .iter()
-                                .any(|external| code.starts_with(external))
-                        {
-                            valid_codes.push(original_code);
-                        } else {
-                            if let Ok(rule) = Rule::from_code(code) {
+                                .any(|external| code.starts_with(external));
+
+                            if is_code_used {
+                                valid_codes.push(original_code);
+                            } else if let Ok(rule) = Rule::from_code(code) {
                                 if settings.rules.enabled(rule) {
                                     unmatched_codes.push(original_code);
                                 } else {
@@ -171,8 +187,13 @@ pub(crate) fn check_noqa(
                         let edit = if valid_codes.is_empty() {
                             delete_comment(directive.range(), locator)
                         } else {
+                            let prefix = if is_file_level {
+                                "# ruff: noqa: "
+                            } else {
+                                "# noqa: "
+                            };
                             Edit::range_replacement(
-                                format!("# noqa: {}", valid_codes.join(", ")),
+                                format!("{}{}", prefix, valid_codes.join(", ")),
                                 directive.range(),
                             )
                         };
