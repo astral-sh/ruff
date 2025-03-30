@@ -9,8 +9,8 @@ use ruff_python_literal::escape::AsciiEscape;
 use crate::types::class_base::ClassBase;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    ClassLiteralType, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
-    StringLiteralType, Type, UnionType, WrapperDescriptorKind,
+    InstanceType, IntersectionType, KnownClass, MethodWrapperKind, StringLiteralType, Type,
+    UnionType, WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -34,7 +34,7 @@ impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db);
         match self.ty {
-            Type::ClassLiteral(literal) if literal.class().is_known(self.db, KnownClass::Any) => {
+            Type::ClassLiteral(literal) if literal.is_known(self.db, KnownClass::Any) => {
                 write!(f, "typing.Any")
             }
             Type::IntLiteral(_)
@@ -82,7 +82,7 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<module '{}'>", module.module(self.db).name())
             }
             // TODO functions and classes should display using a fully qualified name
-            Type::ClassLiteral(ClassLiteralType { class }) => f.write_str(class.name(self.db)),
+            Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].

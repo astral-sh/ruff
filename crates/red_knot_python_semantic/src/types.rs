@@ -41,9 +41,8 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
-pub use class::Class;
-pub(crate) use class::KnownClass;
-pub use class::{ClassLiteralType, InstanceType, KnownInstanceType};
+pub(crate) use class::{Class, GenericClass, KnownClass, NonGenericClass};
+pub use class::{ClassLiteralType, ClassType, InstanceType, KnownInstanceType};
 
 mod builder;
 mod call;
@@ -348,20 +347,17 @@ impl<'db> Type<'db> {
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
         self.into_instance()
-            .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
+            .is_some_and(|instance| instance.class.is_known(db, KnownClass::NoneType))
     }
 
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
-        self.into_instance().is_some_and(|instance| {
-            instance
-                .class()
-                .is_known(db, KnownClass::NotImplementedType)
-        })
+        self.into_instance()
+            .is_some_and(|instance| instance.class.is_known(db, KnownClass::NotImplementedType))
     }
 
     pub fn is_object(&self, db: &'db dyn Db) -> bool {
         self.into_instance()
-            .is_some_and(|instance| instance.class().is_object(db))
+            .is_some_and(|instance| instance.class.is_object(db))
     }
 
     pub const fn is_todo(&self) -> bool {
@@ -437,10 +433,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub const fn class_literal(class: Class<'db>) -> Self {
-        Self::ClassLiteral(ClassLiteralType { class })
-    }
-
     pub const fn into_class_literal(self) -> Option<ClassLiteralType<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
@@ -456,6 +448,27 @@ impl<'db> Type<'db> {
 
     pub const fn is_class_literal(&self) -> bool {
         matches!(self, Type::ClassLiteral(..))
+    }
+
+    pub const fn into_class_type(self) -> Option<ClassType<'db>> {
+        match self {
+            Type::ClassLiteral(ClassLiteralType::NonGeneric(non_generic)) => {
+                Some(ClassType::NonGeneric(non_generic))
+            }
+            // XXX: GenericAlias
+            _ => None,
+        }
+    }
+
+    #[track_caller]
+    pub fn expect_class_type(self) -> ClassType<'db> {
+        self.into_class_type()
+            .expect("Expected a Type::GenericAlias or non-generic Type::ClassLiteral variant")
+    }
+
+    pub const fn is_class_type(&self) -> bool {
+        // XXX: GenericAlias
+        matches!(self, Type::ClassLiteral(ClassLiteralType::NonGeneric(_)))
     }
 
     pub const fn is_instance(&self) -> bool {
@@ -593,7 +606,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::LiteralString)
     }
 
-    pub const fn instance(class: Class<'db>) -> Self {
+    pub const fn instance(class: ClassType<'db>) -> Self {
         Self::Instance(InstanceType { class })
     }
 
@@ -901,10 +914,7 @@ impl<'db> Type<'db> {
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
-            (
-                Type::ClassLiteral(ClassLiteralType { class }),
-                Type::SubclassOf(target_subclass_ty),
-            ) => target_subclass_ty
+            (Type::ClassLiteral(class), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
                 .is_some_and(|target_class| class.is_subclass_of(db, target_class)),
@@ -917,7 +927,7 @@ impl<'db> Type<'db> {
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
-            (Type::ClassLiteral(ClassLiteralType { class }), _) => {
+            (Type::ClassLiteral(class), _) => {
                 class.metaclass_instance_type(db).is_subtype_of(db, target)
             }
 
@@ -1399,17 +1409,13 @@ impl<'db> Type<'db> {
                 Type::Tuple(..),
             ) => true,
 
-            (
-                Type::SubclassOf(subclass_of_ty),
-                Type::ClassLiteral(ClassLiteralType { class: class_b }),
-            )
-            | (
-                Type::ClassLiteral(ClassLiteralType { class: class_b }),
-                Type::SubclassOf(subclass_of_ty),
-            ) => match subclass_of_ty.subclass_of() {
-                ClassBase::Dynamic(_) => false,
-                ClassBase::Class(class_a) => !class_b.is_subclass_of(db, class_a),
-            },
+            (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
+            | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
+                match subclass_of_ty.subclass_of() {
+                    ClassBase::Dynamic(_) => false,
+                    ClassBase::Class(class_a) => !class_b.is_subclass_of(db, class_a),
+                }
+            }
 
             (
                 Type::SubclassOf(_),
@@ -1526,12 +1532,10 @@ impl<'db> Type<'db> {
             // A class-literal type `X` is always disjoint from an instance type `Y`,
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
             // where `Z` is `X`'s metaclass.
-            (Type::ClassLiteral(ClassLiteralType { class }), instance @ Type::Instance(_))
-            | (instance @ Type::Instance(_), Type::ClassLiteral(ClassLiteralType { class })) => {
-                !class
-                    .metaclass_instance_type(db)
-                    .is_subtype_of(db, instance)
-            }
+            (Type::ClassLiteral(class), instance @ Type::Instance(_))
+            | (instance @ Type::Instance(_), Type::ClassLiteral(class)) => !class
+                .metaclass_instance_type(db)
+                .is_subtype_of(db, instance),
 
             (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::FunctionLiteral(..)) => {
@@ -1889,7 +1893,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Some(Symbol::bound(self).into()),
 
-            Type::ClassLiteral(class_literal @ ClassLiteralType { class }) => {
+            Type::ClassLiteral(class) => {
                 match (class.known(db), name) {
                     (Some(KnownClass::FunctionType), "__get__") => Some(
                         Symbol::bound(Type::WrapperDescriptor(
@@ -1933,7 +1937,7 @@ impl<'db> Type<'db> {
                         "__get__" | "__set__" | "__delete__",
                     ) => Some(Symbol::Unbound.into()),
 
-                    _ => Some(class_literal.class_member(db, name)),
+                    _ => Some(class.class_member(db, name)),
                 }
             }
 
@@ -2411,7 +2415,7 @@ impl<'db> Type<'db> {
             )
             .into(),
 
-            Type::ClassLiteral(ClassLiteralType { class })
+            Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
             {
                 Symbol::bound(Type::WrapperDescriptor(
@@ -2419,7 +2423,7 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
-            Type::ClassLiteral(ClassLiteralType { class })
+            Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::Property) =>
             {
                 Symbol::bound(Type::WrapperDescriptor(
@@ -2427,7 +2431,7 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
-            Type::ClassLiteral(ClassLiteralType { class })
+            Type::ClassLiteral(class)
                 if name == "__set__" && class.is_known(db, KnownClass::Property) =>
             {
                 Symbol::bound(Type::WrapperDescriptor(
@@ -2758,14 +2762,14 @@ impl<'db> Type<'db> {
                 .callable_type(db)
                 .try_bool_impl(db, allow_short_circuit)?,
 
-            Type::ClassLiteral(ClassLiteralType { class }) => class
+            Type::ClassLiteral(class) => class
                 .metaclass_instance_type(db)
                 .try_bool_impl(db, allow_short_circuit)?,
 
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => Truthiness::Ambiguous,
                 ClassBase::Class(class) => {
-                    Type::class_literal(class).try_bool_impl(db, allow_short_circuit)?
+                    Type::from(class).try_bool_impl(db, allow_short_circuit)?
                 }
             },
 
@@ -3096,7 +3100,7 @@ impl<'db> Type<'db> {
                 )),
             },
 
-            Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
+            Type::ClassLiteral(class) => match class.known(db) {
                 Some(KnownClass::Bool) => {
                     // ```py
                     // class bool(int):
@@ -3278,7 +3282,7 @@ impl<'db> Type<'db> {
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).signatures(db),
-                ClassBase::Class(class) => Type::class_literal(class).signatures(db),
+                ClassBase::Class(class) => Type::from(class).signatures(db),
             },
 
             Type::Instance(_) => {
@@ -3520,7 +3524,7 @@ impl<'db> Type<'db> {
     pub fn to_instance(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Dynamic(_) | Type::Never => Some(*self),
-            Type::ClassLiteral(ClassLiteralType { class }) => Some(Type::instance(*class)),
+            Type::ClassLiteral(class) => Some(Type::instance(class.default_specialization(db))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance()),
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -3569,7 +3573,7 @@ impl<'db> Type<'db> {
         match self {
             // Special cases for `float` and `complex`
             // https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
-            Type::ClassLiteral(ClassLiteralType { class }) => {
+            Type::ClassLiteral(class) => {
                 let ty = match class.known(db) {
                     Some(KnownClass::Any) => Type::any(),
                     Some(KnownClass::Complex) => UnionType::from_elements(
@@ -3587,7 +3591,7 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
-                    _ => Type::instance(*class),
+                    _ => Type::instance(class.default_specialization(db)),
                 };
                 Ok(ty)
             }
@@ -3837,7 +3841,7 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
+            Type::ClassLiteral(class) => class.metaclass(db),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => *self,
                 ClassBase::Class(class) => SubclassOfType::from(
@@ -5732,8 +5736,8 @@ impl<'db> TypeAliasType<'db> {
 /// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(super) struct MetaclassCandidate<'db> {
-    metaclass: Class<'db>,
-    explicit_metaclass_of: Class<'db>,
+    metaclass: ClassType<'db>,
+    explicit_metaclass_of: ClassLiteralType<'db>,
 }
 
 #[salsa::interned(debug)]

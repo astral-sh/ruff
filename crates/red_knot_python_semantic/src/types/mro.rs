@@ -4,34 +4,55 @@ use std::ops::Deref;
 use rustc_hash::FxHashSet;
 
 use crate::types::class_base::ClassBase;
-use crate::types::{Class, Type};
+use crate::types::{ClassLiteralType, ClassType, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
+///
+/// An MRO cannot contain non-specialized generic classes. (This is why [`ClassBase`] contains a
+/// [`ClassType`], not a [`ClassLiteralType`].) Any generic classes in a base class list are always
+/// specialized — either because the class is explicitly specialized if there is a subscript
+/// expression, or because we create the default specialization if there isn't.
+///
+/// The MRO of a non-specialized generic class can contain generic classes that are specialized
+/// with a typevar from the inheriting class. When the inheriting class is specialized, the MRO of
+/// the resulting generic alias will substitute those type variables accordingly. For instance, in
+/// the following example, the MRO of `D[int]` includes `C[int]`, and the MRO of `D[U]` includes
+/// `C[U]` (which is a generic alias, not a non-specialized generic class):
+///
+/// ```py
+/// class C[T]: ...
+/// class D[U](C[U]): ...
+/// ```
 ///
 /// See [`Class::iter_mro`] for more details.
 #[derive(PartialEq, Eq, Clone, Debug, salsa::Update)]
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
-    /// Attempt to resolve the MRO of a given class
+    /// Attempt to resolve the MRO of a given class. Because we derive the MRO from the list of
+    /// base classes in the class definition, this operation is performed on a [class
+    /// literal][ClassLiteral], not a [class type][ClassType]. (You can _also_ get the MRO of a
+    /// class type, but this is done by first getting the MRO of the underlying class literal, and
+    /// specializing each base class as needed if the class type is a generic alias.)
     ///
-    /// In the event that a possible list of bases would (or could) lead to a
-    /// `TypeError` being raised at runtime due to an unresolvable MRO, we infer
-    /// the MRO of the class as being `[<the class in question>, Unknown, object]`.
-    /// This seems most likely to reduce the possibility of cascading errors
-    /// elsewhere.
+    /// In the event that a possible list of bases would (or could) lead to a `TypeError` being
+    /// raised at runtime due to an unresolvable MRO, we infer the MRO of the class as being `[<the
+    /// class in question>, Unknown, object]`. This seems most likely to reduce the possibility of
+    /// cascading errors elsewhere. (For a generic class, the first entry in this fallback MRO uses
+    /// the default specialization of the class's type variables.)
     ///
     /// (We emit a diagnostic warning about the runtime `TypeError` in
     /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
-    pub(super) fn of_class(db: &'db dyn Db, class: Class<'db>) -> Result<Self, MroError<'db>> {
-        Self::of_class_impl(db, class).map_err(|error_kind| MroError {
-            kind: error_kind,
-            fallback_mro: Self::from_error(db, class),
-        })
+    pub(super) fn of_class(
+        db: &'db dyn Db,
+        class: ClassLiteralType<'db>,
+    ) -> Result<Self, MroError<'db>> {
+        Self::of_class_impl(db, class)
+            .map_err(|err| err.into_mro_error(db, class.default_specialization(db)))
     }
 
-    pub(super) fn from_error(db: &'db dyn Db, class: Class<'db>) -> Self {
+    pub(super) fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         Self::from([
             ClassBase::Class(class),
             ClassBase::unknown(),
@@ -39,20 +60,26 @@ impl<'db> Mro<'db> {
         ])
     }
 
-    fn of_class_impl(db: &'db dyn Db, class: Class<'db>) -> Result<Self, MroErrorKind<'db>> {
+    fn of_class_impl(
+        db: &'db dyn Db,
+        class: ClassLiteralType<'db>,
+    ) -> Result<Self, MroErrorKind<'db>> {
         let class_bases = class.explicit_bases(db);
 
         if !class_bases.is_empty() && class.inheritance_cycle(db).is_some() {
             // We emit errors for cyclically defined classes elsewhere.
             // It's important that we don't even try to infer the MRO for a cyclically defined class,
             // or we'll end up in an infinite loop.
-            return Ok(Mro::from_error(db, class));
+            return Ok(Mro::from_error(db, class.default_specialization(db)));
         }
 
         match class_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
-            [] if class.is_object(db) => Ok(Self::from([ClassBase::Class(class)])),
+            [] if class.is_object(db) => Ok(Self::from([
+                // object is not generic, so the default specialization should be a no-op
+                ClassBase::Class(class.default_specialization(db)),
+            ])),
 
             // All other classes in Python have an MRO with length >=2.
             // Even if a class has no explicit base classes,
@@ -67,7 +94,10 @@ impl<'db> Mro<'db> {
             // >>> Foo.__mro__
             // (<class '__main__.Foo'>, <class 'object'>)
             // ```
-            [] => Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)])),
+            [] => Ok(Self::from([
+                ClassBase::Class(class.default_specialization(db)),
+                ClassBase::object(db),
+            ])),
 
             // Fast path for a class that has only a single explicit base.
             //
@@ -77,9 +107,11 @@ impl<'db> Mro<'db> {
             [single_base] => ClassBase::try_from_type(db, *single_base).map_or_else(
                 || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                 |single_base| {
-                    Ok(std::iter::once(ClassBase::Class(class))
-                        .chain(single_base.mro(db))
-                        .collect())
+                    Ok(
+                        std::iter::once(ClassBase::Class(class.default_specialization(db)))
+                            .chain(single_base.mro(db))
+                            .collect(),
+                    )
                 },
             ),
 
@@ -103,7 +135,9 @@ impl<'db> Mro<'db> {
                     return Err(MroErrorKind::InvalidBases(invalid_bases.into_boxed_slice()));
                 }
 
-                let mut seqs = vec![VecDeque::from([ClassBase::Class(class)])];
+                let mut seqs = vec![VecDeque::from([ClassBase::Class(
+                    class.default_specialization(db),
+                )])];
                 for base in &valid_bases {
                     seqs.push(base.mro(db).collect());
                 }
@@ -118,7 +152,7 @@ impl<'db> Mro<'db> {
                         .filter_map(|(index, base)| Some((index, base.into_class()?)))
                     {
                         if !seen_bases.insert(base) {
-                            duplicate_bases.push((index, base));
+                            duplicate_bases.push((index, base.class_literal(db)));
                         }
                     }
 
@@ -183,7 +217,7 @@ pub(super) struct MroIterator<'db> {
     db: &'db dyn Db,
 
     /// The class whose MRO we're iterating over
-    class: Class<'db>,
+    class: ClassLiteralType<'db>,
 
     /// Whether or not we've already yielded the first element of the MRO
     first_element_yielded: bool,
@@ -197,7 +231,7 @@ pub(super) struct MroIterator<'db> {
 }
 
 impl<'db> MroIterator<'db> {
-    pub(super) fn new(db: &'db dyn Db, class: Class<'db>) -> Self {
+    pub(super) fn new(db: &'db dyn Db, class: ClassLiteralType<'db>) -> Self {
         Self {
             db,
             class,
@@ -228,7 +262,7 @@ impl<'db> Iterator for MroIterator<'db> {
     fn next(&mut self) -> Option<Self::Item> {
         if !self.first_element_yielded {
             self.first_element_yielded = true;
-            return Some(ClassBase::Class(self.class));
+            return Some(ClassBase::Class(self.class.default_specialization(self.db)));
         }
         self.full_mro_except_first_element().next()
     }
@@ -277,12 +311,21 @@ pub(super) enum MroErrorKind<'db> {
     /// of the duplicate bases. The indices are the indices of nodes
     /// in the bases list of the class's [`StmtClassDef`](ruff_python_ast::StmtClassDef) node.
     /// Each index is the index of a node representing a duplicate base.
-    DuplicateBases(Box<[(usize, Class<'db>)]>),
+    DuplicateBases(Box<[(usize, ClassLiteralType<'db>)]>),
 
     /// The MRO is otherwise unresolvable through the C3-merge algorithm.
     ///
     /// See [`c3_merge`] for more details.
     UnresolvableMro { bases_list: Box<[ClassBase<'db>]> },
+}
+
+impl<'db> MroErrorKind<'db> {
+    pub(super) fn into_mro_error(self, db: &'db dyn Db, class: ClassType<'db>) -> MroError<'db> {
+        MroError {
+            kind: self,
+            fallback_mro: Mro::from_error(db, class),
+        }
+    }
 }
 
 /// Implementation of the [C3-merge algorithm] for calculating a Python class's

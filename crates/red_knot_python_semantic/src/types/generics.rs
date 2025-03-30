@@ -75,6 +75,15 @@ impl<'db> GenericContext<'db> {
         parameter
     }
 
+    pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        let types = self
+            .variables(db)
+            .iter()
+            .map(|typevar| typevar.default_ty(db).unwrap_or(Type::unknown()))
+            .collect();
+        self.specialize(db, types)
+    }
+
     pub(crate) fn specialize(
         self,
         db: &'db dyn Db,
@@ -92,6 +101,28 @@ pub struct Specialization<'db> {
 }
 
 impl<'db> Specialization<'db> {
+    /// Applies a specialization to this specialization. This is used, for instance, when a generic
+    /// class inherits from a generic alias:
+    ///
+    /// ```py
+    /// class A[T]: ...
+    /// class B[U](A[U]): ...
+    /// ```
+    ///
+    /// `B` is a generic class, whose MRO includes the generic alias `A[U]`, which specializes `A`
+    /// with the specialization `{T: U}`. If `B` is specialized to `B[int]`, with specialization
+    /// `{U: int}`, we can apply the second specialization to the first, resulting in `T: int`.
+    /// That lets us produce the generic alias `A[int]`, which is the corresponding entry in the
+    /// MRO of `B[int]`.
+    pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
+        let types = self
+            .types(db)
+            .iter()
+            .map(|ty| ty.apply_specialization(db, other))
+            .collect();
+        Specialization::new(db, self.generic_context(db), types)
+    }
+
     /// Returns the type that a typevar is specialized to, or None if the typevar isn't part of
     /// this specialization.
     pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {

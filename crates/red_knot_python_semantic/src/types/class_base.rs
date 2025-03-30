@@ -1,16 +1,20 @@
-use crate::types::{todo_type, Class, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::types::generics::Specialization;
+use crate::types::{todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::Db;
 use itertools::Either;
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
-/// This is much more limited than the [`Type`] enum:
-/// all types that would be invalid to have as a class base are
-/// transformed into [`ClassBase::unknown`]
+/// This is much more limited than the [`Type`] enum: all types that would be invalid to have as a
+/// class base are transformed into [`ClassBase::unknown`]
+///
+/// Note that a non-specialized generic class _cannot_ be a class base. When we see a
+/// non-specialized generic class in any type expression (including the list of base classes), we
+/// automatically construct the default specialization for that class.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
 pub enum ClassBase<'db> {
     Dynamic(DynamicType),
-    Class(Class<'db>),
+    Class(ClassType<'db>),
 }
 
 impl<'db> ClassBase<'db> {
@@ -26,6 +30,30 @@ impl<'db> ClassBase<'db> {
         match self {
             ClassBase::Dynamic(_) => true,
             ClassBase::Class(_) => false,
+        }
+    }
+
+    /// Applies a specialization to this class base. This is used, for instance, when a generic
+    /// class inherits from a generic alias:
+    ///
+    /// ```py
+    /// class A[T]: ...
+    /// class B[U](A[U]): ...
+    /// ```
+    ///
+    /// `B` is a generic class, whose MRO includes the generic alias `A[U]`. If `B` is specialized
+    /// to `B[int]`, with specialization `{U: int}`, we can apply that specialization to the base
+    /// class. That results in `A[int]`, which is the corresponding entry in the MRO of `B[int]`.
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        match self {
+            ClassBase::Dynamic(_) => self,
+            ClassBase::Class(class) => {
+                ClassBase::Class(class.apply_specialization(db, specialization))
+            }
         }
     }
 
@@ -51,8 +79,8 @@ impl<'db> ClassBase<'db> {
     pub(super) fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
             .to_class_literal(db)
-            .into_class_literal()
-            .map_or(Self::unknown(), |literal| Self::Class(literal.class()))
+            .into_class_type()
+            .map_or(Self::unknown(), |class| Self::Class(class))
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -61,10 +89,10 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => Some(if literal.class().is_known(db, KnownClass::Any) {
+            Type::ClassLiteral(literal) => Some(if literal.is_known(db, KnownClass::Any) {
                 Self::Dynamic(DynamicType::Any)
             } else {
-                Self::Class(literal.class())
+                Self::Class(literal.default_specialization(db))
             }),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
@@ -163,7 +191,7 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(super) fn into_class(self) -> Option<Class<'db>> {
+    pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
             Self::Dynamic(_) => None,
@@ -182,8 +210,8 @@ impl<'db> ClassBase<'db> {
     }
 }
 
-impl<'db> From<Class<'db>> for ClassBase<'db> {
-    fn from(value: Class<'db>) -> Self {
+impl<'db> From<ClassType<'db>> for ClassBase<'db> {
+    fn from(value: ClassType<'db>) -> Self {
         ClassBase::Class(value)
     }
 }
@@ -192,7 +220,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            ClassBase::Class(class) => Type::class_literal(class),
+            ClassBase::Class(class) => class.into(),
         }
     }
 }

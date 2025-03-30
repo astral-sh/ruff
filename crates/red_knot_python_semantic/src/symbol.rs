@@ -425,6 +425,17 @@ impl<'db> SymbolAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     }
 
+    #[must_use]
+    pub(crate) fn map_type(
+        self,
+        f: impl FnOnce(Type<'db>) -> Type<'db>,
+    ) -> SymbolAndQualifiers<'db> {
+        SymbolAndQualifiers {
+            symbol: self.symbol.map_type(f),
+            qualifiers: self.qualifiers,
+        }
+    }
+
     /// Transform symbol and qualifiers into a [`LookupResult`],
     /// a [`Result`] type in which the `Ok` variant represents a definitely bound symbol
     /// and the `Err` variant represents a symbol that is either definitely or possibly unbound.

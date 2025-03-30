@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 pub use db::Db;
 pub use goto::goto_type_definition;
 use red_knot_python_semantic::types::{
-    Class, ClassBase, ClassLiteralType, FunctionType, InstanceType, IntersectionType,
+    ClassBase, ClassLiteralType, ClassType, FunctionType, InstanceType, IntersectionType,
     KnownInstanceType, ModuleLiteralType, Type,
 };
 use ruff_db::files::{File, FileRange};
@@ -198,7 +198,7 @@ impl HasNavigationTargets for FunctionType<'_> {
     }
 }
 
-impl HasNavigationTargets for Class<'_> {
+impl HasNavigationTargets for ClassLiteralType<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         let class_range = self.focus_range(db.upcast());
         NavigationTargets::single(NavigationTarget {
@@ -209,15 +209,20 @@ impl HasNavigationTargets for Class<'_> {
     }
 }
 
-impl HasNavigationTargets for ClassLiteralType<'_> {
+impl HasNavigationTargets for ClassType<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        self.class().navigation_targets(db)
+        let class_range = self.focus_range(db.upcast());
+        NavigationTargets::single(NavigationTarget {
+            file: class_range.file(),
+            focus_range: class_range.range(),
+            full_range: self.full_range(db.upcast()).range(),
+        })
     }
 }
 
 impl HasNavigationTargets for InstanceType<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        self.class().navigation_targets(db)
+        self.class.navigation_targets(db)
     }
 }
 
