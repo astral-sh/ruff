@@ -288,6 +288,24 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         NarrowingConstraints::from_iter([(symbol, ty)])
     }
 
+    fn evaluate_expr_in(&mut self, ty: Type<'db>) -> Type<'db> {
+        let mut builder = UnionBuilder::new(self.db);
+        match ty {
+            Type::Tuple(tuple) => {
+                for element in tuple.elements(self.db) {
+                    builder = builder.add(*element);
+                }
+            }
+            Type::StringLiteral(string_literal) => {
+                for element in string_literal.iter_each_char(self.db) {
+                    builder = builder.add(Type::StringLiteral(element));
+                }
+            }
+            _ => {}
+        }
+        builder.build()
+    }
+
     fn evaluate_expr_compare(
         &mut self,
         expr_compare: &ast::ExprCompare,
@@ -372,14 +390,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             constraints.insert(symbol, rhs_ty);
                         }
                         ast::CmpOp::In => {
-                            if let Type::Tuple(tuple) = rhs_ty {
-                                let mut builder = UnionBuilder::new(self.db);
-                                for element in tuple.elements(self.db) {
-                                    builder = builder.add(*element);
-                                }
-                                let ty = builder.build();
-                                constraints.insert(symbol, ty);
-                            }
+                            let ty = self.evaluate_expr_in(rhs_ty);
+                            constraints.insert(symbol, ty);
+                        }
+                        ast::CmpOp::NotIn => {
+                            let ty = self.evaluate_expr_in(rhs_ty);
+                            constraints.insert(symbol, ty.negate(self.db));
                         }
                         _ => {
                             // TODO other comparison types

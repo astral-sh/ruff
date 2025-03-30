@@ -5391,6 +5391,14 @@ impl<'db> StringLiteralType<'db> {
     pub fn python_len(&self, db: &'db dyn Db) -> usize {
         self.value(db).chars().count()
     }
+
+    /// Return an iterator over each character in the string literal.
+    /// as would be returned by Python's `iter()`.
+    pub fn iter_each_char(&self, db: &'db dyn Db) -> impl Iterator<Item = Self> {
+        self.value(db)
+            .chars()
+            .map(|c| StringLiteralType::new(db, c.to_string().as_str()))
+    }
 }
 
 #[salsa::interned(debug)]
