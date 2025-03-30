@@ -412,6 +412,21 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
+    pub fn is_literal(&self) -> bool {
+        matches!(
+            self,
+            Type::IntLiteral(_)
+                | Type::BooleanLiteral(_)
+                | Type::StringLiteral(_)
+                | Type::BytesLiteral(_)
+        )
+    }
+
+    pub fn is_union_of_literals(&self, db: &'db dyn Db) -> bool {
+        self.into_union()
+            .is_some_and(|union| union.elements(db).iter().all(Type::is_literal))
+    }
+
     pub const fn into_int_literal(self) -> Option<i64> {
         match self {
             Type::IntLiteral(value) => Some(value),
@@ -424,6 +439,10 @@ impl<'db> Type<'db> {
             Type::StringLiteral(string_literal) => Some(string_literal),
             _ => None,
         }
+    }
+
+    pub fn is_string_literal(&self) -> bool {
+        matches!(self, Type::StringLiteral(..))
     }
 
     #[track_caller]

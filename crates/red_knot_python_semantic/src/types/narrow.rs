@@ -296,33 +296,46 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     ) -> Type<'db> {
         let mut builder = UnionBuilder::new(self.db);
 
-        let negate_if = |ty: Type<'db>| if is_positive { ty } else { ty.negate(self.db) };
-
         match (lhs_ty, rhs_ty) {
-            (_, Type::Tuple(rhs_tuple)) => {
+            (_, Type::Tuple(rhs_tuple)) if lhs_ty.is_literal() => {
                 for element in rhs_tuple.elements(self.db) {
                     builder = builder.add(*element);
                 }
                 let ty = builder.build();
-                negate_if(ty)
+                ty.negate_if(self.db, !is_positive)
+            }
+            (_, Type::Tuple(rhs_tuple)) if lhs_ty.is_union_of_literals(self.db) => {
+                for element in rhs_tuple.elements(self.db) {
+                    builder = builder.add(*element);
+                }
+                let ty = builder.build();
+                ty.negate_if(self.db, !is_positive)
             }
 
-            // Don't narrow at all. Since we don't narrow, we shouldn't negate.
-            (Type::Instance(instance_type), Type::StringLiteral(_))
-                if instance_type.class().is_known(self.db, KnownClass::Str) =>
-            {
-                builder = builder.add(KnownClass::Str.to_instance(self.db));
-                builder.build()
-            }
-
-            (_, Type::StringLiteral(string_literal)) => {
+            (Type::StringLiteral(_), Type::StringLiteral(string_literal)) => {
                 for element in string_literal.iter_each_char(self.db) {
                     builder = builder.add(Type::StringLiteral(element));
                 }
                 let ty = builder.build();
-                negate_if(ty)
+                ty.negate_if(self.db, !is_positive)
             }
-            _ => builder.build(),
+            (Type::Union(union_type), Type::StringLiteral(string_literal))
+                if union_type
+                    .elements(self.db)
+                    .iter()
+                    .all(Type::is_string_literal) =>
+            {
+                for element in string_literal.iter_each_char(self.db) {
+                    builder = builder.add(Type::StringLiteral(element));
+                }
+                let ty = builder.build();
+                ty.negate_if(self.db, !is_positive)
+            }
+
+            _ => {
+                builder = builder.add(lhs_ty);
+                builder.build()
+            }
         }
     }
 
