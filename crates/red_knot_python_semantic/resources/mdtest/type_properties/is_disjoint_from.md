@@ -61,7 +61,7 @@ static_assert(is_disjoint_from(B2, FinalSubclass))
 ## Tuple types
 
 ```py
-from typing_extensions import Literal
+from typing_extensions import Literal, Never
 from knot_extensions import TypeOf, is_disjoint_from, static_assert
 
 static_assert(is_disjoint_from(tuple[()], TypeOf[object]))
@@ -352,4 +352,30 @@ class UsesMeta1(metaclass=Meta1): ...
 class UsesMeta2(metaclass=Meta2): ...
 
 static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
+```
+
+## Callables
+
+No two callable types are disjoint because there exists a non-empty callable type
+`(*args: object, **kwargs: object) -> Never` that is a subtype of all fully static callable types.
+As such, for any two callable types, it is possible to conceive of a runtime callable object that would
+inhabit both types simultaneously.
+
+```py
+from knot_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from typing_extensions import Callable, Literal, Never
+
+def mixed(a: int, /, b: str, *args: int, c: int = 2, **kwargs: int) -> None: ...
+
+static_assert(not is_disjoint_from(Callable[[], Never], CallableTypeOf[mixed]))
+static_assert(not is_disjoint_from(Callable[[int, str], float], CallableTypeOf[mixed]))
+
+# Using gradual form
+static_assert(not is_disjoint_from(Callable[..., None], Callable[[], None]))
+static_assert(not is_disjoint_from(Callable[..., None], Callable[..., None]))
+static_assert(not is_disjoint_from(Callable[..., None], Callable[[Literal[1]], None]))
+
+# Using `Never`
+static_assert(not is_disjoint_from(Callable[[], Never], Callable[[], Never]))
+static_assert(not is_disjoint_from(Callable[[Never], str], Callable[[Never], int]))
 ```

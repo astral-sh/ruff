@@ -1343,6 +1343,19 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .is_disjoint_from(db, other),
 
+            (Type::Callable(_) | Type::FunctionLiteral(_), Type::Callable(_))
+            | (Type::Callable(_), Type::FunctionLiteral(_)) => {
+                // No two callable types are ever disjoint because
+                // `(*args: object, **kwargs: object) -> Never` is a subtype of all fully static
+                // callable types.
+                false
+            }
+
+            (Type::Callable(_), _) | (_, Type::Callable(_)) => {
+                // TODO: Implement disjointness for general callable type with other types
+                false
+            }
+
             (Type::ModuleLiteral(..), other @ Type::Instance(..))
             | (other @ Type::Instance(..), Type::ModuleLiteral(..)) => {
                 // Modules *can* actually be instances of `ModuleType` subclasses
@@ -1378,11 +1391,6 @@ impl<'db> Type<'db> {
                 //
                 // TODO: add checks for the above cases once we support them
                 instance.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
-            }
-
-            (Type::Callable(_), _) | (_, Type::Callable(_)) => {
-                // TODO: Implement disjointedness for callable types
-                false
             }
         }
     }
