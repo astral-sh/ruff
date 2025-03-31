@@ -126,7 +126,7 @@ fn definition_expression_type<'db>(
     }
 }
 
-/// The descriptor protocol distiguishes two kinds of descriptors. Non-data descriptors
+/// The descriptor protocol distinguishes two kinds of descriptors. Non-data descriptors
 /// define a `__get__` method, while data descriptors additionally define a `__set__`
 /// method or a `__delete__` method. This enum is used to categorize attributes into two
 /// groups: (1) data descriptors and (2) normal attributes or non-data descriptors.
