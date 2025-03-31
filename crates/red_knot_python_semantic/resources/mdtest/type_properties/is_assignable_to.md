@@ -487,7 +487,6 @@ def f(x: Any) -> str:
 def g(x: Any) -> int:
     return 1
 
-# no error
 c: Callable[[Any], str] = f
 
 # error: [invalid-assignment] "Object of type `Literal[g]` is not assignable to `(Any, /) -> str`"
