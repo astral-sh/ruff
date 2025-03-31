@@ -133,20 +133,13 @@ pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
     Program::get(db).search_paths(db).iter(db)
 }
 
-/// Searches for a `.venv` directory in the current or any parent directory
-fn virtual_env_from_working_dir() -> Option<SystemPathBuf> {
-    let current_dir = std::env::current_dir().ok()?;
+/// Searches for a `.venv` directory in `project_root` that contains a `pyvenv.cfg` file.
+fn discover_venv_in(system: &dyn System, project_root: &SystemPath) -> Option<SystemPathBuf> {
+    let virtual_env_directory = project_root.join(".venv");
 
-    for dir in current_dir.ancestors() {
-        let dot_venv = dir.join(".venv");
-        if dot_venv.is_dir() {
-            if !dot_venv.join("pyvenv.cfg").is_file() {
-                return None;
-            }
-            return SystemPathBuf::from_path_buf(dot_venv).ok();
-        }
-    }
-    None
+    system
+        .is_file(&virtual_env_directory.join("pyvenv.cfg"))
+        .then_some(virtual_env_directory)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -251,15 +244,15 @@ impl SearchPaths {
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
 
-            PythonPath::Discover => {
-                tracing::debug!("Discovering virtual environment");
-                let virtual_env_path = virtual_env_from_working_dir();
+            PythonPath::Discover(root) => {
+                tracing::debug!("Discovering virtual environment in `{root}`");
+                let virtual_env_path = discover_venv_in(db.system(), root);
                 if let Some(virtual_env_path) = virtual_env_path {
-                    tracing::debug!("Found `.venv` folder at '{}'", virtual_env_path);
+                    tracing::debug!("Found `.venv` folder at `{}`", virtual_env_path);
 
                     let handle_invalid_virtual_env = |error: SitePackagesDiscoveryError| {
                         tracing::debug!(
-                            "Ignoring automatically detected virtual environment at '{}': {}",
+                            "Ignoring automatically detected virtual environment at `{}`: {}",
                             virtual_env_path,
                             error
                         );
