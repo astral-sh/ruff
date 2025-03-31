@@ -67,28 +67,28 @@ def _(target: FooSub):
     y = 2
 
     match target:
-        case Foo():
-            y = 3
-        case Bar():
-            y = 4
         case Baz():
+            y = 3
+        case Foo():
+            y = 4
+        case Bar():
             y = 5
 
-    reveal_type(y)  # revealed: Literal[3]
+    reveal_type(y)  # revealed: Literal[4]
 
 def _(target: FooSub | str):
     y = 1
     y = 2
 
     match target:
-        case Foo():
-            y = 3
-        case Bar():
-            y = 4
         case Baz():
+            y = 3
+        case Foo():
             y = 4
+        case Bar():
+            y = 5
 
-    reveal_type(y)  # revealed: Literal[2, 3, 4]
+    reveal_type(y)  # revealed: Literal[2, 4, 5]
 ```
 
 ## Guard with object that implements `__bool__` incorrectly
