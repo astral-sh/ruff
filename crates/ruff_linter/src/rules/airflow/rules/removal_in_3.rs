@@ -609,12 +609,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.listeners.spec
-        ["airflow", "listeners", "spec", "dataset", "on_dataset_created"] => {
-            Replacement::Name("airflow.listeners.spec.asset.on_asset_created")
-        }
-        ["airflow", "listeners", "spec", "dataset", "on_dataset_changed"] => {
-            Replacement::Name("airflow.listeners.spec.asset.on_asset_changed")
-        }
+        ["airflow", "listeners", "spec", "dataset", rest @ ..] => match &rest {
+            ["on_dataset_created"] => {
+                Replacement::Name("airflow.listeners.spec.asset.on_asset_created")
+            }
+            ["on_dataset_changed"] => {
+                Replacement::Name("airflow.listeners.spec.asset.on_asset_changed")
+            }
+            _ => return,
+        },
 
         // airflow.timetables
         ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => {
