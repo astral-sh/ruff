@@ -93,6 +93,79 @@ impl SemanticSyntaxChecker {
         }
 
         Self::debug_shadowing(stmt, ctx);
+        Self::check_annotation(stmt, ctx);
+    }
+
+    fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                type_params,
+                parameters,
+                returns,
+                ..
+            }) => {
+                // test_ok valid_annotation_function
+                // def f() -> (y := 3): ...
+                // def g(arg: (x := 1)): ...
+
+                // test_err invalid_annotation_function
+                // def f[T]() -> (y := 3): ...
+                // def g[T](arg: (x := 1)): ...
+                // def h[T](x: (yield 1)): ...
+                // def i(x: (yield 1)): ...
+                // def j[T]() -> (yield 1): ...
+                // def k() -> (yield 1): ...
+                // def l[T](x: (yield from 1)): ...
+                // def m(x: (yield from 1)): ...
+                // def n[T]() -> (yield from 1): ...
+                // def o() -> (yield from 1): ...
+                // def p[T: (yield 1)](): ...      # yield in TypeVar bound
+                // def q[T = (yield 1)](): ...     # yield in TypeVar default
+                // def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
+                // def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
+                // def t[T: (x := 1)](): ...       # named expr in TypeVar bound
+                // def u[T = (x := 1)](): ...      # named expr in TypeVar default
+                // def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
+                // def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+                let mut visitor = AnnotationVisitor {
+                    allow_named_expr: type_params.is_none(),
+                    ctx,
+                };
+                if let Some(type_params) = type_params {
+                    visitor.visit_type_params(type_params);
+                }
+                for param in parameters
+                    .iter()
+                    .filter_map(ast::AnyParameterRef::annotation)
+                {
+                    visitor.visit_expr(param);
+                }
+                if let Some(returns) = returns {
+                    visitor.visit_expr(returns);
+                }
+            }
+            Stmt::ClassDef(stmt_class_def) => {} // TODO
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                type_params, value, ..
+            }) => {
+                // test_err invalid_annotation_type_alias
+                // type X[T: (yield 1)] = int      # TypeVar bound
+                // type X[T = (yield 1)] = int     # TypeVar default
+                // type X[*Ts = (yield 1)] = int   # TypeVarTuple default
+                // type X[**Ts = (yield 1)] = int  # ParamSpec default
+                // type Y = (yield 1)              # value
+                let mut visitor = AnnotationVisitor {
+                    allow_named_expr: false,
+                    ctx,
+                };
+                visitor.visit_expr(value);
+                if let Some(type_params) = type_params {
+                    visitor.visit_type_params(type_params);
+                }
+            }
+            Stmt::AnnAssign(stmt_ann_assign) => {} // TODO
+            _ => {}
+        }
     }
 
     /// Check for [`SemanticSyntaxErrorKind::WriteToDebug`] in `stmt`.
@@ -467,7 +540,7 @@ impl Display for SemanticSyntaxError {
                     f.write_str("yield expression cannot be used in a type annotation")
                 }
                 InvalidAnnotationKind::NamedExpr => {
-                    f.write_str("yield expression cannot be used in a type annotation")
+                    f.write_str("named expression cannot be used in a type annotation")
                 }
             },
         }
@@ -720,6 +793,48 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
         // match x:
         //     case __debug__: ...
         SemanticSyntaxChecker::check_identifier(ident, self.ctx);
+    }
+}
+
+struct AnnotationVisitor<'a, Ctx> {
+    /// Allow named expressions (`x := ...`) to appear in annotations.
+    ///
+    /// These are allowed in non-generic functions, for example:
+    ///
+    /// ```python
+    /// def foo(arg: (x := int)): ...     # ok
+    /// def foo[T](arg: (x := int)): ...  # syntax error
+    /// ```
+    allow_named_expr: bool,
+
+    /// Context used for emitting errors.
+    ctx: &'a Ctx,
+}
+
+impl<Ctx> Visitor<'_> for AnnotationVisitor<'_, Ctx>
+where
+    Ctx: SemanticSyntaxContext,
+{
+    fn visit_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Named(ast::ExprNamed { range, .. }) if !self.allow_named_expr => {
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::InvalidAnnotation(InvalidAnnotationKind::NamedExpr),
+                    *range,
+                );
+            }
+            Expr::Yield(ast::ExprYield { range, .. })
+            | Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::InvalidAnnotation(InvalidAnnotationKind::Yield),
+                    *range,
+                );
+            }
+            _ => {}
+        }
+        ast::visitor::walk_expr(self, expr);
     }
 }
 
