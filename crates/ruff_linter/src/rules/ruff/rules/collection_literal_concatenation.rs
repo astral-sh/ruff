@@ -139,6 +139,10 @@ fn concatenate_expressions(expr: &Expr) -> Option<(Expr, Type)> {
         Expr::Call(_) | Expr::Attribute(_) | Expr::Name(_) => {
             make_splat_elts(splat_element, other_elements, splat_at_left)
         }
+        // Subscripts are also considered safe-ish to splat if the indexer is a slice.
+        Expr::Subscript(ast::ExprSubscript { slice, .. }) if matches!(&**slice, Expr::Slice(_)) => {
+            make_splat_elts(splat_element, other_elements, splat_at_left)
+        }
         // If the splat element is itself a list/tuple, insert them in the other list/tuple.
         Expr::List(ast::ExprList { elts, .. }) if matches!(type_, Type::List) => {
             other_elements.iter().chain(elts).cloned().collect()
