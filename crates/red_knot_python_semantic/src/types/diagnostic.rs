@@ -888,12 +888,15 @@ declare_lint! {
     ///
     /// ## Example
     /// ```python
-    /// cast(int, 1)  # Redundant
+    /// def f() -> int:
+    ///     return 10
+    ///
+    /// cast(int, f())  # Redundant
     /// ```
     pub(crate) static REDUNDANT_CAST = {
         summary: "detects redundant `cast` calls",
         status: LintStatus::preview("1.0.0"),
-        default_level: Level::Error,
+        default_level: Level::Warn,
     }
 }
 
