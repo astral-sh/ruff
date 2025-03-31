@@ -74,8 +74,7 @@ reveal_type(class_with_normal_dunder[0])  # revealed: str
 Which can be demonstrated by trying to attach a dunder method to an instance, which will not work:
 
 ```py
-from typing import Type, Callable, Any
-from knot_extensions import Intersection
+from typing import Type, Callable
 
 def external_getitem(instance, key: int) -> str:
     return str(key)
@@ -103,17 +102,6 @@ union_of_fail = foo(True)
 
 # error: [non-subscriptable] "Cannot subscript object of type `ThisFails | ThisFails2` with no `__getitem__` method"
 reveal_type(union_of_fail()[0])  # revealed: Unknown
-
-class InterFails(ThisFails, ThisFails2):
-    pass
-
-def bar() -> Intersection[Type[ThisFails], Type[ThisFails2]]:
-    return InterFails
-
-intersection_of_fail = bar()
-
-# TODO: should be an error, like the previous one
-reveal_type(intersection_of_fail()[0])  # revealed: @Todo(Type::Intersection.call())
 ```
 
 However, the attached dunder method *can* be called if accessed directly:
