@@ -634,6 +634,9 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "models", "baseoperator", "cross_downstream"] => {
             Replacement::Name("airflow.sdk.cross_downstream")
         }
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => {
+            Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
+        }
 
         // airflow.operators
         ["airflow", "operators", "subdag", ..] => {
