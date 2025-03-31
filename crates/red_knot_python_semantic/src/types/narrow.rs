@@ -19,6 +19,8 @@ use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
+use super::UnionType;
+
 /// Return the type constraint that `test` (if true) would place on `definition`, if any.
 ///
 /// For example, if we have this code:
@@ -288,55 +290,31 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         NarrowingConstraints::from_iter([(symbol, ty)])
     }
 
-    fn evaluate_expr_in(
-        &mut self,
-        lhs_ty: Type<'db>,
-        rhs_ty: Type<'db>,
-        is_positive: bool,
-    ) -> Type<'db> {
+    fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(self.db);
 
         match (lhs_ty, rhs_ty) {
-            (_, Type::Tuple(rhs_tuple)) if lhs_ty.is_literal() => {
-                for element in rhs_tuple.elements(self.db) {
-                    builder = builder.add(*element);
-                }
-                let ty = builder.build();
-                ty.negate_if(self.db, !is_positive)
-            }
-            (_, Type::Tuple(rhs_tuple)) if lhs_ty.is_union_of_literals(self.db) => {
-                for element in rhs_tuple.elements(self.db) {
-                    builder = builder.add(*element);
-                }
-                let ty = builder.build();
-                ty.negate_if(self.db, !is_positive)
+            (_, Type::Tuple(rhs_tuple)) if lhs_ty.is_closed(self.db) => {
+                builder = builder.add(UnionType::from_elements(
+                    self.db,
+                    rhs_tuple.elements(self.db),
+                ));
             }
 
-            (Type::StringLiteral(_), Type::StringLiteral(string_literal)) => {
-                for element in string_literal.iter_each_char(self.db) {
-                    builder = builder.add(Type::StringLiteral(element));
-                }
-                let ty = builder.build();
-                ty.negate_if(self.db, !is_positive)
-            }
-            (Type::Union(union_type), Type::StringLiteral(string_literal))
-                if union_type
-                    .elements(self.db)
-                    .iter()
-                    .all(Type::is_string_literal) =>
+            (lhs, Type::StringLiteral(string_literal))
+                if lhs.is_string_literal()
+                    || lhs.into_union().is_some_and(|union| {
+                        union.elements(self.db).iter().all(Type::is_string_literal)
+                    }) =>
             {
                 for element in string_literal.iter_each_char(self.db) {
                     builder = builder.add(Type::StringLiteral(element));
                 }
-                let ty = builder.build();
-                ty.negate_if(self.db, !is_positive)
             }
 
-            _ => {
-                builder = builder.add(lhs_ty);
-                builder.build()
-            }
+            _ => return None,
         }
+        Some(builder.build())
     }
 
     fn evaluate_expr_compare(
@@ -423,12 +401,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             constraints.insert(symbol, rhs_ty);
                         }
                         ast::CmpOp::In => {
-                            let ty = self.evaluate_expr_in(lhs_ty, rhs_ty, true);
-                            constraints.insert(symbol, ty);
+                            let ty = self.evaluate_expr_in(lhs_ty, rhs_ty);
+                            if let Some(ty) = ty {
+                                constraints.insert(symbol, ty);
+                            }
                         }
                         ast::CmpOp::NotIn => {
-                            let ty = self.evaluate_expr_in(lhs_ty, rhs_ty, false);
-                            constraints.insert(symbol, ty);
+                            let ty = self.evaluate_expr_in(lhs_ty, rhs_ty);
+                            if let Some(ty) = ty {
+                                constraints.insert(symbol, ty.negate(self.db));
+                            }
                         }
                         _ => {
                             // TODO other comparison types

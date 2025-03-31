@@ -412,19 +412,13 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
-    pub fn is_literal(&self) -> bool {
-        matches!(
-            self,
-            Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::StringLiteral(_)
-                | Type::BytesLiteral(_)
-        )
+    pub fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
+        self.into_union()
+            .is_some_and(|union| union.elements(db).iter().all(|ty| ty.is_single_valued(db)))
     }
 
-    pub fn is_union_of_literals(&self, db: &'db dyn Db) -> bool {
-        self.into_union()
-            .is_some_and(|union| union.elements(db).iter().all(Type::is_literal))
+    pub fn is_closed(&self, db: &'db dyn Db) -> bool {
+        self.is_singleton(db) || self.is_union_of_single_valued(db)
     }
 
     pub const fn into_int_literal(self) -> Option<i64> {
