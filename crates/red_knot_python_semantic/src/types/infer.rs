@@ -3596,8 +3596,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_first_comprehension_iter(generators);
 
-        // TODO generator type
-        todo_type!()
+        todo_type!("generator type")
     }
 
     fn infer_list_comprehension_expression(&mut self, listcomp: &ast::ExprListComp) -> Type<'db> {
@@ -3609,8 +3608,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_first_comprehension_iter(generators);
 
-        // TODO list type
-        todo_type!()
+        todo_type!("list comprehension type")
     }
 
     fn infer_dict_comprehension_expression(&mut self, dictcomp: &ast::ExprDictComp) -> Type<'db> {
@@ -3623,8 +3621,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_first_comprehension_iter(generators);
 
-        // TODO dict type
-        todo_type!()
+        todo_type!("dict comprehension type")
     }
 
     fn infer_set_comprehension_expression(&mut self, setcomp: &ast::ExprSetComp) -> Type<'db> {
@@ -3636,8 +3633,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_first_comprehension_iter(generators);
 
-        // TODO set type
-        todo_type!()
+        todo_type!("set comprehension type")
     }
 
     fn infer_generator_expression_scope(&mut self, generator: &ast::ExprGenerator) {
@@ -5979,7 +5975,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
                 ast::ExprContext::Invalid => TypeAndQualifiers::unknown(),
-                ast::ExprContext::Store | ast::ExprContext::Del => todo_type!().into(),
+                ast::ExprContext::Store | ast::ExprContext::Del => {
+                    todo_type!("Name expression annotation in Store/Del context").into()
+                }
             },
 
             ast::Expr::Subscript(subscript @ ast::ExprSubscript { value, slice, .. }) => {
@@ -6136,7 +6134,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .in_type_expression(self.db())
                     .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
                 ast::ExprContext::Invalid => Type::unknown(),
-                ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
+                ast::ExprContext::Store | ast::ExprContext::Del => {
+                    todo_type!("Name expression annotation in Store/Del context")
+                }
             },
 
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
@@ -6145,7 +6145,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .in_type_expression(self.db())
                     .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
                 ast::ExprContext::Invalid => Type::unknown(),
-                ast::ExprContext::Store | ast::ExprContext::Del => todo_type!(),
+                ast::ExprContext::Store | ast::ExprContext::Del => {
+                    todo_type!("Attribute expression annotation in Store/Del context")
+                }
             },
 
             ast::Expr::NoneLiteral(_literal) => Type::none(self.db()),
