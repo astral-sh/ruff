@@ -76,12 +76,11 @@ use crate::types::diagnostic::{
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MetaclassCandidate, Parameter, ParameterForm, Parameters, SliceLiteralType, SubclassOfType,
-    Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
-    UnionType,
+    class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, Parameter,
+    ParameterForm, Parameters, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
+    Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::types::{CallableType, GeneralCallableType, Signature};
 use crate::unpack::{Unpack, UnpackPosition};
@@ -5322,12 +5321,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            // Lookup the rich comparison `__dunder__` methods on instances
-            (Type::Instance(left_instance), Type::Instance(right_instance)) => {
-                let rich_comparison =
-                    |op| self.infer_rich_comparison(left_instance, right_instance, op);
+            // Lookup the rich comparison `__dunder__` methods
+            _ => {
+                let rich_comparison = |op| self.infer_rich_comparison(left, right, op);
                 let membership_test_comparison = |op, range: TextRange| {
-                    self.infer_membership_test_comparison(left_instance, right_instance, op, range)
+                    self.infer_membership_test_comparison(left, right, op, range)
                 };
                 match op {
                     ast::CmpOp::Eq => rich_comparison(RichCompareOperator::Eq),
@@ -5366,37 +5364,27 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
             }
-            _ => match op {
-                ast::CmpOp::Is | ast::CmpOp::IsNot => Ok(KnownClass::Bool.to_instance(self.db())),
-                _ => Ok(todo_type!("Binary comparisons between more types")),
-            },
         }
     }
 
     /// Rich comparison in Python are the operators `==`, `!=`, `<`, `<=`, `>`, and `>=`. Their
     /// behaviour can be edited for classes by implementing corresponding dunder methods.
-    /// This function performs rich comparison between two instances and returns the resulting type.
+    /// This function performs rich comparison between two types and returns the resulting type.
     /// see `<https://docs.python.org/3/reference/datamodel.html#object.__lt__>`
     fn infer_rich_comparison(
         &self,
-        left: InstanceType<'db>,
-        right: InstanceType<'db>,
+        left: Type<'db>,
+        right: Type<'db>,
         op: RichCompareOperator,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         let db = self.db();
         // The following resource has details about the rich comparison algorithm:
         // https://snarky.ca/unravelling-rich-comparison-operators/
-        let call_dunder =
-            |op: RichCompareOperator, left: InstanceType<'db>, right: InstanceType<'db>| {
-                Type::Instance(left)
-                    .try_call_dunder(
-                        db,
-                        op.dunder(),
-                        CallArgumentTypes::positional([Type::Instance(right)]),
-                    )
-                    .map(|outcome| outcome.return_type(db))
-                    .ok()
-            };
+        let call_dunder = |op: RichCompareOperator, left: Type<'db>, right: Type<'db>| {
+            left.try_call_dunder(db, op.dunder(), CallArgumentTypes::positional([right]))
+                .map(|outcome| outcome.return_type(db))
+                .ok()
+        };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
         if left != right && right.is_subtype_of(db, left) {
@@ -5416,8 +5404,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         })
         .ok_or_else(|| CompareUnsupportedError {
             op: op.into(),
-            left_ty: left.into(),
-            right_ty: right.into(),
+            left_ty: left,
+            right_ty: right,
         })
     }
 
@@ -5427,31 +5415,25 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// and `<https://docs.python.org/3/reference/expressions.html#membership-test-details>`
     fn infer_membership_test_comparison(
         &self,
-        left: InstanceType<'db>,
-        right: InstanceType<'db>,
+        left: Type<'db>,
+        right: Type<'db>,
         op: MembershipTestCompareOperator,
         range: TextRange,
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         let db = self.db();
 
-        let contains_dunder = right.class().class_member(db, "__contains__").symbol;
+        let contains_dunder = right.class_member(db, "__contains__".into()).symbol;
         let compare_result_opt = match contains_dunder {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
-                    .try_call(
-                        db,
-                        CallArgumentTypes::positional([
-                            Type::Instance(right),
-                            Type::Instance(left),
-                        ]),
-                    )
+                    .try_call(db, CallArgumentTypes::positional([right, left]))
                     .map(|bindings| bindings.return_type(db))
                     .ok()
             }
             _ => {
                 // iteration-based membership test
-                Type::Instance(right)
+                right
                     .try_iterate(db)
                     .map(|_| KnownClass::Bool.to_instance(db))
                     .ok()
@@ -5476,8 +5458,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             })
             .ok_or_else(|| CompareUnsupportedError {
                 op: op.into(),
-                left_ty: left.into(),
-                right_ty: right.into(),
+                left_ty: left,
+                right_ty: right,
             })
     }
 
