@@ -25,4 +25,8 @@ reveal_type(cast(1, True))  # revealed: Unknown
 cast(str)
 # error: [too-many-positional-arguments] "Too many positional arguments to function `cast`: expected 2, got 3"
 cast(str, b"ar", "foo")
+
+a: int = 10
+# error: [redundant-cast] "Value is already of type `int`"
+cast(int, a)
 ```

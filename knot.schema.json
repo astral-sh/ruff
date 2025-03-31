@@ -610,6 +610,16 @@
             }
           ]
         },
+        "redundant-cast": {
+          "title": "detects redundant `cast` calls",
+          "description": "## What it does\nDetects redundant `cast` calls where the value already has the target type.\n\n## Why is this bad?\nThese casts have no effect and can be removed.\n\n## Example\n```python\ncast(int, 1)  # Redundant\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "static-assert-error": {
           "title": "Failed static assertion",
           "description": "## What it does\nMakes sure that the argument of `static_assert` is statically known to be true.\n\n## Examples\n```python\nfrom knot_extensions import static_assert\n\nstatic_assert(1 + 1 == 3)  # error: evaluates to `False`\n\nstatic_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness\n```",
