@@ -1,3 +1,8 @@
+//! Test to verify Ruff's behavior when run from deleted directory.
+//! It has to be isolated in a separate module.
+//! Tests in the same module become flaky under `cargo test`s parallel execution
+//! due to in-test working directory manipulation.
+
 #![cfg(not(target_family = "wasm"))]
 
 use std::env::set_current_dir;
