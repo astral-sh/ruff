@@ -844,6 +844,8 @@ pub enum KnownClass {
     SpecialForm,
     TypeVar,
     ParamSpec,
+    ParamSpecArgs,
+    ParamSpecKwargs,
     TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
@@ -893,6 +895,8 @@ impl<'db> KnownClass {
             | Self::TypeAliasType
             | Self::TypeVar
             | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::WrapperDescriptorType
             | Self::MethodWrapperType => Truthiness::AlwaysTrue,
@@ -969,6 +973,8 @@ impl<'db> KnownClass {
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
             Self::ParamSpec => "ParamSpec",
+            Self::ParamSpecArgs => "ParamSpecArgs",
+            Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
@@ -1149,9 +1155,12 @@ impl<'db> KnownClass {
             | Self::StdlibAlias
             | Self::SupportsIndex
             | Self::Sized => KnownModule::Typing,
-            Self::TypeAliasType | Self::TypeVarTuple | Self::ParamSpec | Self::NewType => {
-                KnownModule::TypingExtensions
-            }
+            Self::TypeAliasType
+            | Self::TypeVarTuple
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::NewType => KnownModule::TypingExtensions,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1227,6 +1236,8 @@ impl<'db> KnownClass {
             | Self::StdlibAlias
             | Self::TypeVar
             | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
@@ -1282,6 +1293,8 @@ impl<'db> KnownClass {
             | Self::Classmethod
             | Self::TypeVar
             | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
@@ -1328,6 +1341,8 @@ impl<'db> KnownClass {
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
             "ParamSpec" => Self::ParamSpec,
+            "ParamSpecArgs" => Self::ParamSpecArgs,
+            "ParamSpecKwargs" => Self::ParamSpecKwargs,
             "TypeVarTuple" => Self::TypeVarTuple,
             "ChainMap" => Self::ChainMap,
             "Counter" => Self::Counter,
@@ -1405,6 +1420,8 @@ impl<'db> KnownClass {
             | Self::NoDefaultType
             | Self::SupportsIndex
             | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Sized
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
