@@ -279,10 +279,6 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
     };
 
     let replacement = match *qualname.segments() {
-        ["airflow", .., "DAG" | "dag"] => match attr.as_str() {
-            "allow_future_exec_dates" => Replacement::None,
-            _ => return,
-        },
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
             "dataset_factories" => Replacement::Name("asset_factories"),
             "dataset_uri_handlers" => Replacement::Name("asset_uri_handlers"),
@@ -744,6 +740,9 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 Replacement::Name("airflow.sdk.get_parsing_context")
             }
 
+            // airflow.utils.db
+            ["db", "create_session"] => Replacement::None,
+
             // airflow.utils.decorators
             ["decorators", "apply_defaults"] => Replacement::Message(
                 "`apply_defaults` is now unconditionally done and can be safely removed.",
@@ -764,6 +763,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             ["helpers", "chain"] => Replacement::Name("airflow.sdk.chain"),
             ["helpers", "cross_downstream"] => Replacement::Name("airflow.sdk.cross_downstream"),
 
+            // airflow.utils.log.secrets_masker
             ["log", "secrets_masker"] => {
                 Replacement::Name("airflow.sdk.execution_time.secrets_masker")
             }

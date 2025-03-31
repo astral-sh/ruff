@@ -106,6 +106,7 @@ from airflow.utils.dates import (
     round_time,
     scale_time_units,
 )
+from airflow.utils.db import create_session
 from airflow.utils.decorators import apply_defaults
 from airflow.utils.file import TemporaryDirectory, mkdirs
 from airflow.utils.helpers import chain as helper_chain
@@ -290,6 +291,9 @@ test_cycle
 
 # airflow.utils.dag_parsing_context
 get_parsing_context
+
+# airflow.utils.db
+create_session
 
 # airflow.utils.decorators
 apply_defaults
