@@ -287,17 +287,14 @@ fn arbitrary_type(g: &mut Gen, size: u32) -> Ty {
                     .map(|_| arbitrary_type(g, size - 1))
                     .collect(),
             },
-            4 => {
-                let params = match u32::arbitrary(g) % 2 {
+            4 => Ty::Callable {
+                params: match u32::arbitrary(g) % 2 {
                     0 => CallableParams::GradualForm,
                     1 => CallableParams::List(arbitrary_parameter_list(g, size)),
                     _ => unreachable!(),
-                };
-                Ty::Callable {
-                    params,
-                    returns: arbitrary_optional_type(g, size - 1).map(Box::new),
-                }
-            }
+                },
+                returns: arbitrary_optional_type(g, size - 1).map(Box::new),
+            },
             _ => unreachable!(),
         }
     }
