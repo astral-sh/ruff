@@ -736,7 +736,7 @@ AIR302_names.py:249:1: AIR302 `airflow.sensors.base_sensor_operator.BaseSensorOp
 250 |
 251 | # airflow.sensors.date_time_sensor
     |
-    = help: Use `airflow.sensors.base.BaseSensorOperator` instead
+    = help: Use `airflow.sdk.bases.sensor.BaseSensorOperator` instead
 
 AIR302_names.py:252:1: AIR302 `airflow.sensors.date_time_sensor.DateTimeSensor` is removed in Airflow 3.0
     |
