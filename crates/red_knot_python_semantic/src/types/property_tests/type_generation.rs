@@ -5,6 +5,7 @@ use crate::types::{
     Parameters, Signature, SubclassOfType, TupleType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
+use hashbrown::HashSet;
 use quickcheck::{Arbitrary, Gen};
 use ruff_python_ast::name::Name;
 
@@ -304,6 +305,7 @@ fn arbitrary_type(g: &mut Gen, size: u32) -> Ty {
 
 fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
     let mut params: Vec<Param> = vec![];
+    let mut used_names = HashSet::new();
 
     // First, choose the number of parameters to generate.
     for _ in 0..*g.choose(&[0, 1, 2, 3, 4, 5]).unwrap() {
@@ -330,19 +332,29 @@ fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
                 .choose(&[ParamKind::KeywordOnly, ParamKind::KeywordVariadic])
                 .unwrap(),
             Some(ParamKind::KeywordVariadic) => {
-                // There can't be any other parameter kind after a keyword varaidic parameter.
+                // There can't be any other parameter kind after a keyword variadic parameter.
                 break;
             }
         };
 
-        // TODO: We also need to account for repeated parameter names.
-        params.push(Param {
-            kind: next_kind,
-            name: if matches!(next_kind, ParamKind::PositionalOnly) {
+        let name = loop {
+            let name = if matches!(next_kind, ParamKind::PositionalOnly) {
                 arbitrary_optional_name(g)
             } else {
                 Some(arbitrary_name(g))
-            },
+            };
+            if let Some(name) = name {
+                if used_names.insert(name.clone()) {
+                    break Some(name);
+                }
+            } else {
+                break None;
+            }
+        };
+
+        params.push(Param {
+            kind: next_kind,
+            name,
             annotated_ty: arbitrary_optional_type(g, size),
             default_ty: if matches!(next_kind, ParamKind::Variadic | ParamKind::KeywordVariadic) {
                 None
