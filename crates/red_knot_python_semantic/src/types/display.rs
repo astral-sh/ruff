@@ -154,6 +154,9 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
+            Type::TypeVar(typevar) => {
+                write!(f, "{}", typevar.name(self.db))
+            }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
         }

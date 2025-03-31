@@ -273,7 +273,8 @@ pub enum Type<'db> {
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
-    // TODO protocols, callable types, overloads, generics, type vars
+    TypeVar(TypeVarInstance<'db>),
+    // TODO protocols, callable types, overloads, generics
 }
 
 #[salsa::tracked]
@@ -515,7 +516,8 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::KnownInstance(_)
             | Type::IntLiteral(_)
-            | Type::SubclassOf(_) => self,
+            | Type::SubclassOf(_)
+            | Type::TypeVar(_) => self,
         }
     }
 
@@ -550,7 +552,7 @@ impl<'db> Type<'db> {
 
         match (self, target) {
             // We should have handled these immediately above.
-            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
+            (Type::Dynamic(_) | Type::TypeVar(_), _) | (_, Type::Dynamic(_) | Type::TypeVar(_)) => {
                 unreachable!("Non-fully-static types do not participate in subtyping!")
             }
 
@@ -754,6 +756,26 @@ impl<'db> Type<'db> {
         if self.is_gradual_equivalent_to(db, target) {
             return true;
         }
+
+        // A typevar is assignable to its upper bound, and to something similar to the union of
+        // its constraints. An unbound, unconstrained typevar is assignable to any type.
+        // TODO: It's not _really_ the union of its constraints because each occurrence of the
+        // typevar must be bound to the same type.
+        if let Type::TypeVar(typevar) = self {
+            match typevar.bound_or_constraints(db) {
+                None => {}
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    return bound.is_assignable_to(db, target);
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    return constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| constraint.is_assignable_to(db, target));
+                }
+            }
+        }
+
         match (self, target) {
             // Never can be assigned to any type.
             (Type::Never, _) => true,
@@ -803,6 +825,24 @@ impl<'db> Type<'db> {
                 .positive(db)
                 .iter()
                 .any(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
+
+            // A typevar is always assignable to itself, and is never assignable to any other
+            // typevar (since there is no guarantee that they will be specialized to the same
+            // type).
+            // TODO: Two distinct typevars that are both bounded by the same final class are
+            // subtypes of each other.
+            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
+                self_typevar == other_typevar
+            }
+
+            // No types are assignable to a typevar, since there's no guarantee what type the
+            // typevar will be specialized to. (If the typevar is bounded, it might be specialized
+            // to a smaller type than the bound. If it is constrained, there must be multiple
+            // constraints, and the typevar might be specialized to any one of them.)
+            // TODO: If the typevar is bounded by a final type, then that final type _is_
+            // assignable to the typevar, since that's the only fully static type it could be
+            // specialized to.
+            (_, Type::TypeVar(_)) => false,
 
             // A tuple type S is assignable to a tuple type T if their lengths are the same, and
             // each element of S is assignable to the corresponding element of T.
@@ -979,6 +1019,8 @@ impl<'db> Type<'db> {
                 }
             }
 
+            (Type::TypeVar(first), Type::TypeVar(second)) => first == second,
+
             (Type::Tuple(first), Type::Tuple(second)) => first.is_gradual_equivalent_to(db, second),
 
             (Type::Union(first), Type::Union(second)) => first.is_gradual_equivalent_to(db, second),
@@ -1005,6 +1047,10 @@ impl<'db> Type<'db> {
             (Type::Never, _) | (_, Type::Never) => true,
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
+
+            // A typevar is never disjoint from any other type, since it might be specialized to
+            // `Any`.
+            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => false,
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
@@ -1313,6 +1359,8 @@ impl<'db> Type<'db> {
     pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::Dynamic(_) => false,
+            // A typevar is not fully static, since it can be specialized to a generic type
+            Type::TypeVar(_) => false,
             Type::Never
             | Type::FunctionLiteral(..)
             | Type::Callable(
@@ -1381,6 +1429,12 @@ impl<'db> Type<'db> {
                 // are both of type Literal[345], for example.
                 false
             }
+
+            // A typevar is never a singleton, since it can always be specialized to `Any`.
+            // QUESTION: Should a bounded typevar be considered a singleton if its bound is? It can
+            // still be specialized to `Any`, instead of to the singleton bound.
+            Type::TypeVar(_) => false,
+
             // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
             Type::BooleanLiteral(_)
@@ -1447,6 +1501,11 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(..)
             | Type::SliceLiteral(..)
             | Type::KnownInstance(..) => true,
+
+            // A typevar is never single-valued, since it can always be specialized to `Any`.
+            // QUESTION: Should a bounded typevar be considered single-valued if its bound is? It
+            // can still be specialized to `Any`, instead of to the single-valued bound.
+            Type::TypeVar(_) => false,
 
             Type::SubclassOf(..) => {
                 // TODO: Same comment as above for `is_singleton`
@@ -1577,6 +1636,7 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
+            | Type::TypeVar(_)
             | Type::Instance(_) => None,
         }
     }
@@ -1652,6 +1712,17 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::General(_)) => {
                 KnownClass::Object.to_instance(db).instance_member(db, name)
             }
+
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => KnownClass::Object.to_instance(db).instance_member(db, name),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.instance_member(db, name)
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .map_with_boundness_and_qualifiers(db, |constraint| {
+                        constraint.instance_member(db, name)
+                    }),
+            },
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_instance(db).instance_member(db, name),
@@ -2058,6 +2129,7 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::SliceLiteral(..)
             | Type::Tuple(..)
+            | Type::TypeVar(..)
             | Type::KnownInstance(..)
             | Type::FunctionLiteral(..) => {
                 let fallback = self.instance_member(db, name_str);
@@ -2176,6 +2248,108 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         allow_short_circuit: bool,
     ) -> Result<Truthiness, BoolError<'db>> {
+        let type_to_truthiness = |ty| {
+            if let Type::BooleanLiteral(bool_val) = ty {
+                Truthiness::from(bool_val)
+            } else {
+                Truthiness::Ambiguous
+            }
+        };
+
+        let try_dunder_bool = || {
+            // We only check the `__bool__` method for truth testing, even though at
+            // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
+            // and a subclass could add a `__bool__` method.
+
+            match self.try_call_dunder(db, "__bool__", CallArgumentTypes::none()) {
+                Ok(outcome) => {
+                    let return_type = outcome.return_type(db);
+                    if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                        // The type has a `__bool__` method, but it doesn't return a
+                        // boolean.
+                        return Err(BoolError::IncorrectReturnType {
+                            return_type,
+                            not_boolable_type: *self,
+                        });
+                    }
+                    Ok(type_to_truthiness(return_type))
+                }
+
+                Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                    let return_type = outcome.return_type(db);
+                    if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                        // The type has a `__bool__` method, but it doesn't return a
+                        // boolean.
+                        return Err(BoolError::IncorrectReturnType {
+                            return_type: outcome.return_type(db),
+                            not_boolable_type: *self,
+                        });
+                    }
+
+                    // Don't trust possibly unbound `__bool__` method.
+                    Ok(Truthiness::Ambiguous)
+                }
+
+                Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::Ambiguous),
+                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
+                    Err(BoolError::IncorrectArguments {
+                        truthiness: type_to_truthiness(bindings.return_type(db)),
+                        not_boolable_type: *self,
+                    })
+                }
+                Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
+                    Err(BoolError::NotCallable {
+                        not_boolable_type: *self,
+                    })
+                }
+                Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
+                    Err(BoolError::Other {
+                        not_boolable_type: *self,
+                    })
+                }
+            }
+        };
+
+        let try_union = |union: UnionType<'db>| {
+            let mut truthiness = None;
+            let mut all_not_callable = true;
+            let mut has_errors = false;
+
+            for element in union.elements(db) {
+                let element_truthiness = match element.try_bool_impl(db, allow_short_circuit) {
+                    Ok(truthiness) => truthiness,
+                    Err(err) => {
+                        has_errors = true;
+                        all_not_callable &= matches!(err, BoolError::NotCallable { .. });
+                        err.fallback_truthiness()
+                    }
+                };
+
+                truthiness.get_or_insert(element_truthiness);
+
+                if Some(element_truthiness) != truthiness {
+                    truthiness = Some(Truthiness::Ambiguous);
+
+                    if allow_short_circuit {
+                        return Ok(Truthiness::Ambiguous);
+                    }
+                }
+            }
+
+            if has_errors {
+                if all_not_callable {
+                    return Err(BoolError::NotCallable {
+                        not_boolable_type: *self,
+                    });
+                }
+                return Err(BoolError::Union {
+                    union,
+                    truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
+                });
+            }
+            Ok(truthiness.unwrap_or(Truthiness::Ambiguous))
+        };
+
         let truthiness = match self {
             Type::Dynamic(_) | Type::Never => Truthiness::Ambiguous,
             Type::FunctionLiteral(_) => Truthiness::AlwaysTrue,
@@ -2192,110 +2366,23 @@ impl<'db> Type<'db> {
             },
             Type::AlwaysTruthy => Truthiness::AlwaysTrue,
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
-            instance_ty @ Type::Instance(InstanceType { class }) => match class.known(db) {
-                Some(known_class) => known_class.bool(),
-                None => {
-                    // We only check the `__bool__` method for truth testing, even though at
-                    // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
-                    // and a subclass could add a `__bool__` method.
 
-                    let type_to_truthiness = |ty| {
-                        if let Type::BooleanLiteral(bool_val) = ty {
-                            Truthiness::from(bool_val)
-                        } else {
-                            Truthiness::Ambiguous
-                        }
-                    };
-
-                    match self.try_call_dunder(db, "__bool__", CallArgumentTypes::none()) {
-                        Ok(outcome) => {
-                            let return_type = outcome.return_type(db);
-                            if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
-                                // The type has a `__bool__` method, but it doesn't return a
-                                // boolean.
-                                return Err(BoolError::IncorrectReturnType {
-                                    return_type,
-                                    not_boolable_type: *instance_ty,
-                                });
-                            }
-                            type_to_truthiness(return_type)
-                        }
-
-                        Err(CallDunderError::PossiblyUnbound(outcome)) => {
-                            let return_type = outcome.return_type(db);
-                            if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
-                                // The type has a `__bool__` method, but it doesn't return a
-                                // boolean.
-                                return Err(BoolError::IncorrectReturnType {
-                                    return_type: outcome.return_type(db),
-                                    not_boolable_type: *instance_ty,
-                                });
-                            }
-
-                            // Don't trust possibly unbound `__bool__` method.
-                            Truthiness::Ambiguous
-                        }
-
-                        Err(CallDunderError::MethodNotAvailable) => Truthiness::Ambiguous,
-                        Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
-                            return Err(BoolError::IncorrectArguments {
-                                truthiness: type_to_truthiness(bindings.return_type(db)),
-                                not_boolable_type: *instance_ty,
-                            });
-                        }
-                        Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
-                            return Err(BoolError::NotCallable {
-                                not_boolable_type: *instance_ty,
-                            });
-                        }
-                        Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
-                            return Err(BoolError::Other {
-                                not_boolable_type: *self,
-                            })
-                        }
-                    }
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => Truthiness::Ambiguous,
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.try_bool_impl(db, allow_short_circuit)?
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    try_union(constraints)?
                 }
             },
+
+            Type::Instance(InstanceType { class }) => match class.known(db) {
+                Some(known_class) => known_class.bool(),
+                None => try_dunder_bool()?,
+            },
             Type::KnownInstance(known_instance) => known_instance.bool(),
-            Type::Union(union) => {
-                let mut truthiness = None;
-                let mut all_not_callable = true;
-                let mut has_errors = false;
-
-                for element in union.elements(db) {
-                    let element_truthiness = match element.try_bool_impl(db, allow_short_circuit) {
-                        Ok(truthiness) => truthiness,
-                        Err(err) => {
-                            has_errors = true;
-                            all_not_callable &= matches!(err, BoolError::NotCallable { .. });
-                            err.fallback_truthiness()
-                        }
-                    };
-
-                    truthiness.get_or_insert(element_truthiness);
-
-                    if Some(element_truthiness) != truthiness {
-                        truthiness = Some(Truthiness::Ambiguous);
-
-                        if allow_short_circuit {
-                            return Ok(Truthiness::Ambiguous);
-                        }
-                    }
-                }
-
-                if has_errors {
-                    if all_not_callable {
-                        return Err(BoolError::NotCallable {
-                            not_boolable_type: *self,
-                        });
-                    }
-                    return Err(BoolError::Union {
-                        union: *union,
-                        truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
-                    });
-                }
-                truthiness.unwrap_or(Truthiness::Ambiguous)
-            }
+            Type::Union(union) => try_union(*union)?,
             Type::Intersection(_) => {
                 // TODO
                 Truthiness::Ambiguous
@@ -2915,6 +3002,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
+            | Type::TypeVar(_)
             | Type::LiteralString
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => None,
@@ -2967,6 +3055,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::StringLiteral(_)
             | Type::Tuple(_)
+            | Type::TypeVar(_)
             | Type::Callable(_)
             | Type::Never
             | Type::FunctionLiteral(_) => Err(InvalidTypeExpressionError {
@@ -2998,8 +3087,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Deque => Ok(KnownClass::Deque.to_instance(db)),
                 KnownInstanceType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
 
-                // TODO map this to a new `Type::TypeVar` variant
-                KnownInstanceType::TypeVar(_) => Ok(*self),
+                KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
 
                 // TODO: Use an opt-in rule for a bare `Callable`
                 KnownInstanceType::Callable => Ok(Type::Callable(CallableType::General(
@@ -3184,6 +3272,18 @@ impl<'db> Type<'db> {
             Type::Callable(CallableType::General(_)) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
+
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => KnownClass::Object.to_class_literal(db),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    // TODO: This should create ClassLiterals, not SubclassOfTypes, for each
+                    // element, since constraints must be specialized to those specific types, not
+                    // to subclasses of those types.
+                    constraints.map(db, |constraint| constraint.to_meta_type(db))
+                }
+            },
+
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => *self,

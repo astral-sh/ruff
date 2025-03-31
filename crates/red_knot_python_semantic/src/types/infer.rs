@@ -2314,6 +2314,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::KnownInstance(..)
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
+            | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => match object_ty.class_member(db, attribute.into()) {
                 meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
@@ -4372,6 +4373,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         match (op, operand_type) {
             (_, Type::Dynamic(_)) => operand_type,
             (_, Type::Never) => Type::Never,
+            (_, Type::TypeVar(_)) => Type::unknown(),
 
             (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
             (ast::UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
@@ -4514,6 +4516,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (todo @ Type::Dynamic(DynamicType::TodoProtocol), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::TodoProtocol), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
+            (Type::TypeVar(_), _, _) | (_, Type::TypeVar(_), _) => Some(Type::unknown()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
                 n.checked_add(m)

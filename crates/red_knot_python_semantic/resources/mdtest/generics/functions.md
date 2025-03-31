@@ -108,7 +108,6 @@ def good_return[T: int](x: T) -> T:
 
 def bad_return[T: int](x: T) -> T:
     # TODO: error: int is not assignable to T
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T` and `Literal[1]`"
     return x + 1
 ```
 
@@ -138,8 +137,6 @@ methods that are compatible with the return type, so the `return` expression is 
 
 ```py
 def same_constrained_types[T: (int, str)](t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T` and `T`"
     return t1 + t2
 ```
 
