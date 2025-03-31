@@ -74,8 +74,6 @@ reveal_type(class_with_normal_dunder[0])  # revealed: str
 Which can be demonstrated by trying to attach a dunder method to an instance, which will not work:
 
 ```py
-from typing import Type, Callable
-
 def external_getitem(instance, key: int) -> str:
     return str(key)
 
@@ -87,21 +85,6 @@ this_fails = ThisFails()
 
 # error: [non-subscriptable] "Cannot subscript object of type `ThisFails` with no `__getitem__` method"
 reveal_type(this_fails[0])  # revealed: Unknown
-
-class ThisFails2:
-    def __init__(self):
-        self.__getitem__: Callable[..., str] = external_getitem
-
-def foo(flag: bool) -> Type[ThisFails] | Type[ThisFails2]:
-    if flag:
-        return ThisFails
-    else:
-        return ThisFails2
-
-union_of_fail = foo(True)
-
-# error: [non-subscriptable] "Cannot subscript object of type `ThisFails | ThisFails2` with no `__getitem__` method"
-reveal_type(union_of_fail()[0])  # revealed: Unknown
 ```
 
 However, the attached dunder method *can* be called if accessed directly:
@@ -219,6 +202,28 @@ def _(flag: bool):
 
     d = D()
     reveal_type(d[0])  # revealed: str | bytes
+```
+
+## Calling a union of types without dunder methods
+
+We add instance attributes here to make sure that we don't treat the implicit dunder calls here like
+regular method calls.
+
+```py
+def external_getitem(instance, key: int) -> str:
+    return str(key)
+
+class NotSubscriptable1:
+    def __init__(self, value: int):
+        self.__getitem__ = external_getitem
+
+class NotSubscriptable2:
+    def __init__(self, value: int):
+        self.__getitem__ = external_getitem
+
+def _(union: NotSubscriptable1 | NotSubscriptable2):
+    # error: [non-subscriptable]
+    union[0]
 ```
 
 ## Calling a possibly-unbound dunder method
