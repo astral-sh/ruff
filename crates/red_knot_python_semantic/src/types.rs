@@ -175,18 +175,12 @@ impl AttributeKind {
 /// Meta data for `Type::Todo`, which represents a known limitation in red-knot.
 #[cfg(debug_assertions)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum TodoType {
-    FileAndLine(&'static str, u32),
-    Message(&'static str),
-}
+pub struct TodoType(pub &'static str);
 
 #[cfg(debug_assertions)]
 impl std::fmt::Display for TodoType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TodoType::FileAndLine(file, line) => write!(f, "[{file}:{line}]"),
-            TodoType::Message(msg) => write!(f, "({msg})"),
-        }
+        write!(f, "({msg})", msg = self.0)
     }
 }
 
@@ -203,24 +197,18 @@ impl std::fmt::Display for TodoType {
 
 /// Create a `Type::Todo` variant to represent a known limitation in the type system.
 ///
-/// It can be used with a custom message (preferred): `todo_type!("PEP 604 not supported")`,
-/// or simply using `todo_type!()`, which will include information about the file and line.
+/// It can be created by specifying a custom message: `todo_type!("PEP 604 not supported")`.
 #[cfg(debug_assertions)]
 macro_rules! todo_type {
-    () => {
-        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(
-            $crate::types::TodoType::FileAndLine(file!(), line!()),
-        ))
-    };
     ($message:literal) => {
-        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(
-            $crate::types::TodoType::Message($message),
-        ))
+        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo($crate::types::TodoType(
+            $message,
+        )))
     };
     ($message:ident) => {
-        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo(
-            $crate::types::TodoType::Message($message),
-        ))
+        $crate::types::Type::Dynamic($crate::types::DynamicType::Todo($crate::types::TodoType(
+            $message,
+        )))
     };
 }
 
@@ -5625,16 +5613,12 @@ pub(crate) mod tests {
 
         let todo1 = todo_type!("1");
         let todo2 = todo_type!("2");
-        let todo3 = todo_type!();
-        let todo4 = todo_type!();
 
         let int = KnownClass::Int.to_instance(&db);
 
         assert!(int.is_assignable_to(&db, todo1));
-        assert!(int.is_assignable_to(&db, todo3));
 
         assert!(todo1.is_assignable_to(&db, int));
-        assert!(todo3.is_assignable_to(&db, int));
 
         // We lose information when combining several `Todo` types. This is an
         // acknowledged limitation of the current implementation. We can not
@@ -5646,21 +5630,17 @@ pub(crate) mod tests {
         // salsa, but that would mean we would have to pass in `db` everywhere.
 
         // A union of several `Todo` types collapses to a single `Todo` type:
-        assert!(UnionType::from_elements(&db, vec![todo1, todo2, todo3, todo4]).is_todo());
+        assert!(UnionType::from_elements(&db, vec![todo1, todo2]).is_todo());
 
         // And similar for intersection types:
         assert!(IntersectionBuilder::new(&db)
             .add_positive(todo1)
             .add_positive(todo2)
-            .add_positive(todo3)
-            .add_positive(todo4)
             .build()
             .is_todo());
         assert!(IntersectionBuilder::new(&db)
             .add_positive(todo1)
             .add_negative(todo2)
-            .add_positive(todo3)
-            .add_negative(todo4)
             .build()
             .is_todo());
     }

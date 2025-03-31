@@ -325,18 +325,7 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         (_, DynamicType::Unknown) => Ordering::Greater,
 
         #[cfg(debug_assertions)]
-        (DynamicType::Todo(left), DynamicType::Todo(right)) => match (left, right) {
-            (
-                TodoType::FileAndLine(left_file, left_line),
-                TodoType::FileAndLine(right_file, right_line),
-            ) => left_file
-                .cmp(right_file)
-                .then_with(|| left_line.cmp(&right_line)),
-            (TodoType::FileAndLine(..), _) => Ordering::Less,
-            (_, TodoType::FileAndLine(..)) => Ordering::Greater,
-
-            (TodoType::Message(left), TodoType::Message(right)) => left.cmp(right),
-        },
+        (DynamicType::Todo(TodoType(left)), DynamicType::Todo(TodoType(right))) => left.cmp(right),
 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
