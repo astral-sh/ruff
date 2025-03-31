@@ -590,27 +590,23 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => {
             Replacement::Name("airflow.sdk.Asset")
         }
-        ["airflow", "datasets", "DatasetAliasEvent"] => Replacement::None,
-        ["airflow", "datasets", "DatasetAlias"] => Replacement::Name("airflow.sdk.AssetAlias"),
-        ["airflow", "datasets", "DatasetAll"] => Replacement::Name("airflow.sdk.AssetAll"),
-        ["airflow", "datasets", "DatasetAny"] => Replacement::Name("airflow.sdk.AssetAny"),
-        ["airflow", "datasets", "expand_alias_to_datasets"] => {
-            Replacement::Name("airflow.sdk.expand_alias_to_assets")
-        }
-        ["airflow", "datasets", "metadata", "Metadata"] => {
-            Replacement::Name("airflow.sdk.Metadata")
-        }
-
-        // airflow.datasets.manager
-        ["airflow", "datasets", "manager", "dataset_manager"] => {
-            Replacement::Name("airflow.assets.manager.asset_manager")
-        }
-        ["airflow", "datasets", "manager", "resolve_dataset_manager"] => {
-            Replacement::Name("airflow.assets.resolve_asset_manager")
-        }
-        ["airflow", "datasets", "manager", "DatasetManager"] => {
-            Replacement::Name("airflow.assets.AssetManager")
-        }
+        ["airflow", "datasets", rest @ ..] => match &rest {
+            ["DatasetAliasEvent"] => Replacement::None,
+            ["DatasetAlias"] => Replacement::Name("airflow.sdk.AssetAlias"),
+            ["DatasetAll"] => Replacement::Name("airflow.sdk.AssetAll"),
+            ["DatasetAny"] => Replacement::Name("airflow.sdk.AssetAny"),
+            ["expand_alias_to_datasets"] => Replacement::Name("airflow.sdk.expand_alias_to_assets"),
+            ["metadata", "Metadata"] => Replacement::Name("airflow.sdk.Metadata"),
+            // airflow.datasets.manager
+            ["manager", "DatasetManager"] => Replacement::Name("airflow.assets.AssetManager"),
+            ["manager", "dataset_manager"] => {
+                Replacement::Name("airflow.assets.manager.asset_manager")
+            }
+            ["manager", "resolve_dataset_manager"] => {
+                Replacement::Name("airflow.assets.resolve_asset_manager")
+            }
+            _ => return,
+        },
 
         // airflow.listeners.spec
         ["airflow", "listeners", "spec", "dataset", "on_dataset_created"] => {
