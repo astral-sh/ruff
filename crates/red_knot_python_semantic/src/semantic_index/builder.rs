@@ -928,7 +928,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let mut instance_attribute_tables: IndexVec<_, _> = self
             .instance_attribute_tables
             .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
+            .map(SymbolTableBuilder::finish)
             .collect();
 
         let mut use_def_maps: IndexVec<_, _> = self

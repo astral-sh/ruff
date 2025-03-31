@@ -143,7 +143,7 @@ pub(crate) struct SemanticIndex<'db> {
     symbol_tables: IndexVec<FileScopeId, Arc<SymbolTable>>,
 
     /// List of all instance attribute tables in this file, indexed by scope.
-    instance_attribute_tables: IndexVec<FileScopeId, Arc<SymbolTable>>,
+    instance_attribute_tables: IndexVec<FileScopeId, SymbolTable>,
 
     /// List of all scopes in this file.
     scopes: IndexVec<FileScopeId, Scope>,
@@ -192,8 +192,8 @@ impl<'db> SemanticIndex<'db> {
         self.symbol_tables[scope_id].clone()
     }
 
-    pub(super) fn instance_attribute_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
-        self.instance_attribute_tables[scope_id].clone()
+    pub(super) fn instance_attribute_table(&self, scope_id: FileScopeId) -> &SymbolTable {
+        &self.instance_attribute_tables[scope_id]
     }
 
     /// Returns the use-def map for a specific scope.
