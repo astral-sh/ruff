@@ -489,4 +489,15 @@ def f(x: Any) -> str:
 c: Callable[[Any], str] = f
 ```
 
+```py
+from knot_extensions import static_assert, is_assignable_to
+from typing import Any, Callable
+
+def f(x: Any) -> int:
+    return 1
+
+# error: [invalid-assignment] "Object of type `Literal[f]` is not assignable to `(Any, /) -> str`"
+c: Callable[[Any], str] = f
+```
+
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
