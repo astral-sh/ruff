@@ -550,26 +550,17 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.configuration
-        ["airflow", "configuration", "get"] => Replacement::Name("airflow.configuration.conf.get"),
-        ["airflow", "configuration", "getboolean"] => {
-            Replacement::Name("airflow.configuration.conf.getboolean")
-        }
-        ["airflow", "configuration", "getfloat"] => {
-            Replacement::Name("airflow.configuration.conf.getfloat")
-        }
-        ["airflow", "configuration", "getint"] => {
-            Replacement::Name("airflow.configuration.conf.getint")
-        }
-        ["airflow", "configuration", "has_option"] => {
-            Replacement::Name("airflow.configuration.conf.has_option")
-        }
-        ["airflow", "configuration", "remove_option"] => {
-            Replacement::Name("airflow.configuration.conf.remove_option")
-        }
-        ["airflow", "configuration", "as_dict"] => {
-            Replacement::Name("airflow.configuration.conf.as_dict")
-        }
-        ["airflow", "configuration", "set"] => Replacement::Name("airflow.configuration.conf.set"),
+        ["airflow", "configuration", rest @ ..] => match &rest {
+            ["get"] => Replacement::Name("airflow.configuration.conf.get"),
+            ["getboolean"] => Replacement::Name("airflow.configuration.conf.getboolean"),
+            ["getfloat"] => Replacement::Name("airflow.configuration.conf.getfloat"),
+            ["getint"] => Replacement::Name("airflow.configuration.conf.getint"),
+            ["has_option"] => Replacement::Name("airflow.configuration.conf.has_option"),
+            ["remove_option"] => Replacement::Name("airflow.configuration.conf.remove_option"),
+            ["as_dict"] => Replacement::Name("airflow.configuration.conf.as_dict"),
+            ["set"] => Replacement::Name("airflow.configuration.conf.set"),
+            _ => return,
+        },
 
         // airflow.auth.managers
         ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
