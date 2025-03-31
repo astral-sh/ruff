@@ -613,12 +613,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.datasets.manager
         ["airflow", "datasets", "manager", "dataset_manager"] => {
-            Replacement::Name("airflow.assets.manager")
+            Replacement::Name("airflow.assets.manager.asset_manager")
         }
         ["airflow", "datasets", "manager", "resolve_dataset_manager"] => {
             Replacement::Name("airflow.assets.resolve_asset_manager")
         }
-        ["airflow", "datasets.manager", "DatasetManager"] => {
+        ["airflow", "datasets", "manager", "DatasetManager"] => {
             Replacement::Name("airflow.assets.AssetManager")
         }
 
@@ -782,7 +782,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::Name("airflow.providers.amazon.aws.assets.s3.sanitize_uri")
         }
 
-        ["airflow", "providers", "amazon", "auth_manager", "avp", "entities", "AvpEntities", "DATASET"] => {
+        ["airflow", "providers", "amazon", "aws", "auth_manager", "avp", "entities", "AvpEntities", "DATASET"] => {
             Replacement::Name(
                 "airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.ASSET",
             )

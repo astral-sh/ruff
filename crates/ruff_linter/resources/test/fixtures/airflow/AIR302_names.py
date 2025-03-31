@@ -58,7 +58,7 @@ from airflow.operators.python_operator import (
     ShortCircuitOperator,
 )
 from airflow.operators.subdag import SubDagOperator
-from airflow.providers.amazon.auth_manager.avp.entities import AvpEntities
+from airflow.providers.amazon.aws.auth_manager.avp.entities import AvpEntities
 from airflow.providers.amazon.aws.datasets import s3
 from airflow.providers.common.io.datasets import file as common_io_file
 from airflow.providers.fab.auth_manager import fab_auth_manager

@@ -263,6 +263,16 @@ AIR302_names.py:141:1: AIR302 `airflow.datasets.expand_alias_to_datasets` is rem
     |
     = help: Use `airflow.sdk.expand_alias_to_assets` instead
 
+AIR302_names.py:144:1: AIR302 `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+    |
+143 | # airflow.datasets.manager
+144 | DatasetManager()
+    | ^^^^^^^^^^^^^^ AIR302
+145 | dataset_manager
+146 | resolve_dataset_manager
+    |
+    = help: Use `airflow.assets.AssetManager` instead
+
 AIR302_names.py:145:1: AIR302 `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
     |
 143 | # airflow.datasets.manager
@@ -271,7 +281,7 @@ AIR302_names.py:145:1: AIR302 `airflow.datasets.manager.dataset_manager` is remo
     | ^^^^^^^^^^^^^^^ AIR302
 146 | resolve_dataset_manager
     |
-    = help: Use `airflow.assets.manager` instead
+    = help: Use `airflow.assets.manager.asset_manager` instead
 
 AIR302_names.py:146:1: AIR302 `airflow.datasets.manager.resolve_dataset_manager` is removed in Airflow 3.0
     |
@@ -513,7 +523,7 @@ AIR302_names.py:194:1: AIR302 `airflow.operators.subdag.SubDagOperator` is remov
 196 | # airflow.providers.amazon
     |
 
-AIR302_names.py:197:13: AIR302 `airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.DATASET` is removed in Airflow 3.0
+AIR302_names.py:197:13: AIR302 `airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities.DATASET` is removed in Airflow 3.0
     |
 196 | # airflow.providers.amazon
 197 | AvpEntities.DATASET
