@@ -189,7 +189,6 @@ impl SemanticSyntaxChecker {
                     visitor.visit_type_params(type_params);
                 }
             }
-            Stmt::AnnAssign(_stmt_ann_assign) => {} // TODO
             _ => {}
         }
     }
