@@ -121,7 +121,7 @@ impl Options {
                         .ok()
                         .map(PythonPath::from_virtual_env_var)
                 })
-                .unwrap_or(PythonPath::Discover),
+                .unwrap_or_else(|| PythonPath::Discover(project_root.to_path_buf())),
         }
     }
 
