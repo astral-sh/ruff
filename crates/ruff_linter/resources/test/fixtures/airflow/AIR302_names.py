@@ -46,6 +46,7 @@ from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_create
 from airflow.metrics.validators import AllowListValidator, BlockListValidator
 from airflow.models.baseoperator import chain, chain_linear, cross_downstream
 from airflow.models.baseoperatorlink import BaseOperatorLink
+from airflow.notifications.basenotifier import BaseNotifier
 from airflow.operators import dummy_operator
 from airflow.operators.branch_operator import BaseBranchOperator
 from airflow.operators.dagrun_operator import TriggerDagRunLink, TriggerDagRunOperator
@@ -109,6 +110,7 @@ from airflow.utils.decorators import apply_defaults
 from airflow.utils.file import TemporaryDirectory, mkdirs
 from airflow.utils.helpers import chain as helper_chain
 from airflow.utils.helpers import cross_downstream as helper_cross_downstream
+from airflow.utils.log import secrets_masker
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.trigger_rule import TriggerRule
 from airflow.www.auth import has_access, has_access_dataset
@@ -166,6 +168,9 @@ chain, chain_linear, cross_downstream
 
 # airflow.models.baseoperatorlink
 BaseOperatorLink()
+
+# ariflow.notifications.basenotifier
+BaseNotifier()
 
 # airflow.operators.dummy
 EmptyOperator()
@@ -296,6 +301,9 @@ mkdirs
 #  airflow.utils.helpers
 helper_chain
 helper_cross_downstream
+
+#  airflow.utils.log
+secrets_masker
 
 # airflow.utils.state
 SHUTDOWN

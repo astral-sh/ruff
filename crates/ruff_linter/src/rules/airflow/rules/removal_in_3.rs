@@ -646,6 +646,11 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
         }
 
+        // airflow.notifications
+        ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
+            Replacement::Name("airflow.sdk.BaseNotifier")
+        }
+
         // airflow.operators
         ["airflow", "operators", "subdag", ..] => {
             Replacement::Message("The whole `airflow.subdag` module has been removed.")
@@ -754,6 +759,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             // airflow.utils.helpers
             ["helpers", "chain"] => Replacement::Name("airflow.sdk.chain"),
             ["helpers", "cross_downstream"] => Replacement::Name("airflow.sdk.cross_downstream"),
+
+            ["log", "secrets_masker"] => {
+                Replacement::Name("airflow.sdk.execution_time.secrets_masker")
+            }
 
             // airflow.utils.state
             ["state", "SHUTDOWN" | "terminating_states"] => Replacement::None,
