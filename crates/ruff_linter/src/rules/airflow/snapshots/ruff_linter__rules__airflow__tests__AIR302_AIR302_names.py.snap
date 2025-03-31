@@ -531,7 +531,7 @@ AIR302_names.py:197:13: AIR302 `airflow.providers.amazon.aws.auth_manager.avp.en
 198 | s3.create_dataset
 199 | s3.convert_dataset_to_openlineage
     |
-    = help: Use `airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.ASSET` instead
+    = help: Use `airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities.ASSET` instead
 
 AIR302_names.py:198:4: AIR302 `airflow.providers.amazon.aws.datasets.s3.create_dataset` is removed in Airflow 3.0
     |

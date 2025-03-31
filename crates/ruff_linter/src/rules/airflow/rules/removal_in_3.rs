@@ -533,20 +533,25 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     };
 
     let replacement = match qualified_name.segments() {
+        // airflow.PY\d{1,2}
+        ["airflow", "PY36" | "PY37" | "PY38" | "PY39" | "PY310" | "PY311" | "PY312"] => {
+            Replacement::Name("sys.version_info")
+        }
+
+        // airflow.api_connexion.security
         ["airflow", "api_connexion", "security", "requires_access"] => {
             Replacement::Name("airflow.api_connexion.security.requires_access_*")
         }
         ["airflow", "api_connexion", "security", "requires_access_dataset"] => {
             Replacement::Name("airflow.api_connexion.security.requires_access_asset")
         }
-        ["airflow", "triggers", "external_task", "TaskStateTrigger"] => Replacement::None,
-        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => {
-            Replacement::Name("airflow.security.permissions.RESOURCE_ASSET")
-        }
 
-        // airflow.PY\d{1,2}
-        ["airflow", "PY36" | "PY37" | "PY38" | "PY39" | "PY310" | "PY311" | "PY312"] => {
-            Replacement::Name("sys.version_info")
+        // airflow.auth.managers
+        ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
+            Replacement::Name("airflow.auth.managers.models.resource_details.AssetDetails")
+        }
+        ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => {
+            Replacement::Name("airflow.auth.managers.base_auth_manager.is_authorized_asset")
         }
 
         // airflow.configuration
@@ -562,29 +567,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             _ => return,
         },
 
-        // airflow.auth.managers
-        ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
-            Replacement::Name("airflow.auth.managers.models.resource_details.AssetDetails")
-        }
-        ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => {
-            Replacement::Name("airflow.auth.managers.base_auth_manager.is_authorized_asset")
-        }
-
         // airflow.contrib.*
         ["airflow", "contrib", ..] => {
             Replacement::Message("The whole `airflow.contrib` module has been removed.")
         }
-
-        // airflow.metrics.validators
-        ["airflow", "metrics", "validators", rest @ ..] => match &rest {
-            ["AllowListValidator"] => {
-                Replacement::Name("airflow.metrics.validators.PatternAllowListValidator")
-            }
-            ["BlockListValidator"] => {
-                Replacement::Name("airflow.metrics.validators.PatternBlockListValidator")
-            }
-            _ => return,
-        },
 
         // airflow.datasets
         ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => {
@@ -608,6 +594,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             _ => return,
         },
 
+        // airflow.hooks
+        ["airflow", "hooks", "base_hook", "BaseHook"] => {
+            Replacement::Name("airflow.hooks.base.BaseHook")
+        }
+
+        // airflow.lineage.hook
+        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => {
+            Replacement::Name("airflow.lineage.hook.AssetLineageInfo")
+        }
+
         // airflow.listeners.spec
         ["airflow", "listeners", "spec", "dataset", rest @ ..] => match &rest {
             ["on_dataset_created"] => {
@@ -619,25 +615,24 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             _ => return,
         },
 
-        // airflow.timetables
-        ["airflow", "timetables", rest @ ..] => match &rest {
-            ["datasets", "DatasetOrTimeSchedule"] => {
-                Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule")
+        // airflow.metrics.validators
+        ["airflow", "metrics", "validators", rest @ ..] => match &rest {
+            ["AllowListValidator"] => {
+                Replacement::Name("airflow.metrics.validators.PatternAllowListValidator")
             }
-            ["simple", "DatasetTriggeredTimetable"] => {
-                Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
+            ["BlockListValidator"] => {
+                Replacement::Name("airflow.metrics.validators.PatternBlockListValidator")
             }
             _ => return,
         },
 
-        // airflow.lineage.hook
-        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => {
-            Replacement::Name("airflow.lineage.hook.AssetLineageInfo")
+        // airflow.models.baseoperator
+        ["airflow", "models", "baseoperator", "chain"] => Replacement::Name("airflow.sdk.chain"),
+        ["airflow", "models", "baseoperator", "chain_linear"] => {
+            Replacement::Name("airflow.sdk.chain_linear")
         }
-
-        // airflow.hooks
-        ["airflow", "hooks", "base_hook", "BaseHook"] => {
-            Replacement::Name("airflow.hooks.base.BaseHook")
+        ["airflow", "models", "baseoperator", "cross_downstream"] => {
+            Replacement::Name("airflow.sdk.cross_downstream")
         }
 
         // airflow.operators
@@ -675,6 +670,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::Name("airflow.operators.latest_only.LatestOnlyOperator")
         }
 
+        // airflow.secrets
+        ["airflow", "secrets", "local_filesystem", "load_connections"] => {
+            Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
+        }
+
+        // airflow.security
+        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => {
+            Replacement::Name("airflow.security.permissions.RESOURCE_ASSET")
+        }
+
         // airflow.sensors
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
             Replacement::Name("airflow.sensors.base.BaseSensorOperator")
@@ -695,17 +700,34 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::Name("airflow.sensors.time_delta.TimeDeltaSensor")
         }
 
-        // airflow.secrets
-        ["airflow", "secrets", "local_filesystem", "load_connections"] => {
-            Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
-        }
+        // airflow.timetables
+        ["airflow", "timetables", rest @ ..] => match &rest {
+            ["datasets", "DatasetOrTimeSchedule"] => {
+                Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule")
+            }
+            ["simple", "DatasetTriggeredTimetable"] => {
+                Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
+            }
+            _ => return,
+        },
+
+        // airflow.triggers
+        ["airflow", "triggers", "external_task", "TaskStateTrigger"] => Replacement::None,
 
         // airflow.utils
         ["airflow", "utils", rest @ ..] => match &rest {
+            // airflow.utils.dag_cycle_tester
+            ["dag_cycle_tester", "test_cycle"] => Replacement::None,
+
             // airflow.utils.dag_parsing_context
             ["dag_parsing_context", "get_parsing_context"] => {
                 Replacement::Name("airflow.sdk.get_parsing_context")
             }
+
+            // airflow.utils.decorators
+            ["decorators", "apply_defaults"] => Replacement::Message(
+                "`apply_defaults` is now unconditionally done and can be safely removed.",
+            ),
 
             // airflow.utils.dates
             ["dates", "date_range"] => Replacement::None,
@@ -729,23 +751,8 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             ["trigger_rule", "TriggerRule", "DUMMY" | "NONE_FAILED_OR_SKIPPED"] => {
                 Replacement::None
             }
-
-            // airflow.uilts
-            ["dag_cycle_tester", "test_cycle"] => Replacement::None,
-            ["decorators", "apply_defaults"] => Replacement::Message(
-                "`apply_defaults` is now unconditionally done and can be safely removed.",
-            ),
             _ => return,
         },
-
-        // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", "chain"] => Replacement::Name("airflow.sdk.chain"),
-        ["airflow", "models", "baseoperator", "chain_linear"] => {
-            Replacement::Name("airflow.sdk.chain_linear")
-        }
-        ["airflow", "models", "baseoperator", "cross_downstream"] => {
-            Replacement::Name("airflow.sdk.cross_downstream")
-        }
 
         // airflow.www
         ["airflow", "www", "auth", "has_access"] => {
@@ -762,34 +769,35 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.providers.amazon
-        ["airflow", "providers", "amazon", "aws", "datasets", "s3", "create_dataset"] => {
-            Replacement::Name("airflow.providers.amazon.aws.assets.s3.create_asset")
-        }
+        ["airflow", "providers", "amazon", "aws", rest @ ..] => match &rest {
+            ["datasets", "s3", "create_dataset"] => {
+                Replacement::Name("airflow.providers.amazon.aws.assets.s3.create_asset")
+            }
+            ["datasets", "s3", "convert_dataset_to_openlineage"] => Replacement::Name(
+                "airflow.providers.amazon.aws.assets.s3.convert_asset_to_openlineage",
+            ),
+            ["datasets", "s3", "sanitize_uri"] => {
+                Replacement::Name("airflow.providers.amazon.aws.assets.s3.sanitize_uri")
+            }
+            ["auth_manager", "avp", "entities", "AvpEntities", "DATASET"] => Replacement::Name(
+                "airflow.providers.amazon.aws.auth_manager.avp.entities.AvpEntities.ASSET",
+            ),
+            _ => return,
+        },
 
-        ["airflow", "providers", "amazon", "aws", "datasets", "s3", "convert_dataset_to_openlineage"] => {
-            Replacement::Name("airflow.providers.amazon.aws.assets.s3.convert_asset_to_openlineage")
-        }
-        ["airflow", "providers", "amazon", "aws", "datasets", "s3", "sanitize_uri"] => {
-            Replacement::Name("airflow.providers.amazon.aws.assets.s3.sanitize_uri")
-        }
-
-        ["airflow", "providers", "amazon", "aws", "auth_manager", "avp", "entities", "AvpEntities", "DATASET"] => {
-            Replacement::Name(
-                "airflow.providers.amazon.auth_manager.avp.entities.AvpEntities.ASSET",
-            )
-        }
         // airflow.providers.common.io
-        ["airflow", "providers", "common", "io", "datasets", "file", "create_dataset"] => {
-            Replacement::Name("airflow.providers.common.io.assets.file.create_asset")
-        }
-        ["airflow", "providers", "common", "io", "datasets", "file", "convert_dataset_to_openlineage"] => {
-            Replacement::Name(
+        ["airflow", "providers", "common", "io", rest @ ..] => match &rest {
+            ["datasets", "file", "create_dataset"] => {
+                Replacement::Name("airflow.providers.common.io.assets.file.create_asset")
+            }
+            ["datasets", "file", "convert_dataset_to_openlineage"] => Replacement::Name(
                 "airflow.providers.common.io.assets.file.convert_asset_to_openlineage",
-            )
-        }
-        ["airflow", "providers", "common", "io", "datasets", "file", "sanitize_uri"] => {
-            Replacement::Name("airflow.providers.common.io.assets.file.sanitize_uri")
-        }
+            ),
+            ["datasets", "file", "sanitize_uri"] => {
+                Replacement::Name("airflow.providers.common.io.assets.file.sanitize_uri")
+            }
+            _ => return,
+        },
 
         // airflow.providers.fab
         ["airflow", "providers", "fab", "auth_manager", "fab_auth_manager", "is_authorized_dataset"] => {
@@ -799,18 +807,21 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.providers.google
-        ["airflow", "providers", "google", "datasets", "bigquery", "create_dataset"] => {
-            Replacement::Name("airflow.providers.google.assets.bigquery.create_asset")
-        }
-        ["airflow", "providers", "google", "datasets", "gcs", "create_dataset"] => {
-            Replacement::Name("airflow.providers.google.assets.gcs.create_asset")
-        }
-        ["airflow", "providers", "google", "datasets", "gcs", "convert_dataset_to_openlineage"] => {
-            Replacement::Name("airflow.providers.google.assets.gcs.convert_asset_to_openlineage")
-        }
-        ["airflow", "providers", "google", "datasets", "gcs", "sanitize_uri"] => {
-            Replacement::Name("airflow.providers.google.assets.gcs.sanitize_uri")
-        }
+        ["airflow", "providers", "google", rest @ ..] => match &rest {
+            ["datasets", "bigquery", "create_dataset"] => {
+                Replacement::Name("airflow.providers.google.assets.bigquery.create_asset")
+            }
+            ["datasets", "gcs", "create_dataset"] => {
+                Replacement::Name("airflow.providers.google.assets.gcs.create_asset")
+            }
+            ["datasets", "gcs", "convert_dataset_to_openlineage"] => Replacement::Name(
+                "airflow.providers.google.assets.gcs.convert_asset_to_openlineage",
+            ),
+            ["datasets", "gcs", "sanitize_uri"] => {
+                Replacement::Name("airflow.providers.google.assets.gcs.sanitize_uri")
+            }
+            _ => return,
+        },
 
         // airflow.providers.mysql
         ["airflow", "providers", "mysql", "datasets", "mysql", "sanitize_uri"] => {
@@ -823,13 +834,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.providers.openlineage
-        ["airflow", "providers", "openlineage", "utils", "utils", "DatasetInfo"] => {
-            Replacement::Name("airflow.providers.openlineage.utils.utils.AssetInfo")
-        }
+        ["airflow", "providers", "openlineage", rest @ ..] => match &rest {
+            ["utils", "utils", "DatasetInfo"] => {
+                Replacement::Name("airflow.providers.openlineage.utils.utils.AssetInfo")
+            }
 
-        ["airflow", "providers", "openlineage", "utils", "utils", "translate_airflow_dataset"] => {
-            Replacement::Name("airflow.providers.openlineage.utils.utils.translate_airflow_asset")
-        }
+            ["utils", "utils", "translate_airflow_dataset"] => Replacement::Name(
+                "airflow.providers.openlineage.utils.utils.translate_airflow_asset",
+            ),
+            _ => return,
+        },
 
         // airflow.providers.trino
         ["airflow", "providers", "trino", "datasets", "trino", "sanitize_uri"] => {
