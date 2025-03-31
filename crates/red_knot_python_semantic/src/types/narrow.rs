@@ -19,6 +19,8 @@ use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
+use super::UnionType;
+
 /// Return the type constraint that `test` (if true) would place on `definition`, if any.
 ///
 /// For example, if we have this code:
@@ -288,6 +290,28 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         NarrowingConstraints::from_iter([(symbol, ty)])
     }
 
+    fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+            match rhs_ty {
+                Type::Tuple(rhs_tuple) => Some(UnionType::from_elements(
+                    self.db,
+                    rhs_tuple.elements(self.db),
+                )),
+
+                Type::StringLiteral(string_literal) => Some(UnionType::from_elements(
+                    self.db,
+                    string_literal
+                        .iter_each_char(self.db)
+                        .map(Type::StringLiteral),
+                )),
+
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
     fn evaluate_expr_compare(
         &mut self,
         expr_compare: &ast::ExprCompare,
@@ -370,6 +394,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         }
                         ast::CmpOp::Eq if lhs_ty.is_literal_string() => {
                             constraints.insert(symbol, rhs_ty);
+                        }
+                        ast::CmpOp::In => {
+                            if let Some(ty) = self.evaluate_expr_in(lhs_ty, rhs_ty) {
+                                constraints.insert(symbol, ty);
+                            }
+                        }
+                        ast::CmpOp::NotIn => {
+                            if let Some(ty) = self.evaluate_expr_in(lhs_ty, rhs_ty) {
+                                constraints.insert(symbol, ty.negate(self.db));
+                            }
                         }
                         _ => {
                             // TODO other comparison types
