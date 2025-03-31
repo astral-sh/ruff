@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/invalid_annotation_ty
 ```
 Module(
     ModModule {
-        range: 0..245,
+        range: 0..308,
         body: [
             TypeAlias(
                 StmtTypeAlias {
@@ -247,6 +247,39 @@ Module(
                     ),
                 },
             ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 254..271,
+                    name: Name(
+                        ExprName {
+                            range: 259..260,
+                            id: Name("Y"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Named(
+                        ExprNamed {
+                            range: 264..270,
+                            target: Name(
+                                ExprName {
+                                    range: 264..265,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 269..270,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -276,7 +309,7 @@ Module(
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
   |               ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
-5 | type Y = (yield 1)              # value
+5 | type Y = (yield 1)              # yield in value
   |
 
 
@@ -285,13 +318,23 @@ Module(
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
   |                ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
-5 | type Y = (yield 1)              # value
+5 | type Y = (yield 1)              # yield in value
+6 | type Y = (x := 1)               # named expr in value
   |
 
 
   |
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
-5 | type Y = (yield 1)              # value
+5 | type Y = (yield 1)              # yield in value
   |           ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+6 | type Y = (x := 1)               # named expr in value
+  |
+
+
+  |
+4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
+5 | type Y = (yield 1)              # yield in value
+6 | type Y = (x := 1)               # named expr in value
+  |           ^^^^^^ Syntax Error: named expression cannot be used in a type annotation
   |

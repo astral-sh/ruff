@@ -179,7 +179,8 @@ impl SemanticSyntaxChecker {
                 // type X[T = (yield 1)] = int     # TypeVar default
                 // type X[*Ts = (yield 1)] = int   # TypeVarTuple default
                 // type X[**Ts = (yield 1)] = int  # ParamSpec default
-                // type Y = (yield 1)              # value
+                // type Y = (yield 1)              # yield in value
+                // type Y = (x := 1)               # named expr in value
                 let mut visitor = AnnotationVisitor {
                     allow_named_expr: false,
                     ctx,
