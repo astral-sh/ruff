@@ -576,12 +576,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.metrics.validators
-        ["airflow", "metrics", "validators", "AllowListValidator"] => {
-            Replacement::Name("airflow.metrics.validators.PatternAllowListValidator")
-        }
-        ["airflow", "metrics", "validators", "BlockListValidator"] => {
-            Replacement::Name("airflow.metrics.validators.PatternBlockListValidator")
-        }
+        ["airflow", "metrics", "validators", rest @ ..] => match &rest {
+            ["AllowListValidator"] => {
+                Replacement::Name("airflow.metrics.validators.PatternAllowListValidator")
+            }
+            ["BlockListValidator"] => {
+                Replacement::Name("airflow.metrics.validators.PatternBlockListValidator")
+            }
+            _ => return,
+        },
 
         // airflow.datasets
         ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => {
