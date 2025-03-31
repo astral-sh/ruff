@@ -27,11 +27,15 @@ cast(str)
 cast(str, b"ar", "foo")
 
 
-def function_returning_int() -> int: return 10
+def function_returning_int() -> int:
+    return 10
+
 # error: [redundant-cast] "Value is already of type `int`"
 cast(int, function_returning_int())
 
-def function_returning_any() -> Any: return "blah"
+def function_returning_any() -> Any:
+    return "blah"
+
 # error: [redundant-cast] "Value is already of type `Any`"
 cast(Any, function_returning_any())
 ```
