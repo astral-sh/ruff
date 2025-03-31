@@ -103,7 +103,7 @@ AIR302_names.py:125:1: AIR302 `airflow.auth.managers.base_auth_manager.is_author
     | ^^^^^^^^^^^^^^^^^^^^^ AIR302
 126 | DatasetDetails()
     |
-    = help: Use `airflow.auth.managers.base_auth_manager.is_authorized_asset` instead
+    = help: Use `airflow.api_fastapi.auth.managers.base_auth_manager.is_authorized_asset` instead
 
 AIR302_names.py:126:1: AIR302 `airflow.auth.managers.models.resource_details.DatasetDetails` is removed in Airflow 3.0
     |
@@ -114,7 +114,7 @@ AIR302_names.py:126:1: AIR302 `airflow.auth.managers.models.resource_details.Dat
 127 |
 128 | # airflow.configuration
     |
-    = help: Use `airflow.auth.managers.models.resource_details.AssetDetails` instead
+    = help: Use `airflow.api_fastapi.auth.managers.models.resource_details.AssetDetails` instead
 
 AIR302_names.py:129:1: AIR302 `airflow.configuration.get` is removed in Airflow 3.0
     |

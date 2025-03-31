@@ -186,6 +186,12 @@ fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) 
 fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, arguments: &Arguments) {
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
+            // with replacement
+            checker.report_diagnostics(diagnostic_for_argument(
+                arguments,
+                "fail_stop",
+                Some("fail_fast"),
+            ));
             checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "schedule_interval",
@@ -196,15 +202,13 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                 "timetable",
                 Some("schedule"),
             ));
+            // without replacement
+            checker.report_diagnostics(diagnostic_for_argument(arguments, "default_view", None));
+            checker.report_diagnostics(diagnostic_for_argument(arguments, "orientation", None));
             checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "sla_miss_callback",
                 None,
-            ));
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "fail_stop",
-                Some("fail_fast"),
             ));
         }
         _ => {
@@ -548,10 +552,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.auth.managers
         ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
-            Replacement::Name("airflow.auth.managers.models.resource_details.AssetDetails")
+            Replacement::Name(
+                "airflow.api_fastapi.auth.managers.models.resource_details.AssetDetails",
+            )
         }
         ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => {
-            Replacement::Name("airflow.auth.managers.base_auth_manager.is_authorized_asset")
+            Replacement::Name(
+                "airflow.api_fastapi.auth.managers.base_auth_manager.is_authorized_asset",
+            )
         }
 
         // airflow.configuration
