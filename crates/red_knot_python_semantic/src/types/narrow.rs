@@ -291,30 +291,25 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(self.db);
-
-        match (lhs_ty, rhs_ty) {
-            (_, Type::Tuple(rhs_tuple)) if lhs_ty.is_closed(self.db) => {
-                builder = builder.add(UnionType::from_elements(
+        if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
+            match rhs_ty {
+                Type::Tuple(rhs_tuple) => Some(UnionType::from_elements(
                     self.db,
                     rhs_tuple.elements(self.db),
-                ));
-            }
+                )),
 
-            (lhs, Type::StringLiteral(string_literal))
-                if lhs.is_string_literal()
-                    || lhs.into_union().is_some_and(|union| {
-                        union.elements(self.db).iter().all(Type::is_string_literal)
-                    }) =>
-            {
-                for element in string_literal.iter_each_char(self.db) {
-                    builder = builder.add(Type::StringLiteral(element));
-                }
-            }
+                Type::StringLiteral(string_literal) => Some(UnionType::from_elements(
+                    self.db,
+                    string_literal
+                        .iter_each_char(self.db)
+                        .map(Type::StringLiteral),
+                )),
 
-            _ => return None,
+                _ => None,
+            }
+        } else {
+            None
         }
-        Some(builder.build())
     }
 
     fn evaluate_expr_compare(

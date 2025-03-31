@@ -417,10 +417,6 @@ impl<'db> Type<'db> {
             .is_some_and(|union| union.elements(db).iter().all(|ty| ty.is_single_valued(db)))
     }
 
-    pub fn is_closed(&self, db: &'db dyn Db) -> bool {
-        self.is_singleton(db) || self.is_union_of_single_valued(db)
-    }
-
     pub const fn into_int_literal(self) -> Option<i64> {
         match self {
             Type::IntLiteral(value) => Some(value),

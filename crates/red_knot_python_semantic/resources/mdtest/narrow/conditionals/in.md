@@ -35,8 +35,6 @@ def _(x: Literal[1, 2, "a", "b", False, b"abc"]):
 ```
 
 ```py
-from typing import Literal
-
 def _(x: Literal["a", "b", "c", 1]):
     if x in ("a", "b", "c", 2):
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
@@ -65,11 +63,18 @@ def _(x: Literal["a", "b", "c", "d"]):
 ```
 
 ```py
-from typing import Literal
-
 def _(x: Literal["a", "b", "c", "e"]):
     if x in "abcd":
         reveal_type(x)  # revealed: Literal["a", "b", "c"]
     else:
         reveal_type(x)  # revealed: Literal["e"]
+```
+
+```py
+def _(x: Literal[1, "a", "b", "c", "d"]):
+    # error: [unsupported-operator]
+    if x in "abc":
+        reveal_type(x)  # revealed: Literal["a", "b", "c"]
+    else:
+        reveal_type(x)  # revealed: Literal[1, "d"]
 ```
