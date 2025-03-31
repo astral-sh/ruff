@@ -612,8 +612,8 @@
         },
         "redundant-cast": {
           "title": "detects redundant `cast` calls",
-          "description": "## What it does\nDetects redundant `cast` calls where the value already has the target type.\n\n## Why is this bad?\nThese casts have no effect and can be removed.\n\n## Example\n```python\ncast(int, 1)  # Redundant\n```",
-          "default": "error",
+          "description": "## What it does\nDetects redundant `cast` calls where the value already has the target type.\n\n## Why is this bad?\nThese casts have no effect and can be removed.\n\n## Example\n```python\ndef f() -> int:\n    return 10\n\ncast(int, f())  # Redundant\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
