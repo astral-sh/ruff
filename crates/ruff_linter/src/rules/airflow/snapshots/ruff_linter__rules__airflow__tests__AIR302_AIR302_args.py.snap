@@ -87,207 +87,216 @@ AIR302_args.py:35:33: AIR302 `orientation` is removed in Airflow 3.0
 34 |
 35 | DAG(dag_id="class_orientation", orientation="BT")
    |                                 ^^^^^^^^^^^ AIR302
+36 |
+37 | allow_future_exec_dates_dag = DAG(dag_id="class_allow_future_exec_dates")
    |
 
-AIR302_args.py:43:6: AIR302 [*] `schedule_interval` is removed in Airflow 3.0
+AIR302_args.py:38:29: AIR302 `allow_future_exec_dates` is removed in Airflow 3.0
    |
-43 | @dag(schedule_interval="0 * * * *")
+37 | allow_future_exec_dates_dag = DAG(dag_id="class_allow_future_exec_dates")
+38 | allow_future_exec_dates_dag.allow_future_exec_dates
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+   |
+
+AIR302_args.py:46:6: AIR302 [*] `schedule_interval` is removed in Airflow 3.0
+   |
+46 | @dag(schedule_interval="0 * * * *")
    |      ^^^^^^^^^^^^^^^^^ AIR302
-44 | def decorator_schedule_interval():
-45 |     pass
+47 | def decorator_schedule_interval():
+48 |     pass
    |
    = help: Use `schedule` instead
 
 ℹ Safe fix
-40 40 |     pass
-41 41 | 
-42 42 | 
-43    |-@dag(schedule_interval="0 * * * *")
-   43 |+@dag(schedule="0 * * * *")
-44 44 | def decorator_schedule_interval():
-45 45 |     pass
-46 46 | 
+43 43 |     pass
+44 44 | 
+45 45 | 
+46    |-@dag(schedule_interval="0 * * * *")
+   46 |+@dag(schedule="0 * * * *")
+47 47 | def decorator_schedule_interval():
+48 48 |     pass
+49 49 | 
 
-AIR302_args.py:48:6: AIR302 [*] `timetable` is removed in Airflow 3.0
+AIR302_args.py:51:6: AIR302 [*] `timetable` is removed in Airflow 3.0
    |
-48 | @dag(timetable=NullTimetable())
+51 | @dag(timetable=NullTimetable())
    |      ^^^^^^^^^ AIR302
-49 | def decorator_timetable():
-50 |     pass
+52 | def decorator_timetable():
+53 |     pass
    |
    = help: Use `schedule` instead
 
 ℹ Safe fix
-45 45 |     pass
-46 46 | 
-47 47 | 
-48    |-@dag(timetable=NullTimetable())
-   48 |+@dag(schedule=NullTimetable())
-49 49 | def decorator_timetable():
-50 50 |     pass
-51 51 | 
+48 48 |     pass
+49 49 | 
+50 50 | 
+51    |-@dag(timetable=NullTimetable())
+   51 |+@dag(schedule=NullTimetable())
+52 52 | def decorator_timetable():
+53 53 |     pass
+54 54 | 
 
-AIR302_args.py:53:6: AIR302 `sla_miss_callback` is removed in Airflow 3.0
+AIR302_args.py:56:6: AIR302 `sla_miss_callback` is removed in Airflow 3.0
    |
-53 | @dag(sla_miss_callback=sla_callback)
+56 | @dag(sla_miss_callback=sla_callback)
    |      ^^^^^^^^^^^^^^^^^ AIR302
-54 | def decorator_sla_callback():
-55 |     pass
+57 | def decorator_sla_callback():
+58 |     pass
    |
-
-AIR302_args.py:61:39: AIR302 [*] `execution_date` is removed in Airflow 3.0
-   |
-59 | def decorator_deprecated_operator_args():
-60 |     trigger_dagrun_op = trigger_dagrun.TriggerDagRunOperator(
-61 |         task_id="trigger_dagrun_op1", execution_date="2024-12-04"
-   |                                       ^^^^^^^^^^^^^^ AIR302
-62 |     )
-63 |     trigger_dagrun_op2 = TriggerDagRunOperator(
-   |
-   = help: Use `logical_date` instead
-
-ℹ Safe fix
-58 58 | @dag()
-59 59 | def decorator_deprecated_operator_args():
-60 60 |     trigger_dagrun_op = trigger_dagrun.TriggerDagRunOperator(
-61    |-        task_id="trigger_dagrun_op1", execution_date="2024-12-04"
-   61 |+        task_id="trigger_dagrun_op1", logical_date="2024-12-04"
-62 62 |     )
-63 63 |     trigger_dagrun_op2 = TriggerDagRunOperator(
-64 64 |         task_id="trigger_dagrun_op2", execution_date="2024-12-04"
 
 AIR302_args.py:64:39: AIR302 [*] `execution_date` is removed in Airflow 3.0
    |
-62 |     )
-63 |     trigger_dagrun_op2 = TriggerDagRunOperator(
-64 |         task_id="trigger_dagrun_op2", execution_date="2024-12-04"
+62 | def decorator_deprecated_operator_args():
+63 |     trigger_dagrun_op = trigger_dagrun.TriggerDagRunOperator(
+64 |         task_id="trigger_dagrun_op1", execution_date="2024-12-04"
    |                                       ^^^^^^^^^^^^^^ AIR302
 65 |     )
+66 |     trigger_dagrun_op2 = TriggerDagRunOperator(
    |
    = help: Use `logical_date` instead
 
 ℹ Safe fix
-61 61 |         task_id="trigger_dagrun_op1", execution_date="2024-12-04"
-62 62 |     )
-63 63 |     trigger_dagrun_op2 = TriggerDagRunOperator(
-64    |-        task_id="trigger_dagrun_op2", execution_date="2024-12-04"
-   64 |+        task_id="trigger_dagrun_op2", logical_date="2024-12-04"
+61 61 | @dag()
+62 62 | def decorator_deprecated_operator_args():
+63 63 |     trigger_dagrun_op = trigger_dagrun.TriggerDagRunOperator(
+64    |-        task_id="trigger_dagrun_op1", execution_date="2024-12-04"
+   64 |+        task_id="trigger_dagrun_op1", logical_date="2024-12-04"
 65 65 |     )
-66 66 | 
-67 67 |     branch_dt_op = datetime.BranchDateTimeOperator(
+66 66 |     trigger_dagrun_op2 = TriggerDagRunOperator(
+67 67 |         task_id="trigger_dagrun_op2", execution_date="2024-12-04"
 
-AIR302_args.py:68:33: AIR302 [*] `use_task_execution_day` is removed in Airflow 3.0
+AIR302_args.py:67:39: AIR302 [*] `execution_date` is removed in Airflow 3.0
    |
-67 |     branch_dt_op = datetime.BranchDateTimeOperator(
-68 |         task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
+65 |     )
+66 |     trigger_dagrun_op2 = TriggerDagRunOperator(
+67 |         task_id="trigger_dagrun_op2", execution_date="2024-12-04"
+   |                                       ^^^^^^^^^^^^^^ AIR302
+68 |     )
+   |
+   = help: Use `logical_date` instead
+
+ℹ Safe fix
+64 64 |         task_id="trigger_dagrun_op1", execution_date="2024-12-04"
+65 65 |     )
+66 66 |     trigger_dagrun_op2 = TriggerDagRunOperator(
+67    |-        task_id="trigger_dagrun_op2", execution_date="2024-12-04"
+   67 |+        task_id="trigger_dagrun_op2", logical_date="2024-12-04"
+68 68 |     )
+69 69 | 
+70 70 |     branch_dt_op = datetime.BranchDateTimeOperator(
+
+AIR302_args.py:71:33: AIR302 [*] `use_task_execution_day` is removed in Airflow 3.0
+   |
+70 |     branch_dt_op = datetime.BranchDateTimeOperator(
+71 |         task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
    |                                 ^^^^^^^^^^^^^^^^^^^^^^ AIR302
-69 |     )
-70 |     branch_dt_op2 = BranchDateTimeOperator(
+72 |     )
+73 |     branch_dt_op2 = BranchDateTimeOperator(
    |
    = help: Use `use_task_logical_date` instead
 
 ℹ Safe fix
-65 65 |     )
-66 66 | 
-67 67 |     branch_dt_op = datetime.BranchDateTimeOperator(
-68    |-        task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
-   68 |+        task_id="branch_dt_op", use_task_logical_date=True, task_concurrency=5
-69 69 |     )
-70 70 |     branch_dt_op2 = BranchDateTimeOperator(
-71 71 |         task_id="branch_dt_op2",
+68 68 |     )
+69 69 | 
+70 70 |     branch_dt_op = datetime.BranchDateTimeOperator(
+71    |-        task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
+   71 |+        task_id="branch_dt_op", use_task_logical_date=True, task_concurrency=5
+72 72 |     )
+73 73 |     branch_dt_op2 = BranchDateTimeOperator(
+74 74 |         task_id="branch_dt_op2",
 
-AIR302_args.py:68:62: AIR302 [*] `task_concurrency` is removed in Airflow 3.0
+AIR302_args.py:71:62: AIR302 [*] `task_concurrency` is removed in Airflow 3.0
    |
-67 |     branch_dt_op = datetime.BranchDateTimeOperator(
-68 |         task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
+70 |     branch_dt_op = datetime.BranchDateTimeOperator(
+71 |         task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
    |                                                              ^^^^^^^^^^^^^^^^ AIR302
-69 |     )
-70 |     branch_dt_op2 = BranchDateTimeOperator(
+72 |     )
+73 |     branch_dt_op2 = BranchDateTimeOperator(
    |
    = help: Use `max_active_tis_per_dag` instead
 
 ℹ Safe fix
-65 65 |     )
-66 66 | 
-67 67 |     branch_dt_op = datetime.BranchDateTimeOperator(
-68    |-        task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
-   68 |+        task_id="branch_dt_op", use_task_execution_day=True, max_active_tis_per_dag=5
-69 69 |     )
-70 70 |     branch_dt_op2 = BranchDateTimeOperator(
-71 71 |         task_id="branch_dt_op2",
+68 68 |     )
+69 69 | 
+70 70 |     branch_dt_op = datetime.BranchDateTimeOperator(
+71    |-        task_id="branch_dt_op", use_task_execution_day=True, task_concurrency=5
+   71 |+        task_id="branch_dt_op", use_task_execution_day=True, max_active_tis_per_dag=5
+72 72 |     )
+73 73 |     branch_dt_op2 = BranchDateTimeOperator(
+74 74 |         task_id="branch_dt_op2",
 
-AIR302_args.py:72:9: AIR302 [*] `use_task_execution_day` is removed in Airflow 3.0
+AIR302_args.py:75:9: AIR302 [*] `use_task_execution_day` is removed in Airflow 3.0
    |
-70 |     branch_dt_op2 = BranchDateTimeOperator(
-71 |         task_id="branch_dt_op2",
-72 |         use_task_execution_day=True,
+73 |     branch_dt_op2 = BranchDateTimeOperator(
+74 |         task_id="branch_dt_op2",
+75 |         use_task_execution_day=True,
    |         ^^^^^^^^^^^^^^^^^^^^^^ AIR302
-73 |         sla=timedelta(seconds=10),
-74 |     )
+76 |         sla=timedelta(seconds=10),
+77 |     )
    |
    = help: Use `use_task_logical_date` instead
 
 ℹ Safe fix
-69 69 |     )
-70 70 |     branch_dt_op2 = BranchDateTimeOperator(
-71 71 |         task_id="branch_dt_op2",
-72    |-        use_task_execution_day=True,
-   72 |+        use_task_logical_date=True,
-73 73 |         sla=timedelta(seconds=10),
-74 74 |     )
-75 75 | 
+72 72 |     )
+73 73 |     branch_dt_op2 = BranchDateTimeOperator(
+74 74 |         task_id="branch_dt_op2",
+75    |-        use_task_execution_day=True,
+   75 |+        use_task_logical_date=True,
+76 76 |         sla=timedelta(seconds=10),
+77 77 |     )
+78 78 | 
 
-AIR302_args.py:73:9: AIR302 `sla` is removed in Airflow 3.0
+AIR302_args.py:76:9: AIR302 `sla` is removed in Airflow 3.0
    |
-71 |         task_id="branch_dt_op2",
-72 |         use_task_execution_day=True,
-73 |         sla=timedelta(seconds=10),
+74 |         task_id="branch_dt_op2",
+75 |         use_task_execution_day=True,
+76 |         sla=timedelta(seconds=10),
    |         ^^^ AIR302
-74 |     )
+77 |     )
    |
 
-AIR302_args.py:95:15: AIR302 `filename_template` is removed in Airflow 3.0
-   |
-94 | # deprecated filename_template argument in FileTaskHandler
-95 | S3TaskHandler(filename_template="/tmp/test")
-   |               ^^^^^^^^^^^^^^^^^ AIR302
-96 | HdfsTaskHandler(filename_template="/tmp/test")
-97 | ElasticsearchTaskHandler(filename_template="/tmp/test")
-   |
-
-AIR302_args.py:96:17: AIR302 `filename_template` is removed in Airflow 3.0
-   |
-94 | # deprecated filename_template argument in FileTaskHandler
-95 | S3TaskHandler(filename_template="/tmp/test")
-96 | HdfsTaskHandler(filename_template="/tmp/test")
-   |                 ^^^^^^^^^^^^^^^^^ AIR302
-97 | ElasticsearchTaskHandler(filename_template="/tmp/test")
-98 | GCSTaskHandler(filename_template="/tmp/test")
-   |
-
-AIR302_args.py:97:26: AIR302 `filename_template` is removed in Airflow 3.0
-   |
-95 | S3TaskHandler(filename_template="/tmp/test")
-96 | HdfsTaskHandler(filename_template="/tmp/test")
-97 | ElasticsearchTaskHandler(filename_template="/tmp/test")
-   |                          ^^^^^^^^^^^^^^^^^ AIR302
-98 | GCSTaskHandler(filename_template="/tmp/test")
-   |
-
-AIR302_args.py:98:16: AIR302 `filename_template` is removed in Airflow 3.0
+AIR302_args.py:98:15: AIR302 `filename_template` is removed in Airflow 3.0
     |
- 96 | HdfsTaskHandler(filename_template="/tmp/test")
- 97 | ElasticsearchTaskHandler(filename_template="/tmp/test")
- 98 | GCSTaskHandler(filename_template="/tmp/test")
+ 97 | # deprecated filename_template argument in FileTaskHandler
+ 98 | S3TaskHandler(filename_template="/tmp/test")
+    |               ^^^^^^^^^^^^^^^^^ AIR302
+ 99 | HdfsTaskHandler(filename_template="/tmp/test")
+100 | ElasticsearchTaskHandler(filename_template="/tmp/test")
+    |
+
+AIR302_args.py:99:17: AIR302 `filename_template` is removed in Airflow 3.0
+    |
+ 97 | # deprecated filename_template argument in FileTaskHandler
+ 98 | S3TaskHandler(filename_template="/tmp/test")
+ 99 | HdfsTaskHandler(filename_template="/tmp/test")
+    |                 ^^^^^^^^^^^^^^^^^ AIR302
+100 | ElasticsearchTaskHandler(filename_template="/tmp/test")
+101 | GCSTaskHandler(filename_template="/tmp/test")
+    |
+
+AIR302_args.py:100:26: AIR302 `filename_template` is removed in Airflow 3.0
+    |
+ 98 | S3TaskHandler(filename_template="/tmp/test")
+ 99 | HdfsTaskHandler(filename_template="/tmp/test")
+100 | ElasticsearchTaskHandler(filename_template="/tmp/test")
+    |                          ^^^^^^^^^^^^^^^^^ AIR302
+101 | GCSTaskHandler(filename_template="/tmp/test")
+    |
+
+AIR302_args.py:101:16: AIR302 `filename_template` is removed in Airflow 3.0
+    |
+ 99 | HdfsTaskHandler(filename_template="/tmp/test")
+100 | ElasticsearchTaskHandler(filename_template="/tmp/test")
+101 | GCSTaskHandler(filename_template="/tmp/test")
     |                ^^^^^^^^^^^^^^^^^ AIR302
- 99 |
-100 | FabAuthManager(None)
+102 |
+103 | FabAuthManager(None)
     |
 
-AIR302_args.py:100:15: AIR302 `appbuilder` is removed in Airflow 3.0; The constructor takes no parameter now
+AIR302_args.py:103:15: AIR302 `appbuilder` is removed in Airflow 3.0; The constructor takes no parameter now
     |
- 98 | GCSTaskHandler(filename_template="/tmp/test")
- 99 |
-100 | FabAuthManager(None)
+101 | GCSTaskHandler(filename_template="/tmp/test")
+102 |
+103 | FabAuthManager(None)
     |               ^^^^^^ AIR302
     |

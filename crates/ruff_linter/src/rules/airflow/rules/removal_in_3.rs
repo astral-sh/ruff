@@ -279,6 +279,10 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
     };
 
     let replacement = match *qualname.segments() {
+        ["airflow", .., "DAG" | "dag"] => match attr.as_str() {
+            "allow_future_exec_dates" => Replacement::None,
+            _ => return,
+        },
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
             "dataset_factories" => Replacement::Name("asset_factories"),
             "dataset_uri_handlers" => Replacement::Name("asset_uri_handlers"),

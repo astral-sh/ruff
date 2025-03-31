@@ -34,6 +34,9 @@ DAG(dag_id="class_default_view", default_view="dag_default_view")
 
 DAG(dag_id="class_orientation", orientation="BT")
 
+allow_future_exec_dates_dag = DAG(dag_id="class_allow_future_exec_dates")
+allow_future_exec_dates_dag.allow_future_exec_dates
+
 
 @dag(schedule="0 * * * *")
 def decorator_schedule():
