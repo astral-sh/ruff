@@ -1963,11 +1963,17 @@ impl<'db> Type<'db> {
 
         match self {
             Type::Union(union) => union
-                .map_with_boundness(db, |elem| elem.member(db, &name).symbol)
+                .map_with_boundness(db, |elem| {
+                    elem.member_lookup_with_policy(db, name_str.into(), policy)
+                        .symbol
+                })
                 .into(),
 
             Type::Intersection(intersection) => intersection
-                .map_with_boundness(db, |elem| elem.member(db, &name).symbol)
+                .map_with_boundness(db, |elem| {
+                    elem.member_lookup_with_policy(db, name_str.into(), policy)
+                        .symbol
+                })
                 .into(),
 
             Type::Dynamic(..) | Type::Never => Symbol::bound(self).into(),
