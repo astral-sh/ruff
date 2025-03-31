@@ -185,7 +185,7 @@ RUF005.py:47:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of co
    47 |+astonishment = ("we all feel", *Fun.words)
 48 48 | 
 49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-50 50 | slicing1 = foo[:1] + [7, 8, 9]
+50 50 | 
 
 RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
    |
@@ -193,8 +193,8 @@ RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
 48 |
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
-50 | slicing1 = foo[:1] + [7, 8, 9]
-51 | slicing2 = [7, 8, 9] + bar[1:]
+50 |
+51 | baz = () + zoob
    |
    = help: Replace with iterable unpacking
 
@@ -204,9 +204,9 @@ RUF005.py:49:9: RUF005 [*] Consider iterable unpacking instead of concatenation
 48 48 | 
 49    |-chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
    49 |+chain = ["a", "b", "c", *eggs, *list(("yes", "no", "pants") + zoob)]
-50 50 | slicing1 = foo[:1] + [7, 8, 9]
-51 51 | slicing2 = [7, 8, 9] + bar[1:]
-52 52 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
+50 50 | 
+51 51 | baz = () + zoob
+52 52 | 
 
 RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
    |
@@ -214,8 +214,8 @@ RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of 
 48 |
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
-50 | slicing1 = foo[:1] + [7, 8, 9]
-51 | slicing2 = [7, 8, 9] + bar[1:]
+50 |
+51 | baz = () + zoob
    |
    = help: Replace with `("yes", "no", "pants", *zoob)`
 
@@ -225,192 +225,131 @@ RUF005.py:49:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of 
 48 48 | 
 49    |-chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
    49 |+chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants", *zoob))
-50 50 | slicing1 = foo[:1] + [7, 8, 9]
-51 51 | slicing2 = [7, 8, 9] + bar[1:]
-52 52 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
+50 50 | 
+51 51 | baz = () + zoob
+52 52 | 
 
-RUF005.py:50:12: RUF005 [*] Consider `[*foo[:1], 7, 8, 9]` instead of concatenation
+RUF005.py:51:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
    |
 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-50 | slicing1 = foo[:1] + [7, 8, 9]
-   |            ^^^^^^^^^^^^^^^^^^^ RUF005
-51 | slicing2 = [7, 8, 9] + bar[1:]
-52 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
-   |
-   = help: Replace with `[*foo[:1], 7, 8, 9]`
-
-ℹ Unsafe fix
-47 47 | astonishment = ("we all feel",) + Fun.words
-48 48 | 
-49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-50    |-slicing1 = foo[:1] + [7, 8, 9]
-   50 |+slicing1 = [*foo[:1], 7, 8, 9]
-51 51 | slicing2 = [7, 8, 9] + bar[1:]
-52 52 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
-53 53 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
-
-RUF005.py:51:12: RUF005 [*] Consider `[7, 8, 9, *bar[1:]]` instead of concatenation
-   |
-49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-50 | slicing1 = foo[:1] + [7, 8, 9]
-51 | slicing2 = [7, 8, 9] + bar[1:]
-   |            ^^^^^^^^^^^^^^^^^^^ RUF005
-52 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
-53 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
-   |
-   = help: Replace with `[7, 8, 9, *bar[1:]]`
-
-ℹ Unsafe fix
-48 48 | 
-49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-50 50 | slicing1 = foo[:1] + [7, 8, 9]
-51    |-slicing2 = [7, 8, 9] + bar[1:]
-   51 |+slicing2 = [7, 8, 9, *bar[1:]]
-52 52 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
-53 53 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
-54 54 | 
-
-RUF005.py:52:12: RUF005 [*] Consider `[*foo[:1], 7, 8, 9, *bar[1:]]` instead of concatenation
-   |
-50 | slicing1 = foo[:1] + [7, 8, 9]
-51 | slicing2 = [7, 8, 9] + bar[1:]
-52 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
-53 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
-   |
-   = help: Replace with `[*foo[:1], 7, 8, 9, *bar[1:]]`
-
-ℹ Unsafe fix
-49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
-50 50 | slicing1 = foo[:1] + [7, 8, 9]
-51 51 | slicing2 = [7, 8, 9] + bar[1:]
-52    |-slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
-   52 |+slicing3 = [*foo[:1], 7, 8, 9, *bar[1:]]
-53 53 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
-54 54 | 
-55 55 | baz = () + zoob
-
-RUF005.py:55:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
-   |
-53 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
-54 |
-55 | baz = () + zoob
+50 |
+51 | baz = () + zoob
    |       ^^^^^^^^^ RUF005
-56 |
-57 | [] + foo + [
+52 |
+53 | [] + foo + [
    |
    = help: Replace with `(*zoob,)`
 
 ℹ Unsafe fix
-52 52 | slicing3 = foo[:1] + [7, 8, 9] + bar[1:]
-53 53 | indexing = foo[0] + [7, 8, 9] + bar[1]  # Not changed; looks a little suspect for concatenation.
-54 54 | 
-55    |-baz = () + zoob
-   55 |+baz = (*zoob,)
-56 56 | 
-57 57 | [] + foo + [
-58 58 | ]
+48 48 | 
+49 49 | chain = ["a", "b", "c"] + eggs + list(("yes", "no", "pants") + zoob)
+50 50 | 
+51    |-baz = () + zoob
+   51 |+baz = (*zoob,)
+52 52 | 
+53 53 | [] + foo + [
+54 54 | ]
 
-RUF005.py:57:1: RUF005 [*] Consider `[*foo]` instead of concatenation
+RUF005.py:53:1: RUF005 [*] Consider `[*foo]` instead of concatenation
    |
-55 |   baz = () + zoob
-56 |
-57 | / [] + foo + [
-58 | | ]
+51 |   baz = () + zoob
+52 |
+53 | / [] + foo + [
+54 | | ]
    | |_^ RUF005
-59 |
-60 |   pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+55 |
+56 |   pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
    |
    = help: Replace with `[*foo]`
 
 ℹ Unsafe fix
-54 54 | 
-55 55 | baz = () + zoob
-56 56 | 
-57    |-[] + foo + [
-58    |-]
-   57 |+[*foo]
-59 58 | 
-60 59 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
-61 60 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+50 50 | 
+51 51 | baz = () + zoob
+52 52 | 
+53    |-[] + foo + [
+54    |-]
+   53 |+[*foo]
+55 54 | 
+56 55 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+57 56 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
 
-RUF005.py:60:15: RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of concatenation
+RUF005.py:56:15: RUF005 [*] Consider `[sys.executable, "-m", "pylint", *args, path]` instead of concatenation
    |
-58 | ]
-59 |
-60 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+54 | ]
+55 |
+56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
-61 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
-62 | b = a + [2, 3] + [4]
+57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+58 | b = a + [2, 3] + [4]
    |
    = help: Replace with `[sys.executable, "-m", "pylint", *args, path]`
 
 ℹ Unsafe fix
-57 57 | [] + foo + [
-58 58 | ]
+53 53 | [] + foo + [
+54 54 | ]
+55 55 | 
+56    |-pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+   56 |+pylint_call = [sys.executable, "-m", "pylint", *args, path]
+57 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+58 58 | b = a + [2, 3] + [4]
 59 59 | 
-60    |-pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
-   60 |+pylint_call = [sys.executable, "-m", "pylint", *args, path]
-61 61 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
-62 62 | b = a + [2, 3] + [4]
-63 63 | 
 
-RUF005.py:61:21: RUF005 [*] Consider iterable unpacking instead of concatenation
+RUF005.py:57:21: RUF005 [*] Consider iterable unpacking instead of concatenation
    |
-60 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
-61 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
-62 | b = a + [2, 3] + [4]
+58 | b = a + [2, 3] + [4]
    |
    = help: Replace with iterable unpacking
 
 ℹ Unsafe fix
-58 58 | ]
+54 54 | ]
+55 55 | 
+56 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+57    |-pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+   57 |+pylint_call_tuple = (sys.executable, "-m", "pylint", *args, path, path2)
+58 58 | b = a + [2, 3] + [4]
 59 59 | 
-60 60 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
-61    |-pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
-   61 |+pylint_call_tuple = (sys.executable, "-m", "pylint", *args, path, path2)
-62 62 | b = a + [2, 3] + [4]
-63 63 | 
-64 64 | # Uses the non-preferred quote style, which should be retained.
+60 60 | # Uses the non-preferred quote style, which should be retained.
 
-RUF005.py:62:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
+RUF005.py:58:5: RUF005 [*] Consider `[*a, 2, 3, 4]` instead of concatenation
    |
-60 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
-61 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
-62 | b = a + [2, 3] + [4]
+56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+58 | b = a + [2, 3] + [4]
    |     ^^^^^^^^^^^^^^^^ RUF005
-63 |
-64 | # Uses the non-preferred quote style, which should be retained.
+59 |
+60 | # Uses the non-preferred quote style, which should be retained.
    |
    = help: Replace with `[*a, 2, 3, 4]`
 
 ℹ Unsafe fix
+55 55 | 
+56 56 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
+57 57 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
+58    |-b = a + [2, 3] + [4]
+   58 |+b = [*a, 2, 3, 4]
 59 59 | 
-60 60 | pylint_call = [sys.executable, "-m", "pylint"] + args + [path]
-61 61 | pylint_call_tuple = (sys.executable, "-m", "pylint") + args + (path, path2)
-62    |-b = a + [2, 3] + [4]
-   62 |+b = [*a, 2, 3, 4]
-63 63 | 
-64 64 | # Uses the non-preferred quote style, which should be retained.
-65 65 | f"{a() + ['b']}"
+60 60 | # Uses the non-preferred quote style, which should be retained.
+61 61 | f"{a() + ['b']}"
 
-RUF005.py:65:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
+RUF005.py:61:4: RUF005 [*] Consider `[*a(), 'b']` instead of concatenation
    |
-64 | # Uses the non-preferred quote style, which should be retained.
-65 | f"{a() + ['b']}"
+60 | # Uses the non-preferred quote style, which should be retained.
+61 | f"{a() + ['b']}"
    |    ^^^^^^^^^^^ RUF005
-66 |
-67 | ###
+62 |
+63 | ###
    |
    = help: Replace with `[*a(), 'b']`
 
 ℹ Unsafe fix
-62 62 | b = a + [2, 3] + [4]
-63 63 | 
-64 64 | # Uses the non-preferred quote style, which should be retained.
-65    |-f"{a() + ['b']}"
-   65 |+f"{[*a(), 'b']}"
-66 66 | 
-67 67 | ###
-68 68 | # Non-errors.
+58 58 | b = a + [2, 3] + [4]
+59 59 | 
+60 60 | # Uses the non-preferred quote style, which should be retained.
+61    |-f"{a() + ['b']}"
+   61 |+f"{[*a(), 'b']}"
+62 62 | 
+63 63 | ###
+64 64 | # Non-errors.
