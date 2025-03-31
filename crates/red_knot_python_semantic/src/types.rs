@@ -634,6 +634,12 @@ impl<'db> Type<'db> {
                     .is_subtype_of(db, target)
             }
 
+            (Type::Callable(CallableType::BoundMethod(self_bound_method)), Type::Callable(_)) => {
+                self_bound_method
+                    .into_callable_type(db)
+                    .is_subtype_of(db, target)
+            }
+
             // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
             // so it also, for now, just delegates to its instance fallback.
             (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
@@ -743,6 +749,18 @@ impl<'db> Type<'db> {
             // which means that all instances of `bool` are also instances of `int`
             (Type::Instance(self_instance), Type::Instance(target_instance)) => {
                 self_instance.is_subtype_of(db, target_instance)
+            }
+
+            (Type::Instance(_), Type::Callable(_)) => {
+                let call_symbol = self.member(db, "__call__").symbol;
+                match call_symbol {
+                    Symbol::Type(Type::Callable(CallableType::BoundMethod(call_function)), _) => {
+                        call_function
+                            .into_callable_type(db)
+                            .is_subtype_of(db, target)
+                    }
+                    _ => false,
+                }
             }
 
             // Other than the special cases enumerated above,
@@ -4310,6 +4328,18 @@ pub struct BoundMethodType<'db> {
     /// The instance on which this method has been called. Corresponds to the `__self__`
     /// attribute on a bound method object
     self_instance: Type<'db>,
+}
+
+impl<'db> BoundMethodType<'db> {
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
+        let signature = self.function(db).signature(db).clone();
+        let parameters = Parameters::new(signature.parameters().iter().skip(1).cloned());
+
+        Type::Callable(CallableType::General(GeneralCallableType::new(
+            db,
+            Signature::new(parameters, signature.return_ty),
+        )))
+    }
 }
 
 /// This type represents a general callable type that are used to represent `typing.Callable`
