@@ -26,7 +26,6 @@ cast(str)
 # error: [too-many-positional-arguments] "Too many positional arguments to function `cast`: expected 2, got 3"
 cast(str, b"ar", "foo")
 
-
 def function_returning_int() -> int:
     return 10
 
