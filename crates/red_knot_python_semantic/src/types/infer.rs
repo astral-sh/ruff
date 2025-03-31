@@ -1971,14 +1971,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(expr);
                     None
                 } else {
-                    let tuple = TupleType::new(
+                    let union = UnionType::from_elements(
                         self.db(),
-                        elts.iter()
-                            .map(|expr| self.infer_type_expression(expr))
-                            .collect::<Box<_>>(),
+                        elts.iter().map(|expr| self.infer_type_expression(expr)),
                     );
-                    let constraints = TypeVarBoundOrConstraints::Constraints(tuple);
-                    self.store_expression_type(expr, Type::Tuple(tuple));
+                    let elements = union.into_union().expect(
+                        "should have already checked that there were at least two constraints",
+                    );
+                    let constraints = TypeVarBoundOrConstraints::Constraints(elements);
+                    self.store_expression_type(expr, union);
                     Some(constraints)
                 }
             }

@@ -3496,7 +3496,7 @@ impl<'db> TypeVarInstance<'db> {
 #[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
-    Constraints(TupleType<'db>),
+    Constraints(UnionType<'db>),
 }
 
 /// Error returned if a type is not (or may not be) a context manager.
