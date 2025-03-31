@@ -93,8 +93,8 @@ use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS,
-    TYPE_ASSERTION_FAILURE,
+    report_unresolved_reference, INVALID_METACLASS, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -4014,6 +4014,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             ),
                                         );
                                     };
+                                }
+                            }
+                        }
+                        KnownFunction::Cast => {
+                            if let [Some(casted_ty), Some(source_ty)] = overload.parameter_types() {
+                                if source_ty.is_gradual_equivalent_to(self.context.db(), *casted_ty) {
+                                    self.context.report_lint(
+                                        &REDUNDANT_CAST,
+                                        call_expression,
+                                        format_args!(
+                                            "Value is already of type `{}`",
+                                            casted_ty.display(self.context.db()),
+                                        ),
+                                    );
                                 }
                             }
                         }

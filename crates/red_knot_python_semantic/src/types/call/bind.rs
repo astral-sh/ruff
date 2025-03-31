@@ -13,8 +13,8 @@ use crate::db::Db;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
-    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, REDUNDANT_CAST,
-    TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
+    UNKNOWN_ARGUMENT,
 };
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
@@ -395,18 +395,8 @@ impl<'db> Bindings<'db> {
                     }
 
                     Some(KnownFunction::Cast) => {
-                        let mut redundant_cast_error = None;
-
-                        if let [Some(casted_ty), Some(source_ty)] = overload.parameter_types() {
-                            if source_ty.is_gradual_equivalent_to(db, *casted_ty) {
-                                redundant_cast_error =
-                                    Some(BindingError::RedundantCast { ty: *casted_ty });
-                            }
+                        if let [Some(casted_ty), Some(_)] = overload.parameter_types() {
                             overload.set_return_type(*casted_ty);
-                        }
-
-                        if let Some(error) = redundant_cast_error {
-                            overload.errors.push(error);
                         }
                     }
 
@@ -1045,8 +1035,6 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         parameter: ParameterContext,
     },
-    /// A `cast` to this type is redundant because the argument already has this type.
-    RedundantCast { ty: Type<'db> },
 }
 
 impl<'db> BindingError<'db> {
@@ -1195,14 +1183,6 @@ impl<'db> BindingError<'db> {
                             String::new()
                         }
                     ),
-                );
-            }
-
-            Self::RedundantCast { ty } => {
-                context.report_lint(
-                    &REDUNDANT_CAST,
-                    Self::get_node(node, Some(1)),
-                    format_args!("Value is already of type `{}`", ty.display(context.db()),),
                 );
             }
         }
