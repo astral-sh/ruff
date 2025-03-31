@@ -144,7 +144,33 @@ impl SemanticSyntaxChecker {
                     visitor.visit_expr(returns);
                 }
             }
-            Stmt::ClassDef(stmt_class_def) => {} // TODO
+            Stmt::ClassDef(ast::StmtClassDef {
+                type_params,
+                arguments,
+                ..
+            }) => {
+                // test_ok valid_annotation_class
+                // class F(y := list): ...
+
+                // test_err invalid_annotation_class
+                // class F[T](y := list): ...
+                // class G((yield 1)): ...
+                // class H((yield from 1)): ...
+                // class I[T]((yield 1)): ...
+                // class J[T]((yield from 1)): ...
+                // class K[T: (yield 1)]: ...      # yield in TypeVar
+                // class L[T: (x := 1)]: ...       # named expr in TypeVar
+                let mut visitor = AnnotationVisitor {
+                    allow_named_expr: type_params.is_none(),
+                    ctx,
+                };
+                if let Some(type_params) = type_params {
+                    visitor.visit_type_params(type_params);
+                }
+                if let Some(arguments) = arguments {
+                    visitor.visit_arguments(arguments);
+                }
+            }
             Stmt::TypeAlias(ast::StmtTypeAlias {
                 type_params, value, ..
             }) => {
@@ -163,7 +189,7 @@ impl SemanticSyntaxChecker {
                     visitor.visit_type_params(type_params);
                 }
             }
-            Stmt::AnnAssign(stmt_ann_assign) => {} // TODO
+            Stmt::AnnAssign(_stmt_ann_assign) => {} // TODO
             _ => {}
         }
     }
