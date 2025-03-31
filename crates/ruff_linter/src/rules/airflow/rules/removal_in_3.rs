@@ -620,12 +620,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.timetables
-        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => {
-            Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule")
-        }
-        ["airflow", "timetables", "simple", "DatasetTriggeredTimetable"] => {
-            Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
-        }
+        ["airflow", "timetables", rest @ ..] => match &rest {
+            ["datasets", "DatasetOrTimeSchedule"] => {
+                Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule")
+            }
+            ["simple", "DatasetTriggeredTimetable"] => {
+                Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
+            }
+            _ => return,
+        },
 
         // airflow.lineage.hook
         ["airflow", "lineage", "hook", "DatasetLineageInfo"] => {
