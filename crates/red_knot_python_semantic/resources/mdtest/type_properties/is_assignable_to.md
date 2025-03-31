@@ -476,4 +476,17 @@ static_assert(is_assignable_to(CallableTypeOf[keyword_variadic], Callable[..., N
 static_assert(is_assignable_to(CallableTypeOf[mixed], Callable[..., None]))
 ```
 
+### Non-static types
+
+```py
+from knot_extensions import static_assert, is_assignable_to
+from typing import Any, Callable
+
+def f(x: Any) -> str:
+    return ""
+
+# no error
+c: Callable[[Any], str] = f
+```
+
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

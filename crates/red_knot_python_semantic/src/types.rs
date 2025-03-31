@@ -904,6 +904,12 @@ impl<'db> Type<'db> {
                 Type::Callable(CallableType::General(target_callable)),
             ) => self_callable.is_assignable_to(db, target_callable),
 
+            (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
+                self_function_literal
+                    .into_callable_type(db)
+                    .is_assignable_to(db, target)
+            }
+
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
