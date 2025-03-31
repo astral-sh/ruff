@@ -110,16 +110,25 @@ pub(crate) fn check_noqa(
         && !exemption.includes(Rule::UnusedNOQA)
         && !per_file_ignores.contains(Rule::UnusedNOQA)
     {
-        let directives = noqa_directives
-            .lines()
-            .iter()
-            .map(|line| (&line.directive, &line.matches, false))
-            .chain(
-                file_noqa_directives
-                    .lines()
-                    .iter()
-                    .map(|line| (&line.parsed_file_exemption, &line.matches, true)),
-            );
+        let directives: Vec<_> = if settings.preview.is_enabled() {
+            noqa_directives
+                .lines()
+                .iter()
+                .map(|line| (&line.directive, &line.matches, false))
+                .chain(
+                    file_noqa_directives
+                        .lines()
+                        .iter()
+                        .map(|line| (&line.parsed_file_exemption, &line.matches, true)),
+                )
+                .collect()
+        } else {
+            noqa_directives
+                .lines()
+                .iter()
+                .map(|line| (&line.directive, &line.matches, false))
+                .collect()
+        };
         for (directive, matches, is_file_level) in directives {
             match directive {
                 Directive::All(directive) => {

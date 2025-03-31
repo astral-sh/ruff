@@ -318,7 +318,10 @@ mod tests {
     fn ruff_noqa_filedirective_unused() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_6.py"),
-            &settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA]),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
+            },
         )?;
         assert_messages!(diagnostics);
         Ok(())
