@@ -259,7 +259,7 @@
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
-pub(super) use self::symbol_state::ScopedDefinitionId;
+use self::symbol_state::ScopedDefinitionId;
 use self::symbol_state::{
     LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator, SymbolBindings,
     SymbolDeclarations, SymbolState,
