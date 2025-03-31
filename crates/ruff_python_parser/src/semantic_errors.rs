@@ -462,6 +462,14 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
+            SemanticSyntaxErrorKind::InvalidAnnotation(kind) => match kind {
+                InvalidAnnotationKind::Yield => {
+                    f.write_str("yield expression cannot be used in a type annotation")
+                }
+                InvalidAnnotationKind::NamedExpr => {
+                    f.write_str("yield expression cannot be used in a type annotation")
+                }
+            },
         }
     }
 }
@@ -575,6 +583,23 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [BPO 45000]: https://github.com/python/cpython/issues/89163
     WriteToDebug(WriteToDebugKind),
+
+    /// Represents the use of invalid syntax in a type annotation.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// type X[T: (yield 1)] = int
+    /// type Y = (yield 1)
+    /// def f[T](x: int) -> (y := 3): return x
+    /// ```
+    InvalidAnnotation(InvalidAnnotationKind),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum InvalidAnnotationKind {
+    Yield,
+    NamedExpr,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

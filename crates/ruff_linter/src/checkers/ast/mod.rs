@@ -552,7 +552,8 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
-            | SemanticSyntaxErrorKind::WriteToDebug(_) => {
+            | SemanticSyntaxErrorKind::WriteToDebug(_)
+            | SemanticSyntaxErrorKind::InvalidAnnotation(_) => {
                 if self.settings.preview.is_enabled() {
                     self.semantic_errors.borrow_mut().push(error);
                 }
