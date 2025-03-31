@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
-snapshot_kind: text
 ---
 AIR302_names.py:121:1: AIR302 `airflow.PY36` is removed in Airflow 3.0
     |

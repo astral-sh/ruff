@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
-snapshot_kind: text
 ---
 AIR302_args.py:20:39: AIR302 [*] `schedule_interval` is removed in Airflow 3.0
    |
@@ -89,13 +88,6 @@ AIR302_args.py:35:33: AIR302 `orientation` is removed in Airflow 3.0
    |                                 ^^^^^^^^^^^ AIR302
 36 |
 37 | allow_future_exec_dates_dag = DAG(dag_id="class_allow_future_exec_dates")
-   |
-
-AIR302_args.py:38:29: AIR302 `allow_future_exec_dates` is removed in Airflow 3.0
-   |
-37 | allow_future_exec_dates_dag = DAG(dag_id="class_allow_future_exec_dates")
-38 | allow_future_exec_dates_dag.allow_future_exec_dates
-   |                             ^^^^^^^^^^^^^^^^^^^^^^^ AIR302
    |
 
 AIR302_args.py:46:6: AIR302 [*] `schedule_interval` is removed in Airflow 3.0
