@@ -396,16 +396,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             constraints.insert(symbol, rhs_ty);
                         }
                         ast::CmpOp::In => {
-                            let ty = self.evaluate_expr_in(lhs_ty, rhs_ty);
-                            if let Some(ty) = ty {
+                            self.evaluate_expr_in(lhs_ty, rhs_ty).map(|ty| {
                                 constraints.insert(symbol, ty);
-                            }
+                            });
                         }
                         ast::CmpOp::NotIn => {
-                            let ty = self.evaluate_expr_in(lhs_ty, rhs_ty);
-                            if let Some(ty) = ty {
+                            self.evaluate_expr_in(lhs_ty, rhs_ty).map(|ty| {
                                 constraints.insert(symbol, ty.negate(self.db));
-                            }
+                            });
                         }
                         _ => {
                             // TODO other comparison types
