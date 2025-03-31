@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     self as ast, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, LiteralExpressionRef,
@@ -48,6 +48,8 @@ pub(crate) struct RedundantLiteralUnion {
 }
 
 impl Violation for RedundantLiteralUnion {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let RedundantLiteralUnion {
