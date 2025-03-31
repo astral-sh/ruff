@@ -71,7 +71,7 @@ script for more information or use the `--help` flag to see the available option
 #### CI
 
 The fuzzer is run as part of the CI pipeline. The purpose of running the fuzzer in the CI is to
-catch any regresssions introduced by any new changes to the parser. This is why the fuzzer is run on
+catch any regressions introduced by any new changes to the parser. This is why the fuzzer is run on
 the same set of seeds on every run.
 
 ## Benchmarks

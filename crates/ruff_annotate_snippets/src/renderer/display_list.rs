@@ -474,7 +474,7 @@ impl DisplaySet<'_> {
                             // 3 │       X0 Y0 Z0
                             //   │ ┏━━━━━┛  │  │     < We are writing these lines
                             //   │ ┃┌───────┘  │     < by reverting the "depth" of
-                            //   │ ┃│┌─────────┘     < their multilne spans.
+                            //   │ ┃│┌─────────┘     < their multiline spans.
                             // 4 │ ┃││   X1 Y1 Z1
                             // 5 │ ┃││   X2 Y2 Z2
                             //   │ ┃│└────╿──│──┘ `Z` label

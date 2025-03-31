@@ -290,8 +290,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
     // - If `--diff` or `--fix-only` are set, don't print any violations (only applicable fixes)
-    // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
-    //   `--unsafe-fixes` is set, then [`Applicablility::Suggested`] fixes are included.
+    // - By default, applicable fixes only include [`Applicability::Automatic`], but if
+    //   `--unsafe-fixes` is set, then [`Applicability::Suggested`] fixes are included.
 
     let fix_mode = if cli.diff {
         FixMode::Diff
