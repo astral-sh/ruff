@@ -700,30 +700,43 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
         }
 
-        // airflow.utils.dag_parsing_context
-        ["airflow", "utils", "dag_parsing_context", "get_parsing_context"] => {
-            Replacement::Name("airflow.sdk.get_parsing_context")
-        }
-        // airflow.utils.dates
-        ["airflow", "utils", "dates", "date_range"] => Replacement::None,
-        ["airflow", "utils", "dates", "days_ago"] => {
-            Replacement::Name("pendulum.today('UTC').add(days=-N, ...)")
-        }
-        ["airflow", "utils", "dates", "parse_execution_date" | "round_time" | "scale_time_units" | "infer_time_unit"] => {
-            Replacement::None
-        }
+        // airflow.utils
+        ["airflow", "utils", rest @ ..] => match &rest {
+            // airflow.utils.dag_parsing_context
+            ["dag_parsing_context", "get_parsing_context"] => {
+                Replacement::Name("airflow.sdk.get_parsing_context")
+            }
 
-        // airflow.utils.file
-        ["airflow", "utils", "file", "TemporaryDirectory"] => Replacement::None,
-        ["airflow", "utils", "file", "mkdirs"] => {
-            Replacement::Name("pendulum.today('UTC').add(days=-N, ...)")
-        }
+            // airflow.utils.dates
+            ["dates", "date_range"] => Replacement::None,
+            ["dates", "days_ago"] => Replacement::Name("pendulum.today('UTC').add(days=-N, ...)"),
+            ["dates", "parse_execution_date" | "round_time" | "scale_time_units" | "infer_time_unit"] => {
+                Replacement::None
+            }
 
-        // airflow.utils.helpers
-        ["airflow", "utils", "helpers", "chain"] => Replacement::Name("airflow.sdk.chain"),
-        ["airflow", "utils", "helpers", "cross_downstream"] => {
-            Replacement::Name("airflow.sdk.cross_downstream")
-        }
+            // airflow.utils.file
+            ["file", "TemporaryDirectory"] => Replacement::None,
+            ["file", "mkdirs"] => Replacement::Name("pendulum.today('UTC').add(days=-N, ...)"),
+
+            // airflow.utils.helpers
+            ["helpers", "chain"] => Replacement::Name("airflow.sdk.chain"),
+            ["helpers", "cross_downstream"] => Replacement::Name("airflow.sdk.cross_downstream"),
+
+            // airflow.utils.state
+            ["state", "SHUTDOWN" | "terminating_states"] => Replacement::None,
+
+            // airflow.utils.trigger_rule
+            ["trigger_rule", "TriggerRule", "DUMMY" | "NONE_FAILED_OR_SKIPPED"] => {
+                Replacement::None
+            }
+
+            // airflow.uilts
+            ["dag_cycle_tester", "test_cycle"] => Replacement::None,
+            ["decorators", "apply_defaults"] => Replacement::Message(
+                "`apply_defaults` is now unconditionally done and can be safely removed.",
+            ),
+            _ => return,
+        },
 
         // airflow.models.baseoperator
         ["airflow", "models", "baseoperator", "chain"] => Replacement::Name("airflow.sdk.chain"),
@@ -733,20 +746,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "models", "baseoperator", "cross_downstream"] => {
             Replacement::Name("airflow.sdk.cross_downstream")
         }
-
-        // airflow.utils.state
-        ["airflow", "utils", "state", "SHUTDOWN" | "terminating_states"] => Replacement::None,
-
-        // airflow.utils.trigger_rule
-        ["airflow", "utils", "trigger_rule", "TriggerRule", "DUMMY" | "NONE_FAILED_OR_SKIPPED"] => {
-            Replacement::None
-        }
-
-        // airflow.uilts
-        ["airflow", "utils", "dag_cycle_tester", "test_cycle"] => Replacement::None,
-        ["airflow", "utils", "decorators", "apply_defaults"] => Replacement::Message(
-            "`apply_defaults` is now unconditionally done and can be safely removed.",
-        ),
 
         // airflow.www
         ["airflow", "www", "auth", "has_access"] => {
