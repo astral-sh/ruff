@@ -1975,9 +1975,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         self.db(),
                         elts.iter().map(|expr| self.infer_type_expression(expr)),
                     );
-                    let elements = union.into_union().expect(
-                        "should have already checked that there were at least two constraints",
-                    );
+                    let elements = union
+                        .into_union()
+                        .unwrap_or_else(|| UnionType::new(self.db(), Box::from([union])));
                     let constraints = TypeVarBoundOrConstraints::Constraints(elements);
                     self.store_expression_type(expr, union);
                     Some(constraints)
