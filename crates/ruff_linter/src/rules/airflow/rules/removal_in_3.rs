@@ -545,13 +545,9 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.PY\d{1,2}
-        ["airflow", "PY36"] => Replacement::Name("sys.version_info"),
-        ["airflow", "PY37"] => Replacement::Name("sys.version_info"),
-        ["airflow", "PY38"] => Replacement::Name("sys.version_info"),
-        ["airflow", "PY39"] => Replacement::Name("sys.version_info"),
-        ["airflow", "PY310"] => Replacement::Name("sys.version_info"),
-        ["airflow", "PY311"] => Replacement::Name("sys.version_info"),
-        ["airflow", "PY312"] => Replacement::Name("sys.version_info"),
+        ["airflow", "PY36" | "PY37" | "PY38" | "PY39" | "PY310" | "PY311" | "PY312"] => {
+            Replacement::Name("sys.version_info")
+        }
 
         // airflow.configuration
         ["airflow", "configuration", "get"] => Replacement::Name("airflow.configuration.conf.get"),
