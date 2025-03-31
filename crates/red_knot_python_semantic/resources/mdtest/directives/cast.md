@@ -5,7 +5,7 @@
 The (inferred) type of the value and the given type do not need to have any correlation.
 
 ```py
-from typing import Literal, cast
+from typing import Literal, cast, Any
 
 reveal_type(True)  # revealed: Literal[True]
 reveal_type(cast(str, True))  # revealed: str
@@ -31,4 +31,10 @@ def f() -> int:
   return 10
 # error: [redundant-cast] "Value is already of type `int`"
 cast(int, f())
+
+def function_returning_any() -> Any:
+  return 10
+
+# error: [redundant-cast] "Value is already of type `Any`"
+cast(Any, function_returning_any())
 ```

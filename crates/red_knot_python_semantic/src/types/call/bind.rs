@@ -398,7 +398,7 @@ impl<'db> Bindings<'db> {
                         let mut redundant_cast_error = None;
 
                         if let [Some(casted_ty), Some(source_ty)] = overload.parameter_types() {
-                            if source_ty.is_equivalent_to(db, *casted_ty) {
+                            if source_ty.is_gradual_equivalent_to(db, *casted_ty) {
                                 redundant_cast_error =
                                     Some(BindingError::RedundantCast { ty: *casted_ty });
                             }
