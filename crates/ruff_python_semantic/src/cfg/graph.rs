@@ -239,12 +239,12 @@ impl<'stmt> CFGBuilder<'stmt> {
         // `self.current` should be pointing to an empty block
         // and we push the remaining statements to it here.
         if start < stmts.len() {
-            self.set_stmts(&stmts[start..]);
+            self.set_current_block_stmts(&stmts[start..]);
         }
         // Add edge to exit if not already present
         if self.cfg.blocks[self.current].out.is_empty() {
             let edges = Edges::always(self.exit());
-            self.set_edges(edges);
+            self.set_current_block_edges(edges);
         }
         self.move_to(self.exit());
     }
@@ -272,7 +272,7 @@ impl<'stmt> CFGBuilder<'stmt> {
     /// Populates the current basic block with the given set of statements.
     ///
     /// This should only be called once on any given block.
-    fn set_stmts(&mut self, stmts: &'stmt [Stmt]) {
+    fn set_current_block_stmts(&mut self, stmts: &'stmt [Stmt]) {
         debug_assert!(
             self.cfg.blocks[self.current].stmts.is_empty(),
             "Attempting to set statements on an already populated basic block."
@@ -283,7 +283,7 @@ impl<'stmt> CFGBuilder<'stmt> {
     /// Draws provided edges out of the current basic block.
     ///
     /// This should only be called once on any given block.
-    fn set_edges(&mut self, edges: Edges) {
+    fn set_current_block_edges(&mut self, edges: Edges) {
         debug_assert!(
             self.cfg.blocks[self.current].out.is_empty(),
             "Attempting to set edges on a basic block that already has an outgoing edge."
