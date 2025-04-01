@@ -247,14 +247,14 @@ impl Diagnostic {
         Severity::from(self.inner.severity())
     }
 
-    #[wasm_bindgen]
+    #[wasm_bindgen(js_name = "textRange")]
     pub fn text_range(&self) -> Option<TextRange> {
         self.inner
             .span()
             .and_then(|span| Some(TextRange::from(span.range()?)))
     }
 
-    #[wasm_bindgen]
+    #[wasm_bindgen(js_name = "toRange")]
     pub fn to_range(&self, workspace: &Workspace) -> Option<Range> {
         self.inner.span().and_then(|span| {
             let line_index = line_index(workspace.db.upcast(), span.file());
@@ -287,20 +287,23 @@ pub struct Range {
     pub end: Position,
 }
 
-impl From<SourceLocation> for Position {
-    fn from(location: SourceLocation) -> Self {
-        Self {
-            line: location.row.to_zero_indexed(),
-            character: location.column.to_zero_indexed(),
-        }
-    }
-}
-
 #[wasm_bindgen]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Position {
+    /// One indexed line number
     pub line: usize,
-    pub character: usize,
+
+    /// One indexed column number (the nth character on the line)
+    pub column: usize,
+}
+
+impl From<SourceLocation> for Position {
+    fn from(location: SourceLocation) -> Self {
+        Self {
+            line: location.row.get(),
+            column: location.column.get(),
+        }
+    }
 }
 
 #[wasm_bindgen]

@@ -182,6 +182,7 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
             switch (event.key) {
               case "Enter":
                 event.currentTarget.blur();
+                event.preventDefault();
                 return;
               case "Escape":
                 setNewName(null);

@@ -1,4 +1,5 @@
 import {
+  lazy,
   use,
   useCallback,
   useDeferredValue,
@@ -16,15 +17,16 @@ import type { Diagnostic, Workspace } from "red_knot_wasm";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Files } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";
-import Editor from "./Editor";
 import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
 import Diagnostics from "./Diagnostics";
-import { editor } from "monaco-editor";
-import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import { FileId, ReadonlyFiles } from "../Playground";
+import type { editor } from "monaco-editor";
+import type { Monaco } from "@monaco-editor/react";
+
+const Editor = lazy(() => import("./Editor"));
 
 interface CheckResult {
   diagnostics: Diagnostic[];
@@ -66,11 +68,14 @@ export default function Chrome({
     null,
   );
 
-  const editorRef = useRef<IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<{
+    editor: editor.IStandaloneCodeEditor;
+    monaco: Monaco;
+  } | null>(null);
 
   const handleFileRenamed = (file: FileId, newName: string) => {
     onFileRenamed(workspace, file, newName);
-    editorRef.current?.focus();
+    editorRef.current?.editor.focus();
   };
 
   const handleSecondaryToolSelected = useCallback(
@@ -86,12 +91,15 @@ export default function Chrome({
     [],
   );
 
-  const handleEditorMount = useCallback((editor: IStandaloneCodeEditor) => {
-    editorRef.current = editor;
-  }, []);
+  const handleEditorMount = useCallback(
+    (editor: editor.IStandaloneCodeEditor, monaco: Monaco) => {
+      editorRef.current = { editor, monaco };
+    },
+    [],
+  );
 
   const handleGoTo = useCallback((line: number, column: number) => {
-    const editor = editorRef.current;
+    const editor = editorRef.current?.editor;
 
     if (editor == null) {
       return;
@@ -107,6 +115,25 @@ export default function Chrome({
     editor.setSelection(range);
   }, []);
 
+  const handleRemoved = useCallback(
+    async (id: FileId) => {
+      const name = files.index.find((file) => file.id === id)?.name;
+
+      if (name != null && editorRef.current != null) {
+        // Remove the file from the monaco state to avoid that monaco "restores" the old content.
+        // An alternative is to use a `key` on the `Editor` but that means we lose focus and selection
+        // range when changing between tabs.
+        const monaco = await import("monaco-editor");
+        editorRef.current.monaco.editor
+          .getModel(monaco.Uri.file(name))
+          ?.dispose();
+      }
+
+      onFileRemoved(workspace, id);
+    },
+    [workspace, files.index, onFileRemoved],
+  );
+
   const checkResult = useCheckResult(files, workspace, secondaryTool);
 
   return (
@@ -120,7 +147,7 @@ export default function Chrome({
             onAdd={(name) => onFileAdded(workspace, name)}
             onRename={handleFileRenamed}
             onSelected={onFileSelected}
-            onRemove={(id) => onFileRemoved(workspace, id)}
+            onRemove={handleRemoved}
           />
           <PanelGroup direction="horizontal" autoSaveId="main">
             <Panel
@@ -132,7 +159,6 @@ export default function Chrome({
               <PanelGroup id="vertical" direction="vertical">
                 <Panel minSize={10} className="my-2" order={0}>
                   <Editor
-                    key={selectedFileName}
                     theme={theme}
                     visible={true}
                     fileName={selectedFileName}
