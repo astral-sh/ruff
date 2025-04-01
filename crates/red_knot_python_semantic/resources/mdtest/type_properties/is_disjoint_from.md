@@ -358,8 +358,8 @@ static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
 
 No two callable types are disjoint because there exists a non-empty callable type
 `(*args: object, **kwargs: object) -> Never` that is a subtype of all fully static callable types.
-As such, for any two callable types, it is possible to conceive of a runtime callable object that would
-inhabit both types simultaneously.
+As such, for any two callable types, it is possible to conceive of a runtime callable object that
+would inhabit both types simultaneously.
 
 ```py
 from knot_extensions import CallableTypeOf, is_disjoint_from, static_assert
