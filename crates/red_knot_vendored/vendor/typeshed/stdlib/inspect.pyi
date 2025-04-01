@@ -345,12 +345,12 @@ class Signature:
 
 if sys.version_info >= (3, 10):
     def get_annotations(
-        obj: Callable[..., object] | type[Any] | ModuleType,
+        obj: Callable[..., object] | type[object] | ModuleType,  # any callable, class, or module
         *,
-        globals: Mapping[str, Any] | None = None,
-        locals: Mapping[str, Any] | None = None,
+        globals: Mapping[str, Any] | None = None,  # value types depend on the key
+        locals: Mapping[str, Any] | None = None,  # value types depend on the key
         eval_str: bool = False,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]: ...  # values are type expressions
 
 # The name is the same as the enum's name in CPython
 class _ParameterKind(enum.IntEnum):
