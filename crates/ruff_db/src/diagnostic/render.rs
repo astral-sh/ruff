@@ -47,11 +47,8 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let resolved = Resolved::new(self.resolver, self.diag);
         let renderable = resolved.to_renderable(self.config.context);
-        for (i, diag) in renderable.diagnostics.iter().enumerate() {
-            if i > 0 {
-                writeln!(f)?;
-            }
-            write!(f, "{}", self.annotate_renderer.render(diag.to_annotate()))?;
+        for diag in renderable.diagnostics.iter() {
+            writeln!(f, "{}", self.annotate_renderer.render(diag.to_annotate()))?;
         }
         Ok(())
     }
