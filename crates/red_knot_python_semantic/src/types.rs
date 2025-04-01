@@ -727,11 +727,9 @@ impl<'db> Type<'db> {
                     .is_subtype_of(db, target)
             }
 
-            (Type::Callable(CallableType::BoundMethod(self_bound_method)), Type::Callable(_)) => {
-                self_bound_method
-                    .into_callable_type(db)
-                    .is_subtype_of(db, target)
-            }
+            (Type::BoundMethod(self_bound_method), Type::Callable(_)) => self_bound_method
+                .into_callable_type(db)
+                .is_subtype_of(db, target),
 
             // A `FunctionLiteral` type is a single-valued type like the other literals handled above,
             // so it also, for now, just delegates to its instance fallback.
@@ -842,11 +840,9 @@ impl<'db> Type<'db> {
             (Type::Instance(_), Type::Callable(_)) => {
                 let call_symbol = self.member(db, "__call__").symbol;
                 match call_symbol {
-                    Symbol::Type(Type::Callable(CallableType::BoundMethod(call_function)), _) => {
-                        call_function
-                            .into_callable_type(db)
-                            .is_subtype_of(db, target)
-                    }
+                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
+                        .into_callable_type(db)
+                        .is_subtype_of(db, target),
                     _ => false,
                 }
             }
@@ -4434,10 +4430,10 @@ pub struct BoundMethodType<'db> {
 
 impl<'db> BoundMethodType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::General(GeneralCallableType::new(
+        Type::Callable(CallableType::new(
             db,
             self.function(db).signature(db).bind_self(),
-        )))
+        ))
     }
 }
 
