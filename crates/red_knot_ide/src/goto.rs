@@ -29,25 +29,17 @@ pub fn go_to_type_definition(
             // than using the inferred value.
             argument.value.inferred_type(&model)
         }
-
-        // TODO: Better support for go to type definition in match pattern.
-        // This may require improving type inference (e.g. it currently doesn't handle `...rest`)
-        // but it also requires a new API to query the type because implementing `HasType` for `PatternMatchMapping`
-        // is ambiguous.
+        // TODO: Support identifier targets
         GotoTarget::PatternMatchRest(_)
         | GotoTarget::PatternKeywordArgument(_)
         | GotoTarget::PatternMatchStarName(_)
-        | GotoTarget::PatternMatchAsName(_) => return None,
-
-        // TODO: Resolve the module; The type inference already does all the work
-        // but type isn't stored anywhere. We should either extract the logic
-        // for resolving the module from a ImportFromStmt or store the type during semantic analysis
-        GotoTarget::ImportedModule(_) => return None,
-
-        // Targets without a type definition.
-        GotoTarget::TypeParamTypeVarName(_)
+        | GotoTarget::PatternMatchAsName(_)
+        | GotoTarget::ImportedModule(_)
+        | GotoTarget::TypeParamTypeVarName(_)
         | GotoTarget::TypeParamParamSpecName(_)
-        | GotoTarget::TypeParamTypeVarTupleName(_) => return None,
+        | GotoTarget::TypeParamTypeVarTupleName(_)
+        | GotoTarget::NonLocal { .. }
+        | GotoTarget::Globals { .. } => return None,
     };
 
     tracing::debug!(
@@ -148,6 +140,13 @@ pub(crate) enum GotoTarget<'a> {
     ///             ^^
     /// ```
     TypeParamTypeVarTupleName(&'a ast::TypeParamTypeVarTuple),
+
+    NonLocal {
+        identifier: &'a ast::Identifier,
+    },
+    Globals {
+        identifier: &'a ast::Identifier,
+    },
 }
 
 impl Ranged for GotoTarget<'_> {
@@ -168,6 +167,8 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::TypeParamTypeVarName(type_var) => type_var.name.range,
             GotoTarget::TypeParamParamSpecName(spec) => spec.name.range,
             GotoTarget::TypeParamTypeVarTupleName(tuple) => tuple.name.range,
+            GotoTarget::NonLocal { identifier, .. } => identifier.range,
+            GotoTarget::Globals { identifier, .. } => identifier.range,
         }
     }
 }
@@ -190,7 +191,7 @@ pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Optio
     tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
     match covering_node.node() {
-        AnyNodeRef::Identifier(_) => match covering_node.parent() {
+        AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
             Some(AnyNodeRef::StmtFunctionDef(function)) => Some(GotoTarget::FunctionDef(function)),
             Some(AnyNodeRef::StmtClassDef(class)) => Some(GotoTarget::ClassDef(class)),
             Some(AnyNodeRef::Parameter(parameter)) => Some(GotoTarget::Parameter(parameter)),
@@ -219,6 +220,11 @@ pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Optio
             Some(AnyNodeRef::TypeParamTypeVarTuple(var_tuple)) => {
                 Some(GotoTarget::TypeParamTypeVarTupleName(var_tuple))
             }
+            Some(AnyNodeRef::ExprAttribute(attribute)) => {
+                Some(GotoTarget::Expression(attribute.into()))
+            }
+            Some(AnyNodeRef::StmtNonlocal(_)) => Some(GotoTarget::NonLocal { identifier }),
+            Some(AnyNodeRef::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
             None => None,
             Some(parent) => {
                 tracing::debug!(
