@@ -113,7 +113,15 @@ impl KnownConstraintFunction {
                 }
                 Some(builder.build())
             }
-            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal.class())),
+            Type::ClassLiteral(class_literal) => {
+                // At runtime (on Python 3.11+), this will return `True` for classes that actually
+                // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
+                if class_literal.class().is_known(db, KnownClass::Any) {
+                    None
+                } else {
+                    Some(constraint_fn(class_literal.class()))
+                }
+            }
             Type::SubclassOf(subclass_of_ty) => {
                 subclass_of_ty.subclass_of().into_class().map(constraint_fn)
             }

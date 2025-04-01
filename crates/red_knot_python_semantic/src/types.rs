@@ -2950,6 +2950,7 @@ impl<'db> Type<'db> {
             // https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
             Type::ClassLiteral(ClassLiteralType { class }) => {
                 let ty = match class.known(db) {
+                    Some(KnownClass::Any) => Type::any(),
                     Some(KnownClass::Complex) => UnionType::from_elements(
                         db,
                         [
