@@ -45,6 +45,7 @@ diagnostics.
 ```py
 from typing import Callable
 
-def f(x: Callable[[dict[str, int]], None]):
-    y = cast(Callable[[list[bytes]], None], x)
+def f(x: Callable[[dict[str, int]], None], y: tuple[dict[str, int]]):
+    a = cast(Callable[[list[bytes]], None], x)
+    b = cast(tuple[list[bytes]], y)
 ```
