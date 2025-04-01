@@ -751,7 +751,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::Callable(_), _) => {
-                // TODO: Implement subtyping between general callable types and other types like
+                // TODO: Implement subtyping between callable types and other types like
                 // function literals, bound methods, class literals, `type[]`, etc.)
                 false
             }
@@ -4394,8 +4394,10 @@ pub struct BoundMethodType<'db> {
     self_instance: Type<'db>,
 }
 
-/// This type represents a general callable type that are used to represent `typing.Callable`
-/// and `lambda` expressions.
+/// This type represents the set of all callable objects with a certain signature.
+/// It can be written in type expressions using `typing.Callable`.
+/// `lambda` expressions are inferred directly as `CallableType`s; all function-literal types
+/// are subtypes of a `CallableType`.
 #[salsa::interned(debug)]
 pub struct CallableType<'db> {
     #[return_ref]
@@ -4403,7 +4405,7 @@ pub struct CallableType<'db> {
 }
 
 impl<'db> CallableType<'db> {
-    /// Create a general callable type which accepts any parameters and returns an `Unknown` type.
+    /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> Self {
         CallableType::new(
             db,
