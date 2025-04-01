@@ -73,6 +73,9 @@ impl<'db> ClassBase<'db> {
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
+            | Type::BoundMethod(_)
+            | Type::MethodWrapperDunderGet(_)
+            | Type::WrapperDescriptorDunderGet
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)

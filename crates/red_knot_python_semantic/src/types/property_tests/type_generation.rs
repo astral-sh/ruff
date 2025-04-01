@@ -1,8 +1,8 @@
 use crate::db::tests::TestDb;
 use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    SubclassOfType, TupleType, Type, UnionType,
+    BoundMethodType, IntersectionBuilder, KnownClass, KnownInstanceType, SubclassOfType, TupleType,
+    Type, UnionType,
 };
 use crate::{Db, KnownModule};
 use quickcheck::{Arbitrary, Gen};
@@ -53,11 +53,11 @@ fn create_bound_method<'db>(
     function: Type<'db>,
     builtins_class: Type<'db>,
 ) -> Type<'db> {
-    Type::Callable(CallableType::BoundMethod(BoundMethodType::new(
+    Type::BoundMethod(BoundMethodType::new(
         db,
         function.expect_function_literal(),
         builtins_class.to_instance(db).unwrap(),
-    )))
+    ))
 }
 
 impl Ty {

@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
 use crate::db::Db;
-use crate::types::CallableType;
 
 use super::{
     class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType,
@@ -62,32 +61,22 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
 
-        (
-            Type::Callable(CallableType::BoundMethod(left)),
-            Type::Callable(CallableType::BoundMethod(right)),
-        ) => left.cmp(right),
-        (Type::Callable(CallableType::BoundMethod(_)), _) => Ordering::Less,
-        (_, Type::Callable(CallableType::BoundMethod(_))) => Ordering::Greater,
+        (Type::BoundMethod(left), Type::BoundMethod(right)) => left.cmp(right),
+        (Type::BoundMethod(_), _) => Ordering::Less,
+        (_, Type::BoundMethod(_)) => Ordering::Greater,
 
-        (
-            Type::Callable(CallableType::MethodWrapperDunderGet(left)),
-            Type::Callable(CallableType::MethodWrapperDunderGet(right)),
-        ) => left.cmp(right),
-        (Type::Callable(CallableType::MethodWrapperDunderGet(_)), _) => Ordering::Less,
-        (_, Type::Callable(CallableType::MethodWrapperDunderGet(_))) => Ordering::Greater,
-
-        (
-            Type::Callable(CallableType::WrapperDescriptorDunderGet),
-            Type::Callable(CallableType::WrapperDescriptorDunderGet),
-        ) => Ordering::Equal,
-        (Type::Callable(CallableType::WrapperDescriptorDunderGet), _) => Ordering::Less,
-        (_, Type::Callable(CallableType::WrapperDescriptorDunderGet)) => Ordering::Greater,
-
-        (Type::Callable(CallableType::General(_)), Type::Callable(CallableType::General(_))) => {
-            Ordering::Equal
+        (Type::MethodWrapperDunderGet(left), Type::MethodWrapperDunderGet(right)) => {
+            left.cmp(right)
         }
-        (Type::Callable(CallableType::General(_)), _) => Ordering::Less,
-        (_, Type::Callable(CallableType::General(_))) => Ordering::Greater,
+        (Type::MethodWrapperDunderGet(_), _) => Ordering::Less,
+        (_, Type::MethodWrapperDunderGet(_)) => Ordering::Greater,
+
+        (Type::WrapperDescriptorDunderGet, _) => Ordering::Less,
+        (_, Type::WrapperDescriptorDunderGet) => Ordering::Greater,
+
+        (Type::Callable(left), Type::Callable(right)) => left.cmp(right),
+        (Type::Callable(_), _) => Ordering::Less,
+        (_, Type::Callable(_)) => Ordering::Greater,
 
         (Type::Tuple(left), Type::Tuple(right)) => {
             debug_assert_eq!(*left, left.with_sorted_unions_and_intersections(db));

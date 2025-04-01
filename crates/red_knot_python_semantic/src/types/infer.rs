@@ -82,7 +82,7 @@ use crate::types::{
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
-use crate::types::{CallableType, GeneralCallableType, Signature};
+use crate::types::{CallableType, Signature};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -2313,6 +2313,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::KnownInstance(..)
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
+            | Type::BoundMethod(_)
+            | Type::MethodWrapperDunderGet(_)
+            | Type::WrapperDescriptorDunderGet
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => match object_ty.class_member(db, attribute.into()) {
                 meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
@@ -3887,10 +3890,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        Type::Callable(CallableType::General(GeneralCallableType::new(
+        Type::Callable(CallableType::new(
             self.db(),
             Signature::new(parameters, Some(Type::unknown())),
-        )))
+        ))
     }
 
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
@@ -4410,6 +4413,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
+                | Type::WrapperDescriptorDunderGet
+                | Type::MethodWrapperDunderGet(_)
+                | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -4658,6 +4664,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             (
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
+                | Type::BoundMethod(_)
+                | Type::WrapperDescriptorDunderGet
+                | Type::MethodWrapperDunderGet(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -4674,6 +4683,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::Tuple(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
+                | Type::BoundMethod(_)
+                | Type::WrapperDescriptorDunderGet
+                | Type::MethodWrapperDunderGet(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -6744,12 +6756,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let callable_type = if let (Some(parameters), Some(return_type), true) =
                     (parameters, return_type, correct_argument_number)
                 {
-                    GeneralCallableType::new(db, Signature::new(parameters, Some(return_type)))
+                    CallableType::new(db, Signature::new(parameters, Some(return_type)))
                 } else {
-                    GeneralCallableType::unknown(db)
+                    CallableType::unknown(db)
                 };
 
-                let callable_type = Type::Callable(CallableType::General(callable_type));
+                let callable_type = Type::Callable(callable_type);
 
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
                 // the outer callable type on the these expressions instead.
@@ -6839,10 +6851,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Type::unknown();
                     };
 
-                    Type::Callable(CallableType::General(GeneralCallableType::new(
-                        db,
-                        signature.clone(),
-                    )))
+                    Type::Callable(CallableType::new(db, signature.clone()))
                 }
             },
 
