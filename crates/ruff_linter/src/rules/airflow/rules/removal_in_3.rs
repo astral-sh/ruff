@@ -72,7 +72,7 @@ impl Violation for Airflow3Removal {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 enum Replacement {
     None,
     Name(&'static str),
@@ -293,20 +293,26 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
         },
         _ => return,
     };
+
+    // Create the `Fix` first to avoid cloning `Replacement`.
+    let fix = if let Replacement::Name(name) = replacement {
+        Some(Fix::safe_edit(Edit::range_replacement(
+            name.to_string(),
+            attr.range(),
+        )))
+    } else {
+        None
+    };
     let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: attr.to_string(),
-            replacement: replacement.clone(),
+            replacement,
         },
         attr.range(),
     );
-    if let Replacement::Name(name) = replacement {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-            name.to_string(),
-            attr.range(),
-        )));
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
     }
-
     checker.report_diagnostic(diagnostic);
 }
 
