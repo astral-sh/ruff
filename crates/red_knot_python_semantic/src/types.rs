@@ -1512,7 +1512,7 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(..) => true,
 
             // An unbounded, unconstrained typevar is not single-valued, because it can be
-            // specialized to a multple-valued type. A bounded typevar is not single-valued, even
+            // specialized to a multiple-valued type. A bounded typevar is not single-valued, even
             // if the bound is a final single-valued class, since it can still be specialized to
             // `Never`. A constrained typevar is single-valued if all of its constraints are
             // single-valued. (Note that you cannot specialize a constrained typevar to a subtype
