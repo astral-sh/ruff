@@ -12,11 +12,6 @@ use std::fmt::Formatter;
 /// ## Panics
 /// Panics if `range` is not contained within `root`.
 pub(crate) fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode {
-    assert!(
-        root.range().contains_range(range),
-        "Range is not contained within root"
-    );
-
     struct Visitor<'a> {
         range: TextRange,
         found: bool,
@@ -41,6 +36,11 @@ pub(crate) fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode 
             }
         }
     }
+
+    assert!(
+        root.range().contains_range(range),
+        "Range is not contained within root"
+    );
 
     let mut visitor = Visitor {
         range,
