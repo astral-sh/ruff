@@ -111,21 +111,6 @@ def _(target: bool):
     # TODO: with exhaustivity checking, this should be Literal[3, 4]
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 
-def _(target: Literal[True, False]):
-    y = 1
-    y = 2
-
-    match target:
-        case True:
-            y = 3
-        case False:
-            y = 4
-        case None:
-            y = 5
-
-    # TODO: with exhaustivity checking, this should be Literal[3, 4]
-    reveal_type(y)  # revealed: Literal[2, 3, 4]
-
 def _(target: None):
     y = 1
     y = 2
