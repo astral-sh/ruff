@@ -631,18 +631,8 @@ AIR301_names.py:245:1: AIR301 `airflow.sensors.base_sensor_operator.BaseSensorOp
 244 | # airflow.sensors.base_sensor_operator
 245 | BaseSensorOperator()
     | ^^^^^^^^^^^^^^^^^^ AIR301
-246 |
-247 | # airflow.sensors.date_time_sensor
     |
     = help: Use `airflow.sdk.bases.sensor.BaseSensorOperator` instead
-
-AIR301_names.py:248:1: AIR301 `airflow.sensors.date_time_sensor.DateTimeSensor` is removed in Airflow 3.0
-    |
-247 | # airflow.sensors.date_time_sensor
-248 | DateTimeSensor()
-    | ^^^^^^^^^^^^^^ AIR301
-    |
-    = help: Use `airflow.sensors.date_time.DateTimeSensor` instead
 
 AIR301_names.py:264:1: AIR301 `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0
     |

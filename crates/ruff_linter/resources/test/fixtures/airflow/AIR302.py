@@ -422,11 +422,58 @@ WorkflowTrigger()
 FileTrigger()
 DateTimeTrigger()
 
+from airflow.operators.email import EmailOperator
 from airflow.operators.dummy import DummyOperator, EmptyOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunLink, TriggerDagRunOperator
+from airflow.operators.email_operator import EmailOperator
+from airflow.operators.python import (
+    BranchPythonOperator,
+    PythonOperator,
+    PythonVirtualenvOperator,
+    ShortCircuitOperator,
+)
+from airflow.sensors.date_time_sensor import DateTimeSensor
+from airflow.sensors.external_task import (
+    ExternalTaskMarker,
+    ExternalTaskSensor,
+    ExternalTaskSensorLink,
+)
+from airflow.sensors.external_task_sensor import (
+    ExternalTaskMarker as ExternalTaskMarkerFromExternalTaskSensor,
+)
+from airflow.sensors.external_task_sensor import (
+    ExternalTaskSensor as ExternalTaskSensorFromExternalTaskSensor,
+)
+from airflow.sensors.external_task_sensor import (
+    ExternalTaskSensorLink as ExternalTaskSensorLinkFromExternalTaskSensor,
+)
 
 DummyOperator()
 EmptyOperator()
-
-from airflow.operators.email import EmailOperator
-
 EmailOperator()
+
+# airflow.operators.trigger_dagrun
+TriggerDagRunLink()
+TriggerDagRunOperator()
+
+# airflow.sensors.date_time_sensor
+DateTimeSensor()
+
+# airflow.sensors.external_task
+ExternalTaskSensorLink()
+ExternalTaskMarker()
+ExternalTaskSensor()
+
+# airflow.sensors.external_task_sensor
+ExternalTaskMarkerFromExternalTaskSensor()
+ExternalTaskSensorFromExternalTaskSensor()
+ExternalTaskSensorLinkFromExternalTaskSensor()
+
+# airflow.sensors.time_delta_sensor
+TimeDeltaSensor()
+
+# airflow.operators.python
+BranchPythonOperator()
+PythonOperator()
+PythonVirtualenvOperator()
+ShortCircuitOperator()

@@ -72,20 +72,20 @@ from airflow.secrets.local_filesystem import LocalFilesystemBackend, load_connec
 from airflow.security.permissions import RESOURCE_DATASET
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
 
-from airflow.sensors.external_task import (
-    ExternalTaskMarker,
-    ExternalTaskSensor,
-    ExternalTaskSensorLink,
-)
-from airflow.sensors.external_task_sensor import (
-    ExternalTaskMarker as ExternalTaskMarkerFromExternalTaskSensor,
-)
-from airflow.sensors.external_task_sensor import (
-    ExternalTaskSensor as ExternalTaskSensorFromExternalTaskSensor,
-)
-from airflow.sensors.external_task_sensor import (
-    ExternalTaskSensorLink as ExternalTaskSensorLinkFromExternalTaskSensor,
-)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 from airflow.sensors.time_delta_sensor import TimeDeltaSensor
 from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.timetables.simple import DatasetTriggeredTimetable
