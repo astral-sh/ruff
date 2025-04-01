@@ -265,6 +265,13 @@ impl<'db> Signature<'db> {
     pub(crate) fn parameters(&self) -> &Parameters<'db> {
         &self.parameters
     }
+
+    pub(crate) fn bind_self(&self) -> Self {
+        Self {
+            parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
+            return_ty: self.return_ty,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
