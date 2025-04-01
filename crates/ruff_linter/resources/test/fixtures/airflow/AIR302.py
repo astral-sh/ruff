@@ -423,8 +423,10 @@ FileTrigger()
 DateTimeTrigger()
 
 from airflow.operators.dummy import DummyOperator, EmptyOperator
-from airflow.operators.email import EmailOperator
 
 DummyOperator()
 EmptyOperator()
+
+from airflow.operators.email import EmailOperator
+
 EmailOperator()
