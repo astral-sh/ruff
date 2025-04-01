@@ -1,4 +1,4 @@
-use std::fmt::Formatter;
+use std::{fmt::Formatter, sync::Arc};
 
 use thiserror::Error;
 
@@ -30,7 +30,7 @@ pub struct Diagnostic {
     /// The actual diagnostic.
     ///
     /// We box the diagnostic since it is somewhat big.
-    inner: Box<DiagnosticInner>,
+    inner: Arc<DiagnosticInner>,
 }
 
 impl Diagnostic {
@@ -57,14 +57,12 @@ impl Diagnostic {
         message: impl std::fmt::Display + 'a,
     ) -> Diagnostic {
         let message = message.to_string().into_boxed_str();
-        let inner = Box::new(DiagnosticInner {
+        let inner = Arc::new(DiagnosticInner {
             id,
             severity,
             message,
             annotations: vec![],
             subs: vec![],
-            #[cfg(debug_assertions)]
-            printed: false,
         });
         Diagnostic { inner }
     }
@@ -76,7 +74,7 @@ impl Diagnostic {
     /// should be constructed via [`Annotation::primary`]. A diagnostic with no
     /// primary annotations is allowed, but its rendering may be sub-optimal.
     pub fn annotate(&mut self, ann: Annotation) {
-        self.inner.annotations.push(ann);
+        Arc::make_mut(&mut self.inner).annotations.push(ann);
     }
 
     /// Adds an "info" sub-diagnostic with the given message.
@@ -101,22 +99,10 @@ impl Diagnostic {
     /// to it. For the simpler case of a sub-diagnostic with only a message,
     /// using a method like [`Diagnostic::info`] may be more convenient.
     pub fn sub(&mut self, sub: SubDiagnostic) {
-        self.inner.subs.push(sub);
+        Arc::make_mut(&mut self.inner).subs.push(sub);
     }
 
     /// Print this diagnostic to the given writer.
-    ///
-    /// This also marks the diagnostic as having been printed. If a
-    /// diagnostic is not rendered this way, then it will panic when
-    /// it's dropped when `debug_assertions` is enabled.
-    ///
-    /// # Defuses panics
-    ///
-    /// When `debug_assertions` is enabled and a `Diagnostic` does
-    /// _not_ have this method called, then its `Drop` implementation
-    /// will panic. The intent of this panic is to avoid mistakes where
-    /// a diagnostic is created and then never printed. That is usually
-    /// indicative of a bug.
     ///
     /// # Errors
     ///
@@ -131,30 +117,7 @@ impl Diagnostic {
     ) -> std::io::Result<()> {
         let resolver = FileResolver::new(db);
         let display = DisplayDiagnostic::new(&resolver, config, self);
-        let result = writeln!(wtr, "{display}");
-        // NOTE: This is called specifically even if
-        // `writeln!` fails. The reasoning here is that
-        // the `Drop` impl panicking is meant as a guard
-        // against *programmers* forgetting to print a
-        // diagnostic. We should not punish them if they
-        // remember to do that when the operation itself
-        // failed for some reason. ---AG
-        self.printed();
-        result
-    }
-
-    /// Mark this diagnostic as having been printed.
-    ///
-    /// If a diagnostic has not been marked as printed before being dropped,
-    /// then its `Drop` implementation will panic in debug mode.
-    pub(crate) fn printed(&mut self) {
-        #[cfg(debug_assertions)]
-        {
-            self.inner.printed = true;
-            for sub in &mut self.inner.subs {
-                sub.printed();
-            }
-        }
+        writeln!(wtr, "{display}")
     }
 }
 
@@ -165,29 +128,6 @@ struct DiagnosticInner {
     message: Box<str>,
     annotations: Vec<Annotation>,
     subs: Vec<SubDiagnostic>,
-    /// This will make the `Drop` impl panic if a `Diagnostic` hasn't
-    /// been printed to stderr. This is usually a bug, so we want it to
-    /// be loud. But only when `debug_assertions` is enabled.
-    #[cfg(debug_assertions)]
-    printed: bool,
-}
-
-impl Drop for DiagnosticInner {
-    fn drop(&mut self) {
-        #[cfg(debug_assertions)]
-        {
-            if self.printed || std::thread::panicking() {
-                return;
-            }
-            panic!(
-                "diagnostic `{id}` with severity `{severity:?}` and message `{message}` \
-                 did not get printed to stderr before being dropped",
-                id = self.id,
-                severity = self.severity,
-                message = self.message,
-            );
-        }
-    }
 }
 
 /// A collection of information subservient to a diagnostic.
@@ -224,8 +164,6 @@ impl SubDiagnostic {
             severity,
             message,
             annotations: vec![],
-            #[cfg(debug_assertions)]
-            printed: false,
         });
         SubDiagnostic { inner }
     }
@@ -244,17 +182,6 @@ impl SubDiagnostic {
     pub fn annotate(&mut self, ann: Annotation) {
         self.inner.annotations.push(ann);
     }
-
-    /// Mark this sub-diagnostic as having been printed.
-    ///
-    /// If a sub-diagnostic has not been marked as printed before being
-    /// dropped, then its `Drop` implementation will panic in debug mode.
-    #[cfg(debug_assertions)]
-    pub(crate) fn printed(&mut self) {
-        {
-            self.inner.printed = true;
-        }
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -262,28 +189,6 @@ struct SubDiagnosticInner {
     severity: Severity,
     message: Box<str>,
     annotations: Vec<Annotation>,
-    /// This will make the `Drop` impl panic if a `SubDiagnostic` hasn't
-    /// been printed to stderr. This is usually a bug, so we want it to
-    /// be loud. But only when `debug_assertions` is enabled.
-    #[cfg(debug_assertions)]
-    printed: bool,
-}
-
-impl Drop for SubDiagnosticInner {
-    fn drop(&mut self) {
-        #[cfg(debug_assertions)]
-        {
-            if self.printed || std::thread::panicking() {
-                return;
-            }
-            panic!(
-                "sub-diagnostic with severity `{severity:?}` and message `{message}` \
-                 did not get printed to stderr before being dropped",
-                severity = self.severity,
-                message = self.message,
-            );
-        }
-    }
 }
 
 /// A pointer to a subsequence in the end user's input.
