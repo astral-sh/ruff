@@ -1084,13 +1084,15 @@ class A:
     def f(self, a: int) -> int:
         return a
 
+    @classmethod
+    def g(cls, a: int) -> int:
+        return a
+
 a = A()
 
 static_assert(is_subtype_of(TypeOf[a.f], Callable[[int], int]))
-
-def _(f: Callable[[int], int]) -> None: ...
-
-_(a.f)
+static_assert(is_subtype_of(TypeOf[a.g], Callable[[int], int]))
+static_assert(is_subtype_of(TypeOf[A.g], Callable[[int], int]))
 ```
 
 [special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
