@@ -6509,7 +6509,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
                     Type::ClassLiteral(class_literal_ty) => {
-                        SubclassOfType::from(self.db(), class_literal_ty.class())
+                        if class_literal_ty
+                            .class()
+                            .is_known(self.db(), KnownClass::Any)
+                        {
+                            SubclassOfType::subclass_of_any()
+                        } else {
+                            SubclassOfType::from(self.db(), class_literal_ty.class())
+                        }
                     }
                     Type::KnownInstance(KnownInstanceType::Any) => {
                         SubclassOfType::subclass_of_any()
@@ -6589,6 +6596,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = subscript;
 
         match value_ty {
+            Type::ClassLiteral(literal) if literal.class().is_known(self.db(), KnownClass::Any) => {
+                self.context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    subscript,
+                    format_args!("Type `typing.Any` expected no type parameter",),
+                );
+                Type::unknown()
+            }
             Type::KnownInstance(known_instance) => {
                 self.infer_parameterized_known_instance_type_expression(subscript, known_instance)
             }

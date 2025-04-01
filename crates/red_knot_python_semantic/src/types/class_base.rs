@@ -61,7 +61,11 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => Some(Self::Class(literal.class())),
+            Type::ClassLiteral(literal) => Some(if literal.class().is_known(db, KnownClass::Any) {
+                Self::Dynamic(DynamicType::Any)
+            } else {
+                Self::Class(literal.class())
+            }),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?

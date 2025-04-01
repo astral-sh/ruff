@@ -33,18 +33,19 @@ pub struct DisplayType<'db> {
 impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db);
-        if matches!(
-            self.ty,
+        match self.ty {
+            Type::ClassLiteral(literal) if literal.class().is_known(self.db, KnownClass::Any) => {
+                write!(f, "typing.Any")
+            }
             Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::StringLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::FunctionLiteral(_)
-        ) {
-            write!(f, "Literal[{representation}]")
-        } else {
-            representation.fmt(f)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::FunctionLiteral(_) => {
+                write!(f, "Literal[{representation}]")
+            }
+            _ => representation.fmt(f),
         }
     }
 }
