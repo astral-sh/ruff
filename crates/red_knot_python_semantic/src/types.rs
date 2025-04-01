@@ -367,13 +367,11 @@ impl<'db> Type<'db> {
             | Self::LiteralString
             | Self::SliceLiteral(_)
             | Self::Dynamic(DynamicType::Unknown | DynamicType::Any)
-            | Self::Callable(
-                CallableType::BoundMethod(_)
-                | CallableType::WrapperDescriptorDunderGet
-                | CallableType::MethodWrapperDunderGet(_),
-            ) => false,
+            | Self::BoundMethod(_)
+            | Self::WrapperDescriptorDunderGet
+            | Self::MethodWrapperDunderGet(_) => false,
 
-            Self::Callable(CallableType::General(callable)) => {
+            Self::Callable(callable) => {
                 let signature = callable.signature(db);
                 signature.parameters().iter().any(|param| {
                     param
