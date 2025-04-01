@@ -874,6 +874,11 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-standard
+        ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.operators.empty.EmptyOperator",
+            provider: "standard",
+            version: "0.1.0"
+        },
         ["airflow", "sensors", "filesystem", "FileSensor"] => Replacement::ProviderName{
             name: "airflow.providers.standard.sensors.filesystem.FileSensor",
             provider: "standard",

@@ -452,46 +452,6 @@ AIR301_names.py:174:1: AIR301 `airflow.notifications.basenotifier.BaseNotifier` 
     |
     = help: Use `airflow.sdk.BaseNotifier` instead
 
-AIR301_names.py:177:1: AIR301 `airflow.operators.dummy.EmptyOperator` is removed in Airflow 3.0
-    |
-176 | # airflow.operators.dummy
-177 | EmptyOperator()
-    | ^^^^^^^^^^^^^ AIR301
-178 | DummyOperator()
-    |
-    = help: Use `airflow.operators.empty.EmptyOperator` instead
-
-AIR301_names.py:178:1: AIR301 `airflow.operators.dummy.DummyOperator` is removed in Airflow 3.0
-    |
-176 | # airflow.operators.dummy
-177 | EmptyOperator()
-178 | DummyOperator()
-    | ^^^^^^^^^^^^^ AIR301
-179 |
-180 | # airflow.operators.dummy_operator
-    |
-    = help: Use `airflow.operators.empty.EmptyOperator` instead
-
-AIR301_names.py:181:16: AIR301 `airflow.operators.dummy_operator.EmptyOperator` is removed in Airflow 3.0
-    |
-180 | # airflow.operators.dummy_operator
-181 | dummy_operator.EmptyOperator()
-    |                ^^^^^^^^^^^^^ AIR301
-182 | dummy_operator.DummyOperator()
-    |
-    = help: Use `airflow.operators.empty.EmptyOperator` instead
-
-AIR301_names.py:182:16: AIR301 `airflow.operators.dummy_operator.DummyOperator` is removed in Airflow 3.0
-    |
-180 | # airflow.operators.dummy_operator
-181 | dummy_operator.EmptyOperator()
-182 | dummy_operator.DummyOperator()
-    |                ^^^^^^^^^^^^^ AIR301
-183 |
-184 | # airflow.operators.branch_operator
-    |
-    = help: Use `airflow.operators.empty.EmptyOperator` instead
-
 AIR301_names.py:185:1: AIR301 `airflow.operators.branch_operator.BaseBranchOperator` is removed in Airflow 3.0
     |
 184 | # airflow.operators.branch_operator
@@ -521,16 +481,6 @@ AIR301_names.py:189:1: AIR301 `airflow.operators.dagrun_operator.TriggerDagRunOp
 191 | # airflow.operators.email_operator
     |
     = help: Use `airflow.operators.trigger_dagrun.TriggerDagRunOperator` instead
-
-AIR301_names.py:192:1: AIR301 `airflow.operators.email_operator.EmailOperator` is removed in Airflow 3.0
-    |
-191 | # airflow.operators.email_operator
-192 | EmailOperator()
-    | ^^^^^^^^^^^^^ AIR301
-193 |
-194 | # airflow.operators.latest_only_operator
-    |
-    = help: Use `airflow.operators.email.EmailOperator` instead
 
 AIR301_names.py:195:1: AIR301 `airflow.operators.latest_only_operator.LatestOnlyOperator` is removed in Airflow 3.0
     |
