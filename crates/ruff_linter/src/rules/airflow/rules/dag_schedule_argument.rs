@@ -12,10 +12,10 @@ use crate::checkers::ast::Checker;
 /// `schedule` (or `schedule_interval` for Airflow 1) parameter.
 ///
 /// ## Why is this bad?
-/// The default `schedule` value on Airflow 2 and `schedule_interval` on Airflow 1
-/// is `timedelta(days=1)`, which is almost never what a user is looking for.
-/// Airflow 3 changes this the default to *None*, and would break existing dags
-/// using the implicit default.
+/// The default value of the `schedule` parameter on Airflow 2 and
+/// `schedule_interval` on Airflow 1 is `timedelta(days=1)`, which is almost
+/// never what a user is looking for. Airflow 3 changed the default value to `None`,
+/// and would break existing dags using the implicit default.
 ///
 /// If your dag does not have an explicit `schedule` / `schedule_interval` argument,
 /// Airflow 2 schedules a run for it every day (at the time determined by `start_date`).
