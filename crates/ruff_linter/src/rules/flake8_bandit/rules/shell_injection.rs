@@ -4,6 +4,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::{self as ast, Arguments, Expr};
+use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
 
@@ -287,6 +288,30 @@ impl Violation for UnixCommandWildcardInjection {
     }
 }
 
+/// Check if an expression is a trusted input for subprocess.run.
+/// We assume that any str or list[str] literal
+/// (or variables directly assigned such literals) can be trusted.
+fn is_trusted_input(checker: &Checker, arg: &Expr) -> bool {
+    match arg {
+        Expr::StringLiteral(_) => true,
+        Expr::List(ruff_python_ast::ExprList { elts, .. }) => {
+            elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)))
+        }
+        Expr::Named(ruff_python_ast::ExprNamed { value, .. }) => is_trusted_input(checker, value),
+        Expr::Name(name) => {
+            let semantic = checker.semantic();
+            let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+                return false;
+            };
+            let Some(value) = find_binding_value(binding, semantic) else {
+                return false;
+            };
+            is_trusted_input(checker, value)
+        }
+        _ => false,
+    }
+}
+
 /// S602, S603, S604, S605, S606, S607, S609
 pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     let call_kind = get_call_kind(&call.func, checker.semantic());
@@ -311,11 +336,13 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 _ => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        ));
+                    if !is_trusted_input(checker, arg) {
+                        if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
+                            checker.report_diagnostic(Diagnostic::new(
+                                SubprocessWithoutShellEqualsTrue,
+                                call.func.range(),
+                            ));
+                        }
                     }
                 }
             }
