@@ -12,7 +12,7 @@ use ruff_python_ast::{
     Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 #[derive(Debug)]
@@ -367,6 +367,21 @@ impl SemanticSyntaxChecker {
                         _ => {}
                     };
                 }
+
+                // PLE0118
+                if let Some(stmt) = ctx.global(id) {
+                    let start = stmt.start();
+                    if expr.start() < start {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
+                                name: id.to_string(),
+                                start,
+                            },
+                            expr.range(),
+                        );
+                    }
+                }
             }
             _ => {}
         }
@@ -462,6 +477,9 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
+            SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
+                write!(f, "name `{name}` is used prior to global declaration")
+            }
         }
     }
 }
@@ -575,6 +593,19 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [BPO 45000]: https://github.com/python/cpython/issues/89163
     WriteToDebug(WriteToDebugKind),
+
+    /// Represents the use of a `global` variable before its `global` declaration.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// counter = 1
+    /// def increment():
+    ///     print(f"Adding 1 to {counter}")
+    ///     global counter
+    ///     counter += 1
+    /// ```
+    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -704,6 +735,9 @@ pub trait SemanticSyntaxContext {
 
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
+
+    /// Return the [`TextRange`] at which a name is declared as `global`.
+    fn global(&self, name: &str) -> Option<TextRange>;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 }
