@@ -882,30 +882,84 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
 
         // apache-airflow-providers-standard
+        ["airflow", "operators", "bash_operator", "BashOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.operators.bash.BashOperator",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "operators", "dagrun_operator" | "trigger_dagrun", rest @ ..        ] => match &rest {
+            ["TriggerDagRunLink"] => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunLink",
+                provider: "standard",
+                version: "0.0.2"
+            },
+            ["TriggerDagRunOperator"] => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator",
+                provider: "standard",
+                version: "0.0.2"
+            },
+            _ => return
+        }
         ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => Replacement::ProviderName{
             name: "airflow.providers.standard.operators.empty.EmptyOperator",
             provider: "standard",
-            version: "0.1.0"
+            version: "0.0.2"
         },
+        ["airflow", "operators", "latest_only_operator" | "latest_only", "LatestOnlyOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.operators.latest_only.LatestOnlyOperator",
+            provider: "standard",
+            version: "0.0.3"
+        },
+        ["airflow", "operators", "python_operator"| "python", rest @ ..] => match &rest {
+            ["BranchPythonOperator"] => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.python.BranchPythonOperator",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            ["PythonOperator"] => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.python.PythonOperator",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            ["PythonVirtualenvOperator"] => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.python.PythonVirtualenvOperator",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            ["ShortCircuitOperator"] => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.python.ShortCircuitOperator",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            _ => return
+        }
+        ["airflow", "sensors", "external_task_sensor" | "external_task", rest @..] => match &rest {
+            ["ExternalTaskSensor"] => Replacement::ProviderName{
+                name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensor",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            ["ExternalTaskSensorLink"] => Replacement::ProviderName{
+                name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensorLink",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            ["ExternalTaskMarker"] => Replacement::ProviderName{
+                name: "airflow.providers.standard.sensors.external_task.ExternalTaskMarker",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            _ => return
+        }
         ["airflow", "sensors", "filesystem", "FileSensor"] => Replacement::ProviderName{
             name: "airflow.providers.standard.sensors.filesystem.FileSensor",
             provider: "standard",
             version: "0.0.2"
         },
-        ["airflow", "operators", "trigger_dagrun", "TriggerDagRunOperator"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator",
+        ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.sensors.time_delta.TimeDeltaSensor",
             provider: "standard",
-            version: "0.0.2"
-        },
-        ["airflow", "sensors", "external_task", "ExternalTaskMarker"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.sensors.external_task.ExternalTaskMarker",
-            provider: "standard",
-            version: "0.0.3"
-        },
-        ["airflow", "sensors", "external_task", "ExternalTaskSensor"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensor",
-            provider: "standard",
-            version: "0.0.3"
+            version: "0.1.0"
         },
 
         // apache-airflow-providers-sqlite
