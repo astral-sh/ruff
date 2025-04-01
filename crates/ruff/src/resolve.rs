@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::{bail, Result};
 use log::debug;
-use path_absolutize::path_dedot::{self, ParseDot};
+use path_absolutize::path_dedot;
 
 use ruff_workspace::configuration::Configuration;
 use ruff_workspace::pyproject::{self, find_fallback_target_version};
@@ -24,7 +24,6 @@ pub fn resolve(
     let Ok(cwd) = std::env::current_dir() else {
         bail!("Working directory does not exist")
     };
-    let cwd = cwd.parse_dot()?;
 
     // First priority: if we're running in isolated mode, use the default settings.
     if config_arguments.isolated {
