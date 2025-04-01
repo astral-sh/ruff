@@ -573,16 +573,16 @@ impl VisibilityConstraints {
             PatternPredicateKind::Singleton(singleton) => {
                 let subject_ty = infer_expression_type(db, subject);
 
+                let singleton_ty = match singleton {
+                    ruff_python_ast::Singleton::None => Type::none(db),
+                    ruff_python_ast::Singleton::True => Type::BooleanLiteral(true),
+                    ruff_python_ast::Singleton::False => Type::BooleanLiteral(false),
+                };
+
                 if subject_ty.is_single_valued(db) {
-                    Truthiness::from(match singleton {
-                        ruff_python_ast::Singleton::None => subject_ty.is_none(db),
-                        ruff_python_ast::Singleton::True => {
-                            subject_ty.is_equivalent_to(db, Type::BooleanLiteral(true))
-                        }
-                        ruff_python_ast::Singleton::False => {
-                            subject_ty.is_equivalent_to(db, Type::BooleanLiteral(false))
-                        }
-                    })
+                    Truthiness::from(subject_ty.is_equivalent_to(db, singleton_ty))
+                } else if subject_ty.is_disjoint_from(db, singleton_ty) {
+                    Truthiness::AlwaysFalse
                 } else {
                     Truthiness::Ambiguous
                 }

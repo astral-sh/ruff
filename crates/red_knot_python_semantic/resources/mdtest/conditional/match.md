@@ -91,6 +91,101 @@ def _(target: FooSub | str):
     reveal_type(y)  # revealed: Literal[2, 4, 5]
 ```
 
+## Singleton match
+
+```py
+from typing import Literal
+
+def _(target: bool):
+    y = 1
+    y = 2
+
+    match target:
+        case True:
+            y = 3
+        case False:
+            y = 4
+        case None:
+            y = 5
+
+    # TODO: with exhaustivity checking, this should be Literal[3, 4]
+    reveal_type(y)  # revealed: Literal[2, 3, 4]
+
+def _(target: Literal[True, False]):
+    y = 1
+    y = 2
+
+    match target:
+        case True:
+            y = 3
+        case False:
+            y = 4
+        case None:
+            y = 5
+
+    # TODO: with exhaustivity checking, this should be Literal[3, 4]
+    reveal_type(y)  # revealed: Literal[2, 3, 4]
+
+def _(target: None):
+    y = 1
+    y = 2
+
+    match target:
+        case True:
+            y = 3
+        case False:
+            y = 4
+        case None:
+            y = 5
+
+    reveal_type(y)  # revealed: Literal[5]
+
+def _(target: None | Literal[True]):
+    y = 1
+    y = 2
+
+    match target:
+        case True:
+            y = 3
+        case False:
+            y = 4
+        case None:
+            y = 5
+
+    # TODO: with exhaustivity checking, this should be Literal[3, 5]
+    reveal_type(y)  # revealed: Literal[2, 3, 5]
+
+# bool is an int subclass
+def _(target: int):
+    y = 1
+    y = 2
+
+    match target:
+        case True:
+            y = 3
+        case False:
+            y = 4
+        case None:
+            y = 5
+
+    reveal_type(y)  # revealed: Literal[2, 3, 4]
+
+# bool is an int subclass
+def _(target: str):
+    y = 1
+    y = 2
+
+    match target:
+        case True:
+            y = 3
+        case False:
+            y = 4
+        case None:
+            y = 5
+
+    reveal_type(y)  # revealed: Literal[2]
+```
+
 ## Guard with object that implements `__bool__` incorrectly
 
 ```py
