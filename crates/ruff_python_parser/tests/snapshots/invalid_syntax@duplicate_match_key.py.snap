@@ -1,0 +1,746 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/duplicate_match_key.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..320,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..319,
+                    subject: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..39,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 18..34,
+                                    keys: [
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 19..22,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 19..22,
+                                                            value: "x",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 27..30,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 27..30,
+                                                            value: "x",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 24..25,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 24..25,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 32..33,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 32..33,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 36..39,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 36..39,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 44..72,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 49..67,
+                                    keys: [
+                                        BytesLiteral(
+                                            ExprBytesLiteral {
+                                                range: 50..54,
+                                                value: BytesLiteralValue {
+                                                    inner: Single(
+                                                        BytesLiteral {
+                                                            range: 50..54,
+                                                            value: [
+                                                                120,
+                                                            ],
+                                                            flags: BytesLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Regular,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        BytesLiteral(
+                                            ExprBytesLiteral {
+                                                range: 59..63,
+                                                value: BytesLiteralValue {
+                                                    inner: Single(
+                                                        BytesLiteral {
+                                                            range: 59..63,
+                                                            value: [
+                                                                120,
+                                                            ],
+                                                            flags: BytesLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Regular,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 56..57,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 56..57,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 65..66,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 65..66,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 69..72,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 69..72,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 77..99,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 82..94,
+                                    keys: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 83..84,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 89..90,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 86..87,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 86..87,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 92..93,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 92..93,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 96..99,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 96..99,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 104..130,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 109..125,
+                                    keys: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 110..113,
+                                                value: Float(
+                                                    1.0,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 118..121,
+                                                value: Float(
+                                                    1.0,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 115..116,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 115..116,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 123..124,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 123..124,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 127..130,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 127..130,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 135..171,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 140..166,
+                                    keys: [
+                                        BinOp(
+                                            ExprBinOp {
+                                                range: 141..149,
+                                                left: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 141..144,
+                                                        value: Float(
+                                                            1.0,
+                                                        ),
+                                                    },
+                                                ),
+                                                op: Add,
+                                                right: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 147..149,
+                                                        value: Complex {
+                                                            real: 0.0,
+                                                            imag: 2.0,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        BinOp(
+                                            ExprBinOp {
+                                                range: 154..162,
+                                                left: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 154..157,
+                                                        value: Float(
+                                                            1.0,
+                                                        ),
+                                                    },
+                                                ),
+                                                op: Add,
+                                                right: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 160..162,
+                                                        value: Complex {
+                                                            real: 0.0,
+                                                            imag: 2.0,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 151..152,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 151..152,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 164..165,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 164..165,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 168..171,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 168..171,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 176..204,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 181..199,
+                                    keys: [
+                                        BooleanLiteral(
+                                            ExprBooleanLiteral {
+                                                range: 182..186,
+                                                value: true,
+                                            },
+                                        ),
+                                        BooleanLiteral(
+                                            ExprBooleanLiteral {
+                                                range: 191..195,
+                                                value: true,
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 188..189,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 188..189,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 197..198,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 197..198,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 201..204,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 201..204,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 209..237,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 214..232,
+                                    keys: [
+                                        NoneLiteral(
+                                            ExprNoneLiteral {
+                                                range: 215..219,
+                                            },
+                                        ),
+                                        NoneLiteral(
+                                            ExprNoneLiteral {
+                                                range: 224..228,
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 221..222,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 221..222,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 230..231,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 230..231,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 234..237,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 234..237,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 242..319,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 247..314,
+                                    keys: [
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 253..277,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 253..277,
+                                                            value: "x\n    y\n    z\n    ",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: true,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 286..310,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 286..310,
+                                                            value: "x\n    y\n    z\n    ",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: true,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 279..280,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 279..280,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                range: 312..313,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 312..313,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 316..319,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 316..319,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | match x:
+2 |     case {"x": 1, "x": 2}: ...
+  |          ^^^^^^^^^^^^^^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
+3 |     case {b"x": 1, b"x": 2}: ...
+4 |     case {0: 1, 0: 2}: ...
+  |
+
+
+  |
+1 | match x:
+2 |     case {"x": 1, "x": 2}: ...
+3 |     case {b"x": 1, b"x": 2}: ...
+  |          ^^^^^^^^^^^^^^^^^^ Syntax Error: mapping pattern checks duplicate key `b"x"`
+4 |     case {0: 1, 0: 2}: ...
+5 |     case {1.0: 1, 1.0: 2}: ...
+  |
+
+
+  |
+2 |     case {"x": 1, "x": 2}: ...
+3 |     case {b"x": 1, b"x": 2}: ...
+4 |     case {0: 1, 0: 2}: ...
+  |          ^^^^^^^^^^^^ Syntax Error: mapping pattern checks duplicate key `0`
+5 |     case {1.0: 1, 1.0: 2}: ...
+6 |     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+  |
+
+
+  |
+3 |     case {b"x": 1, b"x": 2}: ...
+4 |     case {0: 1, 0: 2}: ...
+5 |     case {1.0: 1, 1.0: 2}: ...
+  |          ^^^^^^^^^^^^^^^^ Syntax Error: mapping pattern checks duplicate key `1.0`
+6 |     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+7 |     case {True: 1, True: 2}: ...
+  |
+
+
+  |
+4 |     case {0: 1, 0: 2}: ...
+5 |     case {1.0: 1, 1.0: 2}: ...
+6 |     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: mapping pattern checks duplicate key `1.0 + 2j`
+7 |     case {True: 1, True: 2}: ...
+8 |     case {None: 1, None: 2}: ...
+  |
+
+
+  |
+5 |     case {1.0: 1, 1.0: 2}: ...
+6 |     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+7 |     case {True: 1, True: 2}: ...
+  |          ^^^^^^^^^^^^^^^^^^ Syntax Error: mapping pattern checks duplicate key `True`
+8 |     case {None: 1, None: 2}: ...
+9 |     case {
+  |
+
+
+   |
+ 6 |     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+ 7 |     case {True: 1, True: 2}: ...
+ 8 |     case {None: 1, None: 2}: ...
+   |          ^^^^^^^^^^^^^^^^^^ Syntax Error: mapping pattern checks duplicate key `None`
+ 9 |     case {
+10 |     """x
+   |
+
+
+   |
+ 7 |       case {True: 1, True: 2}: ...
+ 8 |       case {None: 1, None: 2}: ...
+ 9 |       case {
+   |  __________^
+10 | |     """x
+11 | |     y
+12 | |     z
+13 | |     """: 1,
+14 | |     """x
+15 | |     y
+16 | |     z
+17 | |     """: 2}: ...
+   | |___________^ Syntax Error: mapping pattern checks duplicate key `"""x
+    y
+    z
+    """`
+   |
