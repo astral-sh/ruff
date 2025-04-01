@@ -62,6 +62,20 @@ impl Violation for RedundantLiteralUnion {
             format!("`Literal` is redundant in a union with `{builtin_type}`")
         }
     }
+
+    fn fix_title(&self) -> Option<String> {
+        let RedundantLiteralUnion {
+            literal,
+            builtin_type,
+        } = self;
+        if let Some(literal) = literal.full_display() {
+            Some(format!(
+                "Replace `Literal[{literal}] | {builtin_type}` with `{builtin_type}`"
+            ))
+        } else {
+            Some(format!("Replace with `{builtin_type}`"))
+        }
+    }
 }
 
 /// PYI051
