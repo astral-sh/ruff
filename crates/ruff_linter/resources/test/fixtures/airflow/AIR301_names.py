@@ -50,7 +50,7 @@ from airflow.notifications.basenotifier import BaseNotifier
 from airflow.operators import dummy_operator
 from airflow.operators.branch_operator import BaseBranchOperator
 from airflow.operators.dagrun_operator import TriggerDagRunLink, TriggerDagRunOperator
-from airflow.operators.dummy import DummyOperator, EmptyOperator
+
 from airflow.operators.email_operator import EmailOperator
 from airflow.operators.latest_only_operator import LatestOnlyOperator
 from airflow.operators.python_operator import (
@@ -173,13 +173,13 @@ BaseOperatorLink()
 # ariflow.notifications.basenotifier
 BaseNotifier()
 
-# airflow.operators.dummy
-EmptyOperator()
-DummyOperator()
 
-# airflow.operators.dummy_operator
-dummy_operator.EmptyOperator()
-dummy_operator.DummyOperator()
+
+
+
+
+
+
 
 # airflow.operators.branch_operator
 BaseBranchOperator()

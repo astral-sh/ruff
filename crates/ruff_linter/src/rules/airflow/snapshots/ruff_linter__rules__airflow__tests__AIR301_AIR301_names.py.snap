@@ -447,8 +447,6 @@ AIR301_names.py:174:1: AIR301 `airflow.notifications.basenotifier.BaseNotifier` 
 173 | # ariflow.notifications.basenotifier
 174 | BaseNotifier()
     | ^^^^^^^^^^^^ AIR301
-175 |
-176 | # airflow.operators.dummy
     |
     = help: Use `airflow.sdk.BaseNotifier` instead
 
