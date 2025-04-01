@@ -258,7 +258,8 @@ impl SemanticSyntaxChecker {
                 .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
             {
                 if !seen.insert(ComparableExpr::from(key)) {
-                    let duplicate_key = ctx.source()[key.range()].to_string();
+                    let key_range = key.range();
+                    let duplicate_key = ctx.source()[key_range].to_string();
                     // test_ok duplicate_match_key_attr
                     // match x:
                     //     case {x.a: 1, x.a: 2}: ...
@@ -284,9 +285,8 @@ impl SemanticSyntaxChecker {
                     Self::add_error(
                         ctx,
                         SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),
-                        mapping.range,
+                        key_range,
                     );
-                    break;
                 }
             }
         }
