@@ -1741,5 +1741,27 @@ AIR302.py:423:1: AIR302 Import path `airflow.triggers.temporal` is moved into `s
 422 | FileTrigger()
 423 | DateTimeTrigger()
     | ^^^^^^^^^^^^^^^ AIR302
+424 |
+425 | from airflow.operators.dummy import DummyOperator, EmptyOperator
     |
     = help: Install `apache-airflow-provider-standard>=0.0.3` and import from `airflow.providers.standard.triggers.temporal` instead.
+
+AIR302.py:428:1: AIR302 `airflow.operators.dummy.DummyOperator` is moved into `standard` provider in Airflow 3.0;
+    |
+426 | from airflow.operators.email import EmailOperator
+427 |
+428 | DummyOperator()
+    | ^^^^^^^^^^^^^ AIR302
+429 | EmptyOperator()
+430 | EmailOperator()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.1.0` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
+
+AIR302.py:429:1: AIR302 `airflow.operators.dummy.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
+    |
+428 | DummyOperator()
+429 | EmptyOperator()
+    | ^^^^^^^^^^^^^ AIR302
+430 | EmailOperator()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.1.0` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
