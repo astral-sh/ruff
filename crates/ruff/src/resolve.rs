@@ -62,9 +62,7 @@ pub fn resolve(
     // that directory. (With `Strategy::Hierarchical`, we'll end up finding
     // the "closest" `pyproject.toml` file for every Python file later on,
     // so these act as the "default" settings.)
-    if let Some(pyproject) =
-        pyproject::find_settings_toml(stdin_filename.as_ref().unwrap_or(&cwd.as_ref()))?
-    {
+    if let Some(pyproject) = pyproject::find_settings_toml(stdin_filename.unwrap_or(&cwd))? {
         debug!(
             "Using configuration file (via parent) at: {}",
             pyproject.display()
@@ -132,8 +130,7 @@ pub fn resolve(
         // `pyproject::find_settings_toml`.)
         // However, there may be a `pyproject.toml` with a `requires-python`
         // specified, and that is what we look for in this step.
-        let fallback =
-            find_fallback_target_version(stdin_filename.as_ref().unwrap_or(&cwd.as_ref()));
+        let fallback = find_fallback_target_version(stdin_filename.unwrap_or(&cwd));
         if let Some(version) = fallback {
             debug!("Derived `target-version` from found `requires-python`: {version:?}");
         }
