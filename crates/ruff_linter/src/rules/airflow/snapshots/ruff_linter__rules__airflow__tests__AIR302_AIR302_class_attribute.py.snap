@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_class_attribute.py:24:21: AIR302 [*] Use `airflow.sdk.Asset` instead
+AIR302_class_attribute.py:24:21: AIR302 [*] `airflow.Dataset` is removed in Airflow 3.0
    |
 23 | # airflow.Dataset
 24 | dataset_from_root = DatasetFromRoot()
@@ -65,7 +65,7 @@ AIR302_class_attribute.py:26:19: AIR302 [*] `iter_dataset_aliases` is removed in
 28 28 | # airflow.datasets
 29 29 | dataset_to_test_method_call = Dataset()
 
-AIR302_class_attribute.py:29:31: AIR302 [*] Use `airflow.sdk.Asset` instead
+AIR302_class_attribute.py:29:31: AIR302 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0
    |
 28 | # airflow.datasets
 29 | dataset_to_test_method_call = Dataset()

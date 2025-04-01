@@ -64,7 +64,7 @@ AIR302_names.py:121:39: AIR302 `airflow.PY312` is removed in Airflow 3.0
     |
     = help: Use `sys.version_info` instead
 
-AIR302_names.py:122:1: AIR302 [*] Use `airflow.sdk.Asset` instead
+AIR302_names.py:122:1: AIR302 [*] `airflow.Dataset` is removed in Airflow 3.0
     |
 120 | # airflow root
 121 | PY36, PY37, PY38, PY39, PY310, PY311, PY312
@@ -99,7 +99,7 @@ AIR302_names.py:125:1: AIR302 `airflow.api_connexion.security.requires_access` i
     |
     = help: Use `airflow.api_connexion.security.requires_access_*` instead
 
-AIR302_names.py:125:18: AIR302 [*] Use `airflow.api_connexion.security.requires_access_asset` instead
+AIR302_names.py:125:18: AIR302 [*] `airflow.api_connexion.security.requires_access_dataset` is removed in Airflow 3.0
     |
 124 | # airflow.api_connexion.security
 125 | requires_access, requires_access_dataset
@@ -221,7 +221,7 @@ AIR302_names.py:136:1: AIR302 `airflow.contrib.aws_athena_hook.AWSAthenaHook` is
 138 | # airflow.datasets
     |
 
-AIR302_names.py:139:1: AIR302 [*] Use `airflow.sdk.Asset` instead
+AIR302_names.py:139:1: AIR302 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0
     |
 138 | # airflow.datasets
 139 | Dataset()

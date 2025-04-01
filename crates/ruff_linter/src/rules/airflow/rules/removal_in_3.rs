@@ -61,7 +61,9 @@ impl Violation for Airflow3Removal {
             Replacement::Message(message) => {
                 format!("`{deprecated}` is removed in Airflow 3.0; {message}")
             }
-            Replacement::AutoImport { path, name } => format!("Use `{path}.{name}` instead"),
+            Replacement::AutoImport { path: _, name: _ } => {
+                format!("`{deprecated}` is removed in Airflow 3.0")
+            }
         }
     }
 
