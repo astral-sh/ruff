@@ -1100,7 +1100,7 @@ pub(super) fn report_invalid_return_type(
             actual_ty.display(context.db()),
             expected_ty.display(context.db())
         ),
-        vec![OldSecondaryDiagnosticMessage::new(
+        &[OldSecondaryDiagnosticMessage::new(
             return_type_span,
             format!(
                 "Return type is declared here as `{}`",

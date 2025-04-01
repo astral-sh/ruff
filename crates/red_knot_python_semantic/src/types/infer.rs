@@ -3960,7 +3960,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         "Revealed type is `{}`",
                                         revealed_type.display(self.db())
                                     ),
-                                    vec![],
+                                    &[],
                                 );
                             }
                         }
