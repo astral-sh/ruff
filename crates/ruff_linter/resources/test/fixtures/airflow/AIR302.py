@@ -421,3 +421,8 @@ SubprocessHook()
 WorkflowTrigger()
 FileTrigger()
 DateTimeTrigger()
+
+
+from airflow.sensors import filesystem
+
+filesystem.FileSensor()

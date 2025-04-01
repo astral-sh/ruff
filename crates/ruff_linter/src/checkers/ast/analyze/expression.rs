@@ -448,6 +448,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
             }
+            if checker.enabled(Rule::Airflow3MovedToProvider) {
+                airflow::rules::moved_to_provider_in_3(checker, expr);
+            }
         }
         Expr::Call(
             call @ ast::ExprCall {

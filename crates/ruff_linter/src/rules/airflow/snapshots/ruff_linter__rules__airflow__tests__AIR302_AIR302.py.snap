@@ -1743,3 +1743,12 @@ AIR302.py:423:1: AIR302 Import path `airflow.triggers.temporal` is moved into `s
     | ^^^^^^^^^^^^^^^ AIR302
     |
     = help: Install `apache-airflow-provider-standard>=0.0.3` and import from `airflow.providers.standard.triggers.temporal` instead.
+
+AIR303.py:428:12: AIR303 `airflow.sensors.filesystem.FileSensor` is moved into `standard` provider in Airflow 3.0;
+    |
+426 | from airflow.sensors import filesystem
+427 |
+428 | filesystem.FileSensor()
+    |            ^^^^^^^^^^ AIR303
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.2` and use `airflow.providers.standard.sensors.filesystem.FileSensor` instead.
