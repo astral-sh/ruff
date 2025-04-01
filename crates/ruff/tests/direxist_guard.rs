@@ -3,7 +3,7 @@
 //! Tests in the same module become flaky under `cargo test`s parallel execution
 //! due to in-test working directory manipulation.
 
-#![cfg(not(target_family = "wasm"))]
+#![cfg(target_family = "unix")]
 
 use std::env::set_current_dir;
 use std::process::Command;
