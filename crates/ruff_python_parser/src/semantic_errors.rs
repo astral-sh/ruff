@@ -462,6 +462,9 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
+            SemanticSyntaxErrorKind::InvalidStarExpression => {
+                f.write_str("can't use starred expression here")
+            }
         }
     }
 }
@@ -575,6 +578,19 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [BPO 45000]: https://github.com/python/cpython/issues/89163
     WriteToDebug(WriteToDebugKind),
+
+    /// Represents the use of a starred expression in an invalid location, such as a `return` or
+    /// `yield` statement.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f(): return *x
+    /// def f(): yield *x
+    /// for _ in *x: ...
+    /// for *x in xs: ...
+    /// ```
+    InvalidStarExpression,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
