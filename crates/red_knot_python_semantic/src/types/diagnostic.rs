@@ -895,12 +895,6 @@ declare_lint! {
 }
 
 /// A collection of type check diagnostics.
-///
-/// The diagnostics are wrapped in an `Arc` because they need to be cloned multiple times
-/// when going from `infer_expression` to `check_file`. We could consider
-/// making [`TypeCheckDiagnostic`] a Salsa struct to have them Arena-allocated (once the Tables refactor is done).
-/// Using Salsa struct does have the downside that it leaks the Salsa dependency into diagnostics and
-/// each Salsa-struct comes with an overhead.
 #[derive(Default, Eq, PartialEq)]
 pub struct TypeCheckDiagnostics {
     diagnostics: Vec<Diagnostic>,
