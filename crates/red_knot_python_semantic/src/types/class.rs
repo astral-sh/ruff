@@ -514,6 +514,8 @@ impl<'db> Class<'db> {
 
         let mut is_attribute_bound = Truthiness::AlwaysFalse;
 
+        let index = semantic_index(db, class_body_scope.file(db));
+
         for attribute_assignment in attribute_assignments(db, class_body_scope, name) {
             let Some(binding) = attribute_assignment.binding else {
                 continue;
@@ -545,7 +547,8 @@ impl<'db> Class<'db> {
                     //     self.name: <annotation>
                     //     self.name: <annotation> = …
 
-                    let annotation_ty = infer_expression_type(db, ann_assign.annotation());
+                    let annotation_ty =
+                        infer_expression_type(db, index.expression(ann_assign.annotation()));
 
                     // TODO: check if there are conflicting declarations
                     match is_attribute_bound {
@@ -578,7 +581,8 @@ impl<'db> Class<'db> {
                             //
                             //     self.name = <value>
 
-                            let inferred_ty = infer_expression_type(db, assign.value());
+                            let inferred_ty =
+                                infer_expression_type(db, index.expression(assign.value()));
 
                             union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                         }
@@ -602,7 +606,8 @@ impl<'db> Class<'db> {
                             //
                             //     for self.name in <iterable>:
 
-                            let iterable_ty = infer_expression_type(db, for_stmt.iterable());
+                            let iterable_ty =
+                                infer_expression_type(db, index.expression(for_stmt.iterable()));
                             // TODO: Potential diagnostics resulting from the iterable are currently not reported.
                             let inferred_ty = iterable_ty.iterate(db);
 
@@ -628,7 +633,10 @@ impl<'db> Class<'db> {
                             //
                             //     with <context_manager> as self.name:
 
-                            let context_ty = infer_expression_type(db, with_item.context_expr());
+                            let context_ty = infer_expression_type(
+                                db,
+                                index.expression(with_item.context_expr()),
+                            );
                             let inferred_ty = context_ty.enter(db);
 
                             union_of_inferred_types = union_of_inferred_types.add(inferred_ty);

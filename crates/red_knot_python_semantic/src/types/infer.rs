@@ -1827,7 +1827,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         with_item: &WithItemDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        let context_expr = with_item.context_expr().node_ref(self.db());
+        let context_expr = with_item.context_expr();
         let target = with_item.target();
 
         let context_expr_ty = self.infer_standalone_expression(context_expr);
@@ -2634,7 +2634,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         assignment: &AssignmentDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        let value = assignment.value().node_ref(self.db());
+        let value = assignment.value();
         let target = assignment.target();
 
         let value_ty = self.infer_standalone_expression(value);
@@ -2702,10 +2702,10 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Infer the types in an annotated assignment definition.
     fn infer_annotated_assignment_definition(
         &mut self,
-        assignment: &'db AnnotatedAssignmentDefinitionKind<'db>,
+        assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
-        let annotation = assignment.annotation().node_ref(self.db());
+        let annotation = assignment.annotation();
         let target = assignment.target();
         let value = assignment.value();
 
@@ -2926,7 +2926,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         for_stmt: &ForStmtDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
-        let iterable = &**for_stmt.iterable().node_ref(self.db());
+        let iterable = for_stmt.iterable();
         let target = for_stmt.target();
 
         let iterable_type = self.infer_standalone_expression(iterable);

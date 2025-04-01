@@ -7,7 +7,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::Db;
@@ -241,14 +240,14 @@ pub(crate) struct ImportFromDefinitionNodeRef<'a> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AssignmentDefinitionNodeRef<'a> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
-    pub(crate) value: Expression<'a>,
+    pub(crate) value: &'a ast::Expr,
     pub(crate) target: &'a ast::Expr,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtAnnAssign,
-    pub(crate) annotation: Expression<'a>,
+    pub(crate) annotation: &'a ast::Expr,
     pub(crate) value: Option<&'a ast::Expr>,
     pub(crate) target: &'a ast::Expr,
 }
@@ -256,7 +255,7 @@ pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'a> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct WithItemDefinitionNodeRef<'a> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
-    pub(crate) context_expr: Expression<'a>,
+    pub(crate) context_expr: &'a ast::Expr,
     pub(crate) target: &'a ast::Expr,
     pub(crate) is_async: bool,
 }
@@ -264,7 +263,7 @@ pub(crate) struct WithItemDefinitionNodeRef<'a> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ForStmtDefinitionNodeRef<'a> {
     pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
-    pub(crate) iterable: Expression<'a>,
+    pub(crate) iterable: &'a ast::Expr,
     pub(crate) target: &'a ast::Expr,
     pub(crate) is_async: bool,
 }
@@ -340,7 +339,7 @@ impl<'db> DefinitionNodeRef<'db> {
                 target,
             }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                value,
+                value: AstNodeRef::new(parsed.clone(), value),
                 target: AstNodeRef::new(parsed, target),
             }),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
@@ -350,7 +349,7 @@ impl<'db> DefinitionNodeRef<'db> {
                 target,
             }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
                 target: AstNodeRef::new(parsed.clone(), target),
-                annotation,
+                annotation: AstNodeRef::new(parsed.clone(), annotation),
                 value: value.map(|v| AstNodeRef::new(parsed, v)),
             }),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
@@ -363,7 +362,7 @@ impl<'db> DefinitionNodeRef<'db> {
                 is_async,
             }) => DefinitionKind::For(ForStmtDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                iterable,
+                iterable: AstNodeRef::new(parsed.clone(), iterable),
                 target: AstNodeRef::new(parsed, target),
                 is_async,
             }),
@@ -394,7 +393,7 @@ impl<'db> DefinitionNodeRef<'db> {
                 is_async,
             }) => DefinitionKind::WithItem(WithItemDefinitionKind {
                 target_kind: TargetKind::from(unpack),
-                context_expr,
+                context_expr: AstNodeRef::new(parsed.clone(), context_expr),
                 target: AstNodeRef::new(parsed, target),
                 is_async,
             }),
@@ -540,7 +539,7 @@ pub enum DefinitionKind<'db> {
     TypeAlias(AstNodeRef<ast::StmtTypeAlias>),
     NamedExpression(AstNodeRef<ast::ExprNamed>),
     Assignment(AssignmentDefinitionKind<'db>),
-    AnnotatedAssignment(AnnotatedAssignmentDefinitionKind<'db>),
+    AnnotatedAssignment(AnnotatedAssignmentDefinitionKind),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
     For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind),
@@ -782,14 +781,14 @@ impl ImportFromDefinitionKind {
 #[derive(Clone, Debug)]
 pub struct AssignmentDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
-    value: Expression<'db>,
+    value: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
     pub(crate) fn new(
         target_kind: TargetKind<'db>,
-        value: Expression<'db>,
+        value: AstNodeRef<ast::Expr>,
         target: AstNodeRef<ast::Expr>,
     ) -> Self {
         Self {
@@ -803,8 +802,8 @@ impl<'db> AssignmentDefinitionKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn value(&self) -> Expression {
-        self.value
+    pub(crate) fn value(&self) -> &ast::Expr {
+        self.value.node()
     }
 
     pub(crate) fn target(&self) -> &ast::Expr {
@@ -813,15 +812,15 @@ impl<'db> AssignmentDefinitionKind<'db> {
 }
 
 #[derive(Clone, Debug)]
-pub struct AnnotatedAssignmentDefinitionKind<'db> {
-    annotation: Expression<'db>,
+pub struct AnnotatedAssignmentDefinitionKind {
+    annotation: AstNodeRef<ast::Expr>,
     value: Option<AstNodeRef<ast::Expr>>,
     target: AstNodeRef<ast::Expr>,
 }
 
-impl<'db> AnnotatedAssignmentDefinitionKind<'db> {
+impl AnnotatedAssignmentDefinitionKind {
     pub(crate) fn new(
-        annotation: Expression<'db>,
+        annotation: AstNodeRef<ast::Expr>,
         value: Option<AstNodeRef<ast::Expr>>,
         target: AstNodeRef<ast::Expr>,
     ) -> Self {
@@ -836,8 +835,8 @@ impl<'db> AnnotatedAssignmentDefinitionKind<'db> {
         self.value.as_deref()
     }
 
-    pub(crate) fn annotation(&self) -> Expression {
-        self.annotation
+    pub(crate) fn annotation(&self) -> &ast::Expr {
+        self.annotation.node()
     }
 
     pub(crate) fn target(&self) -> &ast::Expr {
@@ -848,7 +847,7 @@ impl<'db> AnnotatedAssignmentDefinitionKind<'db> {
 #[derive(Clone, Debug)]
 pub struct WithItemDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
-    context_expr: Expression<'db>,
+    context_expr: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
     is_async: bool,
 }
@@ -856,7 +855,7 @@ pub struct WithItemDefinitionKind<'db> {
 impl<'db> WithItemDefinitionKind<'db> {
     pub(crate) fn new(
         target_kind: TargetKind<'db>,
-        context_expr: Expression<'db>,
+        context_expr: AstNodeRef<ast::Expr>,
         target: AstNodeRef<ast::Expr>,
         is_async: bool,
     ) -> Self {
@@ -868,8 +867,8 @@ impl<'db> WithItemDefinitionKind<'db> {
         }
     }
 
-    pub(crate) fn context_expr(&self) -> Expression {
-        self.context_expr
+    pub(crate) fn context_expr(&self) -> &ast::Expr {
+        self.context_expr.node()
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
@@ -888,7 +887,7 @@ impl<'db> WithItemDefinitionKind<'db> {
 #[derive(Clone, Debug)]
 pub struct ForStmtDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
-    iterable: Expression<'db>,
+    iterable: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
     is_async: bool,
 }
@@ -896,7 +895,7 @@ pub struct ForStmtDefinitionKind<'db> {
 impl<'db> ForStmtDefinitionKind<'db> {
     pub(crate) fn new(
         target_kind: TargetKind<'db>,
-        iterable: Expression<'db>,
+        iterable: AstNodeRef<ast::Expr>,
         target: AstNodeRef<ast::Expr>,
         is_async: bool,
     ) -> Self {
@@ -908,8 +907,8 @@ impl<'db> ForStmtDefinitionKind<'db> {
         }
     }
 
-    pub(crate) fn iterable(&self) -> Expression {
-        self.iterable
+    pub(crate) fn iterable(&self) -> &ast::Expr {
+        self.iterable.node()
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
