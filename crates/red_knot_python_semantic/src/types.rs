@@ -389,6 +389,15 @@ impl<'db> Type<'db> {
                 ClassBase::Class(_) => false,
             },
 
+            Self::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.contains_todo(db),
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .any(|constraint| constraint.contains_todo(db)),
+            },
+
             Self::Tuple(tuple) => tuple.elements(db).iter().any(|ty| ty.contains_todo(db)),
 
             Self::Union(union) => union.elements(db).iter().any(|ty| ty.contains_todo(db)),
@@ -650,8 +659,8 @@ impl<'db> Type<'db> {
         }
 
         // A fully static typevar is a subtype of its upper bound, and to something similar to the
-        // union of its constraints. An unbound, unconstrained, fully static typevar is a subtype
-        // of `object` (which is handled below).
+        // union of its constraints. An unbound, unconstrained, fully static typevar has an
+        // implicit upper bound of `object` (which is handled below).
         // TODO: It's not _really_ the union of its constraints because each occurrence of the
         // typevar must be bound to the same type.
         if let Type::TypeVar(typevar) = self {
@@ -692,40 +701,6 @@ impl<'db> Type<'db> {
                 self_typevar == other_typevar
             }
 
-            // A fully static typevar is a subtype of its upper bound, and to something similar to
-            // the union of its constraints. An unbound, unconstrained typevar has an implicit
-            // upper bound of `object`.
-            // TODO: It's not _really_ the union of its constraints because each occurrence of the
-            // typevar must be bound to the same type.
-            (Type::TypeVar(typevar), _) => match typevar.bound_or_constraints(db) {
-                None => KnownClass::Object.to_instance(db).is_subtype_of(db, target),
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    bound.is_subtype_of(db, target)
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .elements(db)
-                    .iter()
-                    .all(|constraint| constraint.is_subtype_of(db, target)),
-            },
-
-            (_, Type::TypeVar(typevar)) => match typevar.bound_or_constraints(db) {
-                // No types are a subtype of a bounded typevar, or of an unbounded unconstrained
-                // typevar, since there's no guarantee what type the typevar will be specialized
-                // to. If the typevar is bounded, it might be specialized to a smaller type than
-                // the bound. (This is true even if the bound is a final class, since the typevar
-                // can still be specialized to `Never`.)
-                None => false,
-                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
-                // If the typevar is constrained, there must be multiple constraints, and the
-                // typevar might be specialized to any one of them. However, the constraints do not
-                // have to be disjoint, which means an lhs type might be a subtype of all of the
-                // constraints.
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .elements(db)
-                    .iter()
-                    .all(|constraint| self.is_subtype_of(db, *constraint)),
-            },
-
             (Type::Union(union), _) => union
                 .elements(db)
                 .iter()
@@ -754,6 +729,28 @@ impl<'db> Type<'db> {
                 .positive(db)
                 .iter()
                 .any(|&elem_ty| elem_ty.is_subtype_of(db, target)),
+
+            // Other than the special cases enumerated above, typevars are never subtypes of any
+            // other variants.
+            (Type::TypeVar(_), _) => false,
+
+            (_, Type::TypeVar(typevar)) => match typevar.bound_or_constraints(db) {
+                // No types are a subtype of a bounded typevar, or of an unbounded unconstrained
+                // typevar, since there's no guarantee what type the typevar will be specialized
+                // to. If the typevar is bounded, it might be specialized to a smaller type than
+                // the bound. (This is true even if the bound is a final class, since the typevar
+                // can still be specialized to `Never`.)
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                // If the typevar is constrained, there must be multiple constraints, and the
+                // typevar might be specialized to any one of them. However, the constraints do not
+                // have to be disjoint, which means an lhs type might be a subtype of all of the
+                // constraints.
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| self.is_subtype_of(db, *constraint)),
+            },
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
@@ -913,6 +910,26 @@ impl<'db> Type<'db> {
             return true;
         }
 
+        // A typevar is assignable to its upper bound, and to something similar to the union of
+        // its constraints. An unbound, unconstrained typevar has an implicit upper bound of
+        // `object` (which is handled below).
+        // TODO: It's not _really_ the union of its constraints because each occurrence of the
+        // typevar must be bound to the same type.
+        if let Type::TypeVar(typevar) = self {
+            match typevar.bound_or_constraints(db) {
+                None => {}
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    return bound.is_assignable_to(db, target);
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    return constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| constraint.is_assignable_to(db, target));
+                }
+            }
+        }
+
         match (self, target) {
             // Never can be assigned to any type.
             (Type::Never, _) => true,
@@ -932,42 +949,6 @@ impl<'db> Type<'db> {
             (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
                 self_typevar == other_typevar
             }
-
-            // A typevar is assignable to its upper bound, and to something similar to the union of
-            // its constraints. An unbound, unconstrained typevar has an implicit upper bound of
-            // `object`.
-            // TODO: It's not _really_ the union of its constraints because each occurrence of the
-            // typevar must be bound to the same type.
-            (Type::TypeVar(typevar), _) => match typevar.bound_or_constraints(db) {
-                None => KnownClass::Object
-                    .to_instance(db)
-                    .is_assignable_to(db, target),
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                    bound.is_assignable_to(db, target)
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .elements(db)
-                    .iter()
-                    .all(|constraint| constraint.is_assignable_to(db, target)),
-            },
-
-            (_, Type::TypeVar(typevar)) => match typevar.bound_or_constraints(db) {
-                // No types are assignable to a bounded typevar, or to an unbounded unconstrained
-                // typevar, since there's no guarantee what type the typevar will be specialized
-                // to. If the typevar is bounded, it might be specialized to a smaller type than
-                // the bound. (This is true even if the bound is a final class, since the typevar
-                // can still be specialized to `Never`.)
-                None => false,
-                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
-                // If the typevar is constrained, there must be multiple constraints, and the
-                // typevar might be specialized to any one of them. However, the constraints do not
-                // have to be disjoint, which means an lhs type might be assignable to all of the
-                // constraints.
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .elements(db)
-                    .iter()
-                    .all(|constraint| self.is_assignable_to(db, *constraint)),
-            },
 
             // A union is assignable to a type T iff every element of the union is assignable to T.
             (Type::Union(union), ty) => union
@@ -1006,6 +987,24 @@ impl<'db> Type<'db> {
                 .positive(db)
                 .iter()
                 .any(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
+
+            (_, Type::TypeVar(typevar)) => match typevar.bound_or_constraints(db) {
+                // No types are assignable to a bounded typevar, or to an unbounded unconstrained
+                // typevar, since there's no guarantee what type the typevar will be specialized
+                // to. If the typevar is bounded, it might be specialized to a smaller type than
+                // the bound. (This is true even if the bound is a final class, since the typevar
+                // can still be specialized to `Never`.)
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                // If the typevar is constrained, there must be multiple constraints, and the
+                // typevar might be specialized to any one of them. However, the constraints do not
+                // have to be disjoint, which means an lhs type might be assignable to all of the
+                // constraints.
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| self.is_assignable_to(db, *constraint)),
+            },
 
             // A tuple type S is assignable to a tuple type T if their lengths are the same, and
             // each element of S is assignable to the corresponding element of T.
