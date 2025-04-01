@@ -110,7 +110,7 @@ impl Diagnostic {
     /// writer given returns an error. Otherwise, the formatting of
     /// diagnostics themselves is infallible.
     pub fn print(
-        &mut self,
+        &self,
         db: &dyn Db,
         config: &DisplayDiagnosticConfig,
         mut wtr: impl std::io::Write,
