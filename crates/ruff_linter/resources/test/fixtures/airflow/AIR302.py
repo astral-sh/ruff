@@ -461,3 +461,7 @@ TimeSensor()
 TimeSensorAsync()
 BranchDateTimeOperator()
 target_times_as_dates()
+
+from airflow.sensors import filesystem
+
+filesystem.FileSensor()
