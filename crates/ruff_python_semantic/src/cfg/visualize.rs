@@ -3,10 +3,10 @@ use ruff_index::Idx;
 use ruff_text_size::Ranged;
 use std::fmt::{self, Display};
 
-use crate::cfg::graph::{BlockId, BlockKind, Condition, CFG};
+use crate::cfg::graph::{BlockId, BlockKind, Condition, ControlFlowGraph};
 
 /// Returns control flow graph in Mermaid syntax.
-pub fn draw_cfg(graph: CFG, source: &str) -> String {
+pub fn draw_cfg(graph: ControlFlowGraph, source: &str) -> String {
     CFGWithSource::new(graph, source).draw_graph()
 }
 
@@ -155,12 +155,12 @@ pub trait DirectedGraph<'a> {
 }
 
 struct CFGWithSource<'stmt> {
-    cfg: CFG<'stmt>,
+    cfg: ControlFlowGraph<'stmt>,
     source: &'stmt str,
 }
 
 impl<'stmt> CFGWithSource<'stmt> {
-    fn new(cfg: CFG<'stmt>, source: &'stmt str) -> Self {
+    fn new(cfg: ControlFlowGraph<'stmt>, source: &'stmt str) -> Self {
         Self { cfg, source }
     }
 }

@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use smallvec::{smallvec, SmallVec};
 
 /// Returns the control flow graph associated to an array of statements
-pub fn build_cfg(stmts: &[Stmt]) -> CFG<'_> {
+pub fn build_cfg(stmts: &[Stmt]) -> ControlFlowGraph<'_> {
     let mut builder = CFGBuilder::with_capacity(stmts.len());
     builder.process_stmts(stmts);
     builder.finish()
@@ -12,7 +12,7 @@ pub fn build_cfg(stmts: &[Stmt]) -> CFG<'_> {
 
 /// Control flow graph
 #[derive(Debug)]
-pub struct CFG<'stmt> {
+pub struct ControlFlowGraph<'stmt> {
     /// Basic blocks - the nodes of the control flow graph
     blocks: IndexVec<BlockId, BlockData<'stmt>>,
     /// Entry point to the control flow graph
@@ -21,7 +21,7 @@ pub struct CFG<'stmt> {
     terminal: BlockId,
 }
 
-impl<'stmt> CFG<'stmt> {
+impl<'stmt> ControlFlowGraph<'stmt> {
     /// Index of entry point to the control flow graph
     pub fn initial(&self) -> BlockId {
         self.initial
@@ -159,7 +159,7 @@ pub enum Condition {
 
 struct CFGBuilder<'stmt> {
     /// Control flow graph under construction
-    cfg: CFG<'stmt>,
+    cfg: ControlFlowGraph<'stmt>,
     /// Current basic block index
     current: BlockId,
     /// Exit block index for current control flow
@@ -180,7 +180,7 @@ impl<'stmt> CFGBuilder<'stmt> {
         });
 
         Self {
-            cfg: CFG {
+            cfg: ControlFlowGraph {
                 blocks,
                 initial,
                 terminal,
@@ -250,7 +250,7 @@ impl<'stmt> CFGBuilder<'stmt> {
     }
 
     /// Returns finished control flow graph
-    fn finish(self) -> CFG<'stmt> {
+    fn finish(self) -> ControlFlowGraph<'stmt> {
         self.cfg
     }
 

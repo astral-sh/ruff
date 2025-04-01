@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use itertools::Itertools;
 use ruff_python_ast::{Identifier, Stmt};
-use ruff_python_semantic::cfg::graph::{build_cfg, BlockId, Condition, CFG};
+use ruff_python_semantic::cfg::graph::{build_cfg, BlockId, Condition, ControlFlowGraph};
 use ruff_text_size::{Ranged, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -69,7 +69,7 @@ pub(crate) fn in_function(checker: &Checker, name: &Identifier, body: &[Stmt]) {
 }
 
 /// Returns set of block indices reachable from entry block
-fn reachable(cfg: &CFG) -> HashSet<BlockId> {
+fn reachable(cfg: &ControlFlowGraph) -> HashSet<BlockId> {
     let mut reachable = HashSet::with_capacity(cfg.num_blocks());
     let mut stack = Vec::new();
 
