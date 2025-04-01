@@ -4582,6 +4582,14 @@ impl<'db> GeneralCallableType<'db> {
 
             match next_parameter {
                 EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
+                    ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. }
+                        if !other_keywords.is_empty() =>
+                    {
+                        // If there are any unmatched keyword parameters in `other`, they need to
+                        // be checked against the keyword-only / keyword-variadic parameters that
+                        // will be done after this loop.
+                        break;
+                    }
                     ParameterKind::PositionalOnly { default_type, .. }
                     | ParameterKind::PositionalOrKeyword { default_type, .. }
                     | ParameterKind::KeywordOnly { default_type, .. } => {
