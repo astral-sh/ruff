@@ -13,7 +13,9 @@ use crate::{
     Db,
 };
 
-use super::{Annotation, Diagnostic, DisplayDiagnosticConfig, Severity, SubDiagnostic};
+use super::{
+    Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, Severity, SubDiagnostic,
+};
 
 #[derive(Debug)]
 pub(crate) struct DisplayDiagnostic<'a> {
@@ -45,6 +47,27 @@ impl<'a> DisplayDiagnostic<'a> {
 
 impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if matches!(self.config.format, DiagnosticFormat::Concise) {
+            match self.diag.severity() {
+                Severity::Info => f.write_str("info")?,
+                Severity::Warning => f.write_str("warning")?,
+                Severity::Error => f.write_str("error")?,
+                Severity::Fatal => f.write_str("fatal")?,
+            }
+
+            write!(f, "[{rule}]", rule = self.diag.id())?;
+            if let Some(span) = self.diag.primary_span() {
+                write!(f, " {path}", path = self.resolver.path(span.file()))?;
+                if let Some(range) = span.range() {
+                    let input = self.resolver.input(span.file());
+                    let start = input.as_source_code().source_location(range.start());
+                    write!(f, ":{line}:{col}", line = start.row, col = start.column)?;
+                }
+                write!(f, ":")?;
+            }
+            return write!(f, " {message}", message = self.diag.primary_message());
+        }
+
         let resolved = Resolved::new(self.resolver, self.diag);
         let renderable = resolved.to_renderable(self.config.context);
         for diag in renderable.diagnostics.iter() {
