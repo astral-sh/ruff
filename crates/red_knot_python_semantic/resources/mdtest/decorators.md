@@ -21,7 +21,7 @@ reveal_type(f)  # revealed: int
 
 ## Type-annotated decorator
 
-More commonly, a decorated returns a modified callable type:
+More commonly, a decorator returns a modified callable type:
 
 ```py
 from typing import Callable

@@ -306,17 +306,22 @@ impl<'db> Bindings<'db> {
                         }
                         [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                             if let Some(getter) = property.getter(db) {
-                                overload.set_return_type(
-                                    getter
-                                        .try_call(db, CallArgumentTypes::positional([*instance]))
-                                        .map(|binding| binding.return_type(db))
-                                        .unwrap_or(Type::Never),
-                                );
+                                if let Ok(return_ty) = getter
+                                    .try_call(db, CallArgumentTypes::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
+                                {
+                                    overload.set_return_type(return_ty);
+                                } else {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the getter failed",
+                                    ));
+                                    overload.set_return_type(Type::unknown());
+                                }
                             } else {
-                                overload.set_return_type(Type::Never);
                                 overload.errors.push(BindingError::InternalCallError(
                                     "property has no getter",
                                 ));
+                                overload.set_return_type(Type::Never);
                             }
                         }
                         _ => {}
@@ -330,12 +335,17 @@ impl<'db> Bindings<'db> {
                         }
                         [Some(instance), ..] => {
                             if let Some(getter) = property.getter(db) {
-                                overload.set_return_type(
-                                    getter
-                                        .try_call(db, CallArgumentTypes::positional([*instance]))
-                                        .map(|binding| binding.return_type(db))
-                                        .unwrap_or(Type::Never),
-                                );
+                                if let Ok(return_ty) = getter
+                                    .try_call(db, CallArgumentTypes::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
+                                {
+                                    overload.set_return_type(return_ty);
+                                } else {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the getter failed",
+                                    ));
+                                    overload.set_return_type(Type::unknown());
+                                }
                             } else {
                                 overload.set_return_type(Type::Never);
                                 overload.errors.push(BindingError::InternalCallError(

@@ -133,7 +133,10 @@ class C:
 c = C()
 c.attr = 1
 
-c.attr
+# TODO: An error should be emitted here, and the type should be `Unknown`
+# or `Never`. See https://github.com/astral-sh/ruff/issues/16298 for more
+# details.
+reveal_type(c.attr)  # revealed: Unknown | property
 ```
 
 ### Wrong setter signature
@@ -231,7 +234,7 @@ reveal_type(attr_property)  # revealed: property
 ```
 
 The `property` class has a `__get__` method, which makes it a descriptor. It also has a `__set__`
-method, which means that it is a *data* descriptor (If there is no setter, `__set__` is still
+method, which means that it is a *data* descriptor (if there is no setter, `__set__` is still
 available but yields an `AttributeError` at runtime).
 
 ```py
