@@ -1,11 +1,13 @@
 use crate::db::tests::TestDb;
 use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    BoundMethodType, IntersectionBuilder, KnownClass, KnownInstanceType, SubclassOfType, TupleType,
-    Type, UnionType,
+    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType, Parameter,
+    Parameters, Signature, SubclassOfType, TupleType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
+use hashbrown::HashSet;
 use quickcheck::{Arbitrary, Gen};
+use ruff_python_ast::name::Name;
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
 /// given a db.
@@ -45,6 +47,59 @@ pub(crate) enum Ty {
         class: &'static str,
         method: &'static str,
     },
+    Callable {
+        params: CallableParams,
+        returns: Option<Box<Ty>>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum CallableParams {
+    GradualForm,
+    List(Vec<Param>),
+}
+
+impl CallableParams {
+    pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
+        match self {
+            CallableParams::GradualForm => Parameters::gradual_form(),
+            CallableParams::List(params) => Parameters::new(params.into_iter().map(|param| {
+                let mut parameter = match param.kind {
+                    ParamKind::PositionalOnly => Parameter::positional_only(param.name),
+                    ParamKind::PositionalOrKeyword => {
+                        Parameter::positional_or_keyword(param.name.unwrap())
+                    }
+                    ParamKind::Variadic => Parameter::variadic(param.name.unwrap()),
+                    ParamKind::KeywordOnly => Parameter::keyword_only(param.name.unwrap()),
+                    ParamKind::KeywordVariadic => Parameter::keyword_variadic(param.name.unwrap()),
+                };
+                if let Some(annotated_ty) = param.annotated_ty {
+                    parameter = parameter.with_annotated_type(annotated_ty.into_type(db));
+                }
+                if let Some(default_ty) = param.default_ty {
+                    parameter = parameter.with_default_type(default_ty.into_type(db));
+                }
+                parameter
+            })),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Param {
+    kind: ParamKind,
+    name: Option<Name>,
+    annotated_ty: Option<Ty>,
+    default_ty: Option<Ty>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum ParamKind {
+    PositionalOnly,
+    PositionalOrKeyword,
+    Variadic,
+    KeywordOnly,
+    KeywordVariadic,
 }
 
 #[salsa::tracked]
@@ -131,6 +186,13 @@ impl Ty {
 
                 create_bound_method(db, function, builtins_class)
             }
+            Ty::Callable { params, returns } => Type::Callable(CallableType::new(
+                db,
+                Signature::new(
+                    params.into_parameters(db),
+                    returns.map(|ty| ty.into_type(db)),
+                ),
+            )),
         }
     }
 }
@@ -205,7 +267,7 @@ fn arbitrary_type(g: &mut Gen, size: u32) -> Ty {
     if size == 0 {
         arbitrary_core_type(g)
     } else {
-        match u32::arbitrary(g) % 4 {
+        match u32::arbitrary(g) % 5 {
             0 => arbitrary_core_type(g),
             1 => Ty::Union(
                 (0..*g.choose(&[2, 3]).unwrap())
@@ -225,8 +287,100 @@ fn arbitrary_type(g: &mut Gen, size: u32) -> Ty {
                     .map(|_| arbitrary_type(g, size - 1))
                     .collect(),
             },
+            4 => Ty::Callable {
+                params: match u32::arbitrary(g) % 2 {
+                    0 => CallableParams::GradualForm,
+                    1 => CallableParams::List(arbitrary_parameter_list(g, size)),
+                    _ => unreachable!(),
+                },
+                returns: arbitrary_optional_type(g, size - 1).map(Box::new),
+            },
             _ => unreachable!(),
         }
+    }
+}
+
+fn arbitrary_parameter_list(g: &mut Gen, size: u32) -> Vec<Param> {
+    let mut params: Vec<Param> = vec![];
+    let mut used_names = HashSet::new();
+
+    // First, choose the number of parameters to generate.
+    for _ in 0..*g.choose(&[0, 1, 2, 3, 4, 5]).unwrap() {
+        // Next, choose the kind of parameters that can be generated based on the last parameter.
+        let next_kind = match params.last().map(|p| p.kind) {
+            None | Some(ParamKind::PositionalOnly) => *g
+                .choose(&[
+                    ParamKind::PositionalOnly,
+                    ParamKind::PositionalOrKeyword,
+                    ParamKind::Variadic,
+                    ParamKind::KeywordOnly,
+                    ParamKind::KeywordVariadic,
+                ])
+                .unwrap(),
+            Some(ParamKind::PositionalOrKeyword) => *g
+                .choose(&[
+                    ParamKind::PositionalOrKeyword,
+                    ParamKind::Variadic,
+                    ParamKind::KeywordOnly,
+                    ParamKind::KeywordVariadic,
+                ])
+                .unwrap(),
+            Some(ParamKind::Variadic | ParamKind::KeywordOnly) => *g
+                .choose(&[ParamKind::KeywordOnly, ParamKind::KeywordVariadic])
+                .unwrap(),
+            Some(ParamKind::KeywordVariadic) => {
+                // There can't be any other parameter kind after a keyword variadic parameter.
+                break;
+            }
+        };
+
+        let name = loop {
+            let name = if matches!(next_kind, ParamKind::PositionalOnly) {
+                arbitrary_optional_name(g)
+            } else {
+                Some(arbitrary_name(g))
+            };
+            if let Some(name) = name {
+                if used_names.insert(name.clone()) {
+                    break Some(name);
+                }
+            } else {
+                break None;
+            }
+        };
+
+        params.push(Param {
+            kind: next_kind,
+            name,
+            annotated_ty: arbitrary_optional_type(g, size),
+            default_ty: if matches!(next_kind, ParamKind::Variadic | ParamKind::KeywordVariadic) {
+                None
+            } else {
+                arbitrary_optional_type(g, size)
+            },
+        });
+    }
+
+    params
+}
+
+fn arbitrary_optional_type(g: &mut Gen, size: u32) -> Option<Ty> {
+    match u32::arbitrary(g) % 2 {
+        0 => None,
+        1 => Some(arbitrary_type(g, size)),
+        _ => unreachable!(),
+    }
+}
+
+fn arbitrary_name(g: &mut Gen) -> Name {
+    Name::new(format!("n{}", u32::arbitrary(g) % 10))
+}
+
+fn arbitrary_optional_name(g: &mut Gen) -> Option<Name> {
+    match u32::arbitrary(g) % 2 {
+        0 => None,
+        1 => Some(arbitrary_name(g)),
+        _ => unreachable!(),
     }
 }
 
