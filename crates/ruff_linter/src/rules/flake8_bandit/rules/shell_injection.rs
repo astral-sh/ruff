@@ -310,19 +310,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                     }
                 }
                 // S603
-                Some(ShellKeyword {
-                    truthiness:
-                        Truthiness::False | Truthiness::Falsey | Truthiness::None | Truthiness::Unknown,
-                }) => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        ));
-                    }
-                }
-                // S603
-                None => {
+                _ => {
                     if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                         checker.report_diagnostic(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
