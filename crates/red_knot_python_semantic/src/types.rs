@@ -4569,6 +4569,10 @@ impl<'db> GeneralCallableType<'db> {
             iter_other: other_signature.parameters().iter(),
         };
 
+        // Collect all the standard parameters that have only been matched against a variadic
+        // parameter which means that the keyword variant is still unmatched.
+        let mut other_keywords = Vec::new();
+
         loop {
             let Some(next_parameter) = parameters.next() else {
                 // All parameters have been checked or both the parameter lists were empty. In
@@ -4652,12 +4656,23 @@ impl<'db> GeneralCallableType<'db> {
                             }
                         }
 
-                        (ParameterKind::Variadic { .. }, ParameterKind::PositionalOnly { .. }) => {
+                        (
+                            ParameterKind::Variadic { .. },
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                        ) => {
                             if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
                                 return false;
+                            }
+
+                            if matches!(
+                                other_parameter.kind(),
+                                ParameterKind::PositionalOrKeyword { .. }
+                            ) {
+                                other_keywords.push(other_parameter);
                             }
 
                             // We've reached a variadic parameter in `self` which means there can
@@ -4674,14 +4689,17 @@ impl<'db> GeneralCallableType<'db> {
                                 let Some(other_parameter) = parameters.peek_other() else {
                                     break;
                                 };
-                                if !matches!(
-                                    other_parameter.kind(),
+                                match other_parameter.kind() {
+                                    ParameterKind::PositionalOrKeyword { .. } => {
+                                        other_keywords.push(other_parameter);
+                                    }
                                     ParameterKind::PositionalOnly { .. }
-                                        | ParameterKind::Variadic { .. }
-                                ) {
-                                    // Any other parameter kind cannot be checked against a
-                                    // variadic parameter and is deferred to the next iteration.
-                                    break;
+                                    | ParameterKind::Variadic { .. } => {}
+                                    _ => {
+                                        // Any other parameter kind cannot be checked against a
+                                        // variadic parameter and is deferred to the next iteration.
+                                        break;
+                                    }
                                 }
                                 if !check_types(
                                     other_parameter.annotated_type(),
@@ -4753,9 +4771,13 @@ impl<'db> GeneralCallableType<'db> {
             }
         }
 
-        for other_parameter in other_parameters {
+        for other_parameter in other_keywords.into_iter().chain(other_parameters) {
             match other_parameter.kind() {
                 ParameterKind::KeywordOnly {
+                    name: other_name,
+                    default_type: other_default,
+                }
+                | ParameterKind::PositionalOrKeyword {
                     name: other_name,
                     default_type: other_default,
                 } => {
