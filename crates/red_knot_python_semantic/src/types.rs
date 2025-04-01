@@ -273,6 +273,8 @@ pub enum Type<'db> {
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
+    /// An instance of a typevar in a generic class or function. When the generic class or function
+    /// is specialized, we will replace this typevar with its specialization.
     TypeVar(TypeVarInstance<'db>),
     // TODO protocols, callable types, overloads, generics
 }
