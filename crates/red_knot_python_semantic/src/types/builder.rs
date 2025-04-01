@@ -26,7 +26,7 @@
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
 
-use crate::types::{IntersectionType, KnownClass, Type, UnionType};
+use crate::types::{IntersectionType, KnownClass, Type, TypeVarBoundOrConstraints, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
@@ -169,22 +169,38 @@ impl<'db> IntersectionBuilder<'db> {
             // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
             // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
             // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
-            union
+            return union
                 .elements(self.db)
                 .iter()
                 .map(|elem| self.clone().add_positive(*elem))
                 .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
                     builder.intersections.extend(sub.intersections);
                     builder
-                })
-        } else {
-            // If we are already a union-of-intersections, distribute the new intersected element
-            // across all of those intersections.
-            for inner in &mut self.intersections {
-                inner.add_positive(self.db, ty);
-            }
-            self
+                });
         }
+
+        if let Type::TypeVar(typevar) = ty {
+            if let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                typevar.bound_or_constraints(self.db)
+            {
+                // Ditto for the union of constraints in a constrained typevar.
+                return constraints
+                    .elements(self.db)
+                    .iter()
+                    .map(|constraint| self.clone().add_positive(*constraint))
+                    .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
+                        builder.intersections.extend(sub.intersections);
+                        builder
+                    });
+            }
+        }
+
+        // If we are already a union-of-intersections, distribute the new intersected element
+        // across all of those intersections.
+        for inner in &mut self.intersections {
+            inner.add_positive(self.db, ty);
+        }
+        self
     }
 
     pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
