@@ -5,6 +5,7 @@ import dask.array  # unconventional
 import dask.dataframe  # unconventional
 import matplotlib.pyplot  # unconventional
 import numpy  # unconventional
+import numpy.typing  # unconventional
 import pandas  # unconventional
 import seaborn  # unconventional
 import tensorflow  # unconventional
@@ -20,6 +21,7 @@ import matplotlib.pyplot as plot  # unconventional
 import dask.array as darray  # unconventional
 import dask.dataframe as ddf  # unconventional
 import numpy as nmp  # unconventional
+import numpy.typing as nt  # unconventional
 import pandas as pdas  # unconventional
 import seaborn as sbrn  # unconventional
 import tensorflow as tfz  # unconventional
@@ -35,6 +37,7 @@ import dask.array as da  # conventional
 import dask.dataframe as dd  # conventional
 import matplotlib.pyplot as plt  # conventional
 import numpy as np  # conventional
+import numpy as npt  # conventional
 import pandas as pd  # conventional
 import seaborn as sns  # conventional
 import tensorflow as tf # conventional
