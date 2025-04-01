@@ -1247,7 +1247,7 @@ impl<'db> BindingError<'db> {
                             String::new()
                         }
                     ),
-                    messages,
+                    &messages,
                 );
             }
 

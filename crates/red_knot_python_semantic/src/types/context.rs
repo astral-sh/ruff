@@ -74,7 +74,7 @@ impl<'db> InferContext<'db> {
     ) where
         T: Ranged,
     {
-        self.report_lint_with_secondary_messages(lint, ranged, message, vec![]);
+        self.report_lint_with_secondary_messages(lint, ranged, message, &[]);
     }
 
     /// Reports a lint located at `ranged`.
@@ -83,7 +83,7 @@ impl<'db> InferContext<'db> {
         lint: &'static LintMetadata,
         ranged: T,
         message: fmt::Arguments,
-        secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
+        secondary_messages: &[OldSecondaryDiagnosticMessage],
     ) where
         T: Ranged,
     {
@@ -135,7 +135,7 @@ impl<'db> InferContext<'db> {
         id: DiagnosticId,
         severity: Severity,
         message: fmt::Arguments,
-        secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
+        secondary_messages: &[OldSecondaryDiagnosticMessage],
     ) where
         T: Ranged,
     {
@@ -150,7 +150,7 @@ impl<'db> InferContext<'db> {
         //   any global pragma comments in the file, and any per-file-ignores.
 
         let mut diag = Diagnostic::new(id, severity, "");
-        for secondary_msg in &secondary_messages {
+        for secondary_msg in secondary_messages {
             diag.sub(secondary_msg.to_sub_diagnostic());
         }
         let span = Span::from(self.file).with_range(ranged.range());

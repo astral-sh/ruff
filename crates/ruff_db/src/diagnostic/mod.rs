@@ -5,9 +5,7 @@ use thiserror::Error;
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::TextRange;
 
-pub use crate::diagnostic::old::{
-    OldDiagnosticTrait, OldDisplayDiagnostic, OldParseDiagnostic, OldSecondaryDiagnosticMessage,
-};
+pub use crate::diagnostic::old::OldSecondaryDiagnosticMessage;
 use crate::files::File;
 use crate::Db;
 
