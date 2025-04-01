@@ -4020,6 +4020,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         KnownFunction::Cast => {
                             if let [Some(casted_ty), Some(source_ty)] = overload.parameter_types() {
                                 if source_ty.is_gradual_equivalent_to(self.context.db(), *casted_ty)
+                                    && !source_ty.is_todo()
+                                    && !source_ty.contains_todo(self.context.db())
                                 {
                                     self.context.report_lint(
                                         &REDUNDANT_CAST,
