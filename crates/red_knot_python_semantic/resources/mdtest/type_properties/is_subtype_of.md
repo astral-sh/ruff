@@ -1074,7 +1074,7 @@ def _(f: Callable[[int], int]) -> None: ...
 _(a)
 ```
 
-### Bounded methods
+### Bound methods
 
 ```py
 from typing import Callable
