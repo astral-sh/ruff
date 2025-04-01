@@ -17,7 +17,7 @@ pub struct CFG<'stmt> {
     blocks: IndexVec<BlockId, BlockData<'stmt>>,
     /// Entry point to the control flow graph
     initial: BlockId,
-    /// Terminal node - will always be empty
+    /// Terminal block - will always be empty
     terminal: BlockId,
 }
 
@@ -27,7 +27,7 @@ impl<'stmt> CFG<'stmt> {
         self.initial
     }
 
-    /// Index of terminal node
+    /// Index of terminal block
     pub fn terminal(&self) -> BlockId {
         self.terminal
     }
@@ -71,8 +71,13 @@ pub struct BlockId;
 #[derive(Debug, Default)]
 struct BlockData<'stmt> {
     kind: BlockKind,
+    /// Slice of statements regarded as executing unconditionally in order
     stmts: &'stmt [Stmt],
+    /// Outgoing edges, indicating possible paths of execution after the
+    /// block has concluded
     out: Edges,
+    /// Collection of indices for basic blocks having the current
+    /// block as the target of an edge
     parents: SmallVec<[BlockId; 2]>,
 }
 
@@ -95,13 +100,16 @@ pub(crate) enum BlockKind {
     Generic,
     /// Entry point of the control flow graph
     Start,
-    /// Terminal node for the control flow graph
+    /// Terminal block for the control flow graph
     Terminal,
 }
 
 /// Holds a collection of edges. Each edge is determined by:
 ///  - a [`Condition`] for traversing the edge, and
 ///  - a target block, specified by its [`BlockId`].
+///
+/// The conditions and targets are kept in two separate
+/// vectors which must always be kept the same length.
 #[derive(Debug, Default, Clone)]
 pub struct Edges {
     conditions: SmallVec<[Condition; 4]>,
@@ -226,7 +234,10 @@ impl<'stmt> CFGBuilder<'stmt> {
             // Restore exit
             self.update_exit(cache_exit);
         }
-        // Push remaining statements
+        // It can happen that we have statements left over
+        // and not yet occupying a block. In that case,
+        // `self.current` should be pointing to an empty block
+        // and we push the remaining statements to it here.
         if start < stmts.len() {
             self.set_stmts(&stmts[start..]);
         }
