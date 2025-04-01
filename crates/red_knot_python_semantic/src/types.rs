@@ -320,6 +320,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(DynamicType::Todo(_)))
     }
 
+    pub fn contains_todo(&self, db: &'db dyn Db) -> bool {
+        self.is_todo()
+            || matches!(self, Type::Union(union) if union.elements(db).iter().any(Type::is_todo))
+    }
+
     pub const fn class_literal(class: Class<'db>) -> Self {
         Self::ClassLiteral(ClassLiteralType { class })
     }

@@ -67,6 +67,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&ZERO_STEPSIZE_IN_SLICE);
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
+    registry.register_lint(&REDUNDANT_CAST);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -875,6 +876,27 @@ declare_lint! {
         summary: "Invalid attribute access",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects redundant `cast` calls where the value already has the target type.
+    ///
+    /// ## Why is this bad?
+    /// These casts have no effect and can be removed.
+    ///
+    /// ## Example
+    /// ```python
+    /// def f() -> int:
+    ///     return 10
+    ///
+    /// cast(int, f())  # Redundant
+    /// ```
+    pub(crate) static REDUNDANT_CAST = {
+        summary: "detects redundant `cast` calls",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 
