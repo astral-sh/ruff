@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/type_param_param_spec_invalid_default_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -312,4 +311,25 @@ Module(
 4 | type X[**P = x := int] = int
 5 | type X[**P = *int] = int
   |              ^^^^ Syntax Error: Starred expression cannot be used here
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | type X[**P = *int] = int
+2 | type X[**P = yield x] = int
+  |              ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+3 | type X[**P = yield from x] = int
+4 | type X[**P = x := int] = int
+  |
+
+
+  |
+1 | type X[**P = *int] = int
+2 | type X[**P = yield x] = int
+3 | type X[**P = yield from x] = int
+  |              ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+4 | type X[**P = x := int] = int
+5 | type X[**P = *int] = int
   |

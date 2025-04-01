@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/function_def_invalid_return_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -179,4 +178,14 @@ Module(
 2 | def foo() -> (*int): ...
 3 | def foo() -> yield x: ...
   |              ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | def foo() -> *int: ...
+2 | def foo() -> (*int): ...
+3 | def foo() -> yield x: ...
+  |              ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
   |

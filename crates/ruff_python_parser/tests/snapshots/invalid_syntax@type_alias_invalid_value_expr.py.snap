@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/type_alias_invalid_value_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -158,4 +157,24 @@ Module(
 3 | type x = yield from y
 4 | type x = x := 1
   |            ^^ Syntax Error: Expected a statement
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | type x = *y
+2 | type x = yield y
+  |          ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+3 | type x = yield from y
+4 | type x = x := 1
+  |
+
+
+  |
+1 | type x = *y
+2 | type x = yield y
+3 | type x = yield from y
+  |          ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+4 | type x = x := 1
   |

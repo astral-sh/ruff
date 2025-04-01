@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/param_with_invalid_annotation.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -224,4 +223,14 @@ Module(
 2 | def foo(arg: yield int): ...
 3 | def foo(arg: x := int): ...
   |                ^^ Syntax Error: Expected ',', found ':='
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | def foo(arg: *int): ...
+2 | def foo(arg: yield int): ...
+  |              ^^^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+3 | def foo(arg: x := int): ...
   |

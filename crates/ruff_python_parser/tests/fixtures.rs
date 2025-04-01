@@ -184,38 +184,36 @@ fn test_invalid_syntax(input_path: &Path) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    if parsed.has_valid_syntax() {
-        let mut visitor = SemanticSyntaxCheckerVisitor::new(
-            TestContext::default().with_python_version(options.target_version()),
-        );
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(
+        TestContext::default().with_python_version(options.target_version()),
+    );
 
-        for stmt in parsed.suite() {
-            visitor.visit_stmt(stmt);
-        }
+    for stmt in parsed.suite() {
+        visitor.visit_stmt(stmt);
+    }
 
-        let semantic_syntax_errors = visitor.into_context().diagnostics.into_inner();
+    let semantic_syntax_errors = visitor.into_context().diagnostics.into_inner();
 
-        assert!(
+    assert!(
         parsed.has_syntax_errors() || !semantic_syntax_errors.is_empty(),
         "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
     );
 
-        if !semantic_syntax_errors.is_empty() {
-            writeln!(&mut output, "## Semantic Syntax Errors\n").unwrap();
-        }
+    if !semantic_syntax_errors.is_empty() {
+        writeln!(&mut output, "## Semantic Syntax Errors\n").unwrap();
+    }
 
-        for error in semantic_syntax_errors {
-            writeln!(
-                &mut output,
-                "{}\n",
-                CodeFrame {
-                    range: error.range,
-                    error: &ParseErrorType::OtherError(error.to_string()),
-                    source_code: &source_code,
-                }
-            )
-            .unwrap();
-        }
+    for error in semantic_syntax_errors {
+        writeln!(
+            &mut output,
+            "{}\n",
+            CodeFrame {
+                range: error.range,
+                error: &ParseErrorType::OtherError(error.to_string()),
+                source_code: &source_code,
+            }
+        )
+        .unwrap();
     }
 
     insta::with_settings!({
