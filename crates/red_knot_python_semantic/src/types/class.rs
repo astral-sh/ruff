@@ -1511,6 +1511,9 @@ pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
     Never,
     /// The symbol `typing.Any` (which can also be found as `typing_extensions.Any`)
+    /// This is not used since typeshed switched to representing `Any` as a class; now we use
+    /// `KnownClass::Any` instead. But we still support the old `Any = object()` representation, at
+    /// least for now. TODO maybe remove?
     Any,
     /// The symbol `typing.Tuple` (which can also be found as `typing_extensions.Tuple`)
     Tuple,
