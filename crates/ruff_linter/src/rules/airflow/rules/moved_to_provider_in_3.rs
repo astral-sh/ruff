@@ -873,6 +873,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
 
+        // apache-airflow-providers-smtp
+        ["airflow", "operators", "email_operator" | "email", "EmailOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.smtp.operators.smtp.EmailOperator",
+            provider: "smtp",
+            version: "1.0.0",
+        },
+
+
         // apache-airflow-providers-standard
         ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => Replacement::ProviderName{
             name: "airflow.providers.standard.operators.empty.EmptyOperator",

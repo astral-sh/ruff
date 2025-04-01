@@ -1746,22 +1746,31 @@ AIR302.py:423:1: AIR302 Import path `airflow.triggers.temporal` is moved into `s
     |
     = help: Install `apache-airflow-provider-standard>=0.0.3` and import from `airflow.providers.standard.triggers.temporal` instead.
 
-AIR302.py:428:1: AIR302 `airflow.operators.dummy.DummyOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:427:1: AIR302 `airflow.operators.dummy.DummyOperator` is moved into `standard` provider in Airflow 3.0;
     |
-426 | from airflow.operators.email import EmailOperator
-427 |
-428 | DummyOperator()
+425 | from airflow.operators.dummy import DummyOperator, EmptyOperator
+426 |
+427 | DummyOperator()
     | ^^^^^^^^^^^^^ AIR302
-429 | EmptyOperator()
-430 | EmailOperator()
+428 | EmptyOperator()
     |
     = help: Install `apache-airflow-provider-standard>=0.1.0` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
 
-AIR302.py:429:1: AIR302 `airflow.operators.dummy.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:428:1: AIR302 `airflow.operators.dummy.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
     |
-428 | DummyOperator()
-429 | EmptyOperator()
+427 | DummyOperator()
+428 | EmptyOperator()
     | ^^^^^^^^^^^^^ AIR302
-430 | EmailOperator()
+429 |
+430 | from airflow.operators.email import EmailOperator
     |
     = help: Install `apache-airflow-provider-standard>=0.1.0` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
+
+AIR302.py:432:1: AIR302 `airflow.operators.email.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
+    |
+430 | from airflow.operators.email import EmailOperator
+431 |
+432 | EmailOperator()
+    | ^^^^^^^^^^^^^ AIR302
+    |
+    = help: Install `apache-airflow-provider-smtp>=1.0.0` and use `airflow.providers.smtp.operators.smtp.EmailOperator` instead.
