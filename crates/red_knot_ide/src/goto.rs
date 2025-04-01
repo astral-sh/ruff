@@ -243,7 +243,7 @@ pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Optio
 mod tests {
 
     use crate::db::tests::TestDb;
-    use crate::go_to_type_definition;
+    use crate::{go_to_type_definition, NavigationTarget};
     use insta::assert_snapshot;
     use insta::internals::SettingsBindDropGuard;
     use red_knot_python_semantic::{
@@ -253,7 +253,7 @@ mod tests {
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
         Severity, Span, SubDiagnostic,
     };
-    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::files::{system_path_to_file, File, FileRange};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_text_size::{Ranged, TextSize};
@@ -860,23 +860,11 @@ f(**kwargs<CURSOR>)
 
             let mut buf = vec![];
 
-            let mut source = SubDiagnostic::new(Severity::Info, "Source");
-            source.annotate(Annotation::primary(
-                Span::from(targets.range.file()).with_range(targets.range.range()),
-            ));
+            let source = targets.range;
 
-            for target in targets {
-                let mut diagnostic = Diagnostic::new(
-                    DiagnosticId::Lint(LintName::of("goto-type-definition")),
-                    Severity::Info,
-                    "Type definition".to_string(),
-                );
-                diagnostic.annotate(Annotation::primary(
-                    Span::from(target.file).with_range(target.focus_range),
-                ));
-                diagnostic.sub(source.clone());
-
-                diagnostic
+            for target in &*targets {
+                GotoTypeDefinitionDiagnostic::new(source, target)
+                    .into_diagnostic()
                     .print(
                         &self.db,
                         &DisplayDiagnosticConfig::default()
@@ -887,9 +875,40 @@ f(**kwargs<CURSOR>)
                     .unwrap();
             }
 
-            source.printed();
-
             String::from_utf8(buf).unwrap()
+        }
+    }
+
+    struct GotoTypeDefinitionDiagnostic {
+        source: FileRange,
+        target: FileRange,
+    }
+
+    impl GotoTypeDefinitionDiagnostic {
+        fn new(source: FileRange, target: &NavigationTarget) -> Self {
+            Self {
+                source,
+                target: FileRange::new(target.file(), target.focus_range()),
+            }
+        }
+
+        fn into_diagnostic(self) -> Diagnostic {
+            let mut source = SubDiagnostic::new(Severity::Info, "Source");
+            source.annotate(Annotation::primary(
+                Span::from(self.source.file()).with_range(self.source.range()),
+            ));
+
+            let mut main = Diagnostic::new(
+                DiagnosticId::Lint(LintName::of("goto-type-definition")),
+                Severity::Info,
+                "Type definition".to_string(),
+            );
+            main.annotate(Annotation::primary(
+                Span::from(self.target.file()).with_range(self.target.range()),
+            ));
+            main.sub(source);
+
+            main
         }
     }
 }

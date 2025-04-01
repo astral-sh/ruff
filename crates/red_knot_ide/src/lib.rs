@@ -87,6 +87,10 @@ impl NavigationTargets {
         Self(smallvec::SmallVec::new())
     }
 
+    fn iter(&self) -> std::slice::Iter<'_, NavigationTarget> {
+        self.0.iter()
+    }
+
     #[cfg(test)]
     fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -99,6 +103,15 @@ impl IntoIterator for NavigationTargets {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a NavigationTargets {
+    type Item = &'a NavigationTarget;
+    type IntoIter = std::slice::Iter<'a, NavigationTarget>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
