@@ -829,21 +829,19 @@ impl<'db> Type<'db> {
                 .any(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
 
             // A typevar is always assignable to itself, and is never assignable to any other
-            // typevar (since there is no guarantee that they will be specialized to the same
-            // type).
-            // TODO: Two distinct typevars that are both bounded by the same final class are
-            // subtypes of each other.
+            // typevar, since there is no guarantee that they will be specialized to the same
+            // type. (This is true even if both typevars are bounded by the same final class, since
+            // you can specialize the typevars to `Never` in addition to that final class.)
             (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
                 self_typevar == other_typevar
             }
 
             // No types are assignable to a typevar, since there's no guarantee what type the
-            // typevar will be specialized to. (If the typevar is bounded, it might be specialized
-            // to a smaller type than the bound. If it is constrained, there must be multiple
-            // constraints, and the typevar might be specialized to any one of them.)
-            // TODO: If the typevar is bounded by a final type, then that final type _is_
-            // assignable to the typevar, since that's the only fully static type it could be
-            // specialized to.
+            // typevar will be specialized to. If the typevar is bounded, it might be specialized
+            // to a smaller type than the bound. (This is true even if the bound is a final class,
+            // since the typevar can still be specialized to `Never`.) If it is constrained, there
+            // must be multiple constraints, and the typevar might be specialized to any one of
+            // them.
             (_, Type::TypeVar(_)) => false,
 
             // A tuple type S is assignable to a tuple type T if their lengths are the same, and
@@ -1432,10 +1430,19 @@ impl<'db> Type<'db> {
                 false
             }
 
-            // A typevar is never a singleton, since it can always be specialized to `Any`.
-            // QUESTION: Should a bounded typevar be considered a singleton if its bound is? It can
-            // still be specialized to `Any`, instead of to the singleton bound.
-            Type::TypeVar(_) => false,
+            // An unbounded, unconstrained typevar is not a singleton, because it can be
+            // specialized to a non-singleton type. A bounded typevar is not a singleton, even if
+            // the bound is a final singleton class, since it can still be specialized to `Never`.
+            // A constrained typevar is a singleton if all of its constraints are singletons. (Note
+            // that you cannot specialize a constrained typevar to a subtype of a constraint.)
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| constraint.is_singleton(db)),
+            },
 
             // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
@@ -1504,10 +1511,20 @@ impl<'db> Type<'db> {
             | Type::SliceLiteral(..)
             | Type::KnownInstance(..) => true,
 
-            // A typevar is never single-valued, since it can always be specialized to `Any`.
-            // QUESTION: Should a bounded typevar be considered single-valued if its bound is? It
-            // can still be specialized to `Any`, instead of to the single-valued bound.
-            Type::TypeVar(_) => false,
+            // An unbounded, unconstrained typevar is not single-valued, because it can be
+            // specialized to a multple-valued type. A bounded typevar is not single-valued, even
+            // if the bound is a final single-valued class, since it can still be specialized to
+            // `Never`. A constrained typevar is single-valued if all of its constraints are
+            // single-valued. (Note that you cannot specialize a constrained typevar to a subtype
+            // of a constraint.)
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| constraint.is_single_valued(db)),
+            },
 
             Type::SubclassOf(..) => {
                 // TODO: Same comment as above for `is_singleton`
@@ -3554,10 +3571,10 @@ impl<'db> InvalidTypeExpression<'db> {
 /// Data regarding a single type variable.
 ///
 /// This is referenced by `KnownInstanceType::TypeVar` (to represent the singleton type of the
-/// runtime `typing.TypeVar` object itself). In the future, it will also be referenced also by a
-/// new `Type` variant to represent the type that this typevar represents as an annotation: that
-/// is, an unknown set of objects, constrained by the upper-bound/constraints on this type var,
-/// defaulting to the default type of this type var when not otherwise bound to a type.
+/// runtime `typing.TypeVar` object itself), and by `Type::TypeVar` to represent the type that this
+/// typevar represents as an annotation: that is, an unknown set of objects, constrained by the
+/// upper-bound/constraints on this type var, defaulting to the default type of this type var when
+/// not otherwise bound to a type.
 ///
 /// This must be a tracked struct, not an interned one, because typevar equivalence is by identity,
 /// not by value. Two typevars that have the same name, bound/constraints, and default, are still

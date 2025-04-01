@@ -1971,15 +1971,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(expr);
                     None
                 } else {
-                    let union = UnionType::from_elements(
+                    // We don't use UnionType::from_elements or UnionBuilder here, because we don't
+                    // want to simplify the list of constraints like we do with the elements of an
+                    // actual union type.
+                    let elements = UnionType::new(
                         self.db(),
-                        elts.iter().map(|expr| self.infer_type_expression(expr)),
+                        elts.iter()
+                            .map(|expr| self.infer_type_expression(expr))
+                            .collect::<Box<[_]>>(),
                     );
-                    let elements = union
-                        .into_union()
-                        .unwrap_or_else(|| UnionType::new(self.db(), Box::from([union])));
                     let constraints = TypeVarBoundOrConstraints::Constraints(elements);
-                    self.store_expression_type(expr, union);
+                    // But when we construct an actual union type for the constraint expression as
+                    // a whole, we do use UnionType::from_elements to maintain the invariant that
+                    // all union types are simplified.
+                    self.store_expression_type(
+                        expr,
+                        UnionType::from_elements(self.db(), elements.elements(self.db())),
+                    );
                     Some(constraints)
                 }
             }
