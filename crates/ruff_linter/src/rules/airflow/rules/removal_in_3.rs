@@ -689,12 +689,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => {
             Replacement::Name("airflow.operators.branch.BaseBranchOperator")
         }
-        ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => {
-            Replacement::Name("airflow.operators.empty.EmptyOperator")
-        }
-        ["airflow", "operators", "email_operator", "EmailOperator"] => {
-            Replacement::Name("airflow.operators.email.EmailOperator")
-        }
         ["airflow", "operators", "dagrun_operator", "TriggerDagRunLink"] => {
             Replacement::Name("airflow.operators.trigger_dagrun.TriggerDagRunLink")
         }
