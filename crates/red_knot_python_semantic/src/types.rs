@@ -264,7 +264,7 @@ pub enum Type<'db> {
     /// type. We currently add this as a separate variant because `FunctionType.__get__`
     /// is an overloaded method and we do not support `@overload` yet.
     WrapperDescriptorDunderGet,
-    /// An arbitrary type that has a certain specified signature.
+    /// The type of an arbitrary callable object with a certain specified signature.
     Callable(CallableType<'db>),
     /// A specific module object
     ModuleLiteral(ModuleLiteralType<'db>),
