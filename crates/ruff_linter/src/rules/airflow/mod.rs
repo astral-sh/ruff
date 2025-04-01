@@ -1,4 +1,5 @@
 //! Airflow-specific rules.
+pub(crate) mod helpers;
 pub(crate) mod rules;
 
 #[cfg(test)]

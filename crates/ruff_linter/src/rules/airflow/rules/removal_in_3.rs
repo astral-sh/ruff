@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::rules::numpy::helpers::{is_guarded_by_try_except, Replacement};
+use crate::rules::airflow::helpers::{is_guarded_by_try_except, Replacement};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
