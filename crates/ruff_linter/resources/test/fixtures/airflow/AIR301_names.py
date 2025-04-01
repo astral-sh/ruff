@@ -71,7 +71,7 @@ from airflow.providers.trino.datasets import trino
 from airflow.secrets.local_filesystem import LocalFilesystemBackend, load_connections
 from airflow.security.permissions import RESOURCE_DATASET
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
-from airflow.sensors.date_time_sensor import DateTimeSensor
+
 from airflow.sensors.external_task import (
     ExternalTaskMarker,
     ExternalTaskSensor,
@@ -244,8 +244,8 @@ RESOURCE_DATASET
 # airflow.sensors.base_sensor_operator
 BaseSensorOperator()
 
-# airflow.sensors.date_time_sensor
-DateTimeSensor()
+
+
 
 
 
