@@ -38,3 +38,14 @@ def function_returning_any() -> Any:
 # error: [redundant-cast] "Value is already of type `Any`"
 cast(Any, function_returning_any())
 ```
+
+Complex type expressions (which may be unsupported) do not lead to spurious `[redundant-cast]`
+diagnostics.
+
+```py
+from typing import Callable
+
+def f(x: Callable[[dict[str, int]], None], y: tuple[dict[str, int]]):
+    a = cast(Callable[[list[bytes]], None], x)
+    b = cast(tuple[list[bytes]], y)
+```

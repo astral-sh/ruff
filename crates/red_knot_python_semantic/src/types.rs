@@ -321,8 +321,60 @@ impl<'db> Type<'db> {
     }
 
     pub fn contains_todo(&self, db: &'db dyn Db) -> bool {
-        self.is_todo()
-            || matches!(self, Type::Union(union) if union.elements(db).iter().any(Type::is_todo))
+        match self {
+            Self::Dynamic(DynamicType::Todo(_) | DynamicType::TodoProtocol) => true,
+
+            Self::AlwaysFalsy
+            | Self::AlwaysTruthy
+            | Self::Never
+            | Self::BooleanLiteral(_)
+            | Self::BytesLiteral(_)
+            | Self::FunctionLiteral(_)
+            | Self::Instance(_)
+            | Self::ModuleLiteral(_)
+            | Self::ClassLiteral(_)
+            | Self::KnownInstance(_)
+            | Self::StringLiteral(_)
+            | Self::IntLiteral(_)
+            | Self::LiteralString
+            | Self::SliceLiteral(_)
+            | Self::Dynamic(DynamicType::Unknown | DynamicType::Any)
+            | Self::Callable(
+                CallableType::BoundMethod(_)
+                | CallableType::WrapperDescriptorDunderGet
+                | CallableType::MethodWrapperDunderGet(_),
+            ) => false,
+
+            Self::Callable(CallableType::General(callable)) => {
+                let signature = callable.signature(db);
+                signature.parameters().iter().any(|param| {
+                    param
+                        .annotated_type()
+                        .is_some_and(|ty| ty.contains_todo(db))
+                }) || signature.return_ty.is_some_and(|ty| ty.contains_todo(db))
+            }
+
+            Self::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoProtocol) => true,
+                ClassBase::Dynamic(DynamicType::Unknown | DynamicType::Any) => false,
+                ClassBase::Class(_) => false,
+            },
+
+            Self::Tuple(tuple) => tuple.elements(db).iter().any(|ty| ty.contains_todo(db)),
+
+            Self::Union(union) => union.elements(db).iter().any(|ty| ty.contains_todo(db)),
+
+            Self::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|ty| ty.contains_todo(db))
+                    || intersection
+                        .negative(db)
+                        .iter()
+                        .any(|ty| ty.contains_todo(db))
+            }
+        }
     }
 
     pub const fn class_literal(class: Class<'db>) -> Self {
