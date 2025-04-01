@@ -19,6 +19,7 @@ env:
   RUSTUP_MAX_RETRIES: 10
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.13"
+  SHELLCHECK_VERSION: "0.10.0"
 
 jobs:
   determine_changes:
@@ -654,6 +655,21 @@ jobs:
         with:
           path: ~/.cache/pre-commit
           key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: "Cache shellcheck"
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: /usr/local/bin/shellcheck
+          key: shellcheck-${{ env.SHELLCHECK_VERSION }}
+      - name: "Install shellcheck"
+        run: |
+          test -f /usr/local/bin/shellcheck && exit 0  # already installed (e.g. from cache)
+          cd "$(mktemp -d)"
+          gh release download -R koalaman/shellcheck "v${{ env.SHELLCHECK_VERSION }}" -p '*linux.x86_64*'
+          tar --strip-components=1 -xJf "shellcheck-v${{ env.SHELLCHECK_VERSION }}.linux.x86_64.tar.xz"
+          cp shellcheck /usr/local/bin/shellcheck
+          shellcheck --version
+        env:
+          GH_TOKEN: ${{ github.token }} # required to use `gh release download`
       - name: "Run pre-commit"
         run: |
           echo '```console' > "$GITHUB_STEP_SUMMARY"

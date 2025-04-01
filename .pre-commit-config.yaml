@@ -115,11 +115,13 @@ repos:
         args:
           - "-ignore=SC2129" # ignorable stylistic lint from shellcheck
           - "-ignore=SC2016" # another shellcheck lint: seems to have false positives?
-        additional_dependencies:
-          # actionlint has a shellcheck integration which extracts shell scripts in `run:` steps from GitHub Actions
-          # and checks these with shellcheck. This is arguably its most useful feature,
-          # but the integration only works if shellcheck is installed
-          - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.10.0"
+        # actionlint has a shellcheck integration which extracts shell scripts in `run:` steps from GitHub Actions
+        # and checks these with shellcheck. This is arguably its most useful feature,
+        # but the integration only works if shellcheck is installed.
+        # The CI pipeline installs the native version of shellcheck; for maximum local coverage, ensure you do too.
+        # If you can't, you can uncomment the below to install a slow, WASI-based version of shellcheck.
+        # additional_dependencies:
+        # - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.10.0"
 
 ci:
   skip: [cargo-fmt, dev-generate-all]
