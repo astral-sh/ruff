@@ -198,6 +198,7 @@ from airflow.operators.sql import (
 from airflow.operators.sqlite_operator import SqliteOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
+from airflow.sensors import filesystem
 from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
 from airflow.sensors.date_time_sensor import DateTimeSensor
 from airflow.sensors.external_task import (
@@ -325,6 +326,9 @@ fab_override
 FabAuthManager()
 FabAirflowSecurityManagerOverride()
 
+# check whether attribute access
+basic_auth.auth_current_user
+
 # apache-airflow-providers-cncf-kubernetes
 ALL_NAMESPACES
 POD_EXECUTOR_DONE_KEY
@@ -422,6 +426,11 @@ ZendeskHook()
 EmailOperator()
 
 # apache-airflow-providers-standard
+filesystem.FileSensor()
+FileSensor()
+TriggerDagRunOperator()
+ExternalTaskMarker()
+ExternalTaskSensor()
 BranchDateTimeOperator()
 BranchDayOfWeekOperator()
 BranchPythonOperator()
@@ -452,7 +461,6 @@ FileTrigger()
 DateTimeTrigger()
 TimeDeltaTrigger()
 SubprocessResult()
-working_directory()
 SubprocessHook()
 TimeDeltaSensor()
 TimeDeltaSensorAsync()
@@ -460,8 +468,5 @@ WaitSensor()
 TimeSensor()
 TimeSensorAsync()
 BranchDateTimeOperator()
+working_directory()
 target_times_as_dates()
-
-from airflow.sensors import filesystem
-
-filesystem.FileSensor()
