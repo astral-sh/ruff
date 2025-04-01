@@ -1220,7 +1220,7 @@ Module(
 
   |
 1 | def f[T]() -> (y := 3): ...
-  |                ^^^^^^ Syntax Error: named expression cannot be used in a type annotation
+  |                ^^^^^^ Syntax Error: named expression cannot be used within a generic definition
 2 | def g[T](arg: (x := 1)): ...
 3 | def h[T](x: (yield 1)): ...
   |
@@ -1229,7 +1229,7 @@ Module(
   |
 1 | def f[T]() -> (y := 3): ...
 2 | def g[T](arg: (x := 1)): ...
-  |                ^^^^^^ Syntax Error: named expression cannot be used in a type annotation
+  |                ^^^^^^ Syntax Error: named expression cannot be used within a generic definition
 3 | def h[T](x: (yield 1)): ...
 4 | def i(x: (yield 1)): ...
   |
@@ -1239,7 +1239,7 @@ Module(
 1 | def f[T]() -> (y := 3): ...
 2 | def g[T](arg: (x := 1)): ...
 3 | def h[T](x: (yield 1)): ...
-  |              ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |              ^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
 4 | def i(x: (yield 1)): ...
 5 | def j[T]() -> (yield 1): ...
   |
@@ -1249,7 +1249,7 @@ Module(
 2 | def g[T](arg: (x := 1)): ...
 3 | def h[T](x: (yield 1)): ...
 4 | def i(x: (yield 1)): ...
-  |           ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |           ^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
 5 | def j[T]() -> (yield 1): ...
 6 | def k() -> (yield 1): ...
   |
@@ -1259,7 +1259,7 @@ Module(
 3 | def h[T](x: (yield 1)): ...
 4 | def i(x: (yield 1)): ...
 5 | def j[T]() -> (yield 1): ...
-  |                ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |                ^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
 6 | def k() -> (yield 1): ...
 7 | def l[T](x: (yield from 1)): ...
   |
@@ -1269,7 +1269,7 @@ Module(
 4 | def i(x: (yield 1)): ...
 5 | def j[T]() -> (yield 1): ...
 6 | def k() -> (yield 1): ...
-  |             ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |             ^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
 7 | def l[T](x: (yield from 1)): ...
 8 | def m(x: (yield from 1)): ...
   |
@@ -1279,7 +1279,7 @@ Module(
 5 | def j[T]() -> (yield 1): ...
 6 | def k() -> (yield 1): ...
 7 | def l[T](x: (yield from 1)): ...
-  |              ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |              ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
 8 | def m(x: (yield from 1)): ...
 9 | def n[T]() -> (yield from 1): ...
   |
@@ -1289,7 +1289,7 @@ Module(
  6 | def k() -> (yield 1): ...
  7 | def l[T](x: (yield from 1)): ...
  8 | def m(x: (yield from 1)): ...
-   |           ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+   |           ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
  9 | def n[T]() -> (yield from 1): ...
 10 | def o() -> (yield from 1): ...
    |
@@ -1299,7 +1299,7 @@ Module(
  7 | def l[T](x: (yield from 1)): ...
  8 | def m(x: (yield from 1)): ...
  9 | def n[T]() -> (yield from 1): ...
-   |                ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+   |                ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
 10 | def o() -> (yield from 1): ...
 11 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
    |
@@ -1309,7 +1309,7 @@ Module(
  8 | def m(x: (yield from 1)): ...
  9 | def n[T]() -> (yield from 1): ...
 10 | def o() -> (yield from 1): ...
-   |             ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+   |             ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
 11 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
 12 | def q[T = (yield 1)](): ...     # yield in TypeVar default
    |
@@ -1319,7 +1319,7 @@ Module(
  9 | def n[T]() -> (yield from 1): ...
 10 | def o() -> (yield from 1): ...
 11 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
-   |           ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+   |           ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar bound
 12 | def q[T = (yield 1)](): ...     # yield in TypeVar default
 13 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
    |
@@ -1329,7 +1329,7 @@ Module(
 10 | def o() -> (yield from 1): ...
 11 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
 12 | def q[T = (yield 1)](): ...     # yield in TypeVar default
-   |            ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+   |            ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar default
 13 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
 14 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
    |
@@ -1339,7 +1339,7 @@ Module(
 11 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
 12 | def q[T = (yield 1)](): ...     # yield in TypeVar default
 13 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
-   |              ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+   |              ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVarTuple default
 14 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
 15 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
    |
@@ -1349,7 +1349,7 @@ Module(
 12 | def q[T = (yield 1)](): ...     # yield in TypeVar default
 13 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
 14 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
-   |               ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+   |               ^^^^^^^ Syntax Error: yield expression cannot be used within a ParamSpec default
 15 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
 16 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
    |
@@ -1359,7 +1359,7 @@ Module(
 13 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
 14 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
 15 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
-   |           ^^^^^^ Syntax Error: named expression cannot be used in a type annotation
+   |           ^^^^^^ Syntax Error: named expression cannot be used within a TypeVar bound
 16 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
 17 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
    |
@@ -1369,7 +1369,7 @@ Module(
 14 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
 15 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
 16 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
-   |            ^^^^^^ Syntax Error: named expression cannot be used in a type annotation
+   |            ^^^^^^ Syntax Error: named expression cannot be used within a TypeVar default
 17 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
 18 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
    |
@@ -1379,7 +1379,7 @@ Module(
 15 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
 16 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
 17 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
-   |              ^^^^^^ Syntax Error: named expression cannot be used in a type annotation
+   |              ^^^^^^ Syntax Error: named expression cannot be used within a TypeVarTuple default
 18 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
    |
 
@@ -1388,5 +1388,5 @@ Module(
 16 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
 17 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
 18 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
-   |               ^^^^^^ Syntax Error: named expression cannot be used in a type annotation
+   |               ^^^^^^ Syntax Error: named expression cannot be used within a ParamSpec default
    |

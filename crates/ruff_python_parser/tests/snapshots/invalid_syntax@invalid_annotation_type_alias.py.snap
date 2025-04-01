@@ -288,7 +288,7 @@ Module(
 
   |
 1 | type X[T: (yield 1)] = int      # TypeVar bound
-  |            ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |            ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar bound
 2 | type X[T = (yield 1)] = int     # TypeVar default
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
   |
@@ -297,7 +297,7 @@ Module(
   |
 1 | type X[T: (yield 1)] = int      # TypeVar bound
 2 | type X[T = (yield 1)] = int     # TypeVar default
-  |             ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |             ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar default
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
   |
@@ -307,7 +307,7 @@ Module(
 1 | type X[T: (yield 1)] = int      # TypeVar bound
 2 | type X[T = (yield 1)] = int     # TypeVar default
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
-  |               ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |               ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVarTuple default
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
 5 | type Y = (yield 1)              # yield in value
   |
@@ -317,7 +317,7 @@ Module(
 2 | type X[T = (yield 1)] = int     # TypeVar default
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
-  |                ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |                ^^^^^^^ Syntax Error: yield expression cannot be used within a ParamSpec default
 5 | type Y = (yield 1)              # yield in value
 6 | type Y = (x := 1)               # named expr in value
   |
@@ -327,7 +327,7 @@ Module(
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
 5 | type Y = (yield 1)              # yield in value
-  |           ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |           ^^^^^^^ Syntax Error: yield expression cannot be used within a type alias
 6 | type Y = (x := 1)               # named expr in value
   |
 
@@ -336,5 +336,5 @@ Module(
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
 5 | type Y = (yield 1)              # yield in value
 6 | type Y = (x := 1)               # named expr in value
-  |           ^^^^^^ Syntax Error: named expression cannot be used in a type annotation
+  |           ^^^^^^ Syntax Error: named expression cannot be used within a type alias
   |

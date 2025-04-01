@@ -127,12 +127,19 @@ impl SemanticSyntaxChecker {
                 // def u[T = (x := 1)](): ...      # named expr in TypeVar default
                 // def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
                 // def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
-                let mut visitor = AnnotationVisitor {
-                    allow_named_expr: type_params.is_none(),
+                let is_generic = type_params.is_some();
+                let mut visitor = InvalidExpressionVisitor {
+                    allow_named_expr: !is_generic,
+                    place: InvalidExpressionPlace::TypeAnnotation,
                     ctx,
                 };
                 if let Some(type_params) = type_params {
                     visitor.visit_type_params(type_params);
+                }
+                if is_generic {
+                    visitor.place = InvalidExpressionPlace::GenericDefinition;
+                } else {
+                    visitor.place = InvalidExpressionPlace::TypeAnnotation;
                 }
                 for param in parameters
                     .iter()
@@ -160,12 +167,19 @@ impl SemanticSyntaxChecker {
                 // class J[T]((yield from 1)): ...
                 // class K[T: (yield 1)]: ...      # yield in TypeVar
                 // class L[T: (x := 1)]: ...       # named expr in TypeVar
-                let mut visitor = AnnotationVisitor {
-                    allow_named_expr: type_params.is_none(),
+                let is_generic = type_params.is_some();
+                let mut visitor = InvalidExpressionVisitor {
+                    allow_named_expr: !is_generic,
+                    place: InvalidExpressionPlace::TypeAnnotation,
                     ctx,
                 };
                 if let Some(type_params) = type_params {
                     visitor.visit_type_params(type_params);
+                }
+                if is_generic {
+                    visitor.place = InvalidExpressionPlace::GenericDefinition;
+                } else {
+                    visitor.place = InvalidExpressionPlace::BaseClass;
                 }
                 if let Some(arguments) = arguments {
                     visitor.visit_arguments(arguments);
@@ -181,8 +195,9 @@ impl SemanticSyntaxChecker {
                 // type X[**Ts = (yield 1)] = int  # ParamSpec default
                 // type Y = (yield 1)              # yield in value
                 // type Y = (x := 1)               # named expr in value
-                let mut visitor = AnnotationVisitor {
+                let mut visitor = InvalidExpressionVisitor {
                     allow_named_expr: false,
+                    place: InvalidExpressionPlace::TypeAlias,
                     ctx,
                 };
                 visitor.visit_expr(value);
@@ -561,14 +576,9 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
-            SemanticSyntaxErrorKind::InvalidAnnotation(kind) => match kind {
-                InvalidAnnotationKind::Yield => {
-                    f.write_str("yield expression cannot be used in a type annotation")
-                }
-                InvalidAnnotationKind::NamedExpr => {
-                    f.write_str("named expression cannot be used in a type annotation")
-                }
-            },
+            SemanticSyntaxErrorKind::InvalidExpression(kind, place) => {
+                write!(f, "{kind} cannot be used within a {place}")
+            }
         }
     }
 }
@@ -683,7 +693,11 @@ pub enum SemanticSyntaxErrorKind {
     /// [BPO 45000]: https://github.com/python/cpython/issues/89163
     WriteToDebug(WriteToDebugKind),
 
-    /// Represents the use of invalid syntax in a type annotation.
+    /// Represents the use of an invalid expression kind in one of several locations.
+    ///
+    /// The kinds include `yield` and `yield from` expressions and named expressions, and locations
+    /// include type parameter bounds and defaults, type annotations, type aliases, and base class
+    /// lists.
     ///
     /// ## Examples
     ///
@@ -692,13 +706,49 @@ pub enum SemanticSyntaxErrorKind {
     /// type Y = (yield 1)
     /// def f[T](x: int) -> (y := 3): return x
     /// ```
-    InvalidAnnotation(InvalidAnnotationKind),
+    InvalidExpression(InvalidExpressionKind, InvalidExpressionPlace),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InvalidExpressionPlace {
+    TypeVarBound,
+    TypeVarDefault,
+    TypeVarTupleDefault,
+    ParamSpecDefault,
+    TypeAnnotation,
+    BaseClass,
+    GenericDefinition,
+    TypeAlias,
+}
+
+impl Display for InvalidExpressionPlace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            InvalidExpressionPlace::TypeVarBound => "TypeVar bound",
+            InvalidExpressionPlace::TypeVarDefault => "TypeVar default",
+            InvalidExpressionPlace::TypeVarTupleDefault => "TypeVarTuple default",
+            InvalidExpressionPlace::ParamSpecDefault => "ParamSpec default",
+            InvalidExpressionPlace::TypeAnnotation => "type annotation",
+            InvalidExpressionPlace::GenericDefinition => "generic definition",
+            InvalidExpressionPlace::BaseClass => "base class",
+            InvalidExpressionPlace::TypeAlias => "type alias",
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum InvalidAnnotationKind {
+pub enum InvalidExpressionKind {
     Yield,
     NamedExpr,
+}
+
+impl Display for InvalidExpressionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            InvalidExpressionKind::Yield => "yield expression",
+            InvalidExpressionKind::NamedExpr => "named expression",
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -822,7 +872,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
     }
 }
 
-struct AnnotationVisitor<'a, Ctx> {
+struct InvalidExpressionVisitor<'a, Ctx> {
     /// Allow named expressions (`x := ...`) to appear in annotations.
     ///
     /// These are allowed in non-generic functions, for example:
@@ -835,9 +885,11 @@ struct AnnotationVisitor<'a, Ctx> {
 
     /// Context used for emitting errors.
     ctx: &'a Ctx,
+
+    place: InvalidExpressionPlace,
 }
 
-impl<Ctx> Visitor<'_> for AnnotationVisitor<'_, Ctx>
+impl<Ctx> Visitor<'_> for InvalidExpressionVisitor<'_, Ctx>
 where
     Ctx: SemanticSyntaxContext,
 {
@@ -846,7 +898,10 @@ where
             Expr::Named(ast::ExprNamed { range, .. }) if !self.allow_named_expr => {
                 SemanticSyntaxChecker::add_error(
                     self.ctx,
-                    SemanticSyntaxErrorKind::InvalidAnnotation(InvalidAnnotationKind::NamedExpr),
+                    SemanticSyntaxErrorKind::InvalidExpression(
+                        InvalidExpressionKind::NamedExpr,
+                        self.place,
+                    ),
                     *range,
                 );
             }
@@ -854,13 +909,43 @@ where
             | Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
                 SemanticSyntaxChecker::add_error(
                     self.ctx,
-                    SemanticSyntaxErrorKind::InvalidAnnotation(InvalidAnnotationKind::Yield),
+                    SemanticSyntaxErrorKind::InvalidExpression(
+                        InvalidExpressionKind::Yield,
+                        self.place,
+                    ),
                     *range,
                 );
             }
             _ => {}
         }
         ast::visitor::walk_expr(self, expr);
+    }
+
+    fn visit_type_param(&mut self, type_param: &ast::TypeParam) {
+        match type_param {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
+                if let Some(expr) = bound {
+                    self.place = InvalidExpressionPlace::TypeVarBound;
+                    self.visit_expr(expr);
+                }
+                if let Some(expr) = default {
+                    self.place = InvalidExpressionPlace::TypeVarDefault;
+                    self.visit_expr(expr);
+                }
+            }
+            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. }) => {
+                if let Some(expr) = default {
+                    self.place = InvalidExpressionPlace::TypeVarTupleDefault;
+                    self.visit_expr(expr);
+                }
+            }
+            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => {
+                if let Some(expr) = default {
+                    self.place = InvalidExpressionPlace::ParamSpecDefault;
+                    self.visit_expr(expr);
+                }
+            }
+        };
     }
 }
 

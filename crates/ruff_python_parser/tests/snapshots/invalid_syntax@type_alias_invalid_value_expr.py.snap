@@ -165,7 +165,7 @@ Module(
   |
 1 | type x = *y
 2 | type x = yield y
-  |          ^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |          ^^^^^^^ Syntax Error: yield expression cannot be used within a type alias
 3 | type x = yield from y
 4 | type x = x := 1
   |
@@ -175,6 +175,6 @@ Module(
 1 | type x = *y
 2 | type x = yield y
 3 | type x = yield from y
-  |          ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used in a type annotation
+  |          ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a type alias
 4 | type x = x := 1
   |
