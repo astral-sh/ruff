@@ -17,7 +17,7 @@ mod tests {
 
     #[test_case("no_flow.py")]
     fn control_flow_graph(filename: &str) {
-        let path = PathBuf::from_iter(["resources/test/fixtures/cfg", filename]);
+        let path = PathBuf::from("resources/test/fixtures/cfg").join(filename);
         let source = fs::read_to_string(path).expect("failed to read file");
         let stmts = parse_module(&source)
             .unwrap_or_else(|err| panic!("failed to parse source: '{source}': {err}"))
