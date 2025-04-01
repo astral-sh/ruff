@@ -702,9 +702,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
             Replacement::Name("airflow.sdk.bases.sensor.BaseSensorOperator")
         }
-        ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => {
-            Replacement::Name("airflow.sensors.date_time.DateTimeSensor")
-        }
 
         // airflow.timetables
         ["airflow", "timetables", rest @ ..] => match &rest {
