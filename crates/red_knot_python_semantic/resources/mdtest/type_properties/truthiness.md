@@ -120,3 +120,13 @@ static_assert(is_subtype_of(typing.TypeAliasType, AlwaysTruthy))
 static_assert(is_subtype_of(types.MethodWrapperType, AlwaysTruthy))
 static_assert(is_subtype_of(types.WrapperDescriptorType, AlwaysTruthy))
 ```
+
+### `Callable` types always have ambiguous truthiness
+
+```py
+from typing import Callable
+
+def f(x: Callable, y: Callable[[int], str]):
+    reveal_type(bool(x))  # revealed: bool
+    reveal_type(bool(y))  # revealed: bool
+```
