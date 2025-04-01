@@ -10,7 +10,7 @@ mod tests {
     use crate::cfg::graph::build_cfg;
     use crate::cfg::visualize::draw_cfg;
     use insta;
-    use ruff_python_ast::Stmt;
+
     use ruff_python_parser::parse_module;
     use ruff_text_size::Ranged;
     use test_case::test_case;
@@ -26,9 +26,9 @@ mod tests {
         let mut output = String::new();
 
         for (i, stmt) in stmts.into_iter().enumerate() {
-            let Stmt::FunctionDef(func) = stmt else {
-                continue;
-            };
+            let func = stmt.as_function_def_stmt().expect(
+                "Snapshot test for control flow graph should consist only of function definitions",
+            );
             let cfg = build_cfg(&func.body);
 
             let mermaid_graph = draw_cfg(cfg, &source);
