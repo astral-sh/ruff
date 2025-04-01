@@ -112,7 +112,7 @@ fn is_stdin(files: &[PathBuf], stdin_filename: Option<&Path>) -> bool {
     file == Path::new("-")
 }
 
-/// Returns the default set of files if none are provided, otherwise returns `None`.
+/// Returns the default set of files if none are provided, otherwise returns provided files.
 fn resolve_default_files(files: Vec<PathBuf>, is_stdin: bool) -> Vec<PathBuf> {
     if files.is_empty() {
         if is_stdin {
@@ -290,8 +290,8 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     // - If `--fix` or `--fix-only` is set, apply applicable fixes to the filesystem (or
     //   print them to stdout, if we're reading from stdin).
     // - If `--diff` or `--fix-only` are set, don't print any violations (only applicable fixes)
-    // - By default, applicable fixes only include [`Applicablility::Automatic`], but if
-    //   `--unsafe-fixes` is set, then [`Applicablility::Suggested`] fixes are included.
+    // - By default, applicable fixes only include [`Applicability::Automatic`], but if
+    //   `--unsafe-fixes` is set, then [`Applicability::Suggested`] fixes are included.
 
     let fix_mode = if cli.diff {
         FixMode::Diff

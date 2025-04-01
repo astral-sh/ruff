@@ -4,7 +4,7 @@ from collections.abc import Callable, Hashable, Iterable, Mapping, Sequence
 from configparser import RawConfigParser
 from re import Pattern
 from threading import Thread
-from typing import IO, Any, Final, Literal, SupportsIndex, TypedDict, overload
+from typing import IO, Any, Final, Literal, SupportsIndex, TypedDict, overload, type_check_only
 from typing_extensions import Required, TypeAlias
 
 from . import Filter, Filterer, Formatter, Handler, Logger, _FilterType, _FormatStyle, _Level
@@ -14,17 +14,20 @@ RESET_ERROR: Final[int]  # undocumented
 IDENTIFIER: Final[Pattern[str]]  # undocumented
 
 if sys.version_info >= (3, 11):
+    @type_check_only
     class _RootLoggerConfiguration(TypedDict, total=False):
         level: _Level
         filters: Sequence[str | _FilterType]
         handlers: Sequence[str]
 
 else:
+    @type_check_only
     class _RootLoggerConfiguration(TypedDict, total=False):
         level: _Level
         filters: Sequence[str]
         handlers: Sequence[str]
 
+@type_check_only
 class _LoggerConfiguration(_RootLoggerConfiguration, TypedDict, total=False):
     propagate: bool
 
@@ -32,6 +35,7 @@ _FormatterConfigurationTypedDict = TypedDict(
     "_FormatterConfigurationTypedDict", {"class": str, "format": str, "datefmt": str, "style": _FormatStyle}, total=False
 )
 
+@type_check_only
 class _FilterConfigurationTypedDict(TypedDict):
     name: str
 
@@ -43,6 +47,7 @@ _FilterConfiguration: TypeAlias = _FilterConfigurationTypedDict | dict[str, Any]
 # Handler config can have additional keys even when not providing a custom factory so we just use `dict`.
 _HandlerConfiguration: TypeAlias = dict[str, Any]
 
+@type_check_only
 class _DictConfigArgs(TypedDict, total=False):
     version: Required[Literal[1]]
     formatters: dict[str, _FormatterConfiguration]

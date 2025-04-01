@@ -371,6 +371,39 @@ a = NotBoolable()
 10 and a and True
 ```
 
+## Operations on class objects
+
+When operating on class objects, the corresponding dunder methods are looked up on the metaclass.
+
+```py
+from __future__ import annotations
+
+class Meta(type):
+    def __add__(self, other: Meta) -> int:
+        return 1
+
+    def __lt__(self, other: Meta) -> bool:
+        return True
+
+    def __getitem__(self, key: int) -> str:
+        return "a"
+
+class A(metaclass=Meta): ...
+class B(metaclass=Meta): ...
+
+reveal_type(A + B)  # revealed: int
+# error: [unsupported-operator] "Operator `-` is unsupported between objects of type `Literal[A]` and `Literal[B]`"
+reveal_type(A - B)  # revealed: Unknown
+
+reveal_type(A < B)  # revealed: bool
+reveal_type(A > B)  # revealed: bool
+
+# error: [unsupported-operator] "Operator `<=` is not supported for types `Literal[A]` and `Literal[B]`"
+reveal_type(A <= B)  # revealed: Unknown
+
+reveal_type(A[0])  # revealed: str
+```
+
 ## Unsupported
 
 ### Dunder as instance attribute

@@ -858,6 +858,52 @@ static_assert(not is_subtype_of(CallableTypeOf[variadic], CallableTypeOf[keyword
 static_assert(not is_subtype_of(CallableTypeOf[variadic], CallableTypeOf[keyword_variadic]))
 ```
 
+But, there are special cases when matching against standard parameters. This is due to the fact that
+a standard parameter can be passed as a positional or keyword parameter. This means that the
+subtyping relation needs to consider both cases.
+
+```py
+def variadic_keyword(*args: int, **kwargs: int) -> None: ...
+def standard_int(a: int) -> None: ...
+def standard_float(a: float) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_float]))
+```
+
+If the type of either the variadic or keyword-variadic parameter is not a supertype of the standard
+parameter, then the subtyping relation is invalid.
+
+```py
+def variadic_bool(*args: bool, **kwargs: int) -> None: ...
+def keyword_variadic_bool(*args: int, **kwargs: bool) -> None: ...
+
+static_assert(not is_subtype_of(CallableTypeOf[variadic_bool], CallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(CallableTypeOf[keyword_variadic_bool], CallableTypeOf[standard_int]))
+```
+
+The standard parameter can follow a variadic parameter in the subtype.
+
+```py
+def standard_variadic_int(a: int, *args: int) -> None: ...
+def standard_variadic_float(a: int, *args: float) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_variadic_int]))
+static_assert(not is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_variadic_float]))
+```
+
+The keyword part of the standard parameter can be matched against keyword-only parameter with the
+same name if the keyword-variadic parameter is absent.
+
+```py
+def variadic_a(*args: int, a: int) -> None: ...
+def variadic_b(*args: int, b: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[variadic_a], CallableTypeOf[standard_int]))
+# The parameter name is different
+static_assert(not is_subtype_of(CallableTypeOf[variadic_b], CallableTypeOf[standard_int]))
+```
+
 #### Keyword-only
 
 For keyword-only parameters, the name should be the same:

@@ -34,6 +34,10 @@ impl ParseOptions {
         self.target_version = target_version;
         self
     }
+
+    pub fn target_version(&self) -> PythonVersion {
+        self.target_version
+    }
 }
 
 impl From<Mode> for ParseOptions {

@@ -334,9 +334,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.32"
+version = "4.5.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6088f3ae8c3608d19260cd7445411865a485688711b78b5be70d78cd96136f83"
+checksum = "e958897981290da2a852763fe9cdb89cd36977a5d729023127095fa94d95e2ff"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -344,9 +344,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.32"
+version = "4.5.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22a7ef7f676155edfb82daa97f99441f3ebf4a58d5e32f295a56259f1b6facc8"
+checksum = "83b0f35019843db2160b5bb19ae09b4e6411ac33fc6a712003c33e03090e2489"
 dependencies = [
  "anstream",
  "anstyle",
@@ -918,7 +918,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1499,7 +1499,7 @@ checksum = "e04d7f318608d35d4b61ddd75cbdaee86b023ebe2bd5a66ee0915f0bf93095a9"
 dependencies = [
  "hermit-abi 0.5.0",
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1726,9 +1726,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.26"
+version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30bde2b3dc3671ae49d8e2e9f044c7c005836e7a023ee57cffa25ab82764bb9e"
+checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 
 [[package]]
 name = "loom"
@@ -2504,6 +2504,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "red_knot_ide"
+version = "0.0.0"
+dependencies = [
+ "red_knot_python_semantic",
+ "red_knot_vendored",
+ "ruff_db",
+ "salsa",
+ "tracing",
+]
+
+[[package]]
 name = "red_knot_project"
 version = "0.0.0"
 dependencies = [
@@ -2514,6 +2525,7 @@ dependencies = [
  "notify",
  "pep440_rs",
  "rayon",
+ "red_knot_ide",
  "red_knot_python_semantic",
  "red_knot_vendored",
  "ruff_cache",
@@ -2998,7 +3010,6 @@ dependencies = [
  "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_diagnostics",
- "ruff_index",
  "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
@@ -3193,6 +3204,7 @@ name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.9.0",
+ "insta",
  "is-macro",
  "ruff_cache",
  "ruff_index",
@@ -3205,6 +3217,7 @@ dependencies = [
  "schemars",
  "serde",
  "smallvec",
+ "test-case",
 ]
 
 [[package]]
@@ -3386,7 +3399,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3399,7 +3412,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.3",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3784,7 +3797,7 @@ dependencies = [
  "getrandom 0.3.2",
  "once_cell",
  "rustix 1.0.2",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

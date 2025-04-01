@@ -58,7 +58,7 @@ from airflow.operators.python_operator import (
     ShortCircuitOperator,
 )
 from airflow.operators.subdag import SubDagOperator
-from airflow.providers.amazon.auth_manager.avp.entities import AvpEntities
+from airflow.providers.amazon.aws.auth_manager.avp.entities import AvpEntities
 from airflow.providers.amazon.aws.datasets import s3
 from airflow.providers.common.io.datasets import file as common_io_file
 from airflow.providers.fab.auth_manager import fab_auth_manager
@@ -74,10 +74,19 @@ from airflow.secrets.local_filesystem import LocalFilesystemBackend, load_connec
 from airflow.security.permissions import RESOURCE_DATASET
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
 from airflow.sensors.date_time_sensor import DateTimeSensor
-from airflow.sensors.external_task_sensor import (
+from airflow.sensors.external_task import (
     ExternalTaskMarker,
     ExternalTaskSensor,
     ExternalTaskSensorLink,
+)
+from airflow.sensors.external_task_sensor import (
+    ExternalTaskMarker as ExternalTaskMarkerFromExternalTaskSensor,
+)
+from airflow.sensors.external_task_sensor import (
+    ExternalTaskSensor as ExternalTaskSensorFromExternalTaskSensor,
+)
+from airflow.sensors.external_task_sensor import (
+    ExternalTaskSensorLink as ExternalTaskSensorLinkFromExternalTaskSensor,
 )
 from airflow.sensors.time_delta_sensor import TimeDeltaSensor
 from airflow.timetables.datasets import DatasetOrTimeSchedule
@@ -96,8 +105,9 @@ from airflow.utils.dates import (
     scale_time_units,
 )
 from airflow.utils.decorators import apply_defaults
-from airflow.utils.file import mkdirs
-from airflow.utils.helpers import chain, cross_downstream
+from airflow.utils.file import TemporaryDirectory, mkdirs
+from airflow.utils.helpers import chain as helper_chain
+from airflow.utils.helpers import cross_downstream as helper_cross_downstream
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.trigger_rule import TriggerRule
 from airflow.www.auth import has_access, has_access_dataset
@@ -148,6 +158,10 @@ on_dataset_created
 # airflow.metrics.validators
 AllowListValidator()
 BlockListValidator()
+
+
+# airflow.models.baseoperator
+chain, chain_linear, cross_downstream
 
 # airflow.operators.dummy
 EmptyOperator()
@@ -272,12 +286,12 @@ get_parsing_context
 apply_defaults
 
 # airflow.utils.file
-TemporaryDirector()
+TemporaryDirectory()
 mkdirs
 
 #  airflow.utils.helpers
-chain
-cross_downstream
+helper_chain
+helper_cross_downstream
 
 # airflow.utils.state
 SHUTDOWN

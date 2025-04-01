@@ -18,8 +18,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    todo_type, BoundMethodType, CallableType, ClassLiteralType, KnownClass, KnownFunction,
-    KnownInstanceType, UnionType,
+    todo_type, BoundMethodType, ClassLiteralType, KnownClass, KnownFunction, KnownInstanceType,
+    UnionType,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
@@ -210,26 +210,22 @@ impl<'db> Bindings<'db> {
             };
 
             match binding_type {
-                Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+                Type::MethodWrapperDunderGet(function) => {
                     if function.has_known_class_decorator(db, KnownClass::Classmethod)
                         && function.decorators(db).len() == 1
                     {
                         match overload.parameter_types() {
                             [_, Some(owner)] => {
-                                overload.set_return_type(Type::Callable(
-                                    CallableType::BoundMethod(BoundMethodType::new(
-                                        db, function, *owner,
-                                    )),
-                                ));
+                                overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
+                                    db, function, *owner,
+                                )));
                             }
                             [Some(instance), None] => {
-                                overload.set_return_type(Type::Callable(
-                                    CallableType::BoundMethod(BoundMethodType::new(
-                                        db,
-                                        function,
-                                        instance.to_meta_type(db),
-                                    )),
-                                ));
+                                overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
+                                    db,
+                                    function,
+                                    instance.to_meta_type(db),
+                                )));
                             }
                             _ => {}
                         }
@@ -237,14 +233,14 @@ impl<'db> Bindings<'db> {
                         if first.is_none(db) {
                             overload.set_return_type(Type::FunctionLiteral(function));
                         } else {
-                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, *first),
+                            overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
+                                db, function, *first,
                             )));
                         }
                     }
                 }
 
-                Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
+                Type::WrapperDescriptorDunderGet => {
                     if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
                         overload.parameter_types()
                     {
@@ -253,20 +249,18 @@ impl<'db> Bindings<'db> {
                         {
                             match overload.parameter_types() {
                                 [_, _, Some(owner)] => {
-                                    overload.set_return_type(Type::Callable(
-                                        CallableType::BoundMethod(BoundMethodType::new(
-                                            db, *function, *owner,
-                                        )),
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(db, *function, *owner),
                                     ));
                                 }
 
                                 [_, Some(instance), None] => {
-                                    overload.set_return_type(Type::Callable(
-                                        CallableType::BoundMethod(BoundMethodType::new(
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(
                                             db,
                                             *function,
                                             instance.to_meta_type(db),
-                                        )),
+                                        ),
                                     ));
                                 }
 
@@ -308,10 +302,8 @@ impl<'db> Bindings<'db> {
                                 }
 
                                 [_, Some(instance), _] => {
-                                    overload.set_return_type(Type::Callable(
-                                        CallableType::BoundMethod(BoundMethodType::new(
-                                            db, *function, *instance,
-                                        )),
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(db, *function, *instance),
                                     ));
                                 }
 
@@ -935,17 +927,15 @@ impl<'db> CallableDescription<'db> {
                 kind: "class",
                 name: class_type.class().name(db),
             }),
-            Type::Callable(CallableType::BoundMethod(bound_method)) => Some(CallableDescription {
+            Type::BoundMethod(bound_method) => Some(CallableDescription {
                 kind: "bound method",
                 name: bound_method.function(db).name(db),
             }),
-            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
-                Some(CallableDescription {
-                    kind: "method wrapper `__get__` of function",
-                    name: function.name(db),
-                })
-            }
-            Type::Callable(CallableType::WrapperDescriptorDunderGet) => Some(CallableDescription {
+            Type::MethodWrapperDunderGet(function) => Some(CallableDescription {
+                kind: "method wrapper `__get__` of function",
+                name: function.name(db),
+            }),
+            Type::WrapperDescriptorDunderGet => Some(CallableDescription {
                 kind: "wrapper descriptor",
                 name: "FunctionType.__get__",
             }),
@@ -1061,13 +1051,11 @@ impl<'db> BindingError<'db> {
                     None
                 }
             }
-            Type::Callable(CallableType::BoundMethod(bound_method)) => {
-                Self::parameter_span_from_index(
-                    db,
-                    Type::FunctionLiteral(bound_method.function(db)),
-                    parameter_index,
-                )
-            }
+            Type::BoundMethod(bound_method) => Self::parameter_span_from_index(
+                db,
+                Type::FunctionLiteral(bound_method.function(db)),
+                parameter_index,
+            ),
             _ => None,
         }
     }

@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
+snapshot_kind: text
 ---
 AIR302_class_attribute.py:24:21: AIR302 `airflow.Dataset` is removed in Airflow 3.0
    |
@@ -124,6 +125,16 @@ AIR302_class_attribute.py:39:25: AIR302 `iter_dataset_aliases` is removed in Air
 41 | # airflow.datasets.manager
    |
    = help: Use `iter_asset_aliases` instead
+
+AIR302_class_attribute.py:42:6: AIR302 `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+   |
+41 | # airflow.datasets.manager
+42 | dm = DatasetManager()
+   |      ^^^^^^^^^^^^^^ AIR302
+43 | dm.register_dataset_change()
+44 | dm.create_datasets()
+   |
+   = help: Use `airflow.assets.AssetManager` instead
 
 AIR302_class_attribute.py:43:4: AIR302 `register_dataset_change` is removed in Airflow 3.0
    |

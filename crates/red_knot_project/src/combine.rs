@@ -43,7 +43,7 @@ use ruff_python_ast::PythonVersion;
 /// resolved extra search path of `["b", "c", "a"]`, which means `a` will be tried last.
 ///
 /// There's an argument here that the user should be able to specify the order of the paths,
-/// because only then is the user in full control of where to insert the path when specyifing `extra-paths`
+/// because only then is the user in full control of where to insert the path when specifying `extra-paths`
 /// in multiple sources.
 ///
 /// ## Macro

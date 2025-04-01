@@ -1,3 +1,5 @@
+use ruff_text_size::Ranged;
+
 use crate::visitor::source_order::SourceOrderVisitor;
 use crate::{
     self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, PatternArguments,
@@ -35,12 +37,16 @@ impl ast::StmtFunctionDef {
             decorator_list,
             returns,
             type_params,
-            ..
+            range: _,
+            is_async: _,
+            name,
         } = self;
 
         for decorator in decorator_list {
             visitor.visit_decorator(decorator);
         }
+
+        visitor.visit_identifier(name);
 
         if let Some(type_params) = type_params {
             visitor.visit_type_params(type_params);
@@ -66,12 +72,15 @@ impl ast::StmtClassDef {
             body,
             decorator_list,
             type_params,
-            ..
+            name,
+            range: _,
         } = self;
 
         for decorator in decorator_list {
             visitor.visit_decorator(decorator);
         }
+
+        visitor.visit_identifier(name);
 
         if let Some(type_params) = type_params {
             visitor.visit_type_params(type_params);
@@ -197,7 +206,8 @@ impl ast::StmtFor {
             iter,
             body,
             orelse,
-            ..
+            range: _,
+            is_async: _,
         } = self;
 
         visitor.visit_expr(target);
@@ -379,10 +389,14 @@ impl ast::StmtImportFrom {
     {
         let ast::StmtImportFrom {
             range: _,
-            module: _,
+            module,
             names,
             level: _,
         } = self;
+
+        if let Some(module) = module {
+            visitor.visit_identifier(module);
+        }
 
         for alias in names {
             visitor.visit_alias(alias);
@@ -391,22 +405,28 @@ impl ast::StmtImportFrom {
 }
 
 impl ast::StmtGlobal {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::StmtGlobal { range: _, names: _ } = self;
+        let ast::StmtGlobal { range: _, names } = self;
+
+        for name in names {
+            visitor.visit_identifier(name);
+        }
     }
 }
 
 impl ast::StmtNonlocal {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::StmtNonlocal { range: _, names: _ } = self;
+        let ast::StmtNonlocal { range: _, names } = self;
+
+        for name in names {
+            visitor.visit_identifier(name);
+        }
     }
 }
 
@@ -879,12 +899,13 @@ impl ast::ExprAttribute {
     {
         let ast::ExprAttribute {
             value,
-            attr: _,
+            attr,
             ctx: _,
             range: _,
         } = self;
 
         visitor.visit_expr(value);
+        visitor.visit_identifier(attr);
     }
 }
 
@@ -1014,12 +1035,17 @@ impl ast::ExceptHandlerExceptHandler {
         let ast::ExceptHandlerExceptHandler {
             range: _,
             type_,
-            name: _,
+            name,
             body,
         } = self;
         if let Some(expr) = type_ {
             visitor.visit_expr(expr);
         }
+
+        if let Some(name) = name {
+            visitor.visit_identifier(name);
+        }
+
         visitor.visit_body(body);
     }
 }
@@ -1064,12 +1090,25 @@ impl ast::PatternMatchMapping {
         let ast::PatternMatchMapping {
             keys,
             patterns,
+            rest,
             range: _,
-            rest: _,
         } = self;
+
+        let mut rest = rest.as_ref();
+
         for (key, pattern) in keys.iter().zip(patterns) {
+            if let Some(rest_identifier) = rest {
+                if rest_identifier.start() < key.start() {
+                    visitor.visit_identifier(rest_identifier);
+                    rest = None;
+                }
+            }
             visitor.visit_expr(key);
             visitor.visit_pattern(pattern);
+        }
+
+        if let Some(rest) = rest {
+            visitor.visit_identifier(rest);
         }
     }
 }
@@ -1090,12 +1129,15 @@ impl ast::PatternMatchClass {
 }
 
 impl ast::PatternMatchStar {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let ast::PatternMatchStar { range: _, name: _ } = self;
+        let ast::PatternMatchStar { range: _, name } = self;
+
+        if let Some(name) = name {
+            visitor.visit_identifier(name);
+        }
     }
 }
 
@@ -1107,10 +1149,14 @@ impl ast::PatternMatchAs {
         let ast::PatternMatchAs {
             pattern,
             range: _,
-            name: _,
+            name,
         } = self;
         if let Some(pattern) = pattern {
             visitor.visit_pattern(pattern);
+        }
+
+        if let Some(name) = name {
+            visitor.visit_identifier(name);
         }
     }
 }
@@ -1155,10 +1201,11 @@ impl ast::PatternKeyword {
     {
         let PatternKeyword {
             range: _,
-            attr: _,
+            attr,
             pattern,
         } = self;
 
+        visitor.visit_identifier(attr);
         visitor.visit_pattern(pattern);
     }
 }
@@ -1221,10 +1268,11 @@ impl ast::Parameter {
     {
         let ast::Parameter {
             range: _,
-            name: _,
+            name,
             annotation,
         } = self;
 
+        visitor.visit_identifier(name);
         if let Some(expr) = annotation {
             visitor.visit_annotation(expr);
         }
@@ -1255,25 +1303,32 @@ impl ast::Keyword {
     {
         let ast::Keyword {
             range: _,
-            arg: _,
+            arg,
             value,
         } = self;
 
+        if let Some(arg) = arg {
+            visitor.visit_identifier(arg);
+        }
         visitor.visit_expr(value);
     }
 }
 
 impl Alias {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, _visitor: &mut V)
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::Alias {
             range: _,
-            name: _,
-            asname: _,
+            name,
+            asname,
         } = self;
+
+        visitor.visit_identifier(name);
+        if let Some(asname) = asname {
+            visitor.visit_identifier(asname);
+        }
     }
 }
 
@@ -1354,10 +1409,11 @@ impl ast::TypeParamTypeVar {
         let ast::TypeParamTypeVar {
             bound,
             default,
-            name: _,
+            name,
             range: _,
         } = self;
 
+        visitor.visit_identifier(name);
         if let Some(expr) = bound {
             visitor.visit_expr(expr);
         }
@@ -1375,9 +1431,10 @@ impl ast::TypeParamTypeVarTuple {
     {
         let ast::TypeParamTypeVarTuple {
             range: _,
-            name: _,
+            name,
             default,
         } = self;
+        visitor.visit_identifier(name);
         if let Some(expr) = default {
             visitor.visit_expr(expr);
         }
@@ -1392,9 +1449,10 @@ impl ast::TypeParamParamSpec {
     {
         let ast::TypeParamParamSpec {
             range: _,
-            name: _,
+            name,
             default,
         } = self;
+        visitor.visit_identifier(name);
         if let Some(expr) = default {
             visitor.visit_expr(expr);
         }

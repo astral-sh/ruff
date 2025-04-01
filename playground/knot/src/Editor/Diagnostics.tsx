@@ -20,7 +20,7 @@ export default function Diagnostics({
   const diagnostics = useMemo(() => {
     const sorted = [...unsorted];
     sorted.sort((a, b) => {
-      return (a.text_range()?.start ?? 0) - (b.text_range()?.start ?? 0);
+      return (a.textRange()?.start ?? 0) - (b.textRange()?.start ?? 0);
     });
 
     return sorted;
@@ -73,15 +73,15 @@ function Items({
   return (
     <ul className="space-y-0.5 grow overflow-y-scroll">
       {diagnostics.map((diagnostic, index) => {
-        const position = diagnostic.to_range(workspace);
+        const position = diagnostic.toRange(workspace);
         const start = position?.start;
         const id = diagnostic.id();
 
-        const startLine = (start?.line ?? 0) + 1;
-        const startColumn = (start?.character ?? 0) + 1;
+        const startLine = start?.line ?? 1;
+        const startColumn = start?.column ?? 1;
 
         return (
-          <li key={`${diagnostic.text_range()?.start ?? 0}-${id ?? index}`}>
+          <li key={`${startLine}:${startColumn}-${id ?? index}`}>
             <button
               onClick={() => onGoTo(startLine, startColumn)}
               className="w-full text-start cursor-pointer select-text"

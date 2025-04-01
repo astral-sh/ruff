@@ -43,13 +43,13 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build sdist"
-        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1.47.3
         with:
           command: sdist
           args: --out dist
@@ -72,14 +72,14 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - x86_64"
-        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1.47.3
         with:
           target: x86_64
           args: --release --locked --out dist
@@ -114,14 +114,14 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: arm64
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels - aarch64"
-        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1.47.3
         with:
           target: aarch64
           args: --release --locked --out dist
@@ -170,14 +170,14 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1.47.3
         with:
           target: ${{ matrix.platform.target }}
           args: --release --locked --out dist
@@ -223,14 +223,14 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1.47.3
         with:
           target: ${{ matrix.target }}
           manylinux: auto
@@ -298,13 +298,13 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1.47.3
         with:
           target: ${{ matrix.platform.target }}
           manylinux: auto
@@ -363,14 +363,14 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1.47.3
         with:
           target: ${{ matrix.target }}
           manylinux: musllinux_1_2
@@ -429,13 +429,13 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5
+      - uses: actions/setup-python@8d9ed9ac5c53483de85588cdf95a591a75ab9f55 # v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1.47.3
         with:
           target: ${{ matrix.platform.target }}
           manylinux: musllinux_1_2

@@ -26,7 +26,7 @@ pub(crate) fn add_noqa(
     let start = Instant::now();
     let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
     let duration = start.elapsed();
-    debug!("Identified files to lint in: {:?}", duration);
+    debug!("Identified files to lint in: {duration:?}");
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
@@ -87,7 +87,7 @@ pub(crate) fn add_noqa(
         .sum();
 
     let duration = start.elapsed();
-    debug!("Added noqa to files in: {:?}", duration);
+    debug!("Added noqa to files in: {duration:?}");
 
     Ok(modifications)
 }

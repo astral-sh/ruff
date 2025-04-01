@@ -511,6 +511,12 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     }
 }
 
+impl<'db> FromIterator<Parameter<'db>> for Parameters<'db> {
+    fn from_iter<T: IntoIterator<Item = Parameter<'db>>>(iter: T) -> Self {
+        Self::new(iter)
+    }
+}
+
 impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
@@ -597,6 +603,33 @@ impl<'db> Parameter<'db> {
 
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
+        self
+    }
+
+    pub(crate) fn with_sorted_unions_and_intersections(mut self, db: &'db dyn Db) -> Self {
+        self.annotated_type = self
+            .annotated_type
+            .map(|ty| ty.with_sorted_unions_and_intersections(db));
+
+        self.kind = match self.kind {
+            ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
+                name,
+                default_type: default_type.map(|ty| ty.with_sorted_unions_and_intersections(db)),
+            },
+            ParameterKind::PositionalOrKeyword { name, default_type } => {
+                ParameterKind::PositionalOrKeyword {
+                    name,
+                    default_type: default_type
+                        .map(|ty| ty.with_sorted_unions_and_intersections(db)),
+                }
+            }
+            ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
+                name,
+                default_type: default_type.map(|ty| ty.with_sorted_unions_and_intersections(db)),
+            },
+            ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => self.kind,
+        };
+
         self
     }
 

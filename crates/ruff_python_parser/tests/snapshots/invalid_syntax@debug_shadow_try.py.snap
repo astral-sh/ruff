@@ -1,0 +1,76 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_try.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..44,
+        body: [
+            Try(
+                StmtTry {
+                    range: 0..43,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 5..8,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 5..8,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 9..43,
+                                type_: Some(
+                                    Name(
+                                        ExprName {
+                                            range: 16..25,
+                                            id: Name("Exception"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ),
+                                name: Some(
+                                    Identifier {
+                                        id: Name("__debug__"),
+                                        range: 29..38,
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 40..43,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 40..43,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | try: ...
+2 | except Exception as __debug__: ...
+  |                     ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |
