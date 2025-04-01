@@ -3,8 +3,8 @@ import sys
 from _warnings import warn as warn, warn_explicit as warn_explicit
 from collections.abc import Sequence
 from types import ModuleType, TracebackType
-from typing import Any, Generic, Literal, TextIO, TypeVar, overload
-from typing_extensions import LiteralString, TypeAlias
+from typing import Any, Generic, Literal, TextIO, overload
+from typing_extensions import LiteralString, TypeAlias, TypeVar
 
 __all__ = [
     "warn",
@@ -21,7 +21,8 @@ if sys.version_info >= (3, 13):
     __all__ += ["deprecated"]
 
 _T = TypeVar("_T")
-_W = TypeVar("_W", bound=list[WarningMessage] | None)
+_W_co = TypeVar("_W_co", bound=list[WarningMessage] | None, default=list[WarningMessage] | None, covariant=True)
+
 if sys.version_info >= (3, 14):
     _ActionKind: TypeAlias = Literal["default", "error", "ignore", "always", "module", "once"]
 else:
@@ -66,7 +67,7 @@ class WarningMessage:
         source: Any | None = None,
     ) -> None: ...
 
-class catch_warnings(Generic[_W]):
+class catch_warnings(Generic[_W_co]):
     if sys.version_info >= (3, 11):
         @overload
         def __init__(
@@ -92,7 +93,7 @@ class catch_warnings(Generic[_W]):
         ) -> None: ...
         @overload
         def __init__(
-            self: catch_warnings[list[WarningMessage] | None],
+            self,
             *,
             record: bool,
             module: ModuleType | None = None,
@@ -109,11 +110,9 @@ class catch_warnings(Generic[_W]):
             self: catch_warnings[list[WarningMessage]], *, record: Literal[True], module: ModuleType | None = None
         ) -> None: ...
         @overload
-        def __init__(
-            self: catch_warnings[list[WarningMessage] | None], *, record: bool, module: ModuleType | None = None
-        ) -> None: ...
+        def __init__(self, *, record: bool, module: ModuleType | None = None) -> None: ...
 
-    def __enter__(self) -> _W: ...
+    def __enter__(self) -> _W_co: ...
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
     ) -> None: ...

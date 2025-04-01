@@ -240,4 +240,15 @@ static_assert(not is_equivalent_to(CallableTypeOf[f12], CallableTypeOf[f13]))
 static_assert(not is_equivalent_to(CallableTypeOf[f13], CallableTypeOf[f12]))
 ```
 
+### Unions containing `Callable`s containing unions
+
+Differently ordered unions inside `Callable`s inside unions can still be equivalent:
+
+```py
+from typing import Callable
+from knot_extensions import is_equivalent_to, static_assert
+
+static_assert(is_equivalent_to(int | Callable[[int | str], None], Callable[[str | int], None] | int))
+```
+
 [the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent

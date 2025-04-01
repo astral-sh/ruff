@@ -18,7 +18,7 @@ type Props = {
   theme: Theme;
   workspace: Workspace;
   onChange(content: string): void;
-  onMount(editor: IStandaloneCodeEditor): void;
+  onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
 };
 
 type MonacoEditorState = {
@@ -63,7 +63,7 @@ export default function Editor({
         monaco: instance,
       };
 
-      onMount(editor);
+      onMount(editor, instance);
     },
 
     [onMount, workspace, diagnostics],
@@ -120,14 +120,14 @@ function updateMarkers(
         }
       };
 
-      const range = diagnostic.to_range(workspace);
+      const range = diagnostic.toRange(workspace);
 
       return {
         code: diagnostic.id(),
-        startLineNumber: (range?.start?.line ?? 0) + 1,
-        startColumn: (range?.start?.character ?? 0) + 1,
-        endLineNumber: (range?.end?.line ?? 0) + 1,
-        endColumn: (range?.end?.character ?? 0) + 1,
+        startLineNumber: range?.start?.line ?? 0,
+        startColumn: range?.start?.column ?? 0,
+        endLineNumber: range?.end?.line ?? 0,
+        endColumn: range?.end?.column ?? 0,
         message: diagnostic.message(),
         severity: mapSeverity(diagnostic.severity()),
         tags: [],

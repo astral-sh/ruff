@@ -82,7 +82,7 @@ use crate::types::{
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
-use crate::types::{CallableType, GeneralCallableType, Signature};
+use crate::types::{CallableType, Signature};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -93,8 +93,8 @@ use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS,
-    TYPE_ASSERTION_FAILURE,
+    report_unresolved_reference, INVALID_METACLASS, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -2322,6 +2322,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::KnownInstance(..)
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
+            | Type::BoundMethod(_)
+            | Type::MethodWrapperDunderGet(_)
+            | Type::WrapperDescriptorDunderGet
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => match object_ty.class_member(db, attribute.into()) {
@@ -3897,10 +3900,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        Type::Callable(CallableType::General(GeneralCallableType::new(
+        Type::Callable(CallableType::new(
             self.db(),
             Signature::new(parameters, Some(Type::unknown())),
-        )))
+        ))
     }
 
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
@@ -4024,6 +4027,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             ),
                                         );
                                     };
+                                }
+                            }
+                        }
+                        KnownFunction::Cast => {
+                            if let [Some(casted_ty), Some(source_ty)] = overload.parameter_types() {
+                                if source_ty.is_gradual_equivalent_to(self.context.db(), *casted_ty)
+                                    && !source_ty.contains_todo(self.context.db())
+                                {
+                                    self.context.report_lint(
+                                        &REDUNDANT_CAST,
+                                        call_expression,
+                                        format_args!(
+                                            "Value is already of type `{}`",
+                                            casted_ty.display(self.context.db()),
+                                        ),
+                                    );
                                 }
                             }
                         }
@@ -4405,6 +4424,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
+                | Type::WrapperDescriptorDunderGet
+                | Type::MethodWrapperDunderGet(_)
+                | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -4654,6 +4676,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             (
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
+                | Type::BoundMethod(_)
+                | Type::WrapperDescriptorDunderGet
+                | Type::MethodWrapperDunderGet(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -4670,6 +4695,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::Tuple(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
+                | Type::BoundMethod(_)
+                | Type::WrapperDescriptorDunderGet
+                | Type::MethodWrapperDunderGet(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -6447,14 +6475,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         /// homogeneous tuple and a partly homogeneous tuple (respectively) due to the `...`
         /// and the starred expression (respectively), Neither is supported by us right now,
         /// so we should infer `Todo` for the *entire* tuple if we encounter one of those elements.
-        /// Even a subscript subelement could alter the type of the entire tuple
-        /// if the subscript is `Unpack[]` (which again, we don't yet support).
-        fn element_could_alter_type_of_whole_tuple(element: &ast::Expr, element_ty: Type) -> bool {
-            element_ty.is_todo()
-                && matches!(
-                    element,
-                    ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) | ast::Expr::Subscript(_)
-                )
+        fn element_could_alter_type_of_whole_tuple(
+            element: &ast::Expr,
+            element_ty: Type,
+            builder: &TypeInferenceBuilder,
+        ) -> bool {
+            if !element_ty.is_todo() {
+                return false;
+            }
+
+            match element {
+                ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) => true,
+                ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
+                    matches!(
+                        builder.expression_type(value),
+                        Type::KnownInstance(KnownInstanceType::Unpack)
+                    )
+                }
+                _ => false,
+            }
         }
 
         // TODO:
@@ -6470,7 +6509,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 for element in elements {
                     let element_ty = self.infer_type_expression(element);
-                    return_todo |= element_could_alter_type_of_whole_tuple(element, element_ty);
+                    return_todo |=
+                        element_could_alter_type_of_whole_tuple(element, element_ty, self);
                     element_types.push(element_ty);
                 }
 
@@ -6489,7 +6529,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             single_element => {
                 let single_element_ty = self.infer_type_expression(single_element);
-                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
+                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
+                {
                     todo_type!("full tuple[...] support")
                 } else {
                     TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
@@ -6505,7 +6546,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
                     Type::ClassLiteral(class_literal_ty) => {
-                        SubclassOfType::from(self.db(), class_literal_ty.class())
+                        if class_literal_ty
+                            .class()
+                            .is_known(self.db(), KnownClass::Any)
+                        {
+                            SubclassOfType::subclass_of_any()
+                        } else {
+                            SubclassOfType::from(self.db(), class_literal_ty.class())
+                        }
                     }
                     Type::KnownInstance(KnownInstanceType::Any) => {
                         SubclassOfType::subclass_of_any()
@@ -6585,6 +6633,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = subscript;
 
         match value_ty {
+            Type::ClassLiteral(literal) if literal.class().is_known(self.db(), KnownClass::Any) => {
+                self.context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    subscript,
+                    format_args!("Type `typing.Any` expected no type parameter",),
+                );
+                Type::unknown()
+            }
             Type::KnownInstance(known_instance) => {
                 self.infer_parameterized_known_instance_type_expression(subscript, known_instance)
             }
@@ -6712,12 +6768,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let callable_type = if let (Some(parameters), Some(return_type), true) =
                     (parameters, return_type, correct_argument_number)
                 {
-                    GeneralCallableType::new(db, Signature::new(parameters, Some(return_type)))
+                    CallableType::new(db, Signature::new(parameters, Some(return_type)))
                 } else {
-                    GeneralCallableType::unknown(db)
+                    CallableType::unknown(db)
                 };
 
-                let callable_type = Type::Callable(CallableType::General(callable_type));
+                let callable_type = Type::Callable(callable_type);
 
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
                 // the outer callable type on the these expressions instead.
@@ -6807,10 +6863,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Type::unknown();
                     };
 
-                    Type::Callable(CallableType::General(GeneralCallableType::new(
-                        db,
-                        signature.clone(),
-                    )))
+                    Type::Callable(CallableType::new(db, signature.clone()))
                 }
             },
 
