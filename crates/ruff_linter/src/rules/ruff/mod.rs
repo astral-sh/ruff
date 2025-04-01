@@ -328,6 +328,24 @@ mod tests {
     }
 
     #[test]
+    fn ruff_noqa_filedirective_unused_last_of_many() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_7.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::UnusedNOQA,
+                    Rule::FStringMissingPlaceholders,
+                    Rule::LineTooLong,
+                    Rule::UnusedVariable,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn ruff_per_file_ignores() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
