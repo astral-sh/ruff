@@ -6451,14 +6451,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         /// homogeneous tuple and a partly homogeneous tuple (respectively) due to the `...`
         /// and the starred expression (respectively), Neither is supported by us right now,
         /// so we should infer `Todo` for the *entire* tuple if we encounter one of those elements.
-        /// Even a subscript subelement could alter the type of the entire tuple
-        /// if the subscript is `Unpack[]` (which again, we don't yet support).
-        fn element_could_alter_type_of_whole_tuple(element: &ast::Expr, element_ty: Type) -> bool {
-            element_ty.is_todo()
-                && matches!(
-                    element,
-                    ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) | ast::Expr::Subscript(_)
-                )
+        fn element_could_alter_type_of_whole_tuple(
+            element: &ast::Expr,
+            element_ty: Type,
+            builder: &TypeInferenceBuilder,
+        ) -> bool {
+            if !element_ty.is_todo() {
+                return false;
+            }
+
+            match element {
+                ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) => true,
+                ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
+                    matches!(
+                        builder.expression_type(value),
+                        Type::KnownInstance(KnownInstanceType::Unpack)
+                    )
+                }
+                _ => false,
+            }
         }
 
         // TODO:
@@ -6474,7 +6485,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 for element in elements {
                     let element_ty = self.infer_type_expression(element);
-                    return_todo |= element_could_alter_type_of_whole_tuple(element, element_ty);
+                    return_todo |=
+                        element_could_alter_type_of_whole_tuple(element, element_ty, self);
                     element_types.push(element_ty);
                 }
 
@@ -6493,7 +6505,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             single_element => {
                 let single_element_ty = self.infer_type_expression(single_element);
-                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
+                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
+                {
                     todo_type!("full tuple[...] support")
                 } else {
                     TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
