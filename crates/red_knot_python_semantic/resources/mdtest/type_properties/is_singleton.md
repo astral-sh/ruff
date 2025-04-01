@@ -133,3 +133,25 @@ from knot_extensions import static_assert, is_singleton
 reveal_type(types.NotImplementedType)  # revealed: Unknown | Literal[_NotImplementedType]
 static_assert(not is_singleton(types.NotImplementedType))
 ```
+
+### Callables
+
+We currently treat the type of `types.FunctionType.__get__` as a singleton type that has its own
+dedicated variant in the `Type` enum. That variant should be understood as a singleton, but the
+similar variants `Type::BoundMethod` and `Type::MethodWrapperDunderGet` should not be.
+
+If we refactor `Type` in the future to get rid of these `Type` variants, the following assertions do
+not necessarily have to hold true; they're more of a unit test for our current implementation.
+
+```py
+import types
+from knot_extensions import static_assert, is_singleton, TypeOf
+
+class A:
+    def method(self): ...
+
+static_assert(is_singleton(TypeOf[types.FunctionType.__get__]))
+
+static_assert(not is_singleton(TypeOf[A().method]))
+static_assert(not is_singleton(TypeOf[A.method.__get__]))
+```

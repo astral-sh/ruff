@@ -1463,9 +1463,7 @@ impl<'db> Type<'db> {
             Type::SubclassOf(..) => false,
             Type::BooleanLiteral(_)
             | Type::FunctionLiteral(..)
-            | Type::BoundMethod(_)
             | Type::WrapperDescriptorDunderGet
-            | Type::MethodWrapperDunderGet(_)
             | Type::ClassLiteral(..)
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
@@ -1473,6 +1471,22 @@ impl<'db> Type<'db> {
                 // A callable type is never a singleton because for any given signature,
                 // there could be any number of distinct objects that are all callable with that
                 // signature.
+                false
+            }
+            Type::BoundMethod(..) => {
+                // `BoundMethod` types are single-valued types, but not singleton types:
+                // ```pycon
+                // >>> class Foo:
+                // ...     def bar(self): pass
+                // >>> f = Foo()
+                // >>> f.bar is f.bar
+                // False
+                // ```
+                false
+            }
+            Type::MethodWrapperDunderGet(_) => {
+                // Just a special case of `BoundMethod` really
+                // (this variant represents `f.__get__`, where `f` is any function)
                 false
             }
             Type::Instance(InstanceType { class }) => {
