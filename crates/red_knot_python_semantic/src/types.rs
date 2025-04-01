@@ -4332,7 +4332,7 @@ pub struct BoundMethodType<'db> {
 
 impl<'db> BoundMethodType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        let signature = self.function(db).signature(db).clone();
+        let signature = self.function(db).signature(db);
         let parameters = Parameters::new(signature.parameters().iter().skip(1).cloned());
 
         Type::Callable(CallableType::General(GeneralCallableType::new(
