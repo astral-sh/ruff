@@ -155,6 +155,7 @@ class MDTestRunner:
 
     def watch(self) -> Never:
         self._recompile_tests("Compiling tests...", message_on_success=False)
+        self._run_mdtest()
         self.console.print("[dim]Ready to watch for changes...[/dim]")
 
         for changes in watch(CRATE_ROOT):
