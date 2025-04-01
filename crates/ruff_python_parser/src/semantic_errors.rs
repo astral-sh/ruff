@@ -89,10 +89,40 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
+            Stmt::Return(ast::StmtReturn {
+                value: Some(value), ..
+            }) => {
+                // test_err single_star_return
+                // def f(): return *x
+                Self::invalid_star_expression(value, ctx);
+            }
+            Stmt::For(ast::StmtFor { target, iter, .. }) => {
+                // test_err single_star_for
+                // for _ in *x: ...
+                // for *x in xs: ...
+                Self::invalid_star_expression(target, ctx);
+                Self::invalid_star_expression(iter, ctx);
+            }
             _ => {}
         }
 
         Self::debug_shadowing(stmt, ctx);
+    }
+
+    /// Emit a [`SemanticSyntaxErrorKind::InvalidStarExpression`] if `expr` is starred.
+    fn invalid_star_expression<Ctx: SemanticSyntaxContext>(expr: &Expr, ctx: &Ctx) {
+        // test_ok single_star_in_tuple
+        // def f(): yield (*x,)
+        // def f(): return (*x,)
+        // for _ in (*x,): ...
+        // for (*x,) in xs: ...
+        if expr.is_starred_expr() {
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::InvalidStarExpression,
+                expr.range(),
+            );
+        }
     }
 
     /// Check for [`SemanticSyntaxErrorKind::WriteToDebug`] in `stmt`.
@@ -367,6 +397,13 @@ impl SemanticSyntaxChecker {
                         _ => {}
                     };
                 }
+            }
+            Expr::Yield(ast::ExprYield {
+                value: Some(value), ..
+            }) => {
+                // test_err single_star_yield
+                // def f(): yield *x
+                Self::invalid_star_expression(value, ctx);
             }
             _ => {}
         }
