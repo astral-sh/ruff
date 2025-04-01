@@ -1093,6 +1093,13 @@ a = A()
 static_assert(is_subtype_of(TypeOf[a.f], Callable[[int], int]))
 static_assert(is_subtype_of(TypeOf[a.g], Callable[[int], int]))
 static_assert(is_subtype_of(TypeOf[A.g], Callable[[int], int]))
+
+static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
+static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
+
+# TODO: This should be an error
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 
 [special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
