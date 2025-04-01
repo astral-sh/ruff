@@ -39,7 +39,8 @@ def function_returning_any() -> Any:
 cast(Any, function_returning_any())
 ```
 
-Complex type expressions (which may be unsupported) do not lead to spurious `[redundant-cast]` diagnostics.
+Complex type expressions (which may be unsupported) do not lead to spurious `[redundant-cast]`
+diagnostics.
 
 ```py
 from typing import Callable
