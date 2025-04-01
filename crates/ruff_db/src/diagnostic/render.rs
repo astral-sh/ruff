@@ -722,9 +722,9 @@ watermelon
         let mut env = TestEnvironment::new();
         env.add("animals", ANIMALS);
 
-        let mut diag = env.err().primary("animals", "5", "5", "").build();
+        let diag = env.err().primary("animals", "5", "5", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -739,7 +739,7 @@ watermelon
         ",
         );
 
-        let mut diag = env
+        let diag = env
             .builder(
                 "test-diagnostic",
                 Severity::Warning,
@@ -748,7 +748,7 @@ watermelon
             .primary("animals", "5", "5", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         warning: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -763,12 +763,12 @@ watermelon
         ",
         );
 
-        let mut diag = env
+        let diag = env
             .builder("test-diagnostic", Severity::Info, "main diagnostic message")
             .primary("animals", "5", "5", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         info: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -789,9 +789,9 @@ watermelon
         let mut env = TestEnvironment::new();
         env.add("non-ascii", NON_ASCII);
 
-        let mut diag = env.err().primary("non-ascii", "5", "5", "").build();
+        let diag = env.err().primary("non-ascii", "5", "5", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /non-ascii:5:1
@@ -808,9 +808,9 @@ watermelon
 
         // Just highlight one multi-byte codepoint
         // that has a >1 Unicode width.
-        let mut diag = env.err().primary("non-ascii", "2:4", "2:8", "").build();
+        let diag = env.err().primary("non-ascii", "2:4", "2:8", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /non-ascii:2:2
@@ -831,10 +831,10 @@ watermelon
         env.add("animals", ANIMALS);
 
         // Smaller context
-        let mut diag = env.err().primary("animals", "5", "5", "").build();
+        let diag = env.err().primary("animals", "5", "5", "").build();
         env.context(1);
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -848,10 +848,10 @@ watermelon
         );
 
         // No context
-        let mut diag = env.err().primary("animals", "5", "5", "").build();
+        let diag = env.err().primary("animals", "5", "5", "").build();
         env.context(0);
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -863,10 +863,10 @@ watermelon
         );
 
         // No context before snippet
-        let mut diag = env.err().primary("animals", "1", "1", "").build();
+        let diag = env.err().primary("animals", "1", "1", "").build();
         env.context(2);
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:1:1
@@ -880,10 +880,10 @@ watermelon
         );
 
         // No context after snippet
-        let mut diag = env.err().primary("animals", "11", "11", "").build();
+        let diag = env.err().primary("animals", "11", "11", "").build();
         env.context(2);
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /animals:11:1
@@ -897,10 +897,10 @@ watermelon
         );
 
         // Context that exceeds source
-        let mut diag = env.err().primary("animals", "5", "5", "").build();
+        let diag = env.err().primary("animals", "5", "5", "").build();
         env.context(200);
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /animals:5:1
@@ -927,13 +927,13 @@ watermelon
         let mut env = TestEnvironment::new();
         env.add("animals", ANIMALS);
 
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "1", "1", "")
             .primary("animals", "11", "11", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /animals:1:1
@@ -965,7 +965,7 @@ watermelon
         // default context changes.
         env.context(1);
 
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "1", "1", "")
             // This is the line that immediately follows
@@ -977,7 +977,7 @@ watermelon
             .primary("animals", "3", "3", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:1:1
@@ -996,13 +996,13 @@ watermelon
         // then the context windows for each annotation
         // are adjacent, and thus we still end up with
         // one snippet.
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "1", "1", "")
             .primary("animals", "4", "4", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:1:1
@@ -1024,13 +1024,13 @@ watermelon
         // omitted from the snippet below, since it
         // is not in either annotation's context
         // window.
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "1", "1", "")
             .primary("animals", "5", "5", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:1:1
@@ -1052,13 +1052,13 @@ watermelon
         // Do the same round of tests as above,
         // but with a bigger context window.
         env.context(3);
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "1", "1", "")
             .primary("animals", "5", "5", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:1:1
@@ -1077,13 +1077,13 @@ watermelon
         ",
         );
 
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "1", "1", "")
             .primary("animals", "8", "8", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /animals:1:1
@@ -1105,7 +1105,7 @@ watermelon
         ",
         );
 
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "1", "1", "")
             .primary("animals", "9", "9", "")
@@ -1114,7 +1114,7 @@ watermelon
         // it is not in either annotation's context
         // window.
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /animals:1:1
@@ -1150,9 +1150,9 @@ watermelon
         // lines after that. As a result, the context window
         // effectively shrinks to `1`.
         env.context(2);
-        let mut diag = env.err().primary("spacey-animals", "8", "8", "").build();
+        let diag = env.err().primary("spacey-animals", "8", "8", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /spacey-animals:8:1
@@ -1167,9 +1167,9 @@ watermelon
 
         // Same thing, but where trimming only happens
         // in the preceding context.
-        let mut diag = env.err().primary("spacey-animals", "12", "12", "").build();
+        let diag = env.err().primary("spacey-animals", "12", "12", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /spacey-animals:12:1
@@ -1185,9 +1185,9 @@ watermelon
 
         // Again, with trimming only happening in the
         // following context.
-        let mut diag = env.err().primary("spacey-animals", "13", "13", "").build();
+        let diag = env.err().primary("spacey-animals", "13", "13", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /spacey-animals:13:1
@@ -1208,7 +1208,7 @@ watermelon
         env.add("spacey-animals", SPACEY_ANIMALS);
 
         env.context(1);
-        let mut diag = env
+        let diag = env
             .err()
             .primary("spacey-animals", "3", "3", "")
             .primary("spacey-animals", "5", "5", "")
@@ -1227,7 +1227,7 @@ watermelon
         // behavior we wanted, so I left it as-is for now
         // instead of special casing the snippet assembly.
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /spacey-animals:3:1
@@ -1250,13 +1250,13 @@ watermelon
         env.add("animals", ANIMALS);
         env.add("fruits", FRUITS);
 
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "3", "3", "")
             .primary("fruits", "3", "3", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:3:1
@@ -1293,7 +1293,7 @@ watermelon
                 .build(),
         );
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:3:1
@@ -1330,7 +1330,7 @@ watermelon
                 .build(),
         );
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:3:1
@@ -1358,7 +1358,7 @@ watermelon
         let mut diag = env.err().primary("animals", "3", "3", "").build();
         diag.sub(env.sub_warn().primary("fruits", "3", "3", "").build());
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:3:1
@@ -1394,7 +1394,7 @@ watermelon
         diag.sub(env.sub_warn().primary("fruits", "3", "3", "").build());
         diag.sub(env.sub_warn().primary("animals", "11", "11", "").build());
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:3:1
@@ -1433,7 +1433,7 @@ watermelon
         diag.sub(env.sub_warn().primary("animals", "11", "11", "").build());
         diag.sub(env.sub_warn().primary("fruits", "3", "3", "").build());
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:3:1
@@ -1481,7 +1481,7 @@ watermelon
         // Namely, they are generally treated as completely separate.
         diag.sub(env.sub_warn().secondary("animals", "3", "3", "").build());
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:3:1
@@ -1515,9 +1515,9 @@ watermelon
         // We just try out various offsets here.
 
         // Two entire lines.
-        let mut diag = env.err().primary("animals", "5", "6", "").build();
+        let diag = env.err().primary("animals", "5", "6", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -1538,9 +1538,9 @@ watermelon
         // will render the position of the start of the line as just
         // past the end of the previous line, our annotation still only
         // extends across two lines.
-        let mut diag = env.err().primary("animals", "5", "7:0", "").build();
+        let diag = env.err().primary("animals", "5", "7:0", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -1558,9 +1558,9 @@ watermelon
 
         // Add one more to our end position though, and the third
         // line gets included (as you might expect).
-        let mut diag = env.err().primary("animals", "5", "7:1", "").build();
+        let diag = env.err().primary("animals", "5", "7:1", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -1578,9 +1578,9 @@ watermelon
         );
 
         // Starting and stopping in the middle of two different lines.
-        let mut diag = env.err().primary("animals", "5:3", "8:8", "").build();
+        let diag = env.err().primary("animals", "5:3", "8:8", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /animals:5:4
@@ -1600,9 +1600,9 @@ watermelon
         );
 
         // Same as above, but with a secondary annotation.
-        let mut diag = env.err().secondary("animals", "5:3", "8:8", "").build();
+        let diag = env.err().secondary("animals", "5:3", "8:8", "").build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /animals:5:4
@@ -1628,13 +1628,13 @@ watermelon
         env.add("animals", ANIMALS);
 
         // One annotation fully contained within another.
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "5", "6", "")
             .primary("animals", "4", "7", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:4:1
@@ -1657,13 +1657,13 @@ watermelon
 
         // Same as above, but with order swapped.
         // Shouldn't impact rendering.
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "4", "7", "")
             .primary("animals", "5", "6", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:4:1
@@ -1688,13 +1688,13 @@ watermelon
         // by the other, but the other has one
         // non-overlapping line preceding the
         // overlapping portion.
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "5", "7", "")
             .primary("animals", "6", "7", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -1719,7 +1719,7 @@ watermelon
         // by the other, but the other has one
         // non-overlapping line following the
         // overlapping portion.
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "5", "6", "")
             .primary("animals", "5", "7", "")
@@ -1729,7 +1729,7 @@ watermelon
         // I'm not sure if it's possible to do much
         // better using only ASCII art.
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -1751,13 +1751,13 @@ watermelon
 
         // Annotations partially overlap, but both
         // contain lines that aren't in the other.
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "5", "6", "")
             .primary("animals", "6", "7", "")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -1784,12 +1784,12 @@ watermelon
         let mut env = TestEnvironment::new();
         env.add("animals", ANIMALS);
 
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "5:2", "5:6", "giant land mammal")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:3
@@ -1805,13 +1805,13 @@ watermelon
         );
 
         // Same as above, but add two annotations for the same range.
-        let mut diag = env
+        let diag = env
             .err()
             .primary("animals", "5:2", "5:6", "giant land mammal")
             .secondary("animals", "5:2", "5:6", "but afraid of mice")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:3
@@ -1838,13 +1838,13 @@ watermelon
         // The secondary annotation is not only added first,
         // but it appears first in the source. But it still
         // comes second.
-        let mut diag = env
+        let diag = env
             .err()
             .secondary("animals", "1", "1", "secondary")
             .primary("animals", "8", "8", "primary")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /animals:8:1
@@ -1875,7 +1875,7 @@ watermelon
         // (We also drop the context so that we can squeeze
         // more snippets out of our test data.)
         env.context(0);
-        let mut diag = env
+        let diag = env
             .err()
             .secondary("animals", "7", "7", "secondary 7")
             .primary("animals", "9", "9", "primary 9")
@@ -1884,7 +1884,7 @@ watermelon
             .primary("animals", "5", "5", "primary 5")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /animals:5:1
@@ -1922,13 +1922,13 @@ watermelon
         env.add("animals", ANIMALS);
         env.add("fruits", FRUITS);
 
-        let mut diag = env
+        let diag = env
             .err()
             .secondary("animals", "1", "1", "secondary")
             .primary("fruits", "1", "1", "primary")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
          --> /fruits:1:1
@@ -1953,7 +1953,7 @@ watermelon
         // files. Those should always appear first
         // *within* each file.
         env.context(0);
-        let mut diag = env
+        let diag = env
             .err()
             .secondary("animals", "7", "7", "secondary animals 7")
             .secondary("fruits", "2", "2", "secondary fruits 2")
@@ -1963,7 +1963,7 @@ watermelon
             .primary("fruits", "10", "10", "primary fruits 10")
             .build();
         insta::assert_snapshot!(
-            env.render(&mut diag),
+            env.render(&diag),
             @r"
         error: lint:test-diagnostic: main diagnostic message
           --> /animals:11:1
@@ -2109,7 +2109,7 @@ watermelon
         /// Render the given diagnostic into a `String`.
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
-        fn render(&self, diag: &mut Diagnostic) -> String {
+        fn render(&self, diag: &Diagnostic) -> String {
             let mut buf = vec![];
             diag.print(&self.db, &self.config, &mut buf).unwrap();
             String::from_utf8(buf).unwrap()
