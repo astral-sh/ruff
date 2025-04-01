@@ -24,7 +24,7 @@ tracing = { workspace = true }
 [dev-dependencies]
 red_knot_vendored = { workspace = true }
 
-insta = { workspace = true }
+insta = { workspace = true, features = ["filters"] }
 
 [lints]
 workspace = true

@@ -41,7 +41,7 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
             snapshot.encoding(),
         );
 
-        let Some(range_info) = go_to_type_definition(&db, file, offset) else {
+        let Some(ranged) = go_to_type_definition(&db, file, offset) else {
             return Ok(None);
         };
 
@@ -49,18 +49,15 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
             .resolved_client_capabilities()
             .declaration_link_support
         {
-            let links: Vec<_> = range_info
-                .info
+            let src = Some(ranged.range);
+            let links: Vec<_> = ranged
                 .into_iter()
-                .filter_map(|target| {
-                    target.to_link(&db, Some(range_info.range), snapshot.encoding())
-                })
+                .filter_map(|target| target.to_link(&db, src, snapshot.encoding()))
                 .collect();
 
             Ok(Some(GotoDefinitionResponse::Link(links)))
         } else {
-            let locations: Vec<_> = range_info
-                .info
+            let locations: Vec<_> = ranged
                 .into_iter()
                 .filter_map(|target| target.to_location(&db, snapshot.encoding()))
                 .collect();

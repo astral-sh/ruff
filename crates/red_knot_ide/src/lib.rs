@@ -2,6 +2,8 @@ mod db;
 mod find_node;
 mod goto;
 
+use std::ops::{Deref, DerefMut};
+
 pub use db::Db;
 pub use goto::go_to_type_definition;
 use red_knot_python_semantic::types::{
@@ -12,9 +14,35 @@ use ruff_text_size::{Ranged, TextRange};
 
 /// Information associated with a text range.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct RangeInfo<T> {
+pub struct RangedValue<T> {
     pub range: FileRange,
-    pub info: T,
+    pub value: T,
+}
+
+impl<T> Deref for RangedValue<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T> DerefMut for RangedValue<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
+}
+
+impl<T> IntoIterator for RangedValue<T>
+where
+    T: IntoIterator,
+{
+    type Item = T::Item;
+    type IntoIter = T::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.value.into_iter()
+    }
 }
 
 /// Target to which the editor can navigate to.

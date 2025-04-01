@@ -1,5 +1,5 @@
 use crate::find_node::covering_node;
-use crate::{Db, HasNavigationTargets, NavigationTargets, RangeInfo};
+use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
 use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{parsed_module, ParsedModule};
@@ -11,7 +11,7 @@ pub fn go_to_type_definition(
     db: &dyn Db,
     file: File,
     offset: TextSize,
-) -> Option<RangeInfo<NavigationTargets>> {
+) -> Option<RangedValue<NavigationTargets>> {
     let parsed = parsed_module(db.upcast(), file);
     let goto_target = find_goto_target(parsed, offset)?;
 
@@ -55,9 +55,9 @@ pub fn go_to_type_definition(
         ty.display(db.upcast())
     );
 
-    Some(RangeInfo {
+    Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
-        info: ty.navigation_targets(db),
+        value: ty.navigation_targets(db),
     })
 }
 
@@ -239,6 +239,7 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::go_to_type_definition;
     use insta::assert_snapshot;
+    use insta::internals::SettingsBindDropGuard;
     use red_knot_python_semantic::{
         Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
     };
@@ -515,7 +516,7 @@ mod tests {
         let test = goto_test(
             r#"
             def test(a: str): ...
-            
+
             test(a<CURSOR>= "123")
             "#,
         );
@@ -535,7 +536,7 @@ mod tests {
          --> /main.py:4:18
           |
         2 |             def test(a: str): ...
-        3 |             
+        3 |
         4 |             test(a= "123")
           |                  ^
           |
@@ -811,11 +812,17 @@ f(**kwargs<CURSOR>)
         )
         .expect("Default settings to be valid");
 
+        let mut insta_settings = insta::Settings::clone_current();
+        insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+
+        let insta_settings_guard = insta_settings.bind_to_scope();
+
         GotoTest {
             db,
             cursor_offset: TextSize::try_from(cursor_offset)
                 .expect("source to be smaller than 4GB"),
             file,
+            _insta_settings_guard: insta_settings_guard,
         }
     }
 
@@ -823,6 +830,7 @@ f(**kwargs<CURSOR>)
         db: TestDb,
         cursor_offset: TextSize,
         file: File,
+        _insta_settings_guard: SettingsBindDropGuard,
     }
 
     impl GotoTest {
@@ -840,7 +848,7 @@ f(**kwargs<CURSOR>)
                 return "No goto target found".to_string();
             };
 
-            if targets.info.is_empty() {
+            if targets.is_empty() {
                 return "No type definitions found".to_string();
             }
 
@@ -851,7 +859,7 @@ f(**kwargs<CURSOR>)
                 Span::from(targets.range.file()).with_range(targets.range.range()),
             ));
 
-            for target in targets.info {
+            for target in targets {
                 let mut diagnostic = Diagnostic::new(
                     DiagnosticId::Lint(LintName::of("goto-type-definition")),
                     Severity::Info,
