@@ -624,8 +624,20 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::KnownInstance(_)
             | Type::IntLiteral(_)
-            | Type::SubclassOf(_)
-            | Type::TypeVar(_) => self,
+            | Type::SubclassOf(_) => self,
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) | None => self,
+                Some(TypeVarBoundOrConstraints::Constraints(union)) => {
+                    Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        typevar.name(db).clone(),
+                        Some(TypeVarBoundOrConstraints::Constraints(
+                            union.to_sorted_union(db),
+                        )),
+                        typevar.default_ty(db),
+                    ))
+                }
+            },
         }
     }
 
