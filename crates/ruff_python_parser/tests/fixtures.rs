@@ -86,7 +86,7 @@ fn test_valid_syntax(input_path: &Path) {
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
     let mut visitor =
-        SemanticSyntaxCheckerVisitor::new().with_python_version(options.target_version());
+        SemanticSyntaxCheckerVisitor::default().with_python_version(options.target_version());
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);
@@ -181,7 +181,7 @@ fn test_invalid_syntax(input_path: &Path) {
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
     let mut visitor =
-        SemanticSyntaxCheckerVisitor::new().with_python_version(options.target_version());
+        SemanticSyntaxCheckerVisitor::default().with_python_version(options.target_version());
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);

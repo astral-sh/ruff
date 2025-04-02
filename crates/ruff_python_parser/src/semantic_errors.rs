@@ -15,7 +15,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the `__future__` import boundary.
     ///
@@ -36,9 +36,7 @@ pub struct SemanticSyntaxChecker {
 
 impl SemanticSyntaxChecker {
     pub fn new() -> Self {
-        Self {
-            seen_futures_boundary: false,
-        }
+        Self::default()
     }
 }
 
@@ -499,12 +497,6 @@ impl SemanticSyntaxChecker {
     }
 }
 
-impl Default for SemanticSyntaxChecker {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SemanticSyntaxError {
     pub kind: SemanticSyntaxErrorKind,
@@ -857,6 +849,7 @@ pub trait SemanticSyntaxContext {
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 }
 
+#[derive(Default)]
 pub struct SemanticSyntaxCheckerVisitor {
     checker: SemanticSyntaxChecker,
     diagnostics: RefCell<Vec<SemanticSyntaxError>>,
@@ -864,14 +857,6 @@ pub struct SemanticSyntaxCheckerVisitor {
 }
 
 impl SemanticSyntaxCheckerVisitor {
-    pub fn new() -> Self {
-        Self {
-            checker: SemanticSyntaxChecker::new(),
-            diagnostics: RefCell::default(),
-            python_version: PythonVersion::default(),
-        }
-    }
-
     #[must_use]
     pub fn with_python_version(mut self, python_version: PythonVersion) -> Self {
         self.python_version = python_version;
