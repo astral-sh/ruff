@@ -33,14 +33,15 @@ use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
 use crate::types::call::{Bindings, CallArgumentTypes};
-use crate::types::class_base::ClassBase;
+pub use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{Class, KnownClass};
+pub use class::Class;
+pub(crate) use class::KnownClass;
 pub use class::{ClassLiteralType, InstanceType, KnownInstanceType};
 
 mod builder;
@@ -3787,7 +3788,7 @@ pub struct TypeVarInstance<'db> {
     name: ast::name::Name,
 
     /// The type var's definition
-    definition: Definition<'db>,
+    pub definition: Definition<'db>,
 
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
@@ -3797,11 +3798,6 @@ pub struct TypeVarInstance<'db> {
 }
 
 impl<'db> TypeVarInstance<'db> {
-    pub fn range(self, db: &dyn Db) -> FileRange {
-        let definition = self.definition(db);
-        FileRange::new(definition.file(db), definition.kind(db).target_range())
-    }
-
     #[allow(unused)]
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
@@ -4646,7 +4642,7 @@ impl KnownFunction {
 pub struct BoundMethodType<'db> {
     /// The function that is being bound. Corresponds to the `__func__` attribute on a
     /// bound method object
-    pub(crate) function: FunctionType<'db>,
+    pub function: FunctionType<'db>,
     /// The instance on which this method has been called. Corresponds to the `__self__`
     /// attribute on a bound method object
     self_instance: Type<'db>,

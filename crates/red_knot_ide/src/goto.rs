@@ -7,7 +7,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-pub fn go_to_type_definition(
+pub fn goto_type_definition(
     db: &dyn Db,
     file: File,
     offset: TextSize,
@@ -243,7 +243,7 @@ pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Optio
 mod tests {
 
     use crate::db::tests::TestDb;
-    use crate::{go_to_type_definition, NavigationTarget};
+    use crate::{goto_type_definition, NavigationTarget};
     use insta::assert_snapshot;
     use insta::internals::SettingsBindDropGuard;
     use red_knot_python_semantic::{
@@ -849,7 +849,7 @@ f(**kwargs<CURSOR>)
         }
 
         fn goto_type_definition(&self) -> String {
-            let Some(targets) = go_to_type_definition(&self.db, self.file, self.cursor_offset)
+            let Some(targets) = goto_type_definition(&self.db, self.file, self.cursor_offset)
             else {
                 return "No goto target found".to_string();
             };

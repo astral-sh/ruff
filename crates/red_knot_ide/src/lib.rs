@@ -5,12 +5,14 @@ mod goto;
 use std::ops::{Deref, DerefMut};
 
 pub use db::Db;
-pub use goto::go_to_type_definition;
+pub use goto::goto_type_definition;
 use red_knot_python_semantic::types::{
-    ClassLiteralType, FunctionType, InstanceType, KnownInstanceType, ModuleLiteralType, Type,
+    Class, ClassBase, ClassLiteralType, FunctionType, InstanceType, KnownInstanceType,
+    ModuleLiteralType, Type,
 };
 use ruff_db::files::{File, FileRange};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_db::source::source_text;
+use ruff_text_size::{Ranged, TextLen, TextRange};
 
 /// Information associated with a text range.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -128,6 +130,7 @@ pub trait HasNavigationTargets {
 impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
+            Type::BoundMethod(method) => method.function(db).navigation_targets(db),
             Type::FunctionLiteral(function) => function.navigation_targets(db),
             Type::ModuleLiteral(module) => module.navigation_targets(db),
             Type::Union(union) => union
@@ -137,21 +140,28 @@ impl HasNavigationTargets for Type<'_> {
             Type::ClassLiteral(class) => class.navigation_targets(db),
             Type::Instance(instance) => instance.navigation_targets(db),
             Type::KnownInstance(instance) => instance.navigation_targets(db),
+            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+                ClassBase::Class(class) => class.navigation_targets(db),
+                ClassBase::Dynamic(_) => NavigationTargets::empty(),
+            },
+
             Type::StringLiteral(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::LiteralString
             | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_) => self.to_meta_type(db.upcast()).navigation_targets(db),
+            | Type::SliceLiteral(_)
+            | Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
+            | Type::PropertyInstance(_)
+            | Type::Tuple(_) => self.to_meta_type(db.upcast()).navigation_targets(db),
 
             Type::Dynamic(_)
-            | Type::SubclassOf(_)
             | Type::Never
             | Type::Callable(_)
             | Type::Intersection(_)
-            | Type::Tuple(_) => NavigationTargets::empty(),
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::IntLiteral(_) => NavigationTargets::empty(),
         }
     }
 }
@@ -167,38 +177,38 @@ impl HasNavigationTargets for FunctionType<'_> {
     }
 }
 
-impl HasNavigationTargets for ClassLiteralType<'_> {
+impl HasNavigationTargets for Class<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let class = self.class();
-        let class_range = class.focus_range(db.upcast());
+        let class_range = self.focus_range(db.upcast());
         NavigationTargets::single(NavigationTarget {
             file: class_range.file(),
             focus_range: class_range.range(),
-            full_range: class.full_range(db.upcast()).range(),
+            full_range: self.full_range(db.upcast()).range(),
         })
+    }
+}
+
+impl HasNavigationTargets for ClassLiteralType<'_> {
+    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+        self.class().navigation_targets(db)
     }
 }
 
 impl HasNavigationTargets for InstanceType<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let class = self.class();
-        let class_range = class.focus_range(db.upcast());
-        NavigationTargets::single(NavigationTarget {
-            file: class_range.file(),
-            focus_range: class_range.range(),
-            full_range: class.full_range(db.upcast()).range(),
-        })
+        self.class().navigation_targets(db)
     }
 }
 
 impl HasNavigationTargets for ModuleLiteralType<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         let file = self.module(db).file();
+        let source = source_text(db.upcast(), file);
 
         NavigationTargets::single(NavigationTarget {
             file,
             focus_range: TextRange::default(),
-            full_range: TextRange::default(),
+            full_range: TextRange::up_to(source.text_len()),
         })
     }
 }
@@ -207,11 +217,13 @@ impl HasNavigationTargets for KnownInstanceType<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
             KnownInstanceType::TypeVar(var) => {
-                let range = var.range(db.upcast());
+                let definition = var.definition(db);
+                let full_range = definition.full_range(db.upcast());
+
                 NavigationTargets::single(NavigationTarget {
-                    file: range.file(),
-                    focus_range: range.range(),
-                    full_range: range.range(),
+                    file: full_range.file(),
+                    focus_range: definition.focus_range(db.upcast()).range(),
+                    full_range: full_range.range(),
                 })
             }
 

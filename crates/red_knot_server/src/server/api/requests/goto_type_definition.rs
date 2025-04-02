@@ -2,7 +2,7 @@ use std::borrow::Cow;
 
 use lsp_types::request::{GotoTypeDefinition, GotoTypeDefinitionParams};
 use lsp_types::{GotoDefinitionResponse, Url};
-use red_knot_ide::go_to_type_definition;
+use red_knot_ide::goto_type_definition;
 use red_knot_project::ProjectDatabase;
 use ruff_db::source::{line_index, source_text};
 
@@ -41,13 +41,13 @@ impl BackgroundDocumentRequestHandler for GotoTypeDefinitionRequestHandler {
             snapshot.encoding(),
         );
 
-        let Some(ranged) = go_to_type_definition(&db, file, offset) else {
+        let Some(ranged) = goto_type_definition(&db, file, offset) else {
             return Ok(None);
         };
 
         if snapshot
             .resolved_client_capabilities()
-            .declaration_link_support
+            .type_definition_link_support
         {
             let src = Some(ranged.range);
             let links: Vec<_> = ranged

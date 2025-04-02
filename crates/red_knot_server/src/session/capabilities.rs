@@ -8,8 +8,8 @@ pub(crate) struct ResolvedClientCapabilities {
     pub(crate) document_changes: bool,
     pub(crate) workspace_refresh: bool,
     pub(crate) pull_diagnostics: bool,
-    /// Whether `textDocument.declaration.linkSupport` is `true`
-    pub(crate) declaration_link_support: bool,
+    /// Whether `textDocument.typeDefinition.linkSupport` is `true`
+    pub(crate) type_definition_link_support: bool,
 }
 
 impl ResolvedClientCapabilities {
@@ -41,7 +41,7 @@ impl ResolvedClientCapabilities {
         let declaration_link_support = client_capabilities
             .text_document
             .as_ref()
-            .and_then(|document| document.declaration?.link_support)
+            .and_then(|document| document.type_definition?.link_support)
             .unwrap_or_default();
 
         let workspace_refresh = true;
@@ -70,7 +70,7 @@ impl ResolvedClientCapabilities {
             document_changes,
             workspace_refresh,
             pull_diagnostics,
-            declaration_link_support,
+            type_definition_link_support: declaration_link_support,
         }
     }
 }

@@ -581,7 +581,7 @@ impl Tokens {
                 TokenAt::Single(token)
             }
 
-            // No token found that starts exactly at the given offset.But it's possible that
+            // No token found that starts exactly at the given offset. But it's possible that
             // the token starting before `offset` fully encloses `offset` (it's end range ends after `offset`).
             // ```python
             // object.attribute
@@ -655,16 +655,16 @@ impl Deref for Tokens {
     }
 }
 
-/// One challenge here is how to we keep the spine to the root.
+/// A token that encloses a given offset or ends exactly at it.
 pub enum TokenAt {
-    /// There's no node at the given offset
+    /// There's no token at the given offset
     None,
 
-    /// A single node fully encloses the offset.
+    /// There's a single token at the given offset.
     Single(Token),
 
-    /// The offset falls exactly between two nodes. E.g. `CURSOR` in `call<CURSOR>(arguments)` is
-    /// positioned exactly between the callee and the arguments.
+    /// The offset falls exactly between two tokens. E.g. `CURSOR` in `call<CURSOR>(arguments)` is
+    /// positioned exactly between the `call` and `(` tokens.`
     Between(Token, Token),
 }
 
@@ -672,9 +672,12 @@ impl Iterator for TokenAt {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match std::mem::replace(self, TokenAt::None) {
+        match *self {
             TokenAt::None => None,
-            TokenAt::Single(token) => Some(token),
+            TokenAt::Single(token) => {
+                *self = TokenAt::None;
+                Some(token)
+            }
             TokenAt::Between(first, second) => {
                 *self = TokenAt::Single(second);
                 Some(first)
