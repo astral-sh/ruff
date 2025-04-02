@@ -71,7 +71,7 @@ pub(crate) fn invalid_noqa_code(
             continue;
         }
         if valid_codes.is_empty() {
-            handle_all_codes_invalid(diagnostics, directive, line, locator);
+            handle_all_codes_invalid(diagnostics, directive);
             continue;
         }
 
@@ -79,12 +79,7 @@ pub(crate) fn invalid_noqa_code(
     }
 }
 
-fn handle_all_codes_invalid(
-    diagnostics: &mut Vec<Diagnostic>,
-    directive: &Codes<'_>,
-    line: &NoqaDirectiveLine<'_>,
-    locator: &Locator,
-) {
+fn handle_all_codes_invalid(diagnostics: &mut Vec<Diagnostic>, directive: &Codes<'_>) {
     let invalid_codes = directive
         .iter()
         .map(crate::noqa::Code::as_str)
@@ -98,17 +93,7 @@ fn handle_all_codes_invalid(
         directive.range(),
     );
 
-    let original_text = locator.slice(line.range());
-    if let Some(comment_start) = original_text.find('#') {
-        let comment_range = ruff_text_size::TextRange::new(
-            line.range().start()
-                + ruff_text_size::TextSize::from(u32::try_from(comment_start).unwrap_or(0)),
-            line.range().end(),
-        );
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(comment_range)));
-    } else {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(line.range())));
-    }
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(directive.range())));
     diagnostics.push(diagnostic);
 }
 
