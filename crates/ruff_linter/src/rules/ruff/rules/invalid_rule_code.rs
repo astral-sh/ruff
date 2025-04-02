@@ -49,6 +49,7 @@ pub(crate) fn invalid_noqa_code(
     diagnostics: &mut Vec<Diagnostic>,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
+    external: &[String],
 ) {
     for line in noqa_directives.lines() {
         let Directive::Codes(directive) = &line.directive else {
@@ -60,7 +61,9 @@ pub(crate) fn invalid_noqa_code(
 
         for code in directive.iter() {
             let code_str = code.as_str();
-            if Rule::from_code(code.as_str()).is_err() {
+            if external.iter().any(|ext| code_str.starts_with(ext)) {
+                valid_codes.push(code_str);
+            } else if Rule::from_code(code.as_str()).is_err() {
                 invalid_code_refs.push(code);
             } else {
                 valid_codes.push(code_str);
