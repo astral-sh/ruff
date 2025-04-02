@@ -5564,3 +5564,16 @@ fn semantic_syntax_errors() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn async_comprehension_in_sync_comprehension() {
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    cmd.args(STDIN_BASE_OPTIONS)
+        .args(["--config", "lint.select = []"])
+        .arg("--preview")
+        .arg("-");
+
+    let contents = "async def f(): return [[x async for x in foo(n)] for n in range(3)]";
+
+    assert_cmd_snapshot!(cmd.args(["--target-version", "py310"]).pass_stdin(contents), @r"");
+}
