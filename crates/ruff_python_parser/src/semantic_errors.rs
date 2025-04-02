@@ -15,11 +15,6 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
-#[derive(Debug)]
-struct Checkpoint {
-    in_async_context: bool,
-}
-
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the `__future__` import boundary.
@@ -38,8 +33,6 @@ pub struct SemanticSyntaxChecker {
     /// non-`__future__`-importing statements.
     seen_futures_boundary: bool,
     in_async_context: bool,
-
-    checkpoint: Option<Checkpoint>,
 }
 
 impl SemanticSyntaxChecker {
@@ -340,8 +333,6 @@ impl SemanticSyntaxChecker {
 
         // intentionally visit `stmt` before updating the async context because we want to know
         // about the *parent* context while visiting
-        self.save_checkpoint();
-
         #[allow(clippy::single_match, reason = "this is likely to grow later")]
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
@@ -351,15 +342,10 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    pub fn exit_stmt(&mut self) {
-        self.restore_checkpoint();
-    }
-
     pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         // intentionally visit `expr` before updating the async context because we want to know
         // about the *parent* context while visiting
         self.check_expr(expr, ctx);
-        self.save_checkpoint();
         match expr {
             Expr::ListComp(ast::ExprListComp { generators, .. })
             | Expr::SetComp(ast::ExprSetComp { generators, .. })
@@ -368,10 +354,6 @@ impl SemanticSyntaxChecker {
             }
             _ => {}
         }
-    }
-
-    pub fn exit_expr(&mut self) {
-        self.restore_checkpoint();
     }
 
     fn check_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
@@ -542,18 +524,6 @@ impl SemanticSyntaxChecker {
                     generator.range,
                 );
             }
-        }
-    }
-
-    fn save_checkpoint(&mut self) {
-        self.checkpoint = Some(Checkpoint {
-            in_async_context: self.in_async_context,
-        });
-    }
-
-    fn restore_checkpoint(&mut self) {
-        if let Some(Checkpoint { in_async_context }) = self.checkpoint {
-            self.in_async_context = in_async_context;
         }
     }
 }
