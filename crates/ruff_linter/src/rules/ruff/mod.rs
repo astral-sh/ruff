@@ -99,6 +99,7 @@ mod tests {
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
+    #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -318,11 +319,6 @@ mod tests {
     fn ruf102() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF102.py"),
-            &settings::LinterSettings::for_rule(Rule::InvalidRuleCode),
-        )?;
-
-        let diagnostics_ignore_external = test_path(
-            Path::new("ruff/RUF102.py"),
             &settings::LinterSettings {
                 external: vec!["V".to_string()],
                 ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
@@ -330,7 +326,6 @@ mod tests {
         )?;
 
         assert_messages!(diagnostics);
-        assert_messages!(diagnostics_ignore_external);
         Ok(())
     }
 

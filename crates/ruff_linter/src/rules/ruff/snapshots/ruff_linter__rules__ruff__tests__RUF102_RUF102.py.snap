@@ -19,6 +19,27 @@ RUF102.py:2:12: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 4 4 | import re  # noqa: V123
 5 5 | # Valid noqa
 
+RUF102.py:4:12: RUF102 [*] Invalid rule code in `# noqa`: V123
+  |
+2 | import os  # noqa: INVALID123
+3 | # External code
+4 | import re  # noqa: V123
+  |            ^^^^^^^^^^^^ RUF102
+5 | # Valid noqa
+6 | import sys  # noqa: E402
+  |
+  = help: Remove the rule code
+
+ℹ Safe fix
+1 1 | # Invalid code
+2 2 | import os  # noqa: INVALID123
+3 3 | # External code
+4   |-import re  # noqa: V123
+  4 |+import re  
+5 5 | # Valid noqa
+6 6 | import sys  # noqa: E402
+7 7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
+
 RUF102.py:7:65: RUF102 [*] Invalid rule code in `# noqa`: INVALID456
   |
 5 | # Valid noqa
