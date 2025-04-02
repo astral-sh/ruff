@@ -1438,12 +1438,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         ));
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            if let Type::FunctionLiteral(function) = decorator_ty {
-                if function.is_known(self.db(), KnownFunction::Overload) {
-                    continue;
-                }
-            }
-
             inferred_ty = match decorator_ty
                 .try_call(self.db(), CallArgumentTypes::positional([inferred_ty]))
                 .map(|bindings| bindings.return_type(self.db()))

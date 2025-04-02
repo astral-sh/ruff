@@ -1328,7 +1328,7 @@ impl<'db> BindingError<'db> {
                     &CALL_NON_CALLABLE,
                     Self::get_node(node, None),
                     format_args!(
-                        "Internal error while evaluating call{}: {reason}",
+                        "Call{} failed: {reason}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {

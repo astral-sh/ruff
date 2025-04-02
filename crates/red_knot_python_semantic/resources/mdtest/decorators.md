@@ -158,7 +158,7 @@ reveal_type(f(1))  # revealed: @Todo(generics)
 def g(x: int) -> str:
     return "a"
 
-# TODO: With bidirectional type inference, this should be `Literal[g]` or `(int, /) -> str`
+# TODO: This should be `Literal[g]` or `(int, /) -> str`
 reveal_type(g)  # revealed: Unknown
 ```
 
@@ -180,6 +180,8 @@ reveal_type(f)  # revealed: Unknown
 # error: [unsupported-operator]
 @(1 + "a")
 def f(x): ...
+
+reveal_type(f)  # revealed: Unknown
 ```
 
 ### Non-callable decorator
@@ -214,7 +216,7 @@ reveal_type(f)  # revealed: str
 
 #### Wrong number of arguments
 
-Decorators need to be callable with a single argument. If they do not, we emit a diagnostic:
+Decorators need to be callable with a single argument. If they are not, we emit a diagnostic:
 
 ```py
 def takes_two_arguments(f, g) -> str:

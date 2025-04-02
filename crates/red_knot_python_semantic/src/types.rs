@@ -2593,7 +2593,7 @@ impl<'db> Type<'db> {
                 //     def __get__(self, instance: object, owner: type | None = None, /) -> MethodType: ...
                 // ```
                 //
-                // For `builtins.property.__get__`, we use the same signature (the return types are not
+                // For `builtins.property.__get__`, we use the same signature. The return types are not
                 // specified yet, they will be dynamically added in `Bindings::evaluate_known_cases`.
 
                 let not_none = Type::none(db).negate(db);
