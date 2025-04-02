@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/params_duplicate_names.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -132,7 +131,7 @@ Module(
     },
 )
 ```
-## Errors
+## Semantic Syntax Errors
 
   |
 1 | def foo(a, a=10, *a, a, a: str, **a): ...
