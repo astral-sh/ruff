@@ -32,6 +32,12 @@ pub struct SemanticSyntaxChecker {
     /// Python considers it a syntax error to import from `__future__` after any other
     /// non-`__future__`-importing statements.
     seen_futures_boundary: bool,
+
+    /// The checker is currently in an `async` context: either the body of an `async` function or an
+    /// `async` comprehension.
+    ///
+    /// Note that this should be updated *after* checking the current statement or expression
+    /// because the parent context is what matters.
     in_async_context: bool,
 }
 
@@ -313,6 +319,9 @@ impl SemanticSyntaxChecker {
     }
 
     pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
+        // check for errors
+        self.check_stmt(stmt, ctx);
+
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
@@ -323,28 +332,17 @@ impl SemanticSyntaxChecker {
                     self.seen_futures_boundary = true;
                 }
             }
+            Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
+                self.in_async_context = *is_async;
+                self.seen_futures_boundary = true;
+            }
             _ => {
                 self.seen_futures_boundary = true;
             }
         }
-
-        // check for errors
-        self.check_stmt(stmt, ctx);
-
-        // intentionally visit `stmt` before updating the async context because we want to know
-        // about the *parent* context while visiting
-        #[allow(clippy::single_match, reason = "this is likely to grow later")]
-        match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
-                self.in_async_context = *is_async;
-            }
-            _ => {}
-        }
     }
 
     pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
-        // intentionally visit `expr` before updating the async context because we want to know
-        // about the *parent* context while visiting
         self.check_expr(expr, ctx);
         match expr {
             Expr::ListComp(ast::ExprListComp { generators, .. })
