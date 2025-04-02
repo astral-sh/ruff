@@ -5605,4 +5605,25 @@ fn async_comprehension_in_sync_comprehension() {
 
     ----- stderr -----
     ");
+
+    let contents =
+        "async def test(): return [[x async for x in elements(n)] async for n in range(3)]";
+
+    // okay on 3.10 because everything is async
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", "lint.select = []"])
+        .args(["--target-version", "py310"])
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(contents),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
 }

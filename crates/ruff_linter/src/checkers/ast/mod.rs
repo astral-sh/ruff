@@ -545,26 +545,6 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.global(name)
     }
 
-    fn in_async_context(&self) -> bool {
-        for scope in self.semantic.current_scopes() {
-            match scope.kind {
-                ScopeKind::Function(function) => return function.is_async,
-                ScopeKind::Generator {
-                    kind:
-                        GeneratorKind::DictComprehension
-                        | GeneratorKind::ListComprehension
-                        | GeneratorKind::SetComprehension,
-                    is_async,
-                } => return is_async,
-                _ => {}
-            }
-            if let ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) = scope.kind {
-                return *is_async;
-            }
-        }
-        false
-    }
-
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
