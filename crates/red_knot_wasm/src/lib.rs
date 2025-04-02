@@ -273,11 +273,10 @@ impl Diagnostic {
     #[wasm_bindgen]
     pub fn display(&self, workspace: &Workspace) -> JsString {
         let config = DisplayDiagnosticConfig::default().color(false);
-        let mut buf = vec![];
         self.inner
-            .print(workspace.db.upcast(), &config, &mut buf)
-            .unwrap();
-        String::from_utf8(buf).unwrap().into()
+            .display(workspace.db.upcast(), &config)
+            .to_string()
+            .into()
     }
 }
 

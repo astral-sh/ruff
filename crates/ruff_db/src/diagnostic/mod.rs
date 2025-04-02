@@ -5,11 +5,12 @@ use thiserror::Error;
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::TextRange;
 
+pub use self::render::DisplayDiagnostic;
 pub use crate::diagnostic::old::OldSecondaryDiagnosticMessage;
 use crate::files::File;
 use crate::Db;
 
-use self::render::{DisplayDiagnostic, FileResolver};
+use self::render::FileResolver;
 
 // This module should not be exported. We are planning to migrate off
 // the APIs in this module.
@@ -100,22 +101,18 @@ impl Diagnostic {
         Arc::make_mut(&mut self.inner).subs.push(sub);
     }
 
-    /// Print this diagnostic to the given writer.
+    /// Return a `std::fmt::Display` implementation that renders this
+    /// diagnostic into a human readable format.
     ///
-    /// # Errors
-    ///
-    /// This is guaranteed to only return an error if the underlying
-    /// writer given returns an error. Otherwise, the formatting of
-    /// diagnostics themselves is infallible.
-    pub fn print(
-        &self,
-        db: &dyn Db,
-        config: &DisplayDiagnosticConfig,
-        mut wtr: impl std::io::Write,
-    ) -> std::io::Result<()> {
+    /// Note that this `Display` impl includes a trailing line terminator, so
+    /// callers should prefer using this with `write!` instead of `writeln!`.
+    pub fn display<'c, 'db, 'd>(
+        &'d self,
+        db: &'db dyn Db,
+        config: &'c DisplayDiagnosticConfig,
+    ) -> DisplayDiagnostic<'c, 'db, 'd> {
         let resolver = FileResolver::new(db);
-        let display = DisplayDiagnostic::new(&resolver, config, self);
-        writeln!(wtr, "{display}")
+        DisplayDiagnostic::new(resolver, config, self)
     }
 
     /// Returns the identifier for this diagnostic.

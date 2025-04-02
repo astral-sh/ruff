@@ -13,8 +13,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
-use std::fmt::Write as _;
-use std::io::Write as _;
+use std::fmt::Write;
 
 mod assertion;
 mod config;
@@ -324,7 +323,7 @@ fn create_diagnostic_snapshot(
 ) -> String {
     let display_config = DisplayDiagnosticConfig::default().color(false);
 
-    let mut snapshot = Vec::new();
+    let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
     writeln!(snapshot, "---").unwrap();
     writeln!(snapshot, "mdtest name: {}", test.name()).unwrap();
@@ -360,8 +359,8 @@ fn create_diagnostic_snapshot(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        diag.print(db, &display_config, &mut snapshot).unwrap();
+        write!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
-    String::from_utf8(snapshot).unwrap()
+    snapshot
 }
