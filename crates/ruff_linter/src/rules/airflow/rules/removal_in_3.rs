@@ -186,6 +186,12 @@ fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) 
 fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, arguments: &Arguments) {
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
+            // with replacement
+            checker.report_diagnostics(diagnostic_for_argument(
+                arguments,
+                "fail_stop",
+                Some("fail_fast"),
+            ));
             checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "schedule_interval",
@@ -196,15 +202,13 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                 "timetable",
                 Some("schedule"),
             ));
+            // without replacement
+            checker.report_diagnostics(diagnostic_for_argument(arguments, "default_view", None));
+            checker.report_diagnostics(diagnostic_for_argument(arguments, "orientation", None));
             checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "sla_miss_callback",
                 None,
-            ));
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "fail_stop",
-                Some("fail_fast"),
             ));
         }
         _ => {
@@ -562,10 +566,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.auth.managers
         ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
-            Replacement::Name("airflow.auth.managers.models.resource_details.AssetDetails")
+            Replacement::Name(
+                "airflow.api_fastapi.auth.managers.models.resource_details.AssetDetails",
+            )
         }
         ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => {
-            Replacement::Name("airflow.auth.managers.base_auth_manager.is_authorized_asset")
+            Replacement::Name(
+                "airflow.api_fastapi.auth.managers.base_auth_manager.is_authorized_asset",
+            )
         }
 
         // airflow.configuration
@@ -648,6 +656,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "models", "baseoperator", "cross_downstream"] => {
             Replacement::Name("airflow.sdk.cross_downstream")
         }
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => {
+            Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
+        }
+
+        // airflow.notifications
+        ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
+            Replacement::Name("airflow.sdk.BaseNotifier")
+        }
 
         // airflow.operators
         ["airflow", "operators", "subdag", ..] => {
@@ -696,7 +712,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.sensors
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
-            Replacement::Name("airflow.sensors.base.BaseSensorOperator")
+            Replacement::Name("airflow.sdk.bases.sensor.BaseSensorOperator")
         }
         ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => {
             Replacement::Name("airflow.sensors.date_time.DateTimeSensor")
@@ -738,6 +754,9 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 Replacement::Name("airflow.sdk.get_parsing_context")
             }
 
+            // airflow.utils.db
+            ["db", "create_session"] => Replacement::None,
+
             // airflow.utils.decorators
             ["decorators", "apply_defaults"] => Replacement::Message(
                 "`apply_defaults` is now unconditionally done and can be safely removed.",
@@ -751,12 +770,17 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             }
 
             // airflow.utils.file
-            ["file", "TemporaryDirectory"] => Replacement::None,
-            ["file", "mkdirs"] => Replacement::Name("pendulum.today('UTC').add(days=-N, ...)"),
+            ["file", "TemporaryDirectory"] => Replacement::Name("tempfile.TemporaryDirectory"),
+            ["file", "mkdirs"] => Replacement::Name("pathlib.Path({path}).mkdir"),
 
             // airflow.utils.helpers
             ["helpers", "chain"] => Replacement::Name("airflow.sdk.chain"),
             ["helpers", "cross_downstream"] => Replacement::Name("airflow.sdk.cross_downstream"),
+
+            // airflow.utils.log.secrets_masker
+            ["log", "secrets_masker"] => {
+                Replacement::Name("airflow.sdk.execution_time.secrets_masker")
+            }
 
             // airflow.utils.state
             ["state", "SHUTDOWN" | "terminating_states"] => Replacement::None,
