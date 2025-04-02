@@ -272,6 +272,8 @@ def f(cond: bool) -> int:
 
 ## NotImplemented
 
+### All Python version
+
 `NotImplemented` is a special symbol in Python. It is commonly used to control the fallback behavior
 of special dunder methods. You can find more details in the
 [documentation](https://docs.python.org/3/library/numbers.html#implementing-the-arithmetic-operations).
@@ -309,5 +311,24 @@ def f(cond: bool) -> str:
 
 def f(cond: bool) -> int:
     # error: [invalid-return-type] "Object of type `Literal["hello"]` is not assignable to return type `int`"
+    return "hello" if cond else NotImplemented
+```
+
+### Python 3.10+
+
+Unlike Ellipsis, `_NotImplementedType` remains in `builtins.pyi` regardless of the Python version.
+Even if `builtins._NotImplementedType` is fully replaced by `types.NotImplementedType` in the
+future, it should still work as expected.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def f() -> int:
+    return NotImplemented
+
+def f(cond: bool) -> str:
     return "hello" if cond else NotImplemented
 ```
