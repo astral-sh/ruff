@@ -57,28 +57,41 @@ pub(crate) fn invalid_noqa_code(
         };
 
         let mut invalid_code_refs = vec![];
-        let mut valid_codes = vec![];
+        let mut all_invalid = true;
 
         for code in directive.iter() {
             let code_str = code.as_str();
-            if external.iter().any(|ext| code_str.starts_with(ext)) {
-                valid_codes.push(code_str);
-            } else if Rule::from_code(code.as_str()).is_err() {
-                invalid_code_refs.push(code);
+            if external.iter().any(|ext| code_str.starts_with(ext))
+                || Rule::from_code(code.as_str()).is_ok()
+            {
+                all_invalid = false;
             } else {
-                valid_codes.push(code_str);
+                invalid_code_refs.push(code);
             }
         }
 
         if invalid_code_refs.is_empty() {
             continue;
         }
-        if valid_codes.is_empty() {
-            handle_all_codes_invalid(diagnostics, directive);
-            continue;
-        }
 
-        handle_some_codes_invalid(diagnostics, &invalid_code_refs, &valid_codes, line, locator);
+        if all_invalid {
+            handle_all_codes_invalid(diagnostics, directive);
+        } else {
+            let valid_codes = directive
+                .iter()
+                .filter_map(|code| {
+                    let code_str = code.as_str();
+                    if external.iter().any(|ext| code_str.starts_with(ext))
+                        || Rule::from_code(code_str).is_ok()
+                    {
+                        Some(code_str)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            handle_some_codes_invalid(diagnostics, &invalid_code_refs, &valid_codes, line, locator);
+        }
     }
 }
 
