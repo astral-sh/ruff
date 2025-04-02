@@ -606,31 +606,54 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    pub(crate) fn with_sorted_unions_and_intersections(mut self, db: &'db dyn Db) -> Self {
-        self.annotated_type = self
-            .annotated_type
-            .map(|ty| ty.with_sorted_unions_and_intersections(db));
+    /// Strip information from the parameter so that two equivalent parameters compare equal.
+    /// Normalize nested unions and intersections in the annotated type, if any.
+    ///
+    /// See [`Type::normalized`] for more details.
+    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+        let Parameter {
+            annotated_type,
+            kind,
+            form,
+        } = self;
 
-        self.kind = match self.kind {
-            ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
-                name,
-                default_type: default_type.map(|ty| ty.with_sorted_unions_and_intersections(db)),
+        // Ensure unions and intersections are ordered in the annotated type (if there is one)
+        let annotated_type = annotated_type.map(|ty| ty.normalized(db));
+
+        // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
+        // Ensure that we only record whether a parameter *has* a default
+        // (strip the precise *type* of the default from the parameter, replacing it with `Never`).
+        let kind = match kind {
+            ParameterKind::PositionalOnly {
+                name: _,
+                default_type,
+            } => ParameterKind::PositionalOnly {
+                name: None,
+                default_type: default_type.map(|_| Type::Never),
             },
             ParameterKind::PositionalOrKeyword { name, default_type } => {
                 ParameterKind::PositionalOrKeyword {
-                    name,
-                    default_type: default_type
-                        .map(|ty| ty.with_sorted_unions_and_intersections(db)),
+                    name: name.clone(),
+                    default_type: default_type.map(|_| Type::Never),
                 }
             }
             ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
-                name,
-                default_type: default_type.map(|ty| ty.with_sorted_unions_and_intersections(db)),
+                name: name.clone(),
+                default_type: default_type.map(|_| Type::Never),
             },
-            ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => self.kind,
+            ParameterKind::Variadic { name: _ } => ParameterKind::Variadic {
+                name: Name::new_static("args"),
+            },
+            ParameterKind::KeywordVariadic { name: _ } => ParameterKind::KeywordVariadic {
+                name: Name::new_static("kwargs"),
+            },
         };
 
-        self
+        Self {
+            annotated_type,
+            kind,
+            form: *form,
+        }
     }
 
     fn from_node_and_kind(
