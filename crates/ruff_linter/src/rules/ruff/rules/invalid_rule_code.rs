@@ -7,7 +7,7 @@ use ruff_text_size::Ranged;
 
 use crate::noqa::{Codes, NoqaDirectiveLine, NoqaDirectives};
 
-/// ### What it does
+/// ## What it does
 /// Checks for `noqa` codes that are invalid.
 ///
 /// ## Why is this bad?
