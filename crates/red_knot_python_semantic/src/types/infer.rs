@@ -4615,16 +4615,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
             ),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => {
-                let m = u32::try_from(m);
-                Some(match m {
-                    Ok(m) => n
-                        .checked_pow(m)
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => Some({
+                if m < 0 {
+                    KnownClass::Float.to_instance(self.db())
+                } else {
+                    u32::try_from(m)
+                        .ok()
+                        .and_then(|m| n.checked_pow(m))
                         .map(Type::IntLiteral)
-                        .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-                    Err(_) => KnownClass::Int.to_instance(self.db()),
-                })
-            }
+                        .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+                }
+            }),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 let bytes = [&**lhs.value(self.db()), &**rhs.value(self.db())].concat();

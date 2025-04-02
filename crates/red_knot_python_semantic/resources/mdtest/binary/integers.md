@@ -55,6 +55,18 @@ def variable(x: int):
     reveal_type(x**x)  # revealed: @Todo(return type of overloaded function)
 ```
 
+If the second argument is \<0, a `float` is returned at runtime. If the first argument is \<0 but
+the second argument is >=0, an `int` is still returned:
+
+```py
+reveal_type(1**0)  # revealed: Literal[1]
+reveal_type(0**1)  # revealed: Literal[0]
+reveal_type(0**0)  # revealed: Literal[1]
+reveal_type((-1) ** 2)  # revealed: Literal[1]
+reveal_type(2 ** (-1))  # revealed: float
+reveal_type((-1) ** (-1))  # revealed: float
+```
+
 ## Division by Zero
 
 This error is really outside the current Python type system, because e.g. `int.__truediv__` and
