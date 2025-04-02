@@ -8,7 +8,7 @@ check_call(a, shell=False)
 check_output(a, shell=False)
 run(a, shell=False)
 
-# Values that falsey values are treated as false.
+# Falsey values are treated as false.
 Popen(a, shell=0)
 Popen(a, shell=[])
 Popen(a, shell={})
@@ -23,6 +23,11 @@ Popen(a)
 # Literals are fine, they're trusted.
 run("true")
 Popen(["true"])
+Popen("true", shell=False)
+call("true", shell=False)
+check_call("true", shell=False)
+check_output("true", shell=False)
+run("true", shell=False)
 
 # Not through assignments though.
 cmd = ["true"]

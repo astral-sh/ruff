@@ -292,7 +292,7 @@ impl Violation for UnixCommandWildcardInjection {
 fn is_trusted_input(arg: &Expr) -> bool {
     match arg {
         Expr::StringLiteral(_) => true,
-        Expr::List(ruff_python_ast::ExprList { elts, .. }) => {
+        Expr::List(ast::ExprList { elts, .. }) => {
             elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)))
         }
         Expr::Named(named) => is_trusted_input(&named.value),
@@ -324,7 +324,7 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 _ => {
-                    if !is_trusted_input(arg) {
+                    if !is_trusted_input(arg) || checker.settings.preview.is_disabled() {
                         if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                             checker.report_diagnostic(Diagnostic::new(
                                 SubprocessWithoutShellEqualsTrue,
