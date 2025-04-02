@@ -272,7 +272,7 @@ def f(cond: bool) -> int:
 
 ## NotImplemented
 
-### All Python versions
+### Default Python version
 
 `NotImplemented` is a special symbol in Python. It is commonly used to control the fallback behavior
 of special dunder methods. You can find more details in the
