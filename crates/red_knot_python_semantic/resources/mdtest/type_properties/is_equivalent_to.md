@@ -213,7 +213,7 @@ When the parameter kinds are different:
 def f7(a: int, /) -> None: ...
 def f8(a: int) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f7], CallableTypeOf[f8]))
+static_assert(not is_equivalent_to(CallableTypeOf[f7], CallableTypeOf[f8]))  # revealed: int
 ```
 
 When the annotated types of the parameters are not equivalent or absent in one or both of the
@@ -224,7 +224,7 @@ def f9(a: int) -> None: ...
 def f10(a: str) -> None: ...
 def f11(a) -> None: ...
 
-static_assert(not is_equivalent_to(CallableTypeOf[f9], CallableTypeOf[f10]))
+static_assert(is_equivalent_to(CallableTypeOf[f9], CallableTypeOf[f10]))
 static_assert(not is_equivalent_to(CallableTypeOf[f10], CallableTypeOf[f11]))
 static_assert(not is_equivalent_to(CallableTypeOf[f11], CallableTypeOf[f10]))
 static_assert(not is_equivalent_to(CallableTypeOf[f11], CallableTypeOf[f11]))
