@@ -106,11 +106,11 @@ impl Diagnostic {
     ///
     /// Note that this `Display` impl includes a trailing line terminator, so
     /// callers should prefer using this with `write!` instead of `writeln!`.
-    pub fn display<'c, 'db, 'd>(
-        &'d self,
-        db: &'db dyn Db,
-        config: &'c DisplayDiagnosticConfig,
-    ) -> DisplayDiagnostic<'c, 'db, 'd> {
+    pub fn display<'a>(
+        &'a self,
+        db: &'a dyn Db,
+        config: &'a DisplayDiagnosticConfig,
+    ) -> DisplayDiagnostic<'a> {
         let resolver = FileResolver::new(db);
         DisplayDiagnostic::new(resolver, config, self)
     }
