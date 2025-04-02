@@ -1,0 +1,141 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/nested_async_comprehension_py310.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..183,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 101..182,
+                    is_async: true,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("test"),
+                        range: 111..115,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 115..117,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Return(
+                            StmtReturn {
+                                range: 119..182,
+                                value: Some(
+                                    ListComp(
+                                        ExprListComp {
+                                            range: 126..182,
+                                            elt: ListComp(
+                                                ExprListComp {
+                                                    range: 127..157,
+                                                    elt: Name(
+                                                        ExprName {
+                                                            range: 128..129,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    generators: [
+                                                        Comprehension {
+                                                            range: 130..156,
+                                                            target: Name(
+                                                                ExprName {
+                                                                    range: 140..141,
+                                                                    id: Name("x"),
+                                                                    ctx: Store,
+                                                                },
+                                                            ),
+                                                            iter: Call(
+                                                                ExprCall {
+                                                                    range: 145..156,
+                                                                    func: Name(
+                                                                        ExprName {
+                                                                            range: 145..153,
+                                                                            id: Name("elements"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    arguments: Arguments {
+                                                                        range: 153..156,
+                                                                        args: [
+                                                                            Name(
+                                                                                ExprName {
+                                                                                    range: 154..155,
+                                                                                    id: Name("n"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                        ],
+                                                                        keywords: [],
+                                                                    },
+                                                                },
+                                                            ),
+                                                            ifs: [],
+                                                            is_async: true,
+                                                        },
+                                                    ],
+                                                },
+                                            ),
+                                            generators: [
+                                                Comprehension {
+                                                    range: 158..181,
+                                                    target: Name(
+                                                        ExprName {
+                                                            range: 168..169,
+                                                            id: Name("n"),
+                                                            ctx: Store,
+                                                        },
+                                                    ),
+                                                    iter: Call(
+                                                        ExprCall {
+                                                            range: 173..181,
+                                                            func: Name(
+                                                                ExprName {
+                                                                    range: 173..178,
+                                                                    id: Name("range"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            arguments: Arguments {
+                                                                range: 178..181,
+                                                                args: [
+                                                                    NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 179..180,
+                                                                            value: Int(
+                                                                                3,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                                keywords: [],
+                                                            },
+                                                        },
+                                                    ),
+                                                    ifs: [],
+                                                    is_async: true,
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

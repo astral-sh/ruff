@@ -482,6 +482,11 @@ impl SemanticSyntaxChecker {
                 // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
                 // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
 
+                // test_ok nested_async_comprehension_py310
+                // # parse_options: {"target-version": "3.10"}
+                // # if all the comprehensions are async, it should be okay
+                // async def test(): return [[x async for x in elements(n)] async for n in range(3)]
+
                 // test_err nested_async_comprehension_py310
                 // # parse_options: {"target-version": "3.10"}
                 // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
@@ -854,6 +859,7 @@ pub struct SemanticSyntaxCheckerVisitor {
     checker: SemanticSyntaxChecker,
     diagnostics: RefCell<Vec<SemanticSyntaxError>>,
     python_version: PythonVersion,
+    in_async_context: bool,
 }
 
 impl SemanticSyntaxCheckerVisitor {
@@ -892,18 +898,41 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor {
     }
 
     fn in_async_context(&self) -> bool {
-        false
+        self.in_async_context
     }
 }
 
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor {
-    fn visit_stmt(&mut self, stmt: &'_ Stmt) {
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        // intentionally visit `stmt` before updating the async context because we want to know
+        // about the *parent* context while visiting
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        let in_async_context = self.in_async_context;
+        #[allow(clippy::single_match, reason = "this is likely to grow later")]
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
+                self.in_async_context = *is_async;
+            }
+            _ => {}
+        }
         ruff_python_ast::visitor::walk_stmt(self, stmt);
+        self.in_async_context = in_async_context;
     }
 
-    fn visit_expr(&mut self, expr: &'_ Expr) {
+    fn visit_expr(&mut self, expr: &Expr) {
+        // intentionally visit `expr` before updating the async context because we want to know
+        // about the *parent* context while visiting
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+        let in_async_context = self.in_async_context;
+        match expr {
+            Expr::ListComp(ast::ExprListComp { generators, .. })
+            | Expr::SetComp(ast::ExprSetComp { generators, .. })
+            | Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
+                self.in_async_context = generators.iter().any(|g| g.is_async);
+            }
+            _ => {}
+        }
         ruff_python_ast::visitor::walk_expr(self, expr);
+        self.in_async_context = in_async_context;
     }
 }
