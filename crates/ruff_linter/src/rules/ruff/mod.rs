@@ -320,7 +320,17 @@ mod tests {
             Path::new("ruff/RUF102.py"),
             &settings::LinterSettings::for_rule(Rule::InvalidRuleCode),
         )?;
+
+        let diagnostics_ignore_external = test_path(
+            Path::new("ruff/RUF102.py"),
+            &settings::LinterSettings {
+                external: vec!["V".to_string()],
+                ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
+            },
+        )?;
+
         assert_messages!(diagnostics);
+        assert_messages!(diagnostics_ignore_external);
         Ok(())
     }
 

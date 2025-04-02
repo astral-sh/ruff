@@ -6,8 +6,8 @@ RUF102.py:2:12: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 1 | # Invalid code
 2 | import os  # noqa: INVALID123
   |            ^^^^^^^^^^^^^^^^^^ RUF102
-3 | # Valid noqa
-4 | import sys  # noqa: E402
+3 | # External code
+4 | import re  # noqa: V123
   |
   = help: Remove the rule code
 
@@ -15,63 +15,84 @@ RUF102.py:2:12: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 1 1 | # Invalid code
 2   |-import os  # noqa: INVALID123
   2 |+import os  
-3 3 | # Valid noqa
-4 4 | import sys  # noqa: E402
-5 5 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
+3 3 | # External code
+4 4 | import re  # noqa: V123
+5 5 | # Valid noqa
 
-RUF102.py:5:65: RUF102 [*] Invalid rule code in `# noqa`: INVALID456
+RUF102.py:4:12: RUF102 [*] Invalid rule code in `# noqa`: V123
   |
-3 | # Valid noqa
-4 | import sys  # noqa: E402
-5 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
-  |                                                                 ^^^^^^^^^^ RUF102
-6 | from itertools import product  # Preceeding comment # noqa: INVALID789
-7 | # Mixed valid and invalid
+2 | import os  # noqa: INVALID123
+3 | # External code
+4 | import re  # noqa: V123
+  |            ^^^^^^^^^^^^ RUF102
+5 | # Valid noqa
+6 | import sys  # noqa: E402
   |
   = help: Remove the rule code
 
 ℹ Safe fix
+1 1 | # Invalid code
 2 2 | import os  # noqa: INVALID123
-3 3 | # Valid noqa
-4 4 | import sys  # noqa: E402
-5   |-from functools import cache  # Preceeding comment # noqa: F401, INVALID456
-  5 |+from functools import cache  # Preceeding comment # noqa: F401
-6 6 | from itertools import product  # Preceeding comment # noqa: INVALID789
-7 7 | # Mixed valid and invalid
-8 8 | from typing import List  # noqa: F401, INVALID123
+3 3 | # External code
+4   |-import re  # noqa: V123
+  4 |+import re  
+5 5 | # Valid noqa
+6 6 | import sys  # noqa: E402
+7 7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
 
-RUF102.py:6:53: RUF102 [*] Invalid rule code in `# noqa`: INVALID789
+RUF102.py:7:65: RUF102 [*] Invalid rule code in `# noqa`: INVALID456
   |
-4 | import sys  # noqa: E402
-5 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
-6 | from itertools import product  # Preceeding comment # noqa: INVALID789
-  |                                                     ^^^^^^^^^^^^^^^^^^ RUF102
-7 | # Mixed valid and invalid
-8 | from typing import List  # noqa: F401, INVALID123
-  |
-  = help: Remove the rule code
-
-ℹ Safe fix
-3 3 | # Valid noqa
-4 4 | import sys  # noqa: E402
-5 5 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
-6   |-from itertools import product  # Preceeding comment # noqa: INVALID789
-  6 |+from itertools import product  # Preceeding comment 
-7 7 | # Mixed valid and invalid
-8 8 | from typing import List  # noqa: F401, INVALID123
-
-RUF102.py:8:40: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
-  |
-6 | from itertools import product  # Preceeding comment # noqa: INVALID789
-7 | # Mixed valid and invalid
-8 | from typing import List  # noqa: F401, INVALID123
-  |                                        ^^^^^^^^^^ RUF102
+5 | # Valid noqa
+6 | import sys  # noqa: E402
+7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
+  |                                                                 ^^^^^^^^^^ RUF102
+8 | from itertools import product  # Preceeding comment # noqa: INVALID789
+9 | # Mixed valid and invalid
   |
   = help: Remove the rule code
 
 ℹ Safe fix
-5 5 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
-6 6 | from itertools import product  # Preceeding comment # noqa: INVALID789
-7 7 | # Mixed valid and invalid
-8   |-from typing import List  # noqa: F401, INVALID123
-  8 |+from typing import List  # noqa: F401
+4 4 | import re  # noqa: V123
+5 5 | # Valid noqa
+6 6 | import sys  # noqa: E402
+7   |-from functools import cache  # Preceeding comment # noqa: F401, INVALID456
+  7 |+from functools import cache  # Preceeding comment # noqa: F401
+8 8 | from itertools import product  # Preceeding comment # noqa: INVALID789
+9 9 | # Mixed valid and invalid
+10 10 | from typing import List  # noqa: F401, INVALID123
+
+RUF102.py:8:53: RUF102 [*] Invalid rule code in `# noqa`: INVALID789
+   |
+ 6 | import sys  # noqa: E402
+ 7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
+ 8 | from itertools import product  # Preceeding comment # noqa: INVALID789
+   |                                                     ^^^^^^^^^^^^^^^^^^ RUF102
+ 9 | # Mixed valid and invalid
+10 | from typing import List  # noqa: F401, INVALID123
+   |
+   = help: Remove the rule code
+
+ℹ Safe fix
+5 5 | # Valid noqa
+6 6 | import sys  # noqa: E402
+7 7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
+8   |-from itertools import product  # Preceeding comment # noqa: INVALID789
+  8 |+from itertools import product  # Preceeding comment 
+9 9 | # Mixed valid and invalid
+10 10 | from typing import List  # noqa: F401, INVALID123
+
+RUF102.py:10:40: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+   |
+ 8 | from itertools import product  # Preceeding comment # noqa: INVALID789
+ 9 | # Mixed valid and invalid
+10 | from typing import List  # noqa: F401, INVALID123
+   |                                        ^^^^^^^^^^ RUF102
+   |
+   = help: Remove the rule code
+
+ℹ Safe fix
+7  7  | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
+8  8  | from itertools import product  # Preceeding comment # noqa: INVALID789
+9  9  | # Mixed valid and invalid
+10    |-from typing import List  # noqa: F401, INVALID123
+   10 |+from typing import List  # noqa: F401
