@@ -517,7 +517,11 @@ impl Display for SemanticSyntaxError {
                 }
             },
             SemanticSyntaxErrorKind::DuplicateMatchKey(key) => {
-                write!(f, "mapping pattern checks duplicate key `{key}`")
+                write!(
+                    f,
+                    "mapping pattern checks duplicate key `{}`",
+                    EscapeDefault(key)
+                )
             }
         }
     }
@@ -834,5 +838,22 @@ where
     fn visit_expr(&mut self, expr: &'_ Expr) {
         self.checker.visit_expr(expr, &self.context);
         ruff_python_ast::visitor::walk_expr(self, expr);
+    }
+}
+
+/// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.
+struct EscapeDefault<'a>(&'a str);
+
+impl Display for EscapeDefault<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write;
+
+        for c in self.0.chars() {
+            match c {
+                '\'' | '\"' => f.write_char(c)?,
+                _ => write!(f, "{}", c.escape_default())?,
+            }
+        }
+        Ok(())
     }
 }

@@ -982,10 +982,7 @@ Module(
 15 | |     y
 16 | |     z
 17 | |     """: 2}: ...
-   | |_______^ Syntax Error: mapping pattern checks duplicate key `"""x
-    y
-    z
-    """`
+   | |_______^ Syntax Error: mapping pattern checks duplicate key `"""x\n    y\n    z\n    """`
 18 |       case {"x": 1, "x": 2, "x": 3}: ...
 19 |       case {0: 1, "x": 1, 0: 2, "x": 2}: ...
    |
