@@ -5575,5 +5575,13 @@ fn async_comprehension_in_sync_comprehension() {
 
     let contents = "async def f(): return [[x async for x in foo(n)] for n in range(3)]";
 
-    assert_cmd_snapshot!(cmd.args(["--target-version", "py310"]).pass_stdin(contents), @r"");
+    assert_cmd_snapshot!(cmd.args(["--target-version", "py310"]).pass_stdin(contents), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:27: SyntaxError: cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)
+    Found 1 error.
+
+    ----- stderr -----
+    ");
 }

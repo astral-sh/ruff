@@ -73,7 +73,10 @@ pub(crate) fn await_outside_async<T: Ranged>(checker: &Checker, node: T) {
     // ```
     if matches!(
         checker.semantic().current_scope().kind,
-        ScopeKind::Generator(GeneratorKind::Generator)
+        ScopeKind::Generator {
+            kind: GeneratorKind::Generator,
+            is_async: _
+        }
     ) {
         return;
     }
