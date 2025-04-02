@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/nested_async_comprehen
 ```
 Module(
     ModModule {
-        range: 0..256,
+        range: 0..398,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -137,16 +137,16 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 183..255,
+                    range: 226..298,
                     is_async: true,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("f"),
-                        range: 193..194,
+                        range: 236..237,
                     },
                     type_params: None,
                     parameters: Parameters {
-                        range: 194..196,
+                        range: 237..239,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -157,43 +157,43 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 202..223,
+                                range: 245..266,
                                 value: ListComp(
                                     ExprListComp {
-                                        range: 202..223,
+                                        range: 245..266,
                                         elt: Name(
                                             ExprName {
-                                                range: 203..204,
+                                                range: 246..247,
                                                 id: Name("_"),
                                                 ctx: Load,
                                             },
                                         ),
                                         generators: [
                                             Comprehension {
-                                                range: 205..222,
+                                                range: 248..265,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 209..210,
+                                                        range: 252..253,
                                                         id: Name("n"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 iter: Call(
                                                     ExprCall {
-                                                        range: 214..222,
+                                                        range: 257..265,
                                                         func: Name(
                                                             ExprName {
-                                                                range: 214..219,
+                                                                range: 257..262,
                                                                 id: Name("range"),
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         arguments: Arguments {
-                                                            range: 219..222,
+                                                            range: 262..265,
                                                             args: [
                                                                 NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 220..221,
+                                                                        range: 263..264,
                                                                         value: Int(
                                                                             3,
                                                                         ),
@@ -214,43 +214,156 @@ Module(
                         ),
                         Expr(
                             StmtExpr {
-                                range: 228..255,
+                                range: 271..298,
                                 value: ListComp(
                                     ExprListComp {
-                                        range: 228..255,
+                                        range: 271..298,
                                         elt: Name(
                                             ExprName {
-                                                range: 229..230,
+                                                range: 272..273,
                                                 id: Name("_"),
                                                 ctx: Load,
                                             },
                                         ),
                                         generators: [
                                             Comprehension {
-                                                range: 231..254,
+                                                range: 274..297,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 241..242,
+                                                        range: 284..285,
                                                         id: Name("n"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 iter: Call(
                                                     ExprCall {
-                                                        range: 246..254,
+                                                        range: 289..297,
                                                         func: Name(
                                                             ExprName {
-                                                                range: 246..251,
+                                                                range: 289..294,
                                                                 id: Name("range"),
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         arguments: Arguments {
-                                                            range: 251..254,
+                                                            range: 294..297,
                                                             args: [
                                                                 NumberLiteral(
                                                                     ExprNumberLiteral {
-                                                                        range: 252..253,
+                                                                        range: 295..296,
+                                                                        value: Int(
+                                                                            3,
+                                                                        ),
+                                                                    },
+                                                                ),
+                                                            ],
+                                                            keywords: [],
+                                                        },
+                                                    },
+                                                ),
+                                                ifs: [],
+                                                is_async: true,
+                                            },
+                                        ],
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 334..397,
+                    is_async: true,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 344..345,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 345..347,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 353..365,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("g"),
+                                    range: 357..358,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 358..360,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 362..365,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 362..365,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                range: 370..397,
+                                value: ListComp(
+                                    ExprListComp {
+                                        range: 370..397,
+                                        elt: Name(
+                                            ExprName {
+                                                range: 371..372,
+                                                id: Name("_"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        generators: [
+                                            Comprehension {
+                                                range: 373..396,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 383..384,
+                                                        id: Name("n"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                iter: Call(
+                                                    ExprCall {
+                                                        range: 388..396,
+                                                        func: Name(
+                                                            ExprName {
+                                                                range: 388..393,
+                                                                id: Name("range"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        arguments: Arguments {
+                                                            range: 393..396,
+                                                            args: [
+                                                                NumberLiteral(
+                                                                    ExprNumberLiteral {
+                                                                        range: 394..395,
                                                                         value: Int(
                                                                             3,
                                                                         ),
