@@ -19,10 +19,10 @@ fn mdtest(fixture: Fixture<&str>) {
 
     let test_name = test_name("mdtest", absolute_fixture_path);
 
-    let output_format = if cfg!(feature = "mdtest_github_output_format") {
+    let output_format = if std::env::var("MDTEST_GITHUB_ANNOTATIONS_FORMAT").is_ok() {
         OutputFormat::GitHub
     } else {
-        OutputFormat::Cargo
+        OutputFormat::Cli
     };
 
     red_knot_test::run(

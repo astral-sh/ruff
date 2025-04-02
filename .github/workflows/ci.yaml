@@ -456,7 +456,8 @@ jobs:
         shell: bash
         env:
           NO_COLOR: 1
-        run: cargo test --features=mdtest_github_output_format -p red_knot_python_semantic --test mdtest
+          MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
+        run: cargo test -p red_knot_python_semantic --test mdtest
 
   fuzz-parser:
     name: "fuzz parser"

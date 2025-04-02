@@ -61,7 +61,7 @@ pub fn run(
         if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
             any_failures = true;
 
-            if output_format.is_cargo() {
+            if output_format.is_cli() {
                 println!("\n{}\n", test.name().bold().underline());
             }
 
@@ -77,7 +77,7 @@ pub fn run(
 
                     for failure in failures {
                         match output_format {
-                            OutputFormat::Cargo => {
+                            OutputFormat::Cli => {
                                 let line_info =
                                     format!("{relative_fixture_path}:{absolute_line_number}")
                                         .cyan();
@@ -93,7 +93,7 @@ pub fn run(
 
             let escaped_test_name = test.name().replace('\'', "\\'");
 
-            if output_format.is_cargo() {
+            if output_format.is_cli() {
                 println!(
                     "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
                 );
@@ -113,7 +113,7 @@ pub fn run(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutputFormat {
     /// The format `cargo test` should use by default.
-    Cargo,
+    Cli,
     /// A format that will provide annotations from GitHub Actions
     /// if mdtest fails on a PR.
     /// See <https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#setting-an-error-message>
@@ -121,8 +121,8 @@ pub enum OutputFormat {
 }
 
 impl OutputFormat {
-    const fn is_cargo(self) -> bool {
-        matches!(self, OutputFormat::Cargo)
+    const fn is_cli(self) -> bool {
+        matches!(self, OutputFormat::Cli)
     }
 }
 
