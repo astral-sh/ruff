@@ -77,7 +77,7 @@ impl Violation for Airflow3Removal {
     }
 }
 
-/// AIR302
+/// AIR301
 pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
@@ -114,7 +114,7 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
     }
 }
 
-/// AIR302
+/// AIR301
 pub(crate) fn airflow_3_removal_function_def(checker: &Checker, function_def: &StmtFunctionDef) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;

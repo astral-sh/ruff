@@ -15,13 +15,13 @@ mod tests {
 
     #[test_case(Rule::AirflowVariableNameTaskIdMismatch, Path::new("AIR001.py"))]
     #[test_case(Rule::AirflowDagNoScheduleArgument, Path::new("AIR002.py"))]
-    #[test_case(Rule::Airflow3Removal, Path::new("AIR302_args.py"))]
-    #[test_case(Rule::Airflow3Removal, Path::new("AIR302_names.py"))]
-    #[test_case(Rule::Airflow3Removal, Path::new("AIR302_names_try.py"))]
-    #[test_case(Rule::Airflow3Removal, Path::new("AIR302_class_attribute.py"))]
-    #[test_case(Rule::Airflow3Removal, Path::new("AIR302_airflow_plugin.py"))]
-    #[test_case(Rule::Airflow3Removal, Path::new("AIR302_context.py"))]
-    #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR303.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR301_args.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names_try.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR301_class_attribute.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR301_airflow_plugin.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR301_context.py"))]
+    #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
