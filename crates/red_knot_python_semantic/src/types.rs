@@ -304,7 +304,7 @@ pub enum Type<'db> {
     /// An instance of a typevar in a generic class or function. When the generic class or function
     /// is specialized, we will replace this typevar with its specialization.
     TypeVar(TypeVarInstance<'db>),
-    // TODO protocols, callable types, overloads, generics
+    // TODO protocols, overloads, generics
 }
 
 #[salsa::tracked]
