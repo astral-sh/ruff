@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF102.py:2:12: RUF102 [*] Invalid rule code in `# noqa`: XYZ111
+  |
+1 | # Invalid code
+2 | import os  # noqa: XYZ111
+  |            ^^^^^^^^^^^^^^ RUF102
+3 | # Valid noqa
+4 | import sys  # noqa: E402
+  |
+  = help: Remove the rule code
+
+ℹ Safe fix
+1 1 | # Invalid code
+2   |-import os  # noqa: XYZ111
+  2 |+import os  
+3 3 | # Valid noqa
+4 4 | import sys  # noqa: E402
+5 5 | # Mixed valid and invalid
+
+RUF102.py:6:40: RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+  |
+4 | import sys  # noqa: E402
+5 | # Mixed valid and invalid
+6 | from typing import List  # noqa: F401, INVALID123
+  |                                        ^^^^^^^^^^ RUF102
+7 |
+8 | # Multiple invalid codes
+  |
+  = help: Remove the rule code
+
+ℹ Safe fix
+3 3 | # Valid noqa
+4 4 | import sys  # noqa: E402
+5 5 | # Mixed valid and invalid
+6   |-from typing import List  # noqa: F401, INVALID123
+  6 |+from typing import List  # noqa: F401
+7 7 | 
+8 8 | # Multiple invalid codes
+9 9 | # noqa: XYZ222, XYZ333
+
+RUF102.py:9:1: RUF102 [*] Invalid rule code in `# noqa`: XYZ222, XYZ333
+  |
+8 | # Multiple invalid codes
+9 | # noqa: XYZ222, XYZ333
+  | ^^^^^^^^^^^^^^^^^^^^^^ RUF102
+  |
+  = help: Remove the rule code
+
+ℹ Safe fix
+6 6 | from typing import List  # noqa: F401, INVALID123
+7 7 | 
+8 8 | # Multiple invalid codes
+9   |-# noqa: XYZ222, XYZ333
+  9 |+
