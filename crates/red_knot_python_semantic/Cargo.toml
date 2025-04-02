@@ -61,5 +61,10 @@ quickcheck_macros = { version = "1.0.0" }
 [features]
 serde = ["ruff_db/serde", "dep:serde", "ruff_python_ast/serde"]
 
+# When enabled, this feature causes mdtest to output failures in a format
+# that leads GitHub Actions to annotate the PR diff with the failures.
+# (Nice for CI, not so nice for local development.)
+mdtest_github_output_format = []
+
 [lints]
 workspace = true

@@ -36,6 +36,8 @@ jobs:
       code: ${{ steps.check_code.outputs.changed }}
       # Flag that is raised when any code that affects the fuzzer is changed
       fuzz: ${{ steps.check_fuzzer.outputs.changed }}
+      # Flag that is set to "true" when code related to red-knot changes.
+      red_knot: ${{ steps.check_red_knot.outputs.changed }}
 
       # Flag that is set to "true" when code related to the playground changes.
       playground: ${{ steps.check_playground.outputs.changed }}
@@ -160,6 +162,29 @@ jobs:
         run: |
           if git diff --quiet "${MERGE_BASE}...HEAD" -- \
             ':playground/**' \
+          ; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if the red-knot code changed
+        id: check_red_knot
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            ':Cargo.toml' \
+            ':Cargo.lock' \
+            ':crates/red_knot*/**' \
+            ':crates/ruff_db/**' \
+            ':crates/ruff_annotate_snippets/**' \
+            ':crates/ruff_python_ast/**' \
+            ':crates/ruff_python_parser/**' \
+            ':crates/ruff_python_trivia/**' \
+            ':crates/ruff_source_file/**' \
+            ':crates/ruff_text_size/**' \
+            ':.github/workflows/ci.yaml' \
           ; then
               echo "changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -407,6 +432,31 @@ jobs:
         # Download the latest version from quick install and not the github releases because github releases only has MUSL targets.
         run: cargo binstall cargo-fuzz --force  --disable-strategies crate-meta-data --no-confirm
       - run: cargo fuzz build -s none
+
+  mdtest-github-format:
+    name: "red-knot mdtest (GitHub annotations)"
+    runs-on: ubuntu-latest
+    needs: determine_changes
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && needs.determine_changes.outputs.red_knot == 'true' && github.event_name == 'pull_request' }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - name: "Install cargo insta"
+        uses: taiki-e/install-action@6aca1cfa12ef3a6b98ee8c70e0171bfa067604f5 # v2
+        with:
+          tool: cargo-insta
+      - name: "Run mdtest"
+        shell: bash
+        env:
+          NO_COLOR: 1
+        run: cargo test --features=mdtest_github_output_format -p red_knot_python_semantic --test mdtest
 
   fuzz-parser:
     name: "fuzz parser"

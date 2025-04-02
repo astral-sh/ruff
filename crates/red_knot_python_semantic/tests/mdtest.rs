@@ -1,5 +1,6 @@
 use camino::Utf8Path;
 use dir_test::{dir_test, Fixture};
+use red_knot_test::OutputFormat;
 
 /// See `crates/red_knot_test/README.md` for documentation on these tests.
 #[dir_test(
@@ -18,12 +19,19 @@ fn mdtest(fixture: Fixture<&str>) {
 
     let test_name = test_name("mdtest", absolute_fixture_path);
 
+    let output_format = if cfg!(feature = "mdtest_github_output_format") {
+        OutputFormat::GitHub
+    } else {
+        OutputFormat::Cargo
+    };
+
     red_knot_test::run(
         absolute_fixture_path,
         relative_fixture_path,
         &snapshot_path,
         short_title,
         &test_name,
+        output_format,
     );
 }
 

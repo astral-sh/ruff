@@ -34,6 +34,7 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
+    output_format: OutputFormat,
 ) {
     let source = std::fs::read_to_string(absolute_fixture_path).unwrap();
     let suite = match test_parser::parse(short_title, &source) {
@@ -59,7 +60,10 @@ pub fn run(
 
         if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
             any_failures = true;
-            println!("\n{}\n", test.name().bold().underline());
+
+            if output_format.is_cargo() {
+                println!("\n{}\n", test.name().bold().underline());
+            }
 
             let md_index = LineIndex::from_source_text(&source);
 
@@ -72,27 +76,54 @@ pub fn run(
                         source_map.to_absolute_line_number(relative_line_number);
 
                     for failure in failures {
-                        let line_info =
-                            format!("{relative_fixture_path}:{absolute_line_number}").cyan();
-                        println!("  {line_info} {failure}");
+                        match output_format {
+                            OutputFormat::Cargo => {
+                                let line_info =
+                                    format!("{relative_fixture_path}:{absolute_line_number}")
+                                        .cyan();
+                                println!("  {line_info} {failure}");
+                            }
+                            OutputFormat::GitHub => println!(
+                                "::error file={absolute_fixture_path},line={absolute_line_number}::{failure}"
+                            ),
+                        }
                     }
                 }
             }
 
             let escaped_test_name = test.name().replace('\'', "\\'");
 
-            println!(
-                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
-            );
-            println!(
-                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
-            );
+            if output_format.is_cargo() {
+                println!(
+                    "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
+                );
+                println!(
+                    "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
+                );
+            }
         }
     }
 
     println!("\n{}\n", "-".repeat(50));
 
     assert!(!any_failures, "Some tests failed.");
+}
+
+/// Defines the format in which mdtest should print an error to the terminal
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputFormat {
+    /// The format `cargo test` should use by default.
+    Cargo,
+    /// A format that will provide annotations from GitHub Actions
+    /// if mdtest fails on a PR.
+    /// See <https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#setting-an-error-message>
+    GitHub,
+}
+
+impl OutputFormat {
+    const fn is_cargo(self) -> bool {
+        matches!(self, OutputFormat::Cargo)
+    }
 }
 
 fn run_test(
