@@ -97,7 +97,7 @@ AIR302.py:241:1: AIR302 `airflow.sensors.s3_key_sensor.S3KeySensor` is moved int
 242 | S3ToRedshiftOperator()
 243 | S3ToRedshiftTransfer()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `S3KeySensor` instead.
+    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.sensors.s3.S3KeySensor` instead.
 
 AIR302.py:242:1: AIR302 `airflow.operators.s3_to_redshift_operator.S3ToRedshiftOperator` is moved into `amazon` provider in Airflow 3.0;
     |
