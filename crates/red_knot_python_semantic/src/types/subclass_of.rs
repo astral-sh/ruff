@@ -52,7 +52,7 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return the inner [`ClassBase`] value wrapped by this `SubclassOfType`.
-    pub(crate) const fn subclass_of(self) -> ClassBase<'db> {
+    pub const fn subclass_of(self) -> ClassBase<'db> {
         self.subclass_of
     }
 

@@ -6,7 +6,7 @@ use lsp_types::Url;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    edit::{DocumentKey, DocumentVersion, NotebookDocument},
+    document::{DocumentKey, DocumentVersion, NotebookDocument},
     PositionEncoding, TextDocument,
 };
 

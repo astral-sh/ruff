@@ -82,7 +82,7 @@ use crate::types::{
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
-use crate::types::{CallableType, Signature};
+use crate::types::{CallableType, FunctionDecorators, Signature};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -1373,19 +1373,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
-        // Check if the function is decorated with the `no_type_check` decorator
-        // and, if so, suppress any errors that come after the decorators.
-        let mut decorator_tys = Vec::with_capacity(decorator_list.len());
+        let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
+        let mut function_decorators = FunctionDecorators::empty();
 
         for decorator in decorator_list {
-            let ty = self.infer_decorator(decorator);
-            decorator_tys.push(ty);
+            let decorator_ty = self.infer_decorator(decorator);
 
-            if let Type::FunctionLiteral(function) = ty {
+            if let Type::FunctionLiteral(function) = decorator_ty {
                 if function.is_known(self.db(), KnownFunction::NoTypeCheck) {
+                    // If the function is decorated with the `no_type_check` decorator,
+                    // we need to suppress any errors that come after the decorators.
                     self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                    function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
+                    continue;
+                } else if function.is_known(self.db(), KnownFunction::Overload) {
+                    function_decorators |= FunctionDecorators::OVERLOAD;
+                    continue;
+                }
+            } else if let Type::ClassLiteral(class) = decorator_ty {
+                if class.class.is_known(self.db(), KnownClass::Classmethod) {
+                    function_decorators |= FunctionDecorators::CLASSMETHOD;
+                    continue;
                 }
             }
+
+            decorator_types_and_nodes.push((decorator_ty, decorator));
         }
 
         for default in parameters
@@ -1417,18 +1429,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Function(function))
             .to_scope_id(self.db(), self.file());
 
-        let function_ty = Type::FunctionLiteral(FunctionType::new(
+        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
             &name.id,
             function_kind,
             body_scope,
-            decorator_tys.into_boxed_slice(),
+            function_decorators,
         ));
+
+        for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
+            inferred_ty = match decorator_ty
+                .try_call(self.db(), CallArgumentTypes::positional([inferred_ty]))
+                .map(|bindings| bindings.return_type(self.db()))
+            {
+                Ok(return_ty) => return_ty,
+                Err(CallError(_, bindings)) => {
+                    bindings.report_diagnostics(&self.context, (*decorator_node).into());
+                    bindings.return_type(self.db())
+                }
+            };
+        }
 
         self.add_declaration_with_binding(
             function.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(function_ty),
+            &DeclaredAndInferredType::AreTheSame(inferred_ty),
         );
     }
 
@@ -1991,6 +2016,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             name.id.clone(),
+            definition,
             bound_or_constraint,
             default_ty,
         )));
@@ -2311,11 +2337,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::SliceLiteral(..)
             | Type::Tuple(..)
             | Type::KnownInstance(..)
+            | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
             | Type::BoundMethod(_)
-            | Type::MethodWrapperDunderGet(_)
-            | Type::WrapperDescriptorDunderGet
+            | Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => match object_ty.class_member(db, attribute.into()) {
                 meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
@@ -4413,14 +4440,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
-                | Type::WrapperDescriptorDunderGet
-                | Type::MethodWrapperDunderGet(_)
+                | Type::WrapperDescriptor(_)
+                | Type::MethodWrapper(_)
                 | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
                 | Type::Union(_)
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
@@ -4665,13 +4693,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
-                | Type::WrapperDescriptorDunderGet
-                | Type::MethodWrapperDunderGet(_)
+                | Type::WrapperDescriptor(_)
+                | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
@@ -4684,13 +4713,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
-                | Type::WrapperDescriptorDunderGet
-                | Type::MethodWrapperDunderGet(_)
+                | Type::WrapperDescriptor(_)
+                | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy

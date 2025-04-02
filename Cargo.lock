@@ -2507,10 +2507,15 @@ dependencies = [
 name = "red_knot_ide"
 version = "0.0.0"
 dependencies = [
+ "insta",
  "red_knot_python_semantic",
  "red_knot_vendored",
  "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
  "salsa",
+ "smallvec",
  "tracing",
 ]
 
@@ -2597,7 +2602,9 @@ dependencies = [
  "libc",
  "lsp-server",
  "lsp-types",
+ "red_knot_ide",
  "red_knot_project",
+ "red_knot_python_semantic",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_ast",
