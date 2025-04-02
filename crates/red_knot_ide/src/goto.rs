@@ -241,6 +241,7 @@ pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Optio
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write;
 
     use crate::db::tests::TestDb;
     use crate::{goto_type_definition, NavigationTarget};
@@ -860,24 +861,19 @@ f(**kwargs<CURSOR>)
                 return "No type definitions found".to_string();
             }
 
-            let mut buf = vec![];
+            let mut buf = String::new();
 
             let source = targets.range;
 
+            let config = DisplayDiagnosticConfig::default()
+                .color(false)
+                .format(DiagnosticFormat::Full);
             for target in &*targets {
-                GotoTypeDefinitionDiagnostic::new(source, target)
-                    .into_diagnostic()
-                    .print(
-                        &self.db,
-                        &DisplayDiagnosticConfig::default()
-                            .color(false)
-                            .format(DiagnosticFormat::Full),
-                        &mut buf,
-                    )
-                    .unwrap();
+                let diag = GotoTypeDefinitionDiagnostic::new(source, target).into_diagnostic();
+                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
             }
 
-            String::from_utf8(buf).unwrap()
+            buf
         }
     }
 

@@ -288,7 +288,7 @@ impl MainLoop {
                             let diagnostics_count = result.len();
 
                             for diagnostic in result {
-                                diagnostic.print(db, &display_config, &mut stdout)?;
+                                write!(stdout, "{}", diagnostic.display(db, &display_config))?;
 
                                 failed |= diagnostic.severity() >= min_error_severity;
                             }

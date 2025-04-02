@@ -17,20 +17,31 @@ use super::{
     Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, Severity, SubDiagnostic,
 };
 
+/// A type that implements `std::fmt::Display` for diagnostic rendering.
+///
+/// It is created via [`Diagnostic::display`].
+///
+/// The lifetime parameters are:
+///
+/// * `'c` is the lifetime of the rendering configuration.
+/// * `'r` is the lifetime of the resolver used to load the contents of `Span`
+///   values. When using Salsa, this most commonly corresponds to the lifetime
+///   of a Salsa `Db`.
+/// * `'d` is the lifetime of the diagnostic being rendered.
 #[derive(Debug)]
-pub(crate) struct DisplayDiagnostic<'a> {
-    config: &'a DisplayDiagnosticConfig,
-    resolver: &'a FileResolver<'a>,
+pub struct DisplayDiagnostic<'c, 'r, 'd> {
+    config: &'c DisplayDiagnosticConfig,
+    resolver: FileResolver<'r>,
     annotate_renderer: AnnotateRenderer,
-    diag: &'a Diagnostic,
+    diag: &'d Diagnostic,
 }
 
-impl<'a> DisplayDiagnostic<'a> {
+impl<'c, 'r, 'd> DisplayDiagnostic<'c, 'r, 'd> {
     pub(crate) fn new(
-        resolver: &'a FileResolver<'a>,
-        config: &'a DisplayDiagnosticConfig,
-        diag: &'a Diagnostic,
-    ) -> DisplayDiagnostic<'a> {
+        resolver: FileResolver<'r>,
+        config: &'c DisplayDiagnosticConfig,
+        diag: &'d Diagnostic,
+    ) -> DisplayDiagnostic<'c, 'r, 'd> {
         let annotate_renderer = if config.color {
             AnnotateRenderer::styled()
         } else {
@@ -45,7 +56,7 @@ impl<'a> DisplayDiagnostic<'a> {
     }
 }
 
-impl std::fmt::Display for DisplayDiagnostic<'_> {
+impl std::fmt::Display for DisplayDiagnostic<'_, '_, '_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if matches!(self.config.format, DiagnosticFormat::Concise) {
             match self.diag.severity() {
@@ -65,15 +76,15 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 }
                 write!(f, ":")?;
             }
-            return write!(f, " {message}", message = self.diag.primary_message());
+            return writeln!(f, " {message}", message = self.diag.primary_message());
         }
 
-        let resolved = Resolved::new(self.resolver, self.diag);
+        let resolved = Resolved::new(&self.resolver, self.diag);
         let renderable = resolved.to_renderable(self.config.context);
         for diag in renderable.diagnostics.iter() {
             writeln!(f, "{}", self.annotate_renderer.render(diag.to_annotate()))?;
         }
-        Ok(())
+        writeln!(f)
     }
 }
 
@@ -2130,9 +2141,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         fn render(&self, diag: &Diagnostic) -> String {
-            let mut buf = vec![];
-            diag.print(&self.db, &self.config, &mut buf).unwrap();
-            String::from_utf8(buf).unwrap()
+            diag.display(&self.db, &self.config).to_string()
         }
     }
 
