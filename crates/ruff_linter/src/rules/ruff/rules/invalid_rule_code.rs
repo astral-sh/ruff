@@ -69,11 +69,13 @@ pub(crate) fn invalid_noqa_code(
 
         if invalid_code_refs.is_empty() {
             continue;
-        } else if valid_codes.is_empty() {
-            handle_all_codes_invalid(diagnostics, directive, line, locator);
-        } else {
-            handle_some_codes_invalid(diagnostics, &invalid_code_refs, &valid_codes, line, locator);
         }
+        if valid_codes.is_empty() {
+            handle_all_codes_invalid(diagnostics, directive, line, locator);
+            continue;
+        }
+
+        handle_some_codes_invalid(diagnostics, &invalid_code_refs, &valid_codes, line, locator);
     }
 }
 
@@ -85,7 +87,7 @@ fn handle_all_codes_invalid(
 ) {
     let invalid_codes = directive
         .iter()
-        .map(|code| code.as_str())
+        .map(crate::noqa::Code::as_str)
         .collect::<Vec<_>>()
         .join(", ");
 
@@ -99,7 +101,8 @@ fn handle_all_codes_invalid(
     let original_text = locator.slice(line.range());
     if let Some(comment_start) = original_text.find('#') {
         let comment_range = ruff_text_size::TextRange::new(
-            line.range().start() + ruff_text_size::TextSize::from(comment_start as u32),
+            line.range().start()
+                + ruff_text_size::TextSize::from(u32::try_from(comment_start).unwrap_or(0)),
             line.range().end(),
         );
         diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(comment_range)));
@@ -149,6 +152,6 @@ fn update_noqa(line: &NoqaDirectiveLine<'_>, valid_codes: &[&str], locator: &Loc
             formatted_codes
         )
     } else {
-        format!("# noqa: {}", formatted_codes)
+        format!("# noqa: {formatted_codes}")
     }
 }
