@@ -673,8 +673,6 @@ impl<'db> Type<'db> {
         // A fully static typevar is a subtype of its upper bound, and to something similar to the
         // union of its constraints. An unbound, unconstrained, fully static typevar has an
         // implicit upper bound of `object` (which is handled below).
-        // TODO: It's not _really_ the union of its constraints because each occurrence of the
-        // typevar must be bound to the same type.
         if let Type::TypeVar(typevar) = self {
             match typevar.bound_or_constraints(db) {
                 None => {}
@@ -925,8 +923,6 @@ impl<'db> Type<'db> {
         // A typevar is assignable to its upper bound, and to something similar to the union of
         // its constraints. An unbound, unconstrained typevar has an implicit upper bound of
         // `object` (which is handled below).
-        // TODO: It's not _really_ the union of its constraints because each occurrence of the
-        // typevar must be bound to the same type.
         if let Type::TypeVar(typevar) = self {
             match typevar.bound_or_constraints(db) {
                 None => {}
