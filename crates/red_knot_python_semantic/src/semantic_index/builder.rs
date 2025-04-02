@@ -1186,8 +1186,11 @@ where
                 self.visit_expr(&node.test);
                 let no_branch_taken = self.flow_snapshot();
                 let last_predicate = self.record_expression_narrowing_constraint(&node.test);
-
                 self.record_visibility_constraint(last_predicate);
+
+                if let Some(msg) = &node.msg {
+                    self.visit_expr(msg);
+                }
 
                 self.simplify_visibility_constraints(no_branch_taken);
             }
