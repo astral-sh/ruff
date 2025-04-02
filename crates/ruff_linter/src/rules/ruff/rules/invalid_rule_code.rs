@@ -131,11 +131,13 @@ fn update_noqa(line: &NoqaDirectiveLine<'_>, valid_codes: &[&str], locator: &Loc
     if let Some(noqa_idx) = original_text.find(noqa_slice) {
         let prefix_end = noqa_idx + noqa_slice.len();
         let (prefix, codes_part) = original_text.split_at(prefix_end);
-        let whitespace_len = codes_part.chars().take_while(|c| c.is_whitespace()).count();
+        let whitespace_end = codes_part
+            .find(|c: char| !c.is_whitespace())
+            .unwrap_or(codes_part.len());
         format!(
             "{}{}{}",
             prefix,
-            &codes_part[..whitespace_len],
+            &codes_part[..whitespace_end],
             formatted_codes
         )
     } else {
