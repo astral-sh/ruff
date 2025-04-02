@@ -251,6 +251,8 @@ jobs:
         env:
           NO_COLOR: 1
           MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
+        # Ignore errors if this step fails; we want to continue to later steps in the workflow anyway.
+        # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
         run: cargo test -p red_knot_python_semantic --test mdtest || true
       - name: "Run tests"
         shell: bash
