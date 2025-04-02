@@ -7,8 +7,8 @@ use std::ops::{Deref, DerefMut};
 pub use db::Db;
 pub use goto::goto_type_definition;
 use red_knot_python_semantic::types::{
-    Class, ClassBase, ClassLiteralType, FunctionType, InstanceType, KnownInstanceType,
-    ModuleLiteralType, Type,
+    Class, ClassBase, ClassLiteralType, FunctionType, InstanceType, IntersectionType,
+    KnownInstanceType, ModuleLiteralType, Type,
 };
 use ruff_db::files::{File, FileRange};
 use ruff_db::source::source_text;
@@ -148,6 +148,7 @@ impl HasNavigationTargets for Type<'_> {
             Type::StringLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::LiteralString
+            | Type::IntLiteral(_)
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::MethodWrapper(_)
@@ -155,13 +156,13 @@ impl HasNavigationTargets for Type<'_> {
             | Type::PropertyInstance(_)
             | Type::Tuple(_) => self.to_meta_type(db.upcast()).navigation_targets(db),
 
+            Type::Intersection(intersection) => intersection.navigation_targets(db),
+
             Type::Dynamic(_)
             | Type::Never
             | Type::Callable(_)
-            | Type::Intersection(_)
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::IntLiteral(_) => NavigationTargets::empty(),
+            | Type::AlwaysFalsy => NavigationTargets::empty(),
         }
     }
 }
@@ -229,6 +230,28 @@ impl HasNavigationTargets for KnownInstanceType<'_> {
 
             // TODO: Track the definition of `KnownInstance` and navigate to their definition.
             _ => NavigationTargets::empty(),
+        }
+    }
+}
+
+impl HasNavigationTargets for IntersectionType<'_> {
+    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+        // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
+        let mut targets = self
+            .iter_positive(db.upcast())
+            .filter(|ty| !ty.is_unknown());
+
+        let Some(first) = targets.next() else {
+            return NavigationTargets::empty();
+        };
+
+        match targets.next() {
+            Some(_) => {
+                // If there are multiple types in the intersection, we can't navigate to a single one
+                // because the type is the intersection of all those types.
+                NavigationTargets::empty()
+            }
+            None => first.navigation_targets(db),
         }
     }
 }

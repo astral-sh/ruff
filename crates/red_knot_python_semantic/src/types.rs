@@ -5759,6 +5759,10 @@ impl<'db> IntersectionType<'db> {
             qualifiers,
         }
     }
+
+    pub fn iter_positive(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+        self.positive(db).iter().copied()
+    }
 }
 
 #[salsa::interned(debug)]

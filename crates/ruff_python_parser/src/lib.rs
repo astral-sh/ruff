@@ -561,6 +561,40 @@ impl Tokens {
     ///
     /// Returns [`TokenAt::Between`] if `offset` points directly inbetween two tokens
     /// (the left token ends at `offset` and the right token starts at `offset`).
+    ///
+    ///
+    /// ## Examples
+    ///
+    /// [Playground](https://play.ruff.rs/f3ad0a55-5931-4a13-96c7-b2b8bfdc9a2e?secondary=Tokens)
+    ///
+    /// ```
+    /// # use ruff_python_ast::PySourceType;
+    /// # use ruff_python_parser::{Token, TokenAt, TokenKind};
+    /// # use ruff_text_size::{Ranged, TextSize};
+    ///
+    /// let source = r#"
+    /// def test(arg):
+    ///     arg.call()
+    ///     if True:
+    ///         pass
+    ///     print("true")
+    /// "#.trim();
+    ///
+    /// let parsed = ruff_python_parser::parse_unchecked_source(source, PySourceType::Python);
+    /// let tokens = parsed.tokens();
+    ///
+    /// let collect_tokens = |offset: TextSize| {
+    ///     tokens.at_offset(offset).into_iter().map(|t| (t.kind(), &source[t.range()])).collect::<Vec<_>>()
+    /// };
+    ///
+    /// assert_eq!(collect_tokens(TextSize::new(4)), vec! [(TokenKind::Name, "test")]);
+    /// assert_eq!(collect_tokens(TextSize::new(6)), vec! [(TokenKind::Name, "test")]);
+    /// // between `arg` and `.`
+    /// assert_eq!(collect_tokens(TextSize::new(22)), vec! [(TokenKind::Name, "arg"), (TokenKind::Dot, ".")]);
+    /// assert_eq!(collect_tokens(TextSize::new(36)), vec! [(TokenKind::If, "if")]);
+    /// // Before the dedent token
+    /// assert_eq!(collect_tokens(TextSize::new(57)), vec! []);
+    /// ```
     pub fn at_offset(&self, offset: TextSize) -> TokenAt {
         match self.binary_search_by_key(&offset, ruff_text_size::Ranged::start) {
             // The token at `index` starts exactly at `offset.
@@ -664,7 +698,7 @@ pub enum TokenAt {
     Single(Token),
 
     /// The offset falls exactly between two tokens. E.g. `CURSOR` in `call<CURSOR>(arguments)` is
-    /// positioned exactly between the `call` and `(` tokens.`
+    /// positioned exactly between the `call` and `(` tokens.
     Between(Token, Token),
 }
 
