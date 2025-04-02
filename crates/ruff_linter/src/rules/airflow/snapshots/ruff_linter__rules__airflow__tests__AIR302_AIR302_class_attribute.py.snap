@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR302_class_attribute.py:24:21: AIR302 `airflow.Dataset` is removed in Airflow 3.0
+AIR302_class_attribute.py:24:21: AIR302 [*] `airflow.Dataset` is removed in Airflow 3.0
    |
 23 | # airflow.Dataset
 24 | dataset_from_root = DatasetFromRoot()
@@ -10,6 +10,19 @@ AIR302_class_attribute.py:24:21: AIR302 `airflow.Dataset` is removed in Airflow 
 26 | dataset_from_root.iter_dataset_aliases()
    |
    = help: Use `airflow.sdk.Asset` instead
+
+ℹ Safe fix
+19 19 | from airflow.providers_manager import ProvidersManager
+20 20 | from airflow.secrets.base_secrets import BaseSecretsBackend
+21 21 | from airflow.secrets.local_filesystem import LocalFilesystemBackend
+   22 |+from airflow.sdk import Asset
+22 23 | 
+23 24 | # airflow.Dataset
+24    |-dataset_from_root = DatasetFromRoot()
+   25 |+dataset_from_root = Asset()
+25 26 | dataset_from_root.iter_datasets()
+26 27 | dataset_from_root.iter_dataset_aliases()
+27 28 | 
 
 AIR302_class_attribute.py:25:19: AIR302 [*] `iter_datasets` is removed in Airflow 3.0
    |
@@ -52,7 +65,7 @@ AIR302_class_attribute.py:26:19: AIR302 [*] `iter_dataset_aliases` is removed in
 28 28 | # airflow.datasets
 29 29 | dataset_to_test_method_call = Dataset()
 
-AIR302_class_attribute.py:29:31: AIR302 `airflow.datasets.Dataset` is removed in Airflow 3.0
+AIR302_class_attribute.py:29:31: AIR302 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0
    |
 28 | # airflow.datasets
 29 | dataset_to_test_method_call = Dataset()
@@ -61,6 +74,24 @@ AIR302_class_attribute.py:29:31: AIR302 `airflow.datasets.Dataset` is removed in
 31 | dataset_to_test_method_call.iter_dataset_aliases()
    |
    = help: Use `airflow.sdk.Asset` instead
+
+ℹ Safe fix
+19 19 | from airflow.providers_manager import ProvidersManager
+20 20 | from airflow.secrets.base_secrets import BaseSecretsBackend
+21 21 | from airflow.secrets.local_filesystem import LocalFilesystemBackend
+   22 |+from airflow.sdk import Asset
+22 23 | 
+23 24 | # airflow.Dataset
+24 25 | dataset_from_root = DatasetFromRoot()
+--------------------------------------------------------------------------------
+26 27 | dataset_from_root.iter_dataset_aliases()
+27 28 | 
+28 29 | # airflow.datasets
+29    |-dataset_to_test_method_call = Dataset()
+   30 |+dataset_to_test_method_call = Asset()
+30 31 | dataset_to_test_method_call.iter_datasets()
+31 32 | dataset_to_test_method_call.iter_dataset_aliases()
+32 33 | 
 
 AIR302_class_attribute.py:30:29: AIR302 [*] `iter_datasets` is removed in Airflow 3.0
    |
