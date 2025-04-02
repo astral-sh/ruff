@@ -736,7 +736,7 @@ pub trait SemanticSyntaxContext {
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
 
-    /// Return the [`TextRange`] at which a name is declared as `global`.
+    /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
