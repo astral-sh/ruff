@@ -5626,4 +5626,28 @@ fn async_comprehension_in_sync_comprehension() {
 
     ----- stderr -----
     ");
+
+    // this one will only pass if `SemanticSyntaxChecker::exit_expr` and `exit_stmt` have been wired
+    // up correctly
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", "lint.select = []"])
+        .args(["--target-version", "py310"])
+        .arg("--preview")
+        .arg("-")
+		.pass_stdin("
+async def f(): [x for x in foo()] and [x async for x in foo()]
+async def f():
+    def g(): ...
+    [x async for x in foo()]
+		"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
 }

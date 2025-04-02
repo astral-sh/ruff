@@ -1188,6 +1188,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
         self.last_stmt_end = stmt.end();
+
+        self.semantic_checker.exit_stmt();
     }
 
     fn visit_annotation(&mut self, expr: &'a Expr) {
@@ -1737,6 +1739,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
         analyze::expression(expr, self);
         self.semantic.pop_node();
+
+        self.semantic_checker.exit_expr();
     }
 
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
