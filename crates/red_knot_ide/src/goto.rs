@@ -338,7 +338,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r###"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
          --> /main.py:3:17
           |
@@ -355,6 +355,7 @@ mod tests {
         12 |             a
            |             ^
            |
+
         info: lint:goto-type-definition: Type definition
          --> /main.py:5:17
           |
@@ -373,7 +374,7 @@ mod tests {
         12 |             a
            |             ^
            |
-        "###);
+        ");
     }
 
     #[test]
@@ -752,7 +753,7 @@ f(**kwargs<CURSOR>)
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r###"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
            --> stdlib/builtins.pyi:443:7
             |
@@ -770,6 +771,7 @@ f(**kwargs<CURSOR>)
         3 |                 a
           |                 ^
           |
+
         info: lint:goto-type-definition: Type definition
            --> stdlib/types.pyi:677:11
             |
@@ -786,7 +788,7 @@ f(**kwargs<CURSOR>)
         3 |                 a
           |                 ^
           |
-        "###);
+        ");
     }
 
     fn goto_test(source: &str) -> GotoTest {
