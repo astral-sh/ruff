@@ -5567,20 +5567,41 @@ fn semantic_syntax_errors() -> Result<()> {
 
 #[test]
 fn async_comprehension_in_sync_comprehension() {
-    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
-    cmd.args(STDIN_BASE_OPTIONS)
-        .args(["--config", "lint.select = []"])
-        .arg("--preview")
-        .arg("-");
-
     let contents = "async def f(): return [[x async for x in foo(n)] for n in range(3)]";
 
-    assert_cmd_snapshot!(cmd.args(["--target-version", "py310"]).pass_stdin(contents), @r"
+    // error on 3.10
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", "lint.select = []"])
+        .args(["--target-version", "py310"])
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(contents),
+        @r"
     success: false
     exit_code: 1
     ----- stdout -----
     -:1:27: SyntaxError: cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)
     Found 1 error.
+
+    ----- stderr -----
+    ");
+
+    // okay on 3.11
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--config", "lint.select = []"])
+        .args(["--target-version", "py311"])
+        .arg("--preview")
+        .arg("-")
+        .pass_stdin(contents),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
     ----- stderr -----
     ");
