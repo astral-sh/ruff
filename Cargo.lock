@@ -2665,6 +2665,7 @@ dependencies = [
  "getrandom 0.3.2",
  "js-sys",
  "log",
+ "red_knot_ide",
  "red_knot_project",
  "red_knot_python_semantic",
  "ruff_db",
