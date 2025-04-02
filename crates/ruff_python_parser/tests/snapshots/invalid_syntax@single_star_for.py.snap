@@ -1,0 +1,107 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/single_star_for.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..35,
+        body: [
+            For(
+                StmtFor {
+                    range: 0..16,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 4..5,
+                            id: Name("_"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Starred(
+                        ExprStarred {
+                            range: 9..11,
+                            value: Name(
+                                ExprName {
+                                    range: 10..11,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 13..16,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 13..16,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 17..34,
+                    is_async: false,
+                    target: Starred(
+                        ExprStarred {
+                            range: 21..23,
+                            value: Name(
+                                ExprName {
+                                    range: 22..23,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 27..29,
+                            id: Name("xs"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 31..34,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 31..34,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | for _ in *x: ...
+  |          ^^ Syntax Error: can't use starred expression here
+2 | for *x in xs: ...
+  |
+
+
+  |
+1 | for _ in *x: ...
+2 | for *x in xs: ...
+  |     ^^ Syntax Error: can't use starred expression here
+  |
