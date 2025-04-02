@@ -26,6 +26,6 @@ def _(x: bool, y: bool):
 from typing import Literal
 
 def _(x: Literal[1, 2, 3]):
-    assert x == 4
-    reveal_type(x)  # revealed: Never
+    assert x == 2
+    reveal_type(x)  # revealed: Literal[2]
 ```
