@@ -24,11 +24,13 @@ Popen(a)
 run("true")
 Popen(["true"])
 
-# Fine through assignments as well.
-run(c := "true")
+# Not through assignments though.
 cmd = ["true"]
 run(cmd)
 
-# Imperfect literals cannot be trusted.
-cmd = ["echo", input()]
-run(cmd)
+# Instant named expressions are fine.
+run(c := "true")
+
+# But non-instant are not.
+(e := "echo")
+run(e)

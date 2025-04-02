@@ -106,10 +106,20 @@ S603.py:21:1: S603 `subprocess` call: check for execution of untrusted input
 23 | # Literals are fine, they're trusted.
    |
 
-S603.py:34:1: S603 `subprocess` call: check for execution of untrusted input
+S603.py:29:1: S603 `subprocess` call: check for execution of untrusted input
    |
-32 | # Imperfect literals cannot be trusted.
-33 | cmd = ["echo", input()]
-34 | run(cmd)
+27 | # Not through assignments though.
+28 | cmd = ["true"]
+29 | run(cmd)
+   | ^^^ S603
+30 |
+31 | # Instant named expressions are fine.
+   |
+
+S603.py:36:1: S603 `subprocess` call: check for execution of untrusted input
+   |
+34 | # But non-instant are not.
+35 | (e := "echo")
+36 | run(e)
    | ^^^ S603
    |
