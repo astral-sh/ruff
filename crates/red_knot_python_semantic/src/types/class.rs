@@ -1370,9 +1370,7 @@ impl<'db> KnownClass {
             "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
                 Self::EllipsisType
             }
-            "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
-                Self::NotImplementedType
-            }
+            "_NotImplementedType" => Self::NotImplementedType,
             _ => return None,
         };
 
