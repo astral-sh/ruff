@@ -21,27 +21,27 @@ use super::{
 ///
 /// It is created via [`Diagnostic::display`].
 ///
-/// The lifetime parameters are:
+/// The lifetime parameter, `'a`, refers to the shorter of:
 ///
-/// * `'c` is the lifetime of the rendering configuration.
-/// * `'r` is the lifetime of the resolver used to load the contents of `Span`
+/// * The lifetime of the rendering configuration.
+/// * The lifetime of the resolver used to load the contents of `Span`
 ///   values. When using Salsa, this most commonly corresponds to the lifetime
 ///   of a Salsa `Db`.
-/// * `'d` is the lifetime of the diagnostic being rendered.
+/// * The lifetime of the diagnostic being rendered.
 #[derive(Debug)]
-pub struct DisplayDiagnostic<'c, 'r, 'd> {
-    config: &'c DisplayDiagnosticConfig,
-    resolver: FileResolver<'r>,
+pub struct DisplayDiagnostic<'a> {
+    config: &'a DisplayDiagnosticConfig,
+    resolver: FileResolver<'a>,
     annotate_renderer: AnnotateRenderer,
-    diag: &'d Diagnostic,
+    diag: &'a Diagnostic,
 }
 
-impl<'c, 'r, 'd> DisplayDiagnostic<'c, 'r, 'd> {
+impl<'a> DisplayDiagnostic<'a> {
     pub(crate) fn new(
-        resolver: FileResolver<'r>,
-        config: &'c DisplayDiagnosticConfig,
-        diag: &'d Diagnostic,
-    ) -> DisplayDiagnostic<'c, 'r, 'd> {
+        resolver: FileResolver<'a>,
+        config: &'a DisplayDiagnosticConfig,
+        diag: &'a Diagnostic,
+    ) -> DisplayDiagnostic<'a> {
         let annotate_renderer = if config.color {
             AnnotateRenderer::styled()
         } else {
@@ -56,7 +56,7 @@ impl<'c, 'r, 'd> DisplayDiagnostic<'c, 'r, 'd> {
     }
 }
 
-impl std::fmt::Display for DisplayDiagnostic<'_, '_, '_> {
+impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if matches!(self.config.format, DiagnosticFormat::Concise) {
             match self.diag.severity() {
