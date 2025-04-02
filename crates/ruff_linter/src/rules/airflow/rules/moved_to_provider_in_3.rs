@@ -987,14 +987,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "api", "auth", "backend", "basic_auth", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.api.auth.backend.basic_auth",
             new_path: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth",
-            provider:"fab",
+            provider: "fab",
             version: "1.0.0"
         },
         ["airflow", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
-            original_path:"airflow.api.auth.backend.kerberos_auth",
+            original_path: "airflow.api.auth.backend.kerberos_auth",
             new_path: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
             provider: "fab",
-            version:"1.0.0"
+            version: "1.0.0"
         },
         ["airflow", "auth", "managers", "fab", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.auth_manager.api.auth.backend.kerberos_auth",
