@@ -144,6 +144,7 @@ def f3(a1: int, /, *args1: int, **kwargs2: int) -> None: ...
 def f4(a2: int, /, *args2: int, **kwargs1: int) -> None: ...
 
 static_assert(is_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
+static_assert(is_equivalent_to(CallableTypeOf[f3] | bool | CallableTypeOf[f4], CallableTypeOf[f4] | bool | CallableTypeOf[f3]))
 ```
 
 Putting it all together, the following two callables are equivalent:

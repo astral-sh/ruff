@@ -595,19 +595,22 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Return a normalized version of `self` in which all unions and intersections are sorted
-    /// according to a canonical order, no matter how "deeply" a union/intersection may be nested.
+    /// Return a "normalized" version of `self` that ensures that equivalent types have the same Salsa ID.
+    ///
+    /// A normalized type:
+    /// - Has all unions and intersections sorted according to a canonical order,
+    ///   no matter how "deeply" a union/intersection may be nested.
+    /// - Strips the names of positional-only parameters and variadic parameters from `Callable` types,
+    ///   as these are irrelevant to whether a callable type `X` is equivalent to a callable type `Y`.
+    /// - Strips the types of default values from parameters in `Callable` types: only whether a parameter
+    ///   *has* or *does not have* a default value is relevant to whether two `Callable` types  are equivalent.
     #[must_use]
-    pub fn with_sorted_unions_and_intersections(self, db: &'db dyn Db) -> Self {
+    pub fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
-            Type::Union(union) => Type::Union(union.to_sorted_union(db)),
-            Type::Intersection(intersection) => {
-                Type::Intersection(intersection.to_sorted_intersection(db))
-            }
-            Type::Tuple(tuple) => Type::Tuple(tuple.with_sorted_unions_and_intersections(db)),
-            Type::Callable(callable) => {
-                Type::Callable(callable.with_sorted_unions_and_intersections(db))
-            }
+            Type::Union(union) => Type::Union(union.normalized(db)),
+            Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
+            Type::Tuple(tuple) => Type::Tuple(tuple.normalized(db)),
+            Type::Callable(callable) => Type::Callable(callable.normalized(db)),
             Type::LiteralString
             | Type::Instance(_)
             | Type::PropertyInstance(_)
@@ -4656,16 +4659,19 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    fn with_sorted_unions_and_intersections(self, db: &'db dyn Db) -> Self {
+    /// Return a "normalized" version of this `Callable` type.
+    ///
+    /// See [`Type::normalized`] for more details.
+    fn normalized(self, db: &'db dyn Db) -> Self {
         let signature = self.signature(db);
         let parameters = signature
             .parameters()
             .iter()
-            .map(|param| param.clone().with_sorted_unions_and_intersections(db))
+            .map(|param| param.normalized(db))
             .collect();
         let return_ty = signature
             .return_ty
-            .map(|return_ty| return_ty.with_sorted_unions_and_intersections(db));
+            .map(|return_ty| return_ty.normalized(db));
         CallableType::new(db, Signature::new(parameters, return_ty))
     }
 
@@ -4693,38 +4699,28 @@ impl<'db> CallableType<'db> {
             .is_some_and(|return_type| return_type.is_fully_static(db))
     }
 
+    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        if !self.is_fully_static(db) {
+            return false;
+        }
+        if self == other {
+            return true;
+        }
+        let normalized_self = self.normalized(db);
+        normalized_self == other || normalized_self == other.normalized(db)
+    }
+
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
-    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_equivalent_to_impl(db, other, |self_type, other_type| {
+    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        let check_types = |self_type: Option<Type>, other_type: Option<Type>| {
             self_type
                 .unwrap_or(Type::unknown())
                 .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
-        })
-    }
+        };
 
-    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_equivalent_to_impl(db, other, |self_type, other_type| {
-            match (self_type, other_type) {
-                (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
-                // We need the catch-all case here because it's not guaranteed that this is a fully
-                // static type.
-                _ => false,
-            }
-        })
-    }
-
-    /// Implementation for the [`is_equivalent_to`] and [`is_gradual_equivalent_to`] for callable
-    /// types.
-    ///
-    /// [`is_equivalent_to`]: Self::is_equivalent_to
-    /// [`is_gradual_equivalent_to`]: Self::is_gradual_equivalent_to
-    fn is_equivalent_to_impl<F>(self, db: &'db dyn Db, other: Self, check_types: F) -> bool
-    where
-        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
-    {
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
 
@@ -5423,13 +5419,15 @@ impl<'db> UnionType<'db> {
         self.elements(db).iter().all(|ty| ty.is_fully_static(db))
     }
 
-    /// Create a new union type with the elements sorted according to a canonical ordering.
+    /// Create a new union type with the elements normalized.
+    ///
+    /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub fn to_sorted_union(self, db: &'db dyn Db) -> Self {
+    pub fn normalized(self, db: &'db dyn Db) -> Self {
         let mut new_elements: Vec<Type<'db>> = self
             .elements(db)
             .iter()
-            .map(|element| element.with_sorted_unions_and_intersections(db))
+            .map(|element| element.normalized(db))
             .collect();
         new_elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
         UnionType::new(db, new_elements.into_boxed_slice())
@@ -5463,13 +5461,13 @@ impl<'db> UnionType<'db> {
             return true;
         }
 
-        let sorted_self = self.to_sorted_union(db);
+        let sorted_self = self.normalized(db);
 
         if sorted_self == other {
             return true;
         }
 
-        sorted_self == other.to_sorted_union(db)
+        sorted_self == other.normalized(db)
     }
 
     /// Return `true` if `self` has exactly the same set of possible static materializations as `other`
@@ -5486,13 +5484,13 @@ impl<'db> UnionType<'db> {
             return false;
         }
 
-        let sorted_self = self.to_sorted_union(db);
+        let sorted_self = self.normalized(db);
 
         if sorted_self == other {
             return true;
         }
 
-        let sorted_other = other.to_sorted_union(db);
+        let sorted_other = other.normalized(db);
 
         if sorted_self == sorted_other {
             return true;
@@ -5523,17 +5521,17 @@ pub struct IntersectionType<'db> {
 
 impl<'db> IntersectionType<'db> {
     /// Return a new `IntersectionType` instance with the positive and negative types sorted
-    /// according to a canonical ordering.
+    /// according to a canonical ordering, and other normalizations applied to each element as applicable.
+    ///
+    /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub fn to_sorted_intersection(self, db: &'db dyn Db) -> Self {
+    pub fn normalized(self, db: &'db dyn Db) -> Self {
         fn normalized_set<'db>(
             db: &'db dyn Db,
             elements: &FxOrderSet<Type<'db>>,
         ) -> FxOrderSet<Type<'db>> {
-            let mut elements: FxOrderSet<Type<'db>> = elements
-                .iter()
-                .map(|ty| ty.with_sorted_unions_and_intersections(db))
-                .collect();
+            let mut elements: FxOrderSet<Type<'db>> =
+                elements.iter().map(|ty| ty.normalized(db)).collect();
 
             elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
             elements
@@ -5596,13 +5594,13 @@ impl<'db> IntersectionType<'db> {
             return true;
         }
 
-        let sorted_self = self.to_sorted_intersection(db);
+        let sorted_self = self.normalized(db);
 
         if sorted_self == other {
             return true;
         }
 
-        sorted_self == other.to_sorted_intersection(db)
+        sorted_self == other.normalized(db)
     }
 
     /// Return `true` if `self` has exactly the same set of possible static materializations as `other`
@@ -5618,13 +5616,13 @@ impl<'db> IntersectionType<'db> {
             return false;
         }
 
-        let sorted_self = self.to_sorted_intersection(db);
+        let sorted_self = self.normalized(db);
 
         if sorted_self == other {
             return true;
         }
 
-        let sorted_other = other.to_sorted_intersection(db);
+        let sorted_other = other.normalized(db);
 
         if sorted_self == sorted_other {
             return true;
@@ -5806,14 +5804,15 @@ impl<'db> TupleType<'db> {
         Type::Tuple(Self::new(db, elements.into_boxed_slice()))
     }
 
-    /// Return a normalized version of `self` in which all unions and intersections are sorted
-    /// according to a canonical order, no matter how "deeply" a union/intersection may be nested.
+    /// Return a normalized version of `self`.
+    ///
+    /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub fn with_sorted_unions_and_intersections(self, db: &'db dyn Db) -> Self {
+    pub fn normalized(self, db: &'db dyn Db) -> Self {
         let elements: Box<[Type<'db>]> = self
             .elements(db)
             .iter()
-            .map(|ty| ty.with_sorted_unions_and_intersections(db))
+            .map(|ty| ty.normalized(db))
             .collect();
         TupleType::new(db, elements)
     }
