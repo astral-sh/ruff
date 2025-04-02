@@ -15,6 +15,11 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
+#[derive(Debug)]
+struct Checkpoint {
+    in_async_context: bool,
+}
+
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the `__future__` import boundary.
@@ -39,6 +44,8 @@ pub struct SemanticSyntaxChecker {
     /// Note that this should be updated *after* checking the current statement or expression
     /// because the parent context is what matters.
     in_async_context: bool,
+
+    checkpoint: Vec<Checkpoint>,
 }
 
 impl SemanticSyntaxChecker {
@@ -322,6 +329,8 @@ impl SemanticSyntaxChecker {
         // check for errors
         self.check_stmt(stmt, ctx);
 
+        self.save_checkpoint();
+
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
@@ -342,8 +351,13 @@ impl SemanticSyntaxChecker {
         }
     }
 
+    pub fn exit_stmt(&mut self) {
+        self.restore_checkpoint();
+    }
+
     pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         self.check_expr(expr, ctx);
+        self.save_checkpoint();
         match expr {
             Expr::ListComp(ast::ExprListComp { generators, .. })
             | Expr::SetComp(ast::ExprSetComp { generators, .. })
@@ -352,6 +366,10 @@ impl SemanticSyntaxChecker {
             }
             _ => {}
         }
+    }
+
+    pub fn exit_expr(&mut self) {
+        self.restore_checkpoint();
     }
 
     fn check_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
@@ -527,6 +545,18 @@ impl SemanticSyntaxChecker {
                     generator.range,
                 );
             }
+        }
+    }
+
+    fn save_checkpoint(&mut self) {
+        self.checkpoint.push(Checkpoint {
+            in_async_context: self.in_async_context,
+        });
+    }
+
+    fn restore_checkpoint(&mut self) {
+        if let Some(Checkpoint { in_async_context }) = self.checkpoint.pop() {
+            self.in_async_context = in_async_context;
         }
     }
 }
@@ -907,10 +937,12 @@ where
     fn visit_stmt(&mut self, stmt: &'_ Stmt) {
         self.checker.visit_stmt(stmt, &self.context);
         ruff_python_ast::visitor::walk_stmt(self, stmt);
+        self.checker.exit_stmt();
     }
 
     fn visit_expr(&mut self, expr: &'_ Expr) {
         self.checker.visit_expr(expr, &self.context);
         ruff_python_ast::visitor::walk_expr(self, expr);
+        self.checker.exit_expr();
     }
 }
