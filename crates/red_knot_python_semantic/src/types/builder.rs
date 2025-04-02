@@ -169,38 +169,22 @@ impl<'db> IntersectionBuilder<'db> {
             // (T2 & T4)`. If `self` is already a union-of-intersections `(T1 & T2) | (T3 & T4)`
             // and we add `T5 | T6` to it, that flattens all the way out to `(T1 & T2 & T5) | (T1 &
             // T2 & T6) | (T3 & T4 & T5) ...` -- you get the idea.
-            return union
+            union
                 .elements(self.db)
                 .iter()
                 .map(|elem| self.clone().add_positive(*elem))
                 .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
                     builder.intersections.extend(sub.intersections);
                     builder
-                });
-        }
-
-        if let Type::TypeVar(typevar) = ty {
-            if let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
-                typevar.bound_or_constraints(self.db)
-            {
-                // Ditto for the union of constraints in a constrained typevar.
-                return constraints
-                    .elements(self.db)
-                    .iter()
-                    .map(|constraint| self.clone().add_positive(*constraint))
-                    .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
-                        builder
-                    });
+                })
+        } else {
+            // If we are already a union-of-intersections, distribute the new intersected element
+            // across all of those intersections.
+            for inner in &mut self.intersections {
+                inner.add_positive(self.db, ty);
             }
+            self
         }
-
-        // If we are already a union-of-intersections, distribute the new intersected element
-        // across all of those intersections.
-        for inner in &mut self.intersections {
-            inner.add_positive(self.db, ty);
-        }
-        self
     }
 
     pub(crate) fn add_negative(mut self, ty: Type<'db>) -> Self {
@@ -501,7 +485,84 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
+    /// Tries to simplify any constrained typevars in the intersection. If the intersection
+    /// contains negative entries for all but one of the typevar's constraints, we can remove the
+    /// negative constraints and replace the typevar with the remaining positive constraint. If the
+    /// intersection contains negative entries for all of the constraints, the overall intersection
+    /// is `Never`.
+    fn simplify_constrained_typevars(&mut self, db: &'db dyn Db) {
+        let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
+        let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
+        let mut negative_to_remove = Vec::new();
+
+        for (typevar_index, ty) in self.positive.iter().enumerate() {
+            let Type::TypeVar(typevar) = ty else {
+                continue;
+            };
+            let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                typevar.bound_or_constraints(db)
+            else {
+                continue;
+            };
+
+            // Determine which constraints appear as negative entries in the intersection. Note
+            // that we shouldn't have duplicate entries in the positive or negative lists, so we
+            // don't need to worry about finding any particular constraint more than once.
+            let constraints = constraints.elements(db);
+            let mut to_remove = Vec::with_capacity(constraints.len());
+            let mut remaining_constraints: Vec<_> = constraints.iter().copied().map(Some).collect();
+            for (negative_index, negative) in self.negative.iter().enumerate() {
+                // This linear search should be fine as long as we don't encounter typevars with
+                // thousands of constraints.
+                let matching_constraints = constraints
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| c.is_subtype_of(db, *negative));
+                for (constraint_index, _) in matching_constraints {
+                    to_remove.push(negative_index);
+                    remaining_constraints[constraint_index] = None;
+                }
+            }
+
+            let mut iter = remaining_constraints.into_iter().flatten();
+            let Some(remaining_constraint) = iter.next() else {
+                // All of the typevar constraints have been removed, so the entire intersection is
+                // `Never`.
+                *self = Self::default();
+                self.positive.insert(Type::Never);
+                return;
+            };
+
+            let more_than_one_remaining_constraint = iter.next().is_some();
+            if more_than_one_remaining_constraint {
+                // This typevar cannot be simplified.
+                continue;
+            }
+
+            // Only one typevar constraint remains. Remove all of the negative constraints, and replace
+            // the typevar itself with the remaining positive constraint.
+            to_add.push(remaining_constraint);
+            positive_to_remove.push(typevar_index);
+            negative_to_remove.extend(to_remove);
+        }
+
+        for index in positive_to_remove.into_iter().rev() {
+            self.positive.swap_remove_index(index);
+        }
+
+        negative_to_remove.sort_unstable();
+        negative_to_remove.dedup();
+        for index in negative_to_remove.into_iter().rev() {
+            self.negative.swap_remove_index(index);
+        }
+
+        for remaining_constraint in to_add {
+            self.add_positive(db, remaining_constraint);
+        }
+    }
+
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
+        self.simplify_constrained_typevars(db);
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => Type::object(db),
             (1, 0) => self.positive[0],
