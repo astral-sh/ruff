@@ -294,13 +294,26 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
         _ => return,
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    // Create the `Fix` first to avoid cloning `Replacement`.
+    let fix = if let Replacement::Name(name) = replacement {
+        Some(Fix::safe_edit(Edit::range_replacement(
+            name.to_string(),
+            attr.range(),
+        )))
+    } else {
+        None
+    };
+    let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: attr.to_string(),
             replacement,
         },
         attr.range(),
-    ));
+    );
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
+    }
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
