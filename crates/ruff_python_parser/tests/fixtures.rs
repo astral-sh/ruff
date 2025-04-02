@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Write};
 use std::fs;
@@ -7,7 +8,9 @@ use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_python_ast::visitor::source_order::{walk_module, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{AnyNodeRef, Mod, PythonVersion};
-use ruff_python_parser::semantic_errors::SemanticSyntaxCheckerVisitor;
+use ruff_python_parser::semantic_errors::{
+    SemanticSyntaxCheckerVisitor, SemanticSyntaxContext, SemanticSyntaxError,
+};
 use ruff_python_parser::{parse_unchecked, Mode, ParseErrorType, ParseOptions, Token};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -85,14 +88,15 @@ fn test_valid_syntax(input_path: &Path) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor =
-        SemanticSyntaxCheckerVisitor::default().with_python_version(options.target_version());
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(
+        TestContext::default().with_python_version(options.target_version()),
+    );
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);
     }
 
-    let semantic_syntax_errors = visitor.into_diagnostics();
+    let semantic_syntax_errors = visitor.into_context().diagnostics.into_inner();
 
     if !semantic_syntax_errors.is_empty() {
         let mut message = "Expected no semantic syntax errors for a valid program:\n".to_string();
@@ -180,14 +184,15 @@ fn test_invalid_syntax(input_path: &Path) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor =
-        SemanticSyntaxCheckerVisitor::default().with_python_version(options.target_version());
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(
+        TestContext::default().with_python_version(options.target_version()),
+    );
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);
     }
 
-    let semantic_syntax_errors = visitor.into_diagnostics();
+    let semantic_syntax_errors = visitor.into_context().diagnostics.into_inner();
 
     assert!(
         parsed.has_syntax_errors() || !semantic_syntax_errors.is_empty(),
@@ -454,5 +459,37 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         self.parents.pop().expect("Expected tree to be balanced");
 
         self.previous = Some(node);
+    }
+}
+
+#[derive(Debug, Default)]
+struct TestContext {
+    diagnostics: RefCell<Vec<SemanticSyntaxError>>,
+    python_version: PythonVersion,
+}
+
+impl TestContext {
+    #[must_use]
+    fn with_python_version(mut self, python_version: PythonVersion) -> Self {
+        self.python_version = python_version;
+        self
+    }
+}
+
+impl SemanticSyntaxContext for TestContext {
+    fn seen_docstring_boundary(&self) -> bool {
+        false
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        self.python_version
+    }
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        self.diagnostics.borrow_mut().push(error);
+    }
+
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
     }
 }

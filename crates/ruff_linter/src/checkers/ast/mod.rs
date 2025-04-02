@@ -1975,10 +1975,7 @@ impl<'a> Checker<'a> {
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
-        self.semantic.push_scope(ScopeKind::Generator {
-            kind,
-            is_async: generators.iter().any(|gen| gen.is_async),
-        });
+        self.semantic.push_scope(ScopeKind::Generator(kind));
 
         self.visit_expr(&generator.target);
         self.semantic.flags = flags;

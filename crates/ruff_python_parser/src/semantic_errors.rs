@@ -4,7 +4,7 @@
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 
-use std::{cell::RefCell, fmt::Display};
+use std::fmt::Display;
 
 use ruff_python_ast::{
     self as ast,
@@ -879,56 +879,35 @@ pub trait SemanticSyntaxContext {
 }
 
 #[derive(Default)]
-pub struct SemanticSyntaxCheckerVisitor {
+pub struct SemanticSyntaxCheckerVisitor<Ctx> {
     checker: SemanticSyntaxChecker,
-    diagnostics: RefCell<Vec<SemanticSyntaxError>>,
-    python_version: PythonVersion,
+    context: Ctx,
 }
 
-impl SemanticSyntaxCheckerVisitor {
-    #[must_use]
-    pub fn with_python_version(mut self, python_version: PythonVersion) -> Self {
-        self.python_version = python_version;
-        self
+impl<Ctx> SemanticSyntaxCheckerVisitor<Ctx> {
+    pub fn new(context: Ctx) -> Self {
+        Self {
+            checker: SemanticSyntaxChecker::new(),
+            context,
+        }
     }
 
-    pub fn into_diagnostics(self) -> Vec<SemanticSyntaxError> {
-        self.diagnostics.into_inner()
-    }
-
-    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
-        let mut checker = std::mem::take(&mut self.checker);
-        f(&mut checker, self);
-        self.checker = checker;
+    pub fn into_context(self) -> Ctx {
+        self.context
     }
 }
 
-impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor {
-    fn seen_docstring_boundary(&self) -> bool {
-        false
-    }
-
-    fn python_version(&self) -> PythonVersion {
-        self.python_version
-    }
-
-    fn report_semantic_error(&self, error: SemanticSyntaxError) {
-        self.diagnostics.borrow_mut().push(error);
-    }
-
-    fn global(&self, _name: &str) -> Option<TextRange> {
-        None
-    }
-}
-
-impl Visitor<'_> for SemanticSyntaxCheckerVisitor {
-    fn visit_stmt(&mut self, stmt: &Stmt) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+impl<Ctx> Visitor<'_> for SemanticSyntaxCheckerVisitor<Ctx>
+where
+    Ctx: SemanticSyntaxContext,
+{
+    fn visit_stmt(&mut self, stmt: &'_ Stmt) {
+        self.checker.visit_stmt(stmt, &self.context);
         ruff_python_ast::visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+    fn visit_expr(&mut self, expr: &'_ Expr) {
+        self.checker.visit_expr(expr, &self.context);
         ruff_python_ast::visitor::walk_expr(self, expr);
     }
 }
