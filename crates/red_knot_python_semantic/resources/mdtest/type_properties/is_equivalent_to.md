@@ -134,6 +134,7 @@ def f1(a: int = 1) -> None: ...
 def f2(a: int = 2) -> None: ...
 
 static_assert(is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f2]))
+static_assert(is_equivalent_to(CallableTypeOf[f1] | bool | CallableTypeOf[f2], CallableTypeOf[f2] | bool | CallableTypeOf[f1]))
 ```
 
 The names of the positional-only, variadic and keyword-variadic parameters does not need to be the
@@ -154,6 +155,7 @@ def f5(a1: int, /, b: float, c: bool = False, *args1: int, d: int = 1, e: str, *
 def f6(a2: int, /, b: float, c: bool = True, *args2: int, d: int = 2, e: str, **kwargs2: float) -> None: ...
 
 static_assert(is_equivalent_to(CallableTypeOf[f5], CallableTypeOf[f6]))
+static_assert(is_equivalent_to(CallableTypeOf[f5] | bool | CallableTypeOf[f6], CallableTypeOf[f6] | bool | CallableTypeOf[f5]))
 ```
 
 ### Not equivalent

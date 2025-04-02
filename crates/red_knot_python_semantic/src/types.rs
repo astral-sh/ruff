@@ -4699,28 +4699,38 @@ impl<'db> CallableType<'db> {
             .is_some_and(|return_type| return_type.is_fully_static(db))
     }
 
-    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
-    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        if !self.is_fully_static(db) {
-            return false;
-        }
-        if self == other {
-            return true;
-        }
-        let normalized_self = self.normalized(db);
-        normalized_self == other || normalized_self == other.normalized(db)
-    }
-
     /// Return `true` if `self` has exactly the same set of possible static materializations as
     /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
     /// `other`).
-    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        let check_types = |self_type: Option<Type>, other_type: Option<Type>| {
+    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_equivalent_to_impl(db, other, |self_type, other_type| {
             self_type
                 .unwrap_or(Type::unknown())
                 .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
-        };
+        })
+    }
 
+    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_equivalent_to_impl(db, other, |self_type, other_type| {
+            match (self_type, other_type) {
+                (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
+                // We need the catch-all case here because it's not guaranteed that this is a fully
+                // static type.
+                _ => false,
+            }
+        })
+    }
+
+    /// Implementation for the [`is_equivalent_to`] and [`is_gradual_equivalent_to`] for callable
+    /// types.
+    ///
+    /// [`is_equivalent_to`]: Self::is_equivalent_to
+    /// [`is_gradual_equivalent_to`]: Self::is_gradual_equivalent_to
+    fn is_equivalent_to_impl<F>(self, db: &'db dyn Db, other: Self, check_types: F) -> bool
+    where
+        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
+    {
         let self_signature = self.signature(db);
         let other_signature = other.signature(db);
 
