@@ -1355,21 +1355,12 @@ fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     })
 }
 
-fn is_redundant_boolean_comparison(op: CmpOp, comparator: &Expr) -> (bool, bool) {
+fn is_redundant_boolean_comparison(op: CmpOp, comparator: &Expr) -> Option<bool> {
+    let value = comparator.as_boolean_literal_expr()?.value;
     match op {
-        CmpOp::Is => {
-            if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
-                return (true, *value);
-            }
-            (false, false)
-        }
-        CmpOp::IsNot => {
-            if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = comparator {
-                return (true, !*value);
-            }
-            (false, false)
-        }
-        _ => (false, false),
+        CmpOp::Is => Some(value),
+        CmpOp::IsNot => Some(!value),
+        _ => None,
     }
 }
 
@@ -1391,9 +1382,8 @@ pub fn generate_comparison(
             .unwrap_or(left.range())],
     );
 
-    if ops.len() == 1 {
-        let (op, comparator) = (ops[0], &comparators[0]);
-        if let (true, kind) = is_redundant_boolean_comparison(op, comparator) {
+    if let ([op], [comparator]) = (ops, comparators) {
+        if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
             return if kind {
                 contents
             } else {
