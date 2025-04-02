@@ -5,7 +5,7 @@ use lsp_types::DidOpenNotebookDocumentParams;
 use red_knot_project::watch::ChangeEvent;
 use ruff_db::Db;
 
-use crate::edit::NotebookDocument;
+use crate::document::NotebookDocument;
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::server::api::LSPResult;
 use crate::server::client::{Notifier, Requester};

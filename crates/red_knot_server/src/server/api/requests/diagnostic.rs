@@ -7,7 +7,7 @@ use lsp_types::{
     RelatedFullDocumentDiagnosticReport, Url,
 };
 
-use crate::edit::ToRangeExt;
+use crate::document::ToRangeExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;

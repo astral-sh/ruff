@@ -18,7 +18,7 @@ use crate::{
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
 use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
 
@@ -151,6 +151,15 @@ impl<'db> Class<'db> {
     /// query depends on the AST of another file (bad!).
     fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
         self.body_scope(db).node(db).expect_class()
+    }
+
+    /// Returns the file range of the class's name.
+    pub fn focus_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.node(db).name.range)
+    }
+
+    pub fn full_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.node(db).range)
     }
 
     /// Return the types of the decorators on this class
@@ -754,7 +763,7 @@ pub struct ClassLiteralType<'db> {
 }
 
 impl<'db> ClassLiteralType<'db> {
-    pub(crate) fn class(self) -> Class<'db> {
+    pub fn class(self) -> Class<'db> {
         self.class
     }
 
@@ -780,7 +789,7 @@ pub struct InstanceType<'db> {
 }
 
 impl<'db> InstanceType<'db> {
-    pub(super) fn class(self) -> Class<'db> {
+    pub fn class(self) -> Class<'db> {
         self.class
     }
 

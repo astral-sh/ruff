@@ -8,7 +8,7 @@ use itertools::Either;
 /// all types that would be invalid to have as a class base are
 /// transformed into [`ClassBase::unknown`]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
-pub(crate) enum ClassBase<'db> {
+pub enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(Class<'db>),
 }
@@ -18,7 +18,7 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Any)
     }
 
-    pub(crate) const fn unknown() -> Self {
+    pub const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
 

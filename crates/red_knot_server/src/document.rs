@@ -1,12 +1,14 @@
 //! Types and utilities for working with text, modifying source files, and `Ruff <-> LSP` type conversion.
 
+mod location;
 mod notebook;
 mod range;
 mod text_document;
 
+pub(crate) use location::ToLink;
 use lsp_types::{PositionEncodingKind, Url};
 pub use notebook::NotebookDocument;
-pub(crate) use range::{RangeExt, ToRangeExt};
+pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, ToRangeExt};
 pub(crate) use text_document::DocumentVersion;
 pub use text_document::TextDocument;
 
@@ -53,17 +55,17 @@ impl std::fmt::Display for DocumentKey {
     }
 }
 
-impl From<PositionEncoding> for lsp_types::PositionEncodingKind {
+impl From<PositionEncoding> for PositionEncodingKind {
     fn from(value: PositionEncoding) -> Self {
         match value {
-            PositionEncoding::UTF8 => lsp_types::PositionEncodingKind::UTF8,
-            PositionEncoding::UTF16 => lsp_types::PositionEncodingKind::UTF16,
-            PositionEncoding::UTF32 => lsp_types::PositionEncodingKind::UTF32,
+            PositionEncoding::UTF8 => PositionEncodingKind::UTF8,
+            PositionEncoding::UTF16 => PositionEncodingKind::UTF16,
+            PositionEncoding::UTF32 => PositionEncodingKind::UTF32,
         }
     }
 }
 
-impl TryFrom<&lsp_types::PositionEncodingKind> for PositionEncoding {
+impl TryFrom<&PositionEncodingKind> for PositionEncoding {
     type Error = ();
 
     fn try_from(value: &PositionEncodingKind) -> Result<Self, Self::Error> {

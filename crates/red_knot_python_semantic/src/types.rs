@@ -7,7 +7,7 @@ use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
 use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE};
 use itertools::EitherOrBoth;
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
@@ -33,14 +33,16 @@ use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
 use crate::types::call::{Bindings, CallArgumentTypes};
-use crate::types::class_base::ClassBase;
+pub use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{Class, ClassLiteralType, InstanceType, KnownClass, KnownInstanceType};
+pub use class::Class;
+pub(crate) use class::KnownClass;
+pub use class::{ClassLiteralType, InstanceType, KnownInstanceType};
 
 mod builder;
 mod call;
@@ -3785,6 +3787,9 @@ pub struct TypeVarInstance<'db> {
     #[return_ref]
     name: ast::name::Name,
 
+    /// The type var's definition
+    pub definition: Definition<'db>,
+
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
@@ -4461,6 +4466,21 @@ impl<'db> FunctionType<'db> {
         Type::Callable(CallableType::new(db, self.signature(db).clone()))
     }
 
+    /// Returns the [`FileRange`] of the function's name.
+    pub fn focus_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(
+            self.body_scope(db).file(db),
+            self.body_scope(db).node(db).expect_function().name.range,
+        )
+    }
+
+    pub fn full_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(
+            self.body_scope(db).file(db),
+            self.body_scope(db).node(db).expect_function().range,
+        )
+    }
+
     /// Typed externally-visible signature for this function.
     ///
     /// This is the signature as seen by external callers, possibly modified by decorators and/or
@@ -4622,7 +4642,7 @@ impl KnownFunction {
 pub struct BoundMethodType<'db> {
     /// The function that is being bound. Corresponds to the `__func__` attribute on a
     /// bound method object
-    pub(crate) function: FunctionType<'db>,
+    pub function: FunctionType<'db>,
     /// The instance on which this method has been called. Corresponds to the `__self__`
     /// attribute on a bound method object
     self_instance: Type<'db>,
@@ -5332,6 +5352,10 @@ impl<'db> UnionType<'db> {
         Self::from_elements(db, self.elements(db).iter().filter(filter_fn))
     }
 
+    pub fn iter(&self, db: &'db dyn Db) -> Iter<Type<'db>> {
+        self.elements(db).iter()
+    }
+
     pub(crate) fn map_with_boundness(
         self,
         db: &'db dyn Db,
@@ -5734,6 +5758,10 @@ impl<'db> IntersectionType<'db> {
             },
             qualifiers,
         }
+    }
+
+    pub fn iter_positive(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+        self.positive(db).iter().copied()
     }
 }
 
