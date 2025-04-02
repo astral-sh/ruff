@@ -223,11 +223,37 @@ jobs:
       - name: "Clippy (wasm)"
         run: cargo clippy -p ruff_wasm -p red_knot_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
-  cargo-test-linux:
-    name: "cargo test (linux)"
+  build-linux:
+    name: "build on Linux"
     runs-on: depot-ubuntu-22.04-16
     needs: determine_changes
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.code == 'true' || github.ref == 'refs/heads/main') }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@v1
+      - name: "Build"
+        run: cargo test --locked --no-run
+      # Tarring the binaries ensures executable permissions are retained
+      # when the binaries are downloaded again
+      - name: "Tar binaries"
+        run: tar -cvf test-binaries.tar target/debug/deps
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: test-binaries
+          path: test-binaries.tar
+
+  cargo-test-linux:
+    name: "cargo test (linux)"
+    runs-on: depot-ubuntu-22.04-16
+    needs: build-linux
+    if: ${{ needs.build-linux.result == 'success' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -246,6 +272,11 @@ jobs:
         uses: taiki-e/install-action@6aca1cfa12ef3a6b98ee8c70e0171bfa067604f5 # v2
         with:
           tool: cargo-insta
+      - name: "Download cached binaries for tests"
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+        id: download-cached-binaries
+        with:
+          name: test-binaries
       - name: "Run tests"
         shell: bash
         env:
@@ -436,8 +467,10 @@ jobs:
   mdtest-github-format:
     name: "red-knot mdtest (GitHub annotations)"
     runs-on: ubuntu-latest
-    needs: determine_changes
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && needs.determine_changes.outputs.red_knot == 'true' && github.event_name == 'pull_request' }}
+    needs:
+      - determine_changes
+      - build-linux
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && needs.determine_changes.outputs.red_knot == 'true' && github.event_name == 'pull_request' && needs.build-linux.result == 'success' }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -448,10 +481,11 @@ jobs:
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@v1
-      - name: "Install cargo insta"
-        uses: taiki-e/install-action@6aca1cfa12ef3a6b98ee8c70e0171bfa067604f5 # v2
+      - name: "Download cached binaries for tests"
+        uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+        id: download-cached-binaries
         with:
-          tool: cargo-insta
+          name: test-binaries
       - name: "Run mdtest"
         shell: bash
         env:
