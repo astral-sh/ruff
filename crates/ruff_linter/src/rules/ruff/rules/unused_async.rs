@@ -111,9 +111,7 @@ fn function_def_visit_preorder_except_body<'a, V>(
         ..
     } = function_def;
 
-    for decorator in decorator_list {
-        visitor.visit_decorator(decorator);
-    }
+    visitor.visit_decorators(decorator_list);
 
     if let Some(type_params) = type_params {
         visitor.visit_type_params(type_params);
@@ -139,9 +137,7 @@ where
         ..
     } = class_def;
 
-    for decorator in decorator_list {
-        visitor.visit_decorator(decorator);
-    }
+    visitor.visit_decorators(decorator_list);
 
     if let Some(type_params) = type_params {
         visitor.visit_type_params(type_params);
