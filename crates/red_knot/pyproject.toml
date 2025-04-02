@@ -1,0 +1,20 @@
+[project]
+name = "red_knot"
+version = "0.1.0"
+description = "An extremely fast Python type checker."
+authors = [{ name = "Astral Software Inc.", email = "hey@astral.sh" }]
+readme = "README.md"
+license = "MIT"
+
+[project.urls]
+Repository = "https://github.com/astral-sh/ruff"
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "bin"
+manifest-path = "Cargo.toml"
+module-name = "red_knot"
+strip = true

@@ -836,3 +836,34 @@ jobs:
         with:
           run: cargo codspeed run
           token: ${{ secrets.CODSPEED_TOKEN }}
+
+  python-package-red-knot:
+    name: "python package (red knot)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
+      - name: "Build wheels"
+        uses: PyO3/maturin-action@22fe573c6ed0c03ab9b84e631cbfa49bddf6e20e # v1.47.3
+        with:
+          working-directory: crates/red_knot
+          args: --out ${{ github.workspace }}/dist
+      - name: "Test wheel"
+        id: test-wheel
+        run: |
+          WHEEL_PATH="$(find ${{ github.workspace }}/dist -name 'red_knot-*.whl' -print -quit)"
+          WHEEL_NAME="$(basename "$WHEEL_PATH")"
+          echo "Wheel: $WHEEL_PATH"
+          uvx --from "$WHEEL_PATH" red_knot --help
+
+          echo "wheel_name=$WHEEL_NAME" >> "$GITHUB_OUTPUT"
+          echo "wheel_path=$WHEEL_PATH" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.test-wheel.outputs.wheel_name }}
+          path: ${{ steps.test-wheel.outputs.wheel_path }}
