@@ -1393,6 +1393,20 @@ impl<'db> Type<'db> {
                 false
             }
 
+            (
+                Type::Callable(_),
+                Type::StringLiteral(_) | Type::BytesLiteral(_) | Type::SliceLiteral(_),
+            )
+            | (
+                Type::StringLiteral(_) | Type::BytesLiteral(_) | Type::SliceLiteral(_),
+                Type::Callable(_),
+            ) => {
+                // A callable type is disjoint from other literal types. For example,
+                // `Type::StringLiteral` must be an instance of exactly `str`, not a subclass
+                // of `str`, and `str` is not callable. The same applies to other literal types.
+                true
+            }
+
             (Type::Callable(_), _) | (_, Type::Callable(_)) => {
                 // TODO: Implement disjointness for general callable type with other types
                 false
