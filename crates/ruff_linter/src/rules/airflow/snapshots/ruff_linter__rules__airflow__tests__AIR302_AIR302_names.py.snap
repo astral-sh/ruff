@@ -970,6 +970,7 @@ AIR302_names.py:302:1: AIR302 `airflow.utils.file.TemporaryDirectory` is removed
     | ^^^^^^^^^^^^^^^^^^ AIR302
 303 | mkdirs
     |
+    = help: Use `tempfile.TemporaryDirectory` instead
 
 AIR302_names.py:303:1: AIR302 `airflow.utils.file.mkdirs` is removed in Airflow 3.0
     |
@@ -980,7 +981,7 @@ AIR302_names.py:303:1: AIR302 `airflow.utils.file.mkdirs` is removed in Airflow 
 304 |
 305 | #  airflow.utils.helpers
     |
-    = help: Use `pendulum.today('UTC').add(days=-N, ...)` instead
+    = help: Use `pathlib.Path({path}).mkdir` instead
 
 AIR302_names.py:306:1: AIR302 `airflow.utils.helpers.chain` is removed in Airflow 3.0
     |

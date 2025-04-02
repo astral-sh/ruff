@@ -756,8 +756,8 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             }
 
             // airflow.utils.file
-            ["file", "TemporaryDirectory"] => Replacement::None,
-            ["file", "mkdirs"] => Replacement::Name("pendulum.today('UTC').add(days=-N, ...)"),
+            ["file", "TemporaryDirectory"] => Replacement::Name("tempfile.TemporaryDirectory"),
+            ["file", "mkdirs"] => Replacement::Name("pathlib.Path({path}).mkdir"),
 
             // airflow.utils.helpers
             ["helpers", "chain"] => Replacement::Name("airflow.sdk.chain"),
