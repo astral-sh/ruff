@@ -171,7 +171,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "sensors", "s3_key_sensor", "S3KeySensor"] => Replacement::ProviderName{
-            name: "S3KeySensor",
+            name: "airflow.providers.amazon.aws.sensors.s3.S3KeySensor",
             provider: "amazon",
             version: "1.0.0"
         },
@@ -407,7 +407,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             name: "airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride",
             provider: "fab",
             version: "1.0.0"
-            },
+        },
         ["airflow", "auth", "managers", "fab", "fab_auth_manager", "FabAuthManager"] => Replacement::ProviderName{
             name: "airflow.providers.fab.auth_manager.security_manager.FabAuthManager",
             provider: "fab",
