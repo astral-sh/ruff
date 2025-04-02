@@ -501,4 +501,8 @@ impl SemanticSyntaxContext for TestContext<'_> {
     fn source(&self) -> &str {
         self.source
     }
+
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
+    }
 }

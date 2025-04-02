@@ -7,7 +7,7 @@ use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
 use red_knot_python_semantic::Program;
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait};
+use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::{line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
@@ -223,18 +223,18 @@ impl FileHandle {
 #[wasm_bindgen]
 pub struct Diagnostic {
     #[wasm_bindgen(readonly)]
-    inner: Box<dyn OldDiagnosticTrait>,
+    inner: diagnostic::Diagnostic,
 }
 
 #[wasm_bindgen]
 impl Diagnostic {
-    fn wrap(diagnostic: Box<dyn OldDiagnosticTrait>) -> Self {
+    fn wrap(diagnostic: diagnostic::Diagnostic) -> Self {
         Self { inner: diagnostic }
     }
 
     #[wasm_bindgen]
     pub fn message(&self) -> JsString {
-        JsString::from(&*self.inner.message())
+        JsString::from(self.inner.primary_message())
     }
 
     #[wasm_bindgen]
@@ -250,13 +250,13 @@ impl Diagnostic {
     #[wasm_bindgen(js_name = "textRange")]
     pub fn text_range(&self) -> Option<TextRange> {
         self.inner
-            .span()
+            .primary_span()
             .and_then(|span| Some(TextRange::from(span.range()?)))
     }
 
     #[wasm_bindgen(js_name = "toRange")]
     pub fn to_range(&self, workspace: &Workspace) -> Option<Range> {
-        self.inner.span().and_then(|span| {
+        self.inner.primary_span().and_then(|span| {
             let line_index = line_index(workspace.db.upcast(), span.file());
             let source = source_text(workspace.db.upcast(), span.file());
             let text_range = span.range()?;
@@ -273,10 +273,11 @@ impl Diagnostic {
     #[wasm_bindgen]
     pub fn display(&self, workspace: &Workspace) -> JsString {
         let config = DisplayDiagnosticConfig::default().color(false);
+        let mut buf = vec![];
         self.inner
-            .display(workspace.db.upcast(), &config)
-            .to_string()
-            .into()
+            .print(workspace.db.upcast(), &config, &mut buf)
+            .unwrap();
+        String::from_utf8(buf).unwrap().into()
     }
 }
 

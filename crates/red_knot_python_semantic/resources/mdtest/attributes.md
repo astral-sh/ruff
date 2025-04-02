@@ -1541,7 +1541,7 @@ integers are instances of that class:
 
 ```py
 reveal_type((2).bit_length)  # revealed: <bound method `bit_length` of `Literal[2]`>
-reveal_type((2).denominator)  # revealed: @Todo(@property)
+reveal_type((2).denominator)  # revealed: Literal[1]
 ```
 
 Some attributes are special-cased, however:

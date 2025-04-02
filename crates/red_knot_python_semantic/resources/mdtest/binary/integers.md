@@ -50,9 +50,9 @@ reveal_type(1 ** (largest_u32 + 1))  # revealed: int
 reveal_type(2**largest_u32)  # revealed: int
 
 def variable(x: int):
-    reveal_type(x**2)  # revealed: @Todo(return type of decorated function)
-    reveal_type(2**x)  # revealed: @Todo(return type of decorated function)
-    reveal_type(x**x)  # revealed: @Todo(return type of decorated function)
+    reveal_type(x**2)  # revealed: @Todo(return type of overloaded function)
+    reveal_type(2**x)  # revealed: @Todo(return type of overloaded function)
+    reveal_type(x**x)  # revealed: @Todo(return type of overloaded function)
 ```
 
 ## Division by Zero

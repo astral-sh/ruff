@@ -120,3 +120,26 @@ static_assert(is_subtype_of(typing.TypeAliasType, AlwaysTruthy))
 static_assert(is_subtype_of(types.MethodWrapperType, AlwaysTruthy))
 static_assert(is_subtype_of(types.WrapperDescriptorType, AlwaysTruthy))
 ```
+
+### `Callable` types always have ambiguous truthiness
+
+```py
+from typing import Callable
+
+def f(x: Callable, y: Callable[[int], str]):
+    reveal_type(bool(x))  # revealed: bool
+    reveal_type(bool(y))  # revealed: bool
+```
+
+But certain callable single-valued types are known to be always truthy:
+
+```py
+from types import FunctionType
+
+class A:
+    def method(self): ...
+
+reveal_type(bool(A().method))  # revealed: Literal[True]
+reveal_type(bool(f.__get__))  # revealed: Literal[True]
+reveal_type(bool(FunctionType.__get__))  # revealed: Literal[True]
+```

@@ -13,7 +13,7 @@ use ruff_python_ast::{
     Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 #[derive(Debug)]
@@ -91,10 +91,40 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
+            Stmt::Return(ast::StmtReturn {
+                value: Some(value), ..
+            }) => {
+                // test_err single_star_return
+                // def f(): return *x
+                Self::invalid_star_expression(value, ctx);
+            }
+            Stmt::For(ast::StmtFor { target, iter, .. }) => {
+                // test_err single_star_for
+                // for _ in *x: ...
+                // for *x in xs: ...
+                Self::invalid_star_expression(target, ctx);
+                Self::invalid_star_expression(iter, ctx);
+            }
             _ => {}
         }
 
         Self::debug_shadowing(stmt, ctx);
+    }
+
+    /// Emit a [`SemanticSyntaxErrorKind::InvalidStarExpression`] if `expr` is starred.
+    fn invalid_star_expression<Ctx: SemanticSyntaxContext>(expr: &Expr, ctx: &Ctx) {
+        // test_ok single_star_in_tuple
+        // def f(): yield (*x,)
+        // def f(): return (*x,)
+        // for _ in (*x,): ...
+        // for (*x,) in xs: ...
+        if expr.is_starred_expr() {
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::InvalidStarExpression,
+                expr.range(),
+            );
+        }
     }
 
     /// Check for [`SemanticSyntaxErrorKind::WriteToDebug`] in `stmt`.
@@ -421,6 +451,28 @@ impl SemanticSyntaxChecker {
                         _ => {}
                     };
                 }
+
+                // PLE0118
+                if let Some(stmt) = ctx.global(id) {
+                    let start = stmt.start();
+                    if expr.start() < start {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
+                                name: id.to_string(),
+                                start,
+                            },
+                            expr.range(),
+                        );
+                    }
+                }
+            }
+            Expr::Yield(ast::ExprYield {
+                value: Some(value), ..
+            }) => {
+                // test_err single_star_yield
+                // def f(): yield *x
+                Self::invalid_star_expression(value, ctx);
             }
             _ => {}
         }
@@ -522,6 +574,12 @@ impl Display for SemanticSyntaxError {
                     "mapping pattern checks duplicate key `{}`",
                     EscapeDefault(key)
                 )
+            }
+            SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
+                write!(f, "name `{name}` is used prior to global declaration")
+            }
+            SemanticSyntaxErrorKind::InvalidStarExpression => {
+                f.write_str("can't use starred expression here")
             }
         }
     }
@@ -671,6 +729,32 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [CPython grammar]: https://docs.python.org/3/reference/grammar.html
     DuplicateMatchKey(String),
+
+    /// Represents the use of a `global` variable before its `global` declaration.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// counter = 1
+    /// def increment():
+    ///     print(f"Adding 1 to {counter}")
+    ///     global counter
+    ///     counter += 1
+    /// ```
+    LoadBeforeGlobalDeclaration { name: String, start: TextSize },
+
+    /// Represents the use of a starred expression in an invalid location, such as a `return` or
+    /// `yield` statement.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f(): return *x
+    /// def f(): yield *x
+    /// for _ in *x: ...
+    /// for *x in xs: ...
+    /// ```
+    InvalidStarExpression,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -803,6 +887,9 @@ pub trait SemanticSyntaxContext {
 
     /// Returns the source text under analysis.
     fn source(&self) -> &str;
+
+    /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
+    fn global(&self, name: &str) -> Option<TextRange>;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 }

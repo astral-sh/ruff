@@ -67,6 +67,7 @@ use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::LateFutureImport;
+use crate::rules::pylint::rules::LoadBeforeGlobalDeclaration;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa, Locator};
@@ -540,11 +541,30 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.target_version
     }
 
+    fn global(&self, name: &str) -> Option<TextRange> {
+        self.semantic.global(name)
+    }
+
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 if self.settings.rules.enabled(Rule::LateFutureImport) {
                     self.report_diagnostic(Diagnostic::new(LateFutureImport, error.range));
+                }
+            }
+            SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::LoadBeforeGlobalDeclaration)
+                {
+                    self.report_diagnostic(Diagnostic::new(
+                        LoadBeforeGlobalDeclaration {
+                            name,
+                            row: self.compute_source_row(start),
+                        },
+                        error.range,
+                    ));
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
@@ -553,7 +573,8 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
-            | SemanticSyntaxErrorKind::DuplicateMatchKey(_) => {
+            | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
+            | SemanticSyntaxErrorKind::InvalidStarExpression => {
                 if self.settings.preview.is_enabled() {
                     self.semantic_errors.borrow_mut().push(error);
                 }

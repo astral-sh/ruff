@@ -265,6 +265,13 @@ impl<'db> Signature<'db> {
     pub(crate) fn parameters(&self) -> &Parameters<'db> {
         &self.parameters
     }
+
+    pub(crate) fn bind_self(&self) -> Self {
+        Self {
+            parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
+            return_ty: self.return_ty,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
@@ -504,6 +511,12 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     }
 }
 
+impl<'db> FromIterator<Parameter<'db>> for Parameters<'db> {
+    fn from_iter<T: IntoIterator<Item = Parameter<'db>>>(iter: T) -> Self {
+        Self::new(iter)
+    }
+}
+
 impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
@@ -590,6 +603,33 @@ impl<'db> Parameter<'db> {
 
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
+        self
+    }
+
+    pub(crate) fn with_sorted_unions_and_intersections(mut self, db: &'db dyn Db) -> Self {
+        self.annotated_type = self
+            .annotated_type
+            .map(|ty| ty.with_sorted_unions_and_intersections(db));
+
+        self.kind = match self.kind {
+            ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
+                name,
+                default_type: default_type.map(|ty| ty.with_sorted_unions_and_intersections(db)),
+            },
+            ParameterKind::PositionalOrKeyword { name, default_type } => {
+                ParameterKind::PositionalOrKeyword {
+                    name,
+                    default_type: default_type
+                        .map(|ty| ty.with_sorted_unions_and_intersections(db)),
+                }
+            }
+            ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
+                name,
+                default_type: default_type.map(|ty| ty.with_sorted_unions_and_intersections(db)),
+            },
+            ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => self.kind,
+        };
+
         self
     }
 
@@ -986,27 +1026,6 @@ mod tests {
         let func = get_function_f(&db, "/src/a.py");
 
         let expected_sig = func.internal_signature(&db);
-
-        // With no decorators, internal and external signature are the same
-        assert_eq!(func.signature(&db), &expected_sig);
-    }
-
-    #[test]
-    fn external_signature_decorated() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def deco(func): ...
-
-            @deco
-            def f(a: int) -> int: ...
-            ",
-        )
-        .unwrap();
-        let func = get_function_f(&db, "/src/a.py");
-
-        let expected_sig = Signature::todo("return type of decorated function");
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);
