@@ -340,10 +340,15 @@ impl SemanticSyntaxChecker {
             })
             | Expr::SetComp(ast::ExprSetComp {
                 elt, generators, ..
-            })
-            | Expr::Generator(ast::ExprGenerator {
+            }) => {
+                Self::check_generator_expr(elt, generators, ctx);
+                Self::async_comprehension_outside_async_function(ctx, generators);
+            }
+            Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
-            }) => Self::check_generator_expr(elt, generators, ctx),
+            }) => {
+                Self::check_generator_expr(elt, generators, ctx);
+            }
             Expr::DictComp(ast::ExprDictComp {
                 key,
                 value,
@@ -352,6 +357,7 @@ impl SemanticSyntaxChecker {
             }) => {
                 Self::check_generator_expr(key, generators, ctx);
                 Self::check_generator_expr(value, generators, ctx);
+                Self::async_comprehension_outside_async_function(ctx, generators);
             }
             Expr::Name(ast::ExprName {
                 range,
@@ -463,6 +469,34 @@ impl SemanticSyntaxChecker {
             );
         }
     }
+
+    fn async_comprehension_outside_async_function<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        generators: &[ast::Comprehension],
+    ) {
+        let python_version = ctx.python_version();
+        let in_async_context = ctx.in_async_context();
+        for generator in generators {
+            if generator.is_async && !in_async_context && python_version < PythonVersion::PY311 {
+                // test_ok nested_async_comprehension_py311
+                // # parse_options: {"target-version": "3.11"}
+                // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+                // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+                // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+
+                // test_err nested_async_comprehension_py310
+                // # parse_options: {"target-version": "3.10"}
+                // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+                // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+                // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+                Self::add_error(
+                    ctx,
+                    SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version),
+                    generator.range,
+                );
+            }
+        }
+    }
 }
 
 impl Default for SemanticSyntaxChecker {
@@ -519,6 +553,13 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::InvalidStarExpression => {
                 f.write_str("can't use starred expression here")
+            }
+            SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version) => {
+                write!(
+                    f,
+                    "cannot use an asynchronous comprehension outside of an asynchronous \
+                                function on Python {python_version} (syntax was added in 3.11)",
+                )
             }
         }
     }
@@ -659,6 +700,25 @@ pub enum SemanticSyntaxErrorKind {
     /// for *x in xs: ...
     /// ```
     InvalidStarExpression,
+
+    /// Represents the use of an asynchronous comprehension inside of a synchronous comprehension
+    /// before Python 3.11.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.11, code like this produces a syntax error because of the implicit function
+    /// scope introduced by the outer comprehension:
+    ///
+    /// ```python
+    /// async def elements(n): yield n
+    ///
+    /// async def test(): return { n: [x async for x in elements(n)] for n in range(3)}
+    /// ```
+    ///
+    /// This was discussed in [BPO 33346] and fixed in Python 3.11.
+    ///
+    /// [BPO 33346]: https://github.com/python/cpython/issues/77527
+    AsyncComprehensionOutsideAsyncFunction(PythonVersion),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -791,6 +851,8 @@ pub trait SemanticSyntaxContext {
 
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
+
+    fn in_async_context(&self) -> bool;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 }

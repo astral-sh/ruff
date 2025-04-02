@@ -545,6 +545,10 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.global(name)
     }
 
+    fn in_async_context(&self) -> bool {
+        self.semantic.in_async_context()
+    }
+
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
@@ -573,7 +577,8 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
-            | SemanticSyntaxErrorKind::InvalidStarExpression => {
+            | SemanticSyntaxErrorKind::InvalidStarExpression
+            | SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(_) => {
                 if self.settings.preview.is_enabled() {
                     self.semantic_errors.borrow_mut().push(error);
                 }

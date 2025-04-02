@@ -492,4 +492,8 @@ impl SemanticSyntaxContext for TestContext {
     fn global(&self, _name: &str) -> Option<TextRange> {
         None
     }
+
+    fn in_async_context(&self) -> bool {
+        false
+    }
 }
