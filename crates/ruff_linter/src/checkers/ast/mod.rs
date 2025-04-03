@@ -585,7 +585,12 @@ impl SemanticSyntaxContext for Checker<'_> {
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        // For functions, defer semantic syntax error checks until the body of the function is
+        // visited
+        let is_function_def_stmt = stmt.is_function_def_stmt();
+        if !is_function_def_stmt {
+            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        }
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
@@ -1189,7 +1194,9 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.pop_node();
         self.last_stmt_end = stmt.end();
 
-        self.semantic_checker.exit_stmt();
+        if !is_function_def_stmt {
+            self.semantic_checker.exit_stmt();
+        }
     }
 
     fn visit_annotation(&mut self, expr: &'a Expr) {
@@ -2576,17 +2583,23 @@ impl<'a> Checker<'a> {
             for snapshot in deferred_functions {
                 self.semantic.restore(snapshot);
 
+                let stmt = self.semantic.current_statement();
+
                 let Stmt::FunctionDef(ast::StmtFunctionDef {
                     body, parameters, ..
-                }) = self.semantic.current_statement()
+                }) = stmt
                 else {
                     unreachable!("Expected Stmt::FunctionDef")
                 };
+
+                self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
                 self.visit_parameters(parameters);
                 // Set the docstring state before visiting the function body.
                 self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
                 self.visit_body(body);
+
+                self.semantic_checker.exit_stmt();
             }
         }
         self.semantic.restore(snapshot);
