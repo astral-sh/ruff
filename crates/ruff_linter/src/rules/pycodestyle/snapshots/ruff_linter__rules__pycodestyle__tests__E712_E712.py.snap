@@ -56,7 +56,7 @@ E712.py:8:4: E712 [*] Avoid inequality comparisons to `True`; use `if not res:` 
 6 6 |     pass
 7 7 | #: E712
 8   |-if True != res:
-  8 |+if True is not res:
+  8 |+if not res:
 9 9 |     pass
 10 10 | #: E712
 11 11 | if False == res:
@@ -77,7 +77,7 @@ E712.py:11:4: E712 [*] Avoid equality comparisons to `False`; use `if not res:` 
 9  9  |     pass
 10 10 | #: E712
 11    |-if False == res:
-   11 |+if False is res:
+   11 |+if not res:
 12 12 |     pass
 13 13 | #: E712
 14 14 | if res[1] == True:
@@ -181,7 +181,7 @@ E712.py:22:4: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
 20 20 | var = 1 if cond == True else -1 if cond == False else cond
 21 21 | #: E712
 22    |-if (True) == TrueElement or x == TrueElement:
-   22 |+if (True) is TrueElement or x == TrueElement:
+   22 |+if (TrueElement) or x == TrueElement:
 23 23 |     pass
 24 24 | 
 25 25 | if res == True != False:
@@ -241,7 +241,7 @@ E712.py:28:3: E712 [*] Avoid equality comparisons to `True`; use `if TrueElement
 26 26 |     pass
 27 27 | 
 28    |-if(True) == TrueElement or x == TrueElement:
-   28 |+if(True) is TrueElement or x == TrueElement:
+   28 |+if(TrueElement) or x == TrueElement:
 29 29 |     pass
 30 30 | 
 31 31 | if (yield i) == True:
