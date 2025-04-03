@@ -19,7 +19,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 #[derive(Debug)]
-struct Checkpoint {
+pub struct Checkpoint {
     in_async_context: bool,
 }
 
@@ -47,8 +47,6 @@ pub struct SemanticSyntaxChecker {
     /// Note that this should be updated *after* checking the current statement or expression
     /// because the parent context is what matters.
     in_async_context: bool,
-
-    checkpoint: Vec<Checkpoint>,
 }
 
 impl SemanticSyntaxChecker {
@@ -385,11 +383,15 @@ impl SemanticSyntaxChecker {
     ///
     /// This should be followed by a call to [`SemanticSyntaxChecker::exit_stmt`] to reset any state
     /// specific to scopes introduced by `stmt`, such as whether the body of a function is async.
-    pub fn enter_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
+    pub fn enter_stmt<Ctx: SemanticSyntaxContext>(
+        &mut self,
+        stmt: &ast::Stmt,
+        ctx: &Ctx,
+    ) -> Checkpoint {
         // check for errors
         self.check_stmt(stmt, ctx);
 
-        self.save_checkpoint();
+        let checkpoint = self.checkpoint();
 
         // update internal state
         match stmt {
@@ -409,10 +411,12 @@ impl SemanticSyntaxChecker {
                 self.seen_futures_boundary = true;
             }
         }
+
+        checkpoint
     }
 
-    pub fn exit_stmt(&mut self) {
-        self.restore_checkpoint();
+    pub fn exit_stmt(&mut self, checkpoint: Checkpoint) {
+        self.restore_checkpoint(checkpoint);
     }
 
     /// Check `expr` for semantic syntax errors and update the checker's internal state.
@@ -420,9 +424,9 @@ impl SemanticSyntaxChecker {
     /// This should be followed by a call to [`SemanticSyntaxChecker::exit_expr`] to reset any state
     /// specific to scopes introduced by `expr`, such as whether the body of a comprehension is
     /// async.
-    pub fn enter_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
+    pub fn enter_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) -> Checkpoint {
         self.check_expr(expr, ctx);
-        self.save_checkpoint();
+        let checkpoint = self.checkpoint();
         match expr {
             Expr::ListComp(ast::ExprListComp { generators, .. })
             | Expr::SetComp(ast::ExprSetComp { generators, .. })
@@ -431,10 +435,12 @@ impl SemanticSyntaxChecker {
             }
             _ => {}
         }
+
+        checkpoint
     }
 
-    pub fn exit_expr(&mut self) {
-        self.restore_checkpoint();
+    pub fn exit_expr(&mut self, checkpoint: Checkpoint) {
+        self.restore_checkpoint(checkpoint);
     }
 
     fn check_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
@@ -622,16 +628,15 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn save_checkpoint(&mut self) {
-        self.checkpoint.push(Checkpoint {
+    fn checkpoint(&self) -> Checkpoint {
+        Checkpoint {
             in_async_context: self.in_async_context,
-        });
+        }
     }
 
-    fn restore_checkpoint(&mut self) {
-        if let Some(Checkpoint { in_async_context }) = self.checkpoint.pop() {
-            self.in_async_context = in_async_context;
-        }
+    #[allow(clippy::needless_pass_by_value)]
+    fn restore_checkpoint(&mut self, checkpoint: Checkpoint) {
+        self.in_async_context = checkpoint.in_async_context;
     }
 }
 
@@ -1054,15 +1059,15 @@ where
     Ctx: SemanticSyntaxContext,
 {
     fn visit_stmt(&mut self, stmt: &'_ Stmt) {
-        self.checker.enter_stmt(stmt, &self.context);
+        let checkpoint = self.checker.enter_stmt(stmt, &self.context);
         ruff_python_ast::visitor::walk_stmt(self, stmt);
-        self.checker.exit_stmt();
+        self.checker.exit_stmt(checkpoint);
     }
 
     fn visit_expr(&mut self, expr: &'_ Expr) {
-        self.checker.enter_expr(expr, &self.context);
+        let checkpoint = self.checker.enter_expr(expr, &self.context);
         ruff_python_ast::visitor::walk_expr(self, expr);
-        self.checker.exit_expr();
+        self.checker.exit_expr(checkpoint);
     }
 }
 
