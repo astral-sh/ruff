@@ -3493,9 +3493,6 @@ impl<'db> Type<'db> {
                 None => KnownClass::Object.to_class_literal(db),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    // TODO: This should create ClassLiterals, not SubclassOfTypes, for each
-                    // element, since constraints must be specialized to those specific types, not
-                    // to subclasses of those types.
                     constraints.map(db, |constraint| constraint.to_meta_type(db))
                 }
             },
