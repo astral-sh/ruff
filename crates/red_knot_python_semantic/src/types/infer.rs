@@ -1974,6 +1974,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // We don't use UnionType::from_elements or UnionBuilder here, because we don't
                     // want to simplify the list of constraints like we do with the elements of an
                     // actual union type.
+                    // TODO: Consider using a new `OneOfType` connective here instead, since that
+                    // more accurately represents the actual semantics of typevar constraints.
                     let elements = UnionType::new(
                         self.db(),
                         elts.iter()

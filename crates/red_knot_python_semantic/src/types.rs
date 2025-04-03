@@ -3493,6 +3493,8 @@ impl<'db> Type<'db> {
                 None => KnownClass::Object.to_class_literal(db),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    // TODO: If we add a proper `OneOf` connector, we should use that here instead
+                    // of union. (Using a union here doesn't break anything, but it is imprecise.)
                     constraints.map(db, |constraint| constraint.to_meta_type(db))
                 }
             },
