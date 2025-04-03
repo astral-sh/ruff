@@ -66,7 +66,6 @@ impl SemanticSyntaxChecker {
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
                 Self::multiple_case_assignment(match_stmt, ctx);
-                Self::duplicate_match_keys(match_stmt, ctx);
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
             | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
@@ -269,78 +268,6 @@ impl SemanticSyntaxChecker {
                 ctx,
             };
             visitor.visit_pattern(&case.pattern);
-        }
-    }
-
-    /// Check for duplicate keys in mapping and class patterns in `stmt`.
-    fn duplicate_match_keys<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
-        for case in &stmt.cases {
-            match &case.pattern {
-                Pattern::MatchMapping(ast::PatternMatchMapping { keys, .. }) => {
-                    let mut seen = FxHashSet::default();
-                    for key in keys
-                        .iter()
-                        // complex numbers (`1 + 2j`) are allowed as keys but are not literals
-                        // because they are represented as a `BinOp::Add` between a real number and
-                        // an imaginary number
-                        .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
-                    {
-                        if !seen.insert(ComparableExpr::from(key)) {
-                            let key_range = key.range();
-                            let duplicate_key = ctx.source()[key_range].to_string();
-                            // test_ok duplicate_match_key_attr
-                            // match x:
-                            //     case {x.a: 1, x.a: 2}: ...
-
-                            // test_err duplicate_match_key
-                            // match x:
-                            //     case {"x": 1, "x": 2}: ...
-                            //     case {b"x": 1, b"x": 2}: ...
-                            //     case {0: 1, 0: 2}: ...
-                            //     case {1.0: 1, 1.0: 2}: ...
-                            //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
-                            //     case {True: 1, True: 2}: ...
-                            //     case {None: 1, None: 2}: ...
-                            //     case {
-                            //     """x
-                            //     y
-                            //     z
-                            //     """: 1,
-                            //     """x
-                            //     y
-                            //     z
-                            //     """: 2}: ...
-                            //     case {"x": 1, "x": 2, "x": 3}: ...
-                            //     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
-                            //     case [{"x": 1, "x": 2}]: ...
-                            Self::add_error(
-                                ctx,
-                                SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),
-                                key_range,
-                            );
-                        }
-                    }
-                }
-                Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
-                    let mut seen = FxHashSet::default();
-                    for keyword in &arguments.keywords {
-                        if !seen.insert(&keyword.attr.id) {
-                            // test_err duplicate_match_class_attr
-                            // match x:
-                            //     case Class(x=1, x=2): ...
-                            //     case [Class(x=1, x=2)]: ...
-                            Self::add_error(
-                                ctx,
-                                SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(
-                                    keyword.attr.id.clone(),
-                                ),
-                                keyword.attr.range,
-                            );
-                        }
-                    }
-                }
-                _ => {}
-            }
         }
     }
 
@@ -854,19 +781,82 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
             }
-            Pattern::MatchMapping(ast::PatternMatchMapping { patterns, rest, .. }) => {
+            Pattern::MatchMapping(ast::PatternMatchMapping {
+                keys,
+                patterns,
+                rest,
+                ..
+            }) => {
                 for pattern in patterns {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
                     self.insert(rest);
                 }
+
+                let mut seen = FxHashSet::default();
+                for key in keys
+                    .iter()
+                    // complex numbers (`1 + 2j`) are allowed as keys but are not literals
+                    // because they are represented as a `BinOp::Add` between a real number and
+                    // an imaginary number
+                    .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
+                {
+                    if !seen.insert(ComparableExpr::from(key)) {
+                        let key_range = key.range();
+                        let duplicate_key = self.ctx.source()[key_range].to_string();
+                        // test_ok duplicate_match_key_attr
+                        // match x:
+                        //     case {x.a: 1, x.a: 2}: ...
+
+                        // test_err duplicate_match_key
+                        // match x:
+                        //     case {"x": 1, "x": 2}: ...
+                        //     case {b"x": 1, b"x": 2}: ...
+                        //     case {0: 1, 0: 2}: ...
+                        //     case {1.0: 1, 1.0: 2}: ...
+                        //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+                        //     case {True: 1, True: 2}: ...
+                        //     case {None: 1, None: 2}: ...
+                        //     case {
+                        //     """x
+                        //     y
+                        //     z
+                        //     """: 1,
+                        //     """x
+                        //     y
+                        //     z
+                        //     """: 2}: ...
+                        //     case {"x": 1, "x": 2, "x": 3}: ...
+                        //     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+                        //     case [{"x": 1, "x": 2}]: ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),
+                            key_range,
+                        );
+                    }
+                }
             }
             Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
                 for pattern in &arguments.patterns {
                     self.visit_pattern(pattern);
                 }
+                let mut seen = FxHashSet::default();
                 for keyword in &arguments.keywords {
+                    if !seen.insert(&keyword.attr.id) {
+                        // test_err duplicate_match_class_attr
+                        // match x:
+                        //     case Class(x=1, x=2): ...
+                        //     case [Class(x=1, x=2)]: ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(
+                                keyword.attr.id.clone(),
+                            ),
+                            keyword.attr.range,
+                        );
+                    }
                     self.visit_pattern(&keyword.pattern);
                 }
             }

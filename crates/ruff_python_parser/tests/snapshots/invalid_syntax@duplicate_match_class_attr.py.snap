@@ -190,3 +190,11 @@ Module(
   |                     ^ Syntax Error: attribute name `x` repeated in class pattern
 3 |     case [Class(x=1, x=2)]: ...
   |
+
+
+  |
+1 | match x:
+2 |     case Class(x=1, x=2): ...
+3 |     case [Class(x=1, x=2)]: ...
+  |                      ^ Syntax Error: attribute name `x` repeated in class pattern
+  |
