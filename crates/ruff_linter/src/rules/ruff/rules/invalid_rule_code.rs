@@ -63,7 +63,7 @@ pub(crate) fn invalid_noqa_code(
 
         for code in directive.iter() {
             let code_str = code.as_str();
-            if Rule::from_code(code.as_str()).is_ok()
+            if Rule::from_code(code_str).is_ok()
                 || external.iter().any(|ext| code_str.starts_with(ext))
             {
                 all_invalid = false;
