@@ -265,3 +265,101 @@ impl HasNavigationTargets for IntersectionType<'_> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::db::tests::TestDb;
+    use insta::internals::SettingsBindDropGuard;
+    use red_knot_python_semantic::{
+        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+    };
+    use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
+    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
+    use ruff_text_size::TextSize;
+
+    pub(super) fn cursor_test(source: &str) -> CursorTest {
+        let mut db = TestDb::new();
+        let cursor_offset = source.find("<CURSOR>").expect(
+            "`source`` should contain a `<CURSOR>` marker, indicating the position of the cursor.",
+        );
+
+        let mut content = source[..cursor_offset].to_string();
+        content.push_str(&source[cursor_offset + "<CURSOR>".len()..]);
+
+        db.write_file("main.py", &content)
+            .expect("write to memory file system to be successful");
+
+        let file = system_path_to_file(&db, "main.py").expect("newly written file to existing");
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersion::latest(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_roots: vec![SystemPathBuf::from("/")],
+                    custom_typeshed: None,
+                    python_path: PythonPath::KnownSitePackages(vec![]),
+                },
+            },
+        )
+        .expect("Default settings to be valid");
+
+        let mut insta_settings = insta::Settings::clone_current();
+        insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+
+        let insta_settings_guard = insta_settings.bind_to_scope();
+
+        CursorTest {
+            db,
+            cursor_offset: TextSize::try_from(cursor_offset)
+                .expect("source to be smaller than 4GB"),
+            file,
+            _insta_settings_guard: insta_settings_guard,
+        }
+    }
+
+    pub(super) struct CursorTest {
+        pub(super) db: TestDb,
+        pub(super) cursor_offset: TextSize,
+        pub(super) file: File,
+        _insta_settings_guard: SettingsBindDropGuard,
+    }
+
+    impl CursorTest {
+        pub(super) fn write_file(
+            &mut self,
+            path: impl AsRef<SystemPath>,
+            content: &str,
+        ) -> std::io::Result<()> {
+            self.db.write_file(path, content)
+        }
+
+        pub(super) fn render_diagnostics<I, D>(&self, diagnostics: I) -> String
+        where
+            I: IntoIterator<Item = D>,
+            D: IntoDiagnostic,
+        {
+            use std::fmt::Write;
+
+            let mut buf = String::new();
+
+            let config = DisplayDiagnosticConfig::default()
+                .color(false)
+                .format(DiagnosticFormat::Full);
+            for diagnostic in diagnostics {
+                let diag = diagnostic.into_diagnostic();
+                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
+            }
+
+            buf
+        }
+    }
+
+    pub(super) trait IntoDiagnostic {
+        fn into_diagnostic(self) -> Diagnostic;
+    }
+}

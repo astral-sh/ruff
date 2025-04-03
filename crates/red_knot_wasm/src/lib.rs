@@ -359,15 +359,11 @@ pub struct Range {
 }
 
 impl Range {
-    fn from_file_range(db: &dyn Db, range: FileRange) -> Self {
-        let index = line_index(db.upcast(), range.file());
-        let source = source_text(db.upcast(), range.file());
+    fn from_file_range(db: &dyn Db, file_range: FileRange) -> Self {
+        let index = line_index(db.upcast(), file_range.file());
+        let source = source_text(db.upcast(), file_range.file());
 
-        let text_range = range.range();
-
-        let start = index.source_location(text_range.start(), &source);
-        let end = index.source_location(text_range.end(), &source);
-        Self::from((start, end))
+        Self::from_text_range(file_range.range(), &index, &source)
     }
 
     fn from_text_range(
