@@ -1538,7 +1538,6 @@ impl<'db> Type<'db> {
     pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::Dynamic(_) => false,
-            // A typevar is not fully static, since it can be specialized to a generic type
             Type::Never
             | Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
