@@ -66,7 +66,7 @@ impl SemanticSyntaxChecker {
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
                 Self::multiple_case_assignment(match_stmt, ctx);
-                Self::duplicate_match_mapping_keys(match_stmt, ctx);
+                Self::duplicate_match_keys(match_stmt, ctx);
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
             | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
@@ -272,54 +272,72 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn duplicate_match_mapping_keys<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
-        for mapping in stmt
-            .cases
-            .iter()
-            .filter_map(|case| case.pattern.as_match_mapping())
-        {
-            let mut seen = FxHashSet::default();
-            for key in mapping
-                .keys
-                .iter()
-                // complex numbers (`1 + 2j`) are allowed as keys but are not literals
-                // because they are represented as a `BinOp::Add` between a real number and
-                // an imaginary number
-                .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
-            {
-                if !seen.insert(ComparableExpr::from(key)) {
-                    let key_range = key.range();
-                    let duplicate_key = ctx.source()[key_range].to_string();
-                    // test_ok duplicate_match_key_attr
-                    // match x:
-                    //     case {x.a: 1, x.a: 2}: ...
+    /// Check for duplicate keys in mapping and class patterns in `stmt`.
+    fn duplicate_match_keys<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
+        for case in &stmt.cases {
+            match &case.pattern {
+                Pattern::MatchMapping(ast::PatternMatchMapping { keys, .. }) => {
+                    let mut seen = FxHashSet::default();
+                    for key in keys
+                        .iter()
+                        // complex numbers (`1 + 2j`) are allowed as keys but are not literals
+                        // because they are represented as a `BinOp::Add` between a real number and
+                        // an imaginary number
+                        .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
+                    {
+                        if !seen.insert(ComparableExpr::from(key)) {
+                            let key_range = key.range();
+                            let duplicate_key = ctx.source()[key_range].to_string();
+                            // test_ok duplicate_match_key_attr
+                            // match x:
+                            //     case {x.a: 1, x.a: 2}: ...
 
-                    // test_err duplicate_match_key
-                    // match x:
-                    //     case {"x": 1, "x": 2}: ...
-                    //     case {b"x": 1, b"x": 2}: ...
-                    //     case {0: 1, 0: 2}: ...
-                    //     case {1.0: 1, 1.0: 2}: ...
-                    //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
-                    //     case {True: 1, True: 2}: ...
-                    //     case {None: 1, None: 2}: ...
-                    //     case {
-                    //     """x
-                    //     y
-                    //     z
-                    //     """: 1,
-                    //     """x
-                    //     y
-                    //     z
-                    //     """: 2}: ...
-                    //     case {"x": 1, "x": 2, "x": 3}: ...
-                    //     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
-                    Self::add_error(
-                        ctx,
-                        SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),
-                        key_range,
-                    );
+                            // test_err duplicate_match_key
+                            // match x:
+                            //     case {"x": 1, "x": 2}: ...
+                            //     case {b"x": 1, b"x": 2}: ...
+                            //     case {0: 1, 0: 2}: ...
+                            //     case {1.0: 1, 1.0: 2}: ...
+                            //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+                            //     case {True: 1, True: 2}: ...
+                            //     case {None: 1, None: 2}: ...
+                            //     case {
+                            //     """x
+                            //     y
+                            //     z
+                            //     """: 1,
+                            //     """x
+                            //     y
+                            //     z
+                            //     """: 2}: ...
+                            //     case {"x": 1, "x": 2, "x": 3}: ...
+                            //     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),
+                                key_range,
+                            );
+                        }
+                    }
                 }
+                Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
+                    let mut seen = FxHashSet::default();
+                    for keyword in &arguments.keywords {
+                        if !seen.insert(&keyword.attr.id) {
+                            // test_err duplicate_match_class_attr
+                            // match x:
+                            //     case Class(x=1, x=2): ...
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(
+                                    keyword.attr.id.clone(),
+                                ),
+                                keyword.attr.range,
+                            );
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -575,6 +593,9 @@ impl Display for SemanticSyntaxError {
                     EscapeDefault(key)
                 )
             }
+            SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(name) => {
+                write!(f, "attribute name `{name}` repeated in class pattern",)
+            }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
                 write!(f, "name `{name}` is used prior to global declaration")
             }
@@ -729,6 +750,16 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [CPython grammar]: https://docs.python.org/3/reference/grammar.html
     DuplicateMatchKey(String),
+
+    /// Represents a duplicate attribute name in a `match` class pattern.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case Class(x=1, x=2): ...
+    /// ```
+    DuplicateMatchClassAttribute(ast::name::Name),
 
     /// Represents the use of a `global` variable before its `global` declaration.
     ///
