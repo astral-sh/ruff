@@ -1,3 +1,4 @@
+use crate::rules::numpy::helpers::ImportSearcher;
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
@@ -891,50 +892,4 @@ fn try_block_contains_undeprecated_import(
     let mut import_searcher = ImportSearcher::new(path, name);
     import_searcher.visit_body(&try_node.body);
     import_searcher.found_import
-}
-
-/// AST visitor that searches an AST tree for [`ast::StmtImportFrom`] nodes
-/// that match a certain [`QualifiedName`].
-struct ImportSearcher<'a> {
-    module: &'a str,
-    name: &'a str,
-    found_import: bool,
-}
-
-impl<'a> ImportSearcher<'a> {
-    fn new(module: &'a str, name: &'a str) -> Self {
-        Self {
-            module,
-            name,
-            found_import: false,
-        }
-    }
-}
-
-impl StatementVisitor<'_> for ImportSearcher<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        if self.found_import {
-            return;
-        }
-        if let ast::Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) = stmt {
-            if module.as_ref().is_some_and(|module| module == self.module)
-                && names
-                    .iter()
-                    .any(|ast::Alias { name, .. }| name == self.name)
-            {
-                self.found_import = true;
-                return;
-            }
-        }
-        ast::statement_visitor::walk_stmt(self, stmt);
-    }
-
-    fn visit_body(&mut self, body: &[ruff_python_ast::Stmt]) {
-        for stmt in body {
-            self.visit_stmt(stmt);
-            if self.found_import {
-                return;
-            }
-        }
-    }
 }

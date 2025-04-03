@@ -1,10 +1,17 @@
 use super::notebook;
 use super::PositionEncoding;
+use crate::system::file_to_url;
+
 use lsp_types as types;
+use lsp_types::Location;
+
+use red_knot_python_semantic::Db;
+use ruff_db::files::FileRange;
+use ruff_db::source::{line_index, source_text};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::OneIndexed;
 use ruff_source_file::{LineIndex, SourceLocation};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub(crate) struct NotebookRange {
     pub(crate) cell: notebook::CellId,
@@ -14,6 +21,10 @@ pub(crate) struct NotebookRange {
 pub(crate) trait RangeExt {
     fn to_text_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding)
         -> TextRange;
+}
+
+pub(crate) trait PositionExt {
+    fn to_text_size(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> TextSize;
 }
 
 pub(crate) trait ToRangeExt {
@@ -31,6 +42,41 @@ fn u32_index_to_usize(index: u32) -> usize {
     usize::try_from(index).expect("u32 fits in usize")
 }
 
+impl PositionExt for lsp_types::Position {
+    fn to_text_size(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> TextSize {
+        let start_line = index.line_range(
+            OneIndexed::from_zero_indexed(u32_index_to_usize(self.line)),
+            text,
+        );
+
+        let start_column_offset = match encoding {
+            PositionEncoding::UTF8 => TextSize::new(self.character),
+
+            PositionEncoding::UTF16 => {
+                // Fast path for ASCII only documents
+                if index.is_ascii() {
+                    TextSize::new(self.character)
+                } else {
+                    // UTF16 encodes characters either as one or two 16 bit words.
+                    // The position in `range` is the 16-bit word offset from the start of the line (and not the character offset)
+                    // UTF-16 with a text that may use variable-length characters.
+                    utf8_column_offset(self.character, &text[start_line])
+                }
+            }
+            PositionEncoding::UTF32 => {
+                // UTF-32 uses 4 bytes for each character. Meaning, the position in range is a character offset.
+                return index.offset(
+                    OneIndexed::from_zero_indexed(u32_index_to_usize(self.line)),
+                    OneIndexed::from_zero_indexed(u32_index_to_usize(self.character)),
+                    text,
+                );
+            }
+        };
+
+        start_line.start() + start_column_offset.clamp(TextSize::new(0), start_line.end())
+    }
+}
+
 impl RangeExt for lsp_types::Range {
     fn to_text_range(
         &self,
@@ -38,58 +84,9 @@ impl RangeExt for lsp_types::Range {
         index: &LineIndex,
         encoding: PositionEncoding,
     ) -> TextRange {
-        let start_line = index.line_range(
-            OneIndexed::from_zero_indexed(u32_index_to_usize(self.start.line)),
-            text,
-        );
-        let end_line = index.line_range(
-            OneIndexed::from_zero_indexed(u32_index_to_usize(self.end.line)),
-            text,
-        );
-
-        let (start_column_offset, end_column_offset) = match encoding {
-            PositionEncoding::UTF8 => (
-                TextSize::new(self.start.character),
-                TextSize::new(self.end.character),
-            ),
-
-            PositionEncoding::UTF16 => {
-                // Fast path for ASCII only documents
-                if index.is_ascii() {
-                    (
-                        TextSize::new(self.start.character),
-                        TextSize::new(self.end.character),
-                    )
-                } else {
-                    // UTF16 encodes characters either as one or two 16 bit words.
-                    // The position in `range` is the 16-bit word offset from the start of the line (and not the character offset)
-                    // UTF-16 with a text that may use variable-length characters.
-                    (
-                        utf8_column_offset(self.start.character, &text[start_line]),
-                        utf8_column_offset(self.end.character, &text[end_line]),
-                    )
-                }
-            }
-            PositionEncoding::UTF32 => {
-                // UTF-32 uses 4 bytes for each character. Meaning, the position in range is a character offset.
-                return TextRange::new(
-                    index.offset(
-                        OneIndexed::from_zero_indexed(u32_index_to_usize(self.start.line)),
-                        OneIndexed::from_zero_indexed(u32_index_to_usize(self.start.character)),
-                        text,
-                    ),
-                    index.offset(
-                        OneIndexed::from_zero_indexed(u32_index_to_usize(self.end.line)),
-                        OneIndexed::from_zero_indexed(u32_index_to_usize(self.end.character)),
-                        text,
-                    ),
-                );
-            }
-        };
-
         TextRange::new(
-            start_line.start() + start_column_offset.clamp(TextSize::new(0), start_line.end()),
-            end_line.start() + end_column_offset.clamp(TextSize::new(0), end_line.end()),
+            self.start.to_text_size(text, index, encoding),
+            self.end.to_text_size(text, index, encoding),
         )
     }
 }
@@ -211,5 +208,21 @@ fn source_location_to_position(location: &SourceLocation) -> types::Position {
         line: u32::try_from(location.row.to_zero_indexed()).expect("row usize fits in u32"),
         character: u32::try_from(location.column.to_zero_indexed())
             .expect("character usize fits in u32"),
+    }
+}
+
+pub(crate) trait FileRangeExt {
+    fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location>;
+}
+
+impl FileRangeExt for FileRange {
+    fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location> {
+        let file = self.file();
+        let uri = file_to_url(db, file)?;
+        let source = source_text(db.upcast(), file);
+        let line_index = line_index(db.upcast(), file);
+
+        let range = self.range().to_range(&source, &line_index, encoding);
+        Some(Location { uri, range })
     }
 }

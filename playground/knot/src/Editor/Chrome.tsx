@@ -15,7 +15,7 @@ import {
 } from "shared";
 import type { Diagnostic, Workspace } from "red_knot_wasm";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { Files } from "./Files";
+import { Files, isPythonFile } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";
 import SecondaryPanel, {
   SecondaryPanelResult,
@@ -161,12 +161,14 @@ export default function Chrome({
                   <Editor
                     theme={theme}
                     visible={true}
+                    files={files}
+                    selected={files.selected}
                     fileName={selectedFileName}
-                    source={files.contents[files.selected]}
                     diagnostics={checkResult.diagnostics}
                     workspace={workspace}
                     onMount={handleEditorMount}
                     onChange={(content) => onFileChanged(workspace, content)}
+                    onOpenFile={onFileSelected}
                   />
                   {checkResult.error ? (
                     <div
@@ -245,10 +247,7 @@ function useCheckResult(
     }
 
     const currentHandle = files.handles[files.selected];
-
-    const extension =
-      currentHandle?.path()?.toLowerCase().split(".").pop() ?? "";
-    if (currentHandle == null || !["py", "pyi", "pyw"].includes(extension)) {
+    if (currentHandle == null || !isPythonFile(currentHandle)) {
       return {
         diagnostics: [],
         error: null,

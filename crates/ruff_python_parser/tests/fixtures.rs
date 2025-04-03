@@ -488,4 +488,8 @@ impl SemanticSyntaxContext for TestContext {
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         self.diagnostics.borrow_mut().push(error);
     }
+
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
+    }
 }

@@ -9,8 +9,8 @@ use ruff_python_literal::escape::AsciiEscape;
 use crate::types::class_base::ClassBase;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType, Type,
-    UnionType,
+    ClassLiteralType, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
+    StringLiteralType, Type, UnionType, WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -77,6 +77,7 @@ impl Display for DisplayRepresentation<'_> {
                 };
                 f.write_str(representation)
             }
+            Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())
             }
@@ -99,15 +100,26 @@ impl Display for DisplayRepresentation<'_> {
                     instance = bound_method.self_instance(self.db).display(self.db)
                 )
             }
-            Type::MethodWrapperDunderGet(function) => {
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 write!(
                     f,
                     "<method-wrapper `__get__` of `{function}`>",
                     function = function.name(self.db)
                 )
             }
-            Type::WrapperDescriptorDunderGet => {
-                f.write_str("<wrapper-descriptor `__get__` of `function` objects>")
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
+                write!(f, "<method-wrapper `__get__` of `property` object>",)
+            }
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => {
+                write!(f, "<method-wrapper `__set__` of `property` object>",)
+            }
+            Type::WrapperDescriptor(kind) => {
+                let (method, object) = match kind {
+                    WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
+                    WrapperDescriptorKind::PropertyDunderGet => ("__get__", "property"),
+                    WrapperDescriptorKind::PropertyDunderSet => ("__set__", "property"),
+                };
+                write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
             }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
@@ -424,7 +436,7 @@ struct DisplayMaybeParenthesizedType<'db> {
 
 impl Display for DisplayMaybeParenthesizedType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Type::Callable(_) | Type::MethodWrapperDunderGet(_) = self.ty {
+        if let Type::Callable(_) | Type::MethodWrapper(_) = self.ty {
             write!(f, "({})", self.ty.display(self.db))
         } else {
             self.ty.display(self.db).fmt(f)

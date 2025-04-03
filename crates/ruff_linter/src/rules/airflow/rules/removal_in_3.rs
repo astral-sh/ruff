@@ -1,4 +1,6 @@
 use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::rules::airflow::helpers::{is_guarded_by_try_except, Replacement};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
@@ -59,27 +61,23 @@ impl Violation for Airflow3Removal {
             Replacement::Message(message) => {
                 format!("`{deprecated}` is removed in Airflow 3.0; {message}")
             }
+            Replacement::AutoImport { path: _, name: _ } => {
+                format!("`{deprecated}` is removed in Airflow 3.0")
+            }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         let Airflow3Removal { replacement, .. } = self;
-        if let Replacement::Name(name) = replacement {
-            Some(format!("Use `{name}` instead"))
-        } else {
-            None
+        match replacement {
+            Replacement::Name(name) => Some(format!("Use `{name}` instead")),
+            Replacement::AutoImport { path, name } => Some(format!("Use `{path}.{name}` instead")),
+            _ => None,
         }
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-enum Replacement {
-    None,
-    Name(&'static str),
-    Message(&'static str),
-}
-
-/// AIR302
+/// AIR301
 pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
@@ -116,7 +114,7 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
     }
 }
 
-/// AIR302
+/// AIR301
 pub(crate) fn airflow_3_removal_function_def(checker: &Checker, function_def: &StmtFunctionDef) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
@@ -186,6 +184,12 @@ fn check_function_parameters(checker: &Checker, function_def: &StmtFunctionDef) 
 fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, arguments: &Arguments) {
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
+            // with replacement
+            checker.report_diagnostics(diagnostic_for_argument(
+                arguments,
+                "fail_stop",
+                Some("fail_fast"),
+            ));
             checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "schedule_interval",
@@ -196,15 +200,13 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                 "timetable",
                 Some("schedule"),
             ));
+            // without replacement
+            checker.report_diagnostics(diagnostic_for_argument(arguments, "default_view", None));
+            checker.report_diagnostics(diagnostic_for_argument(arguments, "orientation", None));
             checker.report_diagnostics(diagnostic_for_argument(
                 arguments,
                 "sla_miss_callback",
                 None,
-            ));
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "fail_stop",
-                Some("fail_fast"),
             ));
         }
         _ => {
@@ -290,13 +292,26 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
         _ => return,
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    // Create the `Fix` first to avoid cloning `Replacement`.
+    let fix = if let Replacement::Name(name) = replacement {
+        Some(Fix::safe_edit(Edit::range_replacement(
+            name.to_string(),
+            attr.range(),
+        )))
+    } else {
+        None
+    };
+    let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: attr.to_string(),
             replacement,
         },
         attr.range(),
-    ));
+    );
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
+    }
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
@@ -504,13 +519,27 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             }
         }
     };
-    checker.report_diagnostic(Diagnostic::new(
+    // Create the `Fix` first to avoid cloning `Replacement`.
+    let fix = if let Replacement::Name(name) = replacement {
+        Some(Fix::safe_edit(Edit::range_replacement(
+            name.to_string(),
+            attr.range(),
+        )))
+    } else {
+        None
+    };
+
+    let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: attr.to_string(),
             replacement,
         },
         attr.range(),
-    ));
+    );
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
+    }
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Check whether a removed Airflow name is used.
@@ -528,7 +557,9 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
 /// SubDagOperator()
 /// ```
 fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
-    let Some(qualified_name) = checker.semantic().resolve_qualified_name(expr) else {
+    let semantic = checker.semantic();
+
+    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
         return;
     };
 
@@ -543,15 +574,22 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             Replacement::Name("airflow.api_connexion.security.requires_access_*")
         }
         ["airflow", "api_connexion", "security", "requires_access_dataset"] => {
-            Replacement::Name("airflow.api_connexion.security.requires_access_asset")
+            Replacement::AutoImport {
+                path: "airflow.api_connexion.security",
+                name: "requires_access_asset",
+            }
         }
 
         // airflow.auth.managers
         ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
-            Replacement::Name("airflow.auth.managers.models.resource_details.AssetDetails")
+            Replacement::Name(
+                "airflow.api_fastapi.auth.managers.models.resource_details.AssetDetails",
+            )
         }
         ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => {
-            Replacement::Name("airflow.auth.managers.base_auth_manager.is_authorized_asset")
+            Replacement::Name(
+                "airflow.api_fastapi.auth.managers.base_auth_manager.is_authorized_asset",
+            )
         }
 
         // airflow.configuration
@@ -573,9 +611,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.datasets
-        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => {
-            Replacement::Name("airflow.sdk.Asset")
-        }
+        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::AutoImport {
+            path: "airflow.sdk",
+            name: "Asset",
+        },
         ["airflow", "datasets", rest @ ..] => match &rest {
             ["DatasetAliasEvent"] => Replacement::None,
             ["DatasetAlias"] => Replacement::Name("airflow.sdk.AssetAlias"),
@@ -634,6 +673,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "models", "baseoperator", "cross_downstream"] => {
             Replacement::Name("airflow.sdk.cross_downstream")
         }
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => {
+            Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
+        }
+
+        // airflow.notifications
+        ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
+            Replacement::Name("airflow.sdk.BaseNotifier")
+        }
 
         // airflow.operators
         ["airflow", "operators", "subdag", ..] => {
@@ -682,7 +729,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.sensors
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
-            Replacement::Name("airflow.sensors.base.BaseSensorOperator")
+            Replacement::Name("airflow.sdk.bases.sensor.BaseSensorOperator")
         }
         ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => {
             Replacement::Name("airflow.sensors.date_time.DateTimeSensor")
@@ -724,6 +771,9 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 Replacement::Name("airflow.sdk.get_parsing_context")
             }
 
+            // airflow.utils.db
+            ["db", "create_session"] => Replacement::None,
+
             // airflow.utils.decorators
             ["decorators", "apply_defaults"] => Replacement::Message(
                 "`apply_defaults` is now unconditionally done and can be safely removed.",
@@ -737,12 +787,17 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             }
 
             // airflow.utils.file
-            ["file", "TemporaryDirectory"] => Replacement::None,
-            ["file", "mkdirs"] => Replacement::Name("pendulum.today('UTC').add(days=-N, ...)"),
+            ["file", "TemporaryDirectory"] => Replacement::Name("tempfile.TemporaryDirectory"),
+            ["file", "mkdirs"] => Replacement::Name("pathlib.Path({path}).mkdir"),
 
             // airflow.utils.helpers
             ["helpers", "chain"] => Replacement::Name("airflow.sdk.chain"),
             ["helpers", "cross_downstream"] => Replacement::Name("airflow.sdk.cross_downstream"),
+
+            // airflow.utils.log.secrets_masker
+            ["log", "secrets_masker"] => {
+                Replacement::Name("airflow.sdk.execution_time.secrets_masker")
+            }
 
             // airflow.utils.state
             ["state", "SHUTDOWN" | "terminating_states"] => Replacement::None,
@@ -853,13 +908,31 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         _ => return,
     };
 
-    checker.report_diagnostic(Diagnostic::new(
+    if is_guarded_by_try_except(expr, &replacement, semantic) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
         Airflow3Removal {
             deprecated: qualified_name.to_string(),
-            replacement,
+            replacement: replacement.clone(),
         },
         range,
-    ));
+    );
+
+    if let Replacement::AutoImport { path, name } = replacement {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from(path, name),
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let replacement_edit = Edit::range_replacement(binding, range);
+            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+        });
+    };
+
+    checker.report_diagnostic(diagnostic);
 }
 
 /// Check whether a customized Airflow plugin contains removed extensions.

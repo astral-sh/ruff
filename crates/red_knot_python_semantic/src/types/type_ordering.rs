@@ -65,22 +65,25 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BoundMethod(_), _) => Ordering::Less,
         (_, Type::BoundMethod(_)) => Ordering::Greater,
 
-        (Type::MethodWrapperDunderGet(left), Type::MethodWrapperDunderGet(right)) => {
+        (Type::MethodWrapper(left), Type::MethodWrapper(right)) => left.cmp(right),
+        (Type::MethodWrapper(_), _) => Ordering::Less,
+        (_, Type::MethodWrapper(_)) => Ordering::Greater,
+
+        (Type::WrapperDescriptor(left), Type::WrapperDescriptor(right)) => left.cmp(right),
+        (Type::WrapperDescriptor(_), _) => Ordering::Less,
+        (_, Type::WrapperDescriptor(_)) => Ordering::Greater,
+
+        (Type::Callable(left), Type::Callable(right)) => {
+            debug_assert_eq!(*left, left.normalized(db));
+            debug_assert_eq!(*right, right.normalized(db));
             left.cmp(right)
         }
-        (Type::MethodWrapperDunderGet(_), _) => Ordering::Less,
-        (_, Type::MethodWrapperDunderGet(_)) => Ordering::Greater,
-
-        (Type::WrapperDescriptorDunderGet, _) => Ordering::Less,
-        (_, Type::WrapperDescriptorDunderGet) => Ordering::Greater,
-
-        (Type::Callable(left), Type::Callable(right)) => left.cmp(right),
         (Type::Callable(_), _) => Ordering::Less,
         (_, Type::Callable(_)) => Ordering::Greater,
 
         (Type::Tuple(left), Type::Tuple(right)) => {
-            debug_assert_eq!(*left, left.with_sorted_unions_and_intersections(db));
-            debug_assert_eq!(*right, right.with_sorted_unions_and_intersections(db));
+            debug_assert_eq!(*left, left.normalized(db));
+            debug_assert_eq!(*right, right.normalized(db));
             left.cmp(right)
         }
         (Type::Tuple(_), _) => Ordering::Less,
@@ -263,6 +266,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::KnownInstance(_), _) => Ordering::Less,
         (_, Type::KnownInstance(_)) => Ordering::Greater,
 
+        (Type::PropertyInstance(left), Type::PropertyInstance(right)) => left.cmp(right),
+        (Type::PropertyInstance(_), _) => Ordering::Less,
+        (_, Type::PropertyInstance(_)) => Ordering::Greater,
+
         (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(*left, *right),
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
@@ -272,8 +279,8 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         }
 
         (Type::Intersection(left), Type::Intersection(right)) => {
-            debug_assert_eq!(*left, left.to_sorted_intersection(db));
-            debug_assert_eq!(*right, right.to_sorted_intersection(db));
+            debug_assert_eq!(*left, left.normalized(db));
+            debug_assert_eq!(*right, right.normalized(db));
 
             if left == right {
                 return Ordering::Equal;

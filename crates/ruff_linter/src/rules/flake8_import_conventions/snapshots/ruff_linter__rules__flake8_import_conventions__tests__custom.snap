@@ -304,3 +304,23 @@ custom.py:31:19: ICN001 `pyarrow` should be imported as `pa`
 33 | import altair as alt  # conventional
    |
    = help: Alias `pyarrow` to `pa`
+
+custom.py:50:8: ICN001 `numpy.typing` should be imported as `npt`
+   |
+48 | from tensorflow.keras import Model  # conventional
+49 |
+50 | import numpy.typing  # unconventional
+   |        ^^^^^^^^^^^^ ICN001
+51 | import numpy.typing as nt  # unconventional
+52 | import numpy.typing as npt  # conventional
+   |
+   = help: Alias `numpy.typing` to `npt`
+
+custom.py:51:24: ICN001 `numpy.typing` should be imported as `npt`
+   |
+50 | import numpy.typing  # unconventional
+51 | import numpy.typing as nt  # unconventional
+   |                        ^^ ICN001
+52 | import numpy.typing as npt  # conventional
+   |
+   = help: Alias `numpy.typing` to `npt`

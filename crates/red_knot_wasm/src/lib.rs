@@ -1,14 +1,15 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
+use red_knot_ide::goto_type_definition;
 use red_knot_project::metadata::options::Options;
 use red_knot_project::metadata::value::ValueSource;
 use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
 use red_knot_python_semantic::Program;
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait};
-use ruff_db::files::{system_path_to_file, File};
+use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
+use ruff_db::files::{system_path_to_file, File, FileRange};
 use ruff_db::source::{line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
@@ -17,7 +18,8 @@ use ruff_db::system::{
 };
 use ruff_db::Upcast;
 use ruff_notebook::Notebook;
-use ruff_source_file::SourceLocation;
+use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
+use ruff_text_size::Ranged;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -195,6 +197,52 @@ impl Workspace {
 
         Ok(source_text.to_string())
     }
+
+    #[wasm_bindgen(js_name = "gotoTypeDefinition")]
+    pub fn goto_type_definition(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = index.offset(
+            OneIndexed::new(position.line).ok_or_else(|| {
+                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
+            })?,
+            OneIndexed::new(position.column).ok_or_else(|| {
+                Error::new(
+                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                )
+            })?,
+            &source,
+        );
+
+        let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        let source_range = Range::from_text_range(targets.file_range().range(), &index, &source);
+
+        let links: Vec<_> = targets
+            .into_iter()
+            .map(|target| LocationLink {
+                path: target.file().path(&self.db).to_string(),
+                full_range: Range::from_file_range(
+                    &self.db,
+                    FileRange::new(target.file(), target.full_range()),
+                ),
+                selection_range: Some(Range::from_file_range(
+                    &self.db,
+                    FileRange::new(target.file(), target.focus_range()),
+                )),
+                origin_selection_range: Some(source_range),
+            })
+            .collect();
+
+        Ok(links)
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -223,18 +271,18 @@ impl FileHandle {
 #[wasm_bindgen]
 pub struct Diagnostic {
     #[wasm_bindgen(readonly)]
-    inner: Box<dyn OldDiagnosticTrait>,
+    inner: diagnostic::Diagnostic,
 }
 
 #[wasm_bindgen]
 impl Diagnostic {
-    fn wrap(diagnostic: Box<dyn OldDiagnosticTrait>) -> Self {
+    fn wrap(diagnostic: diagnostic::Diagnostic) -> Self {
         Self { inner: diagnostic }
     }
 
     #[wasm_bindgen]
     pub fn message(&self) -> JsString {
-        JsString::from(&*self.inner.message())
+        JsString::from(self.inner.primary_message())
     }
 
     #[wasm_bindgen]
@@ -250,23 +298,17 @@ impl Diagnostic {
     #[wasm_bindgen(js_name = "textRange")]
     pub fn text_range(&self) -> Option<TextRange> {
         self.inner
-            .span()
+            .primary_span()
             .and_then(|span| Some(TextRange::from(span.range()?)))
     }
 
     #[wasm_bindgen(js_name = "toRange")]
     pub fn to_range(&self, workspace: &Workspace) -> Option<Range> {
-        self.inner.span().and_then(|span| {
-            let line_index = line_index(workspace.db.upcast(), span.file());
-            let source = source_text(workspace.db.upcast(), span.file());
-            let text_range = span.range()?;
-
-            Some(Range {
-                start: line_index
-                    .source_location(text_range.start(), &source)
-                    .into(),
-                end: line_index.source_location(text_range.end(), &source).into(),
-            })
+        self.inner.primary_span().and_then(|span| {
+            Some(Range::from_file_range(
+                &workspace.db,
+                FileRange::new(span.file(), span.range()?),
+            ))
         })
     }
 
@@ -287,6 +329,38 @@ pub struct Range {
     pub end: Position,
 }
 
+impl Range {
+    fn from_file_range(db: &dyn Db, range: FileRange) -> Self {
+        let index = line_index(db.upcast(), range.file());
+        let source = source_text(db.upcast(), range.file());
+
+        let text_range = range.range();
+
+        let start = index.source_location(text_range.start(), &source);
+        let end = index.source_location(text_range.end(), &source);
+        Self::from((start, end))
+    }
+
+    fn from_text_range(
+        text_range: ruff_text_size::TextRange,
+        line_index: &LineIndex,
+        source: &str,
+    ) -> Self {
+        let start = line_index.source_location(text_range.start(), source);
+        let end = line_index.source_location(text_range.end(), source);
+        Self::from((start, end))
+    }
+}
+
+impl From<(SourceLocation, SourceLocation)> for Range {
+    fn from((start, end): (SourceLocation, SourceLocation)) -> Self {
+        Self {
+            start: start.into(),
+            end: end.into(),
+        }
+    }
+}
+
 #[wasm_bindgen]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Position {
@@ -295,6 +369,14 @@ pub struct Position {
 
     /// One indexed column number (the nth character on the line)
     pub column: usize,
+}
+
+#[wasm_bindgen]
+impl Position {
+    #[wasm_bindgen(constructor)]
+    pub fn new(line: usize, column: usize) -> Self {
+        Self { line, column }
+    }
 }
 
 impl From<SourceLocation> for Position {
@@ -339,6 +421,20 @@ impl From<ruff_text_size::TextRange> for TextRange {
             end: value.end().into(),
         }
     }
+}
+
+#[wasm_bindgen]
+pub struct LocationLink {
+    /// The target file path
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+
+    /// The full range of the target
+    pub full_range: Range,
+    /// The target's range that should be selected/highlighted
+    pub selection_range: Option<Range>,
+    /// The range of the origin.
+    pub origin_selection_range: Option<Range>,
 }
 
 #[derive(Debug, Clone)]
