@@ -2850,21 +2850,31 @@ impl<'db> Type<'db> {
                         self,
                         [
                             Signature::new(
-                                Parameters::new([Parameter::positional_only(Some(
-                                    Name::new_static("o"),
-                                ))
-                                .with_annotated_type(Type::any())
+                                Parameters::new([Parameter::positional_or_keyword(
+                                    Name::new_static("object"),
+                                )
+                                .with_annotated_type(Type::object(db))
                                 .with_default_type(Type::string_literal(db, ""))]),
                                 Some(KnownClass::Str.to_instance(db)),
                             ),
                             Signature::new(
                                 Parameters::new([
-                                    Parameter::positional_only(Some(Name::new_static("o")))
-                                        .with_annotated_type(Type::any()), // TODO: ReadableBuffer
-                                    Parameter::positional_only(Some(Name::new_static("encoding")))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
-                                    Parameter::positional_only(Some(Name::new_static("errors")))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                    Parameter::positional_or_keyword(Name::new_static("object"))
+                                        // TODO: Should be `ReadableBuffer` instead of this union type:
+                                        .with_annotated_type(UnionType::from_elements(
+                                            db,
+                                            [
+                                                KnownClass::Bytes.to_instance(db),
+                                                KnownClass::Bytearray.to_instance(db),
+                                            ],
+                                        ))
+                                        .with_default_type(Type::bytes_literal(db, b"")),
+                                    Parameter::positional_or_keyword(Name::new_static("encoding"))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db))
+                                        .with_default_type(Type::string_literal(db, "utf-8")),
+                                    Parameter::positional_or_keyword(Name::new_static("errors"))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db))
+                                        .with_default_type(Type::string_literal(db, "strict")),
                                 ]),
                                 Some(KnownClass::Str.to_instance(db)),
                             ),
