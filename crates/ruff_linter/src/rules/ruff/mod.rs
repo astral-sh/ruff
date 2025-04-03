@@ -316,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    fn ruf102() -> Result<()> {
+    fn invalid_rule_code_external_rules() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF102.py"),
             &settings::LinterSettings {
