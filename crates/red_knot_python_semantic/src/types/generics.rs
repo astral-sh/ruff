@@ -90,3 +90,16 @@ pub struct Specialization<'db> {
     generic_context: GenericContext<'db>,
     types: Box<[Type<'db>]>,
 }
+
+impl<'db> Specialization<'db> {
+    /// Returns the type that a typevar is specialized to, or None if the typevar isn't part of
+    /// this specialization.
+    pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
+        self.generic_context(db)
+            .variables(db)
+            .iter()
+            .zip(self.types(db))
+            .find(|(var, _)| **var == typevar)
+            .map(|(_, ty)| ty)
+    }
+}

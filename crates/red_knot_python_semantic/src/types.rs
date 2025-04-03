@@ -3850,6 +3850,77 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Applies a specialization to this type, replacing any typevars with the types that they are
+    /// specialized to.
+    ///
+    /// Note that this does not specialize generic classes, functions, or type aliases! That is a
+    /// different operation that is performed explicitly (via a subscript operation), or implicitly
+    /// via a call to the generic object.
+    #[must_use]
+    #[salsa::tracked]
+    pub fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        match self {
+            Type::TypeVar(typevar) => specialization.get(db, typevar).unwrap_or(self),
+
+            // Callables need this extra wrapper that will apply the specialization to the
+            // callable's parameters and return types. That is done lazily if and when the callable
+            // is actually called.
+            Type::FunctionLiteral(_)
+            | Type::Callable(_)
+            | Type::BoundMethod(_)
+            | Type::SpecializedCallable(_)
+            | Type::WrapperDescriptor(_)
+            | Type::MethodWrapper(_) => {
+                Type::SpecializedCallable(SpecializedCallableType::new(db, self, specialization))
+            }
+
+            Type::Union(union) => union.map(db, |element| {
+                element.apply_specialization(db, specialization)
+            }),
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db);
+                for positive in intersection.positive(db) {
+                    builder =
+                        builder.add_positive(positive.apply_specialization(db, specialization));
+                }
+                for negative in intersection.negative(db) {
+                    builder =
+                        builder.add_negative(negative.apply_specialization(db, specialization));
+                }
+                builder.build()
+            }
+            Type::Tuple(tuple) => TupleType::from_elements(
+                db,
+                tuple
+                    .iter(db)
+                    .map(|ty| ty.apply_specialization(db, specialization)),
+            ),
+
+            // XXX: Is this right?
+            Type::PropertyInstance(_) => self,
+
+            Type::Dynamic(_)
+            | Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::SubclassOf(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_)
+            | Type::Instance(_)
+            | Type::KnownInstance(_) => self,
+        }
+    }
+
     /// Return the string representation of this type when converted to string as it would be
     /// provided by the `__str__` method.
     ///
