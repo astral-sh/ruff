@@ -634,6 +634,7 @@ impl VisibilityConstraints {
 
         if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
             // Fall back to ambiguous, the guard might change the result.
+            // TODO: actually analyze guard truthiness
             Truthiness::Ambiguous
         } else {
             truthiness
