@@ -4430,8 +4430,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         match (op, operand_type) {
             (_, Type::Dynamic(_)) => operand_type,
             (_, Type::Never) => Type::Never,
-            // TODO: Apply the unary expression to the typevar's upper bound/constraints.
-            (_, Type::TypeVar(_)) => Type::unknown(),
 
             (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
             (ast::UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
@@ -4472,7 +4470,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
-                | Type::Tuple(_),
+                | Type::Tuple(_)
+                | Type::TypeVar(_),
             ) => {
                 let unary_dunder_method = match op {
                     ast::UnaryOp::Invert => "__invert__",
@@ -4594,8 +4593,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             (todo @ Type::Dynamic(DynamicType::TodoProtocol), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::TodoProtocol), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
-            // TODO: Apply the binary expression to the typevar's upper bound/constraints.
-            (Type::TypeVar(_), _, _) | (_, Type::TypeVar(_), _) => Some(Type::unknown()),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
                 n.checked_add(m)
@@ -4749,7 +4746,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
-                | Type::Tuple(_),
+                | Type::Tuple(_)
+                | Type::TypeVar(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
@@ -4769,7 +4767,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
-                | Type::Tuple(_),
+                | Type::Tuple(_)
+                | Type::TypeVar(_),
                 op,
             ) => {
                 // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
