@@ -38,11 +38,6 @@
 
 - \[`refurb`\] Document why `UserDict`, `UserList`, and `UserString` are preferred over `dict`, `list`, and `str` (`FURB189`) ([#16927](https://github.com/astral-sh/ruff/pull/16927))
 
-### Other changes
-
-- Fixing more spelling errors ([#16926](https://github.com/astral-sh/ruff/pull/16926))
-- \[`pylint`\] Fix typo in documentation of `PLC1802` ([#16920](https://github.com/astral-sh/ruff/pull/16920))
-
 ## 0.11.2
 
 ### Preview features
