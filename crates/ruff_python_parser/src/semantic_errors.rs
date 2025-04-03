@@ -65,7 +65,13 @@ impl SemanticSyntaxChecker {
             }
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
-                Self::multiple_case_assignment(match_stmt, ctx);
+                for case in &match_stmt.cases {
+                    let mut visitor = MatchPatternVisitor {
+                        names: FxHashSet::default(),
+                        ctx,
+                    };
+                    visitor.visit_pattern(&case.pattern);
+                }
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
             | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
@@ -258,16 +264,6 @@ impl SemanticSyntaxChecker {
                     type_param.range(),
                 );
             }
-        }
-    }
-
-    fn multiple_case_assignment<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
-        for case in &stmt.cases {
-            let mut visitor = MultipleCaseAssignmentVisitor {
-                names: FxHashSet::default(),
-                ctx,
-            };
-            visitor.visit_pattern(&case.pattern);
         }
     }
 
@@ -747,12 +743,12 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
     }
 }
 
-struct MultipleCaseAssignmentVisitor<'a, Ctx> {
+struct MatchPatternVisitor<'a, Ctx> {
     names: FxHashSet<&'a ast::name::Name>,
     ctx: &'a Ctx,
 }
 
-impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
+impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
         // test_ok class_keyword_in_case_pattern
         // match 2:
