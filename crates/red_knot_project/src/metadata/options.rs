@@ -54,20 +54,25 @@ impl Options {
         project_root: &SystemPath,
         system: &dyn System,
     ) -> ProgramSettings {
-        let (python_version, python_platform) = self
+        let python_version = self
             .environment
             .as_ref()
-            .map(|env| {
-                (
-                    env.python_version.as_deref().copied(),
-                    env.python_platform.as_deref(),
-                )
-            })
+            .and_then(|env| env.python_version.as_deref().copied())
             .unwrap_or_default();
-
+        let python_platform = self
+            .environment
+            .as_ref()
+            .and_then(|env| env.python_platform.as_deref().cloned())
+            .unwrap_or_else(|| {
+                let default = PythonPlatform::default();
+                tracing::info!(
+                    "Defaulting to default python version for this platform: '{default}'",
+                );
+                default
+            });
         ProgramSettings {
-            python_version: python_version.unwrap_or_default(),
-            python_platform: python_platform.cloned().unwrap_or_default(),
+            python_version,
+            python_platform,
             search_paths: self.to_search_path_settings(project_root, system),
         }
     }
@@ -237,7 +242,12 @@ pub struct EnvironmentOptions {
     /// If specified, Red Knot will tailor its use of type stub files,
     /// which conditionalize type definitions based on the platform.
     ///
-    /// If no platform is specified, knot will use `all` or the current platform in the LSP use case.
+    /// If no platform is specified, knot will use current platform:
+    /// - `win32` for Windows
+    /// - `darwin` for macOS
+    /// - `android` for Android
+    /// - `ios` for iOS
+    /// - `linux` for everything else
     #[serde(skip_serializing_if = "Option::is_none")]
     pub python_platform: Option<RangedValue<PythonPlatform>>,
 

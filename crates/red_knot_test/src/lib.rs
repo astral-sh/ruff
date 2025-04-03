@@ -5,7 +5,9 @@ use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{Program, ProgramSettings, PythonPath, SearchPathSettings};
+use red_knot_python_semantic::{
+    Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+};
 use ruff_db::diagnostic::{create_parse_diagnostic, Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::panic::catch_unwind;
@@ -223,7 +225,10 @@ fn run_test(
 
     let settings = ProgramSettings {
         python_version: test.configuration().python_version().unwrap_or_default(),
-        python_platform: test.configuration().python_platform().unwrap_or_default(),
+        python_platform: test
+            .configuration()
+            .python_platform()
+            .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
         search_paths: SearchPathSettings {
             src_roots: vec![src_path],
             extra_paths: test
