@@ -7,11 +7,11 @@ input_file: crates/ruff_python_parser/resources/inline/err/duplicate_match_key.p
 ```
 Module(
     ModModule {
-        range: 0..402,
+        range: 0..435,
         body: [
             Match(
                 StmtMatch {
-                    range: 0..401,
+                    range: 0..434,
                     subject: Name(
                         ExprName {
                             range: 6..7,
@@ -897,6 +897,101 @@ Module(
                                 ),
                             ],
                         },
+                        MatchCase {
+                            range: 406..434,
+                            pattern: MatchSequence(
+                                PatternMatchSequence {
+                                    range: 411..429,
+                                    patterns: [
+                                        MatchMapping(
+                                            PatternMatchMapping {
+                                                range: 412..428,
+                                                keys: [
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 413..416,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 413..416,
+                                                                        value: "x",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Double,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 421..424,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 421..424,
+                                                                        value: "x",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Double,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                ],
+                                                patterns: [
+                                                    MatchValue(
+                                                        PatternMatchValue {
+                                                            range: 418..419,
+                                                            value: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    range: 418..419,
+                                                                    value: Int(
+                                                                        1,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    MatchValue(
+                                                        PatternMatchValue {
+                                                            range: 426..427,
+                                                            value: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    range: 426..427,
+                                                                    value: Int(
+                                                                        2,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                rest: None,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 431..434,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 431..434,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
                     ],
                 },
             ),
@@ -994,6 +1089,7 @@ Module(
 18 |     case {"x": 1, "x": 2, "x": 3}: ...
    |                   ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
 19 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+20 |     case [{"x": 1, "x": 2}]: ...
    |
 
 
@@ -1003,6 +1099,7 @@ Module(
 18 |     case {"x": 1, "x": 2, "x": 3}: ...
    |                           ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
 19 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+20 |     case [{"x": 1, "x": 2}]: ...
    |
 
 
@@ -1011,6 +1108,7 @@ Module(
 18 |     case {"x": 1, "x": 2, "x": 3}: ...
 19 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
    |                         ^ Syntax Error: mapping pattern checks duplicate key `0`
+20 |     case [{"x": 1, "x": 2}]: ...
    |
 
 
@@ -1019,4 +1117,5 @@ Module(
 18 |     case {"x": 1, "x": 2, "x": 3}: ...
 19 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
    |                               ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
+20 |     case [{"x": 1, "x": 2}]: ...
    |
