@@ -334,7 +334,6 @@ mod tests {
 
     const TYPESHED_STDLIB_DIR: &str = "stdlib";
 
-    #[allow(unsafe_code)]
     const ONE: Option<NonZeroU16> = Some(NonZeroU16::new(1).unwrap());
 
     impl TypeshedVersions {
