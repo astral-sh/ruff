@@ -723,7 +723,7 @@ impl<'db> Type<'db> {
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
-            // implicit upper bound of `object` (which is handled below).
+            // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(typevar), _) if typevar.bound_or_constraints(db).is_some() => {
                 match typevar.bound_or_constraints(db) {
                     None => unreachable!(),
