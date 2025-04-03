@@ -160,6 +160,7 @@ impl HasNavigationTargets for Type<'_> {
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
             | Type::PropertyInstance(_)
+            | Type::TypeVar(_)
             | Type::Tuple(_) => self.to_meta_type(db.upcast()).navigation_targets(db),
 
             Type::Intersection(intersection) => intersection.navigation_targets(db),
