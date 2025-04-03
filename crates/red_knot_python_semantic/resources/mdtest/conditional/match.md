@@ -92,6 +92,19 @@ def _(target: FooSub):
 
     reveal_type(y)  # revealed: Literal[3]
 
+def _(target: FooSub):
+    y = 1
+
+    match target:
+        case Baz():
+            y = 2
+        case Bar():
+            y = 3
+        case Foo():
+            y = 4
+
+    reveal_type(y)  # revealed: Literal[3, 4]
+
 def _(target: FooSub | str):
     y = 1
 
