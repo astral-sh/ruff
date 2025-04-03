@@ -1749,5 +1749,5 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         _ => {}
-    };
+    }
 }

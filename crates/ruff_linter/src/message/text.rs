@@ -162,7 +162,7 @@ impl Display for RuleCodeAndBody<'_> {
                     );
                 }
             }
-        };
+        }
 
         if let Some(rule) = self.message.rule() {
             write!(

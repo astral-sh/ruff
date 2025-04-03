@@ -145,7 +145,7 @@ pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut Type
 fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
     if context.is_lint_disabled(&UNKNOWN_RULE) {
         return;
-    };
+    }
 
     for unknown in &context.suppressions.unknown {
         match &unknown.reason {
@@ -174,7 +174,7 @@ fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
                     format_args!("Unknown rule `{prefixed}`. Did you mean `{suggestion}`?"),
                 );
             }
-        };
+        }
     }
 }
 
@@ -267,7 +267,7 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
                 suppression.range,
                 format_args!("Unused `{kind}` without a code", kind = suppression.kind),
             ),
-        };
+        }
     }
 }
 

@@ -449,7 +449,7 @@ impl SemanticSyntaxChecker {
                             }
                         }
                         _ => {}
-                    };
+                    }
                 }
 
                 // PLE0118
@@ -781,7 +781,7 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
                 }) {
                     self.rebound_variables.push(*range);
                 }
-            };
+            }
         }
         walk_expr(self, expr);
     }

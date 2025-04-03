@@ -610,7 +610,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                             }
                         }
 
-                        StartEntry | StartBestFittingEntry { .. } => {
+                        StartEntry | StartBestFittingEntry => {
                             // handled after the match for all start tags
                         }
                         EndEntry | EndBestFittingEntry => write!(f, [ContentArrayEnd])?,
@@ -630,7 +630,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                         | EndVerbatim => {
                             write!(f, [ContentArrayEnd, token(")")])?;
                         }
-                    };
+                    }
 
                     if tag.is_start() {
                         write!(f, [ContentArrayStart])?;

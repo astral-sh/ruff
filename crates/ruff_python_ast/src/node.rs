@@ -322,10 +322,10 @@ impl ast::StmtRaise {
 
         if let Some(expr) = exc {
             visitor.visit_expr(expr);
-        };
+        }
         if let Some(expr) = cause {
             visitor.visit_expr(expr);
-        };
+        }
     }
 }
 

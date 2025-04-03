@@ -1,5 +1,5 @@
 use compact_str::CompactString;
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
@@ -1028,7 +1028,7 @@ impl<'src> Parser<'src> {
                         ..
                     }) = &**slice
                     {
-                        buffer.push_str(&format!("{integer}"));
+                        let _ = write!(buffer, "{integer}");
                     } else {
                         parser.add_error(
                             ParseErrorType::OtherError(

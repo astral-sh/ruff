@@ -31,7 +31,7 @@ impl<'b> Visitor<'b> for LoggerCandidateVisitor<'_, 'b> {
                     {
                         if let Some(logging_level) = LoggingLevel::from_attribute(attr) {
                             self.calls.push((call, logging_level));
-                        };
+                        }
                     }
                 }
                 Expr::Name(_) => {

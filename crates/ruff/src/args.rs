@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::fmt::Formatter;
+use std::fmt::{Formatter, Write as _};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -974,12 +974,13 @@ A `--config` flag must either be a path to a `.toml` configuration file
             .is_some_and(|ext| ext.eq_ignore_ascii_case("toml"))
         {
             if !value.contains('=') {
-                tip.push_str(&format!(
+                let _ = write!(
+                    &mut tip,
                     "
 
 It looks like you were trying to pass a path to a configuration file.
 The path `{value}` does not point to a configuration file"
-                ));
+                );
             }
         } else if let Some((key, value)) = value.split_once('=') {
             let key = key.trim_ascii();
@@ -993,7 +994,8 @@ The path `{value}` does not point to a configuration file"
                         .map(|(name, _)| format!("- `{key}.{name}`"))
                         .join("\n");
 
-                    tip.push_str(&format!(
+                    let _ = write!(
+                        &mut tip,
                         "
 
 `{key}` is a table of configuration options.
@@ -1002,13 +1004,14 @@ Did you want to override one of the table's subkeys?
 Possible choices:
 
 {prefixed_subfields}"
-                    ));
+                    );
                 }
                 _ => {
-                    tip.push_str(&format!(
+                    let _ = write!(
+                        &mut tip,
                         "\n\n{}:\n\n{underlying_error}",
                         config_parse_error.description()
-                    ));
+                    );
                 }
             }
         }

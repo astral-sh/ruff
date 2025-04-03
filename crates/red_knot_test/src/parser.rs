@@ -673,7 +673,7 @@ impl<'s> Parser<'s> {
                         "Test `{test_name}` has duplicate files named `{}`.",
                         path.as_str(),
                     );
-                };
+                }
 
                 if has_explicit_file_paths {
                     bail!("Merged snippets in test `{test_name}` are not allowed in the presence of other files.");

@@ -985,7 +985,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
             _ => return false,
-        };
+        }
 
         let (op, by_zero) = match op {
             ast::Operator::Div => ("divide", "by zero"),
@@ -1036,7 +1036,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
             bound_ty = declared_ty;
-        };
+        }
 
         self.types.bindings.insert(binding, bound_ty);
     }
@@ -2216,7 +2216,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
             ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}
-        };
+        }
     }
 
     fn infer_assignment_statement(&mut self, assignment: &ast::StmtAssign) {
@@ -3242,7 +3242,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 &DeclaredAndInferredType::AreTheSame(ty),
             );
             return;
-        };
+        }
 
         // If the module doesn't bind the symbol, check if it's a submodule.  This won't get
         // handled by the `Type::member` call because it relies on the semantic index's
@@ -4044,7 +4044,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                 parameter_ty=parameter_ty.display(self.db())
                                             ),
                                         );
-                                    };
+                                    }
                                 }
                             }
                         }
@@ -4895,7 +4895,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     if done {
                         return Type::Never;
-                    };
+                    }
 
                     match (truthiness, op) {
                         (Truthiness::AlwaysTrue, ast::BoolOp::And) => Type::Never,
@@ -5815,7 +5815,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Err(CallDunderError::MethodNotAvailable) => {
                         // try `__class_getitem__`
                     }
-                };
+                }
 
                 // Otherwise, if the value is itself a class and defines `__class_getitem__`,
                 // return its return type.

@@ -458,7 +458,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                         checker.report_diagnostic(diagnostic);
                     }
                 }
-            };
+            }
         }
         Expr::List(ast::ExprList { elts, .. }) => {
             if elts.len() == 1 {
@@ -505,7 +505,7 @@ fn check_names(checker: &Checker, call: &ExprCall, expr: &Expr, argvalues: &Expr
                         checker.report_diagnostic(diagnostic);
                     }
                 }
-            };
+            }
         }
         _ => {}
     }

@@ -82,7 +82,7 @@ fn map_call_with_two_arguments<'a>(
 
     if !semantic.match_builtin_expr(func, "map") {
         return None;
-    };
+    }
 
     Some((first, second))
 }
