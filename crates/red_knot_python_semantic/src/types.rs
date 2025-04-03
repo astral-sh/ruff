@@ -5066,10 +5066,10 @@ impl<'db> BoundMethodType<'db> {
 pub struct SpecializedCallableType<'db> {
     /// The callable that has been specialized. (Note that this is not [`CallableType`] since there
     /// are other types that are callable.)
-    pub(crate) callable_type: Type<'db>,
+    pub callable_type: Type<'db>,
 
     /// The specialization of any generic typevars that are visible to the callable.
-    pub(crate) specialization: Specialization<'db>,
+    pub specialization: Specialization<'db>,
 }
 
 impl<'db> SpecializedCallableType<'db> {

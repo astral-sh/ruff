@@ -137,6 +137,9 @@ impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
             Type::BoundMethod(method) => method.function(db).navigation_targets(db),
+            Type::SpecializedCallable(specialized) => {
+                specialized.callable_type(db).navigation_targets(db)
+            }
             Type::FunctionLiteral(function) => function.navigation_targets(db),
             Type::ModuleLiteral(module) => module.navigation_targets(db),
             Type::Union(union) => union
