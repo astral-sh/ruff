@@ -679,7 +679,7 @@ pub(crate) fn normalize_string(
                                 output.push_str(&input[last_index..escape_start_offset]);
                                 output.push_str(normalised);
                                 last_index = escape_start_offset + normalised.len();
-                            };
+                            }
 
                             // Move the `chars` iterator passed the escape sequence.
                             // Simply reassigning `chars` doesn't work because the indices` would

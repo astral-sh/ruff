@@ -646,7 +646,7 @@ impl<'a> Visitor<'a> for SkipFunctionsVisitor<'a> {
                     .is_some_and(|name| matches!(name.segments(), ["request", "addfinalizer"]))
                 {
                     self.addfinalizer_call = Some(expr);
-                };
+                }
                 visitor::walk_expr(self, expr);
             }
             _ => {}

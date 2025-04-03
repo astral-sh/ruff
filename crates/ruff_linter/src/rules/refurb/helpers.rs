@@ -283,7 +283,7 @@ fn match_open_keywords(
 
             // All other keywords cannot be directly forwarded.
             _ => return None,
-        };
+        }
     }
     Some((result, mode))
 }

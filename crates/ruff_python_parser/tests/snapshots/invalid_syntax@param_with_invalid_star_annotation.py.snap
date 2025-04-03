@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/param_with_invalid_star_annotation.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -307,5 +306,16 @@ Module(
 3 | def foo(*args: *int or str): ...
 4 | def foo(*args: *yield x): ...
   |                 ^^^^^^^ Syntax Error: Yield expression cannot be used here
+5 | # def foo(*args: **int): ...
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+2 | def foo(*args: (*tuple[int])): ...
+3 | def foo(*args: *int or str): ...
+4 | def foo(*args: *yield x): ...
+  |                 ^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
 5 | # def foo(*args: **int): ...
   |

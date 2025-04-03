@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/param_with_annotation.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..113,
+        range: 0..84,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -148,7 +147,7 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 54..82,
+                    range: 54..83,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -157,92 +156,31 @@ Module(
                     },
                     type_params: None,
                     parameters: Parameters {
-                        range: 61..77,
+                        range: 61..78,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
-                                range: 62..76,
+                                range: 62..77,
                                 parameter: Parameter {
-                                    range: 62..76,
+                                    range: 62..77,
                                     name: Identifier {
                                         id: Name("arg"),
                                         range: 62..65,
                                     },
                                     annotation: Some(
-                                        Yield(
-                                            ExprYield {
-                                                range: 68..75,
-                                                value: Some(
-                                                    Name(
-                                                        ExprName {
-                                                            range: 74..75,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        ),
-                                    ),
-                                },
-                                default: None,
-                            },
-                        ],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 79..82,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 79..82,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 83..112,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 87..90,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 90..107,
-                        posonlyargs: [],
-                        args: [
-                            ParameterWithDefault {
-                                range: 91..106,
-                                parameter: Parameter {
-                                    range: 91..106,
-                                    name: Identifier {
-                                        id: Name("arg"),
-                                        range: 91..94,
-                                    },
-                                    annotation: Some(
                                         Named(
                                             ExprNamed {
-                                                range: 97..105,
+                                                range: 68..76,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 97..98,
+                                                        range: 68..69,
                                                         id: Name("x"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 value: Name(
                                                     ExprName {
-                                                        range: 102..105,
+                                                        range: 73..76,
                                                         id: Name("int"),
                                                         ctx: Load,
                                                     },
@@ -262,10 +200,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 109..112,
+                                range: 80..83,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 109..112,
+                                        range: 80..83,
                                     },
                                 ),
                             },

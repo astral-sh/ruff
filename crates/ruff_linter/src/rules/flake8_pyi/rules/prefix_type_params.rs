@@ -73,7 +73,7 @@ pub(crate) fn prefix_type_params(checker: &Checker, value: &Expr, targets: &[Exp
         if id.starts_with('_') {
             return;
         }
-    };
+    }
 
     let Expr::Call(ast::ExprCall { func, .. }) = value else {
         return;

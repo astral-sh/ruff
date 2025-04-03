@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use itertools::Itertools;
 use ruff_python_ast::{Identifier, Stmt};
 use ruff_python_semantic::cfg::graph::{build_cfg, BlockId, Condition, ControlFlowGraph};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -46,19 +46,24 @@ pub(crate) fn in_function(checker: &Checker, name: &Identifier, body: &[Stmt]) {
     let cfg = build_cfg(body);
     let reachable = reachable(&cfg);
 
-    let mut unreachable = (0..cfg.num_blocks())
+    let mut blocks = (0..cfg.num_blocks())
         .map(BlockId::from_usize)
-        .filter(|block| !reachable.contains(block) && !cfg.stmts(*block).is_empty())
-        .map(|block| cfg.range(block))
-        .sorted_by_key(ruff_text_size::Ranged::start)
+        .filter(|block| !cfg.stmts(*block).is_empty())
+        .sorted_by_key(|block| cfg.range(*block).start())
         .peekable();
 
-    while let Some(block_range) = unreachable.next() {
-        let start = block_range.start();
-        let mut end = block_range.end();
-        while let Some(next_block) = unreachable.next_if(|nxt| nxt.start() <= end) {
-            end = next_block.end();
+    // Advance past leading reachable blocks
+    while blocks.next_if(|block| reachable.contains(block)).is_some() {}
+
+    while let Some(start_block) = blocks.next() {
+        // Advance to next reachable block
+        let mut end_block = start_block;
+        while let Some(next_block) = blocks.next_if(|block| !reachable.contains(block)) {
+            end_block = next_block;
         }
+        let start = cfg.range(start_block).start();
+        let end = cfg.range(end_block).end();
+
         checker.report_diagnostic(Diagnostic::new(
             UnreachableCode {
                 name: name.to_string(),

@@ -6,6 +6,7 @@ use regex::Regex;
 use ruff_diagnostics::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};
 use ruff_source_file::OneIndexed;
+use std::fmt::Write;
 
 pub(crate) struct Hover;
 
@@ -84,12 +85,16 @@ pub(crate) fn hover(
 
 fn format_rule_text(rule: Rule) -> String {
     let mut output = String::new();
-    output.push_str(&format!("# {} ({})", rule.as_ref(), rule.noqa_code()));
+    let _ = write!(&mut output, "# {} ({})", rule.as_ref(), rule.noqa_code());
     output.push('\n');
     output.push('\n');
 
     let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
-    output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+    let _ = write!(
+        &mut output,
+        "Derived from the **{}** linter.",
+        linter.name()
+    );
     output.push('\n');
     output.push('\n');
 

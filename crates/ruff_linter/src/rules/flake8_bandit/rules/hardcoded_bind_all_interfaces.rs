@@ -70,5 +70,5 @@ pub(crate) fn hardcoded_bind_all_interfaces(checker: &Checker, string: StringLik
             }
         }
         StringLike::Bytes(_) => (),
-    };
+    }
 }

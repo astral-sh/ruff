@@ -478,7 +478,7 @@ enum SuppressionComments<'a> {
         /// Any following `fmt: off` comment if any.
         /// * `None`: The suppression ends here (for good)
         /// * `Some`: A `fmt: off`..`fmt: on` .. `fmt: off` sequence. The suppression continues after
-        ///     the `fmt: off` comment.
+        ///   the `fmt: off` comment.
         format_off_comment: Option<&'a SourceComment>,
     },
 

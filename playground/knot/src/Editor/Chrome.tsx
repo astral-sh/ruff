@@ -13,15 +13,15 @@ import {
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import type { Diagnostic, Workspace } from "red_knot_wasm";
+import type { Workspace } from "red_knot_wasm";
 import { Panel, PanelGroup } from "react-resizable-panels";
-import { Files } from "./Files";
+import { Files, isPythonFile } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";
 import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
-import Diagnostics from "./Diagnostics";
+import Diagnostics, { Diagnostic } from "./Diagnostics";
 import { FileId, ReadonlyFiles } from "../Playground";
 import type { editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
@@ -161,12 +161,14 @@ export default function Chrome({
                   <Editor
                     theme={theme}
                     visible={true}
+                    files={files}
+                    selected={files.selected}
                     fileName={selectedFileName}
-                    source={files.contents[files.selected]}
                     diagnostics={checkResult.diagnostics}
                     workspace={workspace}
                     onMount={handleEditorMount}
                     onChange={(content) => onFileChanged(workspace, content)}
+                    onFileOpened={onFileSelected}
                   />
                   {checkResult.error ? (
                     <div
@@ -190,7 +192,6 @@ export default function Chrome({
                 >
                   <Diagnostics
                     diagnostics={checkResult.diagnostics}
-                    workspace={workspace}
                     onGoTo={handleGoTo}
                     theme={theme}
                   />
@@ -245,10 +246,7 @@ function useCheckResult(
     }
 
     const currentHandle = files.handles[files.selected];
-
-    const extension =
-      currentHandle?.path()?.toLowerCase().split(".").pop() ?? "";
-    if (currentHandle == null || !["py", "pyi", "pyw"].includes(extension)) {
+    if (currentHandle == null || !isPythonFile(currentHandle)) {
       return {
         diagnostics: [],
         error: null,
@@ -291,8 +289,18 @@ function useCheckResult(
         };
       }
 
+      // Eagerly convert the diagnostic to avoid out of bound errors
+      // when the diagnostics are "deferred".
+      const serializedDiagnostics = diagnostics.map((diagnostic) => ({
+        id: diagnostic.id(),
+        message: diagnostic.message(),
+        severity: diagnostic.severity(),
+        range: diagnostic.toRange(workspace) ?? null,
+        textRange: diagnostic.textRange() ?? null,
+      }));
+
       return {
-        diagnostics,
+        diagnostics: serializedDiagnostics,
         error: null,
         secondary,
       };

@@ -19,14 +19,14 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use crate::program::{Program, SearchPathSettings};
-    use crate::{default_lint_registry, ProgramSettings, PythonPlatform};
+    use crate::{default_lint_registry, ProgramSettings, PythonPath, PythonPlatform};
 
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
     use anyhow::Context;
     use ruff_db::files::{File, Files};
     use ruff_db::system::{
-        DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
+        DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
     };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
@@ -139,8 +139,8 @@ pub(crate) mod tests {
         python_version: PythonVersion,
         /// Target Python platform
         python_platform: PythonPlatform,
-        /// Path to a custom typeshed directory
-        custom_typeshed: Option<SystemPathBuf>,
+        /// Paths to the directory to use for `site-packages`
+        site_packages: Vec<SystemPathBuf>,
         /// Path and content pairs for files that should be present
         files: Vec<(&'a str, &'a str)>,
     }
@@ -150,7 +150,7 @@ pub(crate) mod tests {
             Self {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
-                custom_typeshed: None,
+                site_packages: vec![],
                 files: vec![],
             }
         }
@@ -160,8 +160,20 @@ pub(crate) mod tests {
             self
         }
 
-        pub(crate) fn with_file(mut self, path: &'a str, content: &'a str) -> Self {
-            self.files.push((path, content));
+        pub(crate) fn with_file(
+            mut self,
+            path: &'a (impl AsRef<SystemPath> + ?Sized),
+            content: &'a str,
+        ) -> Self {
+            self.files.push((path.as_ref().as_str(), content));
+            self
+        }
+
+        pub(crate) fn with_site_packages_search_path(
+            mut self,
+            path: &(impl AsRef<SystemPath> + ?Sized),
+        ) -> Self {
+            self.site_packages.push(path.as_ref().to_path_buf());
             self
         }
 
@@ -175,7 +187,7 @@ pub(crate) mod tests {
                 .context("Failed to write test files")?;
 
             let mut search_paths = SearchPathSettings::new(vec![src_root]);
-            search_paths.custom_typeshed = self.custom_typeshed;
+            search_paths.python_path = PythonPath::KnownSitePackages(self.site_packages);
 
             Program::from_settings(
                 &db,

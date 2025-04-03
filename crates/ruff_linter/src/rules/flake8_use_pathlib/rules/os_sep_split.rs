@@ -74,7 +74,7 @@ pub(crate) fn os_sep_split(checker: &Checker, call: &ast::ExprCall) {
 
     if attr.as_str() != "split" {
         return;
-    };
+    }
 
     // Match `.split(os.sep)` or `.split(sep=os.sep)`, but avoid cases in which a `maxsplit` is
     // specified.

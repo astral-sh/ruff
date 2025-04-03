@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Write;
 use std::str::FromStr;
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -501,7 +502,7 @@ pub(crate) fn printf_string_formatting(
     }
 
     // Add the `.format` call.
-    contents.push_str(&format!(".format{params_string}"));
+    let _ = write!(&mut contents, ".format{params_string}");
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, bin_op.range());
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(

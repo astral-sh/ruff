@@ -187,7 +187,7 @@ impl ProjectDatabase {
                     let program = Program::get(self);
                     if let Err(error) = program.update_from_settings(self, program_settings) {
                         tracing::error!("Failed to update the program settings, keeping the old program settings: {error}");
-                    };
+                    }
 
                     if metadata.root() == project.root(self) {
                         tracing::debug!("Reloading project after structural change");

@@ -146,7 +146,7 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
         .is_none()
     {
         return;
-    };
+    }
     let mut content_lines =
         UniversalNewlineIterator::with_offset(docstring.contents(), docstring.start());
 
@@ -201,7 +201,7 @@ pub(crate) fn multi_line_summary_start(checker: &Checker, docstring: &Docstring)
                         indentation.push_str(checker.stylist().indentation());
                         fixable = true;
                     }
-                };
+                }
             }
 
             if fixable {

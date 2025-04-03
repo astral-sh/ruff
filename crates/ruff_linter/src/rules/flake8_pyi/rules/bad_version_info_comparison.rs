@@ -149,6 +149,6 @@ pub(crate) fn bad_version_info_comparison(checker: &Checker, test: &Expr, has_el
     } else {
         if checker.enabled(Rule::BadVersionInfoComparison) {
             checker.report_diagnostic(Diagnostic::new(BadVersionInfoComparison, test.range()));
-        };
+        }
     }
 }

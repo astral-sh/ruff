@@ -47,7 +47,7 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
 
     if module_name != "__future__" {
         return;
-    };
+    }
 
     if names.iter().all(|alias| &*alias.name != "annotations") {
         return;

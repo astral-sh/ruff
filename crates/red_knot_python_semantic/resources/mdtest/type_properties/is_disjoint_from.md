@@ -379,3 +379,15 @@ static_assert(not is_disjoint_from(Callable[..., None], Callable[[Literal[1]], N
 static_assert(not is_disjoint_from(Callable[[], Never], Callable[[], Never]))
 static_assert(not is_disjoint_from(Callable[[Never], str], Callable[[Never], int]))
 ```
+
+A callable type is disjoint from all literal types.
+
+```py
+from knot_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from typing_extensions import Callable, Literal, Never
+
+static_assert(is_disjoint_from(Callable[[], None], Literal[""]))
+static_assert(is_disjoint_from(Callable[[], None], Literal[b""]))
+static_assert(is_disjoint_from(Callable[[], None], Literal[1]))
+static_assert(is_disjoint_from(Callable[[], None], Literal[True]))
+```

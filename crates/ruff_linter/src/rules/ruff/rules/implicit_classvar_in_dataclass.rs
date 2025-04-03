@@ -71,7 +71,7 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
 
     if !matches!(dataclass_kind, Some((DataclassKind::Stdlib, _))) {
         return;
-    };
+    }
 
     for statement in &class_def.body {
         let Stmt::Assign(StmtAssign { targets, .. }) = statement else {

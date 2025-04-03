@@ -26,6 +26,12 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
                 BackgroundSchedule::LatencySensitive,
             )
         }
+        request::GotoTypeDefinitionRequestHandler::METHOD => {
+            background_request_task::<request::GotoTypeDefinitionRequestHandler>(
+                req,
+                BackgroundSchedule::LatencySensitive,
+            )
+        }
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
             return Task::nothing();
@@ -80,6 +86,10 @@ fn _local_request_task<'a, R: traits::SyncRequestHandler>(
     }))
 }
 
+// TODO(micha): Calls to `db` could panic if the db gets mutated while this task is running.
+// We should either wrap `R::run_with_snapshot` with a salsa catch cancellation handler or
+// use `SemanticModel` instead of passing `db` which uses a Result for all it's methods
+// that propagate cancellations.
 fn background_request_task<'a, R: traits::BackgroundDocumentRequestHandler>(
     req: server::Request,
     schedule: BackgroundSchedule,

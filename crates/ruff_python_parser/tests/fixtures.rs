@@ -89,7 +89,7 @@ fn test_valid_syntax(input_path: &Path) {
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
     let mut visitor = SemanticSyntaxCheckerVisitor::new(
-        TestContext::default().with_python_version(options.target_version()),
+        TestContext::new(&source).with_python_version(options.target_version()),
     );
 
     for stmt in parsed.suite() {
@@ -185,7 +185,7 @@ fn test_invalid_syntax(input_path: &Path) {
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
     let mut visitor = SemanticSyntaxCheckerVisitor::new(
-        TestContext::default().with_python_version(options.target_version()),
+        TestContext::new(&source).with_python_version(options.target_version()),
     );
 
     for stmt in parsed.suite() {
@@ -462,13 +462,22 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     }
 }
 
-#[derive(Debug, Default)]
-struct TestContext {
+#[derive(Debug)]
+struct TestContext<'a> {
     diagnostics: RefCell<Vec<SemanticSyntaxError>>,
     python_version: PythonVersion,
+    source: &'a str,
 }
 
-impl TestContext {
+impl<'a> TestContext<'a> {
+    fn new(source: &'a str) -> Self {
+        Self {
+            diagnostics: RefCell::default(),
+            python_version: PythonVersion::default(),
+            source,
+        }
+    }
+
     #[must_use]
     fn with_python_version(mut self, python_version: PythonVersion) -> Self {
         self.python_version = python_version;
@@ -476,7 +485,7 @@ impl TestContext {
     }
 }
 
-impl SemanticSyntaxContext for TestContext {
+impl SemanticSyntaxContext for TestContext<'_> {
     fn seen_docstring_boundary(&self) -> bool {
         false
     }
@@ -487,5 +496,13 @@ impl SemanticSyntaxContext for TestContext {
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         self.diagnostics.borrow_mut().push(error);
+    }
+
+    fn source(&self) -> &str {
+        self.source
+    }
+
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
     }
 }

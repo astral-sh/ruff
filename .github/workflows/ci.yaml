@@ -36,6 +36,8 @@ jobs:
       code: ${{ steps.check_code.outputs.changed }}
       # Flag that is raised when any code that affects the fuzzer is changed
       fuzz: ${{ steps.check_fuzzer.outputs.changed }}
+      # Flag that is set to "true" when code related to red-knot changes.
+      red_knot: ${{ steps.check_red_knot.outputs.changed }}
 
       # Flag that is set to "true" when code related to the playground changes.
       playground: ${{ steps.check_playground.outputs.changed }}
@@ -166,6 +168,29 @@ jobs:
               echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Check if the red-knot code changed
+        id: check_red_knot
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            ':Cargo.toml' \
+            ':Cargo.lock' \
+            ':crates/red_knot*/**' \
+            ':crates/ruff_db/**' \
+            ':crates/ruff_annotate_snippets/**' \
+            ':crates/ruff_python_ast/**' \
+            ':crates/ruff_python_parser/**' \
+            ':crates/ruff_python_trivia/**' \
+            ':crates/ruff_source_file/**' \
+            ':crates/ruff_text_size/**' \
+            ':.github/workflows/ci.yaml' \
+          ; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
@@ -221,6 +246,14 @@ jobs:
         uses: taiki-e/install-action@6aca1cfa12ef3a6b98ee8c70e0171bfa067604f5 # v2
         with:
           tool: cargo-insta
+      - name: Red-knot mdtests (GitHub annotations)
+        if: ${{ needs.determine_changes.outputs.red_knot == 'true' }}
+        env:
+          NO_COLOR: 1
+          MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
+        # Ignore errors if this step fails; we want to continue to later steps in the workflow anyway.
+        # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
+        run: cargo test -p red_knot_python_semantic --test mdtest || true
       - name: "Run tests"
         shell: bash
         env:

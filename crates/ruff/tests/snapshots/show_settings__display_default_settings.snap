@@ -250,6 +250,7 @@ linter.flake8_import_conventions.aliases = {
 	matplotlib.pyplot = plt,
 	networkx = nx,
 	numpy = np,
+	numpy.typing = npt,
 	pandas = pd,
 	panel = pn,
 	plotly.express = px,

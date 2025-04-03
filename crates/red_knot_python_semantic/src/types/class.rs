@@ -18,7 +18,7 @@ use crate::{
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
 use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
 
@@ -151,6 +151,15 @@ impl<'db> Class<'db> {
     /// query depends on the AST of another file (bad!).
     fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
         self.body_scope(db).node(db).expect_class()
+    }
+
+    /// Returns the file range of the class's name.
+    pub fn focus_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.node(db).name.range)
+    }
+
+    pub fn full_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.node(db).range)
     }
 
     /// Return the types of the decorators on this class
@@ -754,7 +763,7 @@ pub struct ClassLiteralType<'db> {
 }
 
 impl<'db> ClassLiteralType<'db> {
-    pub(crate) fn class(self) -> Class<'db> {
+    pub fn class(self) -> Class<'db> {
         self.class
     }
 
@@ -780,7 +789,7 @@ pub struct InstanceType<'db> {
 }
 
 impl<'db> InstanceType<'db> {
-    pub(super) fn class(self) -> Class<'db> {
+    pub fn class(self) -> Class<'db> {
         self.class
     }
 
@@ -811,6 +820,7 @@ pub enum KnownClass {
     Bool,
     Object,
     Bytes,
+    Bytearray,
     Type,
     Int,
     Float,
@@ -921,6 +931,7 @@ impl<'db> KnownClass {
             | Self::Int
             | Self::Type
             | Self::Bytes
+            | Self::Bytearray
             | Self::FrozenSet
             | Self::Range
             | Self::Property
@@ -950,6 +961,7 @@ impl<'db> KnownClass {
             Self::Bool => "bool",
             Self::Object => "object",
             Self::Bytes => "bytes",
+            Self::Bytearray => "bytearray",
             Self::Tuple => "tuple",
             Self::Int => "int",
             Self::Float => "float",
@@ -1127,6 +1139,7 @@ impl<'db> KnownClass {
             Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1209,6 +1222,7 @@ impl<'db> KnownClass {
             | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1267,6 +1281,7 @@ impl<'db> KnownClass {
             | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Tuple
             | Self::Int
             | Self::Float
@@ -1321,6 +1336,7 @@ impl<'db> KnownClass {
             "bool" => Self::Bool,
             "object" => Self::Object,
             "bytes" => Self::Bytes,
+            "bytearray" => Self::Bytearray,
             "tuple" => Self::Tuple,
             "type" => Self::Type,
             "int" => Self::Int,
@@ -1370,9 +1386,7 @@ impl<'db> KnownClass {
             "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
                 Self::EllipsisType
             }
-            "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
-                Self::NotImplementedType
-            }
+            "_NotImplementedType" => Self::NotImplementedType,
             _ => return None,
         };
 
@@ -1388,6 +1402,7 @@ impl<'db> KnownClass {
             | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float

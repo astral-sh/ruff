@@ -891,7 +891,7 @@ impl<'src> Parser<'src> {
                     elt.range(),
                 );
             }
-        };
+        }
 
         ast::ExprSubscript {
             value: Box::new(value),
@@ -1462,7 +1462,7 @@ impl<'src> Parser<'src> {
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
                         TextRange::at(expr.range.start() + quote_position, quote_len),
                     );
-                };
+                }
             }
 
             self.check_fstring_comments(range);
@@ -2114,7 +2114,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::For);
         } else {
             self.bump(TokenKind::For);
-        };
+        }
 
         let mut target =
             self.parse_expression_list(ExpressionContext::starred_conditional().with_in_excluded());

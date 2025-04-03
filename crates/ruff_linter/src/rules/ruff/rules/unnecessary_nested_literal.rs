@@ -84,7 +84,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
             // If the parent is not equal to the `literal_expr` then we know we are traversing recursively.
             if !AnyNodeRef::ptr_eq(parent.into(), literal_expr.into()) {
                 is_nested = true;
-            };
+            }
         },
         checker.semantic(),
         literal_expr,
@@ -133,7 +133,7 @@ pub(crate) fn unnecessary_nested_literal<'a>(checker: &Checker, literal_expr: &'
             },
         );
         diagnostic.set_fix(fix);
-    };
+    }
 
     checker.report_diagnostic(diagnostic);
 }

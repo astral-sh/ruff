@@ -44,8 +44,8 @@ fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream>
                     return Err(
                         quote_spanned!(expr.span() => compile_error!("prefer `String::to_string` over `format!` without arguments")),
                     );
-                };
-            };
+                }
+            }
             strings.extend(quote! {#first_token,});
             Ok(())
         }

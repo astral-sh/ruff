@@ -31,7 +31,7 @@ pub(crate) fn is_native_module_file_name(module_name: &str, file_name: &Path) ->
         .is_some_and(is_native_module_file_extension)
     {
         return false;
-    };
+    }
 
     // The file must represent the module name.
     native_module_name(file_name) == Some(module_name)

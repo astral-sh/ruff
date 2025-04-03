@@ -8,17 +8,11 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{ClassLiteralType, KnownInstanceType, Type};
-use ruff_db::diagnostic::{
-    DiagnosticId, OldDiagnosticTrait, OldSecondaryDiagnosticMessage, Severity, Span,
-};
-use ruff_db::files::File;
+use ruff_db::diagnostic::{Diagnostic, OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
-use std::borrow::Cow;
 use std::fmt::Formatter;
-use std::ops::Deref;
-use std::sync::Arc;
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
@@ -900,68 +894,16 @@ declare_lint! {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub struct TypeCheckDiagnostic {
-    pub(crate) id: DiagnosticId,
-    pub(crate) message: String,
-    pub(crate) range: TextRange,
-    pub(crate) severity: Severity,
-    pub(crate) file: File,
-    pub(crate) secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
-}
-
-impl TypeCheckDiagnostic {
-    pub fn id(&self) -> DiagnosticId {
-        self.id
-    }
-
-    pub fn message(&self) -> &str {
-        &self.message
-    }
-
-    pub fn file(&self) -> File {
-        self.file
-    }
-}
-
-impl OldDiagnosticTrait for TypeCheckDiagnostic {
-    fn id(&self) -> DiagnosticId {
-        self.id
-    }
-
-    fn message(&self) -> Cow<str> {
-        TypeCheckDiagnostic::message(self).into()
-    }
-
-    fn span(&self) -> Option<Span> {
-        Some(Span::from(self.file).with_range(self.range))
-    }
-
-    fn secondary_messages(&self) -> &[OldSecondaryDiagnosticMessage] {
-        &self.secondary_messages
-    }
-
-    fn severity(&self) -> Severity {
-        self.severity
-    }
-}
-
 /// A collection of type check diagnostics.
-///
-/// The diagnostics are wrapped in an `Arc` because they need to be cloned multiple times
-/// when going from `infer_expression` to `check_file`. We could consider
-/// making [`TypeCheckDiagnostic`] a Salsa struct to have them Arena-allocated (once the Tables refactor is done).
-/// Using Salsa struct does have the downside that it leaks the Salsa dependency into diagnostics and
-/// each Salsa-struct comes with an overhead.
 #[derive(Default, Eq, PartialEq)]
 pub struct TypeCheckDiagnostics {
-    diagnostics: Vec<Arc<TypeCheckDiagnostic>>,
+    diagnostics: Vec<Diagnostic>,
     used_suppressions: FxHashSet<FileSuppressionId>,
 }
 
 impl TypeCheckDiagnostics {
-    pub(crate) fn push(&mut self, diagnostic: TypeCheckDiagnostic) {
-        self.diagnostics.push(Arc::new(diagnostic));
+    pub(crate) fn push(&mut self, diagnostic: Diagnostic) {
+        self.diagnostics.push(diagnostic);
     }
 
     pub(super) fn extend(&mut self, other: &TypeCheckDiagnostics) {
@@ -985,6 +927,10 @@ impl TypeCheckDiagnostics {
         self.used_suppressions.shrink_to_fit();
         self.diagnostics.shrink_to_fit();
     }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
+        self.diagnostics.iter()
+    }
 }
 
 impl std::fmt::Debug for TypeCheckDiagnostics {
@@ -993,17 +939,9 @@ impl std::fmt::Debug for TypeCheckDiagnostics {
     }
 }
 
-impl Deref for TypeCheckDiagnostics {
-    type Target = [std::sync::Arc<TypeCheckDiagnostic>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.diagnostics
-    }
-}
-
 impl IntoIterator for TypeCheckDiagnostics {
-    type Item = Arc<TypeCheckDiagnostic>;
-    type IntoIter = std::vec::IntoIter<std::sync::Arc<TypeCheckDiagnostic>>;
+    type Item = Diagnostic;
+    type IntoIter = std::vec::IntoIter<Diagnostic>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.diagnostics.into_iter()
@@ -1011,8 +949,8 @@ impl IntoIterator for TypeCheckDiagnostics {
 }
 
 impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
-    type Item = &'a Arc<TypeCheckDiagnostic>;
-    type IntoIter = std::slice::Iter<'a, std::sync::Arc<TypeCheckDiagnostic>>;
+    type Item = &'a Diagnostic;
+    type IntoIter = std::slice::Iter<'a, Diagnostic>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.diagnostics.iter()
@@ -1156,7 +1094,7 @@ pub(super) fn report_invalid_return_type(
             actual_ty.display(context.db()),
             expected_ty.display(context.db())
         ),
-        vec![OldSecondaryDiagnosticMessage::new(
+        &[OldSecondaryDiagnosticMessage::new(
             return_type_span,
             format!(
                 "Return type is declared here as `{}`",

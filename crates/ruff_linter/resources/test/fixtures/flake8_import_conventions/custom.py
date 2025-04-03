@@ -46,3 +46,7 @@ import polars as pl # conventional
 import pyarrow as pa  # conventional
 
 from tensorflow.keras import Model  # conventional
+
+import numpy.typing  # unconventional
+import numpy.typing as nt  # unconventional
+import numpy.typing as npt  # conventional

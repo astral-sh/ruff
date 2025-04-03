@@ -108,6 +108,6 @@ pub(crate) fn percent(checker: &Checker, expr: &Expr, format_string: &ExprString
                     expr.range(),
                 ));
             }
-        };
+        }
     }
 }

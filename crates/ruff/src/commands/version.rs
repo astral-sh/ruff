@@ -16,6 +16,6 @@ pub(crate) fn version(output_format: HelpFormat) -> Result<()> {
         HelpFormat::Json => {
             serde_json::to_writer_pretty(stdout, &version_info)?;
         }
-    };
+    }
     Ok(())
 }

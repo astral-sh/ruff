@@ -192,8 +192,12 @@ impl<'stmt> CFGBuilder<'stmt> {
 
     /// Runs the core logic for the builder.
     fn process_stmts(&mut self, stmts: &'stmt [Stmt]) {
-        let start = 0;
-        for stmt in stmts {
+        // SAFETY With notation as below, we always maintain the invariant
+        // `start <= end + 1`. Since `end <= stmts.len() -1` we conclude that
+        // `start <= stmts.len()`. It is therefore always safe to use `start` as
+        // the beginning of a range for the purposes of slicing into `stmts`.
+        let mut start = 0;
+        for (end, stmt) in stmts.iter().enumerate() {
             let cache_exit = self.exit();
             match stmt {
                 Stmt::FunctionDef(_)
@@ -223,10 +227,30 @@ impl<'stmt> CFGBuilder<'stmt> {
                 Stmt::With(_) => {}
 
                 // Jumps
-                Stmt::Return(_) => {}
+                Stmt::Return(_) => {
+                    let edges = Edges::always(self.cfg.terminal());
+                    self.set_current_block_stmts(&stmts[start..=end]);
+                    self.set_current_block_edges(edges);
+                    start = end + 1;
+
+                    if stmts.get(start).is_some() {
+                        let next_block = self.new_block();
+                        self.move_to(next_block);
+                    }
+                }
                 Stmt::Break(_) => {}
                 Stmt::Continue(_) => {}
-                Stmt::Raise(_) => {}
+                Stmt::Raise(_) => {
+                    let edges = Edges::always(self.cfg.terminal());
+                    self.set_current_block_stmts(&stmts[start..=end]);
+                    self.set_current_block_edges(edges);
+                    start = end + 1;
+
+                    if stmts.get(start).is_some() {
+                        let next_block = self.new_block();
+                        self.move_to(next_block);
+                    }
+                }
 
                 // An `assert` is a mixture of a switch and a jump.
                 Stmt::Assert(_) => {}
@@ -267,6 +291,11 @@ impl<'stmt> CFGBuilder<'stmt> {
     /// Moves current block to provided index
     fn move_to(&mut self, block: BlockId) {
         self.current = block;
+    }
+
+    /// Makes new block and returns index
+    fn new_block(&mut self) -> BlockId {
+        self.cfg.blocks.push(BlockData::default())
     }
 
     /// Populates the current basic block with the given set of statements.

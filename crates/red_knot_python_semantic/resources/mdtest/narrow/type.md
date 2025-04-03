@@ -76,6 +76,9 @@ No narrowing should occur if `type` is used to dynamically create a class:
 
 ```py
 def _(x: str | int):
+    # The following diagnostic is valid, since the three-argument form of `type`
+    # can only be called with `str` as the first argument.
+    # error: [no-matching-overload] "No overload of class `type` matches arguments"
     if type(x, (), {}) is str:
         reveal_type(x)  # revealed: str | int
     else:

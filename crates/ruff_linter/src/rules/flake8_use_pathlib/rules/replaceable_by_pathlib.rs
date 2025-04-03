@@ -178,7 +178,7 @@ fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
         })
     ) {
         return true;
-    };
+    }
 
     let Some(name) = expr.as_name_expr() else {
         return false;

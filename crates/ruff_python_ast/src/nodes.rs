@@ -1522,7 +1522,7 @@ impl BytesLiteralFlags {
                 self.0
                     .set(BytesLiteralFlagsInner::R_PREFIX_LOWER, !uppercase_r);
             }
-        };
+        }
         self
     }
 
@@ -1749,7 +1749,7 @@ impl AnyStringFlags {
         match quotes {
             Quote::Double => self.0 |= AnyStringFlagsInner::DOUBLE,
             Quote::Single => self.0 -= AnyStringFlagsInner::DOUBLE,
-        };
+        }
         self
     }
 

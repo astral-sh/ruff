@@ -80,7 +80,7 @@ pub(crate) fn bad_staticmethod_argument(checker: &Checker, scope: &Scope) {
         FunctionType::Function | FunctionType::Method | FunctionType::ClassMethod => {
             return;
         }
-    };
+    }
 
     let Some(ParameterWithDefault {
         parameter: self_or_cls,

@@ -59,7 +59,7 @@ pub(crate) fn import_from(
     // If level is not zero or module is none, return
     if level != 0 {
         return None;
-    };
+    }
 
     if let Some(module) = module {
         if is_pytest_or_subpackage(module) {
@@ -68,7 +68,7 @@ pub(crate) fn import_from(
                 import_from.range(),
             ));
         }
-    };
+    }
 
     None
 }

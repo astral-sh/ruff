@@ -70,7 +70,7 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
 
     if dataclass_kind(class_def, semantic).is_none() {
         return;
-    };
+    }
 
     for statement in &class_def.body {
         let Stmt::AnnAssign(ast::StmtAnnAssign {

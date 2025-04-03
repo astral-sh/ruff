@@ -27,7 +27,7 @@ pub fn classify(
 ) -> FunctionType {
     if !parent_scope.kind.is_class() {
         return FunctionType::Function;
-    };
+    }
     if decorator_list
         .iter()
         .any(|decorator| is_static_method(decorator, semantic, staticmethod_decorators))

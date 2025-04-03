@@ -315,7 +315,7 @@ impl DisplaySet<'_> {
                         None => {
                             buffer.putc(line_offset, lineno_width + 1, '|', *lineno_color);
                         }
-                    };
+                    }
                 }
                 if let DisplaySourceLine::Content { text, .. } = line {
                     // The width of the line number, a space, pipe, and a space
@@ -1753,7 +1753,7 @@ fn format_inline_marks(
             DisplayMarkType::AnnotationThrough(depth) => {
                 buf.putc(line, 3 + lineno_width + depth, '|', *annotation_style);
             }
-        };
+        }
     }
     Ok(())
 }

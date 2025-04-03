@@ -1,10 +1,10 @@
-//! Match [`OldDiagnosticTrait`]s against assertions and produce test failure
+//! Match [`Diagnostic`]s against assertions and produce test failure
 //! messages for any mismatches.
 use crate::assertion::{InlineFileAssertions, ParsedAssertion, UnparsedAssertion};
 use crate::db::Db;
 use crate::diagnostic::SortedDiagnostics;
 use colored::Colorize;
-use ruff_db::diagnostic::{DiagnosticAsStrError, DiagnosticId, OldDiagnosticTrait};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticAsStrError, DiagnosticId};
 use ruff_db::files::File;
 use ruff_db::source::{line_index, source_text, SourceText};
 use ruff_source_file::{LineIndex, OneIndexed};
@@ -47,14 +47,11 @@ struct LineFailures {
     range: Range<usize>,
 }
 
-pub(super) fn match_file<T>(
+pub(super) fn match_file(
     db: &Db,
     file: File,
-    diagnostics: impl IntoIterator<Item = T>,
-) -> Result<(), FailuresByLine>
-where
-    T: OldDiagnosticTrait,
-{
+    diagnostics: &[Diagnostic],
+) -> Result<(), FailuresByLine> {
     // Parse assertions from comments in the file, and get diagnostics from the file; both
     // ordered by line number.
     let assertions = InlineFileAssertions::from_file(db, file);
@@ -155,8 +152,8 @@ impl Unmatched for ParsedAssertion<'_> {
     }
 }
 
-fn maybe_add_undefined_reveal_clarification<T: OldDiagnosticTrait>(
-    diagnostic: &T,
+fn maybe_add_undefined_reveal_clarification(
+    diagnostic: &Diagnostic,
     original: std::fmt::Arguments,
 ) -> String {
     if diagnostic.id().is_lint_named("undefined-reveal") {
@@ -169,10 +166,7 @@ fn maybe_add_undefined_reveal_clarification<T: OldDiagnosticTrait>(
     }
 }
 
-impl<T> Unmatched for T
-where
-    T: OldDiagnosticTrait,
-{
+impl Unmatched for &Diagnostic {
     fn unmatched(&self) -> String {
         let id = self.id();
         let id = id.as_str().unwrap_or_else(|error| match error {
@@ -181,15 +175,12 @@ where
 
         maybe_add_undefined_reveal_clarification(
             self,
-            format_args!(r#"[{id}] "{message}""#, message = self.message()),
+            format_args!(r#"[{id}] "{message}""#, message = self.primary_message()),
         )
     }
 }
 
-impl<T> UnmatchedWithColumn for T
-where
-    T: OldDiagnosticTrait,
-{
+impl UnmatchedWithColumn for &Diagnostic {
     fn unmatched_with_column(&self, column: OneIndexed) -> String {
         let id = self.id();
         let id = id.as_str().unwrap_or_else(|error| match error {
@@ -198,7 +189,10 @@ where
 
         maybe_add_undefined_reveal_clarification(
             self,
-            format_args!(r#"{column} [{id}] "{message}""#, message = self.message()),
+            format_args!(
+                r#"{column} [{id}] "{message}""#,
+                message = self.primary_message()
+            ),
         )
     }
 }
@@ -226,21 +220,21 @@ impl Matcher {
         }
     }
 
-    /// Check a slice of [`OldDiagnosticTrait`]s against a slice of
+    /// Check a slice of [`Diagnostic`]s against a slice of
     /// [`UnparsedAssertion`]s.
     ///
     /// Return vector of [`Unmatched`] for any unmatched diagnostics or
     /// assertions.
-    fn match_line<'a, 'b, T: OldDiagnosticTrait + 'a>(
+    fn match_line<'a, 'b>(
         &self,
-        diagnostics: &'a [T],
+        diagnostics: &'a [&'a Diagnostic],
         assertions: &'a [UnparsedAssertion<'b>],
     ) -> Result<(), Vec<String>>
     where
         'b: 'a,
     {
         let mut failures = vec![];
-        let mut unmatched: Vec<_> = diagnostics.iter().collect();
+        let mut unmatched = diagnostics.to_vec();
         for assertion in assertions {
             match assertion.parse() {
                 Ok(assertion) => {
@@ -263,9 +257,9 @@ impl Matcher {
         }
     }
 
-    fn column<T: OldDiagnosticTrait>(&self, diagnostic: &T) -> OneIndexed {
+    fn column(&self, diagnostic: &Diagnostic) -> OneIndexed {
         diagnostic
-            .span()
+            .primary_span()
             .and_then(|span| span.range())
             .map(|range| {
                 self.line_index
@@ -275,7 +269,7 @@ impl Matcher {
             .unwrap_or(OneIndexed::from_zero_indexed(0))
     }
 
-    /// Check if `assertion` matches any [`OldDiagnosticTrait`]s in `unmatched`.
+    /// Check if `assertion` matches any [`Diagnostic`]s in `unmatched`.
     ///
     /// If so, return `true` and remove the matched diagnostics from `unmatched`. Otherwise, return
     /// `false`.
@@ -285,11 +279,7 @@ impl Matcher {
     ///
     /// A `Revealed` assertion must match a revealed-type diagnostic, and may also match an
     /// undefined-reveal diagnostic, if present.
-    fn matches<T: OldDiagnosticTrait>(
-        &self,
-        assertion: &ParsedAssertion,
-        unmatched: &mut Vec<&T>,
-    ) -> bool {
+    fn matches(&self, assertion: &ParsedAssertion, unmatched: &mut Vec<&Diagnostic>) -> bool {
         match assertion {
             ParsedAssertion::Error(error) => {
                 let position = unmatched.iter().position(|diagnostic| {
@@ -297,10 +287,10 @@ impl Matcher {
                         !(diagnostic.id().is_lint_named(rule) || diagnostic.id().matches(rule))
                     }) && error
                         .column
-                        .is_none_or(|col| col == self.column(*diagnostic))
+                        .is_none_or(|col| col == self.column(diagnostic))
                         && error
                             .message_contains
-                            .is_none_or(|needle| diagnostic.message().contains(needle))
+                            .is_none_or(|needle| diagnostic.primary_message().contains(needle))
                 });
                 if let Some(position) = position {
                     unmatched.swap_remove(position);
@@ -319,7 +309,7 @@ impl Matcher {
                 for (index, diagnostic) in unmatched.iter().enumerate() {
                     if matched_revealed_type.is_none()
                         && diagnostic.id() == DiagnosticId::RevealedType
-                        && diagnostic.message() == expected_reveal_type_message
+                        && diagnostic.primary_message() == expected_reveal_type_message
                     {
                         matched_revealed_type = Some(index);
                     } else if matched_undefined_reveal.is_none()
@@ -347,13 +337,12 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
-    use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, Severity, Span};
+    use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
-    use std::borrow::Cow;
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,
@@ -371,45 +360,17 @@ mod tests {
             }
         }
 
-        fn into_diagnostic(self, file: File) -> TestDiagnostic {
-            TestDiagnostic {
-                id: self.id,
-                message: self.message,
-                range: self.range,
-                file,
-            }
-        }
-    }
-
-    #[derive(Debug)]
-    struct TestDiagnostic {
-        id: DiagnosticId,
-        message: &'static str,
-        range: TextRange,
-        file: File,
-    }
-
-    impl OldDiagnosticTrait for TestDiagnostic {
-        fn id(&self) -> DiagnosticId {
-            self.id
-        }
-
-        fn message(&self) -> Cow<str> {
-            self.message.into()
-        }
-
-        fn span(&self) -> Option<Span> {
-            Some(Span::from(self.file).with_range(self.range))
-        }
-
-        fn severity(&self) -> Severity {
-            Severity::Error
+        fn into_diagnostic(self, file: File) -> Diagnostic {
+            let mut diag = Diagnostic::new(self.id, Severity::Error, "");
+            let span = Span::from(file).with_range(self.range);
+            diag.annotate(Annotation::primary(span).message(self.message));
+            diag
         }
     }
 
     fn get_result(
         source: &str,
-        diagnostics: Vec<ExpectedDiagnostic>,
+        expected_diagnostics: Vec<ExpectedDiagnostic>,
     ) -> Result<(), FailuresByLine> {
         colored::control::set_override(false);
 
@@ -417,13 +378,11 @@ mod tests {
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 
-        super::match_file(
-            &db,
-            file,
-            diagnostics
-                .into_iter()
-                .map(|diagnostic| diagnostic.into_diagnostic(file)),
-        )
+        let diagnostics: Vec<Diagnostic> = expected_diagnostics
+            .into_iter()
+            .map(|diagnostic| diagnostic.into_diagnostic(file))
+            .collect();
+        super::match_file(&db, file, &diagnostics)
     }
 
     fn assert_fail(result: Result<(), FailuresByLine>, messages: &[(usize, &[&str])]) {

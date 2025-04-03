@@ -96,18 +96,13 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
         FilePath::SystemVirtual(_) => return None,
     };
 
-    let mut search_paths = search_paths(db);
-
-    let module_name = loop {
-        let candidate = search_paths.next()?;
+    let module_name = search_paths(db).find_map(|candidate| {
         let relative_path = match path {
             SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
             SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
-        };
-        if let Some(relative_path) = relative_path {
-            break relative_path.to_module_name()?;
-        }
-    };
+        }?;
+        relative_path.to_module_name()
+    })?;
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
@@ -115,7 +110,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     // in which case we ignore it.
     let module = resolve_module(db, &module_name)?;
 
-    if file == module.file() {
+    if file.path(db) == module.file().path(db) {
         Some(module)
     } else {
         // This path is for a module with the same name but with a different precedence. For example:
@@ -1968,5 +1963,34 @@ not_a_directory
             .ends_with("src/a/__init__.py"),);
 
         Ok(())
+    }
+
+    #[test]
+    fn file_to_module_where_one_search_path_is_subdirectory_of_other() {
+        let project_directory = SystemPathBuf::from("/project");
+        let site_packages = project_directory.join(".venv/lib/python3.13/site-packages");
+        let installed_foo_module = site_packages.join("foo/__init__.py");
+
+        let mut db = TestDb::new();
+        db.write_file(&installed_foo_module, "").unwrap();
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersion::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_roots: vec![project_directory],
+                    custom_typeshed: None,
+                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
+                },
+            },
+        )
+        .unwrap();
+
+        let foo_module_file = File::new(&db, FilePath::System(installed_foo_module));
+        let module = file_to_module(&db, foo_module_file).unwrap();
+        assert_eq!(module.search_path(), &site_packages);
     }
 }

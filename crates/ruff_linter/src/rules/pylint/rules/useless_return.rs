@@ -85,7 +85,7 @@ pub(crate) fn useless_return(
         .is_none_or(|expr| expr.is_none_literal_expr())
     {
         return;
-    };
+    }
 
     // Finally: verify that there are no _other_ return statements in the function.
     let mut visitor = ReturnStatementVisitor::default();

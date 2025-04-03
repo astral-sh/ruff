@@ -115,6 +115,6 @@ pub(crate) fn ends_with_period(checker: &Checker, docstring: &Docstring) {
                 )));
             }
             checker.report_diagnostic(diagnostic);
-        };
+        }
     }
 }

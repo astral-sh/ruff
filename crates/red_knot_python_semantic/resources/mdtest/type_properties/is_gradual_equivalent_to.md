@@ -147,6 +147,9 @@ def f4(a=2): ...
 def f5(a): ...
 
 static_assert(is_gradual_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
+static_assert(
+    is_gradual_equivalent_to(CallableTypeOf[f3] | bool | CallableTypeOf[f4], CallableTypeOf[f4] | bool | CallableTypeOf[f3])
+)
 static_assert(not is_gradual_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f5]))
 
 def f6(a, /): ...

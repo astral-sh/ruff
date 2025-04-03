@@ -110,7 +110,7 @@ pub(crate) fn path_constructor_current_directory(checker: &Checker, call: &ExprC
             let edit = remove_argument(arg, arguments, Parentheses::Preserve, checker.source())?;
             Ok(Fix::applicable_edit(edit, applicability(call.range())))
         }),
-    };
+    }
 
     checker.report_diagnostic(diagnostic);
 }

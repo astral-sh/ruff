@@ -63,12 +63,12 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
     };
     if *value != 0 {
         return;
-    };
+    }
 
     // Verify that the call is to the `range` builtin.
     if !checker.semantic().match_builtin_expr(&call.func, "range") {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(UnnecessaryRangeStart, start.range());
     diagnostic.try_set_fix(|| {

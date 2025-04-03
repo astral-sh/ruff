@@ -527,6 +527,6 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
                 call.range(),
             )));
         }
-    };
+    }
     checker.report_diagnostic(diagnostic);
 }

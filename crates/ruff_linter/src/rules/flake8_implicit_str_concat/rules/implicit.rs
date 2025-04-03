@@ -160,7 +160,7 @@ pub(crate) fn implicit(
             }
 
             diagnostics.push(diagnostic);
-        };
+        }
     }
 }
 

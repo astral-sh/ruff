@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import timedelta
 
 from airflow import DAG, dag
@@ -26,7 +28,14 @@ def sla_callback(*arg, **kwargs):
 
 DAG(dag_id="class_sla_callback", sla_miss_callback=sla_callback)
 
-DAG(dag_id="class_sla_callback", fail_stop=True)
+DAG(dag_id="class_fail_stop", fail_stop=True)
+
+DAG(dag_id="class_default_view", default_view="dag_default_view")
+
+DAG(dag_id="class_orientation", orientation="BT")
+
+allow_future_exec_dates_dag = DAG(dag_id="class_allow_future_exec_dates")
+allow_future_exec_dates_dag.allow_future_exec_dates
 
 
 @dag(schedule="0 * * * *")

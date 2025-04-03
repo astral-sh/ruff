@@ -71,7 +71,7 @@ pub(crate) fn zip_dict_keys_and_values(checker: &Checker, expr: &ast::ExprCall) 
             arg: Some(name), ..
         }] if name.as_str() == "strict" => {}
         _ => return,
-    };
+    }
     let [arg1, arg2] = &args[..] else {
         return;
     };

@@ -78,7 +78,7 @@ pub(crate) fn sync_call(checker: &Checker, call: &ExprCall) {
         .is_some_and(Expr::is_await_expr)
     {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(TrioSyncCall { method_name }, call.range);
     if checker.semantic().in_async_context() {

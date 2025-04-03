@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/function_def_valid_return_expr.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..125,
+        range: 0..97,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -135,7 +134,7 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 58..85,
+                    range: 58..96,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -152,73 +151,25 @@ Module(
                         kwarg: None,
                     },
                     returns: Some(
-                        Yield(
-                            ExprYield {
-                                range: 72..79,
-                                value: Some(
-                                    Name(
-                                        ExprName {
-                                            range: 78..79,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                            },
-                        ),
-                    ),
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 82..85,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 82..85,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 86..124,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("foo"),
-                        range: 90..93,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 93..95,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: Some(
                         If(
                             ExprIf {
-                                range: 99..119,
+                                range: 71..91,
                                 test: BooleanLiteral(
                                     ExprBooleanLiteral {
-                                        range: 106..110,
+                                        range: 78..82,
                                         value: true,
                                     },
                                 ),
                                 body: Name(
                                     ExprName {
-                                        range: 99..102,
+                                        range: 71..74,
                                         id: Name("int"),
                                         ctx: Load,
                                     },
                                 ),
                                 orelse: Name(
                                     ExprName {
-                                        range: 116..119,
+                                        range: 88..91,
                                         id: Name("str"),
                                         ctx: Load,
                                     },
@@ -229,10 +180,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 121..124,
+                                range: 93..96,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 121..124,
+                                        range: 93..96,
                                     },
                                 ),
                             },

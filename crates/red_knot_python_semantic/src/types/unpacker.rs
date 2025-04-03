@@ -11,7 +11,7 @@ use crate::types::{infer_expression_types, todo_type, Type, TypeCheckDiagnostics
 use crate::unpack::{UnpackKind, UnpackValue};
 use crate::Db;
 
-use super::context::{InferContext, WithDiagnostics};
+use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
 use super::{TupleType, UnionType};
 
@@ -116,8 +116,10 @@ impl<'db> Unpacker<'db> {
                             // it's worth it.
                             TupleType::from_elements(
                                 self.db(),
-                                std::iter::repeat(Type::LiteralString)
-                                    .take(string_literal_ty.python_len(self.db())),
+                                std::iter::repeat_n(
+                                    Type::LiteralString,
+                                    string_literal_ty.python_len(self.db()),
+                                ),
                             )
                         }
                         _ => ty,
@@ -283,10 +285,9 @@ impl<'db> UnpackResult<'db> {
     pub(crate) fn expression_type(&self, expr_id: ScopedExpressionId) -> Type<'db> {
         self.targets[&expr_id]
     }
-}
 
-impl WithDiagnostics for UnpackResult<'_> {
-    fn diagnostics(&self) -> &TypeCheckDiagnostics {
+    /// Returns the diagnostics in this unpacking assignment.
+    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
     }
 }

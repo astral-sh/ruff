@@ -50,9 +50,21 @@ reveal_type(1 ** (largest_u32 + 1))  # revealed: int
 reveal_type(2**largest_u32)  # revealed: int
 
 def variable(x: int):
-    reveal_type(x**2)  # revealed: @Todo(return type of decorated function)
-    reveal_type(2**x)  # revealed: @Todo(return type of decorated function)
-    reveal_type(x**x)  # revealed: @Todo(return type of decorated function)
+    reveal_type(x**2)  # revealed: @Todo(return type of overloaded function)
+    reveal_type(2**x)  # revealed: @Todo(return type of overloaded function)
+    reveal_type(x**x)  # revealed: @Todo(return type of overloaded function)
+```
+
+If the second argument is \<0, a `float` is returned at runtime. If the first argument is \<0 but
+the second argument is >=0, an `int` is still returned:
+
+```py
+reveal_type(1**0)  # revealed: Literal[1]
+reveal_type(0**1)  # revealed: Literal[0]
+reveal_type(0**0)  # revealed: Literal[1]
+reveal_type((-1) ** 2)  # revealed: Literal[1]
+reveal_type(2 ** (-1))  # revealed: float
+reveal_type((-1) ** (-1))  # revealed: float
 ```
 
 ## Division by Zero

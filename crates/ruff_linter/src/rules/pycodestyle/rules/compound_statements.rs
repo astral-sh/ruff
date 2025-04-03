@@ -307,7 +307,7 @@ pub(crate) fn compound_statements(
                 match_ = Some(token.range());
             }
             _ => {}
-        };
+        }
     }
 }
 

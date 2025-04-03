@@ -295,6 +295,6 @@ pub(crate) fn double_negation(checker: &Checker, expr: &Expr, op: UnaryOp, opera
             checker.generator().expr(&node1.into()),
             expr.range(),
         )));
-    };
+    }
     checker.report_diagnostic(diagnostic);
 }

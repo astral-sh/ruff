@@ -1,0 +1,1 @@
+def f(): return *x

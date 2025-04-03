@@ -54,6 +54,6 @@ pub(crate) fn too_many_locals(checker: &Checker, scope: &Scope) {
                 },
                 func.identifier(),
             ));
-        };
+        }
     }
 }

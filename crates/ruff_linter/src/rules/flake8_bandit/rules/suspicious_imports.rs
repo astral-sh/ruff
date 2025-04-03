@@ -599,7 +599,7 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
             }
         }
         _ => panic!("Expected Stmt::Import | Stmt::ImportFrom"),
-    };
+    }
 }
 
 fn check_and_push_diagnostic(checker: &Checker, diagnostic_kind: DiagnosticKind, range: TextRange) {

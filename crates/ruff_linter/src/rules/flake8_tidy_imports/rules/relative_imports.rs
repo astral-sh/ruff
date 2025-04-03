@@ -128,7 +128,7 @@ pub(crate) fn banned_relative_import(
             fix_banned_relative_import(stmt, level, module, module_path, checker.generator())
         {
             diagnostic.set_fix(fix);
-        };
+        }
         Some(diagnostic)
     } else {
         None

@@ -1125,11 +1125,11 @@ print(sys.last_exc, os.getegid())
 
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(
-        diagnostics[0].message(),
+        diagnostics[0].primary_message(),
         "Type `<module 'sys'>` has no attribute `last_exc`"
     );
     assert_eq!(
-        diagnostics[1].message(),
+        diagnostics[1].primary_message(),
         "Type `<module 'os'>` has no attribute `getegid`"
     );
 

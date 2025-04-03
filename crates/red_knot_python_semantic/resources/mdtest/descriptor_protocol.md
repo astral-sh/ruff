@@ -506,8 +506,7 @@ class C:
     @property
     def name(self) -> str:
         return self._name or "Unset"
-    # TODO: No diagnostic should be emitted here
-    # error: [unresolved-attribute] "Type `Literal[name]` has no attribute `setter`"
+
     @name.setter
     def name(self, value: str | None) -> None:
         self._value = value
@@ -515,22 +514,13 @@ class C:
 c = C()
 
 reveal_type(c._name)  # revealed: str | None
+reveal_type(c.name)  # revealed: str
+reveal_type(C.name)  # revealed: property
 
-# TODO: Should be `str`
-reveal_type(c.name)  # revealed: <bound method `name` of `C`>
-
-# Should be `builtins.property`
-reveal_type(C.name)  # revealed: Literal[name]
-
-# TODO: These should not emit errors
-# error: [invalid-assignment]
 c.name = "new"
-
-# error: [invalid-assignment]
 c.name = None
 
-# TODO: this should be an error, but with a proper error message
-# error: [invalid-assignment] "Implicit shadowing of function `name`; annotate to make it explicit if this is intentional"
+# error: [invalid-assignment] "Invalid assignment to data descriptor attribute `name` on type `C` with custom `__set__` method"
 c.name = 42
 ```
 
@@ -587,7 +577,7 @@ reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: Literal[f]
 reveal_type(f.__get__.__hash__)  # revealed: <bound method `__hash__` of `MethodWrapperType`>
 
 # Attribute access on the wrapper-descriptor falls back to `WrapperDescriptorType`:
-reveal_type(wrapper_descriptor.__qualname__)  # revealed: @Todo(@property)
+reveal_type(wrapper_descriptor.__qualname__)  # revealed: str
 ```
 
 We can also bind the free function `f` to an instance of a class `C`:

@@ -459,7 +459,7 @@ impl<'src> DocstringLinePrinter<'_, '_, '_, 'src> {
                 Indentation::from_str(trim_end).columns() - self.stripped_indentation.columns();
             let in_docstring_indent = " ".repeat(indent_len) + trim_end.trim_start();
             text(&in_docstring_indent).fmt(self.f)?;
-        };
+        }
 
         // We handled the case that the closing quotes are on their own line
         // above (the last line is empty except for whitespace). If they are on

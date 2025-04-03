@@ -85,7 +85,7 @@ pub(crate) fn quadratic_list_summation(checker: &Checker, call: &ast::ExprCall) 
 
     if !start_is_empty_list(arguments, semantic) {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(QuadraticListSummation, *range);
     diagnostic.try_set_fix(|| convert_to_reduce(iterable, call, checker));

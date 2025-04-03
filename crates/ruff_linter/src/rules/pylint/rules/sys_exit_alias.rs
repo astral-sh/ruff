@@ -79,7 +79,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
     if call.arguments.len() > 1 || has_star_kwargs {
         checker.report_diagnostic(diagnostic);
         return;
-    };
+    }
 
     diagnostic.try_set_fix(|| {
         let (import_edit, binding) = checker.importer().get_or_import_symbol(
@@ -94,7 +94,7 @@ pub(crate) fn sys_exit_alias(checker: &Checker, call: &ExprCall) {
                 checker.source()[kwarg.value.range()].to_string(),
                 kwarg.range,
             ));
-        };
+        }
         Ok(Fix::unsafe_edits(import_edit, edits))
     });
     checker.report_diagnostic(diagnostic);

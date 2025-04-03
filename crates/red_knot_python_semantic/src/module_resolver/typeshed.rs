@@ -322,6 +322,7 @@ fn python_version_from_versions_file_string(
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
     use std::num::{IntErrorKind, NonZeroU16};
     use std::path::Path;
 
@@ -333,8 +334,7 @@ mod tests {
 
     const TYPESHED_STDLIB_DIR: &str = "stdlib";
 
-    #[allow(unsafe_code)]
-    const ONE: Option<NonZeroU16> = Some(unsafe { NonZeroU16::new_unchecked(1) });
+    const ONE: Option<NonZeroU16> = Some(NonZeroU16::new(1).unwrap());
 
     impl TypeshedVersions {
         #[must_use]
@@ -571,7 +571,7 @@ foo: 3.8-   # trailing comment
 
         let mut massive_versions_file = String::new();
         for i in 0..too_many {
-            massive_versions_file.push_str(&format!("x{i}: 3.8-\n"));
+            let _ = writeln!(&mut massive_versions_file, "x{i}: 3.8-");
         }
 
         assert_eq!(

@@ -9,7 +9,9 @@ pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
-use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, OldParseDiagnostic, Severity, Span};
+use ruff_db::diagnostic::{
+    create_parse_diagnostic, Annotation, Diagnostic, DiagnosticId, Severity, Span,
+};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::{source_text, SourceTextError};
@@ -17,7 +19,6 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
-use std::borrow::Cow;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -163,24 +164,27 @@ impl Project {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Box<dyn OldDiagnosticTrait>> {
+    pub(crate) fn check(self, db: &ProjectDatabase) -> Vec<Diagnostic> {
         let project_span = tracing::debug_span!("Project::check");
         let _span = project_span.enter();
 
         tracing::debug!("Checking project '{name}'", name = self.name(db));
 
-        let mut diagnostics: Vec<Box<dyn OldDiagnosticTrait>> = Vec::new();
-        diagnostics.extend(self.settings_diagnostics(db).iter().map(|diagnostic| {
-            let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
-            diagnostic
-        }));
+        let mut diagnostics: Vec<Diagnostic> = Vec::new();
+        diagnostics.extend(
+            self.settings_diagnostics(db)
+                .iter()
+                .map(OptionDiagnostic::to_diagnostic),
+        );
 
         let files = ProjectFiles::new(db, self);
 
-        diagnostics.extend(files.diagnostics().iter().cloned().map(|diagnostic| {
-            let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic);
-            diagnostic
-        }));
+        diagnostics.extend(
+            files
+                .diagnostics()
+                .iter()
+                .map(IOErrorDiagnostic::to_diagnostic),
+        );
 
         let result = Arc::new(std::sync::Mutex::new(diagnostics));
         let inner_result = Arc::clone(&result);
@@ -208,14 +212,11 @@ impl Project {
         Arc::into_inner(result).unwrap().into_inner().unwrap()
     }
 
-    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Box<dyn OldDiagnosticTrait>> {
+    pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
         let mut file_diagnostics: Vec<_> = self
             .settings_diagnostics(db)
             .iter()
-            .map(|diagnostic| {
-                let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
-                diagnostic
-            })
+            .map(OptionDiagnostic::to_diagnostic)
             .collect();
 
         let check_diagnostics = check_file_impl(db, file);
@@ -398,35 +399,36 @@ impl Project {
     }
 }
 
-fn check_file_impl(db: &dyn Db, file: File) -> Vec<Box<dyn OldDiagnosticTrait>> {
-    let mut diagnostics: Vec<Box<dyn OldDiagnosticTrait>> = Vec::new();
+fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
+    let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Abort checking if there are IO errors.
     let source = source_text(db.upcast(), file);
 
     if let Some(read_error) = source.read_error() {
-        diagnostics.push(Box::new(IOErrorDiagnostic {
-            file: Some(file),
-            error: read_error.clone().into(),
-        }));
+        diagnostics.push(
+            IOErrorDiagnostic {
+                file: Some(file),
+                error: read_error.clone().into(),
+            }
+            .to_diagnostic(),
+        );
         return diagnostics;
     }
 
     let parsed = parsed_module(db.upcast(), file);
-    diagnostics.extend(parsed.errors().iter().map(|error| {
-        let diagnostic: Box<dyn OldDiagnosticTrait> =
-            Box::new(OldParseDiagnostic::new(file, error.clone()));
-        diagnostic
-    }));
+    diagnostics.extend(
+        parsed
+            .errors()
+            .iter()
+            .map(|error| create_parse_diagnostic(file, error)),
+    );
 
-    diagnostics.extend(check_types(db.upcast(), file).iter().map(|diagnostic| {
-        let boxed: Box<dyn OldDiagnosticTrait> = Box::new(diagnostic.clone());
-        boxed
-    }));
+    diagnostics.extend(check_types(db.upcast(), file).into_iter().cloned());
 
     diagnostics.sort_unstable_by_key(|diagnostic| {
         diagnostic
-            .span()
+            .primary_span()
             .and_then(|span| span.range())
             .unwrap_or_default()
             .start()
@@ -494,21 +496,13 @@ pub struct IOErrorDiagnostic {
     error: IOErrorKind,
 }
 
-impl OldDiagnosticTrait for IOErrorDiagnostic {
-    fn id(&self) -> DiagnosticId {
-        DiagnosticId::Io
-    }
-
-    fn message(&self) -> Cow<str> {
-        self.error.to_string().into()
-    }
-
-    fn span(&self) -> Option<Span> {
-        self.file.map(Span::from)
-    }
-
-    fn severity(&self) -> Severity {
-        Severity::Error
+impl IOErrorDiagnostic {
+    fn to_diagnostic(&self) -> Diagnostic {
+        let mut diag = Diagnostic::new(DiagnosticId::Io, Severity::Error, &self.error);
+        if let Some(file) = self.file {
+            diag.annotate(Annotation::primary(Span::from(file)));
+        }
+        diag
     }
 }
 
@@ -526,7 +520,6 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::{check_file_impl, ProjectMetadata};
     use red_knot_python_semantic::types::check_types;
-    use ruff_db::diagnostic::OldDiagnosticTrait;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
@@ -550,7 +543,7 @@ mod tests {
         assert_eq!(
             check_file_impl(&db, file)
                 .into_iter()
-                .map(|diagnostic| diagnostic.message().into_owned())
+                .map(|diagnostic| diagnostic.primary_message().to_string())
                 .collect::<Vec<_>>(),
             vec!["Failed to read file: No such file or directory".to_string()]
         );
@@ -566,7 +559,7 @@ mod tests {
         assert_eq!(
             check_file_impl(&db, file)
                 .into_iter()
-                .map(|diagnostic| diagnostic.message().into_owned())
+                .map(|diagnostic| diagnostic.primary_message().to_string())
                 .collect::<Vec<_>>(),
             vec![] as Vec<String>
         );

@@ -160,6 +160,7 @@ impl_binding_has_ty!(ast::StmtFunctionDef);
 impl_binding_has_ty!(ast::StmtClassDef);
 impl_binding_has_ty!(ast::Parameter);
 impl_binding_has_ty!(ast::ParameterWithDefault);
+impl_binding_has_ty!(ast::ExceptHandlerExceptHandler);
 
 impl HasType for ast::Alias {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {

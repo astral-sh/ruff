@@ -82,7 +82,7 @@ impl Violation for Airflow3MovedToProvider {
     }
 }
 
-/// AIR303
+/// AIR302
 pub(crate) fn moved_to_provider_in_3(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;

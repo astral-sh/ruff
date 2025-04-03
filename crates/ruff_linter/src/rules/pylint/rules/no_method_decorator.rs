@@ -135,16 +135,16 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
                             if target_name == *id {
                                 explicit_decorator_calls.insert(id.clone(), stmt);
                             }
-                        };
+                        }
                     }
                 }
             }
-        };
+        }
     }
 
     if explicit_decorator_calls.is_empty() {
         return;
-    };
+    }
 
     for stmt in &class_def.body {
         if let Stmt::FunctionDef(ast::StmtFunctionDef {
@@ -196,7 +196,7 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
                 None => {
                     continue;
                 }
-            };
-        };
+            }
+        }
     }
 }

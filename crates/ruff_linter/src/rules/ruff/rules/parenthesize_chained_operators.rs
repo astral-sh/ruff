@@ -93,6 +93,6 @@ pub(crate) fn parenthesize_chained_logical_operators(checker: &Checker, expr: &a
                 }
             }
             _ => continue,
-        };
+        }
     }
 }

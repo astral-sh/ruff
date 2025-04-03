@@ -3,8 +3,9 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use lsp_types::Url;
-
+use red_knot_python_semantic::Db;
 use ruff_db::file_revision::FileRevision;
+use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, FileType, GlobError, Metadata, OsSystem, PatternError, Result,
@@ -32,6 +33,16 @@ pub(crate) fn url_to_any_system_path(url: &Url) -> std::result::Result<AnySystem
         Ok(AnySystemPath::SystemVirtual(
             SystemVirtualPath::new(url.as_str()).to_path_buf(),
         ))
+    }
+}
+
+pub(crate) fn file_to_url(db: &dyn Db, file: File) -> Option<Url> {
+    match file.path(db) {
+        FilePath::System(system) => Url::from_file_path(system.as_std_path()).ok(),
+        FilePath::SystemVirtual(path) => Url::parse(path.as_str()).ok(),
+        // TODO: Not yet supported, consider an approach similar to Sorbet's custom paths
+        // https://sorbet.org/docs/sorbet-uris
+        FilePath::Vendored(_) => None,
     }
 }
 
