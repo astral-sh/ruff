@@ -6,7 +6,7 @@ use std::fmt::{self, Display};
 use crate::cfg::graph::{BlockId, BlockKind, Condition, ControlFlowGraph};
 
 /// Returns control flow graph in Mermaid syntax.
-pub fn draw_cfg(graph: ControlFlowGraph, source: &str) -> String {
+pub fn draw_cfg<'src>(graph: ControlFlowGraph<'src>, source: &'src str) -> String {
     CFGWithSource::new(graph, source).draw_graph()
 }
 
@@ -176,7 +176,7 @@ impl<'stmt> DirectedGraph<'stmt> for CFGWithSource<'stmt> {
         self.cfg.initial()
     }
 
-    fn successors(&self, node: Self::Node) -> impl ExactSizeIterator<Item = Self::Node> + '_ {
+    fn successors(&self, node: Self::Node) -> impl ExactSizeIterator<Item = Self::Node> {
         self.cfg.outgoing(node).targets()
     }
 }
@@ -210,6 +210,12 @@ impl<'stmt> MermaidGraph<'stmt> for CFGWithSource<'stmt> {
                     shape: MermaidNodeShape::DoubleCircle,
                 }
             }
+            BlockKind::LoopGuard => {
+                return MermaidNode {
+                    content: "LOOP GUARD".to_string(),
+                    shape: MermaidNodeShape::default(),
+                }
+            }
         };
 
         MermaidNode::with_content(content)
@@ -235,6 +241,11 @@ impl<'stmt> MermaidGraph<'stmt> for CFGWithSource<'stmt> {
                             }
                         }
                     }
+                    Condition::Test(expr) => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: self.source[expr.range()].to_string(),
+                    },
+                    Condition::Else => todo!(),
                 };
                 (target, edge)
             })
