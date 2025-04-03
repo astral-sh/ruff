@@ -2907,10 +2907,10 @@ impl<'db> Type<'db> {
                                         .with_annotated_type(KnownClass::Str.to_instance(db)),
                                     Parameter::positional_only(Some(Name::new_static("bases")))
                                         // TODO: Should be tuple[type, ...] once we have support for homogenous tuples
-                                        .with_annotated_type(Type::any()),
+                                        .with_annotated_type(KnownClass::Tuple.to_instance(db)),
                                     Parameter::positional_only(Some(Name::new_static("dict")))
                                         // TODO: Should be `dict[str, Any]` once we have support for generics
-                                        .with_annotated_type(Type::any()),
+                                        .with_annotated_type(KnownClass::Dict.to_instance(db)),
                                 ]),
                                 Some(KnownClass::Type.to_instance(db)),
                             ),
