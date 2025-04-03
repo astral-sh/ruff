@@ -794,6 +794,10 @@ struct MultipleCaseAssignmentVisitor<'a, Ctx> {
 
 impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
+        // test_ok class_keyword_in_case_pattern
+        // match 2:
+        //     case Class(x=x): ...
+
         // test_err multiple_assignment_in_case_pattern
         // match 2:
         //     case [y, z, y]: ...  # MatchSequence
@@ -802,8 +806,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
         //     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
         //     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
         //     case Class(x, x): ...  # MatchClass positional
-        //     case Class(x=1, x=2): ...  # MatchClass keyword
-        //     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+        //     case Class(y=x, z=x): ...  # MatchClass keyword
+        //     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
         //     case x as x: ...  # MatchAs
         match pattern {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
@@ -830,7 +834,6 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
                 for keyword in &arguments.keywords {
-                    self.insert(&keyword.attr);
                     self.visit_pattern(&keyword.pattern);
                 }
             }
