@@ -1,4 +1,4 @@
-use std::fmt::{self, format};
+use std::fmt;
 
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
