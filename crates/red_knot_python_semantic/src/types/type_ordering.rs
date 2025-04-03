@@ -127,6 +127,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::AlwaysFalsy, _) => Ordering::Less,
         (_, Type::AlwaysFalsy) => Ordering::Greater,
 
+        (Type::BoundSuper(_), _) => Ordering::Less,
+        (_, Type::BoundSuper(_)) => Ordering::Greater,
+
         (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance)) => {
             match (left_instance, right_instance) {
                 (KnownInstanceType::Any, _) => Ordering::Less,

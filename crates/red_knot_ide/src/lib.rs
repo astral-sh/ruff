@@ -167,6 +167,7 @@ impl HasNavigationTargets for Type<'_> {
             Type::Dynamic(_)
             | Type::Never
             | Type::Callable(_)
+            | Type::BoundSuper(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => NavigationTargets::empty(),
         }

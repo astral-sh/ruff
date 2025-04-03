@@ -312,7 +312,10 @@ pub enum Type<'db> {
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
-    // TODO protocols, callable types, overloads, generics, type vars
+    // A bound super object like `super()` or `super(A, A())`
+    // This type doesn't handle a unbound super object like `super(A)`.
+    BoundSuper(BoundSuperType<'db>),
+    // TODO protocols, overloads, generics, type vars
 }
 
 #[salsa::tracked]
@@ -379,6 +382,7 @@ impl<'db> Type<'db> {
             | Self::LiteralString
             | Self::SliceLiteral(_)
             | Self::Dynamic(DynamicType::Unknown | DynamicType::Any)
+            | Self::BoundSuper(_)
             | Self::BoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::MethodWrapper(_) => false,
@@ -632,6 +636,7 @@ impl<'db> Type<'db> {
             | Type::ClassLiteral(_)
             | Type::KnownInstance(_)
             | Type::IntLiteral(_)
+            | Type::BoundSuper(_)
             | Type::SubclassOf(_) => self,
         }
     }
@@ -806,6 +811,10 @@ impl<'db> Type<'db> {
             // Note that this is not the same type as the type spelled in type annotations as `tuple`;
             // as that type is equivalent to `type[Any, ...]` (and therefore not a fully static type).
             (Type::Tuple(_), _) => KnownClass::Tuple.to_instance(db).is_subtype_of(db, target),
+
+            (Type::BoundSuper(_), _) | (_, Type::BoundSuper(_)) => {
+                KnownClass::Super.to_instance(db).is_subtype_of(db, target)
+            }
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
@@ -1452,6 +1461,10 @@ impl<'db> Type<'db> {
             (Type::PropertyInstance(_), _) | (_, Type::PropertyInstance(_)) => KnownClass::Property
                 .to_instance(db)
                 .is_disjoint_from(db, other),
+
+            (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => KnownClass::Super
+                .to_instance(db)
+                .is_disjoint_from(db, other),
         }
     }
 
@@ -1476,6 +1489,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::PropertyInstance(_) => true,
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.is_fully_static(),
+            Type::BoundSuper(_) => true,
             Type::ClassLiteral(_) | Type::Instance(_) => {
                 // TODO: Ideally, we would iterate over the MRO of the class, check if all
                 // bases are fully static, and only return `true` if that is the case.
@@ -1528,6 +1542,7 @@ impl<'db> Type<'db> {
             }
             // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
+            Type::BoundSuper(..) => false,
             Type::BooleanLiteral(_)
             | Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(..)
@@ -1593,6 +1608,7 @@ impl<'db> Type<'db> {
         match self {
             Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
+            | Type::BoundSuper(..)
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
             | Type::ModuleLiteral(..)
@@ -1726,6 +1742,10 @@ impl<'db> Type<'db> {
             }
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name),
 
+            Type::BoundSuper(_) => KnownClass::Super
+                .to_class_literal(db)
+                .find_name_in_mro(db, name),
+
             // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`, i.e. Type::Instance(type).
             // So looking up a name in the MRO of `Type::Instance(type)` is equivalent to looking up the name in the
             // MRO of the class `object`.
@@ -1847,6 +1867,7 @@ impl<'db> Type<'db> {
             // required, as `instance_member` is only called for instance-like types through `member`,
             // but we might want to add this in the future.
             Type::ClassLiteral(_) | Type::SubclassOf(_) => Symbol::Unbound.into(),
+            Type::BoundSuper(bound_super) => bound_super.member_lookup(db, name),
         }
     }
 
@@ -2219,10 +2240,6 @@ impl<'db> Type<'db> {
                 Symbol::bound(Type::IntLiteral(segment.into())).into()
             }
 
-            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Super) => {
-                SymbolAndQualifiers::todo("super() support")
-            }
-
             Type::PropertyInstance(property) if name == "fget" => {
                 Symbol::bound(property.getter(db).unwrap_or(Type::none(db))).into()
             }
@@ -2334,6 +2351,21 @@ impl<'db> Type<'db> {
                     db,
                     name_str,
                     class_attr_fallback,
+                    InstanceFallbackShadowsNonDataDescriptor::Yes,
+                )
+            }
+
+            Type::BoundSuper(bound_super) => {
+                let owner_attr_plain = bound_super.member_lookup(db, name_str);
+
+                let owner_attr_fallback = bound_super
+                    .try_call_dunder_get_on_attribute(db, owner_attr_plain)
+                    .0;
+
+                self.invoke_descriptor_protocol(
+                    db,
+                    name_str,
+                    owner_attr_fallback,
                     InstanceFallbackShadowsNonDataDescriptor::Yes,
                 )
             }
@@ -2522,6 +2554,7 @@ impl<'db> Type<'db> {
             Type::StringLiteral(str) => Truthiness::from(!str.value(db).is_empty()),
             Type::BytesLiteral(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             Type::Tuple(items) => Truthiness::from(!items.elements(db).is_empty()),
+            Type::BoundSuper(_) => Truthiness::AlwaysTrue,
         };
 
         Ok(truthiness)
@@ -2907,6 +2940,41 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
 
+                Some(KnownClass::Super) => {
+                    // ```py
+                    // class super:
+                    //     @overload
+                    //     def __init__(self, t: Any, obj: Any, /) -> None: ...
+                    //     @overload
+                    //     def __init__(self, t: Any, /) -> None: ...
+                    //     @overload
+                    //     def __init__(self) -> None: ...
+                    // ```
+                    let signature = CallableSignature::from_overloads(
+                        self,
+                        [
+                            Signature::new(
+                                Parameters::new([
+                                    Parameter::positional_only(Some(Name::new_static("t")))
+                                        .with_annotated_type(Type::any()),
+                                    Parameter::positional_only(Some(Name::new_static("obj")))
+                                        .with_annotated_type(Type::any()),
+                                ]),
+                                Some(KnownClass::Super.to_instance(db)),
+                            ),
+                            Signature::new(
+                                Parameters::new([Parameter::positional_only(Some(
+                                    Name::new_static("t"),
+                                ))
+                                .with_annotated_type(Type::any())]),
+                                Some(KnownClass::Super.to_instance(db)),
+                            ),
+                            Signature::new(Parameters::gradual_form(), None),
+                        ],
+                    );
+                    Signatures::single(signature)
+                }
+
                 Some(KnownClass::Property) => {
                     let getter_signature = Signature::new(
                         Parameters::new([
@@ -3256,6 +3324,7 @@ impl<'db> Type<'db> {
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
             | Type::LiteralString
+            | Type::BoundSuper(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => None,
         }
@@ -3314,6 +3383,7 @@ impl<'db> Type<'db> {
             | Type::MethodWrapper(_)
             | Type::Never
             | Type::FunctionLiteral(_)
+            | Type::BoundSuper(_)
             | Type::PropertyInstance(_) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(*self)],
                 fallback_type: Type::unknown(),
@@ -3541,6 +3611,7 @@ impl<'db> Type<'db> {
                     .expect("Type::Todo should be a valid ClassBase"),
             ),
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
+            Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
         }
     }
 
@@ -5895,6 +5966,139 @@ impl<'db> TupleType<'db> {
 
     pub fn len(&self, db: &'db dyn Db) -> usize {
         self.elements(db).len()
+    }
+}
+
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum SuperOwnerKind<'db> {
+    Class(ClassLiteralType<'db>),
+    Instance(InstanceType<'db>),
+}
+
+impl<'db> SuperOwnerKind<'db> {
+    fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+        match self {
+            SuperOwnerKind::Class(class_literal) => class_literal.class().iter_mro(db),
+            SuperOwnerKind::Instance(instance) => instance.class().iter_mro(db),
+        }
+    }
+
+    fn into_type(self) -> Type<'db> {
+        match self {
+            SuperOwnerKind::Class(class_literal) => Type::ClassLiteral(class_literal),
+            SuperOwnerKind::Instance(instance) => Type::Instance(instance),
+        }
+    }
+}
+
+/// Represent a bound super object like `super(PivotClass, owner)`
+#[salsa::interned(debug)]
+pub struct BoundSuperType<'db> {
+    #[return_ref]
+    pub pivot_class: Class<'db>,
+    #[return_ref]
+    pub owner: SuperOwnerKind<'db>,
+}
+
+impl<'db> BoundSuperType<'db> {
+    /// Attempts to build a `Type::BoundSuper` based on the given `pivot_class` and `owner`.
+    ///
+    /// This mimics the behavior of Python's built-in `super(pivot, owner)` at runtime.
+    /// - `super(pivot, owner_class)` is valid only if `issubclass(owner_class, pivot)`
+    /// - `super(pivot, owner_instance)` is valid only if `isinstance(owner_instance, pivot)`
+    ///
+    /// Note: This may return not only `Type::BoundSuper`, but also an unbound super instance or an
+    /// unknown fallback in cases where a runtime error would occur in Python.
+    /// TODO: Add diagnostics for cases where a runtime error would occur.
+    fn build(db: &'db dyn Db, pivot_class: Class<'db>, owner: Type<'db>) -> Type<'db> {
+        match owner {
+            // When dynamic types are involved, the result is not bound.
+            Type::Dynamic(_) => KnownClass::Super.to_instance(db),
+            Type::ClassLiteral(class_literal) => {
+                // `super(pivot_class, owner_class)` requires `issubclass(owner_class, pivot_class)``
+                if class_literal.class().is_subclass_of(db, pivot_class) {
+                    Type::BoundSuper(BoundSuperType::new(
+                        db,
+                        pivot_class,
+                        SuperOwnerKind::Class(class_literal),
+                    ))
+                } else {
+                    Type::unknown()
+                }
+            }
+            Type::Instance(instance) => {
+                // `super(pivot_class, owner_instance)` requires `isinstance(owner_instance, pivot_class)``
+                if instance.class().is_subclass_of(db, pivot_class) {
+                    Type::BoundSuper(BoundSuperType::new(
+                        db,
+                        pivot_class,
+                        SuperOwnerKind::Instance(instance),
+                    ))
+                } else {
+                    Type::unknown()
+                }
+            }
+            Type::BooleanLiteral(_) => {
+                Self::build(db, pivot_class, KnownClass::Bool.to_instance(db))
+            }
+            Type::IntLiteral(_) => Self::build(db, pivot_class, KnownClass::Bool.to_instance(db)),
+            Type::StringLiteral(_) | Type::LiteralString => {
+                Self::build(db, pivot_class, KnownClass::Str.to_instance(db))
+            }
+            Type::BytesLiteral(_) => {
+                Self::build(db, pivot_class, KnownClass::Bytes.to_instance(db))
+            }
+            Type::KnownInstance(known_instance) => {
+                Self::build(db, pivot_class, known_instance.instance_fallback(db))
+            }
+            _ => Type::unknown(),
+        }
+    }
+
+    fn iter_mro_starting_after_pivot(
+        self,
+        db: &'db dyn Db,
+    ) -> Box<dyn Iterator<Item = ClassBase<'db>> + 'db> {
+        let pivot_index = self
+            .owner(db)
+            .iter_mro(db)
+            .position(|class_base| class_base.into_class().as_ref() == Some(self.pivot_class(db)));
+
+        if let Some(pivot_index) = pivot_index {
+            Box::new(self.owner(db).iter_mro(db).skip(pivot_index + 1))
+        } else {
+            Box::new(std::iter::empty())
+        }
+    }
+
+    /// Try to call `__get__` on the attribute.
+    /// Depending on whether the owner is an instance or a class, the arguments passed to `__get__` differ.
+    /// You can refer to the cpython code: <https://github.com/python/cpython/blob/3b3720f1a26ab34377542b48eb6a6565f78ff892/Objects/typeobject.c#L11690-L11693>
+    fn try_call_dunder_get_on_attribute(
+        self,
+        db: &'db dyn Db,
+        attribute: SymbolAndQualifiers<'db>,
+    ) -> (SymbolAndQualifiers<'db>, AttributeKind) {
+        match self.owner(db) {
+            SuperOwnerKind::Class(class_literal) => Type::try_call_dunder_get_on_attribute(
+                db,
+                attribute,
+                Type::none(db),
+                Type::ClassLiteral(*class_literal),
+            ),
+            SuperOwnerKind::Instance(instance) => Type::try_call_dunder_get_on_attribute(
+                db,
+                attribute,
+                Type::Instance(*instance),
+                Type::class_literal(instance.class()),
+            ),
+        }
+    }
+
+    /// Finds the member in the owner's MRO starting after the pivot class.
+    /// Note: This does *not* execute descriptors.
+    fn member_lookup(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        Class::class_member_from_mro(db, name, self.iter_mro_starting_after_pivot(db))
     }
 }
 

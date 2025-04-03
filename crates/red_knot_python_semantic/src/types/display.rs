@@ -167,6 +167,19 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
+            Type::BoundSuper(bound_super) => {
+                f.write_str("<super: ")?;
+                Type::class_literal(*bound_super.pivot_class(self.db))
+                    .display(self.db)
+                    .fmt(f)?;
+                f.write_str(", ")?;
+                bound_super
+                    .owner(self.db)
+                    .into_type()
+                    .display(self.db)
+                    .fmt(f)?;
+                f.write_str(">")
+            }
         }
     }
 }
