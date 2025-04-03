@@ -4061,16 +4061,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                         }
                         KnownFunction::Cast => {
-                            if let [Some(casted_ty), Some(source_ty)] = overload.parameter_types() {
-                                if source_ty.is_gradual_equivalent_to(self.context.db(), *casted_ty)
-                                    && !source_ty.contains_todo(self.context.db())
+                            if let [Some(casted_type), Some(source_type)] =
+                                overload.parameter_types()
+                            {
+                                let db = self.db();
+                                if (source_type.is_equivalent_to(db, *casted_type)
+                                    || source_type.normalized(db) == casted_type.normalized(db))
+                                    && !source_type.contains_todo(db)
                                 {
                                     self.context.report_lint(
                                         &REDUNDANT_CAST,
                                         call_expression,
                                         format_args!(
                                             "Value is already of type `{}`",
-                                            casted_ty.display(self.context.db()),
+                                            casted_type.display(db),
                                         ),
                                     );
                                 }

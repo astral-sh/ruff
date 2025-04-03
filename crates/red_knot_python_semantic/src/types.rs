@@ -1059,6 +1059,13 @@ impl<'db> Type<'db> {
                     )
             }
 
+            // This special case is required because the left-hand side tuple might be a
+            // gradual type, so we can not rely on subtyping. This allows us to assign e.g.
+            // `tuple[Any, int]` to `tuple`.
+            (Type::Tuple(_), _) => KnownClass::Tuple
+                .to_instance(db)
+                .is_assignable_to(db, target),
+
             // `type[Any]` is assignable to any `type[...]` type, because `type[Any]` can
             // materialize to any `type[...]` type.
             (Type::SubclassOf(subclass_of_ty), Type::SubclassOf(_))
@@ -3055,21 +3062,31 @@ impl<'db> Type<'db> {
                         self,
                         [
                             Signature::new(
-                                Parameters::new([Parameter::positional_only(Some(
-                                    Name::new_static("o"),
-                                ))
-                                .with_annotated_type(Type::any())
+                                Parameters::new([Parameter::positional_or_keyword(
+                                    Name::new_static("object"),
+                                )
+                                .with_annotated_type(Type::object(db))
                                 .with_default_type(Type::string_literal(db, ""))]),
                                 Some(KnownClass::Str.to_instance(db)),
                             ),
                             Signature::new(
                                 Parameters::new([
-                                    Parameter::positional_only(Some(Name::new_static("o")))
-                                        .with_annotated_type(Type::any()), // TODO: ReadableBuffer
-                                    Parameter::positional_only(Some(Name::new_static("encoding")))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
-                                    Parameter::positional_only(Some(Name::new_static("errors")))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                    Parameter::positional_or_keyword(Name::new_static("object"))
+                                        // TODO: Should be `ReadableBuffer` instead of this union type:
+                                        .with_annotated_type(UnionType::from_elements(
+                                            db,
+                                            [
+                                                KnownClass::Bytes.to_instance(db),
+                                                KnownClass::Bytearray.to_instance(db),
+                                            ],
+                                        ))
+                                        .with_default_type(Type::bytes_literal(db, b"")),
+                                    Parameter::positional_or_keyword(Name::new_static("encoding"))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db))
+                                        .with_default_type(Type::string_literal(db, "utf-8")),
+                                    Parameter::positional_or_keyword(Name::new_static("errors"))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db))
+                                        .with_default_type(Type::string_literal(db, "strict")),
                                 ]),
                                 Some(KnownClass::Str.to_instance(db)),
                             ),
@@ -3098,12 +3115,14 @@ impl<'db> Type<'db> {
                             ),
                             Signature::new(
                                 Parameters::new([
-                                    Parameter::positional_only(Some(Name::new_static("o")))
-                                        .with_annotated_type(Type::any()),
+                                    Parameter::positional_only(Some(Name::new_static("name")))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
                                     Parameter::positional_only(Some(Name::new_static("bases")))
-                                        .with_annotated_type(Type::any()),
+                                        // TODO: Should be tuple[type, ...] once we have support for homogenous tuples
+                                        .with_annotated_type(KnownClass::Tuple.to_instance(db)),
                                     Parameter::positional_only(Some(Name::new_static("dict")))
-                                        .with_annotated_type(Type::any()),
+                                        // TODO: Should be `dict[str, Any]` once we have support for generics
+                                        .with_annotated_type(KnownClass::Dict.to_instance(db)),
                                 ]),
                                 Some(KnownClass::Type.to_instance(db)),
                             ),
