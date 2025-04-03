@@ -589,7 +589,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // visited
         let is_function_def_stmt = stmt.is_function_def_stmt();
         if !is_function_def_stmt {
-            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+            self.with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context));
         }
 
         // Step 0: Pre-processing
@@ -1207,7 +1207,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+        self.with_semantic_checker(|semantic, context| semantic.enter_expr(expr, context));
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()
@@ -2592,7 +2592,7 @@ impl<'a> Checker<'a> {
                     unreachable!("Expected Stmt::FunctionDef")
                 };
 
-                self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+                self.with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context));
 
                 self.visit_parameters(parameters);
                 // Set the docstring state before visiting the function body.

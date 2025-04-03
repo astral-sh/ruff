@@ -325,7 +325,11 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
+    /// Check `stmt` for semantic syntax errors and update the checker's internal state.
+    ///
+    /// This should be followed by a call to [`SemanticSyntaxChecker::exit_stmt`] to reset any state
+    /// specific to scopes introduced by `stmt`, such as whether the body of a function is async.
+    pub fn enter_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         // check for errors
         self.check_stmt(stmt, ctx);
 
@@ -355,7 +359,12 @@ impl SemanticSyntaxChecker {
         self.restore_checkpoint();
     }
 
-    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
+    /// Check `expr` for semantic syntax errors and update the checker's internal state.
+    ///
+    /// This should be followed by a call to [`SemanticSyntaxChecker::exit_expr`] to reset any state
+    /// specific to scopes introduced by `expr`, such as whether the body of a comprehension is
+    /// async.
+    pub fn enter_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         self.check_expr(expr, ctx);
         self.save_checkpoint();
         match expr {
@@ -942,13 +951,13 @@ where
     Ctx: SemanticSyntaxContext,
 {
     fn visit_stmt(&mut self, stmt: &'_ Stmt) {
-        self.checker.visit_stmt(stmt, &self.context);
+        self.checker.enter_stmt(stmt, &self.context);
         ruff_python_ast::visitor::walk_stmt(self, stmt);
         self.checker.exit_stmt();
     }
 
     fn visit_expr(&mut self, expr: &'_ Expr) {
-        self.checker.visit_expr(expr, &self.context);
+        self.checker.enter_expr(expr, &self.context);
         ruff_python_ast::visitor::walk_expr(self, expr);
         self.checker.exit_expr();
     }
