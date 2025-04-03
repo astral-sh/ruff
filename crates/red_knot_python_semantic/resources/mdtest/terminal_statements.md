@@ -654,9 +654,7 @@ def f(cond: bool) -> str:
         reveal_type(x)  # revealed: Literal["before"]
         return "a"
         x = "after-return"
-        # TODO: no unresolved-reference error
-        # error: [unresolved-reference]
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: Never
     else:
         x = "else"
     return reveal_type(x)  # revealed: Literal["else"]

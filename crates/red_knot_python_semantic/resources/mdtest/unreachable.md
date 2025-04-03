@@ -211,9 +211,6 @@ def f():
 
     print("unreachable")
 
-    # TODO: we should not emit an error here; we currently do, since there is no control flow path from this
-    # use of 'x' to any definition of 'x'.
-    # error: [unresolved-reference]
     print(x)
 ```
 
@@ -228,8 +225,6 @@ def outer():
     x = 1
 
     def inner():
-        # TODO: we should not emit an error here
-        # error: [unresolved-reference]
         return x  # Name `x` used when not defined
     while True:
         pass
