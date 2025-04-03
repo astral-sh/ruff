@@ -146,16 +146,16 @@ impl SemanticSyntaxChecker {
                 let is_generic = type_params.is_some();
                 let mut visitor = InvalidExpressionVisitor {
                     allow_named_expr: !is_generic,
-                    place: InvalidExpressionPlace::TypeAnnotation,
+                    position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
                 };
                 if let Some(type_params) = type_params {
                     visitor.visit_type_params(type_params);
                 }
                 if is_generic {
-                    visitor.place = InvalidExpressionPlace::GenericDefinition;
+                    visitor.position = InvalidExpressionPosition::GenericDefinition;
                 } else {
-                    visitor.place = InvalidExpressionPlace::TypeAnnotation;
+                    visitor.position = InvalidExpressionPosition::TypeAnnotation;
                 }
                 for param in parameters
                     .iter()
@@ -186,16 +186,16 @@ impl SemanticSyntaxChecker {
                 let is_generic = type_params.is_some();
                 let mut visitor = InvalidExpressionVisitor {
                     allow_named_expr: !is_generic,
-                    place: InvalidExpressionPlace::TypeAnnotation,
+                    position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
                 };
                 if let Some(type_params) = type_params {
                     visitor.visit_type_params(type_params);
                 }
                 if is_generic {
-                    visitor.place = InvalidExpressionPlace::GenericDefinition;
+                    visitor.position = InvalidExpressionPosition::GenericDefinition;
                 } else {
-                    visitor.place = InvalidExpressionPlace::BaseClass;
+                    visitor.position = InvalidExpressionPosition::BaseClass;
                 }
                 if let Some(arguments) = arguments {
                     visitor.visit_arguments(arguments);
@@ -213,7 +213,7 @@ impl SemanticSyntaxChecker {
                 // type Y = (x := 1)               # named expr in value
                 let mut visitor = InvalidExpressionVisitor {
                     allow_named_expr: false,
-                    place: InvalidExpressionPlace::TypeAlias,
+                    position: InvalidExpressionPosition::TypeAlias,
                     ctx,
                 };
                 visitor.visit_expr(value);
@@ -682,8 +682,8 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
-            SemanticSyntaxErrorKind::InvalidExpression(kind, place) => {
-                write!(f, "{kind} cannot be used within a {place}")
+            SemanticSyntaxErrorKind::InvalidExpression(kind, position) => {
+                write!(f, "{kind} cannot be used within a {position}")
             }
             SemanticSyntaxErrorKind::DuplicateMatchKey(key) => {
                 write!(
@@ -825,7 +825,7 @@ pub enum SemanticSyntaxErrorKind {
     /// type Y = (yield 1)
     /// def f[T](x: int) -> (y := 3): return x
     /// ```
-    InvalidExpression(InvalidExpressionKind, InvalidExpressionPlace),
+    InvalidExpression(InvalidExpressionKind, InvalidExpressionPosition),
 
     /// Represents a duplicate key in a `match` mapping pattern.
     ///
@@ -890,7 +890,7 @@ pub enum SemanticSyntaxErrorKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum InvalidExpressionPlace {
+pub enum InvalidExpressionPosition {
     TypeVarBound,
     TypeVarDefault,
     TypeVarTupleDefault,
@@ -901,17 +901,17 @@ pub enum InvalidExpressionPlace {
     TypeAlias,
 }
 
-impl Display for InvalidExpressionPlace {
+impl Display for InvalidExpressionPosition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            InvalidExpressionPlace::TypeVarBound => "TypeVar bound",
-            InvalidExpressionPlace::TypeVarDefault => "TypeVar default",
-            InvalidExpressionPlace::TypeVarTupleDefault => "TypeVarTuple default",
-            InvalidExpressionPlace::ParamSpecDefault => "ParamSpec default",
-            InvalidExpressionPlace::TypeAnnotation => "type annotation",
-            InvalidExpressionPlace::GenericDefinition => "generic definition",
-            InvalidExpressionPlace::BaseClass => "base class",
-            InvalidExpressionPlace::TypeAlias => "type alias",
+            InvalidExpressionPosition::TypeVarBound => "TypeVar bound",
+            InvalidExpressionPosition::TypeVarDefault => "TypeVar default",
+            InvalidExpressionPosition::TypeVarTupleDefault => "TypeVarTuple default",
+            InvalidExpressionPosition::ParamSpecDefault => "ParamSpec default",
+            InvalidExpressionPosition::TypeAnnotation => "type annotation",
+            InvalidExpressionPosition::GenericDefinition => "generic definition",
+            InvalidExpressionPosition::BaseClass => "base class",
+            InvalidExpressionPosition::TypeAlias => "type alias",
         })
     }
 }
@@ -1066,7 +1066,7 @@ struct InvalidExpressionVisitor<'a, Ctx> {
     /// Context used for emitting errors.
     ctx: &'a Ctx,
 
-    place: InvalidExpressionPlace,
+    position: InvalidExpressionPosition,
 }
 
 impl<Ctx> Visitor<'_> for InvalidExpressionVisitor<'_, Ctx>
@@ -1080,7 +1080,7 @@ where
                     self.ctx,
                     SemanticSyntaxErrorKind::InvalidExpression(
                         InvalidExpressionKind::NamedExpr,
-                        self.place,
+                        self.position,
                     ),
                     *range,
                 );
@@ -1091,7 +1091,7 @@ where
                     self.ctx,
                     SemanticSyntaxErrorKind::InvalidExpression(
                         InvalidExpressionKind::Yield,
-                        self.place,
+                        self.position,
                     ),
                     *range,
                 );
@@ -1105,23 +1105,23 @@ where
         match type_param {
             ast::TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
                 if let Some(expr) = bound {
-                    self.place = InvalidExpressionPlace::TypeVarBound;
+                    self.position = InvalidExpressionPosition::TypeVarBound;
                     self.visit_expr(expr);
                 }
                 if let Some(expr) = default {
-                    self.place = InvalidExpressionPlace::TypeVarDefault;
+                    self.position = InvalidExpressionPosition::TypeVarDefault;
                     self.visit_expr(expr);
                 }
             }
             ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. }) => {
                 if let Some(expr) = default {
-                    self.place = InvalidExpressionPlace::TypeVarTupleDefault;
+                    self.position = InvalidExpressionPosition::TypeVarTupleDefault;
                     self.visit_expr(expr);
                 }
             }
             ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => {
                 if let Some(expr) = default {
-                    self.place = InvalidExpressionPlace::ParamSpecDefault;
+                    self.position = InvalidExpressionPosition::ParamSpecDefault;
                     self.visit_expr(expr);
                 }
             }
