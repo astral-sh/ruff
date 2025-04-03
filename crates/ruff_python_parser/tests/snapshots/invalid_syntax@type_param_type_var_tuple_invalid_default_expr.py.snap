@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/type_param_type_var_tuple_invalid_default_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -319,4 +318,25 @@ Module(
 4 | type X[*Ts = yield from x] = int
 5 | type X[*Ts = x := int] = int
   |                ^^ Syntax Error: Expected ',', found ':='
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | type X[*Ts = *int] = int
+2 | type X[*Ts = *int or str] = int
+3 | type X[*Ts = yield x] = int
+  |              ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVarTuple default
+4 | type X[*Ts = yield from x] = int
+5 | type X[*Ts = x := int] = int
+  |
+
+
+  |
+2 | type X[*Ts = *int or str] = int
+3 | type X[*Ts = yield x] = int
+4 | type X[*Ts = yield from x] = int
+  |              ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVarTuple default
+5 | type X[*Ts = x := int] = int
   |

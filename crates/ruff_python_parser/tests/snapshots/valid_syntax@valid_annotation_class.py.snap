@@ -1,0 +1,65 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/valid_annotation_class.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..24,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    range: 0..23,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("F"),
+                        range: 6..7,
+                    },
+                    type_params: None,
+                    arguments: Some(
+                        Arguments {
+                            range: 7..18,
+                            args: [
+                                Named(
+                                    ExprNamed {
+                                        range: 8..17,
+                                        target: Name(
+                                            ExprName {
+                                                range: 8..9,
+                                                id: Name("y"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                range: 13..17,
+                                                id: Name("list"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 20..23,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 20..23,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

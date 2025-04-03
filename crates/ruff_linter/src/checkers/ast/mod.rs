@@ -573,6 +573,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
+            | SemanticSyntaxErrorKind::InvalidExpression(..)
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression => {
