@@ -578,9 +578,11 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
+            | SemanticSyntaxErrorKind::InvalidExpression(..)
+            | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
+            | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
-            | SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(_)
-            | SemanticSyntaxErrorKind::DuplicateMatchKey(_) => {
+            | SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(_) => {
                 if self.settings.preview.is_enabled() {
                     self.semantic_errors.borrow_mut().push(error);
                 }

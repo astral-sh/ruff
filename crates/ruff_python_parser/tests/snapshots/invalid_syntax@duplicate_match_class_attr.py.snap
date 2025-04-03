@@ -1,0 +1,715 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/duplicate_match_class_attr.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..231,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..230,
+                    subject: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..38,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 18..33,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 18..23,
+                                            id: Name("Class"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 23..33,
+                                        patterns: [],
+                                        keywords: [
+                                            PatternKeyword {
+                                                range: 24..27,
+                                                attr: Identifier {
+                                                    id: Name("x"),
+                                                    range: 24..25,
+                                                },
+                                                pattern: MatchValue(
+                                                    PatternMatchValue {
+                                                        range: 26..27,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 26..27,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                            PatternKeyword {
+                                                range: 29..32,
+                                                attr: Identifier {
+                                                    id: Name("x"),
+                                                    range: 29..30,
+                                                },
+                                                pattern: MatchValue(
+                                                    PatternMatchValue {
+                                                        range: 31..32,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 31..32,
+                                                                value: Int(
+                                                                    2,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 35..38,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 35..38,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 43..70,
+                            pattern: MatchSequence(
+                                PatternMatchSequence {
+                                    range: 48..65,
+                                    patterns: [
+                                        MatchClass(
+                                            PatternMatchClass {
+                                                range: 49..64,
+                                                cls: Name(
+                                                    ExprName {
+                                                        range: 49..54,
+                                                        id: Name("Class"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                arguments: PatternArguments {
+                                                    range: 54..64,
+                                                    patterns: [],
+                                                    keywords: [
+                                                        PatternKeyword {
+                                                            range: 55..58,
+                                                            attr: Identifier {
+                                                                id: Name("x"),
+                                                                range: 55..56,
+                                                            },
+                                                            pattern: MatchValue(
+                                                                PatternMatchValue {
+                                                                    range: 57..58,
+                                                                    value: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 57..58,
+                                                                            value: Int(
+                                                                                1,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                        PatternKeyword {
+                                                            range: 60..63,
+                                                            attr: Identifier {
+                                                                id: Name("x"),
+                                                                range: 60..61,
+                                                            },
+                                                            pattern: MatchValue(
+                                                                PatternMatchValue {
+                                                                    range: 62..63,
+                                                                    value: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 62..63,
+                                                                            value: Int(
+                                                                                2,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ],
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 67..70,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 67..70,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 75..113,
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    range: 80..108,
+                                    keys: [
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 81..84,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 81..84,
+                                                            value: "x",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                range: 89..92,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 89..92,
+                                                            value: "y",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchAs(
+                                            PatternMatchAs {
+                                                range: 86..87,
+                                                pattern: None,
+                                                name: Some(
+                                                    Identifier {
+                                                        id: Name("x"),
+                                                        range: 86..87,
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchClass(
+                                            PatternMatchClass {
+                                                range: 94..107,
+                                                cls: Name(
+                                                    ExprName {
+                                                        range: 94..97,
+                                                        id: Name("Foo"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                arguments: PatternArguments {
+                                                    range: 97..107,
+                                                    patterns: [],
+                                                    keywords: [
+                                                        PatternKeyword {
+                                                            range: 98..101,
+                                                            attr: Identifier {
+                                                                id: Name("x"),
+                                                                range: 98..99,
+                                                            },
+                                                            pattern: MatchValue(
+                                                                PatternMatchValue {
+                                                                    range: 100..101,
+                                                                    value: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 100..101,
+                                                                            value: Int(
+                                                                                1,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                        PatternKeyword {
+                                                            range: 103..106,
+                                                            attr: Identifier {
+                                                                id: Name("x"),
+                                                                range: 103..104,
+                                                            },
+                                                            pattern: MatchValue(
+                                                                PatternMatchValue {
+                                                                    range: 105..106,
+                                                                    value: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 105..106,
+                                                                            value: Int(
+                                                                                2,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ],
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 110..113,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 110..113,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 118..162,
+                            pattern: MatchSequence(
+                                PatternMatchSequence {
+                                    range: 123..157,
+                                    patterns: [
+                                        MatchMapping(
+                                            PatternMatchMapping {
+                                                range: 124..126,
+                                                keys: [],
+                                                patterns: [],
+                                                rest: None,
+                                            },
+                                        ),
+                                        MatchMapping(
+                                            PatternMatchMapping {
+                                                range: 128..156,
+                                                keys: [
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 129..132,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 129..132,
+                                                                        value: "x",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Double,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                    StringLiteral(
+                                                        ExprStringLiteral {
+                                                            range: 137..140,
+                                                            value: StringLiteralValue {
+                                                                inner: Single(
+                                                                    StringLiteral {
+                                                                        range: 137..140,
+                                                                        value: "y",
+                                                                        flags: StringLiteralFlags {
+                                                                            quote_style: Double,
+                                                                            prefix: Empty,
+                                                                            triple_quoted: false,
+                                                                        },
+                                                                    },
+                                                                ),
+                                                            },
+                                                        },
+                                                    ),
+                                                ],
+                                                patterns: [
+                                                    MatchAs(
+                                                        PatternMatchAs {
+                                                            range: 134..135,
+                                                            pattern: None,
+                                                            name: Some(
+                                                                Identifier {
+                                                                    id: Name("x"),
+                                                                    range: 134..135,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                    MatchClass(
+                                                        PatternMatchClass {
+                                                            range: 142..155,
+                                                            cls: Name(
+                                                                ExprName {
+                                                                    range: 142..145,
+                                                                    id: Name("Foo"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                            arguments: PatternArguments {
+                                                                range: 145..155,
+                                                                patterns: [],
+                                                                keywords: [
+                                                                    PatternKeyword {
+                                                                        range: 146..149,
+                                                                        attr: Identifier {
+                                                                            id: Name("x"),
+                                                                            range: 146..147,
+                                                                        },
+                                                                        pattern: MatchValue(
+                                                                            PatternMatchValue {
+                                                                                range: 148..149,
+                                                                                value: NumberLiteral(
+                                                                                    ExprNumberLiteral {
+                                                                                        range: 148..149,
+                                                                                        value: Int(
+                                                                                            1,
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                    PatternKeyword {
+                                                                        range: 151..154,
+                                                                        attr: Identifier {
+                                                                            id: Name("x"),
+                                                                            range: 151..152,
+                                                                        },
+                                                                        pattern: MatchValue(
+                                                                            PatternMatchValue {
+                                                                                range: 153..154,
+                                                                                value: NumberLiteral(
+                                                                                    ExprNumberLiteral {
+                                                                                        range: 153..154,
+                                                                                        value: Int(
+                                                                                            2,
+                                                                                        ),
+                                                                                    },
+                                                                                ),
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                ],
+                                                            },
+                                                        },
+                                                    ),
+                                                ],
+                                                rest: None,
+                                            },
+                                        ),
+                                    ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 159..162,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 159..162,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 167..230,
+                            pattern: MatchClass(
+                                PatternMatchClass {
+                                    range: 172..225,
+                                    cls: Name(
+                                        ExprName {
+                                            range: 172..177,
+                                            id: Name("Class"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    arguments: PatternArguments {
+                                        range: 177..225,
+                                        patterns: [],
+                                        keywords: [
+                                            PatternKeyword {
+                                                range: 178..181,
+                                                attr: Identifier {
+                                                    id: Name("x"),
+                                                    range: 178..179,
+                                                },
+                                                pattern: MatchValue(
+                                                    PatternMatchValue {
+                                                        range: 180..181,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 180..181,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                            PatternKeyword {
+                                                range: 183..201,
+                                                attr: Identifier {
+                                                    id: Name("d"),
+                                                    range: 183..184,
+                                                },
+                                                pattern: MatchMapping(
+                                                    PatternMatchMapping {
+                                                        range: 185..201,
+                                                        keys: [
+                                                            StringLiteral(
+                                                                ExprStringLiteral {
+                                                                    range: 186..189,
+                                                                    value: StringLiteralValue {
+                                                                        inner: Single(
+                                                                            StringLiteral {
+                                                                                range: 186..189,
+                                                                                value: "x",
+                                                                                flags: StringLiteralFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: Empty,
+                                                                                    triple_quoted: false,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                },
+                                                            ),
+                                                            StringLiteral(
+                                                                ExprStringLiteral {
+                                                                    range: 194..197,
+                                                                    value: StringLiteralValue {
+                                                                        inner: Single(
+                                                                            StringLiteral {
+                                                                                range: 194..197,
+                                                                                value: "x",
+                                                                                flags: StringLiteralFlags {
+                                                                                    quote_style: Double,
+                                                                                    prefix: Empty,
+                                                                                    triple_quoted: false,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                    },
+                                                                },
+                                                            ),
+                                                        ],
+                                                        patterns: [
+                                                            MatchValue(
+                                                                PatternMatchValue {
+                                                                    range: 191..192,
+                                                                    value: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 191..192,
+                                                                            value: Int(
+                                                                                1,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                            MatchValue(
+                                                                PatternMatchValue {
+                                                                    range: 199..200,
+                                                                    value: NumberLiteral(
+                                                                        ExprNumberLiteral {
+                                                                            range: 199..200,
+                                                                            value: Int(
+                                                                                2,
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        ],
+                                                        rest: None,
+                                                    },
+                                                ),
+                                            },
+                                            PatternKeyword {
+                                                range: 203..224,
+                                                attr: Identifier {
+                                                    id: Name("other"),
+                                                    range: 203..208,
+                                                },
+                                                pattern: MatchClass(
+                                                    PatternMatchClass {
+                                                        range: 209..224,
+                                                        cls: Name(
+                                                            ExprName {
+                                                                range: 209..214,
+                                                                id: Name("Class"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        arguments: PatternArguments {
+                                                            range: 214..224,
+                                                            patterns: [],
+                                                            keywords: [
+                                                                PatternKeyword {
+                                                                    range: 215..218,
+                                                                    attr: Identifier {
+                                                                        id: Name("x"),
+                                                                        range: 215..216,
+                                                                    },
+                                                                    pattern: MatchValue(
+                                                                        PatternMatchValue {
+                                                                            range: 217..218,
+                                                                            value: NumberLiteral(
+                                                                                ExprNumberLiteral {
+                                                                                    range: 217..218,
+                                                                                    value: Int(
+                                                                                        1,
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                PatternKeyword {
+                                                                    range: 220..223,
+                                                                    attr: Identifier {
+                                                                        id: Name("x"),
+                                                                        range: 220..221,
+                                                                    },
+                                                                    pattern: MatchValue(
+                                                                        PatternMatchValue {
+                                                                            range: 222..223,
+                                                                            value: NumberLiteral(
+                                                                                ExprNumberLiteral {
+                                                                                    range: 222..223,
+                                                                                    value: Int(
+                                                                                        2,
+                                                                                    ),
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    ),
+                                                                },
+                                                            ],
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                    },
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 227..230,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 227..230,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | match x:
+2 |     case Class(x=1, x=2): ...
+  |                     ^ Syntax Error: attribute name `x` repeated in class pattern
+3 |     case [Class(x=1, x=2)]: ...
+4 |     case {"x": x, "y": Foo(x=1, x=2)}: ...
+  |
+
+
+  |
+1 | match x:
+2 |     case Class(x=1, x=2): ...
+3 |     case [Class(x=1, x=2)]: ...
+  |                      ^ Syntax Error: attribute name `x` repeated in class pattern
+4 |     case {"x": x, "y": Foo(x=1, x=2)}: ...
+5 |     case [{}, {"x": x, "y": Foo(x=1, x=2)}]: ...
+  |
+
+
+  |
+2 |     case Class(x=1, x=2): ...
+3 |     case [Class(x=1, x=2)]: ...
+4 |     case {"x": x, "y": Foo(x=1, x=2)}: ...
+  |                                 ^ Syntax Error: attribute name `x` repeated in class pattern
+5 |     case [{}, {"x": x, "y": Foo(x=1, x=2)}]: ...
+6 |     case Class(x=1, d={"x": 1, "x": 2}, other=Class(x=1, x=2)): ...
+  |
+
+
+  |
+3 |     case [Class(x=1, x=2)]: ...
+4 |     case {"x": x, "y": Foo(x=1, x=2)}: ...
+5 |     case [{}, {"x": x, "y": Foo(x=1, x=2)}]: ...
+  |                                      ^ Syntax Error: attribute name `x` repeated in class pattern
+6 |     case Class(x=1, d={"x": 1, "x": 2}, other=Class(x=1, x=2)): ...
+  |
+
+
+  |
+4 |     case {"x": x, "y": Foo(x=1, x=2)}: ...
+5 |     case [{}, {"x": x, "y": Foo(x=1, x=2)}]: ...
+6 |     case Class(x=1, d={"x": 1, "x": 2}, other=Class(x=1, x=2)): ...
+  |                                ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
+  |
+
+
+  |
+4 |     case {"x": x, "y": Foo(x=1, x=2)}: ...
+5 |     case [{}, {"x": x, "y": Foo(x=1, x=2)}]: ...
+6 |     case Class(x=1, d={"x": 1, "x": 2}, other=Class(x=1, x=2)): ...
+  |                                                          ^ Syntax Error: attribute name `x` repeated in class pattern
+  |

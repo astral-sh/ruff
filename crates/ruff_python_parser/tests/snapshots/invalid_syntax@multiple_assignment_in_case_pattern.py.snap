@@ -391,18 +391,17 @@ Module(
                                             PatternKeyword {
                                                 range: 331..334,
                                                 attr: Identifier {
-                                                    id: Name("x"),
+                                                    id: Name("y"),
                                                     range: 331..332,
                                                 },
-                                                pattern: MatchValue(
-                                                    PatternMatchValue {
+                                                pattern: MatchAs(
+                                                    PatternMatchAs {
                                                         range: 333..334,
-                                                        value: NumberLiteral(
-                                                            ExprNumberLiteral {
+                                                        pattern: None,
+                                                        name: Some(
+                                                            Identifier {
+                                                                id: Name("x"),
                                                                 range: 333..334,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
                                                             },
                                                         ),
                                                     },
@@ -411,18 +410,17 @@ Module(
                                             PatternKeyword {
                                                 range: 336..339,
                                                 attr: Identifier {
-                                                    id: Name("x"),
+                                                    id: Name("z"),
                                                     range: 336..337,
                                                 },
-                                                pattern: MatchValue(
-                                                    PatternMatchValue {
+                                                pattern: MatchAs(
+                                                    PatternMatchAs {
                                                         range: 338..339,
-                                                        value: NumberLiteral(
-                                                            ExprNumberLiteral {
+                                                        pattern: None,
+                                                        name: Some(
+                                                            Identifier {
+                                                                id: Name("x"),
                                                                 range: 338..339,
-                                                                value: Int(
-                                                                    2,
-                                                                ),
                                                             },
                                                         ),
                                                     },
@@ -518,18 +516,17 @@ Module(
                                                         PatternKeyword {
                                                             range: 398..401,
                                                             attr: Identifier {
-                                                                id: Name("x"),
+                                                                id: Name("y"),
                                                                 range: 398..399,
                                                             },
-                                                            pattern: MatchValue(
-                                                                PatternMatchValue {
+                                                            pattern: MatchAs(
+                                                                PatternMatchAs {
                                                                     range: 400..401,
-                                                                    value: NumberLiteral(
-                                                                        ExprNumberLiteral {
+                                                                    pattern: None,
+                                                                    name: Some(
+                                                                        Identifier {
+                                                                            id: Name("x"),
                                                                             range: 400..401,
-                                                                            value: Int(
-                                                                                1,
-                                                                            ),
                                                                         },
                                                                     ),
                                                                 },
@@ -538,18 +535,17 @@ Module(
                                                         PatternKeyword {
                                                             range: 403..406,
                                                             attr: Identifier {
-                                                                id: Name("x"),
+                                                                id: Name("z"),
                                                                 range: 403..404,
                                                             },
-                                                            pattern: MatchValue(
-                                                                PatternMatchValue {
+                                                            pattern: MatchAs(
+                                                                PatternMatchAs {
                                                                     range: 405..406,
-                                                                    value: NumberLiteral(
-                                                                        ExprNumberLiteral {
+                                                                    pattern: None,
+                                                                    name: Some(
+                                                                        Identifier {
+                                                                            id: Name("x"),
                                                                             range: 405..406,
-                                                                            value: Int(
-                                                                                2,
-                                                                            ),
                                                                         },
                                                                     ),
                                                                 },
@@ -681,7 +677,7 @@ Module(
 6 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
   |                   ^ Syntax Error: multiple assignments to name `x` in pattern
 7 |     case Class(x, x): ...  # MatchClass positional
-8 |     case Class(x=1, x=2): ...  # MatchClass keyword
+8 |     case Class(y=x, z=x): ...  # MatchClass keyword
   |
 
 
@@ -690,33 +686,33 @@ Module(
 6 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
 7 |     case Class(x, x): ...  # MatchClass positional
   |                   ^ Syntax Error: multiple assignments to name `x` in pattern
-8 |     case Class(x=1, x=2): ...  # MatchClass keyword
-9 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+8 |     case Class(y=x, z=x): ...  # MatchClass keyword
+9 |     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
   |
 
 
    |
  6 |     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
  7 |     case Class(x, x): ...  # MatchClass positional
- 8 |     case Class(x=1, x=2): ...  # MatchClass keyword
-   |                     ^ Syntax Error: multiple assignments to name `x` in pattern
- 9 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+ 8 |     case Class(y=x, z=x): ...  # MatchClass keyword
+   |                       ^ Syntax Error: multiple assignments to name `x` in pattern
+ 9 |     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
 10 |     case x as x: ...  # MatchAs
    |
 
 
    |
  7 |     case Class(x, x): ...  # MatchClass positional
- 8 |     case Class(x=1, x=2): ...  # MatchClass keyword
- 9 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
-   |                                    ^ Syntax Error: multiple assignments to name `x` in pattern
+ 8 |     case Class(y=x, z=x): ...  # MatchClass keyword
+ 9 |     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
+   |                                      ^ Syntax Error: multiple assignments to name `x` in pattern
 10 |     case x as x: ...  # MatchAs
    |
 
 
    |
- 8 |     case Class(x=1, x=2): ...  # MatchClass keyword
- 9 |     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+ 8 |     case Class(y=x, z=x): ...  # MatchClass keyword
+ 9 |     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
 10 |     case x as x: ...  # MatchAs
    |               ^ Syntax Error: multiple assignments to name `x` in pattern
    |
