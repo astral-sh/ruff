@@ -950,14 +950,12 @@ impl<'db> Type<'db> {
                     )
             }
 
-            // Any heterogeneous tuple type is assignable to `tuple`. This needs to be a special
-            // case because the left-hand side tuple might be a gradual type, so we can not rely
-            // on subtyping.
-            (Type::Tuple(_), Type::Instance(instance))
-                if instance.class.is_known(db, KnownClass::Tuple) =>
-            {
-                true
-            }
+            // This special case is required because the left-hand side tuple might be a
+            // gradual type, so we can not rely on subtyping. This allows us to assign e.g.
+            // `tuple[Any, int]` to `tuple`.
+            (Type::Tuple(_), _) => KnownClass::Tuple
+                .to_instance(db)
+                .is_assignable_to(db, target),
 
             // `type[Any]` is assignable to any `type[...]` type, because `type[Any]` can
             // materialize to any `type[...]` type.
