@@ -1,8 +1,10 @@
 //! [`SemanticSyntaxChecker`] for AST-based syntax errors.
 //!
 //! This checker is not responsible for traversing the AST itself. Instead, its
-//! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
-//! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
+//! [`SemanticSyntaxChecker::enter_stmt`] and [`SemanticSyntaxChecker::enter_expr`] methods should
+//! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively, and
+//! followed by matching calls to [`SemanticSyntaxChecker::exit_stmt`] and
+//! [`SemanticSyntaxChecker::exit_expr`].
 
 use std::fmt::Display;
 
