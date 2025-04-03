@@ -201,7 +201,7 @@ If `python-platform` is not specified, we currently default to `all`:
 
 ```toml
 [environment]
-# python-platform not specified
+python-platform = "all"
 ```
 
 ```py

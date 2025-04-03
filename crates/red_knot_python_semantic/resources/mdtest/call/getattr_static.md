@@ -2,6 +2,11 @@
 
 ## Basic usage
 
+```toml
+[environment]
+python-platform = "all"
+```
+
 `inspect.getattr_static` is a function that returns attributes of an object without invoking the
 descriptor protocol (for caveats, see the [official documentation]).
 
