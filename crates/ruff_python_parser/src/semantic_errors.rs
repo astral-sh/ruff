@@ -1158,7 +1158,7 @@ where
                     self.visit_expr(expr);
                 }
             }
-        };
+        }
     }
 }
 
