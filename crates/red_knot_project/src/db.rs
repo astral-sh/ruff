@@ -159,7 +159,7 @@ impl salsa::Database for ProjectDatabase {
         }
 
         let event = event();
-        if matches!(event.kind, salsa::EventKind::WillCheckCancellation { .. }) {
+        if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
             return;
         }
 

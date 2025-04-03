@@ -72,7 +72,7 @@ pub(crate) fn dict_iter_missing_items(checker: &Checker, target: &Expr, iter: &E
 
     if tuple.len() != 2 {
         return;
-    };
+    }
 
     let Expr::Name(name) = iter else {
         return;

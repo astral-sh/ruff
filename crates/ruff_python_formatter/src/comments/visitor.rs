@@ -363,7 +363,7 @@ pub(super) enum CommentPlacement<'a> {
     /// Makes the comment a...
     ///
     /// * [trailing comment] of the [`preceding_node`] if both the [`following_node`] and [`preceding_node`] are not [None]
-    ///     and the comment and [`preceding_node`] are only separated by a space (there's no token between the comment and [`preceding_node`]).
+    ///   and the comment and [`preceding_node`] are only separated by a space (there's no token between the comment and [`preceding_node`]).
     /// * [leading comment] of the [`following_node`] if the [`following_node`] is not [None]
     /// * [trailing comment] of the [`preceding_node`] if the [`preceding_node`] is not [None]
     /// * [dangling comment] of the [`enclosing_node`].

@@ -573,12 +573,17 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
+            | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression => {
                 if self.settings.preview.is_enabled() {
                     self.semantic_errors.borrow_mut().push(error);
                 }
             }
         }
+    }
+
+    fn source(&self) -> &str {
+        self.source()
     }
 }
 
@@ -1159,7 +1164,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
             }
             _ => visitor::walk_stmt(self, stmt),
-        };
+        }
 
         if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
             match stmt {
@@ -1721,7 +1726,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope();
             }
             _ => {}
-        };
+        }
 
         // Step 4: Analysis
         match expr {

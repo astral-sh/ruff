@@ -659,7 +659,15 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_)
             | Type::SubclassOf(_) => self,
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(_)) | None => self,
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        typevar.name(db).clone(),
+                        typevar.definition(db),
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound.normalized(db))),
+                        typevar.default_ty(db),
+                    ))
+                }
                 Some(TypeVarBoundOrConstraints::Constraints(union)) => {
                     Type::TypeVar(TypeVarInstance::new(
                         db,
@@ -669,6 +677,7 @@ impl<'db> Type<'db> {
                         typevar.default_ty(db),
                     ))
                 }
+                None => self,
             },
         }
     }
@@ -727,7 +736,7 @@ impl<'db> Type<'db> {
 
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
-            // implicit upper bound of `object` (which is handled below).
+            // implicit upper bound of `object` (which is handled above).
             (Type::TypeVar(typevar), _) if typevar.bound_or_constraints(db).is_some() => {
                 match typevar.bound_or_constraints(db) {
                     None => unreachable!(),

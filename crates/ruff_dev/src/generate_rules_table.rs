@@ -5,6 +5,7 @@
 use itertools::Itertools;
 use ruff_linter::codes::RuleGroup;
 use std::borrow::Cow;
+use std::fmt::Write;
 use strum::IntoEnumIterator;
 
 use ruff_diagnostics::FixAvailability;
@@ -78,7 +79,8 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
         }
 
         #[allow(clippy::or_fun_call)]
-        table_out.push_str(&format!(
+        let _ = write!(
+            table_out,
             "| {ss}{0}{1}{se} {{ #{0}{1} }} | {ss}{2}{se} | {ss}{3}{se} | {ss}{4}{se} |",
             linter.common_prefix(),
             linter.code_for_rule(rule).unwrap(),
@@ -88,7 +90,7 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
                 .unwrap_or(format_args!("{rule_name}")),
             message,
             tokens,
-        ));
+        );
         table_out.push('\n');
     }
     table_out.push('\n');
@@ -101,29 +103,30 @@ pub(crate) fn generate() -> String {
     table_out.push_str("### Legend");
     table_out.push('\n');
 
-    table_out.push_str(&format!(
+    let _ = write!(
+        &mut table_out,
         "{SPACER}{STABLE_SYMBOL}{SPACER} The rule is stable."
-    ));
+    );
     table_out.push_str("<br />");
 
-    table_out.push_str(&format!(
+    let _ = write!(&mut table_out,
         "{SPACER}{PREVIEW_SYMBOL}{SPACER} The rule is unstable and is in [\"preview\"](faq.md#what-is-preview)."
-    ));
+    );
     table_out.push_str("<br />");
 
-    table_out.push_str(&format!(
+    let _ = write!(&mut table_out,
         "{SPACER}{WARNING_SYMBOL}{SPACER} The rule has been deprecated and will be removed in a future release."
-    ));
+    );
     table_out.push_str("<br />");
 
-    table_out.push_str(&format!(
+    let _ = write!(&mut table_out,
         "{SPACER}{REMOVED_SYMBOL}{SPACER} The rule has been removed only the documentation is available."
-    ));
+    );
     table_out.push_str("<br />");
 
-    table_out.push_str(&format!(
+    let _ = write!(&mut table_out,
         "{SPACER}{FIX_SYMBOL}{SPACER} The rule is automatically fixable by the `--fix` command-line option."
-    ));
+    );
     table_out.push_str("<br />");
     table_out.push('\n');
 
@@ -137,7 +140,7 @@ pub(crate) fn generate() -> String {
                 .join(", "),
             prefix => prefix.to_string(),
         };
-        table_out.push_str(&format!("### {} ({codes_csv})", linter.name()));
+        let _ = write!(&mut table_out, "### {} ({codes_csv})", linter.name());
         table_out.push('\n');
         table_out.push('\n');
 
@@ -147,7 +150,8 @@ pub(crate) fn generate() -> String {
                 .split('/')
                 .next()
                 .unwrap();
-            table_out.push_str(&format!(
+            let _ = write!(
+                table_out,
                 "For more, see [{}]({}) on {}.",
                 linter.name(),
                 url,
@@ -160,17 +164,18 @@ pub(crate) fn generate() -> String {
                         linter.name()
                     ),
                 }
-            ));
+            );
             table_out.push('\n');
             table_out.push('\n');
         }
 
         if Options::metadata().has(&format!("lint.{}", linter.name())) {
-            table_out.push_str(&format!(
+            let _ = write!(
+                table_out,
                 "For related settings, see [{}](settings.md#lint{}).",
                 linter.name(),
                 linter.name(),
-            ));
+            );
             table_out.push('\n');
             table_out.push('\n');
         }
@@ -200,10 +205,10 @@ pub(crate) fn generate() -> String {
                     let UpstreamCategoryAndPrefix { category, prefix } = opt.unwrap();
                     match codes_csv.as_str() {
                         "PL" => {
-                            table_out.push_str(&format!("#### {category} ({codes_csv}{prefix})"));
+                            let _ = write!(table_out, "#### {category} ({codes_csv}{prefix})");
                         }
                         _ => {
-                            table_out.push_str(&format!("#### {category} ({prefix})"));
+                            let _ = write!(table_out, "#### {category} ({prefix})");
                         }
                     }
                 }

@@ -97,7 +97,7 @@ pub(crate) fn assert_raises_exception(checker: &Checker, items: &[WithItem]) {
                 && arguments.find_keyword("match").is_none())
         {
             continue;
-        };
+        }
 
         checker.report_diagnostic(Diagnostic::new(
             AssertRaisesException { exception },

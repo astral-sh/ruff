@@ -5,10 +5,10 @@ use serde_json::error::Category;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fs::File;
+use std::io;
 use std::io::{BufReader, Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 use std::sync::OnceLock;
-use std::{io, iter};
 use thiserror::Error;
 
 use ruff_diagnostics::{SourceMap, SourceMarker};
@@ -340,9 +340,10 @@ impl Notebook {
                     }
                 }
             };
-            row_to_cell.extend(
-                iter::repeat(OneIndexed::from_zero_indexed(cell_index as usize)).take(line_count),
-            );
+            row_to_cell.extend(std::iter::repeat_n(
+                OneIndexed::from_zero_indexed(cell_index as usize),
+                line_count,
+            ));
             row_to_row_in_cell.extend((0..line_count).map(OneIndexed::from_zero_indexed));
         }
 

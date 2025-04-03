@@ -645,7 +645,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
                 if let Some(asname) = &alias.asname {
-                    let name = alias.name.split('.').last().unwrap();
+                    let name = alias.name.split('.').next_back().unwrap();
                     if checker.enabled(Rule::ConstantImportedAsNonConstant) {
                         if let Some(diagnostic) =
                             pep8_naming::rules::constant_imported_as_non_constant(
