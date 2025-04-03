@@ -100,7 +100,7 @@ impl Display for DisplayRepresentation<'_> {
                     instance = bound_method.self_instance(self.db).display(self.db)
                 )
             }
-            Type::Specialized(specialized) => {
+            Type::SpecializedCallable(specialized) => {
                 write!(
                     f,
                     "<specialization of {callable}>",

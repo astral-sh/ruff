@@ -87,7 +87,7 @@ impl<'db> ClassBase<'db> {
             | Type::SubclassOf(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy => None,
-            Type::Specialized(specialized) => {
+            Type::SpecializedCallable(specialized) => {
                 // XXX: Specialize the result
                 Self::try_from_type(db, specialized.callable_type(db))
             }
