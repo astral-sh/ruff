@@ -100,12 +100,6 @@ from airflow.kubernetes.secret import K8SModel2, Secret
 from airflow.kubernetes.volume import Volume
 from airflow.kubernetes.volume_mount import VolumeMount
 from airflow.macros.hive import closest_ds_partition, max_partition
-from airflow.operators import (
-    dagrun_operator,
-    dummy_operator,
-    email_operator,
-    python_operator,
-)
 from airflow.operators.bash import BashOperator
 from airflow.operators.bash_operator import BashOperator as LegacyBashOperator
 from airflow.operators.check_operator import (
@@ -204,7 +198,6 @@ from airflow.operators.sql import (
 from airflow.operators.sqlite_operator import SqliteOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
-from airflow.sensors import external_task_sensor
 from airflow.sensors.date_time import DateTimeSensor
 from airflow.sensors.date_time_sensor import DateTimeSensor
 from airflow.sensors.external_task import (
