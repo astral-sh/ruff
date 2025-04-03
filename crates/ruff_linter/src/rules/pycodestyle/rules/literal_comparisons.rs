@@ -353,7 +353,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         format!("not {comparator_str}")
                     };
 
-                    // NOTE: Adding paranthesis if left is boolean and enclosed in parentheses
+                    // NOTE: Adding parenthesis if left is boolean and enclosed in parentheses
                     if compare.left.range().start() == compare.range().start() {
                         content
                     } else {
