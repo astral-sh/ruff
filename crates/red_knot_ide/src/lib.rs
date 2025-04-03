@@ -310,6 +310,8 @@ mod tests {
 
         let mut insta_settings = insta::Settings::clone_current();
         insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        // Filter out TODO types because they are different between debug and release builds.
+        insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
 
         let insta_settings_guard = insta_settings.bind_to_scope();
 

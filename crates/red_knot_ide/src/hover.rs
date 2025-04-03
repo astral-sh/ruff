@@ -394,10 +394,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        @Todo(PEP-695 ParamSpec definition types)
+        @Todo
         ---------------------------------------------
         ```text
-        @Todo(PEP-695 ParamSpec definition types)
+        @Todo
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
@@ -420,10 +420,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        @Todo(PEP-695 TypeVarTuple definition types)
+        @Todo
         ---------------------------------------------
         ```text
-        @Todo(PEP-695 TypeVarTuple definition types)
+        @Todo
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
