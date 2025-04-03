@@ -312,7 +312,10 @@ pub enum Type<'db> {
     /// A heterogeneous tuple type, with elements of the given types in source order.
     // TODO: Support variable length homogeneous tuple type like `tuple[int, ...]`.
     Tuple(TupleType<'db>),
-    // TODO protocols, callable types, overloads, generics, type vars
+    /// An instance of a typevar in a generic class or function. When the generic class or function
+    /// is specialized, we will replace this typevar with its specialization.
+    TypeVar(TypeVarInstance<'db>),
+    // TODO protocols, overloads, generics
 }
 
 #[salsa::tracked]
@@ -396,6 +399,15 @@ impl<'db> Type<'db> {
                 ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoProtocol) => true,
                 ClassBase::Dynamic(DynamicType::Unknown | DynamicType::Any) => false,
                 ClassBase::Class(_) => false,
+            },
+
+            Self::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.contains_todo(db),
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .any(|constraint| constraint.contains_todo(db)),
             },
 
             Self::Tuple(tuple) => tuple.elements(db).iter().any(|ty| ty.contains_todo(db)),
@@ -633,6 +645,27 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::IntLiteral(_)
             | Type::SubclassOf(_) => self,
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        typevar.name(db).clone(),
+                        typevar.definition(db),
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound.normalized(db))),
+                        typevar.default_ty(db),
+                    ))
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(union)) => {
+                    Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        typevar.name(db).clone(),
+                        typevar.definition(db),
+                        Some(TypeVarBoundOrConstraints::Constraints(union.normalized(db))),
+                        typevar.default_ty(db),
+                    ))
+                }
+                None => self,
+            },
         }
     }
 
@@ -680,6 +713,30 @@ impl<'db> Type<'db> {
             // Everything is a subtype of `object`.
             (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
 
+            // A fully static typevar is always a subtype of itself, and is never a subtype of any
+            // other typevar, since there is no guarantee that they will be specialized to the same
+            // type. (This is true even if both typevars are bounded by the same final class, since
+            // you can specialize the typevars to `Never` in addition to that final class.)
+            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
+                self_typevar == other_typevar
+            }
+
+            // A fully static typevar is a subtype of its upper bound, and to something similar to
+            // the union of its constraints. An unbound, unconstrained, fully static typevar has an
+            // implicit upper bound of `object` (which is handled above).
+            (Type::TypeVar(typevar), _) if typevar.bound_or_constraints(db).is_some() => {
+                match typevar.bound_or_constraints(db) {
+                    None => unreachable!(),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.is_subtype_of(db, target)
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| constraint.is_subtype_of(db, target)),
+                }
+            }
+
             (Type::Union(union), _) => union
                 .elements(db)
                 .iter()
@@ -689,6 +746,24 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
+
+            (_, Type::TypeVar(typevar)) => match typevar.bound_or_constraints(db) {
+                // No types are a subtype of a bounded typevar, or of an unbounded unconstrained
+                // typevar, since there's no guarantee what type the typevar will be specialized
+                // to. If the typevar is bounded, it might be specialized to a smaller type than
+                // the bound. (This is true even if the bound is a final class, since the typevar
+                // can still be specialized to `Never`.)
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                // If the typevar is constrained, there must be multiple constraints, and the
+                // typevar might be specialized to any one of them. However, the constraints do not
+                // have to be disjoint, which means an lhs type might be a subtype of all of the
+                // constraints.
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| self.is_subtype_of(db, *constraint)),
+            },
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -874,9 +949,9 @@ impl<'db> Type<'db> {
                 self.is_subtype_of(db, KnownClass::Property.to_instance(db))
             }
 
-            // Other than the special cases enumerated above,
-            // `Instance` types are never subtypes of any other variants
-            (Type::Instance(_), _) => false,
+            // Other than the special cases enumerated above, `Instance` types and typevars are
+            // never subtypes of any other variants
+            (Type::Instance(_) | Type::TypeVar(_), _) => false,
         }
     }
 
@@ -887,6 +962,7 @@ impl<'db> Type<'db> {
         if self.is_gradual_equivalent_to(db, target) {
             return true;
         }
+
         match (self, target) {
             // Never can be assigned to any type.
             (Type::Never, _) => true,
@@ -899,6 +975,30 @@ impl<'db> Type<'db> {
             // TODO this special case might be removable once the below cases are comprehensive
             (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
 
+            // A typevar is always assignable to itself, and is never assignable to any other
+            // typevar, since there is no guarantee that they will be specialized to the same
+            // type. (This is true even if both typevars are bounded by the same final class, since
+            // you can specialize the typevars to `Never` in addition to that final class.)
+            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
+                self_typevar == other_typevar
+            }
+
+            // A typevar is assignable to its upper bound, and to something similar to the union of
+            // its constraints. An unbound, unconstrained typevar has an implicit upper bound of
+            // `object` (which is handled above).
+            (Type::TypeVar(typevar), _) if typevar.bound_or_constraints(db).is_some() => {
+                match typevar.bound_or_constraints(db) {
+                    None => unreachable!(),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.is_assignable_to(db, target)
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| constraint.is_assignable_to(db, target)),
+                }
+            }
+
             // A union is assignable to a type T iff every element of the union is assignable to T.
             (Type::Union(union), ty) => union
                 .elements(db)
@@ -910,6 +1010,24 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
+
+            (_, Type::TypeVar(typevar)) => match typevar.bound_or_constraints(db) {
+                // No types are assignable to a bounded typevar, or to an unbounded unconstrained
+                // typevar, since there's no guarantee what type the typevar will be specialized
+                // to. If the typevar is bounded, it might be specialized to a smaller type than
+                // the bound. (This is true even if the bound is a final class, since the typevar
+                // can still be specialized to `Never`.)
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                // If the typevar is constrained, there must be multiple constraints, and the
+                // typevar might be specialized to any one of them. However, the constraints do not
+                // have to be disjoint, which means an lhs type might be assignable to all of the
+                // constraints.
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| self.is_assignable_to(db, *constraint)),
+            },
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is assignable to (A & B) because the left is assignable to both A and B,
@@ -1115,6 +1233,8 @@ impl<'db> Type<'db> {
                 }
             }
 
+            (Type::TypeVar(first), Type::TypeVar(second)) => first == second,
+
             (Type::Tuple(first), Type::Tuple(second)) => first.is_gradual_equivalent_to(db, second),
 
             (Type::Union(first), Type::Union(second)) => first.is_gradual_equivalent_to(db, second),
@@ -1140,6 +1260,33 @@ impl<'db> Type<'db> {
             (Type::Never, _) | (_, Type::Never) => true,
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => false,
+
+            // A typevar is never disjoint from itself, since all occurrences of the typevar must
+            // be specialized to the same type. (This is an important difference between typevars
+            // and `Any`!) Different typevars might be disjoint, depending on their bounds and
+            // constraints, which are handled below.
+            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar))
+                if self_typevar == other_typevar =>
+            {
+                false
+            }
+
+            // An unbounded typevar is never disjoint from any other type, since it might be
+            // specialized to any type. A bounded typevar is not disjoint from its bound, and is
+            // only disjoint from other types if its bound is. A constrained typevar is disjoint
+            // from a type if all of its constraints are.
+            (Type::TypeVar(typevar), other) | (other, Type::TypeVar(typevar)) => {
+                match typevar.bound_or_constraints(db) {
+                    None => false,
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        bound.is_disjoint_from(db, other)
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| constraint.is_disjoint_from(db, other)),
+                }
+            }
 
             (Type::Union(union), other) | (other, Type::Union(union)) => union
                 .elements(db)
@@ -1482,6 +1629,16 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::PropertyInstance(_) => true,
+
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => true,
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.is_fully_static(db),
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| constraint.is_fully_static(db)),
+            },
+
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.is_fully_static(),
             Type::ClassLiteral(_) | Type::Instance(_) => {
                 // TODO: Ideally, we would iterate over the MRO of the class, check if all
@@ -1533,6 +1690,21 @@ impl<'db> Type<'db> {
                 // are both of type Literal[345], for example.
                 false
             }
+
+            // An unbounded, unconstrained typevar is not a singleton, because it can be
+            // specialized to a non-singleton type. A bounded typevar is not a singleton, even if
+            // the bound is a final singleton class, since it can still be specialized to `Never`.
+            // A constrained typevar is a singleton if all of its constraints are singletons. (Note
+            // that you cannot specialize a constrained typevar to a subtype of a constraint.)
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| constraint.is_singleton(db)),
+            },
+
             // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
             Type::BooleanLiteral(_)
@@ -1610,6 +1782,21 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(..)
             | Type::SliceLiteral(..)
             | Type::KnownInstance(..) => true,
+
+            // An unbounded, unconstrained typevar is not single-valued, because it can be
+            // specialized to a multiple-valued type. A bounded typevar is not single-valued, even
+            // if the bound is a final single-valued class, since it can still be specialized to
+            // `Never`. A constrained typevar is single-valued if all of its constraints are
+            // single-valued. (Note that you cannot specialize a constrained typevar to a subtype
+            // of a constraint.)
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .all(|constraint| constraint.is_single_valued(db)),
+            },
 
             Type::SubclassOf(..) => {
                 // TODO: Same comment as above for `is_singleton`
@@ -1758,6 +1945,7 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
+            | Type::TypeVar(_)
             | Type::Instance(_)
             | Type::PropertyInstance(_) => None,
         }
@@ -1828,6 +2016,17 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
             Type::Callable(_) => KnownClass::Object.to_instance(db).instance_member(db, name),
+
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => KnownClass::Object.to_instance(db).instance_member(db, name),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.instance_member(db, name)
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .map_with_boundness_and_qualifiers(db, |constraint| {
+                        constraint.instance_member(db, name)
+                    }),
+            },
 
             Type::IntLiteral(_) => KnownClass::Int.to_instance(db).instance_member(db, name),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_instance(db).instance_member(db, name),
@@ -2265,6 +2464,7 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::SliceLiteral(..)
             | Type::Tuple(..)
+            | Type::TypeVar(..)
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..) => {
@@ -2384,6 +2584,108 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         allow_short_circuit: bool,
     ) -> Result<Truthiness, BoolError<'db>> {
+        let type_to_truthiness = |ty| {
+            if let Type::BooleanLiteral(bool_val) = ty {
+                Truthiness::from(bool_val)
+            } else {
+                Truthiness::Ambiguous
+            }
+        };
+
+        let try_dunder_bool = || {
+            // We only check the `__bool__` method for truth testing, even though at
+            // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
+            // and a subclass could add a `__bool__` method.
+
+            match self.try_call_dunder(db, "__bool__", CallArgumentTypes::none()) {
+                Ok(outcome) => {
+                    let return_type = outcome.return_type(db);
+                    if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                        // The type has a `__bool__` method, but it doesn't return a
+                        // boolean.
+                        return Err(BoolError::IncorrectReturnType {
+                            return_type,
+                            not_boolable_type: *self,
+                        });
+                    }
+                    Ok(type_to_truthiness(return_type))
+                }
+
+                Err(CallDunderError::PossiblyUnbound(outcome)) => {
+                    let return_type = outcome.return_type(db);
+                    if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
+                        // The type has a `__bool__` method, but it doesn't return a
+                        // boolean.
+                        return Err(BoolError::IncorrectReturnType {
+                            return_type: outcome.return_type(db),
+                            not_boolable_type: *self,
+                        });
+                    }
+
+                    // Don't trust possibly unbound `__bool__` method.
+                    Ok(Truthiness::Ambiguous)
+                }
+
+                Err(CallDunderError::MethodNotAvailable) => Ok(Truthiness::Ambiguous),
+                Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
+                    Err(BoolError::IncorrectArguments {
+                        truthiness: type_to_truthiness(bindings.return_type(db)),
+                        not_boolable_type: *self,
+                    })
+                }
+                Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
+                    Err(BoolError::NotCallable {
+                        not_boolable_type: *self,
+                    })
+                }
+                Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
+                    Err(BoolError::Other {
+                        not_boolable_type: *self,
+                    })
+                }
+            }
+        };
+
+        let try_union = |union: UnionType<'db>| {
+            let mut truthiness = None;
+            let mut all_not_callable = true;
+            let mut has_errors = false;
+
+            for element in union.elements(db) {
+                let element_truthiness = match element.try_bool_impl(db, allow_short_circuit) {
+                    Ok(truthiness) => truthiness,
+                    Err(err) => {
+                        has_errors = true;
+                        all_not_callable &= matches!(err, BoolError::NotCallable { .. });
+                        err.fallback_truthiness()
+                    }
+                };
+
+                truthiness.get_or_insert(element_truthiness);
+
+                if Some(element_truthiness) != truthiness {
+                    truthiness = Some(Truthiness::Ambiguous);
+
+                    if allow_short_circuit {
+                        return Ok(Truthiness::Ambiguous);
+                    }
+                }
+            }
+
+            if has_errors {
+                if all_not_callable {
+                    return Err(BoolError::NotCallable {
+                        not_boolable_type: *self,
+                    });
+                }
+                return Err(BoolError::Union {
+                    union,
+                    truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
+                });
+            }
+            Ok(truthiness.unwrap_or(Truthiness::Ambiguous))
+        };
+
         let truthiness = match self {
             Type::Dynamic(_) | Type::Never | Type::Callable(_) | Type::LiteralString => {
                 Truthiness::Ambiguous
@@ -2410,114 +2712,26 @@ impl<'db> Type<'db> {
                 }
             },
 
-            instance_ty @ Type::Instance(InstanceType { class }) => match class.known(db) {
-                Some(known_class) => known_class.bool(),
-                None => {
-                    // We only check the `__bool__` method for truth testing, even though at
-                    // runtime there is a fallback to `__len__`, since `__bool__` takes precedence
-                    // and a subclass could add a `__bool__` method.
-
-                    let type_to_truthiness = |ty| {
-                        if let Type::BooleanLiteral(bool_val) = ty {
-                            Truthiness::from(bool_val)
-                        } else {
-                            Truthiness::Ambiguous
-                        }
-                    };
-
-                    match self.try_call_dunder(db, "__bool__", CallArgumentTypes::none()) {
-                        Ok(outcome) => {
-                            let return_type = outcome.return_type(db);
-                            if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
-                                // The type has a `__bool__` method, but it doesn't return a
-                                // boolean.
-                                return Err(BoolError::IncorrectReturnType {
-                                    return_type,
-                                    not_boolable_type: *instance_ty,
-                                });
-                            }
-                            type_to_truthiness(return_type)
-                        }
-
-                        Err(CallDunderError::PossiblyUnbound(outcome)) => {
-                            let return_type = outcome.return_type(db);
-                            if !return_type.is_assignable_to(db, KnownClass::Bool.to_instance(db)) {
-                                // The type has a `__bool__` method, but it doesn't return a
-                                // boolean.
-                                return Err(BoolError::IncorrectReturnType {
-                                    return_type: outcome.return_type(db),
-                                    not_boolable_type: *instance_ty,
-                                });
-                            }
-
-                            // Don't trust possibly unbound `__bool__` method.
-                            Truthiness::Ambiguous
-                        }
-
-                        Err(CallDunderError::MethodNotAvailable) => Truthiness::Ambiguous,
-                        Err(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
-                            return Err(BoolError::IncorrectArguments {
-                                truthiness: type_to_truthiness(bindings.return_type(db)),
-                                not_boolable_type: *instance_ty,
-                            });
-                        }
-                        Err(CallDunderError::CallError(CallErrorKind::NotCallable, _)) => {
-                            return Err(BoolError::NotCallable {
-                                not_boolable_type: *instance_ty,
-                            });
-                        }
-                        Err(CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _)) => {
-                            return Err(BoolError::Other {
-                                not_boolable_type: *self,
-                            })
-                        }
-                    }
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => Truthiness::Ambiguous,
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.try_bool_impl(db, allow_short_circuit)?
                 }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    try_union(constraints)?
+                }
+            },
+
+            Type::Instance(InstanceType { class }) => match class.known(db) {
+                Some(known_class) => known_class.bool(),
+                None => try_dunder_bool()?,
             },
 
             Type::KnownInstance(known_instance) => known_instance.bool(),
 
             Type::PropertyInstance(_) => Truthiness::AlwaysTrue,
 
-            Type::Union(union) => {
-                let mut truthiness = None;
-                let mut all_not_callable = true;
-                let mut has_errors = false;
-
-                for element in union.elements(db) {
-                    let element_truthiness = match element.try_bool_impl(db, allow_short_circuit) {
-                        Ok(truthiness) => truthiness,
-                        Err(err) => {
-                            has_errors = true;
-                            all_not_callable &= matches!(err, BoolError::NotCallable { .. });
-                            err.fallback_truthiness()
-                        }
-                    };
-
-                    truthiness.get_or_insert(element_truthiness);
-
-                    if Some(element_truthiness) != truthiness {
-                        truthiness = Some(Truthiness::Ambiguous);
-
-                        if allow_short_circuit {
-                            return Ok(Truthiness::Ambiguous);
-                        }
-                    }
-                }
-
-                if has_errors {
-                    if all_not_callable {
-                        return Err(BoolError::NotCallable {
-                            not_boolable_type: *self,
-                        });
-                    }
-                    return Err(BoolError::Union {
-                        union: *union,
-                        truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
-                    });
-                }
-                truthiness.unwrap_or(Truthiness::Ambiguous)
-            }
+            Type::Union(union) => try_union(*union)?,
 
             Type::Intersection(_) => {
                 // TODO
@@ -3274,6 +3488,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::SliceLiteral(_)
             | Type::Tuple(_)
+            | Type::TypeVar(_)
             | Type::LiteralString
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => None,
@@ -3327,6 +3542,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::StringLiteral(_)
             | Type::Tuple(_)
+            | Type::TypeVar(_)
             | Type::Callable(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -3362,8 +3578,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Deque => Ok(KnownClass::Deque.to_instance(db)),
                 KnownInstanceType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
 
-                // TODO map this to a new `Type::TypeVar` variant
-                KnownInstanceType::TypeVar(_) => Ok(*self),
+                KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
 
                 // TODO: Use an opt-in rule for a bare `Callable`
                 KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
@@ -3541,6 +3756,17 @@ impl<'db> Type<'db> {
             Type::Callable(_) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
+
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => KnownClass::Object.to_class_literal(db),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    // TODO: If we add a proper `OneOf` connector, we should use that here instead
+                    // of union. (Using a union here doesn't break anything, but it is imprecise.)
+                    constraints.map(db, |constraint| constraint.to_meta_type(db))
+                }
+            },
+
             Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => *self,
@@ -3809,10 +4035,10 @@ impl<'db> InvalidTypeExpression<'db> {
 /// Data regarding a single type variable.
 ///
 /// This is referenced by `KnownInstanceType::TypeVar` (to represent the singleton type of the
-/// runtime `typing.TypeVar` object itself). In the future, it will also be referenced also by a
-/// new `Type` variant to represent the type that this typevar represents as an annotation: that
-/// is, an unknown set of objects, constrained by the upper-bound/constraints on this type var,
-/// defaulting to the default type of this type var when not otherwise bound to a type.
+/// runtime `typing.TypeVar` object itself), and by `Type::TypeVar` to represent the type that this
+/// typevar represents as an annotation: that is, an unknown set of objects, constrained by the
+/// upper-bound/constraints on this type var, defaulting to the default type of this type var when
+/// not otherwise bound to a type.
 ///
 /// This must be a tracked struct, not an interned one, because typevar equivalence is by identity,
 /// not by value. Two typevars that have the same name, bound/constraints, and default, are still
@@ -3856,7 +4082,7 @@ impl<'db> TypeVarInstance<'db> {
 #[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
-    Constraints(TupleType<'db>),
+    Constraints(UnionType<'db>),
 }
 
 /// Error returned if a type is not (or may not be) a context manager.
