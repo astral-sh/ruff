@@ -706,7 +706,7 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
             Edit::range_replacement(python_expr.to_string(), expr.range()),
         )),
         Details::Manual { guideline: _ } => {}
-    };
+    }
     checker.report_diagnostic(diagnostic);
 }
 

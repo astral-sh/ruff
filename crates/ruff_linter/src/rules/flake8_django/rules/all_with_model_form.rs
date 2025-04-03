@@ -95,7 +95,7 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
                         }
                     }
                     _ => (),
-                };
+                }
             }
         }
     }

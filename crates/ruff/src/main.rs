@@ -31,7 +31,7 @@ pub fn main() -> ExitCode {
 
     // support FORCE_COLOR env var
     if let Some(force_color) = std::env::var_os("FORCE_COLOR") {
-        if force_color.len() > 0 {
+        if !force_color.is_empty() {
             colored::control::set_override(true);
         }
     }

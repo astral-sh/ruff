@@ -288,7 +288,7 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
         .args
         .iter()
         .filter(|arg| arg.default.is_none())
-        .last()
+        .next_back()
     {
         // Case 1: at least one regular parameter, so append after the last one.
         Edit::insertion(format!(", {parameter}"), last.end())

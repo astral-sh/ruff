@@ -1448,7 +1448,7 @@ where
                 self.visit_expr(subject);
                 if cases.is_empty() {
                     return;
-                };
+                }
 
                 let after_subject = self.flow_snapshot();
                 let mut vis_constraints = vec![];

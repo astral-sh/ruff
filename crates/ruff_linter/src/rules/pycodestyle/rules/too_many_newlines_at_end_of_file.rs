@@ -68,7 +68,7 @@ pub(crate) fn too_many_newlines_at_end_of_file(
         diagnostics.extend(notebook_newline_diagnostics(tokens_iter, cell_offsets));
     } else if let Some(diagnostic) = newline_diagnostic(&mut tokens_iter, false) {
         diagnostics.push(diagnostic);
-    };
+    }
 }
 
 /// Collects trailing newline diagnostics for each cell
@@ -127,7 +127,7 @@ fn newline_diagnostic<'a>(
 
     if num_trailing_newlines == 0 || num_trailing_newlines == 1 {
         return None;
-    };
+    }
 
     let (start, end) = (match (newline_range_start, newline_range_end) {
         (Some(s), Some(e)) => Some((s, e)),

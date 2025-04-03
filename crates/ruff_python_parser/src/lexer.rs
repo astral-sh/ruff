@@ -290,7 +290,7 @@ impl<'src> Lexer<'src> {
                         LexicalErrorType::IndentationError,
                         self.token_range(),
                     )));
-                };
+                }
 
                 // The lexer might've eaten some whitespaces to calculate the `indentation`. For
                 // example:
@@ -1071,7 +1071,7 @@ impl<'src> Lexer<'src> {
         if first_digit_or_dot != '.' {
             number.push(first_digit_or_dot);
             self.radix_run(&mut number, Radix::Decimal);
-        };
+        }
 
         let is_float = if first_digit_or_dot == '.' || self.cursor.eat_char('.') {
             number.push('.');

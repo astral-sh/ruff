@@ -291,7 +291,7 @@ impl<'a> FileNoqaDirectives<'a> {
                     warn!("Invalid `# ruff: noqa` directive at {path_display}:{line}: {err}");
                 }
                 Ok(None) => {}
-            };
+            }
         }
         Self(lines)
     }
@@ -990,7 +990,7 @@ fn generate_noqa_edit<'a>(
             codes = Some(existing_codes);
         }
         Some(Directive::All(_)) => return None,
-    };
+    }
 
     Some(NoqaEdit {
         edit_range,

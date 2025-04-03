@@ -160,7 +160,7 @@ impl<'a> ReplaceTimeZone<'a> {
 
         if !arguments.keywords.is_empty() {
             return None;
-        };
+        }
 
         let ExprAttribute { value, attr, .. } = call.func.as_attribute_expr()?;
 
