@@ -2903,11 +2903,13 @@ impl<'db> Type<'db> {
                             ),
                             Signature::new(
                                 Parameters::new([
-                                    Parameter::positional_only(Some(Name::new_static("o")))
-                                        .with_annotated_type(Type::any()),
+                                    Parameter::positional_only(Some(Name::new_static("name")))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
                                     Parameter::positional_only(Some(Name::new_static("bases")))
+                                        // TODO: Should be tuple[type, ...] once we have support for homogenous tuples
                                         .with_annotated_type(Type::any()),
                                     Parameter::positional_only(Some(Name::new_static("dict")))
+                                        // TODO: Should be `dict[str, Any]` once we have support for generics
                                         .with_annotated_type(Type::any()),
                                 ]),
                                 Some(KnownClass::Type.to_instance(db)),

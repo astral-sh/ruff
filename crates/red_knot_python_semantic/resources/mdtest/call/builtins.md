@@ -26,7 +26,11 @@ reveal_type(type(1))  # revealed: Literal[int]
 But a three-argument call to type creates a dynamic instance of the `type` class:
 
 ```py
+class Base: ...
+
 reveal_type(type("Foo", (), {}))  # revealed: type
+
+reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: type
 ```
 
 Other numbers of arguments are invalid
@@ -37,6 +41,24 @@ type("Foo", ())
 
 # error: [no-matching-overload] "No overload of class `type` matches arguments"
 type("Foo", (), {}, weird_other_arg=42)
+```
+
+The following calls are also invalid, due to incorrect argument types:
+
+```py
+class Base: ...
+
+# error: [no-matching-overload] "No overload of class `type` matches arguments"
+type(b"Foo", (), {})
+
+# TODO: this should be an error
+type("Foo", str, {})
+
+# TODO: this should be an error
+type("Foo", (1, 2), {})
+
+# TODO: this should be an error
+type("Foo", (Base,), {b"attr": 1})
 ```
 
 ## Calls to `str()`
