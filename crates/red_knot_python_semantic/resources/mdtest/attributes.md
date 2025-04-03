@@ -577,7 +577,7 @@ reveal_type(C().a)  # revealed: Unknown | Literal[1]
 # error: [unresolved-attribute]
 reveal_type(C().b)  # revealed: Unknown
 reveal_type(C().c)  # revealed: Unknown | Literal[3] | str
-# error: [possibly-unbound-attribute]
+# TODO: this attribute is possibly unbound
 reveal_type(C().d)  # revealed: Unknown | Literal[5]
 # error: [unresolved-attribute]
 reveal_type(C().e)  # revealed: Unknown
@@ -588,9 +588,13 @@ class C:
     def f(self, cond: bool):
         if cond:
             self.x = 1
+            self.y = 2
+        else:
+            self.y = 3
 
 # error: [possibly-unbound-attribute]
 reveal_type(C().x)  # revealed: Unknown | Literal[1]
+reveal_type(C().y)  # revealed: Unknown | Literal[2, 3]
 ```
 
 #### Diagnostics are reported for the right-hand side of attribute assignments

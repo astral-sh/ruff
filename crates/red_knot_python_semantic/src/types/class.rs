@@ -523,145 +523,199 @@ impl<'db> Class<'db> {
 
         let mut is_attribute_bound = Truthiness::AlwaysFalse;
 
-        let index = semantic_index(db, class_body_scope.file(db));
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+        let class_map = use_def_map(db, class_body_scope);
 
-        for attribute_assignment in attribute_assignments(db, class_body_scope, name) {
-            let Some(binding) = attribute_assignment.binding else {
-                continue;
+        for (attribute_assignments, method_scope_id) in
+            attribute_assignments(db, class_body_scope, name)
+        {
+            let method_scope = method_scope_id.to_scope_id(db, file);
+            let method_map = use_def_map(db, method_scope);
+
+            // The attribute assignment inherits the visibility of the method which contains it
+            let is_method_visible = if let Some(method_def) = method_scope.node(db).as_function() {
+                let method = index.expect_single_definition(method_def);
+                let class_table = symbol_table(db, class_body_scope);
+                let method_symbol = class_table.symbol_id_by_name(&method_def.name).unwrap();
+                class_map
+                    .public_bindings(method_symbol)
+                    .find_map(|bind| {
+                        (bind.binding == Some(method))
+                            .then(|| class_map.is_binding_visible(db, &bind))
+                    })
+                    .unwrap_or(Truthiness::AlwaysFalse)
+            } else {
+                Truthiness::AlwaysFalse
             };
-            let scope = binding.scope(db);
-            let use_def = use_def_map(db, scope);
-            match use_def.is_attribute_assignment_visible(
-                db,
-                &attribute_assignment,
-                class_body_scope,
-            ) {
-                Truthiness::AlwaysTrue => {
-                    is_attribute_bound = Truthiness::AlwaysTrue;
-                }
-                Truthiness::Ambiguous if is_attribute_bound.is_always_false() => {
-                    is_attribute_bound = Truthiness::Ambiguous;
-                }
-                Truthiness::Ambiguous => {}
-                Truthiness::AlwaysFalse => {
-                    continue;
-                }
+            if is_method_visible.is_always_false() {
+                continue;
             }
 
-            match binding.kind(db) {
-                DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                    // We found an annotated assignment of one of the following forms (using 'self' in these
-                    // examples, but we support arbitrary names for the first parameters of methods):
-                    //
-                    //     self.name: <annotation>
-                    //     self.name: <annotation> = …
+            let mut attribute_assignments = attribute_assignments.peekable();
+            let unbound_visibility = attribute_assignments
+                .peek()
+                .map(|attribute_assignment| {
+                    if attribute_assignment.binding.is_none() {
+                        method_map.is_binding_visible(db, attribute_assignment)
+                    } else {
+                        Truthiness::AlwaysFalse
+                    }
+                })
+                .unwrap_or(Truthiness::AlwaysFalse);
 
-                    let annotation_ty =
-                        infer_expression_type(db, index.expression(ann_assign.annotation()));
-
-                    // TODO: check if there are conflicting declarations
-                    match is_attribute_bound {
+            for attribute_assignment in attribute_assignments {
+                let Some(binding) = attribute_assignment.binding else {
+                    continue;
+                };
+                match method_map
+                    .is_binding_visible(db, &attribute_assignment)
+                    .and(is_method_visible)
+                {
                     Truthiness::AlwaysTrue => {
-                        return Symbol::bound(annotation_ty);
+                        is_attribute_bound = Truthiness::AlwaysTrue;
                     }
                     Truthiness::Ambiguous => {
-                        return Symbol::possibly_unbound(annotation_ty);
-                    }
-                    Truthiness::AlwaysFalse => unreachable!("If the attribute assignments are all invisible, inference of their types should be skipped"),
-                }
-                }
-                DefinitionKind::Assignment(assign) => {
-                    match assign.target_kind() {
-                        TargetKind::Sequence(_, unpack) => {
-                            // We found an unpacking assignment like:
-                            //
-                            //     .., self.name, .. = <value>
-                            //     (.., self.name, ..) = <value>
-                            //     [.., self.name, ..] = <value>
-
-                            let unpacked = infer_unpack_types(db, unpack);
-                            let name_ast_id = assign.target().scoped_expression_id(db, scope);
-                            let inferred_ty = unpacked.expression_type(name_ast_id);
-
-                            union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                        }
-                        TargetKind::NameOrAttribute => {
-                            // We found an un-annotated attribute assignment of the form:
-                            //
-                            //     self.name = <value>
-
-                            let inferred_ty =
-                                infer_expression_type(db, index.expression(assign.value()));
-
-                            union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                        if is_attribute_bound.is_always_false() {
+                            is_attribute_bound = Truthiness::Ambiguous;
                         }
                     }
-                }
-                DefinitionKind::For(for_stmt) => {
-                    match for_stmt.target_kind() {
-                        TargetKind::Sequence(_, unpack) => {
-                            // We found an unpacking assignment like:
-                            //
-                            //     for .., self.name, .. in <iterable>:
-
-                            let unpacked = infer_unpack_types(db, unpack);
-                            let name_ast_id = for_stmt.target().scoped_expression_id(db, scope);
-                            let inferred_ty = unpacked.expression_type(name_ast_id);
-
-                            union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                        }
-                        TargetKind::NameOrAttribute => {
-                            // We found an attribute assignment like:
-                            //
-                            //     for self.name in <iterable>:
-
-                            let iterable_ty =
-                                infer_expression_type(db, index.expression(for_stmt.iterable()));
-                            // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                            let inferred_ty = iterable_ty.iterate(db);
-
-                            union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                        }
+                    Truthiness::AlwaysFalse => {
+                        continue;
                     }
                 }
-                DefinitionKind::WithItem(with_item) => {
-                    match with_item.target_kind() {
-                        TargetKind::Sequence(_, unpack) => {
-                            // We found an unpacking assignment like:
-                            //
-                            //     with <context_manager> as .., self.name, ..:
 
-                            let unpacked = infer_unpack_types(db, unpack);
-                            let name_ast_id = with_item.target().scoped_expression_id(db, scope);
-                            let inferred_ty = unpacked.expression_type(name_ast_id);
+                // There is at least one attribute assignment that may be visible,
+                // so if `unbound_visibility` is always false then this attribute is considered bound.
+                // TODO: this is incomplete logic since the attributes bound after termination are considered visible.
+                if unbound_visibility
+                    .negate()
+                    .and(is_method_visible)
+                    .is_always_true()
+                {
+                    is_attribute_bound = Truthiness::AlwaysTrue;
+                }
 
-                            union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                        }
-                        TargetKind::NameOrAttribute => {
-                            // We found an attribute assignment like:
-                            //
-                            //     with <context_manager> as self.name:
+                match binding.kind(db) {
+                    DefinitionKind::AnnotatedAssignment(ann_assign) => {
+                        // We found an annotated assignment of one of the following forms (using 'self' in these
+                        // examples, but we support arbitrary names for the first parameters of methods):
+                        //
+                        //     self.name: <annotation>
+                        //     self.name: <annotation> = …
 
-                            let context_ty = infer_expression_type(
-                                db,
-                                index.expression(with_item.context_expr()),
-                            );
-                            let inferred_ty = context_ty.enter(db);
+                        let annotation_ty =
+                            infer_expression_type(db, index.expression(ann_assign.annotation()));
 
-                            union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                        // TODO: check if there are conflicting declarations
+                        match is_attribute_bound {
+                            Truthiness::AlwaysTrue => {
+                                return Symbol::bound(annotation_ty);
+                            }
+                            Truthiness::Ambiguous => {
+                                return Symbol::possibly_unbound(annotation_ty);
+                            }
+                            Truthiness::AlwaysFalse => unreachable!("If the attribute assignments are all invisible, inference of their types should be skipped"),
                         }
                     }
+                    DefinitionKind::Assignment(assign) => {
+                        match assign.target_kind() {
+                            TargetKind::Sequence(_, unpack) => {
+                                // We found an unpacking assignment like:
+                                //
+                                //     .., self.name, .. = <value>
+                                //     (.., self.name, ..) = <value>
+                                //     [.., self.name, ..] = <value>
+
+                                let unpacked = infer_unpack_types(db, unpack);
+                                let name_ast_id =
+                                    assign.target().scoped_expression_id(db, method_scope);
+                                let inferred_ty = unpacked.expression_type(name_ast_id);
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                            TargetKind::NameOrAttribute => {
+                                // We found an un-annotated attribute assignment of the form:
+                                //
+                                //     self.name = <value>
+
+                                let inferred_ty =
+                                    infer_expression_type(db, index.expression(assign.value()));
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                        }
+                    }
+                    DefinitionKind::For(for_stmt) => {
+                        match for_stmt.target_kind() {
+                            TargetKind::Sequence(_, unpack) => {
+                                // We found an unpacking assignment like:
+                                //
+                                //     for .., self.name, .. in <iterable>:
+
+                                let unpacked = infer_unpack_types(db, unpack);
+                                let name_ast_id =
+                                    for_stmt.target().scoped_expression_id(db, method_scope);
+                                let inferred_ty = unpacked.expression_type(name_ast_id);
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                            TargetKind::NameOrAttribute => {
+                                // We found an attribute assignment like:
+                                //
+                                //     for self.name in <iterable>:
+
+                                let iterable_ty = infer_expression_type(
+                                    db,
+                                    index.expression(for_stmt.iterable()),
+                                );
+                                // TODO: Potential diagnostics resulting from the iterable are currently not reported.
+                                let inferred_ty = iterable_ty.iterate(db);
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                        }
+                    }
+                    DefinitionKind::WithItem(with_item) => {
+                        match with_item.target_kind() {
+                            TargetKind::Sequence(_, unpack) => {
+                                // We found an unpacking assignment like:
+                                //
+                                //     with <context_manager> as .., self.name, ..:
+
+                                let unpacked = infer_unpack_types(db, unpack);
+                                let name_ast_id =
+                                    with_item.target().scoped_expression_id(db, method_scope);
+                                let inferred_ty = unpacked.expression_type(name_ast_id);
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                            TargetKind::NameOrAttribute => {
+                                // We found an attribute assignment like:
+                                //
+                                //     with <context_manager> as self.name:
+
+                                let context_ty = infer_expression_type(
+                                    db,
+                                    index.expression(with_item.context_expr()),
+                                );
+                                let inferred_ty = context_ty.enter(db);
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                        }
+                    }
+                    DefinitionKind::Comprehension(_) => {
+                        // TODO:
+                    }
+                    DefinitionKind::AugmentedAssignment(_) => {
+                        // TODO:
+                    }
+                    DefinitionKind::NamedExpression(_) => {
+                        // TODO:
+                    }
+                    _ => {}
                 }
-                DefinitionKind::Comprehension(_) => {
-                    // TODO:
-                }
-                DefinitionKind::AugmentedAssignment(_) => {
-                    // TODO:
-                }
-                DefinitionKind::NamedExpression(_) => {
-                    // TODO:
-                }
-                _ => {}
             }
         }
 

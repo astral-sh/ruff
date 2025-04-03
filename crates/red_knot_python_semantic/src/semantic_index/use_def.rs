@@ -272,12 +272,10 @@ use crate::semantic_index::narrowing_constraints::{
 use crate::semantic_index::predicate::{
     Predicate, Predicates, PredicatesBuilder, ScopedPredicateId,
 };
-use crate::semantic_index::semantic_index;
-use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
-use crate::semantic_index::{symbol_table, use_def_map};
 use crate::types::Truthiness;
 
 mod symbol_state;
@@ -405,43 +403,13 @@ impl<'db> UseDefMap<'db> {
             .is_always_false()
     }
 
-    pub(crate) fn is_attribute_assignment_visible(
+    pub(crate) fn is_binding_visible(
         &self,
         db: &dyn crate::Db,
         binding: &BindingWithConstraints<'_, 'db>,
-        class_body_scope: ScopeId,
     ) -> Truthiness {
-        let definition = binding.binding.as_ref().unwrap();
-        // The attribute assignment inherits the visibility of the method which contains it
-        let maybe_method_scope = definition.scope(db);
-        let is_method_visible = if let Some(method_def) = maybe_method_scope.node(db).as_function()
-        {
-            let class_map = use_def_map(db, class_body_scope);
-            let class_index = semantic_index(db, class_body_scope.file(db));
-            let method = class_index.expect_single_definition(method_def);
-            let class_table = symbol_table(db, class_body_scope);
-            let method_symbol = class_table.symbol_id_by_name(&method_def.name).unwrap();
-            class_map
-                .public_bindings(method_symbol)
-                .find_map(|bind| {
-                    (bind.binding == Some(method)).then(|| {
-                        class_map.visibility_constraints.evaluate(
-                            db,
-                            &class_map.predicates,
-                            bind.visibility_constraint,
-                        )
-                    })
-                })
-                .unwrap_or(Truthiness::AlwaysFalse)
-        } else {
-            Truthiness::AlwaysFalse
-        };
-
-        is_method_visible.and(self.visibility_constraints.evaluate(
-            db,
-            &self.predicates,
-            binding.visibility_constraint,
-        ))
+        self.visibility_constraints
+            .evaluate(db, &self.predicates, binding.visibility_constraint)
     }
 
     fn bindings_iterator<'map>(
@@ -682,10 +650,12 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_attribute_binding(
         &mut self,
         symbol: ScopedSymbolId,
-        definition: Definition<'db>,
+        binding: Definition<'db>,
     ) {
-        let def_id = self.all_definitions.push(Some(definition));
+        let def_id = self.all_definitions.push(Some(binding));
         let attribute_state = &mut self.instance_attribute_states[symbol];
+        self.declarations_by_binding
+            .insert(binding, attribute_state.declarations().clone());
         attribute_state.record_binding(def_id, self.scope_start_visibility);
     }
 
