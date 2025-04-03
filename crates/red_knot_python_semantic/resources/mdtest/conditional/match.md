@@ -44,9 +44,16 @@ def _(target: int):
     reveal_type(y)  # revealed: Literal[2, 3, 4]
 ```
 
-## Class match
+## Value match
 
-We have to take into account custom equality implementations
+A value pattern matches based on equality: the first `case` branch here will be taken if `subject`
+is equal to `2`, even if `subject` is not an instance of `int`. We can't know whether `C` here has a
+custom `__eq__` implementation that might cause it to compare equal to `2`, so we have to consider
+the possibility that the `case` branch might be taken even though the type `C` is disjoint from the
+type `Literal[2]`.
+
+This leads us to infer `Literal[1, 3]` as the type of `y` after the `match` statement, rather than
+`Literal[1]`:
 
 ```py
 from typing import final
@@ -58,10 +65,15 @@ class C:
 def _(subject: C):
     y = 1
     match subject:
-        case 1:
-            y = 2
-    reveal_type(y)  # revealed: Literal[1, 2]
+        case 2:
+            y = 3
+    reveal_type(y)  # revealed: Literal[1, 3]
 ```
+
+## Class match
+
+A `case` branch with a class pattern is taken if the subject is an instance of the given class, and
+all subpatterns in the class pattern match.
 
 ```py
 from typing import final
@@ -121,6 +133,8 @@ def _(target: FooSub | str):
 
 ## Singleton match
 
+Singleton patterns are matched based on identity, not equality comparisons or `isinstance()` checks.
+
 ```py
 from typing import Literal
 
@@ -135,7 +149,7 @@ def _(target: Literal[True, False]):
         case None:
             y = 4
 
-    # TODO: with exhaustivity checking, this should be Literal[2, 3]
+    # TODO: with exhaustiveness checking, this should be Literal[2, 3]
     reveal_type(y)  # revealed: Literal[1, 2, 3]
 
 def _(target: bool):
@@ -149,7 +163,7 @@ def _(target: bool):
         case None:
             y = 4
 
-    # TODO: with exhaustivity checking, this should be Literal[2, 3]
+    # TODO: with exhaustiveness checking, this should be Literal[2, 3]
     reveal_type(y)  # revealed: Literal[1, 2, 3]
 
 def _(target: None):
@@ -176,7 +190,7 @@ def _(target: None | Literal[True]):
         case None:
             y = 4
 
-    # TODO: with exhaustivity checking, this should be Literal[2, 4]
+    # TODO: with exhaustiveness checking, this should be Literal[2, 4]
     reveal_type(y)  # revealed: Literal[1, 2, 4]
 
 # bool is an int subclass
@@ -208,6 +222,8 @@ def _(target: str):
 ```
 
 ## Or match
+
+A `|` pattern matches if any of the subpatterns match.
 
 ```py
 from typing import Literal, final
