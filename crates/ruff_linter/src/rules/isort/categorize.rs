@@ -146,10 +146,7 @@ pub(crate) fn categorize<'a>(
         reason = Reason::DisabledSection(import_type);
         import_type = default_section;
     }
-    debug!(
-        "Categorized '{}' as {:?} ({:?})",
-        module_name, import_type, reason
-    );
+    debug!("Categorized '{module_name}' as {import_type:?} ({reason:?})");
     import_type
 }
 

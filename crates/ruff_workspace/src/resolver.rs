@@ -578,18 +578,18 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                         &file_basename,
                         &settings.file_resolver.exclude,
                     ) {
-                        debug!("Ignored path via `exclude`: {:?}", path);
+                        debug!("Ignored path via `exclude`: {path:?}");
                         return WalkState::Skip;
                     } else if match_candidate_exclusion(
                         &file_path,
                         &file_basename,
                         &settings.file_resolver.extend_exclude,
                     ) {
-                        debug!("Ignored path via `extend-exclude`: {:?}", path);
+                        debug!("Ignored path via `extend-exclude`: {path:?}");
                         return WalkState::Skip;
                     }
                 } else {
-                    debug!("Ignored path due to error in parsing: {:?}", path);
+                    debug!("Ignored path due to error in parsing: {path:?}");
                     return WalkState::Skip;
                 }
             }
@@ -641,10 +641,10 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                     let resolver = self.global.resolver.read().unwrap();
                     let settings = resolver.resolve(path);
                     if settings.file_resolver.include.is_match(path) {
-                        debug!("Included path via `include`: {:?}", path);
+                        debug!("Included path via `include`: {path:?}");
                         Some(ResolvedFile::Nested(entry.into_path()))
                     } else if settings.file_resolver.extend_include.is_match(path) {
-                        debug!("Included path via `extend-include`: {:?}", path);
+                        debug!("Included path via `extend-include`: {path:?}");
                         Some(ResolvedFile::Nested(entry.into_path()))
                     } else {
                         None
@@ -765,14 +765,14 @@ fn is_file_excluded(path: &Path, resolver: &Resolver) -> bool {
                 &file_basename,
                 &settings.file_resolver.exclude,
             ) {
-                debug!("Ignored path via `exclude`: {:?}", path);
+                debug!("Ignored path via `exclude`: {path:?}");
                 return true;
             } else if match_candidate_exclusion(
                 &file_path,
                 &file_basename,
                 &settings.file_resolver.extend_exclude,
             ) {
-                debug!("Ignored path via `extend-exclude`: {:?}", path);
+                debug!("Ignored path via `extend-exclude`: {path:?}");
                 return true;
             }
         } else {

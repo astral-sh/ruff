@@ -2,20 +2,22 @@ use std::fmt;
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::{
-    diagnostic::{DiagnosticId, OldSecondaryDiagnosticMessage, Severity},
+    diagnostic::{
+        Annotation, Diagnostic, DiagnosticId, OldSecondaryDiagnosticMessage, Severity, Span,
+    },
     files::File,
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{binding_type, KnownFunction, Type, TypeCheckDiagnostic, TypeCheckDiagnostics};
+use super::{binding_type, Type, TypeCheckDiagnostics};
 
-use crate::semantic_index::semantic_index;
 use crate::semantic_index::symbol::ScopeId;
 use crate::{
     lint::{LintId, LintMetadata},
     suppression::suppressions,
     Db,
 };
+use crate::{semantic_index::semantic_index, types::FunctionDecorators};
 
 /// Context for inferring the types of a single file.
 ///
@@ -59,11 +61,8 @@ impl<'db> InferContext<'db> {
         self.db
     }
 
-    pub(crate) fn extend<T>(&mut self, other: &T)
-    where
-        T: WithDiagnostics,
-    {
-        self.diagnostics.get_mut().extend(other.diagnostics());
+    pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
+        self.diagnostics.get_mut().extend(other);
     }
 
     /// Reports a lint located at `ranged`.
@@ -75,7 +74,7 @@ impl<'db> InferContext<'db> {
     ) where
         T: Ranged,
     {
-        self.report_lint_with_secondary_messages(lint, ranged, message, vec![]);
+        self.report_lint_with_secondary_messages(lint, ranged, message, &[]);
     }
 
     /// Reports a lint located at `ranged`.
@@ -84,7 +83,7 @@ impl<'db> InferContext<'db> {
         lint: &'static LintMetadata,
         ranged: T,
         message: fmt::Arguments,
-        secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
+        secondary_messages: &[OldSecondaryDiagnosticMessage],
     ) where
         T: Ranged,
     {
@@ -136,7 +135,7 @@ impl<'db> InferContext<'db> {
         id: DiagnosticId,
         severity: Severity,
         message: fmt::Arguments,
-        secondary_messages: Vec<OldSecondaryDiagnosticMessage>,
+        secondary_messages: &[OldSecondaryDiagnosticMessage],
     ) where
         T: Ranged,
     {
@@ -150,14 +149,13 @@ impl<'db> InferContext<'db> {
         //   returns a rule selector for a given file that respects the package's settings,
         //   any global pragma comments in the file, and any per-file-ignores.
 
-        self.diagnostics.borrow_mut().push(TypeCheckDiagnostic {
-            file: self.file,
-            id,
-            message: message.to_string(),
-            range: ranged.range(),
-            severity,
-            secondary_messages,
-        });
+        let mut diag = Diagnostic::new(id, severity, "");
+        for secondary_msg in secondary_messages {
+            diag.sub(secondary_msg.to_sub_diagnostic());
+        }
+        let span = Span::from(self.file).with_range(ranged.range());
+        diag.annotate(Annotation::primary(span).message(message));
+        self.diagnostics.borrow_mut().push(diag);
     }
 
     pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) {
@@ -182,13 +180,7 @@ impl<'db> InferContext<'db> {
 
                 // Iterate over all functions and test if any is decorated with `@no_type_check`.
                 function_scope_tys.any(|function_ty| {
-                    function_ty
-                        .decorators(self.db)
-                        .iter()
-                        .filter_map(|decorator| decorator.into_function_literal())
-                        .any(|decorator_ty| {
-                            decorator_ty.is_known(self.db, KnownFunction::NoTypeCheck)
-                        })
+                    function_ty.has_known_decorator(self.db, FunctionDecorators::NO_TYPE_CHECK)
                 })
             }
             InNoTypeCheck::Yes => true,
@@ -228,8 +220,4 @@ pub(crate) enum InNoTypeCheck {
 
     /// The inference is known to be in an `@no_type_check` decorated function.
     Yes,
-}
-
-pub(crate) trait WithDiagnostics {
-    fn diagnostics(&self) -> &TypeCheckDiagnostics;
 }

@@ -505,7 +505,7 @@ impl InOrderEntry {
 
 #[derive(Clone, Debug)]
 struct OutOfOrderEntry {
-    /// Index into the [`MultiMap::out_of_order`] vector at which offset the leaading vec is stored.
+    /// Index into the [`MultiMap::out_of_order`] vector at which offset the leading vec is stored.
     leading_index: usize,
     _count: Count<OutOfOrderEntry>,
 }
