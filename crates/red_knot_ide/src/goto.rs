@@ -182,16 +182,18 @@ impl Ranged for GotoTarget<'_> {
 }
 
 pub(crate) fn find_goto_target(parsed: &ParsedModule, offset: TextSize) -> Option<GotoTarget> {
-    let token = parsed.tokens().at_offset(offset).find(|token| {
-        matches!(
-            token.kind(),
+    let token = parsed
+        .tokens()
+        .at_offset(offset)
+        .max_by_key(|token| match token.kind() {
             TokenKind::Name
-                | TokenKind::String
-                | TokenKind::Complex
-                | TokenKind::Float
-                | TokenKind::Int
-        )
-    })?;
+            | TokenKind::String
+            | TokenKind::Complex
+            | TokenKind::Float
+            | TokenKind::Int => 1,
+            _ => 0,
+        })?;
+
     let covering_node = covering_node(parsed.syntax().into(), token.range())
         .find(|node| node.is_identifier() || node.is_expression())
         .ok()?;
@@ -628,7 +630,6 @@ f(**kwargs<CURSOR>)
             "#,
         );
 
-        // FIXME: This should go to `str`
         assert_snapshot!(test.goto_type_definition(), @r###"
         info: lint:goto-type-definition: Type definition
            --> stdlib/builtins.pyi:443:7

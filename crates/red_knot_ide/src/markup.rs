@@ -1,4 +1,5 @@
 use std::fmt;
+use std::fmt::Formatter;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum MarkupKind {
@@ -7,7 +8,7 @@ pub enum MarkupKind {
 }
 
 impl MarkupKind {
-    pub(crate) fn fenced_code_block<T>(self, code: T, language: &str) -> FencedCodeBlock<T>
+    pub(crate) const fn fenced_code_block<T>(self, code: T, language: &str) -> FencedCodeBlock<T>
     where
         T: fmt::Display,
     {
@@ -16,6 +17,10 @@ impl MarkupKind {
             code,
             kind: self,
         }
+    }
+
+    pub(crate) const fn horizontal_line(self) -> HorizontalLine {
+        HorizontalLine { kind: self }
     }
 }
 
@@ -38,6 +43,24 @@ where
                 language = self.language,
                 code = self.code
             ),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub(crate) struct HorizontalLine {
+    kind: MarkupKind,
+}
+
+impl fmt::Display for HorizontalLine {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            MarkupKind::PlainText => {
+                f.write_str("\n---------------------------------------------\n")
+            }
+            MarkupKind::Markdown => {
+                write!(f, "\n---\n")
+            }
         }
     }
 }

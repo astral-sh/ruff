@@ -268,7 +268,9 @@ impl Workspace {
         let source_range = Range::from_text_range(range_info.file_range().range(), &index, &source);
 
         Ok(Some(Hover {
-            markdown: range_info.render(&self.db, MarkupKind::Markdown),
+            markdown: range_info
+                .display(&self.db, MarkupKind::Markdown)
+                .to_string(),
             range: source_range,
         }))
     }
