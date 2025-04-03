@@ -4,11 +4,7 @@
 
 ### Preview features
 
-- \[`airflow`\] Update replacement paths for `AIR302` ([#16876](https://github.com/astral-sh/ruff/pull/16876))
-- \[`airflow`\] Add autofix for `AIR302` attribute checks ([#16977](https://github.com/astral-sh/ruff/pull/16977))
-- \[`airflow`\] Add autofix for `AIR302` method checks ([#16976](https://github.com/astral-sh/ruff/pull/16976))
-- \[`airflow`\] Add autofix infrastructure to `AIR302` name checks ([#16965](https://github.com/astral-sh/ruff/pull/16965))
-- \[`airflow`\] Extend `AIR302` with additional symbols ([#17085](https://github.com/astral-sh/ruff/pull/17085))
+- \[`airflow`\] Add more autofixes for `AIR302` ([#16876](https://github.com/astral-sh/ruff/pull/16876), [#16977](https://github.com/astral-sh/ruff/pull/16977), [#16976](https://github.com/astral-sh/ruff/pull/16976), [#16965](https://github.com/astral-sh/ruff/pull/16965))
 - \[`airflow`\] Move `AIR301` to `AIR002` ([#16978](https://github.com/astral-sh/ruff/pull/16978))
 - \[`airflow`\] Move `AIR302` to `AIR301` and `AIR303` to `AIR302` ([#17151](https://github.com/astral-sh/ruff/pull/17151))
 - \[`flake8-bandit`\] Mark `str` and `list[str]` literals as trusted input (`S603`) ([#17136](https://github.com/astral-sh/ruff/pull/17136))
