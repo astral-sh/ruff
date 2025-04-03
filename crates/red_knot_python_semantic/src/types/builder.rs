@@ -499,7 +499,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn simplify_constrained_typevars(&mut self, db: &'db dyn Db) {
         let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
         let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
-        let mut negative_to_remove = Vec::new();
 
         for (typevar_index, ty) in self.positive.iter().enumerate() {
             let Type::TypeVar(typevar) = ty else {
@@ -567,18 +566,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
             // replace the typevar itself with the remaining positive constraint.
             to_add.push(remaining_constraint);
             positive_to_remove.push(typevar_index);
-            negative_to_remove.extend(to_remove);
         }
 
         // We don't need to sort the positive list, since we only append to it in increasing order.
         for index in positive_to_remove.into_iter().rev() {
             self.positive.swap_remove_index(index);
-        }
-
-        negative_to_remove.sort_unstable();
-        negative_to_remove.dedup();
-        for index in negative_to_remove.into_iter().rev() {
-            self.negative.swap_remove_index(index);
         }
 
         for remaining_constraint in to_add {
