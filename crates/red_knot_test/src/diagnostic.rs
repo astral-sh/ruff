@@ -2,7 +2,7 @@
 //!
 //! We don't assume that we will get the diagnostics in source order.
 
-use ruff_db::diagnostic::OldDiagnosticTrait;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::ops::{Deref, Range};
 
@@ -12,21 +12,21 @@ use std::ops::{Deref, Range};
 /// [`LineDiagnosticRange`] has one entry for each contiguous slice of the diagnostics vector
 /// containing diagnostics which all start on the same line.
 #[derive(Debug)]
-pub(crate) struct SortedDiagnostics<T> {
-    diagnostics: Vec<T>,
+pub(crate) struct SortedDiagnostics<'a> {
+    diagnostics: Vec<&'a Diagnostic>,
     line_ranges: Vec<LineDiagnosticRange>,
 }
 
-impl<T> SortedDiagnostics<T>
-where
-    T: OldDiagnosticTrait,
-{
-    pub(crate) fn new(diagnostics: impl IntoIterator<Item = T>, line_index: &LineIndex) -> Self {
+impl<'a> SortedDiagnostics<'a> {
+    pub(crate) fn new(
+        diagnostics: impl IntoIterator<Item = &'a Diagnostic>,
+        line_index: &LineIndex,
+    ) -> Self {
         let mut diagnostics: Vec<_> = diagnostics
             .into_iter()
             .map(|diagnostic| DiagnosticWithLine {
                 line_number: diagnostic
-                    .span()
+                    .primary_span()
                     .and_then(|span| span.range())
                     .map_or(OneIndexed::from_zero_indexed(0), |range| {
                         line_index.line_index(range.start())
@@ -76,7 +76,7 @@ where
         diags
     }
 
-    pub(crate) fn iter_lines(&self) -> LineDiagnosticsIterator<T> {
+    pub(crate) fn iter_lines(&self) -> LineDiagnosticsIterator<'_> {
         LineDiagnosticsIterator {
             diagnostics: self.diagnostics.as_slice(),
             inner: self.line_ranges.iter(),
@@ -92,16 +92,13 @@ struct LineDiagnosticRange {
 }
 
 /// Iterator to group sorted diagnostics by line.
-pub(crate) struct LineDiagnosticsIterator<'a, T> {
-    diagnostics: &'a [T],
+pub(crate) struct LineDiagnosticsIterator<'a> {
+    diagnostics: &'a [&'a Diagnostic],
     inner: std::slice::Iter<'a, LineDiagnosticRange>,
 }
 
-impl<'a, T> Iterator for LineDiagnosticsIterator<'a, T>
-where
-    T: OldDiagnosticTrait,
-{
-    type Item = LineDiagnostics<'a, T>;
+impl<'a> Iterator for LineDiagnosticsIterator<'a> {
+    type Item = LineDiagnostics<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let LineDiagnosticRange {
@@ -115,20 +112,20 @@ where
     }
 }
 
-impl<T> std::iter::FusedIterator for LineDiagnosticsIterator<'_, T> where T: OldDiagnosticTrait {}
+impl std::iter::FusedIterator for LineDiagnosticsIterator<'_> {}
 
 /// All diagnostics that start on a single line of source code in one embedded Python file.
 #[derive(Debug)]
-pub(crate) struct LineDiagnostics<'a, T> {
+pub(crate) struct LineDiagnostics<'a> {
     /// Line number on which these diagnostics start.
     pub(crate) line_number: OneIndexed,
 
     /// Diagnostics starting on this line.
-    pub(crate) diagnostics: &'a [T],
+    pub(crate) diagnostics: &'a [&'a Diagnostic],
 }
 
-impl<T> Deref for LineDiagnostics<'_, T> {
-    type Target = [T];
+impl<'a> Deref for LineDiagnostics<'a> {
+    type Target = [&'a Diagnostic];
 
     fn deref(&self) -> &Self::Target {
         self.diagnostics
@@ -136,22 +133,20 @@ impl<T> Deref for LineDiagnostics<'_, T> {
 }
 
 #[derive(Debug)]
-struct DiagnosticWithLine<T> {
+struct DiagnosticWithLine<'a> {
     line_number: OneIndexed,
-    diagnostic: T,
+    diagnostic: &'a Diagnostic,
 }
 
 #[cfg(test)]
 mod tests {
     use crate::db::Db;
-    use crate::diagnostic::OldDiagnosticTrait;
-    use ruff_db::diagnostic::{DiagnosticId, LintName, Severity, Span};
-    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
+    use ruff_db::files::system_path_to_file;
     use ruff_db::source::line_index;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::{TextRange, TextSize};
-    use std::borrow::Cow;
 
     #[test]
     fn sort_and_group() {
@@ -168,10 +163,19 @@ mod tests {
 
         let diagnostics: Vec<_> = ranges
             .into_iter()
-            .map(|range| DummyDiagnostic { range, file })
+            .map(|range| {
+                let mut diag = Diagnostic::new(
+                    DiagnosticId::Lint(LintName::of("dummy")),
+                    Severity::Error,
+                    "dummy",
+                );
+                let span = Span::from(file).with_range(range);
+                diag.annotate(Annotation::primary(span));
+                diag
+            })
             .collect();
 
-        let sorted = super::SortedDiagnostics::new(diagnostics, &lines);
+        let sorted = super::SortedDiagnostics::new(diagnostics.iter(), &lines);
         let grouped = sorted.iter_lines().collect::<Vec<_>>();
 
         let [line1, line2] = &grouped[..] else {
@@ -182,29 +186,5 @@ mod tests {
         assert_eq!(line1.diagnostics.len(), 2);
         assert_eq!(line2.line_number, OneIndexed::from_zero_indexed(1));
         assert_eq!(line2.diagnostics.len(), 1);
-    }
-
-    #[derive(Debug)]
-    struct DummyDiagnostic {
-        range: TextRange,
-        file: File,
-    }
-
-    impl OldDiagnosticTrait for DummyDiagnostic {
-        fn id(&self) -> DiagnosticId {
-            DiagnosticId::Lint(LintName::of("dummy"))
-        }
-
-        fn message(&self) -> Cow<str> {
-            "dummy".into()
-        }
-
-        fn span(&self) -> Option<Span> {
-            Some(Span::from(self.file).with_range(self.range))
-        }
-
-        fn severity(&self) -> Severity {
-            Severity::Error
-        }
     }
 }

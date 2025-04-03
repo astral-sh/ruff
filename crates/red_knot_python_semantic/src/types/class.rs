@@ -18,7 +18,7 @@ use crate::{
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
 use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
 
@@ -151,6 +151,15 @@ impl<'db> Class<'db> {
     /// query depends on the AST of another file (bad!).
     fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
         self.body_scope(db).node(db).expect_class()
+    }
+
+    /// Returns the file range of the class's name.
+    pub fn focus_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.node(db).name.range)
+    }
+
+    pub fn full_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.node(db).range)
     }
 
     /// Return the types of the decorators on this class
@@ -754,7 +763,7 @@ pub struct ClassLiteralType<'db> {
 }
 
 impl<'db> ClassLiteralType<'db> {
-    pub(crate) fn class(self) -> Class<'db> {
+    pub fn class(self) -> Class<'db> {
         self.class
     }
 
@@ -780,7 +789,7 @@ pub struct InstanceType<'db> {
 }
 
 impl<'db> InstanceType<'db> {
-    pub(super) fn class(self) -> Class<'db> {
+    pub fn class(self) -> Class<'db> {
         self.class
     }
 
@@ -811,6 +820,7 @@ pub enum KnownClass {
     Bool,
     Object,
     Bytes,
+    Bytearray,
     Type,
     Int,
     Float,
@@ -840,6 +850,7 @@ pub enum KnownClass {
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
+    Any,
     StdlibAlias,
     SpecialForm,
     TypeVar,
@@ -903,7 +914,8 @@ impl<'db> KnownClass {
 
             Self::NoneType => Truthiness::AlwaysFalse,
 
-            Self::BaseException
+            Self::Any
+            | Self::BaseException
             | Self::Object
             | Self::OrderedDict
             | Self::BaseExceptionGroup
@@ -919,6 +931,7 @@ impl<'db> KnownClass {
             | Self::Int
             | Self::Type
             | Self::Bytes
+            | Self::Bytearray
             | Self::FrozenSet
             | Self::Range
             | Self::Property
@@ -944,9 +957,11 @@ impl<'db> KnownClass {
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'static str {
         match self {
+            Self::Any => "Any",
             Self::Bool => "bool",
             Self::Object => "object",
             Self::Bytes => "bytes",
+            Self::Bytearray => "bytearray",
             Self::Tuple => "tuple",
             Self::Int => "int",
             Self::Float => "float",
@@ -1124,6 +1139,7 @@ impl<'db> KnownClass {
             Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1150,7 +1166,8 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm
+            Self::Any
+            | Self::SpecialForm
             | Self::TypeVar
             | Self::StdlibAlias
             | Self::SupportsIndex
@@ -1201,9 +1218,11 @@ impl<'db> KnownClass {
             | Self::TypeAliasType
             | Self::NotImplementedType => true,
 
-            Self::Bool
+            Self::Any
+            | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1258,9 +1277,11 @@ impl<'db> KnownClass {
             | Self::TypeAliasType
             | Self::NotImplementedType => true,
 
-            Self::Bool
+            Self::Any
+            | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Tuple
             | Self::Int
             | Self::Float
@@ -1311,9 +1332,11 @@ impl<'db> KnownClass {
         // We assert that this match is exhaustive over the right-hand side in the unit test
         // `known_class_roundtrip_from_str()`
         let candidate = match class_name {
+            "Any" => Self::Any,
             "bool" => Self::Bool,
             "object" => Self::Object,
             "bytes" => Self::Bytes,
+            "bytearray" => Self::Bytearray,
             "tuple" => Self::Tuple,
             "type" => Self::Type,
             "int" => Self::Int,
@@ -1363,9 +1386,7 @@ impl<'db> KnownClass {
             "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
                 Self::EllipsisType
             }
-            "_NotImplementedType" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
-                Self::NotImplementedType
-            }
+            "_NotImplementedType" => Self::NotImplementedType,
             _ => return None,
         };
 
@@ -1377,9 +1398,11 @@ impl<'db> KnownClass {
     /// Return `true` if the module of `self` matches `module`
     fn check_module(self, db: &'db dyn Db, module: KnownModule) -> bool {
         match self {
-            Self::Bool
+            Self::Any
+            | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1503,6 +1526,9 @@ pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
     Never,
     /// The symbol `typing.Any` (which can also be found as `typing_extensions.Any`)
+    /// This is not used since typeshed switched to representing `Any` as a class; now we use
+    /// `KnownClass::Any` instead. But we still support the old `Any = object()` representation, at
+    /// least for now. TODO maybe remove?
     Any,
     /// The symbol `typing.Tuple` (which can also be found as `typing_extensions.Tuple`)
     Tuple,

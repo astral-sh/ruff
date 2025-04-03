@@ -858,6 +858,52 @@ static_assert(not is_subtype_of(CallableTypeOf[variadic], CallableTypeOf[keyword
 static_assert(not is_subtype_of(CallableTypeOf[variadic], CallableTypeOf[keyword_variadic]))
 ```
 
+But, there are special cases when matching against standard parameters. This is due to the fact that
+a standard parameter can be passed as a positional or keyword parameter. This means that the
+subtyping relation needs to consider both cases.
+
+```py
+def variadic_keyword(*args: int, **kwargs: int) -> None: ...
+def standard_int(a: int) -> None: ...
+def standard_float(a: float) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_float]))
+```
+
+If the type of either the variadic or keyword-variadic parameter is not a supertype of the standard
+parameter, then the subtyping relation is invalid.
+
+```py
+def variadic_bool(*args: bool, **kwargs: int) -> None: ...
+def keyword_variadic_bool(*args: int, **kwargs: bool) -> None: ...
+
+static_assert(not is_subtype_of(CallableTypeOf[variadic_bool], CallableTypeOf[standard_int]))
+static_assert(not is_subtype_of(CallableTypeOf[keyword_variadic_bool], CallableTypeOf[standard_int]))
+```
+
+The standard parameter can follow a variadic parameter in the subtype.
+
+```py
+def standard_variadic_int(a: int, *args: int) -> None: ...
+def standard_variadic_float(a: int, *args: float) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_variadic_int]))
+static_assert(not is_subtype_of(CallableTypeOf[variadic_keyword], CallableTypeOf[standard_variadic_float]))
+```
+
+The keyword part of the standard parameter can be matched against keyword-only parameter with the
+same name if the keyword-variadic parameter is absent.
+
+```py
+def variadic_a(*args: int, a: int) -> None: ...
+def variadic_b(*args: int, b: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[variadic_a], CallableTypeOf[standard_int]))
+# The parameter name is different
+static_assert(not is_subtype_of(CallableTypeOf[variadic_b], CallableTypeOf[standard_int]))
+```
+
 #### Keyword-only
 
 For keyword-only parameters, the name should be the same:
@@ -1051,6 +1097,55 @@ class C:
 
 static_assert(is_subtype_of(TypeOf[C.foo], object))
 static_assert(not is_subtype_of(object, TypeOf[C.foo]))
+```
+
+### Classes with `__call__`
+
+```py
+from typing import Callable
+from knot_extensions import TypeOf, is_subtype_of, static_assert, is_assignable_to
+
+class A:
+    def __call__(self, a: int) -> int:
+        return a
+
+a = A()
+
+static_assert(is_subtype_of(A, Callable[[int], int]))
+static_assert(not is_subtype_of(A, Callable[[], int]))
+static_assert(not is_subtype_of(Callable[[int], int], A))
+
+def f(fn: Callable[[int], int]) -> None: ...
+
+f(a)
+```
+
+### Bound methods
+
+```py
+from typing import Callable
+from knot_extensions import TypeOf, static_assert, is_subtype_of
+
+class A:
+    def f(self, a: int) -> int:
+        return a
+
+    @classmethod
+    def g(cls, a: int) -> int:
+        return a
+
+a = A()
+
+static_assert(is_subtype_of(TypeOf[a.f], Callable[[int], int]))
+static_assert(is_subtype_of(TypeOf[a.g], Callable[[int], int]))
+static_assert(is_subtype_of(TypeOf[A.g], Callable[[int], int]))
+
+static_assert(not is_subtype_of(TypeOf[a.f], Callable[[float], int]))
+static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
+
+# TODO: This assertion should be true
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 
 [special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex

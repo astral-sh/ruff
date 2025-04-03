@@ -82,19 +82,19 @@ use crate::types::{
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
 };
-use crate::types::{CallableType, GeneralCallableType, Signature};
+use crate::types::{CallableType, FunctionDecorators, Signature};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
 use super::class_base::ClassBase;
-use super::context::{InNoTypeCheck, InferContext, WithDiagnostics};
+use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS,
-    TYPE_ASSERTION_FAILURE,
+    report_unresolved_reference, INVALID_METACLASS, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -439,12 +439,6 @@ impl<'db> TypeInference<'db> {
     }
 }
 
-impl WithDiagnostics for TypeInference<'_> {
-    fn diagnostics(&self) -> &TypeCheckDiagnostics {
-        &self.diagnostics
-    }
-}
-
 /// Whether the intersection type is on the left or right side of the comparison.
 #[derive(Debug, Clone, Copy)]
 enum IntersectionOn {
@@ -567,7 +561,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .extend(inference.declarations.iter());
         self.types.expressions.extend(inference.expressions.iter());
         self.types.deferred.extend(inference.deferred.iter());
-        self.context.extend(inference);
+        self.context.extend(inference.diagnostics());
     }
 
     fn file(&self) -> File {
@@ -977,7 +971,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Raise a diagnostic if the given type cannot be divided by zero.
     ///
     /// Expects the resolved type of the left side of the binary expression.
-    fn check_division_by_zero(&mut self, expr: &ast::ExprBinOp, left: Type<'db>) {
+    fn check_division_by_zero(
+        &mut self,
+        node: AnyNodeRef<'_>,
+        op: ast::Operator,
+        left: Type<'db>,
+    ) -> bool {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::Instance(instance)
@@ -985,24 +984,26 @@ impl<'db> TypeInferenceBuilder<'db> {
                     instance.class().known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
-            _ => return,
+            _ => return false,
         };
 
-        let (op, by_zero) = match expr.op {
+        let (op, by_zero) = match op {
             ast::Operator::Div => ("divide", "by zero"),
             ast::Operator::FloorDiv => ("floor divide", "by zero"),
             ast::Operator::Mod => ("reduce", "modulo zero"),
-            _ => return,
+            _ => return false,
         };
 
         self.context.report_lint(
             &DIVISION_BY_ZERO,
-            expr,
+            node,
             format_args!(
                 "Cannot {op} object of type `{}` {by_zero}",
                 left.display(self.db())
             ),
         );
+
+        true
     }
 
     fn add_binding(&mut self, node: AnyNodeRef, binding: Definition<'db>, ty: Type<'db>) {
@@ -1373,19 +1374,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             decorator_list,
         } = function;
 
-        // Check if the function is decorated with the `no_type_check` decorator
-        // and, if so, suppress any errors that come after the decorators.
-        let mut decorator_tys = Vec::with_capacity(decorator_list.len());
+        let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
+        let mut function_decorators = FunctionDecorators::empty();
 
         for decorator in decorator_list {
-            let ty = self.infer_decorator(decorator);
-            decorator_tys.push(ty);
+            let decorator_ty = self.infer_decorator(decorator);
 
-            if let Type::FunctionLiteral(function) = ty {
+            if let Type::FunctionLiteral(function) = decorator_ty {
                 if function.is_known(self.db(), KnownFunction::NoTypeCheck) {
+                    // If the function is decorated with the `no_type_check` decorator,
+                    // we need to suppress any errors that come after the decorators.
                     self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                    function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
+                    continue;
+                } else if function.is_known(self.db(), KnownFunction::Overload) {
+                    function_decorators |= FunctionDecorators::OVERLOAD;
+                    continue;
+                }
+            } else if let Type::ClassLiteral(class) = decorator_ty {
+                if class.class.is_known(self.db(), KnownClass::Classmethod) {
+                    function_decorators |= FunctionDecorators::CLASSMETHOD;
+                    continue;
                 }
             }
+
+            decorator_types_and_nodes.push((decorator_ty, decorator));
         }
 
         for default in parameters
@@ -1417,18 +1430,31 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Function(function))
             .to_scope_id(self.db(), self.file());
 
-        let function_ty = Type::FunctionLiteral(FunctionType::new(
+        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
             &name.id,
             function_kind,
             body_scope,
-            decorator_tys.into_boxed_slice(),
+            function_decorators,
         ));
+
+        for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
+            inferred_ty = match decorator_ty
+                .try_call(self.db(), CallArgumentTypes::positional([inferred_ty]))
+                .map(|bindings| bindings.return_type(self.db()))
+            {
+                Ok(return_ty) => return_ty,
+                Err(CallError(_, bindings)) => {
+                    bindings.report_diagnostics(&self.context, (*decorator_node).into());
+                    bindings.return_type(self.db())
+                }
+            };
+        }
 
         self.add_declaration_with_binding(
             function.into(),
             definition,
-            &DeclaredAndInferredType::AreTheSame(function_ty),
+            &DeclaredAndInferredType::AreTheSame(inferred_ty),
         );
     }
 
@@ -1838,7 +1864,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let unpacked = infer_unpack_types(self.db(), unpack);
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
                     if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked);
+                        self.context.extend(unpacked.diagnostics());
                     }
                     unpacked.expression_type(name_ast_id)
                 }
@@ -1991,6 +2017,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             name.id.clone(),
+            definition,
             bound_or_constraint,
             default_ty,
         )));
@@ -2311,8 +2338,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::SliceLiteral(..)
             | Type::Tuple(..)
             | Type::KnownInstance(..)
+            | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
+            | Type::BoundMethod(_)
+            | Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => match object_ty.class_member(db, attribute.into()) {
                 meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
@@ -2643,7 +2674,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Only copy the diagnostics if this is the first assignment to avoid duplicating the
                 // unpack assignments.
                 if unpack_position == UnpackPosition::First {
-                    self.context.extend(unpacked);
+                    self.context.extend(unpacked.diagnostics());
                 }
 
                 let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
@@ -2834,7 +2865,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Fall back to non-augmented binary operator inference.
         let mut binary_return_ty = || {
-            self.infer_binary_expression_type(target_type, value_type, op)
+            self.infer_binary_expression_type(assignment.into(), false, target_type, value_type, op)
                 .unwrap_or_else(|| {
                     report_unsupported_augmented_op(&mut self.context);
                     Type::unknown()
@@ -2943,7 +2974,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
                     if unpack_position == UnpackPosition::First {
-                        self.context.extend(unpacked);
+                        self.context.extend(unpacked.diagnostics());
                     }
                     let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(name_ast_id)
@@ -3887,10 +3918,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        Type::Callable(CallableType::General(GeneralCallableType::new(
+        Type::Callable(CallableType::new(
             self.db(),
             Signature::new(parameters, Some(Type::unknown())),
-        )))
+        ))
     }
 
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
@@ -3936,7 +3967,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         "Revealed type is `{}`",
                                         revealed_type.display(self.db())
                                     ),
-                                    vec![],
+                                    &[],
                                 );
                             }
                         }
@@ -4014,6 +4045,26 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             ),
                                         );
                                     };
+                                }
+                            }
+                        }
+                        KnownFunction::Cast => {
+                            if let [Some(casted_type), Some(source_type)] =
+                                overload.parameter_types()
+                            {
+                                let db = self.db();
+                                if (source_type.is_equivalent_to(db, *casted_type)
+                                    || source_type.normalized(db) == casted_type.normalized(db))
+                                    && !source_type.contains_todo(db)
+                                {
+                                    self.context.report_lint(
+                                        &REDUNDANT_CAST,
+                                        call_expression,
+                                        format_args!(
+                                            "Value is already of type `{}`",
+                                            casted_type.display(db),
+                                        ),
+                                    );
                                 }
                             }
                         }
@@ -4394,11 +4445,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 op @ (ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
+                | Type::WrapperDescriptor(_)
+                | Type::MethodWrapper(_)
+                | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
                 | Type::Union(_)
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
@@ -4451,19 +4506,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let left_ty = self.infer_expression(left);
         let right_ty = self.infer_expression(right);
 
-        // Check for division by zero; this doesn't change the inferred type for the expression, but
-        // may emit a diagnostic
-        if matches!(
-            (op, right_ty),
-            (
-                ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
-                Type::IntLiteral(0) | Type::BooleanLiteral(false)
-            )
-        ) {
-            self.check_division_by_zero(binary, left_ty);
-        }
-
-        self.infer_binary_expression_type(left_ty, right_ty, *op)
+        self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
                 self.context.report_lint(
                     &UNSUPPORTED_OPERATOR,
@@ -4480,15 +4523,37 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_binary_expression_type(
         &mut self,
+        node: AnyNodeRef<'_>,
+        mut emitted_division_by_zero_diagnostic: bool,
         left_ty: Type<'db>,
         right_ty: Type<'db>,
         op: ast::Operator,
     ) -> Option<Type<'db>> {
+        // Check for division by zero; this doesn't change the inferred type for the expression, but
+        // may emit a diagnostic
+        if !emitted_division_by_zero_diagnostic
+            && matches!(
+                (op, right_ty),
+                (
+                    ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod,
+                    Type::IntLiteral(0) | Type::BooleanLiteral(false)
+                )
+            )
+        {
+            emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
+        }
+
         match (left_ty, right_ty, op) {
             (Type::Union(lhs_union), rhs, _) => {
                 let mut union = UnionBuilder::new(self.db());
                 for lhs in lhs_union.elements(self.db()) {
-                    let result = self.infer_binary_expression_type(*lhs, rhs, op)?;
+                    let result = self.infer_binary_expression_type(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        *lhs,
+                        rhs,
+                        op,
+                    )?;
                     union = union.add(result);
                 }
                 Some(union.build())
@@ -4496,7 +4561,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             (lhs, Type::Union(rhs_union), _) => {
                 let mut union = UnionBuilder::new(self.db());
                 for rhs in rhs_union.elements(self.db()) {
-                    let result = self.infer_binary_expression_type(lhs, *rhs, op)?;
+                    let result = self.infer_binary_expression_type(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        lhs,
+                        *rhs,
+                        op,
+                    )?;
                     union = union.add(result);
                 }
                 Some(union.build())
@@ -4548,16 +4619,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
             ),
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => {
-                let m = u32::try_from(m);
-                Some(match m {
-                    Ok(m) => n
-                        .checked_pow(m)
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Pow) => Some({
+                if m < 0 {
+                    KnownClass::Float.to_instance(self.db())
+                } else {
+                    u32::try_from(m)
+                        .ok()
+                        .and_then(|m| n.checked_pow(m))
                         .map(Type::IntLiteral)
-                        .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-                    Err(_) => KnownClass::Int.to_instance(self.db()),
-                })
-            }
+                        .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
+                }
+            }),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 let bytes = [&**lhs.value(self.db()), &**rhs.value(self.db())].concat();
@@ -4615,13 +4687,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             (Type::BooleanLiteral(bool_value), right, op) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
                 Type::IntLiteral(i64::from(bool_value)),
                 right,
                 op,
             ),
-            (left, Type::BooleanLiteral(bool_value), op) => {
-                self.infer_binary_expression_type(left, Type::IntLiteral(i64::from(bool_value)), op)
-            }
+            (left, Type::BooleanLiteral(bool_value), op) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                left,
+                Type::IntLiteral(i64::from(bool_value)),
+                op,
+            ),
 
             (Type::Tuple(lhs), Type::Tuple(rhs), ast::Operator::Add) => {
                 // Note: this only works on heterogeneous tuples.
@@ -4642,11 +4720,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             (
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
+                | Type::BoundMethod(_)
+                | Type::WrapperDescriptor(_)
+                | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
@@ -4658,11 +4740,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::Tuple(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
+                | Type::BoundMethod(_)
+                | Type::WrapperDescriptor(_)
+                | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
+                | Type::PropertyInstance(_)
                 | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
@@ -6435,14 +6521,25 @@ impl<'db> TypeInferenceBuilder<'db> {
         /// homogeneous tuple and a partly homogeneous tuple (respectively) due to the `...`
         /// and the starred expression (respectively), Neither is supported by us right now,
         /// so we should infer `Todo` for the *entire* tuple if we encounter one of those elements.
-        /// Even a subscript subelement could alter the type of the entire tuple
-        /// if the subscript is `Unpack[]` (which again, we don't yet support).
-        fn element_could_alter_type_of_whole_tuple(element: &ast::Expr, element_ty: Type) -> bool {
-            element_ty.is_todo()
-                && matches!(
-                    element,
-                    ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) | ast::Expr::Subscript(_)
-                )
+        fn element_could_alter_type_of_whole_tuple(
+            element: &ast::Expr,
+            element_ty: Type,
+            builder: &TypeInferenceBuilder,
+        ) -> bool {
+            if !element_ty.is_todo() {
+                return false;
+            }
+
+            match element {
+                ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) => true,
+                ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
+                    matches!(
+                        builder.expression_type(value),
+                        Type::KnownInstance(KnownInstanceType::Unpack)
+                    )
+                }
+                _ => false,
+            }
         }
 
         // TODO:
@@ -6458,7 +6555,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                 for element in elements {
                     let element_ty = self.infer_type_expression(element);
-                    return_todo |= element_could_alter_type_of_whole_tuple(element, element_ty);
+                    return_todo |=
+                        element_could_alter_type_of_whole_tuple(element, element_ty, self);
                     element_types.push(element_ty);
                 }
 
@@ -6477,7 +6575,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             single_element => {
                 let single_element_ty = self.infer_type_expression(single_element);
-                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty) {
+                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
+                {
                     todo_type!("full tuple[...] support")
                 } else {
                     TupleType::from_elements(self.db(), std::iter::once(single_element_ty))
@@ -6493,7 +6592,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
                     Type::ClassLiteral(class_literal_ty) => {
-                        SubclassOfType::from(self.db(), class_literal_ty.class())
+                        if class_literal_ty
+                            .class()
+                            .is_known(self.db(), KnownClass::Any)
+                        {
+                            SubclassOfType::subclass_of_any()
+                        } else {
+                            SubclassOfType::from(self.db(), class_literal_ty.class())
+                        }
                     }
                     Type::KnownInstance(KnownInstanceType::Any) => {
                         SubclassOfType::subclass_of_any()
@@ -6573,6 +6679,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = subscript;
 
         match value_ty {
+            Type::ClassLiteral(literal) if literal.class().is_known(self.db(), KnownClass::Any) => {
+                self.context.report_lint(
+                    &INVALID_TYPE_FORM,
+                    subscript,
+                    format_args!("Type `typing.Any` expected no type parameter",),
+                );
+                Type::unknown()
+            }
             Type::KnownInstance(known_instance) => {
                 self.infer_parameterized_known_instance_type_expression(subscript, known_instance)
             }
@@ -6700,12 +6814,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let callable_type = if let (Some(parameters), Some(return_type), true) =
                     (parameters, return_type, correct_argument_number)
                 {
-                    GeneralCallableType::new(db, Signature::new(parameters, Some(return_type)))
+                    CallableType::new(db, Signature::new(parameters, Some(return_type)))
                 } else {
-                    GeneralCallableType::unknown(db)
+                    CallableType::unknown(db)
                 };
 
-                let callable_type = Type::Callable(CallableType::General(callable_type));
+                let callable_type = Type::Callable(callable_type);
 
                 // `Signature` / `Parameters` are not a `Type` variant, so we're storing
                 // the outer callable type on the these expressions instead.
@@ -6795,10 +6909,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Type::unknown();
                     };
 
-                    Type::Callable(CallableType::General(GeneralCallableType::new(
-                        db,
-                        signature.clone(),
-                    )))
+                    Type::Callable(CallableType::new(db, signature.clone()))
                 }
             },
 
@@ -7266,6 +7377,7 @@ mod tests {
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
     use crate::symbol::global_symbol;
     use crate::types::check_types;
+    use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
@@ -7300,7 +7412,7 @@ mod tests {
     fn assert_diagnostic_messages(diagnostics: &TypeCheckDiagnostics, expected: &[&str]) {
         let messages: Vec<&str> = diagnostics
             .iter()
-            .map(|diagnostic| diagnostic.message())
+            .map(Diagnostic::primary_message)
             .collect();
         assert_eq!(&messages, expected);
     }

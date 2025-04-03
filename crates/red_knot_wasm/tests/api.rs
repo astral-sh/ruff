@@ -21,10 +21,7 @@ fn check() {
     assert_eq!(diagnostic.id(), "lint:unresolved-import");
     assert_eq!(
         diagnostic.to_range(&workspace).unwrap().start,
-        Position {
-            line: 0,
-            character: 7
-        }
+        Position { line: 1, column: 8 }
     );
     assert_eq!(diagnostic.message(), "Cannot resolve import `random22`");
 }

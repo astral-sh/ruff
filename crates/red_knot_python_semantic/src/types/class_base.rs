@@ -8,7 +8,7 @@ use itertools::Either;
 /// all types that would be invalid to have as a class base are
 /// transformed into [`ClassBase::unknown`]
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
-pub(crate) enum ClassBase<'db> {
+pub enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(Class<'db>),
 }
@@ -18,7 +18,7 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Any)
     }
 
-    pub(crate) const fn unknown() -> Self {
+    pub const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
 
@@ -61,14 +61,22 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => Some(Self::Class(literal.class())),
+            Type::ClassLiteral(literal) => Some(if literal.class().is_known(db, KnownClass::Any) {
+                Self::Dynamic(DynamicType::Any)
+            } else {
+                Self::Class(literal.class())
+            }),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
+            Type::PropertyInstance(_) => None,
             Type::Never
             | Type::BooleanLiteral(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
+            | Type::BoundMethod(_)
+            | Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)

@@ -2504,6 +2504,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "red_knot_ide"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "red_knot_python_semantic",
+ "red_knot_vendored",
+ "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
+ "salsa",
+ "smallvec",
+ "tracing",
+]
+
+[[package]]
 name = "red_knot_project"
 version = "0.0.0"
 dependencies = [
@@ -2514,6 +2530,7 @@ dependencies = [
  "notify",
  "pep440_rs",
  "rayon",
+ "red_knot_ide",
  "red_knot_python_semantic",
  "red_knot_vendored",
  "ruff_cache",
@@ -2585,7 +2602,9 @@ dependencies = [
  "libc",
  "lsp-server",
  "lsp-types",
+ "red_knot_ide",
  "red_knot_project",
+ "red_knot_python_semantic",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_ast",
@@ -2646,6 +2665,7 @@ dependencies = [
  "getrandom 0.3.2",
  "js-sys",
  "log",
+ "red_knot_ide",
  "red_knot_project",
  "red_knot_python_semantic",
  "ruff_db",
@@ -2734,7 +2754,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.11.2"
+version = "0.11.3"
 dependencies = [
  "anyhow",
  "argfile",
@@ -2969,7 +2989,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.11.2"
+version = "0.11.3"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -2998,7 +3018,6 @@ dependencies = [
  "ruff_annotate_snippets",
  "ruff_cache",
  "ruff_diagnostics",
- "ruff_index",
  "ruff_macros",
  "ruff_notebook",
  "ruff_python_ast",
@@ -3193,6 +3212,7 @@ name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.9.0",
+ "insta",
  "is-macro",
  "ruff_cache",
  "ruff_index",
@@ -3205,6 +3225,7 @@ dependencies = [
  "schemars",
  "serde",
  "smallvec",
+ "test-case",
 ]
 
 [[package]]
@@ -3292,7 +3313,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.11.2"
+version = "0.11.3"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
