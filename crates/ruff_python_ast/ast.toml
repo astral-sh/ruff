@@ -57,9 +57,15 @@
 anynode_is_label = "module"
 doc = "See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 
-[Mod.nodes]
-ModModule = {}
-ModExpression = {}
+[Mod.nodes.ModModule]
+doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
+fields = [{ name = "body", type = "Stmt*" }]
+source_order = ["body"]
+
+[Mod.nodes.ModExpression]
+doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
+fields = [{ name = "body", type = "Box<Expr>" }]
+source_order = ["body"]
 
 [Stmt]
 add_suffix_to_is_methods = true
@@ -77,9 +83,16 @@ fields = [
   { name = "name", type = "Identifier" },
   { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "parameters", type = "Box<crate::Parameters>" },
-
   { name = "returns", type = "Expr?" },
   { name = "body", type = "Stmt*" },
+]
+source_order = [
+  "decorator_list",
+  "name",
+  "type_params",
+  "parameters",
+  "returns",
+  "body",
 ]
 
 [Stmt.nodes.StmtClassDef]
@@ -91,14 +104,18 @@ fields = [
   { name = "arguments", type = "Box<crate::Arguments>?" },
   { name = "body", type = "Stmt*" },
 ]
+source_order = ["decorator_list", "name", "type_params", "arguments", "body"]
 
 [Stmt.nodes.StmtReturn]
 doc = "See also [Return](https://docs.python.org/3/library/ast.html#ast.Return)"
 fields = [{ name = "value", type = "Expr?" }]
+source_order = ["value"]
 
 [Stmt.nodes.StmtDelete]
 doc = "See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)"
 fields = [{ name = "targets", type = "Expr*" }]
+source_order = ["targets"]
+
 
 [Stmt.nodes.StmtTypeAlias]
 doc = "See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)"
@@ -107,6 +124,7 @@ fields = [
   { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "value", type = "Expr" },
 ]
+source_order = ["name", "type_params", "value"]
 
 [Stmt.nodes.StmtAssign]
 doc = "See also [Assign](https://docs.python.org/3/library/ast.html#ast.Assign)"
@@ -114,6 +132,7 @@ fields = [
   { name = "targets", type = "Expr*" },
   { name = "value", type = "Expr" },
 ]
+source_order = ["targets", "value"]
 
 [Stmt.nodes.StmtAugAssign]
 doc = "See also [AugAssign](https://docs.python.org/3/library/ast.html#ast.AugAssign)"
@@ -122,6 +141,7 @@ fields = [
   { name = "op", type = "Operator" },
   { name = "value", type = "Expr" },
 ]
+source_order = ["target", "op", "value"]
 
 [Stmt.nodes.StmtAnnAssign]
 doc = "See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)"
@@ -131,6 +151,7 @@ fields = [
   { name = "value", type = "Expr?" },
   { name = "simple", type = "bool" },
 ]
+source_order = ["target", "annotation", "value"]
 
 [Stmt.nodes.StmtFor]
 doc = """See also [For](https://docs.python.org/3/library/ast.html#ast.For)
@@ -144,6 +165,8 @@ fields = [
   { name = "body", type = "Stmt*" },
   { name = "orelse", type = "Stmt*" },
 ]
+source_order = ["target", "iter", "body", "orelse"]
+
 
 [Stmt.nodes.StmtWhile]
 doc = """See also [While](https://docs.python.org/3/library/ast.html#ast.While)
@@ -153,6 +176,8 @@ fields = [
   { name = "body", type = "Stmt*" },
   { name = "orelse", type = "Stmt*" },
 ]
+source_order = ["test", "body", "orelse"]
+
 
 [Stmt.nodes.StmtIf]
 doc = "See also [If](https://docs.python.org/3/library/ast.html#ast.If)"
@@ -162,6 +187,7 @@ fields = [
   { name = "body", type = "Stmt*" },
   { name = "elif_else_clauses", type = "ElifElseClause*" },
 ]
+source_order = ["test", "body", "elif_else_clauses"]
 
 [Stmt.nodes.StmtWith]
 doc = """See also [With](https://docs.python.org/3/library/ast.html#ast.With)
@@ -173,6 +199,7 @@ fields = [
   { name = "items", type = "WithItem*" },
   { name = "body", type = "Stmt*" },
 ]
+source_order = ["items", "body"]
 
 [Stmt.nodes.StmtMatch]
 doc = "See also [Match](https://docs.python.org/3/library/ast.html#ast.Match)"
@@ -180,10 +207,12 @@ fields = [
   { name = "subject", type = "Expr" },
   { name = "cases", type = "MatchCase*" },
 ]
+source_order = ["subject", "cases"]
 
 [Stmt.nodes.StmtRaise]
 doc = "See also [Raise](https://docs.python.org/3/library/ast.html#ast.Raise)"
 fields = [{ name = "exc", type = "Expr?" }, { name = "cause", type = "Expr?" }]
+source_order = ["exc", "cause"]
 
 [Stmt.nodes.StmtTry]
 doc = """See also [Try](https://docs.python.org/3/library/ast.html#ast.Try)
@@ -195,14 +224,17 @@ fields = [
   { name = "finalbody", type = "Stmt*" },
   { name = "is_star", type = "bool" },
 ]
+source_order = ["body", "handlers", "orelse", "finalbody"]
 
 [Stmt.nodes.StmtAssert]
 doc = "See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)"
 fields = [{ name = "test", type = "Expr" }, { name = "msg", type = "Expr?" }]
+source_order = ["test", "msg"]
 
 [Stmt.nodes.StmtImport]
 doc = "See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)"
 fields = [{ name = "names", type = "Alias*" }]
+source_order = ["names"]
 
 [Stmt.nodes.StmtImportFrom]
 doc = "See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)"
@@ -211,30 +243,37 @@ fields = [
   { name = "names", type = "Alias*" },
   { name = "level", type = "u32" },
 ]
+source_order = ["module", "names"]
 
 [Stmt.nodes.StmtGlobal]
 doc = "See also [Global](https://docs.python.org/3/library/ast.html#ast.Global)"
 fields = [{ name = "names", type = "Identifier*" }]
+source_order = ["names"]
 
 [Stmt.nodes.StmtNonlocal]
 doc = "See also [Nonlocal](https://docs.python.org/3/library/ast.html#ast.Nonlocal)"
 fields = [{ name = "names", type = "Identifier*" }]
+source_order = ["names"]
 
 [Stmt.nodes.StmtExpr]
 doc = "See also [Expr](https://docs.python.org/3/library/ast.html#ast.Expr)"
 fields = [{ name = "value", type = "Expr" }]
+source_order = ["value"]
 
 [Stmt.nodes.StmtPass]
 doc = "See also [Pass](https://docs.python.org/3/library/ast.html#ast.Pass)"
 fields = []
+source_order = []
 
 [Stmt.nodes.StmtBreak]
 doc = "See also [Break](https://docs.python.org/3/library/ast.html#ast.Break)"
 fields = []
+source_order = []
 
 [Stmt.nodes.StmtContinue]
 doc = "See also [Continue](https://docs.python.org/3/library/ast.html#ast.Continue)"
 fields = []
+source_order = []
 
 [Stmt.nodes.StmtIpyEscapeCommand]
 # TODO: remove crate:: prefix from IpyEscapeKind after it's auto generated
@@ -296,6 +335,7 @@ fields = [
   { name = "kind", type = "IpyEscapeKind" },
   { name = "value", type = "Box<str>" },
 ]
+source_order = []
 
 [Expr]
 add_suffix_to_is_methods = true
@@ -305,10 +345,12 @@ doc = "See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
 [Expr.nodes.ExprBoolOp]
 doc = "See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)"
 fields = [{ name = "op", type = "BoolOp" }, { name = "values", type = "Expr*" }]
+# Source order left out because of complex logic
 
 [Expr.nodes.ExprNamed]
 doc = "See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)"
 fields = [{ name = "target", type = "Expr" }, { name = "value", type = "Expr" }]
+source_order = ["target", "value"]
 
 [Expr.nodes.ExprBinOp]
 doc = "See also [BinOp](https://docs.python.org/3/library/ast.html#ast.BinOp)"
@@ -317,6 +359,7 @@ fields = [
   { name = "op", type = "Operator" },
   { name = "right", type = "Expr" },
 ]
+source_order = ["left", "op", "right"]
 
 [Expr.nodes.ExprUnaryOp]
 doc = "See also [UnaryOp](https://docs.python.org/3/library/ast.html#ast.UnaryOp)"
@@ -324,6 +367,7 @@ fields = [
   { name = "op", type = "UnaryOp" },
   { name = "operand", type = "Expr" },
 ]
+source_order = ["op", "operand"]
 
 [Expr.nodes.ExprLambda]
 doc = "See also [Lambda](https://docs.python.org/3/library/ast.html#ast.Lambda)"
@@ -331,6 +375,7 @@ fields = [
   { name = "parameters", type = "Box<crate::Parameters>?" },
   { name = "body", type = "Expr" },
 ]
+source_order = ["parameters", "body"]
 
 [Expr.nodes.ExprIf]
 doc = "See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)"
@@ -339,14 +384,17 @@ fields = [
   { name = "body", type = "Expr" },
   { name = "orelse", type = "Expr" },
 ]
+source_order = ["body", "test", "orelse"]
 
 [Expr.nodes.ExprDict]
 doc = "See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)"
 fields = [{ name = "items", type = "DictItem*" }]
+source_order = ["items"]
 
 [Expr.nodes.ExprSet]
 doc = "See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)"
 fields = [{ name = "elts", type = "Expr*" }]
+source_order = ["elts"]
 
 [Expr.nodes.ExprListComp]
 doc = "See also [ListComp](https://docs.python.org/3/library/ast.html#ast.ListComp)"
@@ -354,6 +402,7 @@ fields = [
   { name = "elt", type = "Expr" },
   { name = "generators", type = "Comprehension*" },
 ]
+source_order = ["elt", "generators"]
 
 [Expr.nodes.ExprSetComp]
 doc = "See also [SetComp](https://docs.python.org/3/library/ast.html#ast.SetComp)"
@@ -361,6 +410,7 @@ fields = [
   { name = "elt", type = "Expr" },
   { name = "generators", type = "Comprehension*" },
 ]
+source_order = ["elt", "generators"]
 
 [Expr.nodes.ExprDictComp]
 doc = "See also [DictComp](https://docs.python.org/3/library/ast.html#ast.DictComp)"
@@ -369,6 +419,7 @@ fields = [
   { name = "value", type = "Expr" },
   { name = "generators", type = "Comprehension*" },
 ]
+source_order = ["key", "value", "generators"]
 
 [Expr.nodes.ExprGenerator]
 doc = "See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.GeneratorExp)"
@@ -377,18 +428,22 @@ fields = [
   { name = "generators", type = "Comprehension*" },
   { name = "parenthesized", type = "bool" },
 ]
+source_order = ["elt", "generators"]
 
 [Expr.nodes.ExprAwait]
 doc = "See also [Await](https://docs.python.org/3/library/ast.html#ast.Await)"
 fields = [{ name = "value", type = "Expr" }]
+source_order = ["value"]
 
 [Expr.nodes.ExprYield]
 doc = "See also [Yield](https://docs.python.org/3/library/ast.html#ast.Yield)"
 fields = [{ name = "value", type = "Expr?" }]
+source_order = ["value"]
 
 [Expr.nodes.ExprYieldFrom]
 doc = "See also [YieldFrom](https://docs.python.org/3/library/ast.html#ast.YieldFrom)"
 fields = [{ name = "value", type = "Expr" }]
+source_order = ["value"]
 
 [Expr.nodes.ExprCompare]
 doc = "See also [Compare](https://docs.python.org/3/library/ast.html#ast.Compare)"
@@ -397,6 +452,7 @@ fields = [
   { name = "ops", type = "&CmpOp*" },
   { name = "comparators", type = "&Expr*" },
 ]
+# Source order left out because of complexity
 
 [Expr.nodes.ExprCall]
 doc = "See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"
@@ -404,6 +460,7 @@ fields = [
   { name = "func", type = "Expr" },
   { name = "arguments", type = "Arguments" },
 ]
+source_order = ["func", "arguments"]
 
 [Expr.nodes.ExprFString]
 doc = """An AST node that represents either a single-part f-string literal
@@ -415,31 +472,38 @@ it keeps them separate and provide various methods to access the parts.
 
 See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)"""
 fields = [{ name = "value", type = "FStringValue" }]
+source_order = ["value"]
 
 [Expr.nodes.ExprStringLiteral]
 doc = """An AST node that represents either a single-part string literal
 or an implicitly concatenated string literal."""
 fields = [{ name = "value", type = "StringLiteralValue" }]
+source_order = ["value"]
 
 [Expr.nodes.ExprBytesLiteral]
 doc = """An AST node that represents either a single-part bytestring literal
 or an implicitly concatenated bytestring literal."""
 fields = [{ name = "value", type = "BytesLiteralValue" }]
+source_order = ["value"]
 
 [Expr.nodes.ExprNumberLiteral]
 fields = [{ name = "value", type = "Number" }]
+source_order = []
 
 [Expr.nodes.ExprBooleanLiteral]
 fields = [{ name = "value", type = "bool" }]
 derives = ["Default"]
+source_order = []
 
 [Expr.nodes.ExprNoneLiteral]
 fields = []
 derives = ["Default"]
+source_order = []
 
 [Expr.nodes.ExprEllipsisLiteral]
 fields = []
 derives = ["Default"]
+source_order = []
 
 [Expr.nodes.ExprAttribute]
 doc = "See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attribute)"
@@ -448,6 +512,7 @@ fields = [
   { name = "attr", type = "Identifier" },
   { name = "ctx", type = "ExprContext" },
 ]
+source_order = ["value", "attr"]
 
 [Expr.nodes.ExprSubscript]
 doc = "See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subscript)"
@@ -456,6 +521,7 @@ fields = [
   { name = "slice", type = "Expr" },
   { name = "ctx", type = "ExprContext" },
 ]
+source_order = ["value", "slice"]
 
 [Expr.nodes.ExprStarred]
 doc = "See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)"
@@ -463,6 +529,7 @@ fields = [
   { name = "value", type = "Expr" },
   { name = "ctx", type = "ExprContext" },
 ]
+source_order = ["value"]
 
 [Expr.nodes.ExprName]
 doc = "See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)"
@@ -470,6 +537,7 @@ fields = [
   { name = "id", type = "Name" },
   { name = "ctx", type = "ExprContext" },
 ]
+source_order = []
 
 [Expr.nodes.ExprList]
 doc = "See also [List](https://docs.python.org/3/library/ast.html#ast.List)"
@@ -477,6 +545,7 @@ fields = [
   { name = "elts", type = "Expr*" },
   { name = "ctx", type = "ExprContext" },
 ]
+source_order = ["elts"]
 
 [Expr.nodes.ExprTuple]
 doc = "See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)"
@@ -485,6 +554,7 @@ fields = [
   { name = "ctx", type = "ExprContext" },
   { name = "parenthesized", type = "bool" },
 ]
+source_order = ["elts"]
 
 [Expr.nodes.ExprSlice]
 doc = "See also [Slice](https://docs.python.org/3/library/ast.html#ast.Slice)"
@@ -493,6 +563,7 @@ fields = [
   { name = "upper", type = "Expr?" },
   { name = "step", type = "Expr?" },
 ]
+source_order = ["lower", "upper", "step"]
 
 [Expr.nodes.ExprIpyEscapeCommand]
 doc = """An AST node used to represent a IPython escape command at the expression level.
@@ -511,6 +582,7 @@ fields = [
   { name = "kind", type = "IpyEscapeKind" },
   { name = "value", type = "Box<str>" },
 ]
+source_order = []
 
 [ExceptHandler]
 doc = "See also [excepthandler](https://docs.python.org/3/library/ast.html#ast.excepthandler)"
