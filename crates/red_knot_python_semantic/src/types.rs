@@ -646,7 +646,15 @@ impl<'db> Type<'db> {
             | Type::IntLiteral(_)
             | Type::SubclassOf(_) => self,
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                Some(TypeVarBoundOrConstraints::UpperBound(_)) | None => self,
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        typevar.name(db).clone(),
+                        typevar.definition(db),
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound.normalized(db))),
+                        typevar.default_ty(db),
+                    ))
+                }
                 Some(TypeVarBoundOrConstraints::Constraints(union)) => {
                     Type::TypeVar(TypeVarInstance::new(
                         db,
@@ -656,6 +664,7 @@ impl<'db> Type<'db> {
                         typevar.default_ty(db),
                     ))
                 }
+                None => self,
             },
         }
     }
