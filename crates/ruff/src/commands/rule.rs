@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use std::io::{self, BufWriter, Write};
 
 use anyhow::Result;
@@ -43,12 +44,16 @@ impl<'a> Explanation<'a> {
 
 fn format_rule_text(rule: Rule) -> String {
     let mut output = String::new();
-    output.push_str(&format!("# {} ({})", rule.as_ref(), rule.noqa_code()));
+    let _ = write!(&mut output, "# {} ({})", rule.as_ref(), rule.noqa_code());
     output.push('\n');
     output.push('\n');
 
     let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
-    output.push_str(&format!("Derived from the **{}** linter.", linter.name()));
+    let _ = write!(
+        &mut output,
+        "Derived from the **{}** linter.",
+        linter.name()
+    );
     output.push('\n');
     output.push('\n');
 
@@ -76,7 +81,7 @@ fn format_rule_text(rule: Rule) -> String {
         output.push_str("Message formats:");
         for format in rule.message_formats() {
             output.push('\n');
-            output.push_str(&format!("* {format}"));
+            let _ = write!(&mut output, "* {format}");
         }
     }
     output

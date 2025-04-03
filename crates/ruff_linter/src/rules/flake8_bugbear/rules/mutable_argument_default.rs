@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_docstring_stmt;
@@ -160,14 +162,15 @@ fn move_initialization(
 
     // Add an `if`, to set the argument to its original value if still `None`.
     let mut content = String::new();
-    content.push_str(&format!("if {} is None:", parameter.name()));
+    let _ = write!(&mut content, "if {} is None:", parameter.name());
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
-    content.push_str(&format!(
+    let _ = write!(
+        &mut content,
         "{} = {}",
         parameter.name(),
         generator.expr(default)
-    ));
+    );
     content.push_str(stylist.line_ending().as_str());
 
     // Determine the indentation depth of the function body.

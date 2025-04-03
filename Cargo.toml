@@ -209,6 +209,7 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
+needless_continue = "allow"       # An explicit continue can be more readable, especially if the alternative is an empty block.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
@@ -226,6 +227,10 @@ rest_pat_in_fully_bound_structs = "warn"
 redundant_clone = "warn"
 debug_assert_with_mut_call = "warn"
 unused_peekable = "warn"
+
+# Has false positives
+# https://github.com/rust-lang/rust-clippy/issues/14275
+doc_overindented_list_items = "allow"
 
 # Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
 large_stack_arrays = "allow"
