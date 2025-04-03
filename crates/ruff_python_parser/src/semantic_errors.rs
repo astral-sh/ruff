@@ -580,9 +580,11 @@ impl SemanticSyntaxChecker {
         generators: &[ast::Comprehension],
     ) {
         let python_version = ctx.python_version();
+        if python_version >= PythonVersion::PY311 {
+            return;
+        }
         for generator in generators {
-            if generator.is_async && !self.in_async_context && python_version < PythonVersion::PY311
-            {
+            if generator.is_async && !self.in_async_context {
                 // test_ok nested_async_comprehension_py311
                 // # parse_options: {"target-version": "3.11"}
                 // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
