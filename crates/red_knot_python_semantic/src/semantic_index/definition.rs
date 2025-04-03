@@ -656,14 +656,14 @@ impl DefinitionKind<'_> {
 #[derive(Copy, Clone, Debug, PartialEq, Hash)]
 pub(crate) enum TargetKind<'db> {
     Sequence(UnpackPosition, Unpack<'db>),
-    Name,
+    NameOrAttribute,
 }
 
 impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
     fn from(value: Option<(UnpackPosition, Unpack<'db>)>) -> Self {
         match value {
             Some((unpack_position, unpack)) => TargetKind::Sequence(unpack_position, unpack),
-            None => TargetKind::Name,
+            None => TargetKind::NameOrAttribute,
         }
     }
 }

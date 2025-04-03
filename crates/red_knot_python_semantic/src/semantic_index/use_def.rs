@@ -285,7 +285,7 @@ mod symbol_state;
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct UseDefMap<'db> {
-    /// Array of [`Definition`] in this scope. The first entry should be `None`;
+    /// Array of [`Definition`] in this scope. Only the first entry should be `None`;
     /// this represents the implicit "unbound"/"undeclared" definition of every symbol.
     all_definitions: IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
 
@@ -322,7 +322,7 @@ pub(crate) struct UseDefMap<'db> {
     public_symbols: IndexVec<ScopedSymbolId, SymbolState>,
 
     /// [`SymbolState`] for each instance attribute.
-    instance_attribute_states: IndexVec<ScopedSymbolId, SymbolState>,
+    instance_attributes: IndexVec<ScopedSymbolId, SymbolState>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
@@ -359,11 +359,11 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
     }
 
-    pub(crate) fn attribute_assignments(
+    pub(crate) fn instance_attribute_bindings(
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        self.bindings_iterator(self.instance_attribute_states[symbol].bindings())
+        self.bindings_iterator(self.instance_attributes[symbol].bindings())
     }
 
     pub(crate) fn eager_bindings(
@@ -935,7 +935,7 @@ impl<'db> UseDefMapBuilder<'db> {
             visibility_constraints: self.visibility_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             public_symbols: self.symbol_states,
-            instance_attribute_states: self.instance_attribute_states,
+            instance_attributes: self.instance_attribute_states,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_bindings: self.eager_bindings,

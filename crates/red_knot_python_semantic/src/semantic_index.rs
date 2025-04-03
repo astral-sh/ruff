@@ -96,6 +96,8 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
 }
 
 /// Returns all attribute assignments for a specific class body scope.
+/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
+/// introduces a direct dependency on that file's AST.
 pub(crate) fn attribute_assignments<'db, 's>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
@@ -105,19 +107,13 @@ pub(crate) fn attribute_assignments<'db, 's>(
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
 
-    DescendantsIter::new(index, class_scope_id)
-        .filter_map(move |(file_scope_id, maybe_method)| {
-            if maybe_method
-                .parent()
-                .is_none_or(|parent| parent != class_scope_id)
-            {
-                return None;
-            }
+    ChildrenIter::new(index, class_scope_id)
+        .filter_map(|(file_scope_id, maybe_method)| {
             maybe_method.node().as_function()?;
             let attribute_table = index.instance_attribute_table(file_scope_id);
             let symbol = attribute_table.symbol_id_by_name(name)?;
             let use_def = &index.use_def_maps[file_scope_id];
-            Some(use_def.attribute_assignments(symbol))
+            Some(use_def.instance_attribute_bindings(symbol))
         })
         .flatten()
 }

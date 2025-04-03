@@ -576,7 +576,7 @@ impl<'db> Class<'db> {
 
                             union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                         }
-                        TargetKind::Name => {
+                        TargetKind::NameOrAttribute => {
                             // We found an un-annotated attribute assignment of the form:
                             //
                             //     self.name = <value>
@@ -601,7 +601,7 @@ impl<'db> Class<'db> {
 
                             union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                         }
-                        TargetKind::Name => {
+                        TargetKind::NameOrAttribute => {
                             // We found an attribute assignment like:
                             //
                             //     for self.name in <iterable>:
@@ -628,7 +628,7 @@ impl<'db> Class<'db> {
 
                             union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                         }
-                        TargetKind::Name => {
+                        TargetKind::NameOrAttribute => {
                             // We found an attribute assignment like:
                             //
                             //     with <context_manager> as self.name:

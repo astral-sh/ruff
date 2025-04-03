@@ -338,11 +338,9 @@ class C:
         for self.z in NonIterable():
             pass
 
-# TODO: this attribute should always be considered bound
+# Iterable might be empty
 # error: [possibly-unbound-attribute]
 reveal_type(C().x)  # revealed: Unknown | int
-
-# TODO: same here
 # error: [possibly-unbound-attribute]
 reveal_type(C().y)  # revealed: Unknown | str
 ```
@@ -412,8 +410,8 @@ reveal_type(c_instance.a)  # revealed: Unknown
 
 #### Conditionally declared / bound attributes
 
-We currently do not raise a diagnostic or change behavior if an attribute is only conditionally
-defined. This is consistent with what mypy and pyright do.
+Attributes are possibly unbound if they, or the method to which they are added are conditionally
+declared / bound.
 
 ```py
 def flag() -> bool:
@@ -554,30 +552,35 @@ reveal_type(C().x)  # revealed: Unknown
 class C:
     def __init__(self, cond: bool) -> None:
         if True:
-            self.x = 1
+            self.a = 1
         else:
-            self.x = "a"
+            self.a = "a"
 
         if False:
-            self.y = 2
+            self.b = 2
 
         if cond:
             return
 
-        self.z = 3
+        self.c = 3
 
-        self.w = 4
-        self.w = 5
+        self.d = 4
+        self.d = 5
 
-    def set_z(self, z: str) -> None:
-        self.z = z
+    def set_c(self, c: str) -> None:
+        self.c = c
+    if False:
+        def set_e(self, e: str) -> None:
+            self.e = e
 
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
+reveal_type(C().a)  # revealed: Unknown | Literal[1]
 # error: [unresolved-attribute]
-reveal_type(C().y)  # revealed: Unknown
-reveal_type(C().z)  # revealed: Unknown | Literal[3] | str
+reveal_type(C().b)  # revealed: Unknown
+reveal_type(C().c)  # revealed: Unknown | Literal[3] | str
 # error: [possibly-unbound-attribute]
-reveal_type(C().w)  # revealed: Unknown | Literal[5]
+reveal_type(C().d)  # revealed: Unknown | Literal[5]
+# error: [unresolved-attribute]
+reveal_type(C().e)  # revealed: Unknown
 ```
 
 ```py

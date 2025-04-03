@@ -1844,7 +1844,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                     unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::Name => self.infer_context_expression(
+                TargetKind::NameOrAttribute => self.infer_context_expression(
                     context_expr,
                     context_expr_ty,
                     with_item.is_async(),
@@ -2651,7 +2651,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                 unpacked.expression_type(target_ast_id)
             }
-            TargetKind::Name => {
+            TargetKind::NameOrAttribute => {
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
@@ -2943,10 +2943,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                     unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::Name => iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                    err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                    err.fallback_element_type(self.db())
-                }),
+                TargetKind::NameOrAttribute => {
+                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                        err.fallback_element_type(self.db())
+                    })
+                }
             }
         };
 
