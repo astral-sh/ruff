@@ -1,9 +1,9 @@
-use std::fmt;
+use std::fmt::{self, format};
 
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     self as ast, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, LiteralExpressionRef,
@@ -45,6 +45,7 @@ use crate::importer::ImportRequest;
 pub(crate) struct RedundantLiteralUnion {
     literal: SourceCodeSnippet,
     builtin_type: ExprType,
+    union_kind: UnionKind,
 }
 
 impl Violation for RedundantLiteralUnion {
@@ -55,6 +56,7 @@ impl Violation for RedundantLiteralUnion {
         let RedundantLiteralUnion {
             literal,
             builtin_type,
+            ..
         } = self;
         if let Some(literal) = literal.full_display() {
             format!("`Literal[{literal}]` is redundant in a union with `{builtin_type}`")
@@ -67,11 +69,17 @@ impl Violation for RedundantLiteralUnion {
         let RedundantLiteralUnion {
             literal,
             builtin_type,
+            union_kind,
         } = self;
         if let Some(literal) = literal.full_display() {
-            Some(format!(
-                "Replace `Literal[{literal}] | {builtin_type}` with `{builtin_type}`"
-            ))
+            match union_kind {
+                UnionKind::TypingUnion => Some(format!(
+                    "Replace `typing.Union[Literal[{literal}], {builtin_type}]` with `{builtin_type}`"
+                    )),
+                UnionKind::PEP604 => Some(format!(
+                    "Replace `Literal[{literal}] | {builtin_type}` with `{builtin_type}`"
+                )),
+            }
         } else {
             Some(format!("Replace with `{builtin_type}`"))
         }
@@ -84,8 +92,8 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
     let mut builtin_types_in_union = FxHashSet::default();
     let mut literal_subscript = None;
     let mut literal_exprs = Vec::new();
-    let union_type =
-        if (checker.target_version() >= PythonVersion::PY310) || checker.source_type.is_stub() {
+    let union_kind =
+        if checker.target_version() >= PythonVersion::PY310 || checker.source_type.is_stub() {
             UnionKind::PEP604
         } else {
             UnionKind::TypingUnion
@@ -136,6 +144,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
                         checker.locator().slice(typing_literal_expr),
                     ),
                     builtin_type: literal_type,
+                    union_kind,
                 },
                 typing_literal_expr.range(),
             ));
@@ -210,9 +219,17 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
     }
 
     // Now concatenate the exprs based on the union type
-    let fix = match union_type {
-        UnionKind::PEP604 => generate_pep604_fix(checker, new_exprs, union),
-        UnionKind::TypingUnion => generate_typing_union_fix(checker, new_exprs, union),
+    let applicability = if checker.comment_ranges().intersects(union.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    let fix = match union_kind {
+        UnionKind::PEP604 => generate_pep604_fix(checker, new_exprs, union, applicability),
+        UnionKind::TypingUnion => {
+            generate_typing_union_fix(checker, new_exprs, union, applicability)
+        }
     };
 
     for diagnostic in &mut diagnostics {
@@ -222,7 +239,19 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
     checker.report_diagnostics(diagnostics);
 }
 
-fn generate_pep604_fix(checker: &Checker, new_exprs: Vec<Expr>, union: &Expr) -> Fix {
+fn generate_pep604_fix(
+    checker: &Checker,
+    new_exprs: Vec<Expr>,
+    union: &Expr,
+    applicability: Applicability,
+) -> Fix {
+    if new_exprs.len() == 1 {
+        return Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(&new_exprs[0]), union.range()),
+            applicability,
+        );
+    }
+
     let new_expr = new_exprs
         .into_iter()
         .fold(None, |acc: Option<Expr>, right: Expr| {
@@ -239,13 +268,25 @@ fn generate_pep604_fix(checker: &Checker, new_exprs: Vec<Expr>, union: &Expr) ->
         })
         .unwrap();
 
-    Fix::safe_edit(Edit::range_replacement(
-        checker.generator().expr(&new_expr),
-        union.range(),
-    ))
+    Fix::applicable_edit(
+        Edit::range_replacement(checker.generator().expr(&new_expr), union.range()),
+        applicability,
+    )
 }
 
-fn generate_typing_union_fix(checker: &Checker, new_exprs: Vec<Expr>, union: &Expr) -> Fix {
+fn generate_typing_union_fix(
+    checker: &Checker,
+    new_exprs: Vec<Expr>,
+    union: &Expr,
+    applicability: Applicability,
+) -> Fix {
+    if new_exprs.len() == 1 {
+        return Fix::applicable_edit(
+            Edit::range_replacement(checker.generator().expr(&new_exprs[0]), union.range()),
+            applicability,
+        );
+    }
+
     let (import_edit, binding) = checker
         .importer()
         .get_or_import_symbol(
@@ -279,7 +320,7 @@ fn generate_typing_union_fix(checker: &Checker, new_exprs: Vec<Expr>, union: &Ex
     Fix::applicable_edits(
         Edit::range_replacement(checker.generator().expr(&new_expr), union.range()),
         [import_edit],
-        ruff_diagnostics::Applicability::Safe,
+        applicability,
     )
 }
 
