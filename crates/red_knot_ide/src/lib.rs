@@ -160,8 +160,18 @@ impl HasNavigationTargets for Type<'_> {
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
             | Type::PropertyInstance(_)
-            | Type::TypeVar(_)
             | Type::Tuple(_) => self.to_meta_type(db.upcast()).navigation_targets(db),
+
+            Type::TypeVar(var) => {
+                let definition = var.definition(db);
+                let full_range = definition.full_range(db.upcast());
+
+                NavigationTargets::single(NavigationTarget {
+                    file: full_range.file(),
+                    focus_range: definition.focus_range(db.upcast()).range(),
+                    full_range: full_range.range(),
+                })
+            }
 
             Type::Intersection(intersection) => intersection.navigation_targets(db),
 
