@@ -27,7 +27,9 @@ use crate::noqa::{Codes, NoqaDirectiveLine, NoqaDirectives};
 /// ```python
 /// import os  # noqa: E402
 /// ```
-
+///
+/// ## References
+/// - [Ruff external codes](https://docs.astral.sh/ruff/settings/#lint_external)
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidRuleCode {
     pub(crate) rule_code: String,
