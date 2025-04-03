@@ -597,6 +597,51 @@ reveal_type(C().x)  # revealed: Unknown | Literal[1]
 reveal_type(C().y)  # revealed: Unknown | Literal[2, 3]
 ```
 
+#### Attributes considered always bound
+
+```py
+class C:
+    def __init__(self, cond: bool):
+        self.x = 1
+        if cond:
+            raise ValueError("Something went wrong")
+
+        # We consider this attribute is always bound.
+        # This is because, it is not possible to access a partially-initialized object by normal means.
+        self.y = 2
+
+reveal_type(C(False).x)  # revealed: Unknown | Literal[1]
+reveal_type(C(False).y)  # revealed: Unknown | Literal[2]
+
+class C:
+    def __init__(self, b: bytes) -> None:
+        self.b = b
+
+        try:
+            s = b.decode()
+        except UnicodeDecodeError:
+            raise ValueError("Invalid UTF-8 sequence")
+
+        self.s = s
+
+reveal_type(C(b"abc").b)  # revealed: Unknown | bytes
+reveal_type(C(b"abc").s)  # revealed: Unknown | str
+
+class C:
+    def __init__(self, iter) -> None:
+        self.x = 1
+
+        for _ in iter:
+            pass
+
+        # The for-loop may not stop,
+        # but we consider the subsequent attributes to be definitely-bound.
+        self.y = 2
+
+reveal_type(C([]).x)  # revealed: Unknown | Literal[1]
+reveal_type(C([]).y)  # revealed: Unknown | Literal[2]
+```
+
 #### Diagnostics are reported for the right-hand side of attribute assignments
 
 ```py
