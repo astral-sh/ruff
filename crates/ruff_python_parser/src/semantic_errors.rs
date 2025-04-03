@@ -8,6 +8,7 @@ use std::fmt::Display;
 
 use ruff_python_ast::{
     self as ast,
+    comparable::ComparableExpr,
     visitor::{walk_expr, Visitor},
     Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
@@ -65,6 +66,7 @@ impl SemanticSyntaxChecker {
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
                 Self::multiple_case_assignment(match_stmt, ctx);
+                Self::duplicate_match_mapping_keys(match_stmt, ctx);
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
             | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
@@ -267,6 +269,58 @@ impl SemanticSyntaxChecker {
                 ctx,
             };
             visitor.visit_pattern(&case.pattern);
+        }
+    }
+
+    fn duplicate_match_mapping_keys<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
+        for mapping in stmt
+            .cases
+            .iter()
+            .filter_map(|case| case.pattern.as_match_mapping())
+        {
+            let mut seen = FxHashSet::default();
+            for key in mapping
+                .keys
+                .iter()
+                // complex numbers (`1 + 2j`) are allowed as keys but are not literals
+                // because they are represented as a `BinOp::Add` between a real number and
+                // an imaginary number
+                .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
+            {
+                if !seen.insert(ComparableExpr::from(key)) {
+                    let key_range = key.range();
+                    let duplicate_key = ctx.source()[key_range].to_string();
+                    // test_ok duplicate_match_key_attr
+                    // match x:
+                    //     case {x.a: 1, x.a: 2}: ...
+
+                    // test_err duplicate_match_key
+                    // match x:
+                    //     case {"x": 1, "x": 2}: ...
+                    //     case {b"x": 1, b"x": 2}: ...
+                    //     case {0: 1, 0: 2}: ...
+                    //     case {1.0: 1, 1.0: 2}: ...
+                    //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+                    //     case {True: 1, True: 2}: ...
+                    //     case {None: 1, None: 2}: ...
+                    //     case {
+                    //     """x
+                    //     y
+                    //     z
+                    //     """: 1,
+                    //     """x
+                    //     y
+                    //     z
+                    //     """: 2}: ...
+                    //     case {"x": 1, "x": 2, "x": 3}: ...
+                    //     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),
+                        key_range,
+                    );
+                }
+            }
         }
     }
 
@@ -514,6 +568,13 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
+            SemanticSyntaxErrorKind::DuplicateMatchKey(key) => {
+                write!(
+                    f,
+                    "mapping pattern checks duplicate key `{}`",
+                    EscapeDefault(key)
+                )
+            }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
                 write!(f, "name `{name}` is used prior to global declaration")
             }
@@ -633,6 +694,41 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [BPO 45000]: https://github.com/python/cpython/issues/89163
     WriteToDebug(WriteToDebugKind),
+
+    /// Represents a duplicate key in a `match` mapping pattern.
+    ///
+    /// The [CPython grammar] allows keys in mapping patterns to be literals or attribute accesses:
+    ///
+    /// ```text
+    /// key_value_pattern:
+    ///     | (literal_expr | attr) ':' pattern
+    /// ```
+    ///
+    /// But only literals are checked for duplicates:
+    ///
+    /// ```pycon
+    /// >>> match x:
+    /// ...     case {"x": 1, "x": 2}: ...
+    /// ...
+    ///   File "<python-input-160>", line 2
+    ///     case {"x": 1, "x": 2}: ...
+    ///          ^^^^^^^^^^^^^^^^
+    /// SyntaxError: mapping pattern checks duplicate key ('x')
+    /// >>> match x:
+    /// ...     case {x.a: 1, x.a: 2}: ...
+    /// ...
+    /// >>>
+    /// ```
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case {"x": 1, "x": 2}: ...
+    /// ```
+    ///
+    /// [CPython grammar]: https://docs.python.org/3/reference/grammar.html
+    DuplicateMatchKey(String),
 
     /// Represents the use of a `global` variable before its `global` declaration.
     ///
@@ -789,6 +885,9 @@ pub trait SemanticSyntaxContext {
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
 
+    /// Returns the source text under analysis.
+    fn source(&self) -> &str;
+
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
 
@@ -826,5 +925,22 @@ where
     fn visit_expr(&mut self, expr: &'_ Expr) {
         self.checker.visit_expr(expr, &self.context);
         ruff_python_ast::visitor::walk_expr(self, expr);
+    }
+}
+
+/// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.
+struct EscapeDefault<'a>(&'a str);
+
+impl Display for EscapeDefault<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write;
+
+        for c in self.0.chars() {
+            match c {
+                '\'' | '\"' => f.write_char(c)?,
+                _ => write!(f, "{}", c.escape_default())?,
+            }
+        }
+        Ok(())
     }
 }
