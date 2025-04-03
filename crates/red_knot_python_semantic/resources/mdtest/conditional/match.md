@@ -46,6 +46,23 @@ def _(target: int):
 
 ## Class match
 
+We have to take into account custom equality implementations
+
+```py
+from typing import final
+
+@final
+class C:
+    pass
+
+def _(subject: C):
+    y = 1
+    match subject:
+        case 1:
+            y = 2
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
 ```py
 from typing import final
 
@@ -64,31 +81,29 @@ class Baz:
 
 def _(target: FooSub):
     y = 1
-    y = 2
 
     match target:
         case Baz():
-            y = 3
+            y = 2
         case Foo():
-            y = 4
+            y = 3
         case Bar():
-            y = 5
+            y = 4
 
-    reveal_type(y)  # revealed: Literal[4]
+    reveal_type(y)  # revealed: Literal[3]
 
 def _(target: FooSub | str):
     y = 1
-    y = 2
 
     match target:
         case Baz():
-            y = 3
+            y = 2
         case Foo():
-            y = 4
+            y = 3
         case Bar():
-            y = 5
+            y = 4
 
-    reveal_type(y)  # revealed: Literal[2, 4, 5]
+    reveal_type(y)  # revealed: Literal[1, 3, 4]
 ```
 
 ## Singleton match
@@ -96,79 +111,87 @@ def _(target: FooSub | str):
 ```py
 from typing import Literal
 
-def _(target: bool):
+def _(target: Literal[True, False]):
     y = 1
-    y = 2
 
     match target:
         case True:
-            y = 3
+            y = 2
         case False:
-            y = 4
+            y = 3
         case None:
-            y = 5
+            y = 4
 
-    # TODO: with exhaustivity checking, this should be Literal[3, 4]
-    reveal_type(y)  # revealed: Literal[2, 3, 4]
+    # TODO: with exhaustivity checking, this should be Literal[2, 3]
+    reveal_type(y)  # revealed: Literal[1, 2, 3]
+
+def _(target: bool):
+    y = 1
+
+    match target:
+        case True:
+            y = 2
+        case False:
+            y = 3
+        case None:
+            y = 4
+
+    # TODO: with exhaustivity checking, this should be Literal[2, 3]
+    reveal_type(y)  # revealed: Literal[1, 2, 3]
 
 def _(target: None):
     y = 1
-    y = 2
 
     match target:
         case True:
-            y = 3
+            y = 2
         case False:
-            y = 4
+            y = 3
         case None:
-            y = 5
+            y = 4
 
-    reveal_type(y)  # revealed: Literal[5]
+    reveal_type(y)  # revealed: Literal[4]
 
 def _(target: None | Literal[True]):
     y = 1
-    y = 2
 
     match target:
         case True:
-            y = 3
+            y = 2
         case False:
-            y = 4
+            y = 3
         case None:
-            y = 5
+            y = 4
 
-    # TODO: with exhaustivity checking, this should be Literal[3, 5]
-    reveal_type(y)  # revealed: Literal[2, 3, 5]
+    # TODO: with exhaustivity checking, this should be Literal[2, 4]
+    reveal_type(y)  # revealed: Literal[1, 2, 4]
 
 # bool is an int subclass
 def _(target: int):
     y = 1
-    y = 2
 
     match target:
         case True:
-            y = 3
+            y = 2
         case False:
-            y = 4
+            y = 3
         case None:
-            y = 5
+            y = 4
 
-    reveal_type(y)  # revealed: Literal[2, 3, 4]
+    reveal_type(y)  # revealed: Literal[1, 2, 3]
 
-# bool is an int subclass
 def _(target: str):
     y = 1
-    y = 2
 
     match target:
         case True:
-            y = 3
+            y = 2
         case False:
-            y = 4
+            y = 3
         case None:
-            y = 5
+            y = 4
 
-    reveal_type(y)  # revealed: Literal[2]
+    reveal_type(y)  # revealed: Literal[1]
 ```
 
 ## Guard with object that implements `__bool__` incorrectly

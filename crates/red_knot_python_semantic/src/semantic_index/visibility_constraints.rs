@@ -579,8 +579,8 @@ impl VisibilityConstraints {
                     ruff_python_ast::Singleton::False => Type::BooleanLiteral(false),
                 };
 
-                if subject_ty.is_single_valued(db) {
-                    Truthiness::from(subject_ty.is_equivalent_to(db, singleton_ty))
+                if subject_ty.is_equivalent_to(db, singleton_ty) {
+                    Truthiness::AlwaysTrue
                 } else if subject_ty.is_disjoint_from(db, singleton_ty) {
                     Truthiness::AlwaysFalse
                 } else {
