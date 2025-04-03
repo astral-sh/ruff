@@ -17,9 +17,8 @@ import {
 import { RefObject, useCallback, useEffect, useRef } from "react";
 import { Theme } from "shared";
 import {
-  Diagnostic,
   Severity,
-  Workspace,
+  type Workspace,
   Position as KnotPosition,
   type Range as KnotRange,
 } from "red_knot_wasm";
@@ -27,6 +26,7 @@ import {
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import { FileId, ReadonlyFiles } from "../Playground";
 import { isPythonFile } from "./Files";
+import { Diagnostic } from "./Diagnostics";
 
 type Props = {
   visible: boolean;
@@ -38,7 +38,7 @@ type Props = {
   workspace: Workspace;
   onChange(content: string): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
-  onOpenFile(file: FileId): void;
+  onFileOpened(file: FileId): void;
 };
 
 export default function Editor({
@@ -51,7 +51,7 @@ export default function Editor({
   workspace,
   onChange,
   onMount,
-  onOpenFile,
+  onFileOpened,
 }: Props) {
   const disposable = useRef<{
     typeDefinition: IDisposable;
@@ -61,14 +61,14 @@ export default function Editor({
     monaco: null,
     files,
     workspace,
-    onOpenFile,
+    onFileOpened,
   });
 
   playgroundState.current = {
     monaco: playgroundState.current.monaco,
     files,
     workspace,
-    onOpenFile,
+    onFileOpened,
   };
 
   // Update the diagnostics in the editor.
@@ -79,8 +79,8 @@ export default function Editor({
       return;
     }
 
-    updateMarkers(monaco, workspace, diagnostics);
-  }, [workspace, diagnostics]);
+    updateMarkers(monaco, diagnostics);
+  }, [diagnostics]);
 
   const handleChange = useCallback(
     (value: string | undefined) => {
@@ -98,7 +98,7 @@ export default function Editor({
 
   const handleMount: OnMount = useCallback(
     (editor, instance) => {
-      updateMarkers(instance, workspace, diagnostics);
+      updateMarkers(instance, diagnostics);
 
       const server = new PlaygroundServer(playgroundState);
       const typeDefinitionDisposable =
@@ -116,7 +116,7 @@ export default function Editor({
       onMount(editor, instance);
     },
 
-    [onMount, workspace, diagnostics],
+    [onMount, diagnostics],
   );
 
   return (
@@ -141,11 +141,7 @@ export default function Editor({
   );
 }
 
-function updateMarkers(
-  monaco: Monaco,
-  workspace: Workspace,
-  diagnostics: Array<Diagnostic>,
-) {
+function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
   const editor = monaco.editor;
   const model = editor?.getModels()[0];
 
@@ -170,16 +166,16 @@ function updateMarkers(
         }
       };
 
-      const range = diagnostic.toRange(workspace);
+      const range = diagnostic.range;
 
       return {
-        code: diagnostic.id(),
+        code: diagnostic.id,
         startLineNumber: range?.start?.line ?? 0,
         startColumn: range?.start?.column ?? 0,
         endLineNumber: range?.end?.line ?? 0,
         endColumn: range?.end?.column ?? 0,
-        message: diagnostic.message(),
-        severity: mapSeverity(diagnostic.severity()),
+        message: diagnostic.message,
+        severity: mapSeverity(diagnostic.severity),
         tags: [],
       };
     }),
@@ -191,7 +187,7 @@ interface PlaygroundServerProps {
   workspace: Workspace;
   files: ReadonlyFiles;
 
-  onOpenFile: (file: FileId) => void;
+  onFileOpened: (file: FileId) => void;
 }
 
 class PlaygroundServer
@@ -223,26 +219,29 @@ class PlaygroundServer
       new KnotPosition(position.lineNumber, position.column),
     );
 
-    const locations = links.map((link) => {
-      const targetSelection =
-        link.selection_range == null
-          ? undefined
-          : knotRangeToIRange(link.selection_range);
+    return (
+      links
+        .map((link) => {
+          const targetSelection =
+            link.selection_range == null
+              ? undefined
+              : knotRangeToIRange(link.selection_range);
 
-      const originSelection =
-        link.origin_selection_range == null
-          ? undefined
-          : knotRangeToIRange(link.origin_selection_range);
+          const originSelection =
+            link.origin_selection_range == null
+              ? undefined
+              : knotRangeToIRange(link.origin_selection_range);
 
-      return {
-        uri: Uri.parse(link.path),
-        range: knotRangeToIRange(link.full_range),
-        targetSelectionRange: targetSelection,
-        originSelectionRange: originSelection,
-      } as languages.LocationLink;
-    });
-
-    return locations;
+          return {
+            uri: Uri.parse(link.path),
+            range: knotRangeToIRange(link.full_range),
+            targetSelectionRange: targetSelection,
+            originSelectionRange: originSelection,
+          } as languages.LocationLink;
+        })
+        // Filter out vendored files because they aren't open in the editor.
+        .filter((link) => link.uri.scheme !== "vendored")
+    );
   }
 
   openCodeEditor(
@@ -284,7 +283,7 @@ class PlaygroundServer
     if (files.selected !== fileId) {
       source.setModel(model);
 
-      this.props.current.onOpenFile(fileId);
+      this.props.current.onFileOpened(fileId);
     }
 
     if (selectionOrPosition != null) {
