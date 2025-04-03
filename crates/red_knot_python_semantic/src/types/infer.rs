@@ -2009,14 +2009,25 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.infer_expression(expr);
                     None
                 } else {
-                    let tuple = TupleType::new(
+                    // We don't use UnionType::from_elements or UnionBuilder here, because we don't
+                    // want to simplify the list of constraints like we do with the elements of an
+                    // actual union type.
+                    // TODO: Consider using a new `OneOfType` connective here instead, since that
+                    // more accurately represents the actual semantics of typevar constraints.
+                    let elements = UnionType::new(
                         self.db(),
                         elts.iter()
                             .map(|expr| self.infer_type_expression(expr))
-                            .collect::<Box<_>>(),
+                            .collect::<Box<[_]>>(),
                     );
-                    let constraints = TypeVarBoundOrConstraints::Constraints(tuple);
-                    self.store_expression_type(expr, Type::Tuple(tuple));
+                    let constraints = TypeVarBoundOrConstraints::Constraints(elements);
+                    // But when we construct an actual union type for the constraint expression as
+                    // a whole, we do use UnionType::from_elements to maintain the invariant that
+                    // all union types are simplified.
+                    self.store_expression_type(
+                        expr,
+                        UnionType::from_elements(self.db(), elements.elements(self.db())),
+                    );
                     Some(constraints)
                 }
             }
@@ -2357,6 +2368,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::SpecializedCallable(_)
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
+            | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => match object_ty.class_member(db, attribute.into()) {
                 meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
@@ -4476,7 +4488,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
-                | Type::Tuple(_),
+                | Type::Tuple(_)
+                | Type::TypeVar(_),
             ) => {
                 let unary_dunder_method = match op {
                     ast::UnaryOp::Invert => "__invert__",
@@ -4752,7 +4765,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
-                | Type::Tuple(_),
+                | Type::Tuple(_)
+                | Type::TypeVar(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
@@ -4773,7 +4787,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::LiteralString
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
-                | Type::Tuple(_),
+                | Type::Tuple(_)
+                | Type::TypeVar(_),
                 op,
             ) => {
                 // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from

@@ -125,6 +125,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Instance(_), _) => Ordering::Less,
         (_, Type::Instance(_)) => Ordering::Greater,
 
+        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
+        (Type::TypeVar(_), _) => Ordering::Less,
+        (_, Type::TypeVar(_)) => Ordering::Greater,
+
         (Type::AlwaysTruthy, _) => Ordering::Less,
         (_, Type::AlwaysTruthy) => Ordering::Greater,
 
