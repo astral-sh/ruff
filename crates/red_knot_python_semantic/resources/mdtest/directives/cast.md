@@ -49,3 +49,22 @@ def f(x: Callable[[dict[str, int]], None], y: tuple[dict[str, int]]):
     a = cast(Callable[[list[bytes]], None], x)
     b = cast(tuple[list[bytes]], y)
 ```
+
+A cast from `Todo` or `Unknown` to `Any` is not considered a "redundant cast": even if these are
+understood as gradually equivalent types by red-knot, they are understood as different types by
+human readers of red-knot's output. For `Unknown` in particular, we may consider it differently in
+the context of some opt-in diagnostics, as it indicates that the gradual type has come about due to
+an invalid annotation, missing annotation or missing type argument somewhere.
+
+```py
+from knot_extensions import Unknown
+
+def f(x: Any, y: Unknown, z: Any | str | int):
+    a = cast(dict[str, Any], x)
+    reveal_type(a)  # revealed: @Todo(generics)
+
+    b = cast(Any, y)
+    reveal_type(b)  # revealed: Any
+
+    c = cast(str | int | Any, z)  # error: [redundant-cast]
+```

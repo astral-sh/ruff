@@ -828,6 +828,7 @@ pub enum KnownClass {
     Bool,
     Object,
     Bytes,
+    Bytearray,
     Type,
     Int,
     Float,
@@ -939,6 +940,7 @@ impl<'db> KnownClass {
             | Self::Int
             | Self::Type
             | Self::Bytes
+            | Self::Bytearray
             | Self::FrozenSet
             | Self::Range
             | Self::Property
@@ -967,6 +969,7 @@ impl<'db> KnownClass {
             Self::Bool => "bool",
             Self::Object => "object",
             Self::Bytes => "bytes",
+            Self::Bytearray => "bytearray",
             Self::Tuple => "tuple",
             Self::Int => "int",
             Self::Float => "float",
@@ -1144,6 +1147,7 @@ impl<'db> KnownClass {
             Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1226,6 +1230,7 @@ impl<'db> KnownClass {
             | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1284,6 +1289,7 @@ impl<'db> KnownClass {
             | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Tuple
             | Self::Int
             | Self::Float
@@ -1338,6 +1344,7 @@ impl<'db> KnownClass {
             "bool" => Self::Bool,
             "object" => Self::Object,
             "bytes" => Self::Bytes,
+            "bytearray" => Self::Bytearray,
             "tuple" => Self::Tuple,
             "type" => Self::Type,
             "int" => Self::Int,
@@ -1403,6 +1410,7 @@ impl<'db> KnownClass {
             | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
