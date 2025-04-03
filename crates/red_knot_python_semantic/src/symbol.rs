@@ -657,7 +657,7 @@ fn symbol_from_bindings_impl<'db>(
             binding,
             visibility_constraint,
             narrowing_constraint: _,
-        }) if binding.map_or(true, is_non_exported) => {
+        }) if binding.is_none_or(is_non_exported) => {
             visibility_constraints.evaluate(db, predicates, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,
@@ -747,7 +747,7 @@ fn symbol_from_declarations_impl<'db>(
         Some(DeclarationWithConstraint {
             declaration,
             visibility_constraint,
-        }) if declaration.map_or(true, is_non_exported) => {
+        }) if declaration.is_none_or(is_non_exported) => {
             visibility_constraints.evaluate(db, predicates, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,

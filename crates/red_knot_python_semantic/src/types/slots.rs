@@ -30,7 +30,7 @@ impl SlotsKind {
 
         if matches!(bound, Boundness::PossiblyUnbound) {
             return Self::Dynamic;
-        };
+        }
 
         match slots_ty {
             // __slots__ = ("a", "b")
@@ -98,6 +98,6 @@ pub(super) fn check_class_slots(context: &InferContext, class: Class, node: &ast
         if let Some(index) = first_with_solid_base {
             let base_node = &node.bases()[index];
             report_base_with_incompatible_slots(context, base_node);
-        };
+        }
     }
 }

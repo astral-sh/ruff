@@ -92,7 +92,7 @@ pub(crate) fn rule(rule: Rule, format: HelpFormat) -> Result<()> {
         HelpFormat::Json => {
             serde_json::to_writer_pretty(stdout, &Explanation::from_rule(&rule))?;
         }
-    };
+    }
     Ok(())
 }
 

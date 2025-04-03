@@ -209,7 +209,7 @@ pub(crate) fn bad_generator_return_type(function_def: &ast::StmtFunctionDef, che
                 _ => return,
             }
         }
-    };
+    }
     let mut diagnostic = Diagnostic::new(
         GeneratorReturnFromIterMethod {
             return_type: member.to_iter(),

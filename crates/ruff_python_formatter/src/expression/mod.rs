@@ -787,7 +787,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::IpyEscapeCommand(_) => {
                 return;
             }
-        };
+        }
 
         walk_expr(self, expr);
     }

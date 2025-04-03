@@ -204,7 +204,7 @@ fn move_initialization(
             }
         } else {
             break;
-        };
+        }
     }
 
     let initialization_edit = Edit::insertion(content, pos);
