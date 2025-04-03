@@ -3,49 +3,83 @@
  */
 
 import Moncao, { Monaco, OnMount } from "@monaco-editor/react";
-import { editor, MarkerSeverity } from "monaco-editor";
-import { useCallback, useEffect, useRef } from "react";
+import {
+  CancellationToken,
+  editor,
+  IDisposable,
+  IPosition,
+  IRange,
+  languages,
+  MarkerSeverity,
+  Position,
+  Uri,
+} from "monaco-editor";
+import { RefObject, useCallback, useEffect, useRef } from "react";
 import { Theme } from "shared";
-import { Diagnostic, Severity, Workspace } from "red_knot_wasm";
+import {
+  Diagnostic,
+  Severity,
+  Workspace,
+  Position as KnotPosition,
+  type Range as KnotRange,
+} from "red_knot_wasm";
 
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
+import { FileId, ReadonlyFiles } from "../Playground";
+import { isPythonFile } from "./Files";
 
 type Props = {
   visible: boolean;
   fileName: string;
-  source: string;
+  selected: FileId;
+  files: ReadonlyFiles;
   diagnostics: Diagnostic[];
   theme: Theme;
   workspace: Workspace;
   onChange(content: string): void;
-  onMount(editor: IStandaloneCodeEditor): void;
-};
-
-type MonacoEditorState = {
-  monaco: Monaco;
+  onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
+  onOpenFile(file: FileId): void;
 };
 
 export default function Editor({
   visible,
-  source,
   fileName,
+  selected,
+  files,
   theme,
   diagnostics,
   workspace,
   onChange,
   onMount,
+  onOpenFile,
 }: Props) {
-  const monacoRef = useRef<MonacoEditorState | null>(null);
+  const disposable = useRef<{
+    typeDefinition: IDisposable;
+    editorOpener: IDisposable;
+  } | null>(null);
+  const playgroundState = useRef<PlaygroundServerProps>({
+    monaco: null,
+    files,
+    workspace,
+    onOpenFile,
+  });
+
+  playgroundState.current = {
+    monaco: playgroundState.current.monaco,
+    files,
+    workspace,
+    onOpenFile,
+  };
 
   // Update the diagnostics in the editor.
   useEffect(() => {
-    const editorState = monacoRef.current;
+    const monaco = playgroundState.current.monaco;
 
-    if (editorState == null) {
+    if (monaco == null) {
       return;
     }
 
-    updateMarkers(editorState.monaco, workspace, diagnostics);
+    updateMarkers(monaco, workspace, diagnostics);
   }, [workspace, diagnostics]);
 
   const handleChange = useCallback(
@@ -55,15 +89,31 @@ export default function Editor({
     [onChange],
   );
 
+  useEffect(() => {
+    return () => {
+      disposable.current?.typeDefinition.dispose();
+      disposable.current?.editorOpener.dispose();
+    };
+  }, []);
+
   const handleMount: OnMount = useCallback(
     (editor, instance) => {
       updateMarkers(instance, workspace, diagnostics);
 
-      monacoRef.current = {
-        monaco: instance,
+      const server = new PlaygroundServer(playgroundState);
+      const typeDefinitionDisposable =
+        instance.languages.registerTypeDefinitionProvider("python", server);
+      const editorOpenerDisposable =
+        instance.editor.registerEditorOpener(server);
+
+      disposable.current = {
+        typeDefinition: typeDefinitionDisposable,
+        editorOpener: editorOpenerDisposable,
       };
 
-      onMount(editor);
+      playgroundState.current.monaco = instance;
+
+      onMount(editor, instance);
     },
 
     [onMount, workspace, diagnostics],
@@ -79,13 +129,13 @@ export default function Editor({
         fontSize: 14,
         roundedSelection: false,
         scrollBeyondLastLine: false,
-        contextmenu: false,
+        contextmenu: true,
       }}
       language={fileName.endsWith(".pyi") ? "python" : undefined}
       path={fileName}
       wrapperProps={visible ? {} : { style: { display: "none" } }}
       theme={theme === "light" ? "Ayu-Light" : "Ayu-Dark"}
-      value={source}
+      value={files.contents[selected]}
       onChange={handleChange}
     />
   );
@@ -120,18 +170,145 @@ function updateMarkers(
         }
       };
 
-      const range = diagnostic.to_range(workspace);
+      const range = diagnostic.toRange(workspace);
 
       return {
         code: diagnostic.id(),
-        startLineNumber: (range?.start?.line ?? 0) + 1,
-        startColumn: (range?.start?.character ?? 0) + 1,
-        endLineNumber: (range?.end?.line ?? 0) + 1,
-        endColumn: (range?.end?.character ?? 0) + 1,
+        startLineNumber: range?.start?.line ?? 0,
+        startColumn: range?.start?.column ?? 0,
+        endLineNumber: range?.end?.line ?? 0,
+        endColumn: range?.end?.column ?? 0,
         message: diagnostic.message(),
         severity: mapSeverity(diagnostic.severity()),
         tags: [],
       };
     }),
   );
+}
+
+interface PlaygroundServerProps {
+  monaco: Monaco | null;
+  workspace: Workspace;
+  files: ReadonlyFiles;
+
+  onOpenFile: (file: FileId) => void;
+}
+
+class PlaygroundServer
+  implements languages.TypeDefinitionProvider, editor.ICodeEditorOpener
+{
+  constructor(private props: RefObject<PlaygroundServerProps>) {}
+
+  provideTypeDefinition(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _: CancellationToken,
+  ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
+    const workspace = this.props.current.workspace;
+
+    const selectedFile = this.props.current.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.current.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const links = workspace.gotoTypeDefinition(
+      selectedHandle,
+      new KnotPosition(position.lineNumber, position.column),
+    );
+
+    const locations = links.map((link) => {
+      const targetSelection =
+        link.selection_range == null
+          ? undefined
+          : knotRangeToIRange(link.selection_range);
+
+      const originSelection =
+        link.origin_selection_range == null
+          ? undefined
+          : knotRangeToIRange(link.origin_selection_range);
+
+      return {
+        uri: Uri.parse(link.path),
+        range: knotRangeToIRange(link.full_range),
+        targetSelectionRange: targetSelection,
+        originSelectionRange: originSelection,
+      } as languages.LocationLink;
+    });
+
+    return locations;
+  }
+
+  openCodeEditor(
+    source: editor.ICodeEditor,
+    resource: Uri,
+    selectionOrPosition?: IRange | IPosition,
+  ): boolean {
+    const files = this.props.current.files;
+    const monaco = this.props.current.monaco;
+
+    if (monaco == null) {
+      return false;
+    }
+
+    const fileId = files.index.find((file) => {
+      return Uri.file(file.name).toString() === resource.toString();
+    })?.id;
+
+    if (fileId == null) {
+      return false;
+    }
+
+    const handle = files.handles[fileId];
+
+    let model = monaco.editor.getModel(resource);
+    if (model == null) {
+      const language =
+        handle != null && isPythonFile(handle) ? "python" : undefined;
+      model = monaco.editor.createModel(
+        files.contents[fileId],
+        language,
+        resource,
+      );
+    }
+
+    // it's a bit hacky to create the model manually
+    // but only using `onOpenFile` isn't enough
+    // because the model doesn't get updated until the next render.
+    if (files.selected !== fileId) {
+      source.setModel(model);
+
+      this.props.current.onOpenFile(fileId);
+    }
+
+    if (selectionOrPosition != null) {
+      if (Position.isIPosition(selectionOrPosition)) {
+        source.setPosition(selectionOrPosition);
+        source.revealPosition(selectionOrPosition);
+      } else {
+        source.setSelection(selectionOrPosition);
+        source.revealPosition({
+          lineNumber: selectionOrPosition.startLineNumber,
+          column: selectionOrPosition.startColumn,
+        });
+      }
+    }
+
+    return true;
+  }
+}
+
+function knotRangeToIRange(range: KnotRange): IRange {
+  return {
+    startLineNumber: range.start.line,
+    startColumn: range.start.column,
+    endLineNumber: range.end.line,
+    endColumn: range.end.column,
+  };
 }

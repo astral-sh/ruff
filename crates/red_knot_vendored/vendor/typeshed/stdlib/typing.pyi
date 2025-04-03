@@ -130,8 +130,7 @@ if sys.version_info >= (3, 12):
 if sys.version_info >= (3, 13):
     __all__ += ["get_protocol_members", "is_protocol", "NoDefault", "TypeIs", "ReadOnly"]
 
-Any = object()
-
+class Any: ...
 class _Final: ...
 
 def final(f: _T) -> _T: ...
@@ -950,6 +949,9 @@ class _TypedDict(Mapping[str, object], metaclass=ABCMeta):
     # so we only add it to the stub on 3.12+
     if sys.version_info >= (3, 12):
         __orig_bases__: ClassVar[tuple[Any, ...]]
+    if sys.version_info >= (3, 13):
+        __readonly_keys__: ClassVar[frozenset[str]]
+        __mutable_keys__: ClassVar[frozenset[str]]
 
     def copy(self) -> typing_extensions.Self: ...
     # Using Never so that only calls using mypy plugin hook that specialize the signature

@@ -56,7 +56,7 @@ def _(
     reveal_type(d)  # revealed: Unknown
 
     def foo(a_: e) -> None:
-        reveal_type(a_)  # revealed: @Todo(Support for `typing.ParamSpec` instances in type expressions)
+        reveal_type(a_)  # revealed: @Todo(Support for `typing.ParamSpec`)
 ```
 
 ## Inheritance

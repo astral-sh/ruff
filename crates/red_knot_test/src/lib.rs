@@ -6,7 +6,7 @@ use config::SystemKind;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{Program, ProgramSettings, PythonPath, SearchPathSettings};
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, OldParseDiagnostic};
+use ruff_db::diagnostic::{create_parse_diagnostic, Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -34,6 +34,7 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
+    output_format: OutputFormat,
 ) {
     let source = std::fs::read_to_string(absolute_fixture_path).unwrap();
     let suite = match test_parser::parse(short_title, &source) {
@@ -59,7 +60,10 @@ pub fn run(
 
         if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
             any_failures = true;
-            println!("\n{}\n", test.name().bold().underline());
+
+            if output_format.is_cli() {
+                println!("\n{}\n", test.name().bold().underline());
+            }
 
             let md_index = LineIndex::from_source_text(&source);
 
@@ -72,27 +76,54 @@ pub fn run(
                         source_map.to_absolute_line_number(relative_line_number);
 
                     for failure in failures {
-                        let line_info =
-                            format!("{relative_fixture_path}:{absolute_line_number}").cyan();
-                        println!("  {line_info} {failure}");
+                        match output_format {
+                            OutputFormat::Cli => {
+                                let line_info =
+                                    format!("{relative_fixture_path}:{absolute_line_number}")
+                                        .cyan();
+                                println!("  {line_info} {failure}");
+                            }
+                            OutputFormat::GitHub => println!(
+                                "::error file={absolute_fixture_path},line={absolute_line_number}::{failure}"
+                            ),
+                        }
                     }
                 }
             }
 
             let escaped_test_name = test.name().replace('\'', "\\'");
 
-            println!(
-                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
-            );
-            println!(
-                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
-            );
+            if output_format.is_cli() {
+                println!(
+                    "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
+                );
+                println!(
+                    "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
+                );
+            }
         }
     }
 
     println!("\n{}\n", "-".repeat(50));
 
     assert!(!any_failures, "Some tests failed.");
+}
+
+/// Defines the format in which mdtest should print an error to the terminal
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputFormat {
+    /// The format `cargo test` should use by default.
+    Cli,
+    /// A format that will provide annotations from GitHub Actions
+    /// if mdtest fails on a PR.
+    /// See <https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#setting-an-error-message>
+    GitHub,
+}
+
+impl OutputFormat {
+    const fn is_cli(self) -> bool {
+        matches!(self, OutputFormat::Cli)
+    }
 }
 
 fn run_test(
@@ -220,15 +251,10 @@ fn run_test(
         .filter_map(|test_file| {
             let parsed = parsed_module(db, test_file.file);
 
-            let mut diagnostics: Vec<Box<_>> = parsed
+            let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()
                 .iter()
-                .cloned()
-                .map(|error| {
-                    let diagnostic: Box<dyn OldDiagnosticTrait> =
-                        Box::new(OldParseDiagnostic::new(test_file.file, error));
-                    diagnostic
-                })
+                .map(|error| create_parse_diagnostic(test_file.file, error))
                 .collect();
 
             let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
@@ -258,19 +284,15 @@ fn run_test(
                     });
                 }
             };
-            diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
-                let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new((*diagnostic).clone());
-                diagnostic
-            }));
+            diagnostics.extend(type_diagnostics.into_iter().cloned());
 
-            let failure =
-                match matcher::match_file(db, test_file.file, diagnostics.iter().map(|d| &**d)) {
-                    Ok(()) => None,
-                    Err(line_failures) => Some(FileFailures {
-                        backtick_offsets: test_file.backtick_offsets,
-                        by_line: line_failures,
-                    }),
-                };
+            let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
+                Ok(()) => None,
+                Err(line_failures) => Some(FileFailures {
+                    backtick_offsets: test_file.backtick_offsets,
+                    by_line: line_failures,
+                }),
+            };
             if test.should_snapshot_diagnostics() {
                 snapshot_diagnostics.extend(diagnostics);
             }
@@ -324,11 +346,11 @@ struct TestFile {
     backtick_offsets: Vec<BacktickOffsets>,
 }
 
-fn create_diagnostic_snapshot<D: OldDiagnosticTrait>(
+fn create_diagnostic_snapshot(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     test: &parser::MarkdownTest,
-    diagnostics: impl IntoIterator<Item = D>,
+    diagnostics: impl IntoIterator<Item = Diagnostic>,
 ) -> String {
     let display_config = DisplayDiagnosticConfig::default().color(false);
 
@@ -368,7 +390,7 @@ fn create_diagnostic_snapshot<D: OldDiagnosticTrait>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        writeln!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
+        write!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot

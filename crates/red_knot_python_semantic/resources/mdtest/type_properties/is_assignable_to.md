@@ -476,4 +476,21 @@ static_assert(is_assignable_to(CallableTypeOf[keyword_variadic], Callable[..., N
 static_assert(is_assignable_to(CallableTypeOf[mixed], Callable[..., None]))
 ```
 
+### Function types
+
+```py
+from typing import Any, Callable
+
+def f(x: Any) -> str:
+    return ""
+
+def g(x: Any) -> int:
+    return 1
+
+c: Callable[[Any], str] = f
+
+# error: [invalid-assignment] "Object of type `Literal[g]` is not assignable to `(Any, /) -> str`"
+c: Callable[[Any], str] = g
+```
+
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

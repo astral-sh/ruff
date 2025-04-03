@@ -349,7 +349,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             #[cfg(any(feature = "test-rules", test))]
             if checker.enabled(Rule::UnreachableCode) {
-                checker.report_diagnostics(pylint::rules::in_function(name, body));
+                pylint::rules::in_function(checker, name, body);
             }
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());

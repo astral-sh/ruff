@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::ParsedModule;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
@@ -51,6 +51,14 @@ pub struct Definition<'db> {
 impl<'db> Definition<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
+    }
+
+    pub fn full_range(self, db: &'db dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.kind(db).full_range())
+    }
+
+    pub fn focus_range(self, db: &'db dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.kind(db).target_range())
     }
 }
 
@@ -574,8 +582,6 @@ impl DefinitionKind<'_> {
     ///
     /// A definition target would mainly be the node representing the symbol being defined i.e.,
     /// [`ast::ExprName`] or [`ast::Identifier`] but could also be other nodes.
-    ///
-    /// This is mainly used for logging and debugging purposes.
     pub(crate) fn target_range(&self) -> TextRange {
         match self {
             DefinitionKind::Import(import) => import.alias().range(),
@@ -599,6 +605,33 @@ impl DefinitionKind<'_> {
             DefinitionKind::TypeVar(type_var) => type_var.name.range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.name.range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.name.range(),
+        }
+    }
+
+    /// Returns the [`TextRange`] of the entire definition.
+    pub(crate) fn full_range(&self) -> TextRange {
+        match self {
+            DefinitionKind::Import(import) => import.alias().range(),
+            DefinitionKind::ImportFrom(import) => import.alias().range(),
+            DefinitionKind::StarImport(import) => import.import().range(),
+            DefinitionKind::Function(function) => function.range(),
+            DefinitionKind::Class(class) => class.range(),
+            DefinitionKind::TypeAlias(type_alias) => type_alias.range(),
+            DefinitionKind::NamedExpression(named) => named.range(),
+            DefinitionKind::Assignment(assignment) => assignment.target.range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
+            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target.range(),
+            DefinitionKind::Comprehension(comp) => comp.target().range(),
+            DefinitionKind::VariadicPositionalParameter(parameter) => parameter.range(),
+            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.range(),
+            DefinitionKind::Parameter(parameter) => parameter.parameter.range(),
+            DefinitionKind::WithItem(with_item) => with_item.target.range(),
+            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
+            DefinitionKind::ExceptHandler(handler) => handler.node().range(),
+            DefinitionKind::TypeVar(type_var) => type_var.range(),
+            DefinitionKind::ParamSpec(param_spec) => param_spec.range(),
+            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.range(),
         }
     }
 
