@@ -78,16 +78,13 @@ use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, InstanceType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MetaclassCandidate, Parameter, ParameterForm, Parameters, SliceLiteralType, SubclassOfType,
-    Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
-    UnionType,
+    todo_type, Class, DynamicType, FunctionType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownFunction, KnownInstanceType, MetaclassCandidate, Parameter, ParameterForm, Parameters,
+    SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type,
+    TypeAliasType, TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
-use crate::types::{
-    CallableSignature, CallableType, FunctionDecorators, GeneralCallableType, Signature, Signatures,
-};
+use crate::types::{CallableSignature, CallableType, FunctionDecorators, Signature, Signatures};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -2357,6 +2354,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
             | Type::BoundMethod(_)
+            | Type::Specialized(_)
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
             | Type::AlwaysTruthy
@@ -4463,6 +4461,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::BoundMethod(_)
+                | Type::Specialized(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::SubclassOf(_)
@@ -4736,6 +4735,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
+                | Type::Specialized(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
@@ -4756,6 +4756,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
+                | Type::Specialized(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)

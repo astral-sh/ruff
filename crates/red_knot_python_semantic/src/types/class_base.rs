@@ -87,6 +87,10 @@ impl<'db> ClassBase<'db> {
             | Type::SubclassOf(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy => None,
+            Type::Specialized(specialized) => {
+                // XXX: Specialize the result
+                Self::try_from_type(db, specialized.callable_type(db))
+            }
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::TypeAliasType(_)
