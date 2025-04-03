@@ -682,6 +682,12 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
+            SemanticSyntaxErrorKind::InvalidExpression(
+                kind,
+                InvalidExpressionPosition::BaseClass,
+            ) => {
+                write!(f, "{kind} cannot be used as a base class")
+            }
             SemanticSyntaxErrorKind::InvalidExpression(kind, position) => {
                 write!(f, "{kind} cannot be used within a {position}")
             }
