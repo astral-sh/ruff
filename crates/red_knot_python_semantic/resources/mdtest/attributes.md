@@ -1728,15 +1728,16 @@ reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes
 
 ## `super()`
 
-`super()` is not supported yet, but we do not emit false positives on `super()` calls.
-
 ```py
+from __future__ import annotations
+
 class Foo:
     def bar(self) -> int:
         return 42
 
+# TODO: This should work the same even without explicitly annotating `self`.
 class Bar(Foo):
-    def bar(self) -> int:
+    def bar(self: Bar) -> int:
         return super().bar()
 ```
 
