@@ -249,6 +249,10 @@ impl MermaidGraph for CFGWithSource<'_, '_> {
                         kind: MermaidEdgeKind::Arrow,
                         content: "else".to_string(),
                     },
+                    Condition::NotStopIter(expr) => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: self.source[expr.range()].to_string(),
+                    },
                 };
                 (target, edge)
             })
