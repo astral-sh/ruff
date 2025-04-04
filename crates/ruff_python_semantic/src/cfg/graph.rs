@@ -1,7 +1,6 @@
 use ruff_index::{newtype_index, IndexVec};
 use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
-use smallvec::{smallvec, SmallVec};
 
 /// Returns the control flow graph associated to an array of statements
 pub fn build_cfg(stmts: &[Stmt]) -> ControlFlowGraph<'_> {
@@ -78,7 +77,7 @@ struct BlockData<'stmt> {
     out: Edges<'stmt>,
     /// Collection of indices for basic blocks having the current
     /// block as the target of an edge
-    parents: SmallVec<[BlockId; 2]>,
+    parents: Vec<BlockId>,
 }
 
 impl Ranged for BlockData<'_> {
@@ -113,16 +112,16 @@ pub(crate) enum BlockKind {
 /// vectors which must always be kept the same length.
 #[derive(Debug, Default, Clone)]
 pub struct Edges<'stmt> {
-    conditions: SmallVec<[Condition<'stmt>; 4]>,
-    targets: SmallVec<[BlockId; 4]>,
+    conditions: Vec<Condition<'stmt>>,
+    targets: Vec<BlockId>,
 }
 
 impl<'stmt> Edges<'stmt> {
     /// Creates an unconditional edge to the target block
     fn always(target: BlockId) -> Self {
         Self {
-            conditions: smallvec![Condition::Always],
-            targets: smallvec![target],
+            conditions: vec![Condition::Always],
+            targets: vec![target],
         }
     }
 
@@ -132,7 +131,7 @@ impl<'stmt> Edges<'stmt> {
     }
 
     /// Returns iterator over [`Condition`]s which must be satisfied to traverse corresponding edge
-    pub fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition> {
+    pub fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition<'stmt>> {
         self.conditions.iter()
     }
 
@@ -140,7 +139,7 @@ impl<'stmt> Edges<'stmt> {
         self.targets.is_empty()
     }
 
-    pub fn filter_targets_by_conditions<'a, T: FnMut(&Condition) -> bool + 'a>(
+    pub fn filter_targets_by_conditions<'a: 'stmt, T: FnMut(&Condition) -> bool + 'a>(
         &'a self,
         mut predicate: T,
     ) -> impl Iterator<Item = BlockId> + 'a {
@@ -170,7 +169,7 @@ struct CFGBuilder<'stmt> {
     /// Exit block index for current control flow
     exit: BlockId,
     /// Loop contexts
-    loops: SmallVec<[LoopContext; 3]>,
+    loops: Vec<LoopContext>,
 }
 
 impl<'stmt> CFGBuilder<'stmt> {
@@ -194,7 +193,7 @@ impl<'stmt> CFGBuilder<'stmt> {
             },
             current: initial,
             exit: terminal,
-            loops: SmallVec::default(),
+            loops: Vec::default(),
         }
     }
 
@@ -245,8 +244,8 @@ impl<'stmt> CFGBuilder<'stmt> {
 
                     // Finish guard and push loop context
                     let guard_target = orelse.unwrap_or(next_block);
-                    let targets = smallvec![body, guard_target];
-                    let conditions = smallvec![Condition::Test(&stmt_while.test), Condition::Else];
+                    let targets = vec![body, guard_target];
+                    let conditions = vec![Condition::Test(&stmt_while.test), Condition::Else];
                     let edges = Edges {
                         conditions,
                         targets,

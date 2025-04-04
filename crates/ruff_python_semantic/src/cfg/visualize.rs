@@ -10,7 +10,7 @@ pub fn draw_cfg<'src>(graph: ControlFlowGraph<'src>, source: &'src str) -> Strin
     CFGWithSource::new(graph, source).draw_graph()
 }
 
-trait MermaidGraph<'a>: DirectedGraph<'a> {
+trait MermaidGraph: DirectedGraph {
     fn draw_node(&self, node: Self::Node) -> MermaidNode;
     fn draw_edges(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, MermaidEdge)>;
 
@@ -146,7 +146,7 @@ impl Display for MermaidEdgeKind {
     }
 }
 
-pub trait DirectedGraph<'a> {
+pub trait DirectedGraph {
     type Node: Idx;
 
     fn num_nodes(&self) -> usize;
@@ -154,18 +154,18 @@ pub trait DirectedGraph<'a> {
     fn successors(&self, node: Self::Node) -> impl ExactSizeIterator<Item = Self::Node> + '_;
 }
 
-struct CFGWithSource<'stmt> {
+struct CFGWithSource<'source, 'stmt> {
     cfg: ControlFlowGraph<'stmt>,
-    source: &'stmt str,
+    source: &'source str,
 }
 
-impl<'stmt> CFGWithSource<'stmt> {
-    fn new(cfg: ControlFlowGraph<'stmt>, source: &'stmt str) -> Self {
+impl<'source, 'stmt> CFGWithSource<'source, 'stmt> {
+    fn new(cfg: ControlFlowGraph<'stmt>, source: &'source str) -> Self {
         Self { cfg, source }
     }
 }
 
-impl<'stmt> DirectedGraph<'stmt> for CFGWithSource<'stmt> {
+impl DirectedGraph for CFGWithSource<'_, '_> {
     type Node = BlockId;
 
     fn num_nodes(&self) -> usize {
@@ -181,7 +181,7 @@ impl<'stmt> DirectedGraph<'stmt> for CFGWithSource<'stmt> {
     }
 }
 
-impl<'stmt> MermaidGraph<'stmt> for CFGWithSource<'stmt> {
+impl MermaidGraph for CFGWithSource<'_, '_> {
     fn draw_node(&self, node: Self::Node) -> MermaidNode {
         let statements: Vec<String> = self
             .cfg
