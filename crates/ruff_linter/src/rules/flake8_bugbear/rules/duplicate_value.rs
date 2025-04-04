@@ -74,7 +74,7 @@ pub(crate) fn duplicate_value(checker: &Checker, set: &ast::ExprSet) {
 
                 checker.report_diagnostic(diagnostic);
             }
-        };
+        }
     }
 }
 

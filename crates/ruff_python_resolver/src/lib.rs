@@ -625,7 +625,7 @@ mod tests {
 
         let result = resolve_options(file2, "file1", root, ResolverOptions::default());
 
-        debug!("result: {:?}", result);
+        debug!("result: {result:?}");
 
         assert!(!result.is_import_found);
 

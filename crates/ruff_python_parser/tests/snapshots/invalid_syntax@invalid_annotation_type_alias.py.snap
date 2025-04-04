@@ -1,0 +1,340 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/invalid_annotation_type_alias.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..308,
+        body: [
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 0..26,
+                    name: Name(
+                        ExprName {
+                            range: 5..6,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 6..20,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 7..19,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 7..8,
+                                        },
+                                        bound: Some(
+                                            Yield(
+                                                ExprYield {
+                                                    range: 11..18,
+                                                    value: Some(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 17..18,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 23..26,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 48..75,
+                    name: Name(
+                        ExprName {
+                            range: 53..54,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 54..69,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 55..68,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 55..56,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Yield(
+                                                ExprYield {
+                                                    range: 60..67,
+                                                    value: Some(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 66..67,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 72..75,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 98..127,
+                    name: Name(
+                        ExprName {
+                            range: 103..104,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 104..121,
+                            type_params: [
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 105..120,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 106..108,
+                                        },
+                                        default: Some(
+                                            Yield(
+                                                ExprYield {
+                                                    range: 112..119,
+                                                    value: Some(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 118..119,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 124..127,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 153..183,
+                    name: Name(
+                        ExprName {
+                            range: 158..159,
+                            id: Name("X"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 159..177,
+                            type_params: [
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 160..176,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 162..164,
+                                        },
+                                        default: Some(
+                                            Yield(
+                                                ExprYield {
+                                                    range: 168..175,
+                                                    value: Some(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 174..175,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 180..183,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 205..223,
+                    name: Name(
+                        ExprName {
+                            range: 210..211,
+                            id: Name("Y"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Yield(
+                        ExprYield {
+                            range: 215..222,
+                            value: Some(
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 221..222,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 254..271,
+                    name: Name(
+                        ExprName {
+                            range: 259..260,
+                            id: Name("Y"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Named(
+                        ExprNamed {
+                            range: 264..270,
+                            target: Name(
+                                ExprName {
+                                    range: 264..265,
+                                    id: Name("x"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 269..270,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | type X[T: (yield 1)] = int      # TypeVar bound
+  |            ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar bound
+2 | type X[T = (yield 1)] = int     # TypeVar default
+3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
+  |
+
+
+  |
+1 | type X[T: (yield 1)] = int      # TypeVar bound
+2 | type X[T = (yield 1)] = int     # TypeVar default
+  |             ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar default
+3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
+4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
+  |
+
+
+  |
+1 | type X[T: (yield 1)] = int      # TypeVar bound
+2 | type X[T = (yield 1)] = int     # TypeVar default
+3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
+  |               ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVarTuple default
+4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
+5 | type Y = (yield 1)              # yield in value
+  |
+
+
+  |
+2 | type X[T = (yield 1)] = int     # TypeVar default
+3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
+4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
+  |                ^^^^^^^ Syntax Error: yield expression cannot be used within a ParamSpec default
+5 | type Y = (yield 1)              # yield in value
+6 | type Y = (x := 1)               # named expr in value
+  |
+
+
+  |
+3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
+4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
+5 | type Y = (yield 1)              # yield in value
+  |           ^^^^^^^ Syntax Error: yield expression cannot be used within a type alias
+6 | type Y = (x := 1)               # named expr in value
+  |
+
+
+  |
+4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
+5 | type Y = (yield 1)              # yield in value
+6 | type Y = (x := 1)               # named expr in value
+  |           ^^^^^^ Syntax Error: named expression cannot be used within a type alias
+  |

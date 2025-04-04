@@ -72,7 +72,7 @@ pub(crate) fn cancel_scope_no_checkpoint(
                 None
             }
         })
-        .last()
+        .next_back()
     else {
         return;
     };

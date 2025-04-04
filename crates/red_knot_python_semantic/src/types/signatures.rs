@@ -265,6 +265,13 @@ impl<'db> Signature<'db> {
     pub(crate) fn parameters(&self) -> &Parameters<'db> {
         &self.parameters
     }
+
+    pub(crate) fn bind_self(&self) -> Self {
+        Self {
+            parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
+            return_ty: self.return_ty,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
@@ -504,6 +511,12 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     }
 }
 
+impl<'db> FromIterator<Parameter<'db>> for Parameters<'db> {
+    fn from_iter<T: IntoIterator<Item = Parameter<'db>>>(iter: T) -> Self {
+        Self::new(iter)
+    }
+}
+
 impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
@@ -591,6 +604,56 @@ impl<'db> Parameter<'db> {
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
+    }
+
+    /// Strip information from the parameter so that two equivalent parameters compare equal.
+    /// Normalize nested unions and intersections in the annotated type, if any.
+    ///
+    /// See [`Type::normalized`] for more details.
+    pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
+        let Parameter {
+            annotated_type,
+            kind,
+            form,
+        } = self;
+
+        // Ensure unions and intersections are ordered in the annotated type (if there is one)
+        let annotated_type = annotated_type.map(|ty| ty.normalized(db));
+
+        // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
+        // Ensure that we only record whether a parameter *has* a default
+        // (strip the precise *type* of the default from the parameter, replacing it with `Never`).
+        let kind = match kind {
+            ParameterKind::PositionalOnly {
+                name: _,
+                default_type,
+            } => ParameterKind::PositionalOnly {
+                name: None,
+                default_type: default_type.map(|_| Type::Never),
+            },
+            ParameterKind::PositionalOrKeyword { name, default_type } => {
+                ParameterKind::PositionalOrKeyword {
+                    name: name.clone(),
+                    default_type: default_type.map(|_| Type::Never),
+                }
+            }
+            ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
+                name: name.clone(),
+                default_type: default_type.map(|_| Type::Never),
+            },
+            ParameterKind::Variadic { name: _ } => ParameterKind::Variadic {
+                name: Name::new_static("args"),
+            },
+            ParameterKind::KeywordVariadic { name: _ } => ParameterKind::KeywordVariadic {
+                name: Name::new_static("kwargs"),
+            },
+        };
+
+        Self {
+            annotated_type,
+            kind,
+            form: *form,
+        }
     }
 
     fn from_node_and_kind(
@@ -986,27 +1049,6 @@ mod tests {
         let func = get_function_f(&db, "/src/a.py");
 
         let expected_sig = func.internal_signature(&db);
-
-        // With no decorators, internal and external signature are the same
-        assert_eq!(func.signature(&db), &expected_sig);
-    }
-
-    #[test]
-    fn external_signature_decorated() {
-        let mut db = setup_db();
-        db.write_dedented(
-            "/src/a.py",
-            "
-            def deco(func): ...
-
-            @deco
-            def f(a: int) -> int: ...
-            ",
-        )
-        .unwrap();
-        let func = get_function_f(&db, "/src/a.py");
-
-        let expected_sig = Signature::todo("return type of decorated function");
 
         // With no decorators, internal and external signature are the same
         assert_eq!(func.signature(&db), &expected_sig);

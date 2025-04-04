@@ -1,0 +1,178 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/valid_annotation_class.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..94,
+        body: [
+            ClassDef(
+                StmtClassDef {
+                    range: 0..23,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("F"),
+                        range: 6..7,
+                    },
+                    type_params: None,
+                    arguments: Some(
+                        Arguments {
+                            range: 7..18,
+                            args: [
+                                Named(
+                                    ExprNamed {
+                                        range: 8..17,
+                                        target: Name(
+                                            ExprName {
+                                                range: 8..9,
+                                                id: Name("y"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: Name(
+                                            ExprName {
+                                                range: 13..17,
+                                                id: Name("list"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 20..23,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 20..23,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 24..93,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 28..29,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 29..31,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        ClassDef(
+                            StmtClassDef {
+                                range: 37..60,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("G"),
+                                    range: 43..44,
+                                },
+                                type_params: None,
+                                arguments: Some(
+                                    Arguments {
+                                        range: 44..55,
+                                        args: [
+                                            Yield(
+                                                ExprYield {
+                                                    range: 46..53,
+                                                    value: Some(
+                                                        NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 52..53,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 57..60,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 57..60,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ClassDef(
+                            StmtClassDef {
+                                range: 65..93,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("H"),
+                                    range: 71..72,
+                                },
+                                type_params: None,
+                                arguments: Some(
+                                    Arguments {
+                                        range: 72..88,
+                                        args: [
+                                            YieldFrom(
+                                                ExprYieldFrom {
+                                                    range: 74..86,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 85..86,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 90..93,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 90..93,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

@@ -67,6 +67,7 @@ use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::LateFutureImport;
+use crate::rules::pylint::rules::LoadBeforeGlobalDeclaration;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa, Locator};
@@ -540,6 +541,10 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.target_version
     }
 
+    fn global(&self, name: &str) -> Option<TextRange> {
+        self.semantic.global(name)
+    }
+
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
@@ -547,19 +552,44 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(Diagnostic::new(LateFutureImport, error.range));
                 }
             }
-            SemanticSyntaxErrorKind::ReboundComprehensionVariable
-            | SemanticSyntaxErrorKind::DuplicateTypeParameter
-            | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
-            | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
-                if self.settings.preview.is_enabled() =>
-            {
-                self.semantic_errors.borrow_mut().push(error);
+            SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::LoadBeforeGlobalDeclaration)
+                {
+                    self.report_diagnostic(Diagnostic::new(
+                        LoadBeforeGlobalDeclaration {
+                            name,
+                            row: self.compute_source_row(start),
+                        },
+                        error.range,
+                    ));
+                }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
-            | SemanticSyntaxErrorKind::IrrefutableCasePattern(_) => {}
+            | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
+            | SemanticSyntaxErrorKind::SingleStarredAssignment
+            | SemanticSyntaxErrorKind::WriteToDebug(_)
+            | SemanticSyntaxErrorKind::InvalidExpression(..)
+            | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
+            | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
+            | SemanticSyntaxErrorKind::InvalidStarExpression => {
+                if self.settings.preview.is_enabled() {
+                    self.semantic_errors.borrow_mut().push(error);
+                }
+            }
         }
+    }
+
+    fn source(&self) -> &str {
+        self.source()
+    }
+
+    fn future_annotations_or_stub(&self) -> bool {
+        self.semantic.future_annotations_or_stub()
     }
 }
 
@@ -1140,7 +1170,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
             }
             _ => visitor::walk_stmt(self, stmt),
-        };
+        }
 
         if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
             match stmt {
@@ -1643,7 +1673,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 }
                                 self.visit_expr_context(ctx);
                             } else {
-                                debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                if self.semantic.in_type_definition() {
+                                    // this should potentially trigger some kind of violation in the
+                                    // future, since it would indicate an invalid type expression
+                                    debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                }
+                                // even if the expression is invalid as a type expression, we should
+                                // still visit it so we don't accidentally treat variables as unused
+                                self.visit_expr(slice);
+                                self.visit_expr_context(ctx);
                             }
                         }
                         Some(typing::SubscriptKind::TypedDict) => {
@@ -1702,7 +1740,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope();
             }
             _ => {}
-        };
+        }
 
         // Step 4: Analysis
         match expr {

@@ -349,7 +349,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             #[cfg(any(feature = "test-rules", test))]
             if checker.enabled(Rule::UnreachableCode) {
-                checker.report_diagnostics(pylint::rules::in_function(name, body));
+                pylint::rules::in_function(checker, name, body);
             }
             if checker.enabled(Rule::ReimplementedOperator) {
                 refurb::rules::reimplemented_operator(checker, &function_def.into());
@@ -645,7 +645,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
                 if let Some(asname) = &alias.asname {
-                    let name = alias.name.split('.').last().unwrap();
+                    let name = alias.name.split('.').next_back().unwrap();
                     if checker.enabled(Rule::ConstantImportedAsNonConstant) {
                         if let Some(diagnostic) =
                             pep8_naming::rules::constant_imported_as_non_constant(

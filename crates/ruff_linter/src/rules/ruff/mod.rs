@@ -99,6 +99,7 @@ mod tests {
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
+    #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -344,6 +345,19 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+    
+    #[test]
+    fn invalid_rule_code_external_rules() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF102.py"),
+            &settings::LinterSettings {
+                external: vec!["V".to_string()],
+                ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
 
     #[test]
     fn ruff_per_file_ignores() -> Result<()> {
@@ -466,6 +480,7 @@ mod tests {
     #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
+    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

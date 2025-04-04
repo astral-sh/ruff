@@ -49,3 +49,11 @@ def f4(x: float, y: float):
     reveal_type(x // y)  # revealed: int | float
     reveal_type(x % y)  # revealed: int | float
 ```
+
+If any of the union elements leads to a division by zero, we will report an error:
+
+```py
+def f5(m: int, n: Literal[-1, 0, 1]):
+    # error: [division-by-zero] "Cannot divide object of type `int` by zero"
+    return m / n
+```

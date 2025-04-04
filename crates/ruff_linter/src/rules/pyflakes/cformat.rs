@@ -36,7 +36,7 @@ impl From<&CFormatString> for CFormatSummary {
                 None => {
                     num_positional += 1;
                 }
-            };
+            }
             if min_field_width == &Some(CFormatQuantity::FromValuesTuple) {
                 num_positional += 1;
                 starred = true;

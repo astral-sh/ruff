@@ -18,8 +18,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    todo_type, BoundMethodType, CallableType, ClassLiteralType, KnownClass, KnownFunction,
-    KnownInstanceType, UnionType,
+    todo_type, BoundMethodType, ClassLiteralType, FunctionDecorators, KnownClass, KnownFunction,
+    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
@@ -210,26 +210,20 @@ impl<'db> Bindings<'db> {
             };
 
             match binding_type {
-                Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
-                    if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                        && function.decorators(db).len() == 1
-                    {
+                Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+                    if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
                         match overload.parameter_types() {
                             [_, Some(owner)] => {
-                                overload.set_return_type(Type::Callable(
-                                    CallableType::BoundMethod(BoundMethodType::new(
-                                        db, function, *owner,
-                                    )),
-                                ));
+                                overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
+                                    db, function, *owner,
+                                )));
                             }
                             [Some(instance), None] => {
-                                overload.set_return_type(Type::Callable(
-                                    CallableType::BoundMethod(BoundMethodType::new(
-                                        db,
-                                        function,
-                                        instance.to_meta_type(db),
-                                    )),
-                                ));
+                                overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
+                                    db,
+                                    function,
+                                    instance.to_meta_type(db),
+                                )));
                             }
                             _ => {}
                         }
@@ -237,36 +231,32 @@ impl<'db> Bindings<'db> {
                         if first.is_none(db) {
                             overload.set_return_type(Type::FunctionLiteral(function));
                         } else {
-                            overload.set_return_type(Type::Callable(CallableType::BoundMethod(
-                                BoundMethodType::new(db, function, *first),
+                            overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
+                                db, function, *first,
                             )));
                         }
                     }
                 }
 
-                Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
+                Type::WrapperDescriptor(WrapperDescriptorKind::FunctionTypeDunderGet) => {
                     if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
                         overload.parameter_types()
                     {
-                        if function.has_known_class_decorator(db, KnownClass::Classmethod)
-                            && function.decorators(db).len() == 1
-                        {
+                        if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
                             match overload.parameter_types() {
                                 [_, _, Some(owner)] => {
-                                    overload.set_return_type(Type::Callable(
-                                        CallableType::BoundMethod(BoundMethodType::new(
-                                            db, *function, *owner,
-                                        )),
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(db, *function, *owner),
                                     ));
                                 }
 
                                 [_, Some(instance), None] => {
-                                    overload.set_return_type(Type::Callable(
-                                        CallableType::BoundMethod(BoundMethodType::new(
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(
                                             db,
                                             *function,
                                             instance.to_meta_type(db),
-                                        )),
+                                        ),
                                     ));
                                 }
 
@@ -277,46 +267,173 @@ impl<'db> Bindings<'db> {
                                 [_, Some(instance), _] if instance.is_none(db) => {
                                     overload.set_return_type(*function_ty);
                                 }
-
-                                [_, Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                                    type_alias,
-                                ))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
-                                    if class.is_known(db, KnownClass::TypeAliasType)
-                                        && function.name(db) == "__name__" =>
-                                {
-                                    overload.set_return_type(Type::string_literal(
-                                        db,
-                                        type_alias.name(db),
-                                    ));
-                                }
-
-                                [_, Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), Some(Type::ClassLiteral(ClassLiteralType { class }))]
-                                    if class.is_known(db, KnownClass::TypeVar)
-                                        && function.name(db) == "__name__" =>
-                                {
-                                    overload.set_return_type(Type::string_literal(
-                                        db,
-                                        typevar.name(db),
-                                    ));
-                                }
-
-                                [_, Some(_), _]
-                                    if function
-                                        .has_known_class_decorator(db, KnownClass::Property) =>
-                                {
-                                    overload.set_return_type(todo_type!("@property"));
-                                }
-
                                 [_, Some(instance), _] => {
-                                    overload.set_return_type(Type::Callable(
-                                        CallableType::BoundMethod(BoundMethodType::new(
-                                            db, *function, *instance,
-                                        )),
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(db, *function, *instance),
                                     ));
                                 }
 
                                 _ => {}
                             }
+                        }
+                    }
+                }
+
+                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => {
+                    match overload.parameter_types() {
+                        [Some(property @ Type::PropertyInstance(_)), Some(instance), ..]
+                            if instance.is_none(db) =>
+                        {
+                            overload.set_return_type(*property);
+                        }
+                        [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))), ..]
+                            if property.getter(db).is_some_and(|getter| {
+                                getter
+                                    .into_function_literal()
+                                    .is_some_and(|f| f.name(db) == "__name__")
+                            }) =>
+                        {
+                            overload.set_return_type(Type::string_literal(db, type_alias.name(db)));
+                        }
+                        [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeVar(type_var))), ..]
+                            if property.getter(db).is_some_and(|getter| {
+                                getter
+                                    .into_function_literal()
+                                    .is_some_and(|f| f.name(db) == "__name__")
+                            }) =>
+                        {
+                            overload.set_return_type(Type::string_literal(db, type_var.name(db)));
+                        }
+                        [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
+                            if let Some(getter) = property.getter(db) {
+                                if let Ok(return_ty) = getter
+                                    .try_call(db, CallArgumentTypes::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
+                                {
+                                    overload.set_return_type(return_ty);
+                                } else {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the getter failed",
+                                    ));
+                                    overload.set_return_type(Type::unknown());
+                                }
+                            } else {
+                                overload.errors.push(BindingError::InternalCallError(
+                                    "property has no getter",
+                                ));
+                                overload.set_return_type(Type::Never);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
+                    match overload.parameter_types() {
+                        [Some(instance), ..] if instance.is_none(db) => {
+                            overload.set_return_type(Type::PropertyInstance(property));
+                        }
+                        [Some(instance), ..] => {
+                            if let Some(getter) = property.getter(db) {
+                                if let Ok(return_ty) = getter
+                                    .try_call(db, CallArgumentTypes::positional([*instance]))
+                                    .map(|binding| binding.return_type(db))
+                                {
+                                    overload.set_return_type(return_ty);
+                                } else {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the getter failed",
+                                    ));
+                                    overload.set_return_type(Type::unknown());
+                                }
+                            } else {
+                                overload.set_return_type(Type::Never);
+                                overload.errors.push(BindingError::InternalCallError(
+                                    "property has no getter",
+                                ));
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
+                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => {
+                    if let [Some(Type::PropertyInstance(property)), Some(instance), Some(value), ..] =
+                        overload.parameter_types()
+                    {
+                        if let Some(setter) = property.setter(db) {
+                            if let Err(_call_error) = setter
+                                .try_call(db, CallArgumentTypes::positional([*instance, *value]))
+                            {
+                                overload.errors.push(BindingError::InternalCallError(
+                                    "calling the setter failed",
+                                ));
+                            }
+                        } else {
+                            overload
+                                .errors
+                                .push(BindingError::InternalCallError("property has no setter"));
+                        }
+                    }
+                }
+
+                Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
+                    if let [Some(instance), Some(value), ..] = overload.parameter_types() {
+                        if let Some(setter) = property.setter(db) {
+                            if let Err(_call_error) = setter
+                                .try_call(db, CallArgumentTypes::positional([*instance, *value]))
+                            {
+                                overload.errors.push(BindingError::InternalCallError(
+                                    "calling the setter failed",
+                                ));
+                            }
+                        } else {
+                            overload
+                                .errors
+                                .push(BindingError::InternalCallError("property has no setter"));
+                        }
+                    }
+                }
+
+                Type::BoundMethod(bound_method)
+                    if bound_method.self_instance(db).is_property_instance() =>
+                {
+                    match bound_method.function(db).name(db).as_str() {
+                        "setter" => {
+                            if let [Some(_), Some(setter)] = overload.parameter_types() {
+                                let mut ty_property = bound_method.self_instance(db);
+                                if let Type::PropertyInstance(property) = ty_property {
+                                    ty_property =
+                                        Type::PropertyInstance(PropertyInstanceType::new(
+                                            db,
+                                            property.getter(db),
+                                            Some(*setter),
+                                        ));
+                                }
+                                overload.set_return_type(ty_property);
+                            }
+                        }
+                        "getter" => {
+                            if let [Some(_), Some(getter)] = overload.parameter_types() {
+                                let mut ty_property = bound_method.self_instance(db);
+                                if let Type::PropertyInstance(property) = ty_property {
+                                    ty_property =
+                                        Type::PropertyInstance(PropertyInstanceType::new(
+                                            db,
+                                            Some(*getter),
+                                            property.setter(db),
+                                        ));
+                                }
+                                overload.set_return_type(ty_property);
+                            }
+                        }
+                        "deleter" => {
+                            // TODO: we do not store deleters yet
+                            let ty_property = bound_method.self_instance(db);
+                            overload.set_return_type(ty_property);
+                        }
+                        _ => {
+                            // Fall back to typeshed stubs for all other methods
                         }
                     }
                 }
@@ -385,13 +502,13 @@ impl<'db> Bindings<'db> {
                             if let Some(len_ty) = first_arg.len(db) {
                                 overload.set_return_type(len_ty);
                             }
-                        };
+                        }
                     }
 
                     Some(KnownFunction::Repr) => {
                         if let [Some(first_arg)] = overload.parameter_types() {
                             overload.set_return_type(first_arg.repr(db));
-                        };
+                        }
                     }
 
                     Some(KnownFunction::Cast) => {
@@ -467,6 +584,14 @@ impl<'db> Bindings<'db> {
                     Some(KnownClass::Type) if overload_index == 0 => {
                         if let [Some(arg)] = overload.parameter_types() {
                             overload.set_return_type(arg.to_meta_type(db));
+                        }
+                    }
+
+                    Some(KnownClass::Property) => {
+                        if let [getter, setter, ..] = overload.parameter_types() {
+                            overload.set_return_type(Type::PropertyInstance(
+                                PropertyInstanceType::new(db, *getter, *setter),
+                            ));
                         }
                     }
 
@@ -935,19 +1060,29 @@ impl<'db> CallableDescription<'db> {
                 kind: "class",
                 name: class_type.class().name(db),
             }),
-            Type::Callable(CallableType::BoundMethod(bound_method)) => Some(CallableDescription {
+            Type::BoundMethod(bound_method) => Some(CallableDescription {
                 kind: "bound method",
                 name: bound_method.function(db).name(db),
             }),
-            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Some(CallableDescription {
                     kind: "method wrapper `__get__` of function",
                     name: function.name(db),
                 })
             }
-            Type::Callable(CallableType::WrapperDescriptorDunderGet) => Some(CallableDescription {
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
+                Some(CallableDescription {
+                    kind: "method wrapper",
+                    name: "`__get__` of property",
+                })
+            }
+            Type::WrapperDescriptor(kind) => Some(CallableDescription {
                 kind: "wrapper descriptor",
-                name: "FunctionType.__get__",
+                name: match kind {
+                    WrapperDescriptorKind::FunctionTypeDunderGet => "FunctionType.__get__",
+                    WrapperDescriptorKind::PropertyDunderGet => "property.__get__",
+                    WrapperDescriptorKind::PropertyDunderSet => "property.__set__",
+                },
             }),
             _ => None,
         }
@@ -1035,6 +1170,10 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         parameter: ParameterContext,
     },
+    /// The call itself might be well constructed, but an error occurred while evaluating the call.
+    /// We use this variant to report errors in `property.__get__` and `property.__set__`, which
+    /// can occur when the call to the underlying getter/setter fails.
+    InternalCallError(&'static str),
 }
 
 impl<'db> BindingError<'db> {
@@ -1061,13 +1200,11 @@ impl<'db> BindingError<'db> {
                     None
                 }
             }
-            Type::Callable(CallableType::BoundMethod(bound_method)) => {
-                Self::parameter_span_from_index(
-                    db,
-                    Type::FunctionLiteral(bound_method.function(db)),
-                    parameter_index,
-                )
-            }
+            Type::BoundMethod(bound_method) => Self::parameter_span_from_index(
+                db,
+                Type::FunctionLiteral(bound_method.function(db)),
+                parameter_index,
+            ),
             _ => None,
         }
     }
@@ -1110,7 +1247,7 @@ impl<'db> BindingError<'db> {
                             String::new()
                         }
                     ),
-                    messages,
+                    &messages,
                 );
             }
 
@@ -1177,6 +1314,21 @@ impl<'db> BindingError<'db> {
                     Self::get_node(node, *argument_index),
                     format_args!(
                         "Multiple values provided for parameter {parameter}{}",
+                        if let Some(CallableDescription { kind, name }) = callable_description {
+                            format!(" of {kind} `{name}`")
+                        } else {
+                            String::new()
+                        }
+                    ),
+                );
+            }
+
+            Self::InternalCallError(reason) => {
+                context.report_lint(
+                    &CALL_NON_CALLABLE,
+                    Self::get_node(node, None),
+                    format_args!(
+                        "Call{} failed: {reason}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {

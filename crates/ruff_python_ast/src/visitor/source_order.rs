@@ -1,10 +1,10 @@
-use crate::AnyNodeRef;
 use crate::{
     Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
     ExceptHandler, Expr, FString, FStringElement, Keyword, MatchCase, Mod, Operator, Parameter,
     ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
     StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
 };
+use crate::{AnyNodeRef, Identifier};
 
 /// Visitor that traverses all nodes recursively in the order they appear in the source.
 ///
@@ -169,6 +169,11 @@ pub trait SourceOrderVisitor<'a> {
     #[inline]
     fn visit_bytes_literal(&mut self, bytes_literal: &'a BytesLiteral) {
         walk_bytes_literal(self, bytes_literal);
+    }
+
+    #[inline]
+    fn visit_identifier(&mut self, identifier: &'a Identifier) {
+        walk_identifier(self, identifier);
     }
 }
 
@@ -577,6 +582,18 @@ where
     let node = AnyNodeRef::from(alias);
     if visitor.enter_node(node).is_traverse() {
         alias.visit_source_order(visitor);
+    }
+    visitor.leave_node(node);
+}
+
+#[inline]
+pub fn walk_identifier<'a, V: SourceOrderVisitor<'a> + ?Sized>(
+    visitor: &mut V,
+    identifier: &'a Identifier,
+) {
+    let node = AnyNodeRef::from(identifier);
+    if visitor.enter_node(node).is_traverse() {
+        identifier.visit_source_order(visitor);
     }
     visitor.leave_node(node);
 }

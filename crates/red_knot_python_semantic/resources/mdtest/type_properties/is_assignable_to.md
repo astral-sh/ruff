@@ -183,7 +183,7 @@ static_assert(is_assignable_to(Meta, type[Unknown]))
 ## Tuple types
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
+from knot_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
 from typing import Literal, Any
 
 static_assert(is_assignable_to(tuple[()], tuple[()]))
@@ -194,6 +194,17 @@ static_assert(is_assignable_to(tuple[int, str], tuple[int, str]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int, int]))
 static_assert(is_assignable_to(tuple[Any, Literal[2]], tuple[int, int]))
 static_assert(is_assignable_to(tuple[Literal[1], Any], tuple[int, int]))
+static_assert(is_assignable_to(tuple[()], tuple))
+static_assert(is_assignable_to(tuple[int, str], tuple))
+static_assert(is_assignable_to(tuple[Any], tuple))
+
+# TODO: It is not yet clear if we want the following two assertions to hold.
+# See https://github.com/astral-sh/ruff/issues/15528 for more details. The
+# short version is: We either need to special-case enforcement of the Liskov
+# substitution principle on `__bool__` and `__len__` for tuple subclasses,
+# or we need to negate these assertions.
+static_assert(is_assignable_to(tuple[()], AlwaysFalsy))
+static_assert(is_assignable_to(tuple[int], AlwaysTruthy))
 
 static_assert(not is_assignable_to(tuple[()], tuple[int]))
 static_assert(not is_assignable_to(tuple[int], tuple[str]))
@@ -402,7 +413,7 @@ are covered in the [subtyping tests](./is_subtype_of.md#callable).
 ### Return type
 
 ```py
-from knot_extensions import CallableTypeFromFunction, Unknown, static_assert, is_assignable_to
+from knot_extensions import CallableTypeOf, Unknown, static_assert, is_assignable_to
 from typing import Any, Callable
 
 static_assert(is_assignable_to(Callable[[], Any], Callable[[], int]))
@@ -432,7 +443,7 @@ A `Callable` which uses the gradual form (`...`) for the parameter types is cons
 input signature.
 
 ```py
-from knot_extensions import CallableTypeFromFunction, static_assert, is_assignable_to
+from knot_extensions import CallableTypeOf, static_assert, is_assignable_to
 from typing import Any, Callable
 
 static_assert(is_assignable_to(Callable[[], None], Callable[..., None]))
@@ -450,12 +461,12 @@ def keyword_only(*, a: int, b: int) -> None: ...
 def keyword_variadic(**kwargs: int) -> None: ...
 def mixed(a: int, /, b: int, *args: int, c: int, **kwargs: int) -> None: ...
 
-static_assert(is_assignable_to(CallableTypeFromFunction[positional_only], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[positional_or_keyword], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[variadic], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[keyword_only], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[keyword_variadic], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[mixed], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[positional_only], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[positional_or_keyword], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[variadic], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[keyword_only], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[keyword_variadic], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[mixed], Callable[..., None]))
 ```
 
 And, even if the parameters are unannotated.
@@ -468,12 +479,29 @@ def keyword_only(*, a, b) -> None: ...
 def keyword_variadic(**kwargs) -> None: ...
 def mixed(a, /, b, *args, c, **kwargs) -> None: ...
 
-static_assert(is_assignable_to(CallableTypeFromFunction[positional_only], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[positional_or_keyword], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[variadic], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[keyword_only], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[keyword_variadic], Callable[..., None]))
-static_assert(is_assignable_to(CallableTypeFromFunction[mixed], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[positional_only], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[positional_or_keyword], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[variadic], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[keyword_only], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[keyword_variadic], Callable[..., None]))
+static_assert(is_assignable_to(CallableTypeOf[mixed], Callable[..., None]))
+```
+
+### Function types
+
+```py
+from typing import Any, Callable
+
+def f(x: Any) -> str:
+    return ""
+
+def g(x: Any) -> int:
+    return 1
+
+c: Callable[[Any], str] = f
+
+# error: [invalid-assignment] "Object of type `Literal[g]` is not assignable to `(Any, /) -> str`"
+c: Callable[[Any], str] = g
 ```
 
 [typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

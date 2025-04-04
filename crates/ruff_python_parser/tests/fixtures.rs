@@ -42,7 +42,7 @@ fn test_valid_syntax(input_path: &Path) {
     let options = extract_options(&source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
     });
-    let parsed = parse_unchecked(&source, options);
+    let parsed = parse_unchecked(&source, options.clone());
 
     if parsed.has_syntax_errors() {
         let line_index = LineIndex::from_source_text(&source);
@@ -88,7 +88,9 @@ fn test_valid_syntax(input_path: &Path) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor = SemanticSyntaxCheckerVisitor::new(TestContext::default());
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(
+        TestContext::new(&source).with_python_version(options.target_version()),
+    );
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);
@@ -134,7 +136,7 @@ fn test_invalid_syntax(input_path: &Path) {
     let options = extract_options(&source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest())
     });
-    let parsed = parse_unchecked(&source, options);
+    let parsed = parse_unchecked(&source, options.clone());
 
     validate_tokens(parsed.tokens(), source.text_len(), input_path);
     validate_ast(parsed.syntax(), source.text_len(), input_path);
@@ -182,7 +184,9 @@ fn test_invalid_syntax(input_path: &Path) {
 
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
-    let mut visitor = SemanticSyntaxCheckerVisitor::new(TestContext::default());
+    let mut visitor = SemanticSyntaxCheckerVisitor::new(
+        TestContext::new(&source).with_python_version(options.target_version()),
+    );
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);
@@ -458,21 +462,51 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     }
 }
 
-#[derive(Debug, Default)]
-struct TestContext {
+#[derive(Debug)]
+struct TestContext<'a> {
     diagnostics: RefCell<Vec<SemanticSyntaxError>>,
+    python_version: PythonVersion,
+    source: &'a str,
 }
 
-impl SemanticSyntaxContext for TestContext {
+impl<'a> TestContext<'a> {
+    fn new(source: &'a str) -> Self {
+        Self {
+            diagnostics: RefCell::default(),
+            python_version: PythonVersion::default(),
+            source,
+        }
+    }
+
+    #[must_use]
+    fn with_python_version(mut self, python_version: PythonVersion) -> Self {
+        self.python_version = python_version;
+        self
+    }
+}
+
+impl SemanticSyntaxContext for TestContext<'_> {
     fn seen_docstring_boundary(&self) -> bool {
         false
     }
 
+    fn future_annotations_or_stub(&self) -> bool {
+        false
+    }
+
     fn python_version(&self) -> PythonVersion {
-        PythonVersion::default()
+        self.python_version
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         self.diagnostics.borrow_mut().push(error);
+    }
+
+    fn source(&self) -> &str {
+        self.source
+    }
+
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
     }
 }

@@ -107,7 +107,7 @@ pub(crate) fn duplicate_literal_member<'a>(checker: &Checker, expr: &'a Expr) {
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(fix.clone());
         }
-    };
+    }
 
     checker.report_diagnostics(diagnostics);
 }

@@ -1,5 +1,11 @@
 use std::sync::{LazyLock, Mutex};
 
+use super::{
+    class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
+    KnownFunction, Mro, MroError, MroIterator, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeQualifiers, TypeVarInstance,
+};
+use crate::semantic_index::definition::Definition;
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
@@ -18,15 +24,9 @@ use crate::{
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
-use ruff_db::files::File;
+use ruff_db::files::{File, FileRange};
 use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
-
-use super::{
-    class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
-    KnownFunction, Mro, MroError, MroIterator, SubclassOfType, Truthiness, Type, TypeAliasType,
-    TypeQualifiers, TypeVarInstance,
-};
 
 /// Representation of a runtime class object.
 ///
@@ -43,52 +43,14 @@ pub struct Class<'db> {
     pub(crate) known: Option<KnownClass>,
 }
 
-fn explicit_bases_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &[Type<'db>],
-    _count: u32,
-    _self: Class<'db>,
-) -> salsa::CycleRecoveryAction<Box<[Type<'db>]>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn explicit_bases_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Box<[Type<'db>]> {
-    Box::default()
-}
-
-fn try_mro_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Result<Mro<'db>, MroError<'db>>,
-    _count: u32,
-    _self: Class<'db>,
-) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    self_: Class<'db>,
-) -> Result<Mro<'db>, MroError<'db>> {
-    Ok(Mro::from_error(db, self_))
-}
-
-#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-fn inheritance_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<InheritanceCycle>,
-    _count: u32,
-    _self: Class<'db>,
-) -> salsa::CycleRecoveryAction<Option<InheritanceCycle>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn inheritance_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Option<InheritanceCycle> {
-    None
-}
-
 #[salsa::tracked]
 impl<'db> Class<'db> {
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        let scope = self.body_scope(db);
+        let index = semantic_index(db, scope.file(db));
+        index.expect_single_definition(scope.node(db).expect_class())
+    }
+
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
@@ -151,6 +113,15 @@ impl<'db> Class<'db> {
     /// query depends on the AST of another file (bad!).
     fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
         self.body_scope(db).node(db).expect_class()
+    }
+
+    /// Returns the file range of the class's name.
+    pub fn focus_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.node(db).name.range)
+    }
+
+    pub fn full_range(self, db: &dyn Db) -> FileRange {
+        FileRange::new(self.file(db), self.node(db).range)
     }
 
     /// Return the types of the decorators on this class
@@ -230,8 +201,7 @@ impl<'db> Class<'db> {
             .find_keyword("metaclass")?
             .value;
 
-        let class_definition =
-            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+        let class_definition = self.definition(db);
 
         Some(definition_expression_type(
             db,
@@ -731,6 +701,50 @@ impl<'db> Class<'db> {
     }
 }
 
+fn explicit_bases_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &[Type<'db>],
+    _count: u32,
+    _self: Class<'db>,
+) -> salsa::CycleRecoveryAction<Box<[Type<'db>]>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn explicit_bases_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Box<[Type<'db>]> {
+    Box::default()
+}
+
+fn try_mro_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Result<Mro<'db>, MroError<'db>>,
+    _count: u32,
+    _self: Class<'db>,
+) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn try_mro_cycle_initial<'db>(
+    db: &'db dyn Db,
+    self_: Class<'db>,
+) -> Result<Mro<'db>, MroError<'db>> {
+    Ok(Mro::from_error(db, self_))
+}
+
+#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
+fn inheritance_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<InheritanceCycle>,
+    _count: u32,
+    _self: Class<'db>,
+) -> salsa::CycleRecoveryAction<Option<InheritanceCycle>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn inheritance_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Option<InheritanceCycle> {
+    None
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(super) enum InheritanceCycle {
     /// The class is cyclically defined and is a participant in the cycle.
@@ -754,7 +768,7 @@ pub struct ClassLiteralType<'db> {
 }
 
 impl<'db> ClassLiteralType<'db> {
-    pub(crate) fn class(self) -> Class<'db> {
+    pub(super) fn class(self) -> Class<'db> {
         self.class
     }
 
@@ -811,6 +825,7 @@ pub enum KnownClass {
     Bool,
     Object,
     Bytes,
+    Bytearray,
     Type,
     Int,
     Float,
@@ -840,10 +855,13 @@ pub enum KnownClass {
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
+    Any,
     StdlibAlias,
     SpecialForm,
     TypeVar,
     ParamSpec,
+    ParamSpecArgs,
+    ParamSpecKwargs,
     TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
@@ -862,6 +880,7 @@ pub enum KnownClass {
     // Exposed as `types.EllipsisType` on Python >=3.10;
     // backported as `builtins.ellipsis` by typeshed on Python <=3.9
     EllipsisType,
+    NotImplementedType,
 }
 
 impl<'db> KnownClass {
@@ -892,13 +911,16 @@ impl<'db> KnownClass {
             | Self::TypeAliasType
             | Self::TypeVar
             | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::WrapperDescriptorType
             | Self::MethodWrapperType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
 
-            Self::BaseException
+            Self::Any
+            | Self::BaseException
             | Self::Object
             | Self::OrderedDict
             | Self::BaseExceptionGroup
@@ -914,6 +936,7 @@ impl<'db> KnownClass {
             | Self::Int
             | Self::Type
             | Self::Bytes
+            | Self::Bytearray
             | Self::FrozenSet
             | Self::Range
             | Self::Property
@@ -929,15 +952,21 @@ impl<'db> KnownClass {
             | Self::Sized
             | Self::Enum
             | Self::Super
+            // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
+            // and raises a `TypeError` in Python >=3.14
+            // (see https://docs.python.org/3/library/constants.html#NotImplemented)
+            | Self::NotImplementedType
             | Self::Classmethod => Truthiness::Ambiguous,
         }
     }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'static str {
         match self {
+            Self::Any => "Any",
             Self::Bool => "bool",
             Self::Object => "object",
             Self::Bytes => "bytes",
+            Self::Bytearray => "bytearray",
             Self::Tuple => "tuple",
             Self::Int => "int",
             Self::Float => "float",
@@ -964,6 +993,8 @@ impl<'db> KnownClass {
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
             Self::ParamSpec => "ParamSpec",
+            Self::ParamSpecArgs => "ParamSpecArgs",
+            Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
@@ -994,6 +1025,7 @@ impl<'db> KnownClass {
                     "ellipsis"
                 }
             }
+            Self::NotImplementedType => "_NotImplementedType",
         }
     }
 
@@ -1112,6 +1144,7 @@ impl<'db> KnownClass {
             Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1138,14 +1171,18 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
-            Self::SpecialForm
+            Self::Any
+            | Self::SpecialForm
             | Self::TypeVar
             | Self::StdlibAlias
             | Self::SupportsIndex
             | Self::Sized => KnownModule::Typing,
-            Self::TypeAliasType | Self::TypeVarTuple | Self::ParamSpec | Self::NewType => {
-                KnownModule::TypingExtensions
-            }
+            Self::TypeAliasType
+            | Self::TypeVarTuple
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::NewType => KnownModule::TypingExtensions,
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -1167,6 +1204,7 @@ impl<'db> KnownClass {
                     KnownModule::Builtins
                 }
             }
+            Self::NotImplementedType => KnownModule::Builtins,
             Self::ChainMap
             | Self::Counter
             | Self::DefaultDict
@@ -1182,11 +1220,14 @@ impl<'db> KnownClass {
             | Self::NoDefaultType
             | Self::VersionInfo
             | Self::EllipsisType
-            | Self::TypeAliasType => true,
+            | Self::TypeAliasType
+            | Self::NotImplementedType => true,
 
-            Self::Bool
+            Self::Any
+            | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1219,6 +1260,8 @@ impl<'db> KnownClass {
             | Self::StdlibAlias
             | Self::TypeVar
             | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
@@ -1231,17 +1274,19 @@ impl<'db> KnownClass {
     ///
     /// A singleton class is a class where it is known that only one instance can ever exist at runtime.
     pub(super) const fn is_singleton(self) -> bool {
-        // TODO there are other singleton types (NotImplementedType -- any others?)
         match self {
             Self::NoneType
             | Self::EllipsisType
             | Self::NoDefaultType
             | Self::VersionInfo
-            | Self::TypeAliasType => true,
+            | Self::TypeAliasType
+            | Self::NotImplementedType => true,
 
-            Self::Bool
+            Self::Any
+            | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Tuple
             | Self::Int
             | Self::Float
@@ -1274,6 +1319,8 @@ impl<'db> KnownClass {
             | Self::Classmethod
             | Self::TypeVar
             | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
@@ -1290,9 +1337,11 @@ impl<'db> KnownClass {
         // We assert that this match is exhaustive over the right-hand side in the unit test
         // `known_class_roundtrip_from_str()`
         let candidate = match class_name {
+            "Any" => Self::Any,
             "bool" => Self::Bool,
             "object" => Self::Object,
             "bytes" => Self::Bytes,
+            "bytearray" => Self::Bytearray,
             "tuple" => Self::Tuple,
             "type" => Self::Type,
             "int" => Self::Int,
@@ -1320,6 +1369,8 @@ impl<'db> KnownClass {
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
             "ParamSpec" => Self::ParamSpec,
+            "ParamSpecArgs" => Self::ParamSpecArgs,
+            "ParamSpecKwargs" => Self::ParamSpecKwargs,
             "TypeVarTuple" => Self::TypeVarTuple,
             "ChainMap" => Self::ChainMap,
             "Counter" => Self::Counter,
@@ -1340,6 +1391,7 @@ impl<'db> KnownClass {
             "EllipsisType" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
                 Self::EllipsisType
             }
+            "_NotImplementedType" => Self::NotImplementedType,
             _ => return None,
         };
 
@@ -1351,9 +1403,11 @@ impl<'db> KnownClass {
     /// Return `true` if the module of `self` matches `module`
     fn check_module(self, db: &'db dyn Db, module: KnownModule) -> bool {
         match self {
-            Self::Bool
+            Self::Any
+            | Self::Bool
             | Self::Object
             | Self::Bytes
+            | Self::Bytearray
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1385,6 +1439,7 @@ impl<'db> KnownClass {
             | Self::MethodWrapperType
             | Self::Enum
             | Self::Super
+            | Self::NotImplementedType
             | Self::WrapperDescriptorType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
@@ -1393,6 +1448,8 @@ impl<'db> KnownClass {
             | Self::NoDefaultType
             | Self::SupportsIndex
             | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::Sized
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
@@ -1474,6 +1531,9 @@ pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
     Never,
     /// The symbol `typing.Any` (which can also be found as `typing_extensions.Any`)
+    /// This is not used since typeshed switched to representing `Any` as a class; now we use
+    /// `KnownClass::Any` instead. But we still support the old `Any = object()` representation, at
+    /// least for now. TODO maybe remove?
     Any,
     /// The symbol `typing.Tuple` (which can also be found as `typing_extensions.Tuple`)
     Tuple,
@@ -1515,8 +1575,8 @@ pub enum KnownInstanceType<'db> {
     Intersection,
     /// The symbol `knot_extensions.TypeOf`
     TypeOf,
-    /// The symbol `knot_extensions.CallableTypeFromFunction`
-    CallableTypeFromFunction,
+    /// The symbol `knot_extensions.CallableTypeOf`
+    CallableTypeOf,
 
     // Various special forms, special aliases and type qualifiers that we don't yet understand
     // (all currently inferred as TODO in most contexts):
@@ -1579,7 +1639,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Not
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeFromFunction => Truthiness::AlwaysTrue,
+            | Self::CallableTypeOf => Truthiness::AlwaysTrue,
         }
     }
 
@@ -1626,7 +1686,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Not => "knot_extensions.Not",
             Self::Intersection => "knot_extensions.Intersection",
             Self::TypeOf => "knot_extensions.TypeOf",
-            Self::CallableTypeFromFunction => "knot_extensions.CallableTypeFromFunction",
+            Self::CallableTypeOf => "knot_extensions.CallableTypeOf",
         }
     }
 
@@ -1670,7 +1730,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::TypeOf => KnownClass::SpecialForm,
             Self::Not => KnownClass::SpecialForm,
             Self::Intersection => KnownClass::SpecialForm,
-            Self::CallableTypeFromFunction => KnownClass::SpecialForm,
+            Self::CallableTypeOf => KnownClass::SpecialForm,
             Self::Unknown => KnownClass::Object,
             Self::AlwaysTruthy => KnownClass::Object,
             Self::AlwaysFalsy => KnownClass::Object,
@@ -1735,7 +1795,7 @@ impl<'db> KnownInstanceType<'db> {
             "Not" => Self::Not,
             "Intersection" => Self::Intersection,
             "TypeOf" => Self::TypeOf,
-            "CallableTypeFromFunction" => Self::CallableTypeFromFunction,
+            "CallableTypeOf" => Self::CallableTypeOf,
             _ => return None,
         };
 
@@ -1792,7 +1852,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Not
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeFromFunction => module.is_knot_extensions(),
+            | Self::CallableTypeOf => module.is_knot_extensions(),
         }
     }
 }
