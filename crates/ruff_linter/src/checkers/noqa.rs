@@ -198,7 +198,7 @@ pub(crate) fn check_noqa(
                         } else {
                             let original_text = locator.slice(directive.range());
                             let prefix = if is_file_level {
-                                if original_text.contains("flake8:") {
+                                if original_text.contains("flake8") {
                                     "# flake8: noqa: "
                                 } else {
                                     "# ruff: noqa: "
