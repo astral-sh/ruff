@@ -11,6 +11,7 @@ use ruff_db::files::{File, FileRange};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashMap;
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
@@ -80,6 +81,28 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     check_suppressions(db, file, &mut diagnostics);
 
     diagnostics
+}
+
+#[salsa::tracked(return_ref)]
+pub fn get_types(db: &dyn Db, file: File) -> FxHashMap<Definition<'_>, Type<'_>> {
+    let _span = tracing::trace_span!("check_types", ?file).entered();
+
+    tracing::debug!("Checking file '{path}'", path = file.path(db));
+
+    let index = semantic_index(db, file);
+    let mut types = FxHashMap::default();
+
+    for scope_id in index.scope_ids() {
+        let result = infer_scope_types(db, scope_id);
+        types.extend(
+            result
+                .bindings()
+                .iter()
+                .map(|(definition, type_and_qualifiers)| (*definition, *type_and_qualifiers)),
+        );
+    }
+
+    types
 }
 
 /// Infer the type of a binding.

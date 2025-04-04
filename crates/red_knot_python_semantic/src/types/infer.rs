@@ -430,6 +430,10 @@ impl<'db> TypeInference<'db> {
         &self.diagnostics
     }
 
+    pub(crate) fn bindings(&self) -> &FxHashMap<Definition<'db>, Type<'db>> {
+        &self.bindings
+    }
+
     fn shrink_to_fit(&mut self) {
         self.expressions.shrink_to_fit();
         self.bindings.shrink_to_fit();
