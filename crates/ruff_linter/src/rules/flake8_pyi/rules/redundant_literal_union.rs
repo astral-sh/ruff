@@ -305,7 +305,10 @@ fn generate_typing_union_fix(
                 parenthesized: true,
             })
         } else {
-            new_exprs[0].clone()
+            new_exprs
+                .first()
+                .expect("should have at least one new_expr")
+                .clone()
         }),
         ctx: ExprContext::Load,
     });
