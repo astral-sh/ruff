@@ -463,7 +463,7 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(ClassLiteralType::NonGeneric(non_generic)) => {
                 Some(ClassType::NonGeneric(non_generic))
             }
-            // XXX: GenericAlias
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
             _ => None,
         }
     }
@@ -475,8 +475,10 @@ impl<'db> Type<'db> {
     }
 
     pub const fn is_class_type(&self) -> bool {
-        // XXX: GenericAlias
-        matches!(self, Type::ClassLiteral(ClassLiteralType::NonGeneric(_)))
+        matches!(
+            self,
+            Type::ClassLiteral(ClassLiteralType::NonGeneric(_)) | Type::GenericAlias(_)
+        )
     }
 
     pub const fn is_instance(&self) -> bool {
@@ -2013,10 +2015,12 @@ impl<'db> Type<'db> {
                     .find_name_in_mro(db, name)
             }
 
-            Type::SpecializedCallable(specialized) => {
-                // XXX: specialize the result
-                specialized.callable_type(db).find_name_in_mro(db, name)
-            }
+            Type::SpecializedCallable(specialized) => specialized
+                .callable_type(db)
+                .find_name_in_mro(db, name)
+                .map(|sq| {
+                    sq.map_type(|ty| ty.apply_specialization(db, specialized.specialization(db)))
+                }),
 
             Type::FunctionLiteral(_)
             | Type::Callable(_)
@@ -2098,10 +2102,10 @@ impl<'db> Type<'db> {
             Type::BoundMethod(_) => KnownClass::MethodType
                 .to_instance(db)
                 .instance_member(db, name),
-            Type::SpecializedCallable(specialized) => {
-                // XXX: specialize the result
-                specialized.callable_type(db).instance_member(db, name)
-            }
+            Type::SpecializedCallable(specialized) => specialized
+                .callable_type(db)
+                .instance_member(db, name)
+                .map_type(|ty| ty.apply_specialization(db, specialized.specialization(db))),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType
                 .to_instance(db)
                 .instance_member(db, name),
@@ -3580,10 +3584,10 @@ impl<'db> Type<'db> {
                 Some(builder.build())
             }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance()")),
-            Type::SpecializedCallable(specialized) => {
-                // XXX: specialize the result
-                specialized.callable_type(db).to_instance(db)
-            }
+            Type::SpecializedCallable(specialized) => specialized
+                .callable_type(db)
+                .to_instance(db)
+                .map(|ty| ty.apply_specialization(db, specialized.specialization(db))),
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::FunctionLiteral(_)
@@ -3666,10 +3670,10 @@ impl<'db> Type<'db> {
                 fallback_type: Type::unknown(),
             }),
 
-            Type::SpecializedCallable(specialized) => {
-                // XXX: specialize the result
-                specialized.callable_type(db).in_type_expression(db)
-            }
+            Type::SpecializedCallable(specialized) => specialized
+                .callable_type(db)
+                .in_type_expression(db)
+                .map(|ty| ty.apply_specialization(db, specialized.specialization(db))),
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
@@ -3868,10 +3872,10 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
-            Type::SpecializedCallable(specialized) => {
-                // XXX: specialize the result
-                specialized.callable_type(db).to_meta_type(db)
-            }
+            Type::SpecializedCallable(specialized) => specialized
+                .callable_type(db)
+                .to_meta_type(db)
+                .apply_specialization(db, specialized.specialization(db)),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
             Type::Callable(_) => KnownClass::Type.to_instance(db),
