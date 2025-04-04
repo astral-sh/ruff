@@ -196,8 +196,13 @@ pub(crate) fn check_noqa(
                         let edit = if valid_codes.is_empty() {
                             delete_comment(directive.range(), locator)
                         } else {
+                            let original_text = locator.slice(directive.range());
                             let prefix = if is_file_level {
-                                "# ruff: noqa: "
+                                if original_text.contains("flake8:") {
+                                    "# flake8: noqa: "
+                                } else {
+                                    "# ruff: noqa: "
+                                }
                             } else {
                                 "# noqa: "
                             };
