@@ -253,7 +253,6 @@ impl Rule {
             Rule::BidirectionalUnicode
             | Rule::BlankLineWithWhitespace
             | Rule::DocLineTooLong
-            | Rule::IndentedFormFeed
             | Rule::LineTooLong
             | Rule::MissingCopyrightNotice
             | Rule::MissingNewlineAtEndOfFile
@@ -310,6 +309,7 @@ impl Rule {
             | Rule::StdlibModuleShadowing => LintSource::Filesystem,
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::IndentedFormFeed
             | Rule::MissingWhitespace
             | Rule::MissingWhitespaceAfterKeyword
             | Rule::MissingWhitespaceAroundArithmeticOperator
