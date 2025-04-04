@@ -32,30 +32,79 @@ use crate::{module_name::ModuleName, resolve_module, Db};
 
 fn exports_cycle_recover(
     _db: &dyn Db,
-    _value: &FxHashSet<Name>,
+    _value: &Reexports,
     _count: u32,
     _file: File,
-) -> salsa::CycleRecoveryAction<FxHashSet<Name>> {
+) -> salsa::CycleRecoveryAction<Reexports> {
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn exports_cycle_initial(_db: &dyn Db, _file: File) -> FxHashSet<Name> {
-    FxHashSet::default()
+fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Reexports {
+    Reexports::default()
 }
 
 #[salsa::tracked(return_ref, cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial)]
-pub(super) fn exported_names(db: &dyn Db, file: File) -> FxHashSet<Name> {
+pub(super) fn exported_names(db: &dyn Db, file: File) -> Reexports {
     let module = parsed_module(db.upcast(), file);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
     finder.exports
 }
 
+#[derive(Debug, PartialEq, Eq, Default)]
+pub(super) struct Reexports(FxHashSet<Reexport>);
+
+impl<'a> IntoIterator for &'a Reexports {
+    type Item = &'a Reexport;
+    type IntoIter = std::collections::hash_set::Iter<'a, Reexport>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl Reexports {
+    fn add(&mut self, name: Name, availability: SnapshotPriorState) {
+        self.0.insert(Reexport {
+            symbol_name: name,
+            availability,
+        });
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct Reexport {
+    pub(super) symbol_name: Name,
+    pub(super) availability: SnapshotPriorState,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub(super) enum SnapshotPriorState {
+    No,
+    Yes,
+}
+
+impl SnapshotPriorState {
+    pub(super) const fn is_yes(self) -> bool {
+        matches!(self, SnapshotPriorState::Yes)
+    }
+
+    fn and(self, other: SnapshotPriorState) -> SnapshotPriorState {
+        match (self, other) {
+            (SnapshotPriorState::No, SnapshotPriorState::No) => SnapshotPriorState::No,
+            _ => SnapshotPriorState::Yes,
+        }
+    }
+}
+
 struct ExportFinder<'db> {
     db: &'db dyn Db,
     file: File,
     visiting_stub_file: bool,
-    exports: FxHashSet<Name>,
+    exports: Reexports,
+    /// A counter of the number of nested `if`, `while`s, etc. that we are visiting.
+    /// Definitions inside statements like these are not always available.
+    condition_counter: u32,
 }
 
 impl<'db> ExportFinder<'db> {
@@ -64,15 +113,24 @@ impl<'db> ExportFinder<'db> {
             db,
             file,
             visiting_stub_file: file.is_stub(db.upcast()),
-            exports: FxHashSet::default(),
+            exports: Reexports::default(),
+            condition_counter: 0,
         }
     }
 
-    fn possibly_add_export(&mut self, name: &Name) {
+    fn possibly_add_export(&mut self, name: &Name, availability: SnapshotPriorState) {
         if name.starts_with('_') {
             return;
         }
-        self.exports.insert(name.clone());
+        self.exports.add(name.clone(), availability);
+    }
+
+    fn current_availability(&self) -> SnapshotPriorState {
+        if self.condition_counter > 0 {
+            SnapshotPriorState::Yes
+        } else {
+            SnapshotPriorState::No
+        }
     }
 }
 
@@ -83,10 +141,13 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             // If the source is a stub, names defined by imports are only exported
             // if they use the explicit `foo as foo` syntax:
             if asname.as_ref().is_some_and(|asname| asname.id == name.id) {
-                self.possibly_add_export(&name.id);
+                self.possibly_add_export(&name.id, self.current_availability());
             }
         } else {
-            self.possibly_add_export(&asname.as_ref().unwrap_or(name).id);
+            self.possibly_add_export(
+                &asname.as_ref().unwrap_or(name).id,
+                self.current_availability(),
+            );
         }
     }
 
@@ -106,7 +167,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     // all names with leading underscores, but this will not always be the case
                     // (in the future we will want to support modules with `__all__ = ['_']`).
                     if name != "_" {
-                        self.possibly_add_export(&name.id);
+                        self.possibly_add_export(&name.id, SnapshotPriorState::Yes);
                     }
                 }
             }
@@ -120,12 +181,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.possibly_add_export(&rest.id);
+                    self.possibly_add_export(&rest.id, SnapshotPriorState::Yes);
                 }
             }
             ast::Pattern::MatchStar(ast::PatternMatchStar { name, range: _ }) => {
                 if let Some(name) = name {
-                    self.possibly_add_export(&name.id);
+                    self.possibly_add_export(&name.id, SnapshotPriorState::Yes);
                 }
             }
             ast::Pattern::MatchSequence(_)
@@ -147,7 +208,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 body: _,        // We don't want to visit the body of the class
                 range: _,
             }) => {
-                self.possibly_add_export(&name.id);
+                self.possibly_add_export(&name.id, self.current_availability());
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -165,7 +226,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 range: _,
                 is_async: _,
             }) => {
-                self.possibly_add_export(&name.id);
+                self.possibly_add_export(&name.id, self.current_availability());
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -205,30 +266,45 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     if &name.name.id == "*" {
                         if !found_star {
                             found_star = true;
-                            self.exports.extend(
+
+                            let module =
                                 ModuleName::from_import_statement(self.db, self.file, node)
                                     .ok()
-                                    .and_then(|module_name| resolve_module(self.db, &module_name))
-                                    .iter()
-                                    .flat_map(|module| exported_names(self.db, module.file()))
-                                    .cloned(),
-                            );
+                                    .and_then(|module_name| resolve_module(self.db, &module_name));
+
+                            let imported_names = module
+                                .into_iter()
+                                .flat_map(|module| exported_names(self.db, module.file()))
+                                .cloned();
+
+                            for reexport in imported_names {
+                                let Reexport {
+                                    symbol_name,
+                                    availability,
+                                } = reexport;
+
+                                self.exports.add(
+                                    symbol_name,
+                                    availability.and(self.current_availability()),
+                                );
+                            }
                         }
                     } else {
                         self.visit_alias(name);
                     }
                 }
             }
+            ast::Stmt::If(_) | ast::Stmt::With(_) | ast::Stmt::While(_) | ast::Stmt::For(_) => {
+                self.condition_counter += 1;
+                walk_stmt(self, stmt);
+                self.condition_counter -= 1;
+            }
 
             ast::Stmt::Import(_)
             | ast::Stmt::AugAssign(_)
-            | ast::Stmt::While(_)
-            | ast::Stmt::If(_)
-            | ast::Stmt::With(_)
             | ast::Stmt::Assert(_)
             | ast::Stmt::Try(_)
             | ast::Stmt::Expr(_)
-            | ast::Stmt::For(_)
             | ast::Stmt::Assign(_)
             | ast::Stmt::Match(_) => walk_stmt(self, stmt),
 
@@ -245,10 +321,11 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
     }
 
     fn visit_expr(&mut self, expr: &'db ast::Expr) {
+        let condition_counter = self.condition_counter;
         match expr {
             ast::Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
                 if ctx.is_store() {
-                    self.possibly_add_export(id);
+                    self.possibly_add_export(id, self.current_availability());
                 }
             }
 
@@ -268,15 +345,21 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
             | ast::Expr::DictComp(_) => {
                 let mut walrus_finder = WalrusFinder {
                     export_finder: self,
+                    condition_counter,
                 };
                 walk_expr(&mut walrus_finder, expr);
+            }
+
+            ast::Expr::If(_) => {
+                self.condition_counter += 1;
+                walk_expr(self, expr);
+                self.condition_counter -= 1;
             }
 
             ast::Expr::BoolOp(_)
             | ast::Expr::Named(_)
             | ast::Expr::BinOp(_)
             | ast::Expr::UnaryOp(_)
-            | ast::Expr::If(_)
             | ast::Expr::Attribute(_)
             | ast::Expr::Subscript(_)
             | ast::Expr::Starred(_)
@@ -298,6 +381,19 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
 
 struct WalrusFinder<'a, 'db> {
     export_finder: &'a mut ExportFinder<'db>,
+    /// A counter of the number of nested `if`, `while`s, etc. that we are visiting.
+    /// Definitions inside statements like these are not always available.
+    condition_counter: u32,
+}
+
+impl WalrusFinder<'_, '_> {
+    fn current_availability(&self) -> SnapshotPriorState {
+        if self.condition_counter > 0 {
+            SnapshotPriorState::Yes
+        } else {
+            SnapshotPriorState::No
+        }
+    }
 }
 
 impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
@@ -325,8 +421,15 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
                     range: _,
                 }) = &**target
                 {
-                    self.export_finder.possibly_add_export(id);
+                    self.export_finder
+                        .possibly_add_export(id, self.current_availability());
                 }
+            }
+
+            ast::Expr::If(_) => {
+                self.condition_counter += 1;
+                walk_expr(self, expr);
+                self.condition_counter -= 1;
             }
 
             // We must recurse inside nested comprehensions,
@@ -339,7 +442,6 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
             | ast::Expr::BoolOp(_)
             | ast::Expr::BinOp(_)
             | ast::Expr::UnaryOp(_)
-            | ast::Expr::If(_)
             | ast::Expr::Attribute(_)
             | ast::Expr::Subscript(_)
             | ast::Expr::Starred(_)

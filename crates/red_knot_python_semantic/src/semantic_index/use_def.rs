@@ -276,6 +276,9 @@ use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
 
+use super::definition::DefinitionNodeKey;
+use super::re_exports::SnapshotPriorState;
+
 mod symbol_state;
 
 /// Applicable definitions and constraints for every use of a name.
@@ -320,6 +323,8 @@ pub(crate) struct UseDefMap<'db> {
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
     eager_bindings: EagerBindings,
+
+    bindings_at_star_imports: FxHashMap<(DefinitionNodeKey, ScopedSymbolId), SymbolState>,
 
     /// Whether or not the start of the scope is visible.
     /// This is used to check if the function can implicitly return `None`.
@@ -570,6 +575,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
     eager_bindings: EagerBindings,
+
+    bindings_at_star_imports: FxHashMap<(DefinitionNodeKey, ScopedSymbolId), SymbolState>,
 }
 
 impl Default for UseDefMapBuilder<'_> {
@@ -585,6 +592,7 @@ impl Default for UseDefMapBuilder<'_> {
             bindings_by_declaration: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             eager_bindings: EagerBindings::default(),
+            bindings_at_star_imports: FxHashMap::default(),
         }
     }
 }
@@ -687,11 +695,17 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         symbol: ScopedSymbolId,
         definition: Definition<'db>,
+        snapshot_required: SnapshotPriorState,
+        definition_key: DefinitionNodeKey,
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
         let def_id = self.all_definitions.push(Some(definition));
         let symbol_state = &mut self.symbol_states[symbol];
+        if snapshot_required.is_yes() {
+            self.bindings_at_star_imports
+                .insert((definition_key, symbol), symbol_state.clone());
+        }
         symbol_state.record_declaration(def_id);
         symbol_state.record_binding(def_id, self.scope_start_visibility);
     }
@@ -796,6 +810,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_declaration.shrink_to_fit();
         self.eager_bindings.shrink_to_fit();
+        self.bindings_at_star_imports.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
@@ -807,6 +822,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_bindings: self.eager_bindings,
+            bindings_at_star_imports: self.bindings_at_star_imports,
             scope_start_visibility: self.scope_start_visibility,
         }
     }

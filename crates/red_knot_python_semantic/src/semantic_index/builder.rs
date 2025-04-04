@@ -41,6 +41,8 @@ use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::Db;
 
+use super::re_exports::SnapshotPriorState;
+
 mod except_handlers;
 
 #[derive(Clone, Debug, Default)]
@@ -367,7 +369,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition_node: impl Into<DefinitionNodeRef<'db>> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
         let (definition, num_definitions) =
-            self.push_additional_definition(symbol, definition_node);
+            self.push_additional_definition(symbol, definition_node, SnapshotPriorState::No);
         debug_assert_eq!(
             num_definitions,
             1,
@@ -391,6 +393,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         symbol: ScopedSymbolId,
         definition_node: impl Into<DefinitionNodeRef<'db>>,
+        snapshot_prior_state: SnapshotPriorState,
     ) -> (Definition<'db>, usize) {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]
@@ -409,8 +412,9 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
 
+        let definition_key = definition_node.key();
         let num_definitions = {
-            let definitions = self.add_entry_for_definition_key(definition_node.key());
+            let definitions = self.add_entry_for_definition_key(definition_key);
             definitions.push(definition);
             definitions.len()
         };
@@ -425,7 +429,12 @@ impl<'db> SemanticIndexBuilder<'db> {
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(symbol, definition);
+                use_def.record_declaration_and_binding(
+                    symbol,
+                    definition,
+                    snapshot_prior_state,
+                    definition_key,
+                );
             }
             DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
@@ -1147,9 +1156,13 @@ where
                         };
 
                         for export in exported_names(self.db, module.file()) {
-                            let symbol_id = self.add_symbol(export.clone());
+                            let symbol_id = self.add_symbol(export.symbol_name.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
-                            self.push_additional_definition(symbol_id, node_ref);
+                            self.push_additional_definition(
+                                symbol_id,
+                                node_ref,
+                                export.availability,
+                            );
                         }
 
                         continue;
