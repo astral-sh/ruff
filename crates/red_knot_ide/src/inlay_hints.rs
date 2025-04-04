@@ -1,6 +1,8 @@
 use crate::{Db, RangedValue};
 use red_knot_python_semantic::types::{get_types, Type};
 use ruff_db::files::File;
+use ruff_db::source::source_text;
+use ruff_text_size::Ranged;
 use std::fmt;
 use std::fmt::Formatter;
 
@@ -12,37 +14,6 @@ pub enum InlayHintContent<'db> {
 impl<'db> InlayHintContent<'db> {
     pub const fn display(&self, db: &'db dyn Db) -> DisplayInlayHint<'_, 'db> {
         DisplayInlayHint { db, hint: self }
-    }
-
-    pub(crate) fn maybe_from_type(ty: Type<'db>) -> Option<Self> {
-        // TODO: Create proper filtering
-        match ty {
-            Type::ModuleLiteral(_)
-            | Type::Dynamic(_)
-            | Type::Never
-            | Type::FunctionLiteral(_)
-            | Type::BoundMethod(_)
-            | Type::MethodWrapper(_)
-            | Type::WrapperDescriptor(_)
-            | Type::Callable(_)
-            | Type::ClassLiteral(_)
-            | Type::PropertyInstance(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::TypeVar(_) => None,
-            Type::IntLiteral(_)
-            | Type::SubclassOf(_)
-            | Type::KnownInstance(_)
-            | Type::Union(_)
-            | Type::Intersection(_)
-            | Type::Instance(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_)
-            | Type::Tuple(_) => Some(InlayHintContent::Type(ty)),
-        }
     }
 }
 
@@ -62,14 +33,76 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
 pub fn get_inlay_hints(db: &dyn Db, file: File) -> Vec<RangedValue<InlayHintContent>> {
     let types = get_types(db.upcast(), file);
 
+    let source = source_text(db, file);
+
+    let source_len = source.len();
+
     let hints = types
         .iter()
-        .filter_map(|(definition, type_and_qualifiers)| {
-            InlayHintContent::maybe_from_type(*type_and_qualifiers).map(|hint| RangedValue {
-                range: definition.focus_range(db.upcast()),
-                value: hint,
-            })
-        });
+        .map(|(definition, type_and_qualifiers)| RangedValue {
+            range: definition.focus_range(db.upcast()),
+            value: InlayHintContent::Type(*type_and_qualifiers),
+        })
+        .filter(|hint| filter_hint(hint, &source, source_len))
+        .collect();
 
-    hints.collect()
+    hints
+}
+
+fn has_type_annotation(
+    hint: &RangedValue<InlayHintContent>,
+    source: &str,
+    source_len: usize,
+) -> bool {
+    let end_offset = hint.range.range().end().to_usize();
+
+    let mut current_char_offset = end_offset;
+
+    while current_char_offset < source_len
+        && source[current_char_offset..].starts_with(|c: char| c.is_whitespace())
+    {
+        current_char_offset += 1;
+    }
+
+    current_char_offset < source_len && source[current_char_offset..].starts_with(':')
+}
+
+fn filter_type(ty: &InlayHintContent) -> bool {
+    match ty {
+        InlayHintContent::Type(ty) => match ty {
+            Type::ModuleLiteral(_)
+            | Type::Dynamic(_)
+            | Type::Never
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
+            | Type::Callable(_)
+            | Type::ClassLiteral(_)
+            | Type::PropertyInstance(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeVar(_) => false,
+            Type::IntLiteral(_)
+            | Type::SubclassOf(_)
+            | Type::KnownInstance(_)
+            | Type::Union(_)
+            | Type::Intersection(_)
+            | Type::Instance(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_)
+            | Type::Tuple(_) => true,
+        },
+    }
+}
+
+fn filter_hint(hint: &RangedValue<InlayHintContent>, source: &str, source_len: usize) -> bool {
+    if has_type_annotation(hint, source, source_len) {
+        return false;
+    }
+
+    filter_type(&hint.value)
 }

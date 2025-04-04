@@ -278,13 +278,11 @@ impl Workspace {
     #[wasm_bindgen(js_name = "inlayHints")]
     pub fn inlay_hints(&self, file_id: &FileHandle) -> Result<Vec<InlayHint>, Error> {
         let result = get_inlay_hints(&self.db, file_id.file);
-        let source = source_text(&self.db, file_id.file);
-        let index = line_index(&self.db, file_id.file);
 
         Ok(result
             .into_iter()
             .map(|hint| {
-                let source_range = Range::from_text_range(hint.range.range(), &index, &source);
+                let source_range = Range::from_file_range(&self.db, hint.range);
 
                 InlayHint {
                     markdown: hint.display(&self.db).to_string(),
