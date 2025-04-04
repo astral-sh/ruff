@@ -66,12 +66,11 @@ pub(crate) fn invalid_noqa_code(
             continue;
         }
 
-        match valid_codes.is_empty() {
-            true => {
-                let diagnostic = all_codes_invalid_diagnostic(directive, invalid_codes);
-                diagnostics.push(diagnostic);
-            }
-            false => handle_some_codes_invalid(diagnostics, &invalid_codes, line, locator),
+        if valid_codes.is_empty() {
+            let diagnostic = all_codes_invalid_diagnostic(directive, invalid_codes);
+            diagnostics.push(diagnostic);
+        } else {
+            handle_some_codes_invalid(diagnostics, &invalid_codes, line, locator);
         }
     }
 }
@@ -116,9 +115,10 @@ fn handle_some_codes_invalid(
             .iter()
             .filter_map(|code| {
                 let code_str = code.as_str();
-                match code_str != this_invalid_str {
-                    true => Some(code_str),
-                    false => None,
+                if code_str == this_invalid_str {
+                    None
+                } else {
+                    Some(code_str)
                 }
             })
             .collect::<Vec<_>>()
