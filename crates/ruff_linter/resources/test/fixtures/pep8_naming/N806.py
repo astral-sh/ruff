@@ -58,3 +58,10 @@ def model_assign() -> None:
 
     Address: Type = apps.get_model("zerver", variable)  # OK
     ValidationError = import_string(variable)  # N806
+
+
+# Pattern-matching assignment
+def pattern_assign():
+    tP = 0
+    match tP:
+        case fN: ...  # N806
