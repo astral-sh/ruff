@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use ruff_python_ast::{Identifier, Stmt};
+use ruff_python_ast::{Expr, ExprBooleanLiteral, Identifier, Stmt};
 use ruff_python_semantic::cfg::graph::{build_cfg, BlockId, Condition, ControlFlowGraph};
 use ruff_text_size::TextRange;
 
@@ -82,10 +82,24 @@ fn reachable(cfg: &ControlFlowGraph) -> HashSet<BlockId> {
 
     while let Some(block) = stack.pop() {
         if reachable.insert(block) {
+            let mut already_taken_branch = false;
             stack.extend(
                 cfg.outgoing(block)
                     // Traverse edges that are statically known to be possible to cross.
-                    .filter_targets_by_conditions(|cond| matches!(taken(cond), Some(true) | None)),
+                    .filter_targets_by_conditions(|cond| {
+                        if already_taken_branch {
+                            false
+                        } else {
+                            match taken(cond) {
+                                Some(true) => {
+                                    already_taken_branch = true;
+                                    true
+                                }
+                                Some(false) => false,
+                                None => true,
+                            }
+                        }
+                    }),
             );
         }
     }
@@ -102,5 +116,10 @@ fn reachable(cfg: &ControlFlowGraph) -> HashSet<BlockId> {
 fn taken(condition: &Condition) -> Option<bool> {
     match condition {
         Condition::Always => Some(true),
+        Condition::Test(expr) => match expr {
+            Expr::BooleanLiteral(ExprBooleanLiteral { value, .. }) => Some(*value),
+            _ => None,
+        },
+        Condition::Else => None,
     }
 }
