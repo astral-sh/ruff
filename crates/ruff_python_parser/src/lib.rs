@@ -690,6 +690,7 @@ impl Deref for Tokens {
 }
 
 /// A token that encloses a given offset or ends exactly at it.
+#[derive(Debug, Clone)]
 pub enum TokenAt {
     /// There's no token at the given offset
     None,

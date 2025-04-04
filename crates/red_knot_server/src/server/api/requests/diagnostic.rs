@@ -80,7 +80,7 @@ fn to_lsp_diagnostic(
         let source = source_text(db.upcast(), span.file());
 
         span.range()
-            .map(|range| range.to_range(&source, &index, encoding))
+            .map(|range| range.to_lsp_range(&source, &index, encoding))
             .unwrap_or_default()
     } else {
         Range::default()
