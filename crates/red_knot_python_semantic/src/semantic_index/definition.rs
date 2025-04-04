@@ -13,17 +13,13 @@ use crate::Db;
 
 /// A definition of a symbol.
 ///
-/// ## Module-local type
-/// This type should not be used as part of any cross-module API because
-/// it holds a reference to the AST node. Range-offset changes
-/// then propagate through all usages, and deserialization requires
-/// reparsing the entire module.
+/// ## ID stability
+/// The `Definition`'s ID is stable when the only field that change is its `kind` (AST node).
 ///
-/// E.g. don't use this type in:
-///
-/// * a return type of a cross-module query
-/// * a field of a type that is a return type of a cross-module query
-/// * an argument of a cross-module query
+/// The `Definition` changes when the `file`, `scope`, or `symbol` change. This can be
+/// because a new scope gets inserted before the `Definition` or a new symbol is inserted
+/// before this `Definition`. However, the ID can be considered stable and it is okay to use
+/// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
 #[salsa::tracked(debug)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.

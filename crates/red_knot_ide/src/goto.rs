@@ -24,9 +24,11 @@ pub fn goto_type_definition(
         ty.display(db.upcast())
     );
 
+    let navigation_targets = ty.navigation_targets(db);
+
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
-        value: ty.navigation_targets(db),
+        value: navigation_targets,
     })
 }
 
@@ -391,12 +393,12 @@ mod tests {
 
         test.write_file("lib.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r###"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
          --> /lib.py:1:1
           |
         1 | a = 10
-          | ^
+          | ^^^^^^
           |
         info: Source
          --> /main.py:4:13
@@ -406,7 +408,7 @@ mod tests {
         4 |             lib
           |             ^^^
           |
-        "###);
+        ");
     }
 
     #[test]
@@ -756,14 +758,13 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
-           --> stdlib/builtins.pyi:443:7
+           --> stdlib/types.pyi:677:11
             |
-        441 |     def __getitem__(self, key: int, /) -> str | int | None: ...
-        442 |
-        443 | class str(Sequence[str]):
-            |       ^^^
-        444 |     @overload
-        445 |     def __new__(cls, object: object = ...) -> Self: ...
+        675 | if sys.version_info >= (3, 10):
+        676 |     @final
+        677 |     class NoneType:
+            |           ^^^^^^^^
+        678 |         def __bool__(self) -> Literal[False]: ...
             |
         info: Source
          --> /main.py:3:17
@@ -774,13 +775,14 @@ f(**kwargs<CURSOR>)
           |
 
         info: lint:goto-type-definition: Type definition
-           --> stdlib/types.pyi:677:11
+           --> stdlib/builtins.pyi:443:7
             |
-        675 | if sys.version_info >= (3, 10):
-        676 |     @final
-        677 |     class NoneType:
-            |           ^^^^^^^^
-        678 |         def __bool__(self) -> Literal[False]: ...
+        441 |     def __getitem__(self, key: int, /) -> str | int | None: ...
+        442 |
+        443 | class str(Sequence[str]):
+            |       ^^^
+        444 |     @overload
+        445 |     def __new__(cls, object: object = ...) -> Self: ...
             |
         info: Source
          --> /main.py:3:17

@@ -4,19 +4,17 @@ mod goto;
 mod hover;
 mod markup;
 
-use std::ops::{Deref, DerefMut};
-
 pub use db::Db;
 pub use goto::goto_type_definition;
 pub use hover::hover;
 pub use markup::MarkupKind;
-use red_knot_python_semantic::types::{
-    Class, ClassBase, ClassLiteralType, FunctionType, InstanceType, IntersectionType,
-    KnownInstanceType, ModuleLiteralType, Type,
-};
+
+use rustc_hash::FxHashSet;
+use std::ops::{Deref, DerefMut};
+
+use red_knot_python_semantic::types::{Type, TypeDefinition};
 use ruff_db::files::{File, FileRange};
-use ruff_db::source::source_text;
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextRange};
 
 /// Information associated with a text range.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -58,7 +56,7 @@ where
 }
 
 /// Target to which the editor can navigate to.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NavigationTarget {
     file: File,
 
@@ -99,6 +97,17 @@ impl NavigationTargets {
         Self(smallvec::SmallVec::new())
     }
 
+    fn unique(targets: impl IntoIterator<Item = NavigationTarget>) -> Self {
+        let unique: FxHashSet<_> = targets.into_iter().collect();
+        if unique.is_empty() {
+            Self::empty()
+        } else {
+            let mut targets = unique.into_iter().collect::<Vec<_>>();
+            targets.sort_by_key(|target| (target.file, target.focus_range.start()));
+            Self(targets.into())
+        }
+    }
+
     fn iter(&self) -> std::slice::Iter<'_, NavigationTarget> {
         self.0.iter()
     }
@@ -129,7 +138,7 @@ impl<'a> IntoIterator for &'a NavigationTargets {
 
 impl FromIterator<NavigationTarget> for NavigationTargets {
     fn from_iter<T: IntoIterator<Item = NavigationTarget>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+        Self::unique(iter)
     }
 }
 
@@ -140,140 +149,47 @@ pub trait HasNavigationTargets {
 impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
-            Type::BoundMethod(method) => method.function(db).navigation_targets(db),
-            Type::FunctionLiteral(function) => function.navigation_targets(db),
-            Type::ModuleLiteral(module) => module.navigation_targets(db),
             Type::Union(union) => union
                 .iter(db.upcast())
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
-            Type::ClassLiteral(class) => class.navigation_targets(db),
-            Type::Instance(instance) => instance.navigation_targets(db),
-            Type::KnownInstance(instance) => instance.navigation_targets(db),
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                ClassBase::Class(class) => class.navigation_targets(db),
-                ClassBase::Dynamic(_) => NavigationTargets::empty(),
-            },
 
-            Type::StringLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::LiteralString
-            | Type::IntLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_)
-            | Type::MethodWrapper(_)
-            | Type::WrapperDescriptor(_)
-            | Type::PropertyInstance(_)
-            | Type::Tuple(_) => self.to_meta_type(db.upcast()).navigation_targets(db),
+            Type::Intersection(intersection) => {
+                // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
+                let mut targets = intersection
+                    .iter_positive(db.upcast())
+                    .filter(|ty| !ty.is_unknown());
 
-            Type::TypeVar(var) => {
-                let definition = var.definition(db);
-                let full_range = definition.full_range(db.upcast());
+                let Some(first) = targets.next() else {
+                    return NavigationTargets::empty();
+                };
 
-                NavigationTargets::single(NavigationTarget {
-                    file: full_range.file(),
-                    focus_range: definition.focus_range(db.upcast()).range(),
-                    full_range: full_range.range(),
-                })
+                match targets.next() {
+                    Some(_) => {
+                        // If there are multiple types in the intersection, we can't navigate to a single one
+                        // because the type is the intersection of all those types.
+                        NavigationTargets::empty()
+                    }
+                    None => first.navigation_targets(db),
+                }
             }
 
-            Type::Intersection(intersection) => intersection.navigation_targets(db),
-
-            Type::Dynamic(_)
-            | Type::Never
-            | Type::Callable(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => NavigationTargets::empty(),
+            ty => ty
+                .definition(db.upcast())
+                .map(|definition| definition.navigation_targets(db))
+                .unwrap_or_else(NavigationTargets::empty),
         }
     }
 }
 
-impl HasNavigationTargets for FunctionType<'_> {
+impl HasNavigationTargets for TypeDefinition<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let function_range = self.focus_range(db.upcast());
+        let full_range = self.full_range(db.upcast());
         NavigationTargets::single(NavigationTarget {
-            file: function_range.file(),
-            focus_range: function_range.range(),
-            full_range: self.full_range(db.upcast()).range(),
+            file: full_range.file(),
+            focus_range: self.focus_range(db.upcast()).unwrap_or(full_range).range(),
+            full_range: full_range.range(),
         })
-    }
-}
-
-impl HasNavigationTargets for Class<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let class_range = self.focus_range(db.upcast());
-        NavigationTargets::single(NavigationTarget {
-            file: class_range.file(),
-            focus_range: class_range.range(),
-            full_range: self.full_range(db.upcast()).range(),
-        })
-    }
-}
-
-impl HasNavigationTargets for ClassLiteralType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        self.class().navigation_targets(db)
-    }
-}
-
-impl HasNavigationTargets for InstanceType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        self.class().navigation_targets(db)
-    }
-}
-
-impl HasNavigationTargets for ModuleLiteralType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let file = self.module(db).file();
-        let source = source_text(db.upcast(), file);
-
-        NavigationTargets::single(NavigationTarget {
-            file,
-            focus_range: TextRange::default(),
-            full_range: TextRange::up_to(source.text_len()),
-        })
-    }
-}
-
-impl HasNavigationTargets for KnownInstanceType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        match self {
-            KnownInstanceType::TypeVar(var) => {
-                let definition = var.definition(db);
-                let full_range = definition.full_range(db.upcast());
-
-                NavigationTargets::single(NavigationTarget {
-                    file: full_range.file(),
-                    focus_range: definition.focus_range(db.upcast()).range(),
-                    full_range: full_range.range(),
-                })
-            }
-
-            // TODO: Track the definition of `KnownInstance` and navigate to their definition.
-            _ => NavigationTargets::empty(),
-        }
-    }
-}
-
-impl HasNavigationTargets for IntersectionType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
-        let mut targets = self
-            .iter_positive(db.upcast())
-            .filter(|ty| !ty.is_unknown());
-
-        let Some(first) = targets.next() else {
-            return NavigationTargets::empty();
-        };
-
-        match targets.next() {
-            Some(_) => {
-                // If there are multiple types in the intersection, we can't navigate to a single one
-                // because the type is the intersection of all those types.
-                NavigationTargets::empty()
-            }
-            None => first.navigation_targets(db),
-        }
     }
 }
 
