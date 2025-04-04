@@ -297,6 +297,9 @@ pub(crate) struct UseDefMap<'db> {
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
 
+    /// Tracks whether or not a given use of a symbol is reachable from the start of the scope.
+    reachability_by_use: IndexVec<ScopedUseId, ScopedVisibilityConstraintId>,
+
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`SymbolDeclarations`] to know whether this binding is permitted by the live declarations.
     ///
@@ -343,6 +346,24 @@ impl<'db> UseDefMap<'db> {
         use_id: ScopedUseId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
+    }
+
+    /// Returns true if a given 'use' of a symbol is reachable from the start of the scope.
+    /// For example, in the following code, use `2` is reachable, but `1` and `3` are not:
+    /// ```py
+    /// def f():
+    ///     x = 1
+    ///     if False:
+    ///         x  # 1
+    ///     x  # 2
+    ///     return
+    ///     x  # 3
+    /// ```
+    pub(crate) fn is_symbol_use_reachable(&self, db: &dyn crate::Db, use_id: ScopedUseId) -> bool {
+        !self
+            .visibility_constraints
+            .evaluate(db, &self.predicates, self.reachability_by_use[use_id])
+            .is_always_false()
     }
 
     pub(crate) fn public_bindings(
@@ -533,6 +554,7 @@ impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 pub(super) struct FlowSnapshot {
     symbol_states: IndexVec<ScopedSymbolId, SymbolState>,
     scope_start_visibility: ScopedVisibilityConstraintId,
+    reachability: ScopedVisibilityConstraintId,
 }
 
 #[derive(Debug)]
@@ -550,13 +572,56 @@ pub(super) struct UseDefMapBuilder<'db> {
     pub(super) visibility_constraints: VisibilityConstraintsBuilder,
 
     /// A constraint which describes the visibility of the unbound/undeclared state, i.e.
-    /// whether or not the start of the scope is visible. This is important for cases like
-    /// `if True: x = 1; use(x)` where we need to hide the implicit "x = unbound" binding
-    /// in the "else" branch.
+    /// whether or not a use of a symbol at the current point in control flow would see
+    /// the fake `x = <unbound>` binding at the start of the scope. This is important for
+    /// cases like the following, where we need to hide the implicit unbound binding in
+    /// the "else" branch:
+    /// ```py
+    /// # x = <unbound>
+    ///
+    /// if True:
+    ///     x = 1
+    ///
+    /// use(x)  # the `x = <unbound>` binding is not visible here
+    /// ```
     pub(super) scope_start_visibility: ScopedVisibilityConstraintId,
 
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
+
+    /// Tracks whether or not the scope start is visible at the current point in control flow.
+    /// This is subtly different from `scope_start_visibility`, as we apply these constraints
+    /// at the beginnging of a branch. Visibility constraints, on the other hand, need to be
+    /// applied at the end of a branch, as we apply them retroactively to all live bindings:
+    /// ```py
+    /// y = 1
+    ///
+    /// if test:
+    ///    # we record a reachability constraint of [test] here,
+    ///    # so that it can affect the use of `x`:
+    ///
+    ///    x  # we store a reachability constraint of [test] for this use of `x`
+    ///
+    ///    y = 2
+    ///    
+    ///    # we record a visibility constraint of [test] here, which retroactively affects
+    ///    # the `y = 1` and the `y = 2` binding.
+    /// else:
+    ///    # we record a reachability constraint of [~test] here.
+    ///
+    ///    pass
+    ///
+    ///    # we record a visibility constraint of [~test] here, which retroactively affects
+    ///    # the `y = 1` binding.
+    ///
+    /// use(y)
+    /// ```
+    /// Depending on the value of `test`, the `y = 1`, `y = 2`, or both bindings may be visible.
+    /// The use of `x` is recorded with a reachability constraint of `[test]`.
+    reachability: ScopedVisibilityConstraintId,
+
+    /// Tracks whether or not a given use of a symbol is reachable from the start of the scope.
+    reachability_by_use: IndexVec<ScopedUseId, ScopedVisibilityConstraintId>,
 
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, SymbolDeclarations>,
@@ -581,6 +646,8 @@ impl Default for UseDefMapBuilder<'_> {
             visibility_constraints: VisibilityConstraintsBuilder::default(),
             scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
             bindings_by_use: IndexVec::new(),
+            reachability: ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            reachability_by_use: IndexVec::new(),
             declarations_by_binding: FxHashMap::default(),
             bindings_by_declaration: FxHashMap::default(),
             symbol_states: IndexVec::new(),
@@ -592,6 +659,7 @@ impl Default for UseDefMapBuilder<'_> {
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn mark_unreachable(&mut self) {
         self.record_visibility_constraint(ScopedVisibilityConstraintId::ALWAYS_FALSE);
+        self.reachability = ScopedVisibilityConstraintId::ALWAYS_FALSE;
     }
 
     pub(super) fn add_symbol(&mut self, symbol: ScopedSymbolId) {
@@ -671,6 +739,16 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    pub(super) fn record_reachability_constraint(
+        &mut self,
+        constraint: ScopedVisibilityConstraintId,
+    ) -> ScopedVisibilityConstraintId {
+        self.reachability = self
+            .visibility_constraints
+            .add_and_constraint(self.reachability, constraint);
+        self.reachability
+    }
+
     pub(super) fn record_declaration(
         &mut self,
         symbol: ScopedSymbolId,
@@ -703,6 +781,9 @@ impl<'db> UseDefMapBuilder<'db> {
             .bindings_by_use
             .push(self.symbol_states[symbol].bindings().clone());
         debug_assert_eq!(use_id, new_use);
+
+        let new_use = self.reachability_by_use.push(self.reachability);
+        debug_assert_eq!(use_id, new_use);
     }
 
     pub(super) fn snapshot_eager_bindings(
@@ -718,6 +799,7 @@ impl<'db> UseDefMapBuilder<'db> {
         FlowSnapshot {
             symbol_states: self.symbol_states.clone(),
             scope_start_visibility: self.scope_start_visibility,
+            reachability: self.reachability,
         }
     }
 
@@ -732,6 +814,7 @@ impl<'db> UseDefMapBuilder<'db> {
         // Restore the current visible-definitions state to the given snapshot.
         self.symbol_states = snapshot.symbol_states;
         self.scope_start_visibility = snapshot.scope_start_visibility;
+        self.reachability = snapshot.reachability;
 
         // If the snapshot we are restoring is missing some symbols we've recorded since, we need
         // to fill them in so the symbol IDs continue to line up. Since they don't exist in the
@@ -787,6 +870,10 @@ impl<'db> UseDefMapBuilder<'db> {
         self.scope_start_visibility = self
             .visibility_constraints
             .add_or_constraint(self.scope_start_visibility, snapshot.scope_start_visibility);
+
+        self.reachability = self
+            .visibility_constraints
+            .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
@@ -803,6 +890,7 @@ impl<'db> UseDefMapBuilder<'db> {
             narrowing_constraints: self.narrowing_constraints.build(),
             visibility_constraints: self.visibility_constraints.build(),
             bindings_by_use: self.bindings_by_use,
+            reachability_by_use: self.reachability_by_use,
             public_symbols: self.symbol_states,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
