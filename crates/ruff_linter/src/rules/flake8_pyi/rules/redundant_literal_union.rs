@@ -211,7 +211,11 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
                             parenthesized: true,
                         })
                     } else {
-                        group[0].clone()
+                        group
+                            .first()
+                            .expect("should have at least one new_expr")
+                            .to_owned()
+                            .clone()
                     }),
                 });
                 new_exprs.push(new_literal_expr);
