@@ -1,18 +1,20 @@
 mod db;
 mod find_node;
 mod goto;
-
-use std::ops::{Deref, DerefMut};
+mod hover;
+mod markup;
 
 pub use db::Db;
 pub use goto::goto_type_definition;
-use red_knot_python_semantic::types::{
-    ClassBase, ClassLiteralType, ClassType, FunctionType, GenericAlias, InstanceType,
-    IntersectionType, KnownInstanceType, ModuleLiteralType, Type,
-};
+pub use hover::hover;
+pub use markup::MarkupKind;
+
+use rustc_hash::FxHashSet;
+use std::ops::{Deref, DerefMut};
+
+use red_knot_python_semantic::types::{Type, TypeDefinition};
 use ruff_db::files::{File, FileRange};
-use ruff_db::source::source_text;
-use ruff_text_size::{Ranged, TextLen, TextRange};
+use ruff_text_size::{Ranged, TextRange};
 
 /// Information associated with a text range.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -54,7 +56,7 @@ where
 }
 
 /// Target to which the editor can navigate to.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NavigationTarget {
     file: File,
 
@@ -95,6 +97,17 @@ impl NavigationTargets {
         Self(smallvec::SmallVec::new())
     }
 
+    fn unique(targets: impl IntoIterator<Item = NavigationTarget>) -> Self {
+        let unique: FxHashSet<_> = targets.into_iter().collect();
+        if unique.is_empty() {
+            Self::empty()
+        } else {
+            let mut targets = unique.into_iter().collect::<Vec<_>>();
+            targets.sort_by_key(|target| (target.file, target.focus_range.start()));
+            Self(targets.into())
+        }
+    }
+
     fn iter(&self) -> std::slice::Iter<'_, NavigationTarget> {
         self.0.iter()
     }
@@ -125,7 +138,7 @@ impl<'a> IntoIterator for &'a NavigationTargets {
 
 impl FromIterator<NavigationTarget> for NavigationTargets {
     fn from_iter<T: IntoIterator<Item = NavigationTarget>>(iter: T) -> Self {
-        Self(iter.into_iter().collect())
+        Self::unique(iter)
     }
 }
 
@@ -136,159 +149,146 @@ pub trait HasNavigationTargets {
 impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         match self {
-            Type::BoundMethod(method) => method.function(db).navigation_targets(db),
-            Type::SpecializedCallable(specialized) => {
-                specialized.callable_type(db).navigation_targets(db)
-            }
-            Type::FunctionLiteral(function) => function.navigation_targets(db),
-            Type::ModuleLiteral(module) => module.navigation_targets(db),
             Type::Union(union) => union
                 .iter(db.upcast())
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
-            Type::ClassLiteral(class) => class.navigation_targets(db),
-            Type::GenericAlias(alias) => alias.navigation_targets(db),
-            Type::Instance(instance) => instance.navigation_targets(db),
-            Type::KnownInstance(instance) => instance.navigation_targets(db),
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                ClassBase::Class(class) => class.navigation_targets(db),
-                ClassBase::Dynamic(_) => NavigationTargets::empty(),
+
+            Type::Intersection(intersection) => {
+                // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
+                let mut targets = intersection
+                    .iter_positive(db.upcast())
+                    .filter(|ty| !ty.is_unknown());
+
+                let Some(first) = targets.next() else {
+                    return NavigationTargets::empty();
+                };
+
+                match targets.next() {
+                    Some(_) => {
+                        // If there are multiple types in the intersection, we can't navigate to a single one
+                        // because the type is the intersection of all those types.
+                        NavigationTargets::empty()
+                    }
+                    None => first.navigation_targets(db),
+                }
+            }
+
+            ty => ty
+                .definition(db.upcast())
+                .map(|definition| definition.navigation_targets(db))
+                .unwrap_or_else(NavigationTargets::empty),
+        }
+    }
+}
+
+impl HasNavigationTargets for TypeDefinition<'_> {
+    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+        let full_range = self.full_range(db.upcast());
+        NavigationTargets::single(NavigationTarget {
+            file: full_range.file(),
+            focus_range: self.focus_range(db.upcast()).unwrap_or(full_range).range(),
+            full_range: full_range.range(),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::db::tests::TestDb;
+    use insta::internals::SettingsBindDropGuard;
+    use red_knot_python_semantic::{
+        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+    };
+    use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
+    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
+    use ruff_text_size::TextSize;
+
+    pub(super) fn cursor_test(source: &str) -> CursorTest {
+        let mut db = TestDb::new();
+        let cursor_offset = source.find("<CURSOR>").expect(
+            "`source`` should contain a `<CURSOR>` marker, indicating the position of the cursor.",
+        );
+
+        let mut content = source[..cursor_offset].to_string();
+        content.push_str(&source[cursor_offset + "<CURSOR>".len()..]);
+
+        db.write_file("main.py", &content)
+            .expect("write to memory file system to be successful");
+
+        let file = system_path_to_file(&db, "main.py").expect("newly written file to existing");
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersion::latest(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_roots: vec![SystemPathBuf::from("/")],
+                    custom_typeshed: None,
+                    python_path: PythonPath::KnownSitePackages(vec![]),
+                },
             },
+        )
+        .expect("Default settings to be valid");
 
-            Type::StringLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::LiteralString
-            | Type::IntLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::SliceLiteral(_)
-            | Type::MethodWrapper(_)
-            | Type::WrapperDescriptor(_)
-            | Type::PropertyInstance(_)
-            | Type::Tuple(_) => self.to_meta_type(db.upcast()).navigation_targets(db),
+        let mut insta_settings = insta::Settings::clone_current();
+        insta_settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
+        // Filter out TODO types because they are different between debug and release builds.
+        insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
 
-            Type::TypeVar(var) => {
-                let definition = var.definition(db);
-                let full_range = definition.full_range(db.upcast());
+        let insta_settings_guard = insta_settings.bind_to_scope();
 
-                NavigationTargets::single(NavigationTarget {
-                    file: full_range.file(),
-                    focus_range: definition.focus_range(db.upcast()).range(),
-                    full_range: full_range.range(),
-                })
-            }
-
-            Type::Intersection(intersection) => intersection.navigation_targets(db),
-
-            Type::Dynamic(_)
-            | Type::Never
-            | Type::Callable(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => NavigationTargets::empty(),
-        }
-    }
-}
-
-impl HasNavigationTargets for FunctionType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let function_range = self.focus_range(db.upcast());
-        NavigationTargets::single(NavigationTarget {
-            file: function_range.file(),
-            focus_range: function_range.range(),
-            full_range: self.full_range(db.upcast()).range(),
-        })
-    }
-}
-
-impl HasNavigationTargets for ClassLiteralType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let class_range = self.focus_range(db.upcast());
-        NavigationTargets::single(NavigationTarget {
-            file: class_range.file(),
-            focus_range: class_range.range(),
-            full_range: self.full_range(db.upcast()).range(),
-        })
-    }
-}
-
-impl HasNavigationTargets for GenericAlias<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let class_range = self.focus_range(db.upcast());
-        NavigationTargets::single(NavigationTarget {
-            file: class_range.file(),
-            focus_range: class_range.range(),
-            full_range: self.full_range(db.upcast()).range(),
-        })
-    }
-}
-
-impl HasNavigationTargets for ClassType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let class_range = self.focus_range(db.upcast());
-        NavigationTargets::single(NavigationTarget {
-            file: class_range.file(),
-            focus_range: class_range.range(),
-            full_range: self.full_range(db.upcast()).range(),
-        })
-    }
-}
-
-impl HasNavigationTargets for InstanceType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        self.class.navigation_targets(db)
-    }
-}
-
-impl HasNavigationTargets for ModuleLiteralType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        let file = self.module(db).file();
-        let source = source_text(db.upcast(), file);
-
-        NavigationTargets::single(NavigationTarget {
+        CursorTest {
+            db,
+            cursor_offset: TextSize::try_from(cursor_offset)
+                .expect("source to be smaller than 4GB"),
             file,
-            focus_range: TextRange::default(),
-            full_range: TextRange::up_to(source.text_len()),
-        })
-    }
-}
-
-impl HasNavigationTargets for KnownInstanceType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        match self {
-            KnownInstanceType::TypeVar(var) => {
-                let definition = var.definition(db);
-                let full_range = definition.full_range(db.upcast());
-
-                NavigationTargets::single(NavigationTarget {
-                    file: full_range.file(),
-                    focus_range: definition.focus_range(db.upcast()).range(),
-                    full_range: full_range.range(),
-                })
-            }
-
-            // TODO: Track the definition of `KnownInstance` and navigate to their definition.
-            _ => NavigationTargets::empty(),
+            _insta_settings_guard: insta_settings_guard,
         }
     }
-}
 
-impl HasNavigationTargets for IntersectionType<'_> {
-    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        // Only consider the positive elements because the negative elements are mainly from narrowing constraints.
-        let mut targets = self
-            .iter_positive(db.upcast())
-            .filter(|ty| !ty.is_unknown());
+    pub(super) struct CursorTest {
+        pub(super) db: TestDb,
+        pub(super) cursor_offset: TextSize,
+        pub(super) file: File,
+        _insta_settings_guard: SettingsBindDropGuard,
+    }
 
-        let Some(first) = targets.next() else {
-            return NavigationTargets::empty();
-        };
-
-        match targets.next() {
-            Some(_) => {
-                // If there are multiple types in the intersection, we can't navigate to a single one
-                // because the type is the intersection of all those types.
-                NavigationTargets::empty()
-            }
-            None => first.navigation_targets(db),
+    impl CursorTest {
+        pub(super) fn write_file(
+            &mut self,
+            path: impl AsRef<SystemPath>,
+            content: &str,
+        ) -> std::io::Result<()> {
+            self.db.write_file(path, content)
         }
+
+        pub(super) fn render_diagnostics<I, D>(&self, diagnostics: I) -> String
+        where
+            I: IntoIterator<Item = D>,
+            D: IntoDiagnostic,
+        {
+            use std::fmt::Write;
+
+            let mut buf = String::new();
+
+            let config = DisplayDiagnosticConfig::default()
+                .color(false)
+                .format(DiagnosticFormat::Full);
+            for diagnostic in diagnostics {
+                let diag = diagnostic.into_diagnostic();
+                write!(buf, "{}", diag.display(&self.db, &config)).unwrap();
+            }
+
+            buf
+        }
+    }
+
+    pub(super) trait IntoDiagnostic {
+        fn into_diagnostic(self) -> Diagnostic;
     }
 }

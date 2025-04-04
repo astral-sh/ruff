@@ -1,5 +1,12 @@
 use std::sync::{LazyLock, Mutex};
 
+use super::{
+    class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
+    KnownFunction, Mro, MroError, MroIterator, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeQualifiers, TypeVarInstance,
+};
+use crate::semantic_index::definition::Definition;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
@@ -18,28 +25,9 @@ use crate::{
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::File;
 use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
-
-use super::{
-    class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
-    KnownFunction, Mro, MroError, MroIterator, SubclassOfType, Truthiness, Type, TypeAliasType,
-    TypeQualifiers, TypeVarInstance,
-};
-use crate::types::generics::{GenericContext, Specialization};
-
-/// Representation of a class definition statement in the AST. This does not in itself represent a
-/// type, but is used as the inner data for several structs that *do* represent types.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update)]
-pub struct Class<'db> {
-    /// Name of the class at definition
-    pub(crate) name: ast::name::Name,
-
-    pub(crate) body_scope: ScopeId<'db>,
-
-    pub(crate) known: Option<KnownClass>,
-}
 
 fn explicit_bases_cycle_recover<'db>(
     _db: &'db dyn Db,
@@ -96,6 +84,18 @@ fn inheritance_cycle_initial<'db>(
     None
 }
 
+/// Representation of a class definition statement in the AST. This does not in itself represent a
+/// type, but is used as the inner data for several structs that *do* represent types.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update)]
+pub struct Class<'db> {
+    /// Name of the class at definition
+    pub(crate) name: ast::name::Name,
+
+    pub(crate) body_scope: ScopeId<'db>,
+
+    pub(crate) known: Option<KnownClass>,
+}
+
 impl<'db> Class<'db> {
     fn file(&self, db: &dyn Db) -> File {
         self.body_scope.file(db)
@@ -108,6 +108,11 @@ impl<'db> Class<'db> {
     /// query depends on the AST of another file (bad!).
     fn node(&self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
         self.body_scope.node(db).expect_class()
+    }
+
+    fn definition(&self, db: &'db dyn Db) -> Definition<'db> {
+        let index = semantic_index(db, self.body_scope.file(db));
+        index.expect_single_definition(self.body_scope.node(db).expect_class())
     }
 }
 
@@ -146,15 +151,8 @@ pub struct GenericAlias<'db> {
 }
 
 impl<'db> GenericAlias<'db> {
-    /// Returns the file range of the class's name.
-    pub fn focus_range(self, db: &dyn Db) -> FileRange {
-        let class = self.origin(db).class(db);
-        FileRange::new(class.file(db), class.node(db).name.range)
-    }
-
-    pub fn full_range(self, db: &dyn Db) -> FileRange {
-        let class = self.origin(db).class(db);
-        FileRange::new(class.file(db), class.node(db).range)
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        self.origin(db).class(db).definition(db)
     }
 }
 
@@ -206,15 +204,8 @@ impl<'db> ClassType<'db> {
         self.class(db).known
     }
 
-    /// Returns the file range of the class's name.
-    pub fn focus_range(self, db: &dyn Db) -> FileRange {
-        let class = self.class(db);
-        FileRange::new(class.file(db), class.node(db).name.range)
-    }
-
-    pub fn full_range(self, db: &dyn Db) -> FileRange {
-        let class = self.class(db);
-        FileRange::new(class.file(db), class.node(db).range)
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        self.class(db).definition(db)
     }
 
     pub(crate) fn apply_specialization(
@@ -395,15 +386,8 @@ impl<'db> ClassLiteralType<'db> {
         self.class(db).body_scope
     }
 
-    /// Returns the file range of the class's name.
-    pub fn focus_range(self, db: &dyn Db) -> FileRange {
-        let class = self.class(db);
-        FileRange::new(class.file(db), class.node(db).name.range)
-    }
-
-    pub fn full_range(self, db: &dyn Db) -> FileRange {
-        let class = self.class(db);
-        FileRange::new(class.file(db), class.node(db).range)
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        self.class(db).definition(db)
     }
 
     pub(crate) fn apply_optional_specialization(
@@ -571,8 +555,7 @@ impl<'db> ClassLiteralType<'db> {
             .find_keyword("metaclass")?
             .value;
 
-        let class_definition =
-            semantic_index(db, class.file(db)).expect_single_definition(class_stmt);
+        let class_definition = class.definition(db);
 
         Some(definition_expression_type(
             db,

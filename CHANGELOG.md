@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.11.4
+
+### Preview features
+
+- \[`ruff`\] Implement `invalid-rule-code` as `RUF102` ([#17138](https://github.com/astral-sh/ruff/pull/17138))
+- [syntax-errors] Detect duplicate keys in `match` mapping patterns ([#17129](https://github.com/astral-sh/ruff/pull/17129))
+- [syntax-errors] Detect duplicate attributes in `match` class patterns ([#17186](https://github.com/astral-sh/ruff/pull/17186))
+- [syntax-errors] Detect invalid syntax in annotations ([#17101](https://github.com/astral-sh/ruff/pull/17101))
+
+### Bug fixes
+
+- [syntax-errors] Fix multiple assignment error for class fields in `match` patterns ([#17184](https://github.com/astral-sh/ruff/pull/17184))
+- Don't skip visiting non-tuple slice in `typing.Annotated` subscripts ([#17201](https://github.com/astral-sh/ruff/pull/17201))
+
 ## 0.11.3
 
 ### Preview features

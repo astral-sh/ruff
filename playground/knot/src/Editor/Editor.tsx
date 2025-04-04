@@ -56,6 +56,7 @@ export default function Editor({
   const disposable = useRef<{
     typeDefinition: IDisposable;
     editorOpener: IDisposable;
+    hover: IDisposable;
   } | null>(null);
   const playgroundState = useRef<PlaygroundServerProps>({
     monaco: null,
@@ -93,6 +94,7 @@ export default function Editor({
     return () => {
       disposable.current?.typeDefinition.dispose();
       disposable.current?.editorOpener.dispose();
+      disposable.current?.hover.dispose();
     };
   }, []);
 
@@ -103,12 +105,17 @@ export default function Editor({
       const server = new PlaygroundServer(playgroundState);
       const typeDefinitionDisposable =
         instance.languages.registerTypeDefinitionProvider("python", server);
+      const hoverDisposable = instance.languages.registerHoverProvider(
+        "python",
+        server,
+      );
       const editorOpenerDisposable =
         instance.editor.registerEditorOpener(server);
 
       disposable.current = {
         typeDefinition: typeDefinitionDisposable,
         editorOpener: editorOpenerDisposable,
+        hover: hoverDisposable,
       };
 
       playgroundState.current.monaco = instance;
@@ -191,9 +198,48 @@ interface PlaygroundServerProps {
 }
 
 class PlaygroundServer
-  implements languages.TypeDefinitionProvider, editor.ICodeEditorOpener
+  implements
+    languages.TypeDefinitionProvider,
+    editor.ICodeEditorOpener,
+    languages.HoverProvider
 {
   constructor(private props: RefObject<PlaygroundServerProps>) {}
+
+  provideHover(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    context?: languages.HoverContext<languages.Hover> | undefined,
+  ): languages.ProviderResult<languages.Hover> {
+    const workspace = this.props.current.workspace;
+
+    const selectedFile = this.props.current.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.current.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const hover = workspace.hover(
+      selectedHandle,
+      new KnotPosition(position.lineNumber, position.column),
+    );
+
+    if (hover == null) {
+      return;
+    }
+
+    return {
+      range: knotRangeToIRange(hover.range),
+      contents: [{ value: hover.markdown, isTrusted: true }],
+    };
+  }
 
   provideTypeDefinition(
     model: editor.ITextModel,

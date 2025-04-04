@@ -475,11 +475,11 @@ impl<'db> SymbolAndQualifiers<'db> {
     ///
     /// 1. If `self` is definitely bound, return `self` without evaluating `fallback_fn()`.
     /// 2. Else, evaluate `fallback_fn()`:
-    ///    a. If `self` is definitely unbound, return the result of `fallback_fn()`.
-    ///    b. Else, if `fallback` is definitely unbound, return `self`.
-    ///    c. Else, if `self` is possibly unbound and `fallback` is definitely bound,
+    ///    1. If `self` is definitely unbound, return the result of `fallback_fn()`.
+    ///    2. Else, if `fallback` is definitely unbound, return `self`.
+    ///    3. Else, if `self` is possibly unbound and `fallback` is definitely bound,
     ///       return `Symbol(<union of self-type and fallback-type>, Boundness::Bound)`
-    ///    d. Else, if `self` is possibly unbound and `fallback` is possibly unbound,
+    ///    4. Else, if `self` is possibly unbound and `fallback` is possibly unbound,
     ///       return `Symbol(<union of self-type and fallback-type>, Boundness::PossiblyUnbound)`
     #[must_use]
     pub(crate) fn or_fall_back_to(

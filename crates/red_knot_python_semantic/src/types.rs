@@ -21,9 +21,9 @@ pub(crate) use self::infer::{
     infer_deferred_types, infer_definition_types, infer_expression_type, infer_expression_types,
     infer_scope_types,
 };
-pub use self::narrow::KnownConstraintFunction;
+pub(crate) use self::narrow::KnownConstraintFunction;
 pub(crate) use self::signatures::{CallableSignature, Signature, Signatures};
-pub use self::subclass_of::SubclassOfType;
+pub(crate) use self::subclass_of::SubclassOfType;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
@@ -33,7 +33,7 @@ use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
 use crate::types::call::{Bindings, CallArgumentTypes};
-pub use crate::types::class_base::ClassBase;
+pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::generics::Specialization;
 use crate::types::infer::infer_unpack_types;
@@ -41,8 +41,10 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{Class, GenericClass, KnownClass, NonGenericClass};
-pub use class::{ClassLiteralType, ClassType, GenericAlias, InstanceType, KnownInstanceType};
+pub(crate) use class::{
+    Class, ClassLiteralType, ClassType, GenericAlias, GenericClass, InstanceType, KnownClass,
+    KnownInstanceType, NonGenericClass,
+};
 
 mod builder;
 mod call;
@@ -62,6 +64,7 @@ mod subclass_of;
 mod type_ordering;
 mod unpacker;
 
+mod definition;
 #[cfg(test)]
 mod property_tests;
 
@@ -228,6 +231,7 @@ macro_rules! todo_type {
     };
 }
 
+pub use crate::types::definition::TypeDefinition;
 pub(crate) use todo_type;
 
 /// Represents an instance of `builtins.property`.
@@ -1121,9 +1125,13 @@ impl<'db> Type<'db> {
             // This special case is required because the left-hand side tuple might be a
             // gradual type, so we can not rely on subtyping. This allows us to assign e.g.
             // `tuple[Any, int]` to `tuple`.
-            (Type::Tuple(_), _) => KnownClass::Tuple
-                .to_instance(db)
-                .is_assignable_to(db, target),
+            (Type::Tuple(_), _)
+                if KnownClass::Tuple
+                    .to_instance(db)
+                    .is_assignable_to(db, target) =>
+            {
+                true
+            }
 
             // `type[Any]` is assignable to any `type[...]` type, because `type[Any]` can
             // materialize to any `type[...]` type.
@@ -4050,6 +4058,68 @@ impl<'db> Type<'db> {
             _ => KnownClass::Str.to_instance(db),
         }
     }
+
+    /// Returns where this type is defined.
+    ///
+    /// It's the foundation for the editor's "Go to type definition" feature
+    /// where the user clicks on a value and it takes them to where the value's type is defined.
+    ///
+    /// This method returns `None` for unions and intersections because how these
+    /// should be handled, especially when some variants don't have definitions, is
+    /// specific to the call site.
+    pub fn definition(&self, db: &'db dyn Db) -> Option<TypeDefinition<'db>> {
+        match self {
+            Self::BoundMethod(method) => {
+                Some(TypeDefinition::Function(method.function(db).definition(db)))
+            }
+            Self::SpecializedCallable(specialized) => specialized.callable_type(db).definition(db),
+            Self::FunctionLiteral(function) => {
+                Some(TypeDefinition::Function(function.definition(db)))
+            }
+            Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
+            Self::ClassLiteral(class_literal) => {
+                Some(TypeDefinition::Class(class_literal.definition(db)))
+            }
+            Self::GenericAlias(alias) => Some(TypeDefinition::Class(alias.definition(db))),
+            Self::Instance(instance) => Some(TypeDefinition::Class(instance.class.definition(db))),
+            Self::KnownInstance(instance) => match instance {
+                KnownInstanceType::TypeVar(var) => {
+                    Some(TypeDefinition::TypeVar(var.definition(db)))
+                }
+                KnownInstanceType::TypeAliasType(type_alias) => {
+                    Some(TypeDefinition::TypeAlias(type_alias.definition(db)))
+                }
+                _ => None,
+            },
+
+            Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+                ClassBase::Class(class) => Some(TypeDefinition::Class(class.definition(db))),
+                ClassBase::Dynamic(_) => None,
+            },
+
+            Self::StringLiteral(_)
+            | Self::BooleanLiteral(_)
+            | Self::LiteralString
+            | Self::IntLiteral(_)
+            | Self::BytesLiteral(_)
+            | Self::SliceLiteral(_)
+            | Self::MethodWrapper(_)
+            | Self::WrapperDescriptor(_)
+            | Self::PropertyInstance(_)
+            | Self::Tuple(_) => self.to_meta_type(db).definition(db),
+
+            Self::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db))),
+
+            Self::Union(_) | Self::Intersection(_) => None,
+
+            // These types have no definition
+            Self::Dynamic(_)
+            | Self::Never
+            | Self::Callable(_)
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy => None,
+        }
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -4941,7 +5011,7 @@ pub struct FunctionType<'db> {
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
-    pub fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
+    pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.decorators(db).contains(decorator)
     }
 
@@ -4967,6 +5037,12 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        let body_scope = self.body_scope(db);
+        let index = semantic_index(db, body_scope.file(db));
+        index.expect_single_definition(body_scope.node(db).expect_function())
+    }
+
     /// Typed externally-visible signature for this function.
     ///
     /// This is the signature as seen by external callers, possibly modified by decorators and/or
@@ -4980,7 +5056,7 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
-    pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
+    pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let internal_signature = self.internal_signature(db);
 
         if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
@@ -5003,12 +5079,11 @@ impl<'db> FunctionType<'db> {
     fn internal_signature(self, db: &'db dyn Db) -> Signature<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
-        let definition =
-            semantic_index(db, scope.file(db)).expect_single_definition(function_stmt_node);
+        let definition = self.definition(db);
         Signature::from_function(db, definition, function_stmt_node)
     }
 
-    pub fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
+    pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
         self.known(db) == Some(known_function)
     }
 }
@@ -5128,7 +5203,7 @@ impl KnownFunction {
 pub struct BoundMethodType<'db> {
     /// The function that is being bound. Corresponds to the `__func__` attribute on a
     /// bound method object
-    pub function: FunctionType<'db>,
+    pub(crate) function: FunctionType<'db>,
     /// The instance on which this method has been called. Corresponds to the `__self__`
     /// attribute on a bound method object
     self_instance: Type<'db>,
@@ -5803,12 +5878,18 @@ pub struct TypeAliasType<'db> {
 
 #[salsa::tracked]
 impl<'db> TypeAliasType<'db> {
-    #[salsa::tracked]
-    pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let scope = self.rhs_scope(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
-        let definition =
-            semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node);
+
+        semantic_index(db, scope.file(db)).expect_single_definition(type_alias_stmt_node)
+    }
+
+    #[salsa::tracked]
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.rhs_scope(db);
+        let type_alias_stmt_node = scope.node(db).expect_type_alias();
+        let definition = self.definition(db);
         definition_expression_type(db, definition, &type_alias_stmt_node.value)
     }
 }
@@ -5857,7 +5938,11 @@ impl<'db> UnionType<'db> {
         Self::from_elements(db, self.elements(db).iter().map(transform_fn))
     }
 
-    pub fn filter(&self, db: &'db dyn Db, filter_fn: impl FnMut(&&Type<'db>) -> bool) -> Type<'db> {
+    pub(crate) fn filter(
+        self,
+        db: &'db dyn Db,
+        filter_fn: impl FnMut(&&Type<'db>) -> bool,
+    ) -> Type<'db> {
         Self::from_elements(db, self.elements(db).iter().filter(filter_fn))
     }
 
@@ -5952,7 +6037,7 @@ impl<'db> UnionType<'db> {
         }
     }
 
-    pub fn is_fully_static(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
         self.elements(db).iter().all(|ty| ty.is_fully_static(db))
     }
 
@@ -5960,7 +6045,7 @@ impl<'db> UnionType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         let mut new_elements: Vec<Type<'db>> = self
             .elements(db)
             .iter()
@@ -5971,7 +6056,7 @@ impl<'db> UnionType<'db> {
     }
 
     /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`
-    pub fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         /// Inlined version of [`UnionType::is_fully_static`] to avoid having to lookup
         /// `self.elements` multiple times in the Salsa db in this single method.
         #[inline]
@@ -6009,7 +6094,7 @@ impl<'db> UnionType<'db> {
 
     /// Return `true` if `self` has exactly the same set of possible static materializations as `other`
     /// (if `self` represents the same set of possible sets of possible runtime objects as `other`)
-    pub fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         if self == other {
             return true;
         }
@@ -6062,7 +6147,7 @@ impl<'db> IntersectionType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         fn normalized_set<'db>(
             db: &'db dyn Db,
             elements: &FxOrderSet<Type<'db>>,
@@ -6081,13 +6166,13 @@ impl<'db> IntersectionType<'db> {
         )
     }
 
-    pub fn is_fully_static(self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_fully_static(self, db: &'db dyn Db) -> bool {
         self.positive(db).iter().all(|ty| ty.is_fully_static(db))
             && self.negative(db).iter().all(|ty| ty.is_fully_static(db))
     }
 
     /// Return `true` if `self` represents exactly the same set of possible runtime objects as `other`
-    pub fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         /// Inlined version of [`IntersectionType::is_fully_static`] to avoid having to lookup
         /// `positive` and `negative` multiple times in the Salsa db in this single method.
         #[inline]
@@ -6142,7 +6227,7 @@ impl<'db> IntersectionType<'db> {
 
     /// Return `true` if `self` has exactly the same set of possible static materializations as `other`
     /// (if `self` represents the same set of possible sets of possible runtime objects as `other`)
-    pub fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         if self == other {
             return true;
         }
@@ -6284,13 +6369,13 @@ pub struct StringLiteralType<'db> {
 
 impl<'db> StringLiteralType<'db> {
     /// The length of the string, as would be returned by Python's `len()`.
-    pub fn python_len(&self, db: &'db dyn Db) -> usize {
+    pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).chars().count()
     }
 
     /// Return an iterator over each character in the string literal.
     /// as would be returned by Python's `iter()`.
-    pub fn iter_each_char(&self, db: &'db dyn Db) -> impl Iterator<Item = Self> {
+    pub(crate) fn iter_each_char(self, db: &'db dyn Db) -> impl Iterator<Item = Self> {
         self.value(db)
             .chars()
             .map(|c| StringLiteralType::new(db, c.to_string().as_str()))
@@ -6304,7 +6389,7 @@ pub struct BytesLiteralType<'db> {
 }
 
 impl<'db> BytesLiteralType<'db> {
-    pub fn python_len(&self, db: &'db dyn Db) -> usize {
+    pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).len()
     }
 }
@@ -6328,7 +6413,7 @@ pub struct TupleType<'db> {
 }
 
 impl<'db> TupleType<'db> {
-    pub fn from_elements<T: Into<Type<'db>>>(
+    pub(crate) fn from_elements<T: Into<Type<'db>>>(
         db: &'db dyn Db,
         types: impl IntoIterator<Item = T>,
     ) -> Type<'db> {
@@ -6349,7 +6434,7 @@ impl<'db> TupleType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     #[must_use]
-    pub fn normalized(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         let elements: Box<[Type<'db>]> = self
             .elements(db)
             .iter()
@@ -6358,7 +6443,7 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, elements)
     }
 
-    pub fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         let self_elements = self.elements(db);
         let other_elements = other.elements(db);
         self_elements.len() == other_elements.len()
@@ -6368,7 +6453,7 @@ impl<'db> TupleType<'db> {
                 .all(|(self_ty, other_ty)| self_ty.is_equivalent_to(db, *other_ty))
     }
 
-    pub fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         let self_elements = self.elements(db);
         let other_elements = other.elements(db);
         self_elements.len() == other_elements.len()
@@ -6583,16 +6668,11 @@ pub(crate) mod tests {
                 | KnownFunction::IsGradualEquivalentTo => KnownModule::KnotExtensions,
             };
 
-            let function_body_scope = known_module_symbol(&db, module, function_name)
+            let function_definition = known_module_symbol(&db, module, function_name)
                 .symbol
                 .expect_type()
                 .expect_function_literal()
-                .body_scope(&db);
-
-            let function_node = function_body_scope.node(&db).expect_function();
-
-            let function_definition = semantic_index(&db, function_body_scope.file(&db))
-                .expect_single_definition(function_node);
+                .definition(&db);
 
             assert_eq!(
                 KnownFunction::try_from_definition_and_name(&db, function_definition, function_name),

@@ -52,17 +52,17 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return the inner [`ClassBase`] value wrapped by this `SubclassOfType`.
-    pub const fn subclass_of(self) -> ClassBase<'db> {
+    pub(crate) const fn subclass_of(self) -> ClassBase<'db> {
         self.subclass_of
     }
 
-    pub const fn is_dynamic(self) -> bool {
+    pub(crate) const fn is_dynamic(self) -> bool {
         // Unpack `self` so that we're forced to update this method if any more fields are added in the future.
         let Self { subclass_of } = self;
         subclass_of.is_dynamic()
     }
 
-    pub const fn is_fully_static(self) -> bool {
+    pub(crate) const fn is_fully_static(self) -> bool {
         !self.is_dynamic()
     }
 

@@ -12,7 +12,7 @@ use itertools::Either;
 /// non-specialized generic class in any type expression (including the list of base classes), we
 /// automatically construct the default specialization for that class.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
-pub enum ClassBase<'db> {
+pub(crate) enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(ClassType<'db>),
 }
@@ -22,7 +22,7 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Any)
     }
 
-    pub const fn unknown() -> Self {
+    pub(crate) const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
 
