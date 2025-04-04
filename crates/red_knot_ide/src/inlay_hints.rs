@@ -33,7 +33,7 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
 pub fn get_inlay_hints(db: &dyn Db, file: File) -> Vec<RangedValue<InlayHintContent>> {
     let types = get_types(db.upcast(), file);
 
-    let source = source_text(db, file);
+    let source = source_text(db.upcast(), file);
 
     let source_len = source.len();
 
