@@ -14,6 +14,7 @@ use smallvec::{smallvec, SmallVec};
 
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
+use crate::types::generics::Specialization;
 use crate::types::todo_type;
 use crate::Db;
 use ruff_python_ast::{self as ast, name::Name};
@@ -61,6 +62,25 @@ impl<'db> Signatures<'db> {
         assert!(!elements.is_empty());
         Self {
             callable_type: signature_type,
+            signature_type,
+            elements,
+        }
+    }
+
+    pub(crate) fn apply_specialization(
+        &self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        let callable_type = self.callable_type.apply_specialization(db, specialization);
+        let signature_type = self.signature_type.apply_specialization(db, specialization);
+        let elements = self
+            .elements
+            .iter()
+            .map(|callable| callable.apply_specialization(db, specialization))
+            .collect();
+        Self {
+            callable_type,
             signature_type,
             elements,
         }
@@ -183,6 +203,26 @@ impl<'db> CallableSignature<'db> {
         self
     }
 
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let callable_type = self.callable_type.apply_specialization(db, specialization);
+        let signature_type = self.signature_type.apply_specialization(db, specialization);
+        let bound_type = self
+            .bound_type
+            .map(|ty| ty.apply_specialization(db, specialization));
+        let overloads = self
+            .overloads
+            .iter()
+            .map(|overload| overload.apply_specialization(db, specialization))
+            .collect();
+        Self {
+            callable_type,
+            signature_type,
+            dunder_call_is_possibly_unbound: self.dunder_call_is_possibly_unbound,
+            bound_type,
+            overloads,
+        }
+    }
+
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
         self.overloads.iter()
     }
@@ -257,6 +297,17 @@ impl<'db> Signature<'db> {
                 definition,
                 function_node.parameters.as_ref(),
             ),
+            return_ty,
+        }
+    }
+
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let parameters = self.parameters.apply_specialization(db, specialization);
+        let return_ty = self
+            .return_ty
+            .map(|ty| ty.apply_specialization(db, specialization));
+        Self {
+            parameters,
             return_ty,
         }
     }
@@ -445,6 +496,18 @@ impl<'db> Parameters<'db> {
         )
     }
 
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let value = self
+            .value
+            .iter()
+            .map(|param| param.apply_specialization(db, specialization))
+            .collect();
+        Self {
+            value,
+            is_gradual: self.is_gradual,
+        }
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.value.len()
     }
@@ -604,6 +667,18 @@ impl<'db> Parameter<'db> {
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
+    }
+
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let annotated_type = self
+            .annotated_type
+            .map(|ty| ty.apply_specialization(db, specialization));
+        let kind = self.kind.apply_specialization(db, specialization);
+        Self {
+            annotated_type,
+            kind,
+            form: self.form,
+        }
     }
 
     /// Strip information from the parameter so that two equivalent parameters compare equal.
@@ -790,6 +865,27 @@ pub(crate) enum ParameterKind<'db> {
         /// Parameter name.
         name: Name,
     },
+}
+
+impl<'db> ParameterKind<'db> {
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        match self {
+            Self::PositionalOnly { name, default_type } => Self::PositionalOnly {
+                name: name.clone(),
+                default_type: default_type.map(|ty| ty.apply_specialization(db, specialization)),
+            },
+            Self::PositionalOrKeyword { name, default_type } => Self::PositionalOrKeyword {
+                name: name.clone(),
+                default_type: default_type.map(|ty| ty.apply_specialization(db, specialization)),
+            },
+            Self::Variadic { name } => Self::Variadic { name: name.clone() },
+            Self::KeywordOnly { name, default_type } => Self::KeywordOnly {
+                name: name.clone(),
+                default_type: default_type.map(|ty| ty.apply_specialization(db, specialization)),
+            },
+            Self::KeywordVariadic { name } => Self::KeywordVariadic { name: name.clone() },
+        }
+    }
 }
 
 /// Whether a parameter is used as a value or a type form.

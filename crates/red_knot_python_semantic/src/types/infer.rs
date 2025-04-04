@@ -78,7 +78,7 @@ use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    todo_type, Class, ClassLiteralType, DynamicType, FunctionType, GenericClass,
+    todo_type, Class, ClassLiteralType, DynamicType, FunctionType, GenericAlias, GenericClass,
     IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
     MetaclassCandidate, NonGenericClass, Parameter, ParameterForm, Parameters, SliceLiteralType,
     SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
@@ -5673,7 +5673,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             return self.infer_explicit_class_specialization(
                 subscript,
                 value_ty,
-                generic_class.generic_context(self.db()),
+                generic_class,
                 slice,
             );
         }
@@ -5686,7 +5686,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-        generic_context: GenericContext<'db>,
+        generic_class: GenericClass<'db>,
         slice_node: &ast::Expr,
     ) -> Type<'db> {
         let mut call_argument_types = match slice_node {
@@ -5695,6 +5695,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ),
             _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
         };
+        let generic_context = generic_class.generic_context(self.db());
         let signatures = Signatures::single(CallableSignature::single(
             value_ty,
             generic_context.signature(self.db()),
@@ -5715,7 +5716,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let (_, overload) = callable
             .matching_overload()
             .expect("valid bindings should have matching overload");
-        let _specialization = generic_context.specialize(
+        let specialization = generic_context.specialize(
             self.db(),
             overload
                 .parameter_types()
@@ -5723,7 +5724,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .map(|ty| ty.unwrap_or(Type::unknown()))
                 .collect(),
         );
-        value_ty
+        Type::from(GenericAlias::new(self.db(), generic_class, specialization))
     }
 
     fn infer_subscript_expression_types(

@@ -11,7 +11,8 @@ use crate::Db;
 /// A list of formal type variables for a generic function, class, or type alias.
 #[salsa::tracked(debug)]
 pub struct GenericContext<'db> {
-    variables: Box<[TypeVarInstance<'db>]>,
+    #[return_ref]
+    pub(crate) variables: Box<[TypeVarInstance<'db>]>,
 }
 
 impl<'db> GenericContext<'db> {
@@ -96,7 +97,8 @@ impl<'db> GenericContext<'db> {
 /// An assignment of a specific type to each type variable in a generic scope.
 #[salsa::tracked(debug)]
 pub struct Specialization<'db> {
-    generic_context: GenericContext<'db>,
+    pub(crate) generic_context: GenericContext<'db>,
+    #[return_ref]
     pub(crate) types: Box<[Type<'db>]>,
 }
 
@@ -117,7 +119,7 @@ impl<'db> Specialization<'db> {
     pub(crate) fn apply_specialization(self, db: &'db dyn Db, other: Specialization<'db>) -> Self {
         let types = self
             .types(db)
-            .iter()
+            .into_iter()
             .map(|ty| ty.apply_specialization(db, other))
             .collect();
         Specialization::new(db, self.generic_context(db), types)
@@ -133,9 +135,9 @@ impl<'db> Specialization<'db> {
     pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
         self.generic_context(db)
             .variables(db)
-            .iter()
+            .into_iter()
             .zip(self.types(db))
             .find(|(var, _)| **var == typevar)
-            .map(|(_, ty)| ty)
+            .map(|(_, ty)| *ty)
     }
 }

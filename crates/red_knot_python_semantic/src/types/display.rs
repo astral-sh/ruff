@@ -6,11 +6,13 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
+use crate::types::class::{ClassType, GenericAlias, GenericClass};
 use crate::types::class_base::ClassBase;
+use crate::types::generics::Specialization;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     InstanceType, IntersectionType, KnownClass, MethodWrapperKind, StringLiteralType, Type,
-    UnionType, WrapperDescriptorKind,
+    TypeVarInstance, UnionType, WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -69,14 +71,12 @@ impl Display for DisplayRepresentation<'_> {
         match self.ty {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Instance(InstanceType { class }) => {
-                let representation = match class.known(self.db) {
-                    Some(KnownClass::NoneType) => "None",
-                    Some(KnownClass::NoDefaultType) => "NoDefault",
-                    _ => class.name(self.db),
-                };
-                f.write_str(representation)
-            }
+            Type::Instance(InstanceType { class }) => match (class, class.known(self.db)) {
+                (_, Some(KnownClass::NoneType)) => f.write_str("None"),
+                (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
+                (ClassType::NonGeneric(class), _) => f.write_str(&class.class(self.db).name),
+                (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
+            },
             Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())
@@ -84,23 +84,7 @@ impl Display for DisplayRepresentation<'_> {
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
             Type::GenericAlias(generic) => {
-                write!(
-                    f,
-                    "{origin}[",
-                    origin = generic.origin(self.db).class(self.db).name,
-                )?;
-                for (idx, ty) in generic
-                    .specialization(self.db)
-                    .types(self.db)
-                    .iter()
-                    .enumerate()
-                {
-                    if idx > 0 {
-                        f.write_str(", ")?;
-                    }
-                    write!(f, "{}", ty.display(self.db))?;
-                }
-                f.write_str("]")
+                write!(f, "{}", generic.display(self.db))
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as
@@ -197,6 +181,64 @@ impl Display for DisplayRepresentation<'_> {
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
         }
+    }
+}
+
+impl<'db> GenericAlias<'db> {
+    pub(crate) fn display(&'db self, db: &'db dyn Db) -> DisplayGenericAlias<'db> {
+        DisplayGenericAlias {
+            origin: self.origin(db),
+            types: self.specialization(db).types(db),
+            db,
+        }
+    }
+}
+
+pub(crate) struct DisplayGenericAlias<'db> {
+    origin: GenericClass<'db>,
+    types: &'db [Type<'db>],
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayGenericAlias<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{origin}[", origin = self.origin.class(self.db).name,)?;
+        for (idx, ty) in self.types.iter().enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
+            }
+            write!(f, "{}", ty.display(self.db))?;
+        }
+        f.write_str("]")
+    }
+}
+
+impl<'db> Specialization<'db> {
+    pub fn display(&'db self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+        DisplaySpecialization {
+            typevars: self.generic_context(db).variables(db),
+            types: self.types(db),
+            db,
+        }
+    }
+}
+
+pub struct DisplaySpecialization<'db> {
+    typevars: &'db [TypeVarInstance<'db>],
+    types: &'db [Type<'db>],
+    db: &'db dyn Db,
+}
+
+impl Display for DisplaySpecialization<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_char('{')?;
+        for (idx, (var, ty)) in self.typevars.into_iter().zip(self.types).enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
+            }
+            write!(f, "{} = {}", var.name(self.db), ty.display(self.db))?;
+        }
+        f.write_char('}')
     }
 }
 

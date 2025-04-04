@@ -61,8 +61,7 @@ The type parameter can be specified explicitly:
 class C[T]:
     x: T
 
-# TODO: revealed: C[int]
-reveal_type(C[int]())  # revealed: C
+reveal_type(C[int]())  # revealed: C[int]
 ```
 
 The specialization must match the generic types:
@@ -79,11 +78,8 @@ class Bounded[T: int]: ...
 class BoundedByUnion[T: int | str]: ...
 class IntSubclass(int): ...
 
-# TODO: revealed: Bounded[int]
-reveal_type(Bounded[int]())  # revealed: Bounded
-
-# TODO: revealed: Bounded[IntSubclass]
-reveal_type(Bounded[IntSubclass]())  # revealed: Bounded
+reveal_type(Bounded[int]())  # revealed: Bounded[int]
+reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
 # error: [invalid-argument-type] "Object of type `str` cannot be assigned to parameter 1 (`T`) of class `Bounded`; expected type `int`"
 reveal_type(Bounded[str]())  # revealed: Unknown
@@ -91,17 +87,10 @@ reveal_type(Bounded[str]())  # revealed: Unknown
 # error:  [invalid-argument-type] "Object of type `int | str` cannot be assigned to parameter 1 (`T`) of class `Bounded`; expected type `int`"
 reveal_type(Bounded[int | str]())  # revealed: Unknown
 
-# TODO: revealed: BoundedByUnion[int]
-reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion
-
-# TODO: revealed: BoundedByUnion[IntSubclass]
-reveal_type(BoundedByUnion[IntSubclass]())  # revealed: BoundedByUnion
-
-# TODO: revealed: BoundedByUnion[str]
-reveal_type(BoundedByUnion[str]())  # revealed: BoundedByUnion
-
-# TODO: revealed: BoundedByUnion[int | str]
-reveal_type(BoundedByUnion[int | str]())  # revealed: BoundedByUnion
+reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
+reveal_type(BoundedByUnion[IntSubclass]())  # revealed: BoundedByUnion[IntSubclass]
+reveal_type(BoundedByUnion[str]())  # revealed: BoundedByUnion[str]
+reveal_type(BoundedByUnion[int | str]())  # revealed: BoundedByUnion[int | str]
 ```
 
 If the type variable is constrained, the specialized type must satisfy those constraints:
@@ -109,15 +98,13 @@ If the type variable is constrained, the specialized type must satisfy those con
 ```py
 class Constrained[T: (int, str)]: ...
 
-# TODO: revealed: Constrained[int]
-reveal_type(Constrained[int]())  # revealed: Constrained
+reveal_type(Constrained[int]())  # revealed: Constrained[int]
 
 # TODO: error: [invalid-argument-type]
 # TODO: revealed: Unknown
-reveal_type(Constrained[IntSubclass]())  # revealed: Constrained
+reveal_type(Constrained[IntSubclass]())  # revealed: Constrained[IntSubclass]
 
-# TODO: revealed: Constrained[str]
-reveal_type(Constrained[str]())  # revealed: Constrained
+reveal_type(Constrained[str]())  # revealed: Constrained[str]
 
 # error: [invalid-argument-type] "Object of type `object` cannot be assigned to parameter 1 (`T`) of class `Constrained`; expected type `int | str`"
 reveal_type(Constrained[object]())  # revealed: Unknown
@@ -133,14 +120,14 @@ class C[T]:
 
 c: C[int] = C()
 # TODO: revealed: C[int]
-reveal_type(c)  # revealed: C
+reveal_type(c)  # revealed: C[Unknown]
 ```
 
 The typevars of a fully specialized generic class should no longer be visible:
 
 ```py
 # TODO: revealed: int
-reveal_type(c.x)  # revealed: T
+reveal_type(c.x)  # revealed: Unknown
 ```
 
 If the type parameter is not specified explicitly, and there are no constraints that let us infer a
@@ -149,15 +136,13 @@ specific type, we infer the typevar's default type:
 ```py
 class D[T = int]: ...
 
-# TODO: revealed: D[int]
-reveal_type(D())  # revealed: D
+reveal_type(D())  # revealed: D[int]
 ```
 
 If a typevar does not provide a default, we use `Unknown`:
 
 ```py
-# TODO: revealed: C[Unknown]
-reveal_type(C())  # revealed: C
+reveal_type(C())  # revealed: C[Unknown]
 ```
 
 If the type of a constructor parameter is a class typevar, we can use that to infer the type
@@ -168,7 +153,7 @@ class E[T]:
     def __init__(self, x: T) -> None: ...
 
 # TODO: revealed: E[int] or E[Literal[1]]
-reveal_type(E(1))  # revealed: E
+reveal_type(E(1))  # revealed: E[Unknown]
 ```
 
 The types inferred from a type context and from a constructor parameter must be consistent with each
@@ -190,8 +175,7 @@ class Base[T]:
 
 class Sub[U](Base[U]): ...
 
-# TODO: revealed: int | None
-reveal_type(Base[int].x)  # revealed: T | None
+reveal_type(Base[int].x)  # revealed: int | None
 # TODO: revealed: int | None
 reveal_type(Sub[int].x)  # revealed: T | None
 ```

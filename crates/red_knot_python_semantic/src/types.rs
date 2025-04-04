@@ -2926,6 +2926,11 @@ impl<'db> Type<'db> {
                 Signatures::single(signature)
             }
 
+            Type::SpecializedCallable(specialized) => specialized
+                .callable_type(db)
+                .signatures(db)
+                .apply_specialization(db, specialized.specialization(db)),
+
             Type::MethodWrapper(
                 MethodWrapperKind::FunctionTypeDunderGet(_)
                 | MethodWrapperKind::PropertyDunderGet(_),
@@ -3328,6 +3333,21 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
             },
+
+            Type::GenericAlias(_) => {
+                // TODO annotated return type on `__new__` or metaclass `__call__`
+                // TODO check call vs signatures of `__new__` and/or `__init__`
+                eprintln!(
+                    "==> instantiate generic alias {} to {}",
+                    self.display(db),
+                    self.to_instance(db).unwrap_or(Type::unknown()).display(db)
+                );
+                let signature = CallableSignature::single(
+                    self,
+                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                );
+                Signatures::single(signature)
+            }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).signatures(db),
