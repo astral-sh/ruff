@@ -1,4 +1,4 @@
-# ruff: noqa: F841, E501 -- used followed by unused code
+# flake8: noqa: F841, E501 -- used followed by unused code
 # ruff: noqa: E701, F541 -- unused followed by used code
 
 
