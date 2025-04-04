@@ -116,8 +116,9 @@ impl ModulePath {
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
                 let absolute_path = search_path.join(relative_path);
+
                 system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.py")).is_ok()
-                    || system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.py"))
+                    || system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.pyi"))
                         .is_ok()
             }
             SearchPathInner::StandardLibraryCustom(search_path) => {
