@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt;
 use std::iter::FusedIterator;
 use std::str::Split;
 
@@ -611,11 +612,17 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
                     // stubs package doesn't exist, continue with the regular package
                 }
                 Err(PackageKind::Regular) => {
+                    tracing::trace!(
+                        "Stub-package in `{search_path} doesn't contain module: `{name}`"
+                    );
                     // stub exists, but the module doesn't.
                     // TODO: Support partial packages.
                     return None;
                 }
                 Err(PackageKind::Namespace) => {
+                    tracing::trace!(
+                        "Stub-package in `{search_path} doesn't contain module: `{name}` but it is a namespace package, keep going."
+                    );
                     // stub exists, but the module doesn't. But this is a namespace package,
                     // keep searchig the next search path for a stub package with the same name.
                     continue;
@@ -625,13 +632,20 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
 
         match resolve_module_in_search_path(&resolver_state, &name, search_path) {
             Ok((file, kind)) => return Some((search_path.clone(), ResolvedModule { kind, file })),
-            Err(kind) => {
-                // For regular packages, don't search the next search path. All files of that
-                // package must be in the same location
-                if kind.is_regular_package() {
+            Err(kind) => match kind {
+                PackageKind::Root => {}
+                PackageKind::Regular => {
+                    // For regular packages, don't search the next search path. All files of that
+                    // package must be in the same location
+                    tracing::trace!("Package in `{search_path} doesn't contain module: `{name}`");
                     return None;
                 }
-            }
+                PackageKind::Namespace => {
+                    tracing::trace!(
+                        "Package in `{search_path} doesn't contain module: `{name}` but it is a namespace package, keep going."
+                    );
+                }
+            },
         }
     }
 
@@ -787,12 +801,6 @@ enum PackageKind {
     Namespace,
 }
 
-impl PackageKind {
-    const fn is_regular_package(self) -> bool {
-        matches!(self, PackageKind::Regular)
-    }
-}
-
 pub(super) struct ResolverContext<'db> {
     pub(super) db: &'db dyn Db,
     pub(super) python_version: PythonVersion,
@@ -827,6 +835,12 @@ impl RelaxedModuleName {
         } else {
             Self(format_compact!("{package}-stubs", package = self.0))
         }
+    }
+}
+
+impl fmt::Display for RelaxedModuleName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 

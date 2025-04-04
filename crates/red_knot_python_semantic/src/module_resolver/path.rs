@@ -633,6 +633,19 @@ impl PartialEq<SearchPath> for VendoredPathBuf {
     }
 }
 
+impl fmt::Display for SearchPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &*self.0 {
+            SearchPathInner::Extra(system_path_buf)
+            | SearchPathInner::FirstParty(system_path_buf)
+            | SearchPathInner::SitePackages(system_path_buf)
+            | SearchPathInner::Editable(system_path_buf)
+            | SearchPathInner::StandardLibraryCustom(system_path_buf) => system_path_buf.fmt(f),
+            SearchPathInner::StandardLibraryVendored(vendored_path_buf) => vendored_path_buf.fmt(f),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ruff_db::Db;
