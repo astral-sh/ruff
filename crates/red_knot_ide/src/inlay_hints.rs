@@ -17,8 +17,31 @@ impl<'db> InlayHintContent<'db> {
     pub(crate) fn maybe_from_type(ty: Type<'db>) -> Option<Self> {
         // TODO: Create proper filtering
         match ty {
-            Type::ModuleLiteral(_) => None,
-            _ => Some(Self::Type(ty)),
+            Type::ModuleLiteral(_)
+            | Type::Dynamic(_)
+            | Type::Never
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::MethodWrapper(_)
+            | Type::WrapperDescriptor(_)
+            | Type::Callable(_)
+            | Type::ClassLiteral(_)
+            | Type::PropertyInstance(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::TypeVar(_) => None,
+            Type::IntLiteral(_)
+            | Type::SubclassOf(_)
+            | Type::KnownInstance(_)
+            | Type::Union(_)
+            | Type::Intersection(_)
+            | Type::Instance(_)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::LiteralString
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_)
+            | Type::Tuple(_) => Some(InlayHintContent::Type(ty)),
         }
     }
 }
@@ -37,13 +60,13 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
 }
 
 pub fn get_inlay_hints(db: &dyn Db, file: File) -> Vec<RangedValue<InlayHintContent>> {
-    let types = get_types(db, file);
+    let types = get_types(db.upcast(), file);
 
     let hints = types
         .iter()
         .filter_map(|(definition, type_and_qualifiers)| {
             InlayHintContent::maybe_from_type(*type_and_qualifiers).map(|hint| RangedValue {
-                range: definition.focus_range(db),
+                range: definition.focus_range(db.upcast()),
                 value: hint,
             })
         });
