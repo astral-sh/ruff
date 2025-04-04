@@ -232,7 +232,7 @@ pub(crate) fn check_noqa(
         && !exemption.enumerates(Rule::InvalidRuleCode)
     {
         ruff::rules::invalid_noqa_code(diagnostics, &noqa_directives, locator, &settings.external);
-    };
+    }
 
     ignored_diagnostics.sort_unstable();
     ignored_diagnostics
