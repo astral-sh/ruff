@@ -157,24 +157,4 @@ fn remove_invalid_noqa(codes: &Codes, invalid_code: &Code, locator: &Locator) ->
         .unwrap_or(invalid_code.end());
 
     Edit::range_deletion(TextRange::new(start, end))
-
-    // dbg!(locator.slice(invalid_code.range()));
-    //
-    // let noqa_idx = original_text.find(noqa_slice)?;
-    // let prefix_end = noqa_idx + noqa_slice.len();
-    // let (noqa, codes_part) = original_text.split_at(prefix_end);
-    //
-    // // Preserve the whitespace between `noqa:` and the first code
-    // let (after_noqa_whitespace, _codes) = codes_part
-    //     .split_once(|c: char| !c.is_whitespace())
-    //     .unwrap_or_default();
-    //
-    // let codes_to_keep = codes
-    //     .iter()
-    //     .filter(|code| code.range() != invalid_code.range())
-    //     .map(Code::as_str)
-    //     .collect::<Vec<_>>()
-    //     .join(", ");
-    //
-    // Some(format!("{noqa}{after_noqa_whitespace}{codes_to_keep}",))
 }
