@@ -134,7 +134,6 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
 
     let mut diagnostics = Vec::new();
     let mut non_redundant_literal_types = Vec::new();
-    let mut redundant_literal_types = Vec::new();
 
     for typing_literal_expr in typing_literal_exprs {
         let Some(literal_type) = match_literal_type(typing_literal_expr) else {
@@ -142,7 +141,6 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         };
 
         if builtin_types_in_union.contains(&literal_type) {
-            redundant_literal_types.push(typing_literal_expr);
             diagnostics.push(Diagnostic::new(
                 RedundantLiteralUnion {
                     literal: SourceCodeSnippet::from_str(
