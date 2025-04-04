@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:25:5: E129 Visually indented line with same indent as next logical line
+   |
+23 | #: E129 W503
+24 | if (row < 0 or self.moduleCount <= row
+25 |     or col < 0 or self.moduleCount <= col):
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E129
+26 |     raise Exception("%s,%s - %s" % (row, col, self.moduleCount))
+27 | #: E126
+   |
+
+E12.py:201:5: E129 Visually indented line with same indent as next logical line
+    |
+199 | if (a == 2
+200 |     or b == "abc def ghi"
+201 |     "jkl mno"):
+    |     ^^^^^^^^^^^ E129
+202 |     return True
+203 | #:
+    |
