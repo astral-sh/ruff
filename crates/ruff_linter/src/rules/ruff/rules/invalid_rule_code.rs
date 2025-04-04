@@ -58,89 +58,89 @@ pub(crate) fn invalid_noqa_code(
             continue;
         };
 
-        let mut invalid_code_refs = vec![];
-        let mut all_invalid = true;
+        let (invalid_codes, valid_codes): (Vec<_>, Vec<_>) = directive
+            .iter()
+            .partition(|&code| !code_is_valid(code, external));
 
-        for code in directive.iter() {
-            let code_str = code.as_str();
-            if Rule::from_code(code_str).is_ok()
-                || external.iter().any(|ext| code_str.starts_with(ext))
-            {
-                all_invalid = false;
-            } else {
-                invalid_code_refs.push(code);
-            }
-        }
-
-        if invalid_code_refs.is_empty() {
+        if invalid_codes.is_empty() {
             continue;
         }
 
-        if all_invalid {
-            handle_all_codes_invalid(diagnostics, directive);
-        } else {
-            let valid_codes = directive
-                .iter()
-                .filter_map(|code| {
-                    let code_str = code.as_str();
-                    if external.iter().any(|ext| code_str.starts_with(ext))
-                        || Rule::from_code(code_str).is_ok()
-                    {
-                        Some(code_str)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-            handle_some_codes_invalid(diagnostics, &invalid_code_refs, &valid_codes, line, locator);
+        match valid_codes.is_empty() {
+            true => {
+                let diagnostic = all_codes_invalid_diagnostic(directive, invalid_codes);
+                diagnostics.push(diagnostic);
+            }
+            false => handle_some_codes_invalid(diagnostics, &invalid_codes, line, locator),
         }
     }
 }
 
-fn handle_all_codes_invalid(diagnostics: &mut Vec<Diagnostic>, directive: &Codes<'_>) {
-    let invalid_codes = directive
-        .iter()
-        .map(crate::noqa::Code::as_str)
-        .collect::<Vec<_>>()
-        .join(", ");
+fn code_is_valid(code: &Code, external: &[String]) -> bool {
+    let code_str = code.as_str();
+    Rule::from_code(code_str).is_ok() || external.iter().any(|ext| code_str.starts_with(ext))
+}
 
+fn all_codes_invalid_diagnostic(
+    directive: &Codes<'_>,
+    invalid_codes: Vec<&Code<'_>>,
+) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
         InvalidRuleCode {
-            rule_code: invalid_codes,
+            rule_code: invalid_codes
+                .into_iter()
+                .map(Code::as_str)
+                .collect::<Vec<_>>()
+                .join(", "),
         },
         directive.range(),
     );
 
     diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(directive.range())));
-    diagnostics.push(diagnostic);
+    diagnostic
 }
 
 fn handle_some_codes_invalid(
     diagnostics: &mut Vec<Diagnostic>,
-    invalid_codes: &[&Code<'_>],
-    valid_codes: &[&str],
+    invalid_codes: &[&Code],
     line: &NoqaDirectiveLine<'_>,
     locator: &Locator,
 ) {
-    let updated_noqa = update_noqa(line, valid_codes, locator);
-    let fix = Fix::safe_edit(Edit::range_replacement(updated_noqa, line.range()));
+    let Directive::Codes(directive) = &line.directive else {
+        return;
+    };
 
-    for invalid_code in invalid_codes {
+    for &invalid_code in invalid_codes {
+        let this_invalid_str = invalid_code.as_str();
+        let codes_to_keep = directive
+            .iter()
+            .filter_map(|code| {
+                let code_str = code.as_str();
+                match code_str != this_invalid_str {
+                    true => Some(code_str),
+                    false => None,
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        let updated_noqa = update_noqa(line, &codes_to_keep, locator);
+        let fix = Fix::safe_edit(Edit::range_replacement(updated_noqa, line.range()));
+
         let mut diagnostic = Diagnostic::new(
             InvalidRuleCode {
-                rule_code: invalid_code.as_str().to_string(),
+                rule_code: this_invalid_str.to_string(),
             },
             invalid_code.range(),
         );
 
-        diagnostic.set_fix(fix.clone());
+        diagnostic.set_fix(fix);
         diagnostics.push(diagnostic);
     }
 }
 
-fn update_noqa(line: &NoqaDirectiveLine<'_>, valid_codes: &[&str], locator: &Locator) -> String {
+fn update_noqa(line: &NoqaDirectiveLine<'_>, formatted_codes: &str, locator: &Locator) -> String {
     let noqa_slice = "noqa:";
-    let formatted_codes = valid_codes.join(", ");
     let original_text = locator.slice(line.range());
 
     if let Some(noqa_idx) = original_text.find(noqa_slice) {
