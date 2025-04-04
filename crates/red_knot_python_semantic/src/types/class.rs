@@ -186,10 +186,6 @@ impl<'db> ClassType<'db> {
         self.class(db).known
     }
 
-    pub(crate) fn body_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.class(db).body_scope
-    }
-
     /// Returns the file range of the class's name.
     pub fn focus_range(self, db: &dyn Db) -> FileRange {
         let class = self.class(db);
@@ -325,191 +321,12 @@ impl<'db> ClassType<'db> {
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
-    /// Tries to find declarations/bindings of an instance attribute named `name` that are only
-    /// "implicitly" defined in a method of the class that corresponds to `class_body_scope`.
-    fn implicit_instance_attribute(
-        db: &'db dyn Db,
-        class_body_scope: ScopeId<'db>,
-        name: &str,
-    ) -> Option<Type<'db>> {
-        // If we do not see any declarations of an attribute, neither in the class body nor in
-        // any method, we build a union of `Unknown` with the inferred types of all bindings of
-        // that attribute. We include `Unknown` in that union to account for the fact that the
-        // attribute might be externally modified.
-        let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
-
-        let attribute_assignments = attribute_assignments(db, class_body_scope);
-
-        let attribute_assignments = attribute_assignments
-            .as_deref()
-            .and_then(|assignments| assignments.get(name))?;
-
-        for attribute_assignment in attribute_assignments {
-            match attribute_assignment {
-                AttributeAssignment::Annotated { annotation } => {
-                    // We found an annotated assignment of one of the following forms (using 'self' in these
-                    // examples, but we support arbitrary names for the first parameters of methods):
-                    //
-                    //     self.name: <annotation>
-                    //     self.name: <annotation> = …
-
-                    let annotation_ty = infer_expression_type(db, *annotation);
-
-                    // TODO: check if there are conflicting declarations
-                    return Some(annotation_ty);
-                }
-                AttributeAssignment::Unannotated { value } => {
-                    // We found an un-annotated attribute assignment of the form:
-                    //
-                    //     self.name = <value>
-
-                    let inferred_ty = infer_expression_type(db, *value);
-
-                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                }
-                AttributeAssignment::Iterable { iterable } => {
-                    // We found an attribute assignment like:
-                    //
-                    //     for self.name in <iterable>:
-
-                    let iterable_ty = infer_expression_type(db, *iterable);
-                    // TODO: Potential diagnostics resulting from the iterable are currently not reported.
-                    let inferred_ty = iterable_ty.iterate(db);
-
-                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                }
-                AttributeAssignment::ContextManager { context_manager } => {
-                    // We found an attribute assignment like:
-                    //
-                    //     with <context_manager> as self.name:
-
-                    let context_ty = infer_expression_type(db, *context_manager);
-                    let inferred_ty = context_ty.enter(db);
-
-                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                }
-                AttributeAssignment::Unpack {
-                    attribute_expression_id,
-                    unpack,
-                } => {
-                    // We found an unpacking assignment like:
-                    //
-                    //     .., self.name, .. = <value>
-                    //     (.., self.name, ..) = <value>
-                    //     [.., self.name, ..] = <value>
-
-                    let inferred_ty =
-                        infer_unpack_types(db, *unpack).expression_type(*attribute_expression_id);
-                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
-                }
-            }
-        }
-
-        Some(union_of_inferred_types.build())
-    }
-
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        // TODO: There are many things that are not yet implemented here:
-        // - `typing.Final`
-        // - Proper diagnostics
-
-        let body_scope = self.body_scope(db);
-        let table = symbol_table(db, body_scope);
-
-        if let Some(symbol_id) = table.symbol_id_by_name(name) {
-            let use_def = use_def_map(db, body_scope);
-
-            let declarations = use_def.public_declarations(symbol_id);
-            let declared_and_qualifiers = symbol_from_declarations(db, declarations);
-            match declared_and_qualifiers {
-                Ok(SymbolAndQualifiers {
-                    symbol: declared @ Symbol::Type(declared_ty, declaredness),
-                    qualifiers,
-                }) => {
-                    // The attribute is declared in the class body.
-
-                    let bindings = use_def.public_bindings(symbol_id);
-                    let inferred = symbol_from_bindings(db, bindings);
-                    let has_binding = !inferred.is_unbound();
-
-                    if has_binding {
-                        // The attribute is declared and bound in the class body.
-
-                        if let Some(implicit_ty) =
-                            Self::implicit_instance_attribute(db, body_scope, name)
-                        {
-                            if declaredness == Boundness::Bound {
-                                // If a symbol is definitely declared, and we see
-                                // attribute assignments in methods of the class,
-                                // we trust the declared type.
-                                declared.with_qualifiers(qualifiers)
-                            } else {
-                                Symbol::Type(
-                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
-                                    declaredness,
-                                )
-                                .with_qualifiers(qualifiers)
-                            }
-                        } else {
-                            // The symbol is declared and bound in the class body,
-                            // but we did not find any attribute assignments in
-                            // methods of the class. This means that the attribute
-                            // has a class-level default value, but it would not be
-                            // found in a `__dict__` lookup.
-
-                            Symbol::Unbound.into()
-                        }
-                    } else {
-                        // The attribute is declared but not bound in the class body.
-                        // We take this as a sign that this is intended to be a pure
-                        // instance attribute, and we trust the declared type, unless
-                        // it is possibly-undeclared. In the latter case, we also
-                        // union with the inferred type from attribute assignments.
-
-                        if declaredness == Boundness::Bound {
-                            declared.with_qualifiers(qualifiers)
-                        } else {
-                            if let Some(implicit_ty) =
-                                Self::implicit_instance_attribute(db, body_scope, name)
-                            {
-                                Symbol::Type(
-                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
-                                    declaredness,
-                                )
-                                .with_qualifiers(qualifiers)
-                            } else {
-                                declared.with_qualifiers(qualifiers)
-                            }
-                        }
-                    }
-                }
-
-                Ok(SymbolAndQualifiers {
-                    symbol: Symbol::Unbound,
-                    qualifiers: _,
-                }) => {
-                    // The attribute is not *declared* in the class body. It could still be declared/bound
-                    // in a method.
-
-                    Self::implicit_instance_attribute(db, body_scope, name)
-                        .map_or(Symbol::Unbound, Symbol::bound)
-                        .into()
-                }
-                Err((declared, _conflicting_declarations)) => {
-                    // There are conflicting declarations for this attribute in the class body.
-                    Symbol::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
-                }
-            }
-        } else {
-            // This attribute is neither declared nor bound in the class body.
-            // It could still be implicitly defined in a method.
-
-            Self::implicit_instance_attribute(db, body_scope, name)
-                .map_or(Symbol::Unbound, Symbol::bound)
-                .into()
-        }
+        self.class_literal(db)
+            .own_instance_member(db, name)
+            .map_type(|ty| self.specialize_type(db, ty))
     }
 }
 
@@ -855,7 +672,7 @@ impl<'db> ClassLiteralType<'db> {
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Unbound(TypeQualifiers::empty()));
 
-        for superclass in self.iter_mro(db) {
+        for (idx, superclass) in self.iter_mro(db).enumerate() {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
@@ -870,7 +687,15 @@ impl<'db> ClassLiteralType<'db> {
                 }
                 ClassBase::Class(class) => {
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
+                        let member = if idx == 0 {
+                            // The first element of the MRO is always the class itself. For that
+                            // class, we want to look up the member in the class literal, so that
+                            // we don't apply the default specialization.
+                            self.own_class_member(db, name)
+                        } else {
+                            class.own_class_member(db, name)
+                        };
+                        lookup_error.or_fall_back_to(db, member)
                     });
                 }
             }
@@ -930,7 +755,7 @@ impl<'db> ClassLiteralType<'db> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
 
-        for superclass in self.iter_mro(db) {
+        for (idx, superclass) in self.iter_mro(db).enumerate() {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up instance members, in order to
@@ -943,10 +768,18 @@ impl<'db> ClassLiteralType<'db> {
                     );
                 }
                 ClassBase::Class(class) => {
+                    let member = if idx == 0 {
+                        // The first element of the MRO is always the class itself. For that
+                        // class, we want to look up the member in the class literal, so that
+                        // we don't apply the default specialization.
+                        self.own_instance_member(db, name)
+                    } else {
+                        class.own_instance_member(db, name)
+                    };
                     if let member @ SymbolAndQualifiers {
                         symbol: Symbol::Type(ty, boundness),
                         qualifiers,
-                    } = class.own_instance_member(db, name)
+                    } = member
                     {
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
@@ -977,6 +810,193 @@ impl<'db> ClassLiteralType<'db> {
 
             Symbol::Type(union.build(), Boundness::PossiblyUnbound)
                 .with_qualifiers(union_qualifiers)
+        }
+    }
+
+    /// Tries to find declarations/bindings of an instance attribute named `name` that are only
+    /// "implicitly" defined in a method of the class that corresponds to `class_body_scope`.
+    fn implicit_instance_attribute(
+        db: &'db dyn Db,
+        class_body_scope: ScopeId<'db>,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        // If we do not see any declarations of an attribute, neither in the class body nor in
+        // any method, we build a union of `Unknown` with the inferred types of all bindings of
+        // that attribute. We include `Unknown` in that union to account for the fact that the
+        // attribute might be externally modified.
+        let mut union_of_inferred_types = UnionBuilder::new(db).add(Type::unknown());
+
+        let attribute_assignments = attribute_assignments(db, class_body_scope);
+
+        let attribute_assignments = attribute_assignments
+            .as_deref()
+            .and_then(|assignments| assignments.get(name))?;
+
+        for attribute_assignment in attribute_assignments {
+            match attribute_assignment {
+                AttributeAssignment::Annotated { annotation } => {
+                    // We found an annotated assignment of one of the following forms (using 'self' in these
+                    // examples, but we support arbitrary names for the first parameters of methods):
+                    //
+                    //     self.name: <annotation>
+                    //     self.name: <annotation> = …
+
+                    let annotation_ty = infer_expression_type(db, *annotation);
+
+                    // TODO: check if there are conflicting declarations
+                    return Some(annotation_ty);
+                }
+                AttributeAssignment::Unannotated { value } => {
+                    // We found an un-annotated attribute assignment of the form:
+                    //
+                    //     self.name = <value>
+
+                    let inferred_ty = infer_expression_type(db, *value);
+
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
+                AttributeAssignment::Iterable { iterable } => {
+                    // We found an attribute assignment like:
+                    //
+                    //     for self.name in <iterable>:
+
+                    let iterable_ty = infer_expression_type(db, *iterable);
+                    // TODO: Potential diagnostics resulting from the iterable are currently not reported.
+                    let inferred_ty = iterable_ty.iterate(db);
+
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
+                AttributeAssignment::ContextManager { context_manager } => {
+                    // We found an attribute assignment like:
+                    //
+                    //     with <context_manager> as self.name:
+
+                    let context_ty = infer_expression_type(db, *context_manager);
+                    let inferred_ty = context_ty.enter(db);
+
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
+                AttributeAssignment::Unpack {
+                    attribute_expression_id,
+                    unpack,
+                } => {
+                    // We found an unpacking assignment like:
+                    //
+                    //     .., self.name, .. = <value>
+                    //     (.., self.name, ..) = <value>
+                    //     [.., self.name, ..] = <value>
+
+                    let inferred_ty =
+                        infer_unpack_types(db, *unpack).expression_type(*attribute_expression_id);
+                    union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                }
+            }
+        }
+
+        Some(union_of_inferred_types.build())
+    }
+
+    /// A helper function for `instance_member` that looks up the `name` attribute only on
+    /// this class, not on its superclasses.
+    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        // TODO: There are many things that are not yet implemented here:
+        // - `typing.Final`
+        // - Proper diagnostics
+
+        let body_scope = self.body_scope(db);
+        let table = symbol_table(db, body_scope);
+
+        if let Some(symbol_id) = table.symbol_id_by_name(name) {
+            let use_def = use_def_map(db, body_scope);
+
+            let declarations = use_def.public_declarations(symbol_id);
+            let declared_and_qualifiers = symbol_from_declarations(db, declarations);
+            match declared_and_qualifiers {
+                Ok(SymbolAndQualifiers {
+                    symbol: declared @ Symbol::Type(declared_ty, declaredness),
+                    qualifiers,
+                }) => {
+                    // The attribute is declared in the class body.
+
+                    let bindings = use_def.public_bindings(symbol_id);
+                    let inferred = symbol_from_bindings(db, bindings);
+                    let has_binding = !inferred.is_unbound();
+
+                    if has_binding {
+                        // The attribute is declared and bound in the class body.
+
+                        if let Some(implicit_ty) =
+                            Self::implicit_instance_attribute(db, body_scope, name)
+                        {
+                            if declaredness == Boundness::Bound {
+                                // If a symbol is definitely declared, and we see
+                                // attribute assignments in methods of the class,
+                                // we trust the declared type.
+                                declared.with_qualifiers(qualifiers)
+                            } else {
+                                Symbol::Type(
+                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
+                                    declaredness,
+                                )
+                                .with_qualifiers(qualifiers)
+                            }
+                        } else {
+                            // The symbol is declared and bound in the class body,
+                            // but we did not find any attribute assignments in
+                            // methods of the class. This means that the attribute
+                            // has a class-level default value, but it would not be
+                            // found in a `__dict__` lookup.
+
+                            Symbol::Unbound.into()
+                        }
+                    } else {
+                        // The attribute is declared but not bound in the class body.
+                        // We take this as a sign that this is intended to be a pure
+                        // instance attribute, and we trust the declared type, unless
+                        // it is possibly-undeclared. In the latter case, we also
+                        // union with the inferred type from attribute assignments.
+
+                        if declaredness == Boundness::Bound {
+                            declared.with_qualifiers(qualifiers)
+                        } else {
+                            if let Some(implicit_ty) =
+                                Self::implicit_instance_attribute(db, body_scope, name)
+                            {
+                                Symbol::Type(
+                                    UnionType::from_elements(db, [declared_ty, implicit_ty]),
+                                    declaredness,
+                                )
+                                .with_qualifiers(qualifiers)
+                            } else {
+                                declared.with_qualifiers(qualifiers)
+                            }
+                        }
+                    }
+                }
+
+                Ok(SymbolAndQualifiers {
+                    symbol: Symbol::Unbound,
+                    qualifiers: _,
+                }) => {
+                    // The attribute is not *declared* in the class body. It could still be declared/bound
+                    // in a method.
+
+                    Self::implicit_instance_attribute(db, body_scope, name)
+                        .map_or(Symbol::Unbound, Symbol::bound)
+                        .into()
+                }
+                Err((declared, _conflicting_declarations)) => {
+                    // There are conflicting declarations for this attribute in the class body.
+                    Symbol::bound(declared.inner_type()).with_qualifiers(declared.qualifiers())
+                }
+            }
+        } else {
+            // This attribute is neither declared nor bound in the class body.
+            // It could still be implicitly defined in a method.
+
+            Self::implicit_instance_attribute(db, body_scope, name)
+                .map_or(Symbol::Unbound, Symbol::bound)
+                .into()
         }
     }
 
