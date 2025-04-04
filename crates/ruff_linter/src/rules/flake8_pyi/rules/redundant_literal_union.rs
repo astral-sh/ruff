@@ -128,6 +128,10 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
 
     traverse_union(&mut func, checker.semantic(), union);
 
+    let Some(literal_subscript) = literal_subscript else {
+        return;
+    };
+
     let mut diagnostics = Vec::new();
     let mut non_redundant_literal_types = Vec::new();
     let mut redundant_literal_types = Vec::new();
@@ -187,10 +191,6 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
 
     traverse_union(&mut func, checker.semantic(), union);
 
-    let Some(literal_subscript) = literal_subscript else {
-        return;
-    };
-
     // This generates new individual `Literal` exprs and builtins
     let mut new_exprs = Vec::new();
     for group in new_literal_expr_types {
@@ -239,7 +239,7 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
             UnionKind::TypingUnion => diagnostic.try_set_optional_fix(|| {
                 generate_typing_union_fix(checker, &new_exprs, union, applicability)
             }),
-        };
+        }
     }
 
     checker.report_diagnostics(diagnostics);
