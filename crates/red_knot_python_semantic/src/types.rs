@@ -3945,6 +3945,7 @@ impl<'db> Type<'db> {
             | Self::MethodWrapper(_)
             | Self::WrapperDescriptor(_)
             | Self::PropertyInstance(_)
+            | Self::BoundSuper(_)
             | Self::Tuple(_) => self.to_meta_type(db).definition(db),
 
             Self::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db))),
