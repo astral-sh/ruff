@@ -345,7 +345,7 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
-    
+
     #[test]
     fn invalid_rule_code_external_rules() -> Result<()> {
         let diagnostics = test_path(
