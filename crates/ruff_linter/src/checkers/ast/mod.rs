@@ -1669,7 +1669,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 }
                                 self.visit_expr_context(ctx);
                             } else {
-                                debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                if self.semantic.in_type_definition() {
+                                    // this should potentially trigger some kind of violation in the
+                                    // future, since it would indicate an invalid type expression
+                                    debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                }
+                                // even if the expression is invalid as a type expression, we should
+                                // still visit it so we don't accidentally treat variables as unused
+                                self.visit_expr(slice);
+                                self.visit_expr_context(ctx);
                             }
                         }
                         Some(typing::SubscriptKind::TypedDict) => {
