@@ -62,6 +62,7 @@ fn try_mro_cycle_recover<'db>(
     _value: &Result<Mro<'db>, MroError<'db>>,
     _count: u32,
     _self: ClassLiteralType<'db>,
+    _specialization: Option<Specialization<'db>>,
 ) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
     salsa::CycleRecoveryAction::Iterate
 }
@@ -70,8 +71,12 @@ fn try_mro_cycle_recover<'db>(
 fn try_mro_cycle_initial<'db>(
     db: &'db dyn Db,
     self_: ClassLiteralType<'db>,
+    specialization: Option<Specialization<'db>>,
 ) -> Result<Mro<'db>, MroError<'db>> {
-    Ok(Mro::from_error(db, self_.default_specialization(db)))
+    Ok(Mro::from_error(
+        db,
+        self_.apply_optional_specialization(db, specialization),
+    ))
 }
 
 #[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
@@ -178,6 +183,21 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Returns the class literal and specialization for this class. For a non-generic class, this
+    /// is the class itself. For a generic alias, this is the alias's origin.
+    pub(crate) fn class_literal(
+        self,
+        db: &'db dyn Db,
+    ) -> (ClassLiteralType<'db>, Option<Specialization<'db>>) {
+        match self {
+            Self::NonGeneric(non_generic) => (ClassLiteralType::NonGeneric(non_generic), None),
+            Self::Generic(generic) => (
+                ClassLiteralType::Generic(generic.origin(db)),
+                Some(generic.specialization(db)),
+            ),
+        }
+    }
+
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         &self.class(db).name
     }
@@ -214,13 +234,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    fn specialize_class_base(&self, db: &'db dyn Db, base: ClassBase<'db>) -> ClassBase<'db> {
-        match self {
-            Self::NonGeneric(_) => base,
-            Self::Generic(generic) => base.apply_specialization(db, generic.specialization(db)),
-        }
-    }
-
     fn specialize_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             Self::NonGeneric(_) => ty,
@@ -238,15 +251,6 @@ impl<'db> ClassType<'db> {
         self.is_known(db, KnownClass::Object)
     }
 
-    /// Returns the class literal for this class. For a non-generic class, this is the class
-    /// itself. For a generic alias, this is the alias's origin.
-    pub(crate) fn class_literal(self, db: &'db dyn Db) -> ClassLiteralType<'db> {
-        match self {
-            Self::NonGeneric(non_generic) => ClassLiteralType::NonGeneric(non_generic),
-            Self::Generic(generic) => ClassLiteralType::Generic(generic.origin(db)),
-        }
-    }
-
     /// Iterate over the [method resolution order] ("MRO") of the class.
     ///
     /// If the MRO could not be accurately resolved, this method falls back to iterating
@@ -256,14 +260,14 @@ impl<'db> ClassType<'db> {
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     pub(super) fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
-        self.class_literal(db)
-            .iter_mro(db)
-            .map(move |base| self.specialize_class_base(db, base))
+        let (class_literal, specialization) = self.class_literal(db);
+        class_literal.iter_mro(db, specialization)
     }
 
     /// Is this class final?
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
-        self.class_literal(db).is_final(db)
+        let (class_literal, _) = self.class_literal(db);
+        class_literal.is_final(db)
     }
 
     /// Return `true` if `other` is present in this class's MRO.
@@ -275,7 +279,8 @@ impl<'db> ClassType<'db> {
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        self.specialize_type(db, self.class_literal(db).metaclass(db))
+        let (class_literal, _) = self.class_literal(db);
+        self.specialize_type(db, class_literal.metaclass(db))
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
@@ -292,8 +297,9 @@ impl<'db> ClassType<'db> {
     ///
     /// TODO: Should this be made private...?
     pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        self.class_literal(db)
-            .class_member(db, name)
+        let (class_literal, specialization) = self.class_literal(db);
+        class_literal
+            .class_member(db, specialization, name)
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
@@ -304,7 +310,8 @@ impl<'db> ClassType<'db> {
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        self.class_literal(db)
+        let (class_literal, _) = self.class_literal(db);
+        class_literal
             .own_class_member(db, name)
             .map_type(|ty| self.specialize_type(db, ty))
     }
@@ -316,15 +323,17 @@ impl<'db> ClassType<'db> {
     ///
     /// The attribute might also be defined in a superclass of this class.
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        self.class_literal(db)
-            .instance_member(db, name)
+        let (class_literal, specialization) = self.class_literal(db);
+        class_literal
+            .instance_member(db, specialization, name)
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        self.class_literal(db)
+        let (class_literal, _) = self.class_literal(db);
+        class_literal
             .own_instance_member(db, name)
             .map_type(|ty| self.specialize_type(db, ty))
     }
@@ -395,6 +404,23 @@ impl<'db> ClassLiteralType<'db> {
     pub fn full_range(self, db: &dyn Db) -> FileRange {
         let class = self.class(db);
         FileRange::new(class.file(db), class.node(db).range)
+    }
+
+    pub(crate) fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> ClassType<'db> {
+        match (self, specialization) {
+            (Self::NonGeneric(non_generic), _) => ClassType::NonGeneric(non_generic),
+            (Self::Generic(generic), None) => {
+                let specialization = generic.generic_context(db).default_specialization(db);
+                ClassType::Generic(GenericAlias::new(db, generic, specialization))
+            }
+            (Self::Generic(generic), Some(specialization)) => {
+                ClassType::Generic(GenericAlias::new(db, generic, specialization))
+            }
+        }
     }
 
     /// Returns the default specialization of this class. For non-generic classes, the class is
@@ -492,10 +518,14 @@ impl<'db> ClassLiteralType<'db> {
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     #[salsa::tracked(return_ref, cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial)]
-    pub(super) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, MroError<'db>> {
+    pub(super) fn try_mro(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Result<Mro<'db>, MroError<'db>> {
         let class = self.class(db);
         tracing::trace!("ClassLiteralType::try_mro: {}", class.name);
-        Mro::of_class(db, self)
+        Mro::of_class(db, self, specialization)
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
@@ -506,15 +536,25 @@ impl<'db> ClassLiteralType<'db> {
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    pub(super) fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
-        MroIterator::new(db, self)
+    pub(super) fn iter_mro(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> impl Iterator<Item = ClassBase<'db>> {
+        MroIterator::new(db, self, specialization)
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+    pub(super) fn is_subclass_of(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        other: ClassType<'db>,
+    ) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
-        self.iter_mro(db).contains(&ClassBase::Class(other))
+        self.iter_mro(db, specialization)
+            .contains(&ClassBase::Class(other))
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -575,7 +615,8 @@ impl<'db> ClassLiteralType<'db> {
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
             (metaclass, self)
         } else if let Some(base_class) = base_classes.next() {
-            (base_class.metaclass(db), base_class.class_literal(db))
+            let (base_class_literal, _) = base_class.class_literal(db);
+            (base_class.metaclass(db), base_class_literal)
         } else {
             (KnownClass::Type.to_class_literal(db), self)
         };
@@ -626,21 +667,23 @@ impl<'db> ClassLiteralType<'db> {
                 continue;
             };
             if metaclass.is_subclass_of(db, candidate.metaclass) {
+                let (base_class_literal, _) = base_class.class_literal(db);
                 candidate = MetaclassCandidate {
                     metaclass,
-                    explicit_metaclass_of: base_class.class_literal(db),
+                    explicit_metaclass_of: base_class_literal,
                 };
                 continue;
             }
             if candidate.metaclass.is_subclass_of(db, metaclass) {
                 continue;
             }
+            let (base_class_literal, _) = base_class.class_literal(db);
             return Err(MetaclassError {
                 kind: MetaclassErrorKind::Conflict {
                     candidate1: candidate,
                     candidate2: MetaclassCandidate {
                         metaclass,
-                        explicit_metaclass_of: base_class.class_literal(db),
+                        explicit_metaclass_of: base_class_literal,
                     },
                     candidate1_is_base_class: explicit_metaclass.is_none(),
                 },
@@ -655,9 +698,14 @@ impl<'db> ClassLiteralType<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     ///
     /// TODO: Should this be made private...?
-    pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(super) fn class_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> SymbolAndQualifiers<'db> {
         if name == "__mro__" {
-            let tuple_elements = self.iter_mro(db).map(Type::from);
+            let tuple_elements = self.iter_mro(db, specialization).map(Type::from);
             return Symbol::bound(TupleType::from_elements(db, tuple_elements)).into();
         }
 
@@ -672,7 +720,7 @@ impl<'db> ClassLiteralType<'db> {
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Unbound(TypeQualifiers::empty()));
 
-        for (idx, superclass) in self.iter_mro(db).enumerate() {
+        for superclass in self.iter_mro(db, specialization) {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
@@ -687,15 +735,7 @@ impl<'db> ClassLiteralType<'db> {
                 }
                 ClassBase::Class(class) => {
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        let member = if idx == 0 {
-                            // The first element of the MRO is always the class itself. For that
-                            // class, we want to look up the member in the class literal, so that
-                            // we don't apply the default specialization.
-                            self.own_class_member(db, name)
-                        } else {
-                            class.own_class_member(db, name)
-                        };
-                        lookup_error.or_fall_back_to(db, member)
+                        lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
                     });
                 }
             }
@@ -751,11 +791,16 @@ impl<'db> ClassLiteralType<'db> {
     /// defined attribute that is only present in a method (typically `__init__`).
     ///
     /// The attribute might also be defined in a superclass of this class.
-    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(super) fn instance_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> SymbolAndQualifiers<'db> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
 
-        for (idx, superclass) in self.iter_mro(db).enumerate() {
+        for superclass in self.iter_mro(db, specialization) {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up instance members, in order to
@@ -768,18 +813,10 @@ impl<'db> ClassLiteralType<'db> {
                     );
                 }
                 ClassBase::Class(class) => {
-                    let member = if idx == 0 {
-                        // The first element of the MRO is always the class itself. For that
-                        // class, we want to look up the member in the class literal, so that
-                        // we don't apply the default specialization.
-                        self.own_instance_member(db, name)
-                    } else {
-                        class.own_instance_member(db, name)
-                    };
                     if let member @ SymbolAndQualifiers {
                         symbol: Symbol::Type(ty, boundness),
                         qualifiers,
-                    } = member
+                    } = class.own_instance_member(db, name)
                     {
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
@@ -1017,7 +1054,7 @@ impl<'db> ClassLiteralType<'db> {
         ) -> bool {
             let mut result = false;
             for explicit_base_class in class.fully_static_explicit_bases(db) {
-                let explicit_base_class_literal = explicit_base_class.class_literal(db);
+                let (explicit_base_class_literal, _) = explicit_base_class.class_literal(db);
                 if !classes_on_stack.insert(explicit_base_class_literal) {
                     return true;
                 }
@@ -1419,7 +1456,7 @@ impl<'db> KnownClass {
     /// *and* `class` is a subclass of `other`.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         self.try_to_class_literal(db)
-            .is_ok_and(|class| class.is_subclass_of(db, other))
+            .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
     /// Return the module in which we should look up the definition for this class

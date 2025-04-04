@@ -67,7 +67,12 @@ impl<'db> ClassBase<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
+                    ClassBase::Class(class @ ClassType::NonGeneric(_)) => {
+                        write!(f, "<class '{}'>", class.name(self.db))
+                    }
+                    ClassBase::Class(ClassType::Generic(alias)) => {
+                        write!(f, "<class '{}'>", alias.display(self.db))
+                    }
                 }
             }
         }

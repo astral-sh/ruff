@@ -931,7 +931,7 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(class), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
-                .is_some_and(|target_class| class.is_subclass_of(db, target_class)),
+                .is_some_and(|target_class| class.is_subclass_of(db, None, target_class)),
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
@@ -1439,7 +1439,7 @@ impl<'db> Type<'db> {
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     ClassBase::Dynamic(_) => false,
-                    ClassBase::Class(class_a) => !class_b.is_subclass_of(db, class_a),
+                    ClassBase::Class(class_a) => !class_b.is_subclass_of(db, None, class_a),
                 }
             }
 
@@ -1979,7 +1979,7 @@ impl<'db> Type<'db> {
                         "__get__" | "__set__" | "__delete__",
                     ) => Some(Symbol::Unbound.into()),
 
-                    _ => Some(class.class_member(db, name)),
+                    _ => Some(class.class_member(db, None, name)),
                 }
             }
 

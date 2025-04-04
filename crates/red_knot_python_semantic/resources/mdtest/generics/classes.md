@@ -176,8 +176,7 @@ class Base[T]:
 class Sub[U](Base[U]): ...
 
 reveal_type(Base[int].x)  # revealed: int | None
-# TODO: revealed: int | None
-reveal_type(Sub[int].x)  # revealed: T | None
+reveal_type(Sub[int].x)  # revealed: int | None
 ```
 
 ## Cyclic class definition

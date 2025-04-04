@@ -4,6 +4,7 @@ use std::ops::Deref;
 use rustc_hash::FxHashSet;
 
 use crate::types::class_base::ClassBase;
+use crate::types::generics::Specialization;
 use crate::types::{ClassLiteralType, ClassType, Type};
 use crate::Db;
 
@@ -47,9 +48,11 @@ impl<'db> Mro<'db> {
     pub(super) fn of_class(
         db: &'db dyn Db,
         class: ClassLiteralType<'db>,
+        specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroError<'db>> {
-        Self::of_class_impl(db, class)
-            .map_err(|err| err.into_mro_error(db, class.default_specialization(db)))
+        Self::of_class_impl(db, class, specialization).map_err(|err| {
+            err.into_mro_error(db, class.apply_optional_specialization(db, specialization))
+        })
     }
 
     pub(super) fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
@@ -63,6 +66,7 @@ impl<'db> Mro<'db> {
     fn of_class_impl(
         db: &'db dyn Db,
         class: ClassLiteralType<'db>,
+        specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroErrorKind<'db>> {
         let class_bases = class.explicit_bases(db);
 
@@ -70,7 +74,10 @@ impl<'db> Mro<'db> {
             // We emit errors for cyclically defined classes elsewhere.
             // It's important that we don't even try to infer the MRO for a cyclically defined class,
             // or we'll end up in an infinite loop.
-            return Ok(Mro::from_error(db, class.default_specialization(db)));
+            return Ok(Mro::from_error(
+                db,
+                class.apply_optional_specialization(db, specialization),
+            ));
         }
 
         match class_bases {
@@ -78,7 +85,7 @@ impl<'db> Mro<'db> {
             // the only class in Python that has an MRO with length <2
             [] if class.is_object(db) => Ok(Self::from([
                 // object is not generic, so the default specialization should be a no-op
-                ClassBase::Class(class.default_specialization(db)),
+                ClassBase::Class(class.apply_optional_specialization(db, specialization)),
             ])),
 
             // All other classes in Python have an MRO with length >=2.
@@ -95,7 +102,7 @@ impl<'db> Mro<'db> {
             // (<class '__main__.Foo'>, <class 'object'>)
             // ```
             [] => Ok(Self::from([
-                ClassBase::Class(class.default_specialization(db)),
+                ClassBase::Class(class.apply_optional_specialization(db, specialization)),
                 ClassBase::object(db),
             ])),
 
@@ -107,11 +114,11 @@ impl<'db> Mro<'db> {
             [single_base] => ClassBase::try_from_type(db, *single_base).map_or_else(
                 || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                 |single_base| {
-                    Ok(
-                        std::iter::once(ClassBase::Class(class.default_specialization(db)))
-                            .chain(single_base.mro(db))
-                            .collect(),
-                    )
+                    Ok(std::iter::once(ClassBase::Class(
+                        class.apply_optional_specialization(db, specialization),
+                    ))
+                    .chain(single_base.mro(db))
+                    .collect())
                 },
             ),
 
@@ -136,7 +143,7 @@ impl<'db> Mro<'db> {
                 }
 
                 let mut seqs = vec![VecDeque::from([ClassBase::Class(
-                    class.default_specialization(db),
+                    class.apply_optional_specialization(db, specialization),
                 )])];
                 for base in &valid_bases {
                     seqs.push(base.mro(db).collect());
@@ -152,7 +159,8 @@ impl<'db> Mro<'db> {
                         .filter_map(|(index, base)| Some((index, base.into_class()?)))
                     {
                         if !seen_bases.insert(base) {
-                            duplicate_bases.push((index, base.class_literal(db)));
+                            let (base_class_literal, _) = base.class_literal(db);
+                            duplicate_bases.push((index, base_class_literal));
                         }
                     }
 
@@ -219,6 +227,9 @@ pub(super) struct MroIterator<'db> {
     /// The class whose MRO we're iterating over
     class: ClassLiteralType<'db>,
 
+    /// The specialization to apply to each MRO element, if any
+    specialization: Option<Specialization<'db>>,
+
     /// Whether or not we've already yielded the first element of the MRO
     first_element_yielded: bool,
 
@@ -231,10 +242,15 @@ pub(super) struct MroIterator<'db> {
 }
 
 impl<'db> MroIterator<'db> {
-    pub(super) fn new(db: &'db dyn Db, class: ClassLiteralType<'db>) -> Self {
+    pub(super) fn new(
+        db: &'db dyn Db,
+        class: ClassLiteralType<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> Self {
         Self {
             db,
             class,
+            specialization,
             first_element_yielded: false,
             subsequent_elements: None,
         }
@@ -245,7 +261,7 @@ impl<'db> MroIterator<'db> {
     fn full_mro_except_first_element(&mut self) -> impl Iterator<Item = ClassBase<'db>> + '_ {
         self.subsequent_elements
             .get_or_insert_with(|| {
-                let mut full_mro_iter = match self.class.try_mro(self.db) {
+                let mut full_mro_iter = match self.class.try_mro(self.db, self.specialization) {
                     Ok(mro) => mro.iter(),
                     Err(error) => error.fallback_mro().iter(),
                 };
@@ -262,7 +278,10 @@ impl<'db> Iterator for MroIterator<'db> {
     fn next(&mut self) -> Option<Self::Item> {
         if !self.first_element_yielded {
             self.first_element_yielded = true;
-            return Some(ClassBase::Class(self.class.default_specialization(self.db)));
+            return Some(ClassBase::Class(
+                self.class
+                    .apply_optional_specialization(self.db, self.specialization),
+            ));
         }
         self.full_mro_except_first_element().next()
     }

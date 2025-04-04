@@ -755,7 +755,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // (3) Check that the class's MRO is resolvable
-            match class.try_mro(self.db()).as_ref() {
+            match class.try_mro(self.db(), None).as_ref() {
                 Err(mro_error) => {
                     match mro_error.reason() {
                         MroErrorKind::DuplicateBases(duplicates) => {
@@ -4361,7 +4361,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 LookupError::Unbound(_) => {
                     let bound_on_instance = match value_type {
                         Type::ClassLiteral(class) => {
-                            !class.instance_member(db, attr).symbol.is_unbound()
+                            !class.instance_member(db, None, attr).symbol.is_unbound()
                         }
                         Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                             match subclass_of.subclass_of() {

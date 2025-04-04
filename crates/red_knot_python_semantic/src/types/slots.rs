@@ -66,12 +66,13 @@ pub(super) fn check_class_slots(
             continue;
         };
 
-        let solid_base = base.iter_mro(db).find_map(|current| {
+        let solid_base = base.iter_mro(db, None).find_map(|current| {
             let ClassBase::Class(current) = current else {
                 return None;
             };
 
-            match SlotsKind::from(db, current.class_literal(db)) {
+            let (class_literal, _) = current.class_literal(db);
+            match SlotsKind::from(db, class_literal) {
                 SlotsKind::NotEmpty => Some(current),
                 SlotsKind::NotSpecified | SlotsKind::Empty => None,
                 SlotsKind::Dynamic => None,
