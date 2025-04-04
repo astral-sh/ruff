@@ -1502,13 +1502,14 @@ if True:
 from module import symbol
 ```
 
-## Unsupported features
+## Unreachable code
 
-We do not support full unreachable code analysis yet. We also raise diagnostics from
-statically-known to be false branches:
+A closely related feature is the ability to detect unreachable code. For example, we do not emit a
+diagnostic here:
 
 ```py
 if False:
-    # error: [unresolved-reference]
     x
 ```
+
+See [unreachable.md](unreachable.md) for more tests on this topic.
