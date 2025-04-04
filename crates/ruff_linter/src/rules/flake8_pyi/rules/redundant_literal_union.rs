@@ -1,5 +1,6 @@
 use std::fmt;
 
+use anyhow::Result;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
@@ -225,15 +226,20 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         Applicability::Safe
     };
 
-    let fix = match union_kind {
-        UnionKind::PEP604 => generate_pep604_fix(checker, new_exprs, union, applicability),
-        UnionKind::TypingUnion => {
-            generate_typing_union_fix(checker, new_exprs, union, applicability)
-        }
-    };
-
     for diagnostic in &mut diagnostics {
-        diagnostic.set_fix(fix.clone());
+        match union_kind {
+            UnionKind::PEP604 => diagnostic.try_set_optional_fix(|| {
+                Ok(generate_pep604_fix(
+                    checker,
+                    &new_exprs,
+                    union,
+                    applicability,
+                ))
+            }),
+            UnionKind::TypingUnion => diagnostic.try_set_optional_fix(|| {
+                generate_typing_union_fix(checker, &new_exprs, union, applicability)
+            }),
+        };
     }
 
     checker.report_diagnostics(diagnostics);
@@ -241,60 +247,47 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
 
 fn generate_pep604_fix(
     checker: &Checker,
-    new_exprs: Vec<Expr>,
+    new_exprs: &[Expr],
     union: &Expr,
     applicability: Applicability,
-) -> Fix {
+) -> Option<Fix> {
     if new_exprs.len() == 1 {
-        return Fix::applicable_edit(
+        return Some(Fix::applicable_edit(
             Edit::range_replacement(checker.generator().expr(&new_exprs[0]), union.range()),
             applicability,
-        );
+        ));
     }
 
-    let new_expr = new_exprs
-        .into_iter()
-        .fold(None, |acc: Option<Expr>, right: Expr| {
-            if let Some(left) = acc {
-                Some(Expr::BinOp(ExprBinOp {
-                    left: Box::new(left),
-                    op: Operator::BitOr,
-                    right: Box::new(right),
-                    range: TextRange::default(),
-                }))
-            } else {
-                Some(right)
-            }
-        })
-        .unwrap();
+    let new_expr = new_exprs.iter().fold(None, |acc, right| {
+        if let Some(left) = acc {
+            Some(Expr::BinOp(ExprBinOp {
+                left: Box::new(left),
+                op: Operator::BitOr,
+                right: Box::new(right.clone()),
+                range: TextRange::default(),
+            }))
+        } else {
+            Some(right.clone())
+        }
+    })?;
 
-    Fix::applicable_edit(
+    Some(Fix::applicable_edit(
         Edit::range_replacement(checker.generator().expr(&new_expr), union.range()),
         applicability,
-    )
+    ))
 }
 
 fn generate_typing_union_fix(
     checker: &Checker,
-    new_exprs: Vec<Expr>,
+    new_exprs: &[Expr],
     union: &Expr,
     applicability: Applicability,
-) -> Fix {
-    if new_exprs.len() == 1 {
-        return Fix::applicable_edit(
-            Edit::range_replacement(checker.generator().expr(&new_exprs[0]), union.range()),
-            applicability,
-        );
-    }
-
-    let (import_edit, binding) = checker
-        .importer()
-        .get_or_import_symbol(
-            &ImportRequest::import_from("typing", "Union"),
-            union.range().start(),
-            checker.semantic(),
-        )
-        .expect("Error importing");
+) -> Result<Option<Fix>> {
+    let (import_edit, binding) = checker.importer().get_or_import_symbol(
+        &ImportRequest::import_from("typing", "Union"),
+        union.range().start(),
+        checker.semantic(),
+    )?;
 
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {
@@ -306,7 +299,7 @@ fn generate_typing_union_fix(
         })),
         slice: Box::new(if new_exprs.len() > 1 {
             Expr::Tuple(ast::ExprTuple {
-                elts: new_exprs,
+                elts: new_exprs.to_vec(),
                 range: TextRange::default(),
                 ctx: ExprContext::Load,
                 parenthesized: true,
@@ -317,11 +310,11 @@ fn generate_typing_union_fix(
         ctx: ExprContext::Load,
     });
 
-    Fix::applicable_edits(
+    Ok(Some(Fix::applicable_edits(
         Edit::range_replacement(checker.generator().expr(&new_expr), union.range()),
         [import_edit],
         applicability,
-    )
+    )))
 }
 
 #[derive(Debug, Clone)]
