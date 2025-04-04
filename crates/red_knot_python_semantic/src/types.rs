@@ -4755,7 +4755,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(return_ref)]
+    #[salsa::tracked(return_ref, cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
     pub fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let internal_signature = self.internal_signature(db);
 
@@ -4787,6 +4787,19 @@ impl<'db> FunctionType<'db> {
     pub fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
         self.known(db) == Some(known_function)
     }
+}
+
+fn signature_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Signature<'db>,
+    _count: u32,
+    _function: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<Signature<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn signature_cycle_initial<'db>(_db: &'db dyn Db, _function: FunctionType<'db>) -> Signature<'db> {
+    Signature::bottom()
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
