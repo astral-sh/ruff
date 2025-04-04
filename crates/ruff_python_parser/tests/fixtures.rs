@@ -490,6 +490,10 @@ impl SemanticSyntaxContext for TestContext<'_> {
         false
     }
 
+    fn future_annotations_or_stub(&self) -> bool {
+        false
+    }
+
     fn python_version(&self) -> PythonVersion {
         self.python_version
     }

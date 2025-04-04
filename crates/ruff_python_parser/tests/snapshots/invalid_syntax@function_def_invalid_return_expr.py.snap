@@ -179,13 +179,3 @@ Module(
 3 | def foo() -> yield x: ...
   |              ^^^^^^^ Syntax Error: Yield expression cannot be used here
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | def foo() -> *int: ...
-2 | def foo() -> (*int): ...
-3 | def foo() -> yield x: ...
-  |              ^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
-  |
