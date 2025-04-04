@@ -120,12 +120,22 @@ impl SemanticSyntaxChecker {
     fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef {
-                type_params: Some(type_params),
+                type_params,
                 parameters,
                 returns,
                 ..
             }) => {
                 // test_ok valid_annotation_function
+                // def f() -> (y := 3): ...
+                // def g(arg: (x := 1)): ...
+                // def outer():
+                //     def i(x: (yield 1)): ...
+                //     def k() -> (yield 1): ...
+                //     def m(x: (yield from 1)): ...
+                //     def o() -> (yield from 1): ...
+
+                // test_err invalid_annotation_function_py314
+                // # parse_options: {"target-version": "3.14"}
                 // def f() -> (y := 3): ...
                 // def g(arg: (x := 1)): ...
                 // def outer():
@@ -150,10 +160,20 @@ impl SemanticSyntaxChecker {
                 // def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
                 // def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
                 let mut visitor = InvalidExpressionVisitor {
-                    position: InvalidExpressionPosition::GenericDefinition,
+                    position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
                 };
-                visitor.visit_type_params(type_params);
+                if let Some(type_params) = type_params {
+                    visitor.visit_type_params(type_params);
+                }
+                // the __future__ annotation error takes precedence over the generic error
+                if ctx.future_annotations_or_stub() || ctx.python_version() > PythonVersion::PY313 {
+                    visitor.position = InvalidExpressionPosition::TypeAnnotation;
+                } else if type_params.is_some() {
+                    visitor.position = InvalidExpressionPosition::GenericDefinition;
+                } else {
+                    return;
+                }
                 for param in parameters
                     .iter()
                     .filter_map(ast::AnyParameterRef::annotation)
@@ -182,7 +202,7 @@ impl SemanticSyntaxChecker {
                 // class K[T: (yield 1)]: ...      # yield in TypeVar
                 // class L[T: (x := 1)]: ...       # named expr in TypeVar
                 let mut visitor = InvalidExpressionVisitor {
-                    position: InvalidExpressionPosition::TypeVarBound,
+                    position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
                 };
                 visitor.visit_type_params(type_params);
@@ -835,6 +855,7 @@ pub enum InvalidExpressionPosition {
     TypeVarDefault,
     TypeVarTupleDefault,
     ParamSpecDefault,
+    TypeAnnotation,
     GenericDefinition,
     TypeAlias,
 }
@@ -846,6 +867,7 @@ impl Display for InvalidExpressionPosition {
             InvalidExpressionPosition::TypeVarDefault => "TypeVar default",
             InvalidExpressionPosition::TypeVarTupleDefault => "TypeVarTuple default",
             InvalidExpressionPosition::ParamSpecDefault => "ParamSpec default",
+            InvalidExpressionPosition::TypeAnnotation => "type annotation",
             InvalidExpressionPosition::GenericDefinition => "generic definition",
             InvalidExpressionPosition::TypeAlias => "type alias",
         })
@@ -1129,6 +1151,9 @@ where
 pub trait SemanticSyntaxContext {
     /// Returns `true` if a module's docstring boundary has been passed.
     fn seen_docstring_boundary(&self) -> bool;
+
+    /// Returns `true` if `__future__`-style type annotations are enabled.
+    fn future_annotations_or_stub(&self) -> bool;
 
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
