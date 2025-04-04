@@ -3,9 +3,9 @@ use crate::registry::Rule;
 use crate::Locator;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::noqa::{Codes, NoqaDirectiveLine, NoqaDirectives};
+use crate::noqa::{Codes, NoqaDirectives};
 
 /// ## What it does
 /// Checks for `noqa` codes that are invalid.
@@ -28,8 +28,8 @@ use crate::noqa::{Codes, NoqaDirectiveLine, NoqaDirectives};
 /// import os  # noqa: E402
 /// ```
 ///
-/// ## References
-/// - [Ruff external codes](https://docs.astral.sh/ruff/settings/#lint_external)
+/// ## Options
+/// - `lint.external`
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidRuleCode {
     pub(crate) rule_code: String,
@@ -58,19 +58,22 @@ pub(crate) fn invalid_noqa_code(
             continue;
         };
 
-        let (invalid_codes, valid_codes): (Vec<_>, Vec<_>) = directive
-            .iter()
-            .partition(|&code| !code_is_valid(code, external));
+        let all_valid = directive.iter().all(|code| code_is_valid(code, external));
 
-        if invalid_codes.is_empty() {
+        if all_valid {
             continue;
         }
 
+        let (valid_codes, invalid_codes): (Vec<_>, Vec<_>) = directive
+            .iter()
+            .partition(|&code| code_is_valid(code, external));
+
         if valid_codes.is_empty() {
-            let diagnostic = all_codes_invalid_diagnostic(directive, invalid_codes);
-            diagnostics.push(diagnostic);
+            diagnostics.push(all_codes_invalid_diagnostic(directive, invalid_codes));
         } else {
-            handle_some_codes_invalid(diagnostics, &invalid_codes, line, locator);
+            diagnostics.extend(invalid_codes.into_iter().map(|invalid_code| {
+                some_codes_are_invalid_diagnostic(directive, invalid_code, locator)
+            }));
         }
     }
 }
@@ -84,7 +87,7 @@ fn all_codes_invalid_diagnostic(
     directive: &Codes<'_>,
     invalid_codes: Vec<&Code<'_>>,
 ) -> Diagnostic {
-    let mut diagnostic = Diagnostic::new(
+    Diagnostic::new(
         InvalidRuleCode {
             rule_code: invalid_codes
                 .into_iter()
@@ -93,69 +96,85 @@ fn all_codes_invalid_diagnostic(
                 .join(", "),
         },
         directive.range(),
-    );
-
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(directive.range())));
-    diagnostic
+    )
+    .with_fix(Fix::safe_edit(Edit::range_deletion(directive.range())))
 }
 
-fn handle_some_codes_invalid(
-    diagnostics: &mut Vec<Diagnostic>,
-    invalid_codes: &[&Code],
-    line: &NoqaDirectiveLine<'_>,
+fn some_codes_are_invalid_diagnostic(
+    codes: &Codes,
+    invalid_code: &Code,
     locator: &Locator,
-) {
-    let Directive::Codes(directive) = &line.directive else {
-        return;
-    };
-
-    for &invalid_code in invalid_codes {
-        let this_invalid_str = invalid_code.as_str();
-        let codes_to_keep = directive
-            .iter()
-            .filter_map(|code| {
-                let code_str = code.as_str();
-                if code_str == this_invalid_str {
-                    None
-                } else {
-                    Some(code_str)
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(", ");
-
-        let updated_noqa = update_noqa(line, &codes_to_keep, locator);
-        let fix = Fix::safe_edit(Edit::range_replacement(updated_noqa, line.range()));
-
-        let mut diagnostic = Diagnostic::new(
-            InvalidRuleCode {
-                rule_code: this_invalid_str.to_string(),
-            },
-            invalid_code.range(),
-        );
-
-        diagnostic.set_fix(fix);
-        diagnostics.push(diagnostic);
-    }
+) -> Diagnostic {
+    let diagnostic = Diagnostic::new(
+        InvalidRuleCode {
+            rule_code: invalid_code.to_string(),
+        },
+        invalid_code.range(),
+    );
+    diagnostic.with_fix(Fix::safe_edit(remove_invalid_noqa(
+        codes,
+        invalid_code,
+        locator,
+    )))
 }
 
-fn update_noqa(line: &NoqaDirectiveLine<'_>, formatted_codes: &str, locator: &Locator) -> String {
-    let noqa_slice = "noqa:";
-    let original_text = locator.slice(line.range());
+fn remove_invalid_noqa(codes: &Codes, invalid_code: &Code, locator: &Locator) -> Edit {
+    // Is this the first code after the `:` that needs to get deleted
+    // For the first element, delete from after the `:` to the next comma (including)
+    // For any other element, delete from the previous comma (including) to the next comma (excluding)
+    let mut first = false;
 
-    if let Some(noqa_idx) = original_text.find(noqa_slice) {
-        let prefix_end = noqa_idx + noqa_slice.len();
-        let (prefix, codes_part) = original_text.split_at(prefix_end);
-        let whitespace_end = codes_part
-            .find(|c: char| !c.is_whitespace())
-            .unwrap_or(codes_part.len());
-        format!(
-            "{}{}{}",
-            prefix,
-            &codes_part[..whitespace_end],
-            formatted_codes
-        )
-    } else {
-        format!("# noqa: {formatted_codes}")
-    }
+    // Find the index of the previous comma or colon.
+    let start = locator
+        .slice(TextRange::new(codes.start(), invalid_code.start()))
+        .rmatch_indices([',', ':'])
+        .next()
+        .map(|(offset, text)| {
+            let offset = codes.start() + TextSize::try_from(offset).unwrap();
+            if text == ":" {
+                first = true;
+                // Don't include the colon in the deletion range, or the noqa comment becomes invalid
+                offset + ':'.text_len()
+            } else {
+                offset
+            }
+        })
+        .unwrap_or(invalid_code.start());
+
+    // Find the index of the trailing comma (if any)
+    let end = locator
+        .slice(TextRange::new(invalid_code.end(), codes.end()))
+        .find(',')
+        .map(|offset| {
+            let offset = invalid_code.end() + TextSize::try_from(offset).unwrap();
+
+            if first {
+                offset + ','.text_len()
+            } else {
+                offset
+            }
+        })
+        .unwrap_or(invalid_code.end());
+
+    Edit::range_deletion(TextRange::new(start, end))
+
+    // dbg!(locator.slice(invalid_code.range()));
+    //
+    // let noqa_idx = original_text.find(noqa_slice)?;
+    // let prefix_end = noqa_idx + noqa_slice.len();
+    // let (noqa, codes_part) = original_text.split_at(prefix_end);
+    //
+    // // Preserve the whitespace between `noqa:` and the first code
+    // let (after_noqa_whitespace, _codes) = codes_part
+    //     .split_once(|c: char| !c.is_whitespace())
+    //     .unwrap_or_default();
+    //
+    // let codes_to_keep = codes
+    //     .iter()
+    //     .filter(|code| code.range() != invalid_code.range())
+    //     .map(Code::as_str)
+    //     .collect::<Vec<_>>()
+    //     .join(", ");
+    //
+    // Some(format!("{noqa}{after_noqa_whitespace}{codes_to_keep}",))
 }
