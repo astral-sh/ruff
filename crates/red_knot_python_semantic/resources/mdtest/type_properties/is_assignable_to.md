@@ -183,7 +183,7 @@ static_assert(is_assignable_to(Meta, type[Unknown]))
 ## Tuple types
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
+from knot_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
 from typing import Literal, Any
 
 static_assert(is_assignable_to(tuple[()], tuple[()]))
@@ -197,6 +197,8 @@ static_assert(is_assignable_to(tuple[Literal[1], Any], tuple[int, int]))
 static_assert(is_assignable_to(tuple[()], tuple))
 static_assert(is_assignable_to(tuple[int, str], tuple))
 static_assert(is_assignable_to(tuple[Any], tuple))
+static_assert(is_assignable_to(tuple[()], AlwaysFalsy))
+static_assert(is_assignable_to(tuple[int], AlwaysTruthy))
 
 static_assert(not is_assignable_to(tuple[()], tuple[int]))
 static_assert(not is_assignable_to(tuple[int], tuple[str]))

@@ -1071,9 +1071,13 @@ impl<'db> Type<'db> {
             // This special case is required because the left-hand side tuple might be a
             // gradual type, so we can not rely on subtyping. This allows us to assign e.g.
             // `tuple[Any, int]` to `tuple`.
-            (Type::Tuple(_), _) => KnownClass::Tuple
-                .to_instance(db)
-                .is_assignable_to(db, target),
+            (Type::Tuple(_), _)
+                if KnownClass::Tuple
+                    .to_instance(db)
+                    .is_assignable_to(db, target) =>
+            {
+                true
+            }
 
             // `type[Any]` is assignable to any `type[...]` type, because `type[Any]` can
             // materialize to any `type[...]` type.
