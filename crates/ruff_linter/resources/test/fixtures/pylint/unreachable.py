@@ -28,3 +28,33 @@ def multiple_returns():
     print("unreachable")
     return 2
     print("unreachable range should include above return")
+
+def while_loop():
+    while False:
+        print("unreachable")
+    print("reachable")
+    while False:
+        print("unreachable")
+    print("reachable")
+    while True:
+        print("reachable")
+    print("unreachable")
+
+    
+def after_break():
+    while cond:
+        break
+        print("unreachable")
+    print("reachable")    
+
+def after_continue():
+    while True:
+        continue
+        print("unreachable")
+    print("unreachable")
+
+def empty_iter():
+    for i in []:
+        print("unreachable")
+    else:
+        print("reachable")
