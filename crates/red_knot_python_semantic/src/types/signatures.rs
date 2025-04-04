@@ -237,6 +237,13 @@ impl<'db> Signature<'db> {
         }
     }
 
+    pub(crate) fn bottom() -> Self {
+        Signature {
+            parameters: Parameters::gradual_form(),
+            return_ty: Some(Type::Never),
+        }
+    }
+
     /// Return a typed signature from a function definition.
     pub(super) fn from_function(
         db: &'db dyn Db,
