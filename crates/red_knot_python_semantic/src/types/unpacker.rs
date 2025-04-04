@@ -116,8 +116,10 @@ impl<'db> Unpacker<'db> {
                             // it's worth it.
                             TupleType::from_elements(
                                 self.db(),
-                                std::iter::repeat(Type::LiteralString)
-                                    .take(string_literal_ty.python_len(self.db())),
+                                std::iter::repeat_n(
+                                    Type::LiteralString,
+                                    string_literal_ty.python_len(self.db()),
+                                ),
                             )
                         }
                         _ => ty,

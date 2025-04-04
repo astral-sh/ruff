@@ -144,7 +144,7 @@ impl Tag {
             StartVerbatim(_) | EndVerbatim => TagKind::Verbatim,
             StartLabelled(_) | EndLabelled => TagKind::Labelled,
             StartFitsExpanded { .. } | EndFitsExpanded => TagKind::FitsExpanded,
-            StartBestFittingEntry { .. } | EndBestFittingEntry => TagKind::BestFittingEntry,
+            StartBestFittingEntry | EndBestFittingEntry => TagKind::BestFittingEntry,
             StartBestFitParenthesize { .. } | EndBestFitParenthesize => {
                 TagKind::BestFitParenthesize
             }

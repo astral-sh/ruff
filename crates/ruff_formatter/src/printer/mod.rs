@@ -362,9 +362,7 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::FitsExpanded, args);
             }
 
-            FormatElement::Tag(
-                tag @ (StartLabelled(_) | StartEntry | StartBestFittingEntry { .. }),
-            ) => {
+            FormatElement::Tag(tag @ (StartLabelled(_) | StartEntry | StartBestFittingEntry)) => {
                 stack.push(tag.kind(), args);
             }
 
@@ -386,7 +384,7 @@ impl<'a> Printer<'a> {
             ) => {
                 stack.pop(tag.kind())?;
             }
-        };
+        }
 
         Ok(())
     }
@@ -1416,7 +1414,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 | StartVerbatim(_)
                 | StartLabelled(_)
                 | StartEntry
-                | StartBestFittingEntry { .. }),
+                | StartBestFittingEntry),
             ) => {
                 self.stack.push(tag.kind(), args);
             }

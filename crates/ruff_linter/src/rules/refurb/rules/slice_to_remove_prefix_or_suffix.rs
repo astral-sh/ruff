@@ -184,7 +184,7 @@ fn affix_removal_data_stmt(if_stmt: &ast::StmtIf) -> Option<RemoveAffixData> {
     // ```
     if !elif_else_clauses.is_empty() {
         return None;
-    };
+    }
 
     // Cannot safely transform, e.g.,
     // ```python
@@ -265,7 +265,7 @@ fn affix_removal_data<'a>(
         })
     {
         return None;
-    };
+    }
 
     let compr_test_expr = ast::comparable::ComparableExpr::from(
         &test.as_call_expr()?.func.as_attribute_expr()?.value,

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/type_param_invalid_bound_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -256,4 +255,24 @@ Module(
 3 | type X[T: yield from x] = int
 4 | type X[T: x := int] = int
   |             ^^ Syntax Error: Expected ',', found ':='
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | type X[T: *int] = int
+2 | type X[T: yield x] = int
+  |           ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar bound
+3 | type X[T: yield from x] = int
+4 | type X[T: x := int] = int
+  |
+
+
+  |
+1 | type X[T: *int] = int
+2 | type X[T: yield x] = int
+3 | type X[T: yield from x] = int
+  |           ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar bound
+4 | type X[T: x := int] = int
   |

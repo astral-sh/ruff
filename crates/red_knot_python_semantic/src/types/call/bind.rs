@@ -503,13 +503,13 @@ impl<'db> Bindings<'db> {
                             if let Some(len_ty) = first_arg.len(db) {
                                 overload.set_return_type(len_ty);
                             }
-                        };
+                        }
                     }
 
                     Some(KnownFunction::Repr) => {
                         if let [Some(first_arg)] = overload.parameter_types() {
                             overload.set_return_type(first_arg.repr(db));
-                        };
+                        }
                     }
 
                     Some(KnownFunction::Cast) => {

@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use red_knot_ide::goto_type_definition;
+use red_knot_ide::{goto_type_definition, hover, MarkupKind};
 use red_knot_project::metadata::options::Options;
 use red_knot_project::metadata::value::ValueSource;
 use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -243,6 +243,37 @@ impl Workspace {
 
         Ok(links)
     }
+
+    #[wasm_bindgen]
+    pub fn hover(&self, file_id: &FileHandle, position: Position) -> Result<Option<Hover>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = index.offset(
+            OneIndexed::new(position.line).ok_or_else(|| {
+                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
+            })?,
+            OneIndexed::new(position.column).ok_or_else(|| {
+                Error::new(
+                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                )
+            })?,
+            &source,
+        );
+
+        let Some(range_info) = hover(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        let source_range = Range::from_text_range(range_info.file_range().range(), &index, &source);
+
+        Ok(Some(Hover {
+            markdown: range_info
+                .display(&self.db, MarkupKind::Markdown)
+                .to_string(),
+            range: source_range,
+        }))
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -330,15 +361,11 @@ pub struct Range {
 }
 
 impl Range {
-    fn from_file_range(db: &dyn Db, range: FileRange) -> Self {
-        let index = line_index(db.upcast(), range.file());
-        let source = source_text(db.upcast(), range.file());
+    fn from_file_range(db: &dyn Db, file_range: FileRange) -> Self {
+        let index = line_index(db.upcast(), file_range.file());
+        let source = source_text(db.upcast(), file_range.file());
 
-        let text_range = range.range();
-
-        let start = index.source_location(text_range.start(), &source);
-        let end = index.source_location(text_range.end(), &source);
-        Self::from((start, end))
+        Self::from_text_range(file_range.range(), &index, &source)
     }
 
     fn from_text_range(
@@ -435,6 +462,14 @@ pub struct LocationLink {
     pub selection_range: Option<Range>,
     /// The range of the origin.
     pub origin_selection_range: Option<Range>,
+}
+
+#[wasm_bindgen]
+pub struct Hover {
+    #[wasm_bindgen(getter_with_clone)]
+    pub markdown: String,
+
+    pub range: Range,
 }
 
 #[derive(Debug, Clone)]

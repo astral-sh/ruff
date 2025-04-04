@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.83"
+rust-version = "1.84"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -124,7 +124,7 @@ rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "d758691ba17ee1a60c5356ea90888d529e1782ad" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "296a8c78da1b54c76ff5795eb4c1e3fe2467e9fc" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -209,6 +209,7 @@ must_use_candidate = "allow"
 similar_names = "allow"
 single_match_else = "allow"
 too_many_lines = "allow"
+needless_continue = "allow"       # An explicit continue can be more readable, especially if the alternative is an empty block.
 # Without the hashes we run into a `rustfmt` bug in some snapshot tests, see #13250
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
@@ -271,7 +272,7 @@ inherits = "release"
 # Config for 'dist'
 [workspace.metadata.dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.25.2-prerelease.3"
+cargo-dist-version = "0.28.3"
 # CI backends to support
 ci = "github"
 # The installers to generate for each app

@@ -265,13 +265,13 @@ fn run_test(
                     match info.location {
                         Some(location) => messages.push(format!("panicked at {location}")),
                         None => messages.push("panicked at unknown location".to_string()),
-                    };
+                    }
                     match info.payload {
                         Some(payload) => messages.push(payload),
                         // Mimic the default panic hook's rendering of the panic payload if it's
                         // not a string.
                         None => messages.push("Box<dyn Any>".to_string()),
-                    };
+                    }
                     if let Some(backtrace) = info.backtrace {
                         if std::env::var("RUST_BACKTRACE").is_ok() {
                             messages.extend(backtrace.to_string().split('\n').map(String::from));

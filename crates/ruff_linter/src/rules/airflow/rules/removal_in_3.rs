@@ -91,7 +91,7 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
         ) => {
             if let Some(qualified_name) = checker.semantic().resolve_qualified_name(func) {
                 check_call_arguments(checker, &qualified_name, arguments);
-            };
+            }
             check_method(checker, call_expr);
             check_context_key_usage_in_call(checker, call_expr);
         }
@@ -256,7 +256,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                 }
             }
         }
-    };
+    }
 }
 
 /// Check whether a removed Airflow class attribute (include property) is called.
@@ -930,7 +930,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             let replacement_edit = Edit::range_replacement(binding, range);
             Ok(Fix::safe_edits(import_edit, [replacement_edit]))
         });
-    };
+    }
 
     checker.report_diagnostic(diagnostic);
 }

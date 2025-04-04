@@ -1,5 +1,11 @@
 use std::sync::{LazyLock, Mutex};
 
+use super::{
+    class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
+    KnownFunction, Mro, MroError, MroIterator, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeQualifiers, TypeVarInstance,
+};
+use crate::semantic_index::definition::Definition;
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
@@ -22,12 +28,6 @@ use ruff_db::files::{File, FileRange};
 use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
 
-use super::{
-    class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
-    KnownFunction, Mro, MroError, MroIterator, SubclassOfType, Truthiness, Type, TypeAliasType,
-    TypeQualifiers, TypeVarInstance,
-};
-
 /// Representation of a runtime class object.
 ///
 /// Does not in itself represent a type,
@@ -43,52 +43,14 @@ pub struct Class<'db> {
     pub(crate) known: Option<KnownClass>,
 }
 
-fn explicit_bases_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &[Type<'db>],
-    _count: u32,
-    _self: Class<'db>,
-) -> salsa::CycleRecoveryAction<Box<[Type<'db>]>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn explicit_bases_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Box<[Type<'db>]> {
-    Box::default()
-}
-
-fn try_mro_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Result<Mro<'db>, MroError<'db>>,
-    _count: u32,
-    _self: Class<'db>,
-) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    self_: Class<'db>,
-) -> Result<Mro<'db>, MroError<'db>> {
-    Ok(Mro::from_error(db, self_))
-}
-
-#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-fn inheritance_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<InheritanceCycle>,
-    _count: u32,
-    _self: Class<'db>,
-) -> salsa::CycleRecoveryAction<Option<InheritanceCycle>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn inheritance_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Option<InheritanceCycle> {
-    None
-}
-
 #[salsa::tracked]
 impl<'db> Class<'db> {
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        let scope = self.body_scope(db);
+        let index = semantic_index(db, scope.file(db));
+        index.expect_single_definition(scope.node(db).expect_class())
+    }
+
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
@@ -239,8 +201,7 @@ impl<'db> Class<'db> {
             .find_keyword("metaclass")?
             .value;
 
-        let class_definition =
-            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+        let class_definition = self.definition(db);
 
         Some(definition_expression_type(
             db,
@@ -748,6 +709,50 @@ impl<'db> Class<'db> {
     }
 }
 
+fn explicit_bases_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &[Type<'db>],
+    _count: u32,
+    _self: Class<'db>,
+) -> salsa::CycleRecoveryAction<Box<[Type<'db>]>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn explicit_bases_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Box<[Type<'db>]> {
+    Box::default()
+}
+
+fn try_mro_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Result<Mro<'db>, MroError<'db>>,
+    _count: u32,
+    _self: Class<'db>,
+) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn try_mro_cycle_initial<'db>(
+    db: &'db dyn Db,
+    self_: Class<'db>,
+) -> Result<Mro<'db>, MroError<'db>> {
+    Ok(Mro::from_error(db, self_))
+}
+
+#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
+fn inheritance_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<InheritanceCycle>,
+    _count: u32,
+    _self: Class<'db>,
+) -> salsa::CycleRecoveryAction<Option<InheritanceCycle>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn inheritance_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Option<InheritanceCycle> {
+    None
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(super) enum InheritanceCycle {
     /// The class is cyclically defined and is a participant in the cycle.
@@ -771,7 +776,7 @@ pub struct ClassLiteralType<'db> {
 }
 
 impl<'db> ClassLiteralType<'db> {
-    pub fn class(self) -> Class<'db> {
+    pub(super) fn class(self) -> Class<'db> {
         self.class
     }
 
@@ -797,7 +802,7 @@ pub struct InstanceType<'db> {
 }
 
 impl<'db> InstanceType<'db> {
-    pub fn class(self) -> Class<'db> {
+    pub(super) fn class(self) -> Class<'db> {
         self.class
     }
 

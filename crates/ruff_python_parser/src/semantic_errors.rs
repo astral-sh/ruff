@@ -8,6 +8,7 @@ use std::fmt::Display;
 
 use ruff_python_ast::{
     self as ast,
+    comparable::ComparableExpr,
     visitor::{walk_expr, Visitor},
     Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
@@ -64,7 +65,13 @@ impl SemanticSyntaxChecker {
             }
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
-                Self::multiple_case_assignment(match_stmt, ctx);
+                for case in &match_stmt.cases {
+                    let mut visitor = MatchPatternVisitor {
+                        names: FxHashSet::default(),
+                        ctx,
+                    };
+                    visitor.visit_pattern(&case.pattern);
+                }
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
             | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
@@ -107,6 +114,120 @@ impl SemanticSyntaxChecker {
         }
 
         Self::debug_shadowing(stmt, ctx);
+        Self::check_annotation(stmt, ctx);
+    }
+
+    fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                type_params,
+                parameters,
+                returns,
+                ..
+            }) => {
+                // test_ok valid_annotation_function
+                // def f() -> (y := 3): ...
+                // def g(arg: (x := 1)): ...
+
+                // test_err invalid_annotation_function
+                // def f[T]() -> (y := 3): ...
+                // def g[T](arg: (x := 1)): ...
+                // def h[T](x: (yield 1)): ...
+                // def i(x: (yield 1)): ...
+                // def j[T]() -> (yield 1): ...
+                // def k() -> (yield 1): ...
+                // def l[T](x: (yield from 1)): ...
+                // def m(x: (yield from 1)): ...
+                // def n[T]() -> (yield from 1): ...
+                // def o() -> (yield from 1): ...
+                // def p[T: (yield 1)](): ...      # yield in TypeVar bound
+                // def q[T = (yield 1)](): ...     # yield in TypeVar default
+                // def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
+                // def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
+                // def t[T: (x := 1)](): ...       # named expr in TypeVar bound
+                // def u[T = (x := 1)](): ...      # named expr in TypeVar default
+                // def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
+                // def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+                let is_generic = type_params.is_some();
+                let mut visitor = InvalidExpressionVisitor {
+                    allow_named_expr: !is_generic,
+                    position: InvalidExpressionPosition::TypeAnnotation,
+                    ctx,
+                };
+                if let Some(type_params) = type_params {
+                    visitor.visit_type_params(type_params);
+                }
+                if is_generic {
+                    visitor.position = InvalidExpressionPosition::GenericDefinition;
+                } else {
+                    visitor.position = InvalidExpressionPosition::TypeAnnotation;
+                }
+                for param in parameters
+                    .iter()
+                    .filter_map(ast::AnyParameterRef::annotation)
+                {
+                    visitor.visit_expr(param);
+                }
+                if let Some(returns) = returns {
+                    visitor.visit_expr(returns);
+                }
+            }
+            Stmt::ClassDef(ast::StmtClassDef {
+                type_params,
+                arguments,
+                ..
+            }) => {
+                // test_ok valid_annotation_class
+                // class F(y := list): ...
+
+                // test_err invalid_annotation_class
+                // class F[T](y := list): ...
+                // class G((yield 1)): ...
+                // class H((yield from 1)): ...
+                // class I[T]((yield 1)): ...
+                // class J[T]((yield from 1)): ...
+                // class K[T: (yield 1)]: ...      # yield in TypeVar
+                // class L[T: (x := 1)]: ...       # named expr in TypeVar
+                let is_generic = type_params.is_some();
+                let mut visitor = InvalidExpressionVisitor {
+                    allow_named_expr: !is_generic,
+                    position: InvalidExpressionPosition::TypeAnnotation,
+                    ctx,
+                };
+                if let Some(type_params) = type_params {
+                    visitor.visit_type_params(type_params);
+                }
+                if is_generic {
+                    visitor.position = InvalidExpressionPosition::GenericDefinition;
+                } else {
+                    visitor.position = InvalidExpressionPosition::BaseClass;
+                }
+                if let Some(arguments) = arguments {
+                    visitor.visit_arguments(arguments);
+                }
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                type_params, value, ..
+            }) => {
+                // test_err invalid_annotation_type_alias
+                // type X[T: (yield 1)] = int      # TypeVar bound
+                // type X[T = (yield 1)] = int     # TypeVar default
+                // type X[*Ts = (yield 1)] = int   # TypeVarTuple default
+                // type X[**Ts = (yield 1)] = int  # ParamSpec default
+                // type Y = (yield 1)              # yield in value
+                // type Y = (x := 1)               # named expr in value
+                let mut visitor = InvalidExpressionVisitor {
+                    allow_named_expr: false,
+                    position: InvalidExpressionPosition::TypeAlias,
+                    ctx,
+                };
+                visitor.visit_expr(value);
+                if let Some(type_params) = type_params {
+                    visitor.visit_type_params(type_params);
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Emit a [`SemanticSyntaxErrorKind::InvalidStarExpression`] if `expr` is starred.
@@ -260,16 +381,6 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn multiple_case_assignment<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
-        for case in &stmt.cases {
-            let mut visitor = MultipleCaseAssignmentVisitor {
-                names: FxHashSet::default(),
-                ctx,
-            };
-            visitor.visit_pattern(&case.pattern);
-        }
-    }
-
     fn irrefutable_match_case<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
         // test_ok irrefutable_case_pattern_at_end
         // match x:
@@ -395,7 +506,7 @@ impl SemanticSyntaxChecker {
                             }
                         }
                         _ => {}
-                    };
+                    }
                 }
 
                 // PLE0118
@@ -514,6 +625,25 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
+            SemanticSyntaxErrorKind::InvalidExpression(
+                kind,
+                InvalidExpressionPosition::BaseClass,
+            ) => {
+                write!(f, "{kind} cannot be used as a base class")
+            }
+            SemanticSyntaxErrorKind::InvalidExpression(kind, position) => {
+                write!(f, "{kind} cannot be used within a {position}")
+            }
+            SemanticSyntaxErrorKind::DuplicateMatchKey(key) => {
+                write!(
+                    f,
+                    "mapping pattern checks duplicate key `{}`",
+                    EscapeDefault(key)
+                )
+            }
+            SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(name) => {
+                write!(f, "attribute name `{name}` repeated in class pattern",)
+            }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
                 write!(f, "name `{name}` is used prior to global declaration")
             }
@@ -634,6 +764,66 @@ pub enum SemanticSyntaxErrorKind {
     /// [BPO 45000]: https://github.com/python/cpython/issues/89163
     WriteToDebug(WriteToDebugKind),
 
+    /// Represents the use of an invalid expression kind in one of several locations.
+    ///
+    /// The kinds include `yield` and `yield from` expressions and named expressions, and locations
+    /// include type parameter bounds and defaults, type annotations, type aliases, and base class
+    /// lists.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// type X[T: (yield 1)] = int
+    /// type Y = (yield 1)
+    /// def f[T](x: int) -> (y := 3): return x
+    /// ```
+    InvalidExpression(InvalidExpressionKind, InvalidExpressionPosition),
+
+    /// Represents a duplicate key in a `match` mapping pattern.
+    ///
+    /// The [CPython grammar] allows keys in mapping patterns to be literals or attribute accesses:
+    ///
+    /// ```text
+    /// key_value_pattern:
+    ///     | (literal_expr | attr) ':' pattern
+    /// ```
+    ///
+    /// But only literals are checked for duplicates:
+    ///
+    /// ```pycon
+    /// >>> match x:
+    /// ...     case {"x": 1, "x": 2}: ...
+    /// ...
+    ///   File "<python-input-160>", line 2
+    ///     case {"x": 1, "x": 2}: ...
+    ///          ^^^^^^^^^^^^^^^^
+    /// SyntaxError: mapping pattern checks duplicate key ('x')
+    /// >>> match x:
+    /// ...     case {x.a: 1, x.a: 2}: ...
+    /// ...
+    /// >>>
+    /// ```
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case {"x": 1, "x": 2}: ...
+    /// ```
+    ///
+    /// [CPython grammar]: https://docs.python.org/3/reference/grammar.html
+    DuplicateMatchKey(String),
+
+    /// Represents a duplicate attribute name in a `match` class pattern.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case Class(x=1, x=2): ...
+    /// ```
+    DuplicateMatchClassAttribute(ast::name::Name),
+
     /// Represents the use of a `global` variable before its `global` declaration.
     ///
     /// ## Examples
@@ -661,6 +851,48 @@ pub enum SemanticSyntaxErrorKind {
     InvalidStarExpression,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InvalidExpressionPosition {
+    TypeVarBound,
+    TypeVarDefault,
+    TypeVarTupleDefault,
+    ParamSpecDefault,
+    TypeAnnotation,
+    BaseClass,
+    GenericDefinition,
+    TypeAlias,
+}
+
+impl Display for InvalidExpressionPosition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            InvalidExpressionPosition::TypeVarBound => "TypeVar bound",
+            InvalidExpressionPosition::TypeVarDefault => "TypeVar default",
+            InvalidExpressionPosition::TypeVarTupleDefault => "TypeVarTuple default",
+            InvalidExpressionPosition::ParamSpecDefault => "ParamSpec default",
+            InvalidExpressionPosition::TypeAnnotation => "type annotation",
+            InvalidExpressionPosition::GenericDefinition => "generic definition",
+            InvalidExpressionPosition::BaseClass => "base class",
+            InvalidExpressionPosition::TypeAlias => "type alias",
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum InvalidExpressionKind {
+    Yield,
+    NamedExpr,
+}
+
+impl Display for InvalidExpressionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            InvalidExpressionKind::Yield => "yield expression",
+            InvalidExpressionKind::NamedExpr => "named expression",
+        })
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WriteToDebugKind {
     Store,
@@ -685,19 +917,23 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
                 }) {
                     self.rebound_variables.push(*range);
                 }
-            };
+            }
         }
         walk_expr(self, expr);
     }
 }
 
-struct MultipleCaseAssignmentVisitor<'a, Ctx> {
+struct MatchPatternVisitor<'a, Ctx> {
     names: FxHashSet<&'a ast::name::Name>,
     ctx: &'a Ctx,
 }
 
-impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
+impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
+        // test_ok class_keyword_in_case_pattern
+        // match 2:
+        //     case Class(x=x): ...
+
         // test_err multiple_assignment_in_case_pattern
         // match 2:
         //     case [y, z, y]: ...  # MatchSequence
@@ -706,8 +942,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
         //     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
         //     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
         //     case Class(x, x): ...  # MatchClass positional
-        //     case Class(x=1, x=2): ...  # MatchClass keyword
-        //     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+        //     case Class(y=x, z=x): ...  # MatchClass keyword
+        //     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
         //     case x as x: ...  # MatchAs
         match pattern {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
@@ -721,20 +957,87 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
             }
-            Pattern::MatchMapping(ast::PatternMatchMapping { patterns, rest, .. }) => {
+            Pattern::MatchMapping(ast::PatternMatchMapping {
+                keys,
+                patterns,
+                rest,
+                ..
+            }) => {
                 for pattern in patterns {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
                     self.insert(rest);
                 }
+
+                let mut seen = FxHashSet::default();
+                for key in keys
+                    .iter()
+                    // complex numbers (`1 + 2j`) are allowed as keys but are not literals
+                    // because they are represented as a `BinOp::Add` between a real number and
+                    // an imaginary number
+                    .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
+                {
+                    if !seen.insert(ComparableExpr::from(key)) {
+                        let key_range = key.range();
+                        let duplicate_key = self.ctx.source()[key_range].to_string();
+                        // test_ok duplicate_match_key_attr
+                        // match x:
+                        //     case {x.a: 1, x.a: 2}: ...
+
+                        // test_err duplicate_match_key
+                        // match x:
+                        //     case {"x": 1, "x": 2}: ...
+                        //     case {b"x": 1, b"x": 2}: ...
+                        //     case {0: 1, 0: 2}: ...
+                        //     case {1.0: 1, 1.0: 2}: ...
+                        //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+                        //     case {True: 1, True: 2}: ...
+                        //     case {None: 1, None: 2}: ...
+                        //     case {
+                        //     """x
+                        //     y
+                        //     z
+                        //     """: 1,
+                        //     """x
+                        //     y
+                        //     z
+                        //     """: 2}: ...
+                        //     case {"x": 1, "x": 2, "x": 3}: ...
+                        //     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+                        //     case [{"x": 1, "x": 2}]: ...
+                        //     case Foo(x=1, y={"x": 1, "x": 2}): ...
+                        //     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),
+                            key_range,
+                        );
+                    }
+                }
             }
             Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
                 for pattern in &arguments.patterns {
                     self.visit_pattern(pattern);
                 }
+                let mut seen = FxHashSet::default();
                 for keyword in &arguments.keywords {
-                    self.insert(&keyword.attr);
+                    if !seen.insert(&keyword.attr.id) {
+                        // test_err duplicate_match_class_attr
+                        // match x:
+                        //     case Class(x=1, x=2): ...
+                        //     case [Class(x=1, x=2)]: ...
+                        //     case {"x": x, "y": Foo(x=1, x=2)}: ...
+                        //     case [{}, {"x": x, "y": Foo(x=1, x=2)}]: ...
+                        //     case Class(x=1, d={"x": 1, "x": 2}, other=Class(x=1, x=2)): ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(
+                                keyword.attr.id.clone(),
+                            ),
+                            keyword.attr.range,
+                        );
+                    }
                     self.visit_pattern(&keyword.pattern);
                 }
             }
@@ -782,12 +1085,92 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
     }
 }
 
+struct InvalidExpressionVisitor<'a, Ctx> {
+    /// Allow named expressions (`x := ...`) to appear in annotations.
+    ///
+    /// These are allowed in non-generic functions, for example:
+    ///
+    /// ```python
+    /// def foo(arg: (x := int)): ...     # ok
+    /// def foo[T](arg: (x := int)): ...  # syntax error
+    /// ```
+    allow_named_expr: bool,
+
+    /// Context used for emitting errors.
+    ctx: &'a Ctx,
+
+    position: InvalidExpressionPosition,
+}
+
+impl<Ctx> Visitor<'_> for InvalidExpressionVisitor<'_, Ctx>
+where
+    Ctx: SemanticSyntaxContext,
+{
+    fn visit_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Named(ast::ExprNamed { range, .. }) if !self.allow_named_expr => {
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::InvalidExpression(
+                        InvalidExpressionKind::NamedExpr,
+                        self.position,
+                    ),
+                    *range,
+                );
+            }
+            Expr::Yield(ast::ExprYield { range, .. })
+            | Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::InvalidExpression(
+                        InvalidExpressionKind::Yield,
+                        self.position,
+                    ),
+                    *range,
+                );
+            }
+            _ => {}
+        }
+        ast::visitor::walk_expr(self, expr);
+    }
+
+    fn visit_type_param(&mut self, type_param: &ast::TypeParam) {
+        match type_param {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
+                if let Some(expr) = bound {
+                    self.position = InvalidExpressionPosition::TypeVarBound;
+                    self.visit_expr(expr);
+                }
+                if let Some(expr) = default {
+                    self.position = InvalidExpressionPosition::TypeVarDefault;
+                    self.visit_expr(expr);
+                }
+            }
+            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. }) => {
+                if let Some(expr) = default {
+                    self.position = InvalidExpressionPosition::TypeVarTupleDefault;
+                    self.visit_expr(expr);
+                }
+            }
+            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => {
+                if let Some(expr) = default {
+                    self.position = InvalidExpressionPosition::ParamSpecDefault;
+                    self.visit_expr(expr);
+                }
+            }
+        }
+    }
+}
+
 pub trait SemanticSyntaxContext {
     /// Returns `true` if a module's docstring boundary has been passed.
     fn seen_docstring_boundary(&self) -> bool;
 
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
+
+    /// Returns the source text under analysis.
+    fn source(&self) -> &str;
 
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
@@ -826,5 +1209,22 @@ where
     fn visit_expr(&mut self, expr: &'_ Expr) {
         self.checker.visit_expr(expr, &self.context);
         ruff_python_ast::visitor::walk_expr(self, expr);
+    }
+}
+
+/// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.
+struct EscapeDefault<'a>(&'a str);
+
+impl Display for EscapeDefault<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write;
+
+        for c in self.0.chars() {
+            match c {
+                '\'' | '\"' => f.write_char(c)?,
+                _ => write!(f, "{}", c.escape_default())?,
+            }
+        }
+        Ok(())
     }
 }
