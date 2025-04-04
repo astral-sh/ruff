@@ -124,7 +124,12 @@ fn taken(condition: &Condition, semantic: &SemanticModel) -> Option<bool> {
         Condition::Test(expr) => {
             Truthiness::from_expr(expr, |id| semantic.has_builtin_binding(id)).into_bool()
         }
-
+        Condition::NotStopIter(expr) => {
+            match Truthiness::from_expr(expr, |id| semantic.has_builtin_binding(id)) {
+                Truthiness::False | Truthiness::Falsey => Some(false),
+                _ => None,
+            }
+        }
         Condition::Else => None,
     }
 }

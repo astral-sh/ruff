@@ -157,6 +157,8 @@ pub enum Condition<'stmt> {
     Always,
     /// A boolean test expression
     Test(&'stmt Expr),
+    /// Test whether `next` on iterator gives `StopIteration`
+    NotStopIter(&'stmt Expr),
     /// A fallback case (else/wildcard case/etc.)
     Else,
 }
@@ -294,7 +296,7 @@ impl<'stmt> CFGBuilder<'stmt> {
                     // Finish guard and push loop context
                     let guard_target = orelse.unwrap_or(next_block);
                     let targets = vec![body, guard_target];
-                    let conditions = vec![Condition::Test(&stmt_for.iter), Condition::Else];
+                    let conditions = vec![Condition::NotStopIter(&stmt_for.iter), Condition::Else];
                     let edges = Edges {
                         conditions,
                         targets,
