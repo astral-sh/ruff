@@ -7,8 +7,8 @@ use std::ops::{Deref, DerefMut};
 pub use db::Db;
 pub use goto::goto_type_definition;
 use red_knot_python_semantic::types::{
-    ClassBase, ClassLiteralType, ClassType, FunctionType, InstanceType, IntersectionType,
-    KnownInstanceType, ModuleLiteralType, Type,
+    ClassBase, ClassLiteralType, ClassType, FunctionType, GenericAlias, InstanceType,
+    IntersectionType, KnownInstanceType, ModuleLiteralType, Type,
 };
 use ruff_db::files::{File, FileRange};
 use ruff_db::source::source_text;
@@ -147,6 +147,7 @@ impl HasNavigationTargets for Type<'_> {
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
             Type::ClassLiteral(class) => class.navigation_targets(db),
+            Type::GenericAlias(alias) => alias.navigation_targets(db),
             Type::Instance(instance) => instance.navigation_targets(db),
             Type::KnownInstance(instance) => instance.navigation_targets(db),
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
@@ -199,6 +200,17 @@ impl HasNavigationTargets for FunctionType<'_> {
 }
 
 impl HasNavigationTargets for ClassLiteralType<'_> {
+    fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
+        let class_range = self.focus_range(db.upcast());
+        NavigationTargets::single(NavigationTarget {
+            file: class_range.file(),
+            focus_range: class_range.range(),
+            full_range: self.full_range(db.upcast()).range(),
+        })
+    }
+}
+
+impl HasNavigationTargets for GenericAlias<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
         let class_range = self.focus_range(db.upcast());
         NavigationTargets::single(NavigationTarget {

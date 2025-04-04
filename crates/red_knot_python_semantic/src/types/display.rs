@@ -83,6 +83,25 @@ impl Display for DisplayRepresentation<'_> {
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
+            Type::GenericAlias(generic) => {
+                write!(
+                    f,
+                    "{origin}[",
+                    origin = generic.origin(self.db).class(self.db).name,
+                )?;
+                for (idx, ty) in generic
+                    .specialization(self.db)
+                    .types(self.db)
+                    .iter()
+                    .enumerate()
+                {
+                    if idx > 0 {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{}", ty.display(self.db))?;
+                }
+                f.write_str("]")
+            }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].

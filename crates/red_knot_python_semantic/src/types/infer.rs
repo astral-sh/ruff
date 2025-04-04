@@ -2483,7 +2483,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             },
 
-            Type::ClassLiteral(..) | Type::SubclassOf(..) => {
+            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 match object_ty.class_member(db, attribute.into()) {
                     SymbolAndQualifiers {
                         symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
@@ -4475,6 +4475,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::SpecializedCallable(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
@@ -4752,6 +4753,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
@@ -4774,6 +4776,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)

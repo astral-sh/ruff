@@ -97,7 +97,7 @@ impl<'db> GenericContext<'db> {
 #[salsa::tracked(debug)]
 pub struct Specialization<'db> {
     generic_context: GenericContext<'db>,
-    types: Box<[Type<'db>]>,
+    pub(crate) types: Box<[Type<'db>]>,
 }
 
 impl<'db> Specialization<'db> {
@@ -121,6 +121,11 @@ impl<'db> Specialization<'db> {
             .map(|ty| ty.apply_specialization(db, other))
             .collect();
         Specialization::new(db, self.generic_context(db), types)
+    }
+
+    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
+        let types = self.types(db).iter().map(|ty| ty.normalized(db)).collect();
+        Self::new(db, self.generic_context(db), types)
     }
 
     /// Returns the type that a typevar is specialized to, or None if the typevar isn't part of

@@ -140,27 +140,24 @@ pub struct GenericAlias<'db> {
     pub(crate) specialization: Specialization<'db>,
 }
 
-impl<'db> From<GenericAlias<'db>> for Type<'db> {
-    fn from(_alias: GenericAlias<'db>) -> Type<'db> {
-        // XXX: Type::GenericAlias(alias)
-        unreachable!()
-    }
-}
-
-/*
 impl<'db> GenericAlias<'db> {
-    /// Return an iterator over the inferred types of this generic alias's *explicit* bases, with
-    /// the alias's specialization applied.
-    pub(super) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
-        self.explicit_bases_query(db)
+    /// Returns the file range of the class's name.
+    pub fn focus_range(self, db: &dyn Db) -> FileRange {
+        let class = self.origin(db).class(db);
+        FileRange::new(class.file(db), class.node(db).name.range)
     }
 
-    fn explicit_bases_query(self, db: &'db dyn Db) -> &'db [Type<'db>] {
-        // XXX: specialize result
-        ClassLiteralType::Generic(self).explicit_bases_query(db)
+    pub fn full_range(self, db: &dyn Db) -> FileRange {
+        let class = self.origin(db).class(db);
+        FileRange::new(class.file(db), class.node(db).range)
     }
 }
-*/
+
+impl<'db> From<GenericAlias<'db>> for Type<'db> {
+    fn from(alias: GenericAlias<'db>) -> Type<'db> {
+        Type::GenericAlias(alias)
+    }
+}
 
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
@@ -291,13 +288,6 @@ impl<'db> ClassType<'db> {
             .metaclass(db)
             .to_instance(db)
             .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
-    }
-
-    /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
-    pub(super) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
-        self.class_literal(db)
-            .try_metaclass(db)
-            .map(|ty| self.specialize_type(db, ty))
     }
 
     /// Returns the class member of this class named `name`.
@@ -520,6 +510,12 @@ impl<'db> ClassType<'db> {
                 .map_or(Symbol::Unbound, Symbol::bound)
                 .into()
         }
+    }
+}
+
+impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
+    fn from(generic: GenericAlias<'db>) -> ClassType<'db> {
+        ClassType::Generic(generic)
     }
 }
 

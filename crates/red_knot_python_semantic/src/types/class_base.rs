@@ -94,6 +94,7 @@ impl<'db> ClassBase<'db> {
             } else {
                 Self::Class(literal.default_specialization(db))
             }),
+            Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?

@@ -42,7 +42,7 @@ pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{Class, GenericClass, KnownClass, NonGenericClass};
-pub use class::{ClassLiteralType, ClassType, InstanceType, KnownInstanceType};
+pub use class::{ClassLiteralType, ClassType, GenericAlias, InstanceType, KnownInstanceType};
 
 mod builder;
 mod call;
@@ -284,7 +284,9 @@ pub enum Type<'db> {
     ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object
     ClassLiteral(ClassLiteralType<'db>),
-    // The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
+    /// A specialization of a generic class
+    GenericAlias(GenericAlias<'db>),
+    /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
     SubclassOf(SubclassOfType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
@@ -387,6 +389,12 @@ impl<'db> Type<'db> {
             | Self::BoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::MethodWrapper(_) => false,
+
+            Self::GenericAlias(generic) => generic
+                .specialization(db)
+                .types(db)
+                .iter()
+                .any(|ty| ty.contains_todo(db)),
 
             Self::SpecializedCallable(specialized) => {
                 specialized.callable_type(db).contains_todo(db)
@@ -671,6 +679,10 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::IntLiteral(_)
             | Type::SubclassOf(_) => self,
+            Type::GenericAlias(generic) => {
+                let specialization = generic.specialization(db).normalized(db);
+                Type::GenericAlias(GenericAlias::new(db, generic.origin(db), specialization))
+            }
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Type::TypeVar(TypeVarInstance::new(
@@ -918,6 +930,12 @@ impl<'db> Type<'db> {
                 .subclass_of()
                 .into_class()
                 .is_some_and(|target_class| class.is_subclass_of(db, target_class)),
+            (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
+                .subclass_of()
+                .into_class()
+                .is_some_and(|target_class| {
+                    ClassType::from(alias).is_subclass_of(db, target_class)
+                }),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
@@ -930,6 +948,9 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(class), _) => {
                 class.metaclass_instance_type(db).is_subtype_of(db, target)
             }
+            (Type::GenericAlias(alias), _) => ClassType::from(alias)
+                .metaclass_instance_type(db)
+                .is_subtype_of(db, target),
 
             // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
             // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
@@ -1116,11 +1137,10 @@ impl<'db> Type<'db> {
             // Every class literal type is also assignable to `type[Any]`, because the class
             // literal type for a class `C` is a subtype of `type[C]`, and `type[C]` is assignable
             // to `type[Any]`.
-            (Type::ClassLiteral(_) | Type::SubclassOf(_), Type::SubclassOf(target_subclass_of))
-                if target_subclass_of.is_dynamic() =>
-            {
-                true
-            }
+            (
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_),
+                Type::SubclassOf(target_subclass_of),
+            ) if target_subclass_of.is_dynamic() => true,
 
             // `type[Any]` is assignable to any type that `type[object]` is assignable to, because
             // `type[Any]` can materialize to `type[object]`.
@@ -1361,6 +1381,7 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
+                | Type::GenericAlias(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
@@ -1373,6 +1394,7 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
+                | Type::GenericAlias(..)
                 | Type::KnownInstance(..)),
             ) => left != right,
 
@@ -1381,6 +1403,7 @@ impl<'db> Type<'db> {
             (
                 Type::Tuple(..),
                 Type::ClassLiteral(..)
+                | Type::GenericAlias(..)
                 | Type::ModuleLiteral(..)
                 | Type::BooleanLiteral(..)
                 | Type::BytesLiteral(..)
@@ -1395,6 +1418,7 @@ impl<'db> Type<'db> {
             )
             | (
                 Type::ClassLiteral(..)
+                | Type::GenericAlias(..)
                 | Type::ModuleLiteral(..)
                 | Type::BooleanLiteral(..)
                 | Type::BytesLiteral(..)
@@ -1414,6 +1438,16 @@ impl<'db> Type<'db> {
                 match subclass_of_ty.subclass_of() {
                     ClassBase::Dynamic(_) => false,
                     ClassBase::Class(class_a) => !class_b.is_subclass_of(db, class_a),
+                }
+            }
+
+            (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
+            | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
+                match subclass_of_ty.subclass_of() {
+                    ClassBase::Dynamic(_) => false,
+                    ClassBase::Class(class_a) => {
+                        !ClassType::from(alias_b).is_subclass_of(db, class_a)
+                    }
                 }
             }
 
@@ -1534,6 +1568,10 @@ impl<'db> Type<'db> {
             // where `Z` is `X`'s metaclass.
             (Type::ClassLiteral(class), instance @ Type::Instance(_))
             | (instance @ Type::Instance(_), Type::ClassLiteral(class)) => !class
+                .metaclass_instance_type(db)
+                .is_subtype_of(db, instance),
+            (Type::GenericAlias(alias), instance @ Type::Instance(_))
+            | (instance @ Type::Instance(_), Type::GenericAlias(alias)) => !ClassType::from(alias)
                 .metaclass_instance_type(db)
                 .is_subtype_of(db, instance),
 
@@ -1672,7 +1710,7 @@ impl<'db> Type<'db> {
             },
 
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.is_fully_static(),
-            Type::ClassLiteral(_) | Type::Instance(_) => {
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::Instance(_) => {
                 // TODO: Ideally, we would iterate over the MRO of the class, check if all
                 // bases are fully static, and only return `true` if that is the case.
                 //
@@ -1746,6 +1784,7 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
+            | Type::GenericAlias(..)
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
             Type::Callable(_) => {
@@ -1814,6 +1853,7 @@ impl<'db> Type<'db> {
             | Type::MethodWrapper(_)
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
+            | Type::GenericAlias(..)
             | Type::IntLiteral(..)
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
@@ -1940,6 +1980,8 @@ impl<'db> Type<'db> {
                     _ => Some(class.class_member(db, name)),
                 }
             }
+
+            Type::GenericAlias(alias) => Some(ClassType::from(*alias).class_member(db, name)),
 
             Type::SubclassOf(subclass_of)
                 if name == "__get__"
@@ -2103,7 +2145,9 @@ impl<'db> Type<'db> {
             // a `__dict__` that is filled with class level attributes. Modeling this is currently not
             // required, as `instance_member` is only called for instance-like types through `member`,
             // but we might want to add this in the future.
-            Type::ClassLiteral(_) | Type::SubclassOf(_) => Symbol::Unbound.into(),
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                Symbol::Unbound.into()
+            }
         }
     }
 
@@ -2455,12 +2499,10 @@ impl<'db> Type<'db> {
                         })
                 }
             },
-            Type::SpecializedCallable(specialized) => {
-                // XXX: specialize the result
-                specialized
-                    .callable_type(db)
-                    .member_lookup_with_policy(db, name, policy)
-            }
+            Type::SpecializedCallable(specialized) => specialized
+                .callable_type(db)
+                .member_lookup_with_policy(db, name, policy)
+                .map_type(|ty| ty.apply_specialization(db, specialized.specialization(db))),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType
                 .to_instance(db)
                 .member(db, &name),
@@ -2573,7 +2615,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::ClassLiteral(..) | Type::SubclassOf(..) => {
+            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 let class_attr_plain = self.find_name_in_mro(db, name_str).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
@@ -2763,6 +2805,9 @@ impl<'db> Type<'db> {
                 .try_bool_impl(db, allow_short_circuit)?,
 
             Type::ClassLiteral(class) => class
+                .metaclass_instance_type(db)
+                .try_bool_impl(db, allow_short_circuit)?,
+            Type::GenericAlias(alias) => ClassType::from(*alias)
                 .metaclass_instance_type(db)
                 .try_bool_impl(db, allow_short_circuit)?,
 
@@ -3525,6 +3570,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Dynamic(_) | Type::Never => Some(*self),
             Type::ClassLiteral(class) => Some(Type::instance(class.default_specialization(db))),
+            Type::GenericAlias(alias) => Some(Type::instance(ClassType::from(*alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance()),
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -3595,6 +3641,7 @@ impl<'db> Type<'db> {
                 };
                 Ok(ty)
             }
+            Type::GenericAlias(alias) => Ok(Type::instance(ClassType::from(*alias))),
 
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)
@@ -3842,6 +3889,7 @@ impl<'db> Type<'db> {
             },
 
             Type::ClassLiteral(class) => class.metaclass(db),
+            Type::GenericAlias(alias) => ClassType::from(*alias).metaclass(db),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => *self,
                 ClassBase::Class(class) => SubclassOfType::from(
@@ -3889,6 +3937,13 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_) => {
                 Type::SpecializedCallable(SpecializedCallableType::new(db, self, specialization))
+            }
+
+            Type::GenericAlias(generic) => {
+                let specialization = generic
+                    .specialization(db)
+                    .apply_specialization(db, specialization);
+                Type::GenericAlias(GenericAlias::new(db, generic.origin(db), specialization))
             }
 
             Type::Union(union) => union.map(db, |element| {
@@ -5079,7 +5134,8 @@ pub struct SpecializedCallableType<'db> {
 impl<'db> SpecializedCallableType<'db> {
     fn normalized(self, db: &'db dyn Db) -> Self {
         let callable_type = self.callable_type(db).normalized(db);
-        SpecializedCallableType::new(db, callable_type, self.specialization(db))
+        let specialization = self.specialization(db).normalized(db);
+        SpecializedCallableType::new(db, callable_type, specialization)
     }
 }
 

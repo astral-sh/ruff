@@ -98,6 +98,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ClassLiteral(_), _) => Ordering::Less,
         (_, Type::ClassLiteral(_)) => Ordering::Greater,
 
+        (Type::GenericAlias(left), Type::GenericAlias(right)) => left.cmp(right),
+        (Type::GenericAlias(_), _) => Ordering::Less,
+        (_, Type::GenericAlias(_)) => Ordering::Greater,
+
         (Type::SubclassOf(left), Type::SubclassOf(right)) => {
             match (left.subclass_of(), right.subclass_of()) {
                 (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(&right),
