@@ -1,8 +1,11 @@
 use std::collections::HashSet;
 
 use itertools::Itertools;
-use ruff_python_ast::{Expr, ExprBooleanLiteral, Identifier, Stmt};
-use ruff_python_semantic::cfg::graph::{build_cfg, BlockId, Condition, ControlFlowGraph};
+use ruff_python_ast::{helpers::Truthiness, Identifier, Stmt};
+use ruff_python_semantic::{
+    cfg::graph::{build_cfg, BlockId, Condition, ControlFlowGraph},
+    SemanticModel,
+};
 use ruff_text_size::TextRange;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -44,7 +47,7 @@ impl Violation for UnreachableCode {
 
 pub(crate) fn in_function(checker: &Checker, name: &Identifier, body: &[Stmt]) {
     let cfg = build_cfg(body);
-    let reachable = reachable(&cfg);
+    let reachable = reachable(&cfg, checker.semantic());
 
     let mut blocks = (0..cfg.num_blocks())
         .map(BlockId::from_usize)
@@ -70,11 +73,13 @@ pub(crate) fn in_function(checker: &Checker, name: &Identifier, body: &[Stmt]) {
             },
             TextRange::new(start, end),
         ));
+        // Advance past reachable blocks
+        while blocks.next_if(|block| reachable.contains(block)).is_some() {}
     }
 }
 
 /// Returns set of block indices reachable from entry block
-fn reachable(cfg: &ControlFlowGraph) -> HashSet<BlockId> {
+fn reachable(cfg: &ControlFlowGraph, semantic: &SemanticModel) -> HashSet<BlockId> {
     let mut reachable = HashSet::with_capacity(cfg.num_blocks());
     let mut stack = Vec::new();
 
@@ -90,7 +95,7 @@ fn reachable(cfg: &ControlFlowGraph) -> HashSet<BlockId> {
                         if already_taken_branch {
                             false
                         } else {
-                            match taken(cond) {
+                            match taken(cond, semantic) {
                                 Some(true) => {
                                     already_taken_branch = true;
                                     true
@@ -113,13 +118,13 @@ fn reachable(cfg: &ControlFlowGraph) -> HashSet<BlockId> {
 /// with `Some(false)` if it's never taken. If it can't be determined it returns
 /// `None`, e.g. `if i == 100`.
 #[allow(clippy::unnecessary_wraps)]
-fn taken(condition: &Condition) -> Option<bool> {
+fn taken(condition: &Condition, semantic: &SemanticModel) -> Option<bool> {
     match condition {
         Condition::Always => Some(true),
-        Condition::Test(expr) => match expr {
-            Expr::BooleanLiteral(ExprBooleanLiteral { value, .. }) => Some(*value),
-            _ => None,
-        },
+        Condition::Test(expr) => {
+            Truthiness::from_expr(expr, |id| semantic.has_builtin_binding(id)).into_bool()
+        }
+
         Condition::Else => None,
     }
 }
