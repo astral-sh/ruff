@@ -11,12 +11,12 @@ use std::fmt::Display;
 use ruff_python_ast::{
     self as ast,
     comparable::ComparableExpr,
-    visitor::{walk_expr, Visitor},
+    visitor::{source_order::SourceOrderVisitor, walk_expr, Visitor},
     Expr, ExprContext, IrrefutablePatternKind, Pattern, PySourceType, PythonVersion, Stmt,
     StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Debug)]
 pub struct Checkpoint {
@@ -124,6 +124,37 @@ impl SemanticSyntaxChecker {
                 // for *x in xs: ...
                 Self::invalid_star_expression(target, ctx);
                 Self::invalid_star_expression(iter, ctx);
+            }
+            Stmt::Try(ast::StmtTry {
+                range: _,
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star: _,
+            }) => {
+                let mut visitor = TryExceptVisitor::new(ctx);
+                for stmt in body {
+                    SourceOrderVisitor::visit_stmt(&mut visitor, stmt);
+                }
+                if ctx.python_version() < PythonVersion::PY313 {
+                    for stmt in orelse {
+                        SourceOrderVisitor::visit_stmt(&mut visitor, stmt);
+                    }
+                    for handler in handlers {
+                        SourceOrderVisitor::visit_except_handler(&mut visitor, handler);
+                    }
+                } else {
+                    for handler in handlers {
+                        SourceOrderVisitor::visit_except_handler(&mut visitor, handler);
+                    }
+                    for stmt in orelse {
+                        SourceOrderVisitor::visit_stmt(&mut visitor, stmt);
+                    }
+                }
+                for stmt in finalbody {
+                    SourceOrderVisitor::visit_stmt(&mut visitor, stmt);
+                }
             }
             _ => {}
         }
@@ -1277,6 +1308,99 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
         // match x:
         //     case __debug__: ...
         SemanticSyntaxChecker::check_identifier(ident, self.ctx);
+    }
+}
+
+struct TryExceptVisitor<'a, Ctx> {
+    /// Context used for emitting errors.
+    ctx: &'a Ctx,
+    identifiers: FxHashMap<ast::name::Name, TextRange>,
+}
+
+impl<'a, Ctx> TryExceptVisitor<'a, Ctx> {
+    fn new(ctx: &'a Ctx) -> Self {
+        Self {
+            ctx,
+            identifiers: FxHashMap::default(),
+        }
+    }
+}
+
+impl<Ctx> SourceOrderVisitor<'_> for TryExceptVisitor<'_, Ctx>
+where
+    Ctx: SemanticSyntaxContext,
+{
+    fn visit_identifier(&mut self, identifier: &ast::Identifier) {
+        self.identifiers
+            .insert(identifier.id.clone(), identifier.range);
+    }
+
+    fn visit_expr(&mut self, expr: &Expr) {
+        if let Expr::Name(ast::ExprName { range, id, ctx: _ }) = expr {
+            self.identifiers.insert(id.clone(), *range);
+        }
+        ast::visitor::source_order::walk_expr(self, expr);
+    }
+
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        if let Stmt::Global(ast::StmtGlobal { names, .. }) = stmt {
+            for name in names {
+                if let Some(range) = self.identifiers.get(&name.id) {
+                    // test_ok global_in_try_py312
+                    // # parse_options: {"target-version": "3.12"}
+                    // a = 10
+                    // def g():
+                    //     try:
+                    //         1 / 0
+                    //     except:
+                    //         a = 1
+                    //     else:
+                    //         global a
+
+                    // test_ok global_in_try_py313
+                    // # parse_options: {"target-version": "3.13"}
+                    // a = 10
+                    // def f():
+                    //     try:
+                    //         pass
+                    //     except:
+                    //         global a
+                    //     else:
+                    //         print(a)
+
+                    // test_err global_in_try_py312
+                    // # parse_options: {"target-version": "3.12"}
+                    // a = 10
+                    // def f():
+                    //     try:
+                    //         pass
+                    //     except:
+                    //         global a
+                    //     else:
+                    //         print(a)
+
+                    // test_err global_in_try_py313
+                    // # parse_options: {"target-version": "3.13"}
+                    // a = 10
+                    // def g():
+                    //     try:
+                    //         1 / 0
+                    //     except:
+                    //         a = 1
+                    //     else:
+                    //         global a
+                    SemanticSyntaxChecker::add_error(
+                        self.ctx,
+                        SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
+                            name: name.id.to_string(),
+                            start: stmt.start(),
+                        },
+                        *range,
+                    );
+                }
+            }
+        }
+        ast::visitor::source_order::walk_stmt(self, stmt);
     }
 }
 

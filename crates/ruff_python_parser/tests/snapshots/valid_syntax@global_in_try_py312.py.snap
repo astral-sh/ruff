@@ -1,0 +1,142 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/global_in_try_py312.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..136,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 44..50,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 44..45,
+                                id: Name("a"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 48..50,
+                            value: Int(
+                                10,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 51..135,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("g"),
+                        range: 55..56,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 56..58,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Try(
+                            StmtTry {
+                                range: 64..135,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 77..82,
+                                            value: BinOp(
+                                                ExprBinOp {
+                                                    range: 77..82,
+                                                    left: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 77..78,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                    op: Div,
+                                                    right: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 81..82,
+                                                            value: Int(
+                                                                0,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                handlers: [
+                                    ExceptHandler(
+                                        ExceptHandlerExceptHandler {
+                                            range: 87..108,
+                                            type_: None,
+                                            name: None,
+                                            body: [
+                                                Assign(
+                                                    StmtAssign {
+                                                        range: 103..108,
+                                                        targets: [
+                                                            Name(
+                                                                ExprName {
+                                                                    range: 103..104,
+                                                                    id: Name("a"),
+                                                                    ctx: Store,
+                                                                },
+                                                            ),
+                                                        ],
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 107..108,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                ],
+                                orelse: [
+                                    Global(
+                                        StmtGlobal {
+                                            range: 127..135,
+                                            names: [
+                                                Identifier {
+                                                    id: Name("a"),
+                                                    range: 134..135,
+                                                },
+                                            ],
+                                        },
+                                    ),
+                                ],
+                                finalbody: [],
+                                is_star: false,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```

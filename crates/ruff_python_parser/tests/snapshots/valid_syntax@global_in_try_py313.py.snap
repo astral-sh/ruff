@@ -1,0 +1,128 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/global_in_try_py313.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..138,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 44..50,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 44..45,
+                                id: Name("a"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 48..50,
+                            value: Int(
+                                10,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 51..137,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 55..56,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 56..58,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Try(
+                            StmtTry {
+                                range: 64..137,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 77..81,
+                                        },
+                                    ),
+                                ],
+                                handlers: [
+                                    ExceptHandler(
+                                        ExceptHandlerExceptHandler {
+                                            range: 86..110,
+                                            type_: None,
+                                            name: None,
+                                            body: [
+                                                Global(
+                                                    StmtGlobal {
+                                                        range: 102..110,
+                                                        names: [
+                                                            Identifier {
+                                                                id: Name("a"),
+                                                                range: 109..110,
+                                                            },
+                                                        ],
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                ],
+                                orelse: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 129..137,
+                                            value: Call(
+                                                ExprCall {
+                                                    range: 129..137,
+                                                    func: Name(
+                                                        ExprName {
+                                                            range: 129..134,
+                                                            id: Name("print"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    arguments: Arguments {
+                                                        range: 134..137,
+                                                        args: [
+                                                            Name(
+                                                                ExprName {
+                                                                    range: 135..136,
+                                                                    id: Name("a"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        ],
+                                                        keywords: [],
+                                                    },
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                finalbody: [],
+                                is_star: false,
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
