@@ -85,21 +85,16 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
 
 #[salsa::tracked(return_ref)]
 pub fn get_types(db: &dyn Db, file: File) -> FxHashMap<Definition<'_>, Type<'_>> {
-    let _span = tracing::trace_span!("check_types", ?file).entered();
+    let _span = tracing::trace_span!("get_types", ?file).entered();
 
-    tracing::debug!("Checking file '{path}'", path = file.path(db));
+    tracing::debug!("Getting types for file '{path}'", path = file.path(db));
 
     let index = semantic_index(db, file);
     let mut types = FxHashMap::default();
 
     for scope_id in index.scope_ids() {
         let result = infer_scope_types(db, scope_id);
-        types.extend(
-            result
-                .bindings()
-                .iter()
-                .map(|(definition, type_and_qualifiers)| (*definition, *type_and_qualifiers)),
-        );
+        types.extend(result.bindings());
     }
 
     types
