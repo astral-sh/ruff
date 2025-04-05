@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
-snapshot_kind: text
 ---
 AIR002.py:4:1: AIR002 DAG should have an explicit `schedule` argument
   |
