@@ -1,4 +1,5 @@
-use crate::{Db, RangedValue};
+use crate::Db;
+use crate::RangedValue;
 use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{File, FileRange};
@@ -40,7 +41,7 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
 }
 
 pub fn get_inlay_hints(db: &dyn Db, file: File) -> Vec<RangedValue<InlayHintContent<'_>>> {
-    let mut visitor = InlayHintVisitor::new(db.upcast(), file);
+    let mut visitor = InlayHintVisitor::new(db, file);
 
     let ast = parsed_module(db.upcast(), file);
 
@@ -60,7 +61,7 @@ struct InlayHintVisitor<'db> {
 impl<'db> InlayHintVisitor<'db> {
     fn new(db: &'db dyn Db, file: File) -> Self {
         Self {
-            model: SemanticModel::new(db, file),
+            model: SemanticModel::new(db.upcast(), file),
             file,
             hints: Vec::new(),
         }
