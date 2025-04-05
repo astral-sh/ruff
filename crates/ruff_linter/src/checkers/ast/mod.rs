@@ -587,6 +587,10 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn source(&self) -> &str {
         self.source()
     }
+
+    fn future_annotations_or_stub(&self) -> bool {
+        self.semantic.future_annotations_or_stub()
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {

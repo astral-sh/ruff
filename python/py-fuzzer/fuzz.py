@@ -71,6 +71,7 @@ def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
             "--no-cache",
             "--target-version",
             "py313",
+            "--preview",
             "-",
         ],
         capture_output=True,

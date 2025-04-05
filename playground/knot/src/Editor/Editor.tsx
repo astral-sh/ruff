@@ -15,7 +15,7 @@ import {
   Range,
   Uri,
 } from "monaco-editor";
-import { RefObject, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Theme } from "shared";
 import {
   Severity,
@@ -54,35 +54,25 @@ export default function Editor({
   onMount,
   onFileOpened,
 }: Props) {
-  const disposable = useRef<{
-    typeDefinition: IDisposable;
-    editorOpener: IDisposable;
-    hover: IDisposable;
-    inlayHints: IDisposable;
-  } | null>(null);
-  const playgroundState = useRef<PlaygroundServerProps>({
-    monaco: null,
-    files,
-    workspace,
-    onFileOpened,
-  });
+  const serverRef = useRef<PlaygroundServer | null>(null);
 
-  playgroundState.current = {
-    monaco: playgroundState.current.monaco,
-    files,
-    workspace,
-    onFileOpened,
-  };
+  if (serverRef.current != null) {
+    serverRef.current.update({
+      files,
+      workspace,
+      onFileOpened,
+    });
+  }
 
   // Update the diagnostics in the editor.
   useEffect(() => {
-    const monaco = playgroundState.current.monaco;
+    const server = serverRef.current;
 
-    if (monaco == null) {
+    if (server == null) {
       return;
     }
 
-    updateMarkers(monaco, diagnostics);
+    server.updateDiagnostics(diagnostics);
   }, [diagnostics]);
 
   const handleChange = useCallback(
@@ -94,42 +84,29 @@ export default function Editor({
 
   useEffect(() => {
     return () => {
-      disposable.current?.typeDefinition.dispose();
-      disposable.current?.editorOpener.dispose();
-      disposable.current?.hover.dispose();
-      disposable.current?.inlayHints.dispose();
+      const server = serverRef.current;
+
+      if (server != null) {
+        server.dispose();
+      }
     };
   }, []);
 
   const handleMount: OnMount = useCallback(
     (editor, instance) => {
-      updateMarkers(instance, diagnostics);
+      const server = new PlaygroundServer(instance, {
+        workspace,
+        files,
+        onFileOpened,
+      });
 
-      const server = new PlaygroundServer(playgroundState);
-      const typeDefinitionDisposable =
-        instance.languages.registerTypeDefinitionProvider("python", server);
-      const hoverDisposable = instance.languages.registerHoverProvider(
-        "python",
-        server,
-      );
-      const inlayHintsDisposable =
-        instance.languages.registerInlayHintsProvider("python", server);
-      const editorOpenerDisposable =
-        instance.editor.registerEditorOpener(server);
-
-      disposable.current = {
-        typeDefinition: typeDefinitionDisposable,
-        editorOpener: editorOpenerDisposable,
-        hover: hoverDisposable,
-        inlayHints: inlayHintsDisposable,
-      };
-
-      playgroundState.current.monaco = instance;
+      server.updateDiagnostics(diagnostics);
+      serverRef.current = server;
 
       onMount(editor, instance);
     },
 
-    [onMount, diagnostics],
+    [files, onFileOpened, workspace, onMount, diagnostics],
   );
 
   return (
@@ -154,52 +131,9 @@ export default function Editor({
   );
 }
 
-function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
-  const editor = monaco.editor;
-  const model = editor?.getModels()[0];
-
-  if (!model) {
-    return;
-  }
-
-  editor.setModelMarkers(
-    model,
-    "owner",
-    diagnostics.map((diagnostic) => {
-      const mapSeverity = (severity: Severity) => {
-        switch (severity) {
-          case Severity.Info:
-            return MarkerSeverity.Info;
-          case Severity.Warning:
-            return MarkerSeverity.Warning;
-          case Severity.Error:
-            return MarkerSeverity.Error;
-          case Severity.Fatal:
-            return MarkerSeverity.Error;
-        }
-      };
-
-      const range = diagnostic.range;
-
-      return {
-        code: diagnostic.id,
-        startLineNumber: range?.start?.line ?? 0,
-        startColumn: range?.start?.column ?? 0,
-        endLineNumber: range?.end?.line ?? 0,
-        endColumn: range?.end?.column ?? 0,
-        message: diagnostic.message,
-        severity: mapSeverity(diagnostic.severity),
-        tags: [],
-      };
-    }),
-  );
-}
-
 interface PlaygroundServerProps {
-  monaco: Monaco | null;
   workspace: Workspace;
   files: ReadonlyFiles;
-
   onFileOpened: (file: FileId) => void;
 }
 
@@ -210,7 +144,27 @@ class PlaygroundServer
     languages.HoverProvider,
     languages.InlayHintsProvider
 {
-  constructor(private props: RefObject<PlaygroundServerProps>) {}
+  private typeDefinitionProviderDisposable: IDisposable;
+  private editorOpenerDisposable: IDisposable;
+  private hoverDisposable: IDisposable;
+  private inlayHintsDisposable: IDisposable;
+
+  constructor(
+    private monaco: Monaco,
+    private props: PlaygroundServerProps,
+  ) {
+    this.typeDefinitionProviderDisposable =
+      monaco.languages.registerTypeDefinitionProvider("python", this);
+    this.hoverDisposable = monaco.languages.registerHoverProvider(
+      "python",
+      this,
+    );
+    this.inlayHintsDisposable = monaco.languages.registerInlayHintsProvider(
+      "python",
+      this,
+    );
+    this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
+  }
 
   provideInlayHints(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -220,14 +174,14 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.InlayHintList> {
-    const workspace = this.props.current.workspace;
-    const selectedFile = this.props.current.files.selected;
+    const workspace = this.props.workspace;
+    const selectedFile = this.props.files.selected;
 
     if (selectedFile == null) {
       return;
     }
 
-    const selectedHandle = this.props.current.files.handles[selectedFile];
+    const selectedHandle = this.props.files.handles[selectedFile];
 
     if (selectedHandle == null) {
       return;
@@ -267,6 +221,61 @@ class PlaygroundServer
     return undefined;
   }
 
+  update(props: PlaygroundServerProps) {
+    this.props = props;
+  }
+
+  updateDiagnostics(diagnostics: Array<Diagnostic>) {
+    if (this.props.files.selected == null) {
+      return;
+    }
+
+    const handle = this.props.files.handles[this.props.files.selected];
+
+    if (handle == null) {
+      return;
+    }
+
+    const editor = this.monaco.editor;
+    const model = editor.getModel(Uri.parse(handle.path()));
+
+    if (model == null) {
+      return;
+    }
+
+    editor.setModelMarkers(
+      model,
+      "owner",
+      diagnostics.map((diagnostic) => {
+        const mapSeverity = (severity: Severity) => {
+          switch (severity) {
+            case Severity.Info:
+              return MarkerSeverity.Info;
+            case Severity.Warning:
+              return MarkerSeverity.Warning;
+            case Severity.Error:
+              return MarkerSeverity.Error;
+            case Severity.Fatal:
+              return MarkerSeverity.Error;
+          }
+        };
+
+        const range = diagnostic.range;
+
+        return {
+          code: diagnostic.id,
+          startLineNumber: range?.start?.line ?? 0,
+          startColumn: range?.start?.column ?? 0,
+          endLineNumber: range?.end?.line ?? 0,
+          endColumn: range?.end?.column ?? 0,
+          message: diagnostic.message,
+          severity: mapSeverity(diagnostic.severity),
+          tags: [],
+        };
+      }),
+    );
+  }
+
   provideHover(
     model: editor.ITextModel,
     position: Position,
@@ -275,14 +284,14 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     context?: languages.HoverContext<languages.Hover> | undefined,
   ): languages.ProviderResult<languages.Hover> {
-    const workspace = this.props.current.workspace;
+    const workspace = this.props.workspace;
 
-    const selectedFile = this.props.current.files.selected;
+    const selectedFile = this.props.files.selected;
     if (selectedFile == null) {
       return;
     }
 
-    const selectedHandle = this.props.current.files.handles[selectedFile];
+    const selectedHandle = this.props.files.handles[selectedFile];
 
     if (selectedHandle == null) {
       return;
@@ -309,14 +318,14 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
-    const workspace = this.props.current.workspace;
+    const workspace = this.props.workspace;
 
-    const selectedFile = this.props.current.files.selected;
+    const selectedFile = this.props.files.selected;
     if (selectedFile == null) {
       return;
     }
 
-    const selectedHandle = this.props.current.files.handles[selectedFile];
+    const selectedHandle = this.props.files.handles[selectedFile];
 
     if (selectedHandle == null) {
       return;
@@ -357,12 +366,7 @@ class PlaygroundServer
     resource: Uri,
     selectionOrPosition?: IRange | IPosition,
   ): boolean {
-    const files = this.props.current.files;
-    const monaco = this.props.current.monaco;
-
-    if (monaco == null) {
-      return false;
-    }
+    const files = this.props.files;
 
     const fileId = files.index.find((file) => {
       return Uri.file(file.name).toString() === resource.toString();
@@ -374,11 +378,11 @@ class PlaygroundServer
 
     const handle = files.handles[fileId];
 
-    let model = monaco.editor.getModel(resource);
+    let model = this.monaco.editor.getModel(resource);
     if (model == null) {
       const language =
         handle != null && isPythonFile(handle) ? "python" : undefined;
-      model = monaco.editor.createModel(
+      model = this.monaco.editor.createModel(
         files.contents[fileId],
         language,
         resource,
@@ -391,7 +395,7 @@ class PlaygroundServer
     if (files.selected !== fileId) {
       source.setModel(model);
 
-      this.props.current.onFileOpened(fileId);
+      this.props.onFileOpened(fileId);
     }
 
     if (selectionOrPosition != null) {
@@ -408,6 +412,13 @@ class PlaygroundServer
     }
 
     return true;
+  }
+
+  dispose() {
+    this.hoverDisposable.dispose();
+    this.editorOpenerDisposable.dispose();
+    this.typeDefinitionProviderDisposable.dispose();
+    this.inlayHintsDisposable.dispose();
   }
 }
 
