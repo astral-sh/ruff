@@ -168,7 +168,7 @@ if sys.platform == "win32":
 
 ```toml
 [environment]
-# python-platform not specified
+python-platform = "all"
 ```
 
 ```py
