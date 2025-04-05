@@ -189,6 +189,7 @@ from airflow.operators.sql import (
 from airflow.operators.sqlite_operator import SqliteOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
+from airflow.sensors import filesystem
 from airflow.sensors.date_time import DateTimeSensor
 from airflow.sensors.external_task import ExternalTaskMarker, ExternalTaskSensor
 from airflow.sensors.filesystem import FileSensor
@@ -312,6 +313,9 @@ fab_override
 FabAuthManager()
 FabAirflowSecurityManagerOverride()
 
+# check whether attribute access
+basic_auth.auth_current_user
+
 # apache-airflow-providers-cncf-kubernetes
 ALL_NAMESPACES
 POD_EXECUTOR_DONE_KEY
@@ -406,6 +410,7 @@ SqliteOperator()
 ZendeskHook()
 
 # apache-airflow-providers-standard
+filesystem.FileSensor()
 FileSensor()
 TriggerDagRunOperator()
 ExternalTaskMarker(), ExternalTaskSensor()
