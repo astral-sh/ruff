@@ -19,12 +19,16 @@ doctest = false
 default = ["console_error_panic_hook"]
 
 [dependencies]
-red_knot_project = { workspace = true, default-features = false, features = ["deflate"] }
 red_knot_ide = { workspace = true }
+red_knot_project = { workspace = true, default-features = false, features = [
+    "deflate",
+    "format"
+] }
 red_knot_python_semantic = { workspace = true }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
 ruff_notebook = { workspace = true }
+ruff_python_formatter = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
@@ -44,4 +48,3 @@ wasm-bindgen-test = { workspace = true }
 
 [lints]
 workspace = true
-
