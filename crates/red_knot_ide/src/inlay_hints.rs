@@ -96,3 +96,53 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
         source_order::walk_stmt(self, stmt);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use ruff_db::files::{system_path_to_file, File};
+    use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_text_size::TextSize;
+
+    use crate::db::tests::TestDb;
+
+    struct TestCase {
+        db: TestDb,
+        file: File,
+    }
+
+    fn test_case(content: impl AsRef<str>) -> TestCase {
+        let mut db = TestDb::new();
+        db.write_file("test.py", content).unwrap();
+
+        let file = system_path_to_file(&db, "test.py").unwrap();
+
+        TestCase { db, file }
+    }
+
+    #[test]
+    fn test_assign_statement() {
+        let test_case = test_case("x = 1");
+        let hints = get_inlay_hints(&test_case.db, test_case.file);
+        assert_eq!(hints.len(), 1);
+        assert_eq!(
+            hints[0].value,
+            InlayHintContent::AssignStatement(Type::IntLiteral(1))
+        );
+        assert_eq!(
+            hints[0].range,
+            FileRange::new(
+                test_case.file,
+                TextRange::new(TextSize::from(0), TextSize::from(1))
+            )
+        );
+    }
+
+    #[test]
+    fn test_assign_statement_with_type_annotation() {
+        let test_case = test_case("x: int = 1");
+        let hints = get_inlay_hints(&test_case.db, test_case.file);
+        assert_eq!(hints.len(), 0);
+    }
+}
