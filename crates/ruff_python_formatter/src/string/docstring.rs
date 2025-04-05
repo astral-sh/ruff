@@ -1597,11 +1597,14 @@ fn docstring_format_source(
 }
 
 /// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
-/// that avoids `content""""` and `content\"""`. This does only applies to un-escaped backslashes,
-/// so `content\\ """` doesn't need a space while `content\\\ """` does.
+/// that avoids `content""""` and `content\"""`. This does only applies to un-escaped or escaping
+///  backslashes, so `content\\ """` or `content\""""` don't need a space while `content\\\ """` does.
 pub(super) fn needs_chaperone_space(flags: AnyStringFlags, trim_end: &str) -> bool {
-    if trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1 {
-        true
+    if (flags.is_triple_quoted()
+        && trim_end.ends_with(&std::format!("\\{}", flags.quote_style().as_char())))
+        || trim_end.ends_with('\\')
+    {
+        trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
     } else {
         flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
     }
