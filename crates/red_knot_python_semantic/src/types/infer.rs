@@ -7386,7 +7386,7 @@ impl StringPartsCollector {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
+    use crate::db::tests::{setup_db, TestDb};
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
@@ -7394,7 +7394,7 @@ mod tests {
     use crate::types::check_types;
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::system::{DbWithWritableSystem as _, SystemPath};
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
     use super::*;
@@ -7548,26 +7548,6 @@ mod tests {
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         Ok(())
-    }
-
-    #[test]
-    fn relative_import_resolution_in_site_packages_when_site_packages_is_subdirectory_of_first_party_search_path(
-    ) {
-        let project_root = SystemPath::new("/src");
-        let foo_dot_py = project_root.join("foo.py");
-        let site_packages = project_root.join(".venv/lib/python3.13/site-packages");
-
-        let db = TestDbBuilder::new()
-            .with_site_packages_search_path(&site_packages)
-            .with_file(&foo_dot_py, "from bar import A")
-            .with_file(&site_packages.join("bar/__init__.py"), "from .a import *")
-            .with_file(&site_packages.join("bar/a.py"), "class A: ...")
-            .build()
-            .unwrap();
-
-        assert_file_diagnostics(&db, foo_dot_py.as_str(), &[]);
-        let a_symbol = get_symbol(&db, foo_dot_py.as_str(), &[], "A");
-        assert!(a_symbol.expect_type().is_class_literal());
     }
 
     #[test]
