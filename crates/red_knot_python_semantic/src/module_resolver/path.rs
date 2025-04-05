@@ -116,8 +116,9 @@ impl ModulePath {
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
                 let absolute_path = search_path.join(relative_path);
+
                 system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.py")).is_ok()
-                    || system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.py"))
+                    || system_path_to_file(resolver.db.upcast(), absolute_path.join("__init__.pyi"))
                         .is_ok()
             }
             SearchPathInner::StandardLibraryCustom(search_path) => {
@@ -629,6 +630,19 @@ impl PartialEq<VendoredPathBuf> for SearchPath {
 impl PartialEq<SearchPath> for VendoredPathBuf {
     fn eq(&self, other: &SearchPath) -> bool {
         other.eq(self)
+    }
+}
+
+impl fmt::Display for SearchPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &*self.0 {
+            SearchPathInner::Extra(system_path_buf)
+            | SearchPathInner::FirstParty(system_path_buf)
+            | SearchPathInner::SitePackages(system_path_buf)
+            | SearchPathInner::Editable(system_path_buf)
+            | SearchPathInner::StandardLibraryCustom(system_path_buf) => system_path_buf.fmt(f),
+            SearchPathInner::StandardLibraryVendored(vendored_path_buf) => vendored_path_buf.fmt(f),
+        }
     }
 }
 
