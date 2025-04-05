@@ -10,6 +10,7 @@ pub use module_resolver::{resolve_module, system_module_search_paths, KnownModul
 pub use program::{Program, ProgramSettings, PythonPath, SearchPathSettings};
 pub use python_platform::PythonPlatform;
 pub use semantic_model::{HasType, SemanticModel};
+pub use site_packages::SysPrefixPathOrigin;
 
 pub mod ast_node_ref;
 mod db;
