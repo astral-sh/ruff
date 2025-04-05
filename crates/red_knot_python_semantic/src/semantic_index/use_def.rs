@@ -277,7 +277,7 @@ use crate::semantic_index::visibility_constraints::{
 };
 
 use super::definition::DefinitionNodeKey;
-use super::re_exports::SnapshotPriorState;
+use super::re_exports::Availability;
 
 mod symbol_state;
 
@@ -695,14 +695,14 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         symbol: ScopedSymbolId,
         definition: Definition<'db>,
-        snapshot_required: SnapshotPriorState,
+        snapshot_required: Availability,
         definition_key: DefinitionNodeKey,
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
         let def_id = self.all_definitions.push(Some(definition));
         let symbol_state = &mut self.symbol_states[symbol];
-        if snapshot_required.is_yes() {
+        if snapshot_required.is_possibly_unavailable() {
             self.bindings_at_star_imports
                 .insert((definition_key, symbol), symbol_state.clone());
         }

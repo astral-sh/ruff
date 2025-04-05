@@ -41,7 +41,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::Db;
 
-use super::re_exports::SnapshotPriorState;
+use super::re_exports::Availability;
 
 mod except_handlers;
 
@@ -369,7 +369,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition_node: impl Into<DefinitionNodeRef<'db>> + std::fmt::Debug + Copy,
     ) -> Definition<'db> {
         let (definition, num_definitions) =
-            self.push_additional_definition(symbol, definition_node, SnapshotPriorState::No);
+            self.push_additional_definition(symbol, definition_node, Availability::AlwaysAvailable);
         debug_assert_eq!(
             num_definitions,
             1,
@@ -393,7 +393,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         &mut self,
         symbol: ScopedSymbolId,
         definition_node: impl Into<DefinitionNodeRef<'db>>,
-        snapshot_prior_state: SnapshotPriorState,
+        snapshot_prior_state: Availability,
     ) -> (Definition<'db>, usize) {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]

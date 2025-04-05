@@ -64,7 +64,7 @@ impl<'a> IntoIterator for &'a Reexports {
 }
 
 impl Reexports {
-    fn add(&mut self, name: Name, availability: SnapshotPriorState) {
+    fn add(&mut self, name: Name, availability: Availability) {
         self.0.insert(Reexport {
             symbol_name: name,
             availability,
@@ -75,24 +75,26 @@ impl Reexports {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(super) struct Reexport {
     pub(super) symbol_name: Name,
-    pub(super) availability: SnapshotPriorState,
+    pub(super) availability: Availability,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub(super) enum SnapshotPriorState {
-    No,
-    Yes,
+pub(super) enum Availability {
+    AlwaysAvailable,
+    PossiblyUnavailable,
 }
 
-impl SnapshotPriorState {
-    pub(super) const fn is_yes(self) -> bool {
-        matches!(self, SnapshotPriorState::Yes)
+impl Availability {
+    pub(super) const fn is_possibly_unavailable(self) -> bool {
+        matches!(self, Availability::PossiblyUnavailable)
     }
 
-    fn and(self, other: SnapshotPriorState) -> SnapshotPriorState {
+    fn and(self, other: Availability) -> Availability {
         match (self, other) {
-            (SnapshotPriorState::No, SnapshotPriorState::No) => SnapshotPriorState::No,
-            _ => SnapshotPriorState::Yes,
+            (Availability::AlwaysAvailable, Availability::AlwaysAvailable) => {
+                Availability::AlwaysAvailable
+            }
+            _ => Availability::PossiblyUnavailable,
         }
     }
 }
@@ -118,18 +120,18 @@ impl<'db> ExportFinder<'db> {
         }
     }
 
-    fn possibly_add_export(&mut self, name: &Name, availability: SnapshotPriorState) {
+    fn possibly_add_export(&mut self, name: &Name, availability: Availability) {
         if name.starts_with('_') {
             return;
         }
         self.exports.add(name.clone(), availability);
     }
 
-    fn current_availability(&self) -> SnapshotPriorState {
+    fn current_availability(&self) -> Availability {
         if self.condition_counter > 0 {
-            SnapshotPriorState::Yes
+            Availability::PossiblyUnavailable
         } else {
-            SnapshotPriorState::No
+            Availability::AlwaysAvailable
         }
     }
 }
@@ -167,7 +169,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     // all names with leading underscores, but this will not always be the case
                     // (in the future we will want to support modules with `__all__ = ['_']`).
                     if name != "_" {
-                        self.possibly_add_export(&name.id, SnapshotPriorState::Yes);
+                        self.possibly_add_export(&name.id, Availability::PossiblyUnavailable);
                     }
                 }
             }
@@ -181,12 +183,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.possibly_add_export(&rest.id, SnapshotPriorState::Yes);
+                    self.possibly_add_export(&rest.id, Availability::PossiblyUnavailable);
                 }
             }
             ast::Pattern::MatchStar(ast::PatternMatchStar { name, range: _ }) => {
                 if let Some(name) = name {
-                    self.possibly_add_export(&name.id, SnapshotPriorState::Yes);
+                    self.possibly_add_export(&name.id, Availability::PossiblyUnavailable);
                 }
             }
             ast::Pattern::MatchSequence(_)
@@ -387,11 +389,11 @@ struct WalrusFinder<'a, 'db> {
 }
 
 impl WalrusFinder<'_, '_> {
-    fn current_availability(&self) -> SnapshotPriorState {
+    fn current_availability(&self) -> Availability {
         if self.condition_counter > 0 {
-            SnapshotPriorState::Yes
+            Availability::PossiblyUnavailable
         } else {
-            SnapshotPriorState::No
+            Availability::AlwaysAvailable
         }
     }
 }
