@@ -1,3 +1,6 @@
+use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
+use ruff_db::source::source_text;
 use thiserror::Error;
 use tracing::Level;
 
@@ -13,6 +16,7 @@ use crate::comments::{
     has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
+pub use crate::db::Db;
 pub use crate::options::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
     QuoteStyle,
@@ -25,6 +29,7 @@ pub(crate) mod builders;
 pub mod cli;
 mod comments;
 pub(crate) mod context;
+mod db;
 pub(crate) mod expression;
 mod generated;
 pub(crate) mod module;
@@ -96,7 +101,7 @@ where
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, salsa::Update, PartialEq, Eq)]
 pub enum FormatModuleError {
     #[error(transparent)]
     ParseError(#[from] ParseError),
@@ -124,6 +129,19 @@ pub fn format_module_ast<'a>(
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
+    format_node(parsed, comment_ranges, source, options)
+}
+
+fn format_node<'a, N>(
+    parsed: &'a Parsed<N>,
+    comment_ranges: &'a CommentRanges,
+    source: &'a str,
+    options: PyFormatOptions,
+) -> FormatResult<Formatted<PyFormatContext<'a>>>
+where
+    N: AsFormat<PyFormatContext<'a>>,
+    &'a N: Into<AnyNodeRef<'a>>,
+{
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
 
@@ -138,12 +156,60 @@ pub fn format_module_ast<'a>(
     Ok(formatted)
 }
 
+#[salsa::tracked(return_ref)]
+pub fn formatted_file(db: &dyn Db, file: File) -> Result<FormattedFile, FormatModuleError> {
+    let options = db.format_options(file);
+
+    let parsed = parsed_module(db, file);
+
+    if let Some(first) = parsed.errors().first() {
+        return Err(FormatModuleError::ParseError(first.clone()));
+    }
+
+    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let source = source_text(db, file);
+
+    let formatted = format_node(parsed, &comment_ranges, &source, options)?;
+    let printed = formatted.print()?;
+
+    if printed.as_code() == &*source {
+        Ok(FormattedFile::Formatted)
+    } else {
+        Ok(FormattedFile::Reformatted(printed.into_code()))
+    }
+}
+
 /// Public function for generating a printable string of the debug comments.
 pub fn pretty_comments(module: &Mod, comment_ranges: &CommentRanges, source: &str) -> String {
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(module, source_code, comment_ranges);
 
     std::format!("{comments:#?}", comments = comments.debug(source_code))
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, salsa::Update)]
+pub enum FormattedFile {
+    /// The file is already correctly formatted.
+    Formatted,
+
+    /// The file has been reformatted. The string is its newly formatted content.
+    Reformatted(String),
+}
+
+impl FormattedFile {
+    pub fn as_reformatted(&self) -> Option<&str> {
+        match self {
+            FormattedFile::Formatted => None,
+            FormattedFile::Reformatted(code) => Some(code),
+        }
+    }
+
+    pub fn into_reformatted(self) -> Option<String> {
+        match self {
+            FormattedFile::Formatted => None,
+            FormattedFile::Reformatted(code) => Some(code),
+        }
+    }
 }
 
 #[cfg(test)]

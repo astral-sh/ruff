@@ -141,11 +141,13 @@ class PlaygroundServer
   implements
     languages.TypeDefinitionProvider,
     editor.ICodeEditorOpener,
-    languages.HoverProvider
+    languages.HoverProvider,
+    languages.DocumentFormattingEditProvider
 {
   private typeDefinitionProviderDisposable: IDisposable;
   private editorOpenerDisposable: IDisposable;
   private hoverDisposable: IDisposable;
+  private formatDisposable: IDisposable;
 
   constructor(
     private monaco: Monaco,
@@ -158,6 +160,8 @@ class PlaygroundServer
       this,
     );
     this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
+    this.formatDisposable =
+      monaco.languages.registerDocumentFormattingEditProvider("python", this);
   }
 
   update(props: PlaygroundServerProps) {
@@ -353,10 +357,37 @@ class PlaygroundServer
     return true;
   }
 
+  provideDocumentFormattingEdits(
+    model: editor.ITextModel,
+  ): languages.ProviderResult<languages.TextEdit[]> {
+    if (this.props.files.selected == null) {
+      return null;
+    }
+
+    const fileHandle = this.props.files.handles[this.props.files.selected];
+
+    if (fileHandle == null) {
+      return null;
+    }
+
+    const formatted = this.props.workspace.format(fileHandle);
+    if (formatted != null) {
+      return [
+        {
+          range: model.getFullModelRange(),
+          text: formatted,
+        },
+      ];
+    }
+
+    return null;
+  }
+
   dispose() {
     this.hoverDisposable.dispose();
     this.editorOpenerDisposable.dispose();
     this.typeDefinitionProviderDisposable.dispose();
+    this.formatDisposable.dispose();
   }
 }
 
