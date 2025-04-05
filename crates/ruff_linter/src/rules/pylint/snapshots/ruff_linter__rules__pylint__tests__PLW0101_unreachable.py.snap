@@ -31,4 +31,64 @@ unreachable.py:28:5: PLW0101 Unreachable code in `multiple_returns`
 29 | |     return 2
 30 | |     print("unreachable range should include above return")
    | |__________________________________________________________^ PLW0101
+31 |
+32 |   def while_loop():
+   |
+
+unreachable.py:34:9: PLW0101 Unreachable code in `while_loop`
+   |
+32 | def while_loop():
+33 |     while False:
+34 |         print("unreachable")
+   |         ^^^^^^^^^^^^^^^^^^^^ PLW0101
+35 |     print("reachable")
+36 |     while False:
+   |
+
+unreachable.py:37:9: PLW0101 Unreachable code in `while_loop`
+   |
+35 |     print("reachable")
+36 |     while False:
+37 |         print("unreachable")
+   |         ^^^^^^^^^^^^^^^^^^^^ PLW0101
+38 |     print("reachable")
+39 |     while True:
+   |
+
+unreachable.py:41:5: PLW0101 Unreachable code in `while_loop`
+   |
+39 |     while True:
+40 |         print("reachable")
+41 |     print("unreachable")
+   |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
+   |
+
+unreachable.py:47:9: PLW0101 Unreachable code in `after_break`
+   |
+45 |     while cond:
+46 |         break
+47 |         print("unreachable")
+   |         ^^^^^^^^^^^^^^^^^^^^ PLW0101
+48 |     print("reachable")    
+   |
+
+unreachable.py:53:9: PLW0101 Unreachable code in `after_continue`
+   |
+51 |       while True:
+52 |           continue
+53 | /         print("unreachable")
+54 | |     print("unreachable")
+   | |________________________^ PLW0101
+55 |
+56 |   def empty_iter():
+   |
+
+unreachable.py:58:9: PLW0101 Unreachable code in `empty_iter`
+   |
+56 | def empty_iter():
+57 |     for i in []:
+58 |         print("unreachable")
+   |         ^^^^^^^^^^^^^^^^^^^^ PLW0101
+59 |     else:
+60 |         print("reachable")
    |
