@@ -57,6 +57,7 @@ export default function Editor({
     typeDefinition: IDisposable;
     editorOpener: IDisposable;
     hover: IDisposable;
+    format: IDisposable;
   } | null>(null);
   const playgroundState = useRef<PlaygroundServerProps>({
     monaco: null,
@@ -95,6 +96,8 @@ export default function Editor({
       disposable.current?.typeDefinition.dispose();
       disposable.current?.editorOpener.dispose();
       disposable.current?.hover.dispose();
+      disposable.current?.format.dispose();
+      disposable.current = null;
     };
   }, []);
 
@@ -109,6 +112,11 @@ export default function Editor({
         "python",
         server,
       );
+      const formatDisposable =
+        instance.languages.registerDocumentFormattingEditProvider(
+          "python",
+          server,
+        );
       const editorOpenerDisposable =
         instance.editor.registerEditorOpener(server);
 
@@ -116,6 +124,7 @@ export default function Editor({
         typeDefinition: typeDefinitionDisposable,
         editorOpener: editorOpenerDisposable,
         hover: hoverDisposable,
+        format: formatDisposable,
       };
 
       playgroundState.current.monaco = instance;
@@ -201,8 +210,11 @@ class PlaygroundServer
   implements
     languages.TypeDefinitionProvider,
     editor.ICodeEditorOpener,
-    languages.HoverProvider
+    languages.HoverProvider,
+    languages.DocumentFormattingEditProvider
 {
+  displayName = "Red Knot";
+
   constructor(private props: RefObject<PlaygroundServerProps>) {}
 
   provideHover(
@@ -346,6 +358,33 @@ class PlaygroundServer
     }
 
     return true;
+  }
+
+  provideDocumentFormattingEdits(
+    model: editor.ITextModel,
+  ): languages.ProviderResult<languages.TextEdit[]> {
+    if (this.props.current.files.selected == null) {
+      return null;
+    }
+
+    const fileHandle =
+      this.props.current.files.handles[this.props.current.files.selected];
+
+    if (fileHandle == null) {
+      return null;
+    }
+
+    const formatted = this.props.current.workspace.format(fileHandle);
+    if (formatted != null) {
+      return [
+        {
+          range: model.getFullModelRange(),
+          text: formatted,
+        },
+      ];
+    }
+
+    return null;
   }
 }
 
