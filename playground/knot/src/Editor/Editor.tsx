@@ -12,6 +12,7 @@ import {
   languages,
   MarkerSeverity,
   Position,
+  Range,
   Uri,
 } from "monaco-editor";
 import { RefObject, useCallback, useEffect, useRef } from "react";
@@ -57,6 +58,7 @@ export default function Editor({
     typeDefinition: IDisposable;
     editorOpener: IDisposable;
     hover: IDisposable;
+    inlayHints: IDisposable;
   } | null>(null);
   const playgroundState = useRef<PlaygroundServerProps>({
     monaco: null,
@@ -95,6 +97,7 @@ export default function Editor({
       disposable.current?.typeDefinition.dispose();
       disposable.current?.editorOpener.dispose();
       disposable.current?.hover.dispose();
+      disposable.current?.inlayHints.dispose();
     };
   }, []);
 
@@ -109,6 +112,8 @@ export default function Editor({
         "python",
         server,
       );
+      const inlayHintsDisposable =
+        instance.languages.registerInlayHintsProvider("python", server);
       const editorOpenerDisposable =
         instance.editor.registerEditorOpener(server);
 
@@ -116,6 +121,7 @@ export default function Editor({
         typeDefinition: typeDefinitionDisposable,
         editorOpener: editorOpenerDisposable,
         hover: hoverDisposable,
+        inlayHints: inlayHintsDisposable,
       };
 
       playgroundState.current.monaco = instance;
@@ -201,9 +207,65 @@ class PlaygroundServer
   implements
     languages.TypeDefinitionProvider,
     editor.ICodeEditorOpener,
-    languages.HoverProvider
+    languages.HoverProvider,
+    languages.InlayHintsProvider
 {
   constructor(private props: RefObject<PlaygroundServerProps>) {}
+
+  provideInlayHints(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _model: editor.ITextModel,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _range: Range,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.InlayHintList> {
+    const workspace = this.props.current.workspace;
+    const selectedFile = this.props.current.files.selected;
+
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.current.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const inlayHints = workspace.inlayHints(selectedHandle);
+
+    if (inlayHints.length === 0) {
+      return undefined;
+    }
+
+    return {
+      dispose: () => {},
+      hints: inlayHints.map(
+        (hint: {
+          position: { line: number; column: number };
+          markdown: string;
+        }) => {
+          return {
+            label: hint.markdown,
+            position: {
+              lineNumber: hint.position.line,
+              column: hint.position.column,
+            },
+          };
+        },
+      ),
+    };
+  }
+
+  resolveInlayHint(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _hint: languages.InlayHint,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.InlayHint> {
+    return undefined;
+  }
 
   provideHover(
     model: editor.ITextModel,

@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use red_knot_ide::{goto_type_definition, hover, MarkupKind};
+use red_knot_ide::{get_inlay_hints, goto_type_definition, hover, MarkupKind};
 use red_knot_project::metadata::options::Options;
 use red_knot_project::metadata::value::ValueSource;
 use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -274,6 +274,23 @@ impl Workspace {
             range: source_range,
         }))
     }
+
+    #[wasm_bindgen(js_name = "inlayHints")]
+    pub fn inlay_hints(&self, file_id: &FileHandle) -> Result<Vec<InlayHint>, Error> {
+        let result = get_inlay_hints(&self.db, file_id.file);
+
+        Ok(result
+            .into_iter()
+            .map(|hint| {
+                let source_range = Range::from_file_range(&self.db, hint.range);
+
+                InlayHint {
+                    markdown: hint.display(&self.db).to_string(),
+                    position: Position::new(source_range.end.line, source_range.end.column),
+                }
+            })
+            .collect())
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -470,6 +487,14 @@ pub struct Hover {
     pub markdown: String,
 
     pub range: Range,
+}
+
+#[wasm_bindgen]
+pub struct InlayHint {
+    #[wasm_bindgen(getter_with_clone)]
+    pub markdown: String,
+
+    pub position: Position,
 }
 
 #[derive(Debug, Clone)]
