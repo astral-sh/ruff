@@ -221,18 +221,22 @@ fn run_test(
         }
     }
 
+    let configuration = test.configuration();
+
     let settings = ProgramSettings {
-        python_version: test.configuration().python_version().unwrap_or_default(),
-        python_platform: test.configuration().python_platform().unwrap_or_default(),
+        python_version: configuration.python_version().unwrap_or_default(),
+        python_platform: configuration.python_platform().unwrap_or_default(),
         search_paths: SearchPathSettings {
             src_roots: vec![src_path],
-            extra_paths: test
-                .configuration()
-                .extra_paths()
-                .unwrap_or_default()
-                .to_vec(),
+            extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
-            python_path: PythonPath::KnownSitePackages(vec![]),
+            python_path: PythonPath::KnownSitePackages(
+                configuration
+                    .python()
+                    .into_iter()
+                    .map(SystemPath::to_path_buf)
+                    .collect(),
+            ),
         },
     };
 
