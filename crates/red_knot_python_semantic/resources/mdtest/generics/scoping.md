@@ -83,11 +83,7 @@ class C[T]:
         return x
 
 c: C[int] = C()
-# TODO: no error
-# error: [invalid-argument-type]
 c.m1(1)
-# TODO: no error
-# error: [invalid-argument-type]
 c.m2(1)
 # TODO: expected type `int`
 # error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `T`"

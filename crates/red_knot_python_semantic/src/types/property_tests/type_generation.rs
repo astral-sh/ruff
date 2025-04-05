@@ -167,7 +167,7 @@ impl Ty {
                     .symbol
                     .expect_type()
                     .expect_class_literal()
-                    .class,
+                    .default_specialization(db),
             ),
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
@@ -175,7 +175,7 @@ impl Ty {
                     .symbol
                     .expect_type()
                     .expect_class_literal()
-                    .class,
+                    .default_specialization(db),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,

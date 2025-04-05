@@ -1,6 +1,6 @@
 use crate::symbol::SymbolAndQualifiers;
 
-use super::{ClassBase, ClassLiteralType, Db, KnownClass, Type};
+use super::{ClassBase, Db, KnownClass, Type};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
@@ -27,7 +27,7 @@ impl<'db> SubclassOfType<'db> {
             ClassBase::Dynamic(_) => Type::SubclassOf(Self { subclass_of }),
             ClassBase::Class(class) => {
                 if class.is_final(db) {
-                    Type::ClassLiteral(ClassLiteralType { class })
+                    Type::from(class)
                 } else if class.is_object(db) {
                     KnownClass::Type.to_instance(db)
                 } else {

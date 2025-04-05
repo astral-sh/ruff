@@ -7,7 +7,7 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{ClassLiteralType, KnownInstanceType, Type};
+use crate::types::{KnownInstanceType, Type};
 use ruff_db::diagnostic::{Diagnostic, OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
@@ -1025,7 +1025,7 @@ fn report_invalid_assignment_with_message(
     message: std::fmt::Arguments,
 ) {
     match target_ty {
-        Type::ClassLiteral(ClassLiteralType { class }) => {
+        Type::ClassLiteral(class) => {
             context.report_lint(&INVALID_ASSIGNMENT, node, format_args!(
                     "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
                     class.name(context.db())));

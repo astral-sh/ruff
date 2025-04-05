@@ -61,6 +61,7 @@ use crate::symbol::{
     typing_extensions_symbol, Boundness, LookupError,
 };
 use crate::types::call::{Argument, Bindings, CallArgumentTypes, CallArguments, CallError};
+use crate::types::class::MetaclassErrorKind;
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
@@ -73,16 +74,18 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
+use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    class::MetaclassErrorKind, todo_type, Class, DynamicType, FunctionType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MetaclassCandidate, Parameter,
-    ParameterForm, Parameters, SliceLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
-    Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    todo_type, Class, ClassLiteralType, DynamicType, FunctionType, GenericAlias, GenericClass,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MetaclassCandidate, NonGenericClass, Parameter, ParameterForm, Parameters, SliceLiteralType,
+    SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
-use crate::types::{CallableType, FunctionDecorators, Signature};
+use crate::types::{CallableSignature, CallableType, FunctionDecorators, Signature, Signatures};
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
@@ -706,7 +709,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let DefinitionKind::Class(class) = definition.kind(self.db()) {
                     ty.inner_type()
                         .into_class_literal()
-                        .map(|ty| (ty.class(), class.node()))
+                        .map(|ty| (ty, class.node()))
                 } else {
                     None
                 }
@@ -734,10 +737,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // (2) Check for classes that inherit from `@final` classes
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
                 // dynamic/unknown bases are never `@final`
-                let Some(base_class) = base_class
-                    .into_class_literal()
-                    .map(super::class::ClassLiteralType::class)
-                else {
+                let Some(base_class) = base_class.into_class_literal() else {
                     continue;
                 };
                 if !base_class.is_final(self.db()) {
@@ -755,7 +755,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // (3) Check that the class's MRO is resolvable
-            match class.try_mro(self.db()).as_ref() {
+            match class.try_mro(self.db(), None).as_ref() {
                 Err(mro_error) => {
                     match mro_error.reason() {
                         MroErrorKind::DuplicateBases(duplicates) => {
@@ -981,7 +981,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::Instance(instance)
                 if matches!(
-                    instance.class().known(self.db()),
+                    instance.class.known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
             _ => return false,
@@ -1392,7 +1392,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     continue;
                 }
             } else if let Type::ClassLiteral(class) = decorator_ty {
-                if class.class.is_known(self.db(), KnownClass::Classmethod) {
+                if class.is_known(self.db(), KnownClass::Classmethod) {
                     function_decorators |= FunctionDecorators::CLASSMETHOD;
                     continue;
                 }
@@ -1670,6 +1670,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_decorator(decorator);
         }
 
+        let generic_context = type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(self.db(), self.index, type_params)
+        });
+
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class_node))
@@ -1677,8 +1681,18 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let class = Class::new(self.db(), &name.id, body_scope, maybe_known_class);
-        let class_ty = Type::class_literal(class);
+        let class = Class {
+            name: name.id.clone(),
+            body_scope,
+            known: maybe_known_class,
+        };
+        let class_literal = match generic_context {
+            Some(generic_context) => {
+                ClassLiteralType::Generic(GenericClass::new(self.db(), class, generic_context))
+            }
+            None => ClassLiteralType::NonGeneric(NonGenericClass::new(self.db(), class)),
+        };
+        let class_ty = Type::from(class_literal);
 
         self.add_declaration_with_binding(
             class_node.into(),
@@ -2353,6 +2367,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
             | Type::BoundMethod(_)
+            | Type::SpecializedCallable(_)
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
             | Type::TypeVar(..)
@@ -2468,7 +2483,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             },
 
-            Type::ClassLiteral(..) | Type::SubclassOf(..) => {
+            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 match object_ty.class_member(db, attribute.into()) {
                     SymbolAndQualifiers {
                         symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
@@ -2792,10 +2807,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Handle various singletons.
         if let Type::Instance(instance) = declared_ty.inner_type() {
-            if instance
-                .class()
-                .is_known(self.db(), KnownClass::SpecialForm)
-            {
+            if instance.class.is_known(self.db(), KnownClass::SpecialForm) {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
                         self.db(),
@@ -4349,7 +4361,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 LookupError::Unbound(_) => {
                     let bound_on_instance = match value_type {
                         Type::ClassLiteral(class) => {
-                            !class.class().instance_member(db, attr).symbol.is_unbound()
+                            !class.instance_member(db, None, attr).symbol.is_unbound()
                         }
                         Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                             match subclass_of.subclass_of() {
@@ -4460,8 +4472,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::BoundMethod(_)
+                | Type::SpecializedCallable(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
@@ -4734,10 +4748,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
+                | Type::SpecializedCallable(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
@@ -4755,10 +4771,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
+                | Type::SpecializedCallable(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
+                | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::Instance(_)
                 | Type::KnownInstance(_)
@@ -5326,9 +5344,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 range,
             ),
             (Type::Tuple(_), Type::Instance(instance))
-                if instance
-                    .class()
-                    .is_known(self.db(), KnownClass::VersionInfo) =>
+                if instance.class.is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(
                     left,
@@ -5338,9 +5354,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 )
             }
             (Type::Instance(instance), Type::Tuple(_))
-                if instance
-                    .class()
-                    .is_known(self.db(), KnownClass::VersionInfo) =>
+                if instance.class.is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(
                     Type::version_info_tuple(self.db()),
@@ -5648,9 +5662,69 @@ impl<'db> TypeInferenceBuilder<'db> {
             ctx: _,
         } = subscript;
 
+        // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
+        // subscript inference logic and treat this as an explicit specialization.
+        // TODO: Move this logic into a custom callable, and update `find_name_in_mro` to return
+        // this callable as the `__class_getitem__` method on `type`. That probably requires
+        // updating all of the subscript logic below to use custom callables for all of the _other_
+        // special cases, too.
         let value_ty = self.infer_expression(value);
+        if let Type::ClassLiteral(ClassLiteralType::Generic(generic_class)) = value_ty {
+            return self.infer_explicit_class_specialization(
+                subscript,
+                value_ty,
+                generic_class,
+                slice,
+            );
+        }
+
         let slice_ty = self.infer_expression(slice);
         self.infer_subscript_expression_types(value, value_ty, slice_ty)
+    }
+
+    fn infer_explicit_class_specialization(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        value_ty: Type<'db>,
+        generic_class: GenericClass<'db>,
+        slice_node: &ast::Expr,
+    ) -> Type<'db> {
+        let mut call_argument_types = match slice_node {
+            ast::Expr::Tuple(tuple) => CallArgumentTypes::positional(
+                tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
+            ),
+            _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
+        };
+        let generic_context = generic_class.generic_context(self.db());
+        let signatures = Signatures::single(CallableSignature::single(
+            value_ty,
+            generic_context.signature(self.db()),
+        ));
+        let bindings = match Bindings::match_parameters(signatures, &mut call_argument_types)
+            .check_types(self.db(), &mut call_argument_types)
+        {
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => {
+                bindings.report_diagnostics(&self.context, subscript.into());
+                return Type::unknown();
+            }
+        };
+        let callable = bindings
+            .into_iter()
+            .next()
+            .expect("valid bindings should have one callable");
+        let (_, overload) = callable
+            .matching_overload()
+            .expect("valid bindings should have matching overload");
+        let specialization = generic_context.specialize(
+            self.db(),
+            overload
+                .parameter_types()
+                .iter()
+                .map(|ty| ty.unwrap_or(Type::unknown()))
+                .collect(),
+        );
+        Type::from(GenericAlias::new(self.db(), generic_class, specialization))
     }
 
     fn infer_subscript_expression_types(
@@ -5663,16 +5737,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             (
                 Type::Instance(instance),
                 Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
-            ) if instance
-                .class()
-                .is_known(self.db(), KnownClass::VersionInfo) =>
-            {
-                self.infer_subscript_expression_types(
+            ) if instance.class.is_known(self.db(), KnownClass::VersionInfo) => self
+                .infer_subscript_expression_types(
                     value_node,
                     Type::version_info_tuple(self.db()),
                     slice_ty,
-                )
-            }
+                ),
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if i32::try_from(int).is_ok() => {
@@ -5880,9 +5950,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    if matches!(value_ty, Type::ClassLiteral(class_literal) if class_literal.class().is_known(self.db(), KnownClass::Type))
-                    {
-                        return KnownClass::GenericAlias.to_instance(self.db());
+                    if let Type::ClassLiteral(class) = value_ty {
+                        if class.is_known(self.db(), KnownClass::Type) {
+                            return KnownClass::GenericAlias.to_instance(self.db());
+                        }
+
+                        if let ClassLiteralType::Generic(_) = class {
+                            // TODO: specialize the generic class using these explicit type
+                            // variable assignments
+                            return value_ty;
+                        }
                     }
 
                     report_non_subscriptable(
@@ -5905,6 +5982,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                         // TODO: proper support for generic classes
                         // For now, just infer `Sequence`, if we see something like `Sequence[str]`. This allows us
                         // to look up attributes on generic base classes, even if we don't understand generics yet.
+                        // Note that this isn't handled by the clause up above for generic classes
+                        // that use legacy type variables and an explicit `Generic` base class.
+                        // Once we handle legacy typevars, this special case will be removed in
+                        // favor of the specialization logic above.
                         value_ty
                     }
                     _ => Type::unknown(),
@@ -5937,7 +6018,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::Instance(instance))
-                if instance.class().is_known(self.db(), KnownClass::NoneType) =>
+                if instance.class.is_known(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
             }
@@ -6503,8 +6584,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         value_ty: Type<'db>,
     ) -> Type<'db> {
         match value_ty {
-            Type::ClassLiteral(class_literal_ty) => match class_literal_ty.class().known(self.db())
-            {
+            Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
                 Some(KnownClass::Tuple) => self.infer_tuple_type_expression(slice),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
@@ -6606,14 +6686,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let name_ty = self.infer_expression(slice);
                 match name_ty {
-                    Type::ClassLiteral(class_literal_ty) => {
-                        if class_literal_ty
-                            .class()
-                            .is_known(self.db(), KnownClass::Any)
-                        {
+                    Type::ClassLiteral(class_literal) => {
+                        if class_literal.is_known(self.db(), KnownClass::Any) {
                             SubclassOfType::subclass_of_any()
                         } else {
-                            SubclassOfType::from(self.db(), class_literal_ty.class())
+                            SubclassOfType::from(
+                                self.db(),
+                                class_literal.default_specialization(self.db()),
+                            )
                         }
                     }
                     Type::KnownInstance(KnownInstanceType::Any) => {
@@ -6694,7 +6774,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = subscript;
 
         match value_ty {
-            Type::ClassLiteral(literal) if literal.class().is_known(self.db(), KnownClass::Any) => {
+            Type::ClassLiteral(literal) if literal.is_known(self.db(), KnownClass::Any) => {
                 self.context.report_lint(
                     &INVALID_TYPE_FORM,
                     subscript,
