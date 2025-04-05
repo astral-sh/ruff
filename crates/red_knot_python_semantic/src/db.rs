@@ -19,7 +19,7 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use crate::program::{Program, SearchPathSettings};
-    use crate::{default_lint_registry, ProgramSettings, PythonPath, PythonPlatform};
+    use crate::{default_lint_registry, ProgramSettings, PythonPlatform};
 
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
@@ -139,8 +139,6 @@ pub(crate) mod tests {
         python_version: PythonVersion,
         /// Target Python platform
         python_platform: PythonPlatform,
-        /// Paths to the directory to use for `site-packages`
-        site_packages: Vec<SystemPathBuf>,
         /// Path and content pairs for files that should be present
         files: Vec<(&'a str, &'a str)>,
     }
@@ -150,7 +148,6 @@ pub(crate) mod tests {
             Self {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
-                site_packages: vec![],
                 files: vec![],
             }
         }
@@ -169,14 +166,6 @@ pub(crate) mod tests {
             self
         }
 
-        pub(crate) fn with_site_packages_search_path(
-            mut self,
-            path: &(impl AsRef<SystemPath> + ?Sized),
-        ) -> Self {
-            self.site_packages.push(path.as_ref().to_path_buf());
-            self
-        }
-
         pub(crate) fn build(self) -> anyhow::Result<TestDb> {
             let mut db = TestDb::new();
 
@@ -186,15 +175,12 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            let mut search_paths = SearchPathSettings::new(vec![src_root]);
-            search_paths.python_path = PythonPath::KnownSitePackages(self.site_packages);
-
             Program::from_settings(
                 &db,
                 ProgramSettings {
                     python_version: self.python_version,
                     python_platform: self.python_platform,
-                    search_paths,
+                    search_paths: SearchPathSettings::new(vec![src_root]),
                 },
             )
             .context("Failed to configure Program settings")?;
