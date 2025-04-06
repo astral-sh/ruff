@@ -2380,6 +2380,18 @@ requires-python = ">= 3.11"
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.pragma_tags = [
+        	type:,
+        	pyright:,
+        	pylint:,
+        	flake8:,
+        	ruff:,
+        	isort:,
+        	nosec,
+        ]
+        formatter.pragma_tags_case_insensitive = [
+        	noqa,
+        ]
 
         # Analyze Settings
         analyze.exclude = []
@@ -2691,6 +2703,18 @@ requires-python = ">= 3.11"
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.pragma_tags = [
+        	type:,
+        	pyright:,
+        	pylint:,
+        	flake8:,
+        	ruff:,
+        	isort:,
+        	nosec,
+        ]
+        formatter.pragma_tags_case_insensitive = [
+        	noqa,
+        ]
 
         # Analyze Settings
         analyze.exclude = []
@@ -3054,6 +3078,18 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.pragma_tags = [
+        	type:,
+        	pyright:,
+        	pylint:,
+        	flake8:,
+        	ruff:,
+        	isort:,
+        	nosec,
+        ]
+        formatter.pragma_tags_case_insensitive = [
+        	noqa,
+        ]
 
         # Analyze Settings
         analyze.exclude = []
@@ -3433,6 +3469,18 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.pragma_tags = [
+        	type:,
+        	pyright:,
+        	pylint:,
+        	flake8:,
+        	ruff:,
+        	isort:,
+        	nosec,
+        ]
+        formatter.pragma_tags_case_insensitive = [
+        	noqa,
+        ]
 
         # Analyze Settings
         analyze.exclude = []
@@ -3760,6 +3808,18 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.pragma_tags = [
+        	type:,
+        	pyright:,
+        	pylint:,
+        	flake8:,
+        	ruff:,
+        	isort:,
+        	nosec,
+        ]
+        formatter.pragma_tags_case_insensitive = [
+        	noqa,
+        ]
 
         # Analyze Settings
         analyze.exclude = []
@@ -4087,6 +4147,18 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.pragma_tags = [
+        	type:,
+        	pyright:,
+        	pylint:,
+        	flake8:,
+        	ruff:,
+        	isort:,
+        	nosec,
+        ]
+        formatter.pragma_tags_case_insensitive = [
+        	noqa,
+        ]
 
         # Analyze Settings
         analyze.exclude = []
@@ -4371,6 +4443,18 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.pragma_tags = [
+        	type:,
+        	pyright:,
+        	pylint:,
+        	flake8:,
+        	ruff:,
+        	isort:,
+        	nosec,
+        ]
+        formatter.pragma_tags_case_insensitive = [
+        	noqa,
+        ]
 
         # Analyze Settings
         analyze.exclude = []
@@ -4708,6 +4792,18 @@ from typing import Union;foo: Union[int, str] = 1
         formatter.magic_trailing_comma = respect
         formatter.docstring_code_format = disabled
         formatter.docstring_code_line_width = dynamic
+        formatter.pragma_tags = [
+        	type:,
+        	pyright:,
+        	pylint:,
+        	flake8:,
+        	ruff:,
+        	isort:,
+        	nosec,
+        ]
+        formatter.pragma_tags_case_insensitive = [
+        	noqa,
+        ]
 
         # Analyze Settings
         analyze.exclude = []
