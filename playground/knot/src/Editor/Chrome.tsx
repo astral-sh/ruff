@@ -40,15 +40,15 @@ export interface Props {
   theme: Theme;
   selectedFileName: string;
 
-  onFileAdded(workspace: Workspace, name: string): void;
+  onAddFile(workspace: Workspace, name: string): void;
 
-  onFileChanged(workspace: Workspace, content: string): void;
+  onChangeFile(workspace: Workspace, content: string): void;
 
-  onFileRenamed(workspace: Workspace, file: FileId, newName: string): void;
+  onRenameFile(workspace: Workspace, file: FileId, newName: string): void;
 
-  onFileRemoved(workspace: Workspace, file: FileId): void;
+  onRemoveFile(workspace: Workspace, file: FileId): void;
 
-  onFileSelected(id: FileId): void;
+  onSelectFile(id: FileId): void;
 }
 
 export default function Chrome({
@@ -56,11 +56,11 @@ export default function Chrome({
   selectedFileName,
   workspacePromise,
   theme,
-  onFileAdded,
-  onFileRenamed,
-  onFileRemoved,
-  onFileSelected,
-  onFileChanged,
+  onAddFile,
+  onRenameFile,
+  onRemoveFile,
+  onSelectFile,
+  onChangeFile,
 }: Props) {
   const workspace = use(workspacePromise);
 
@@ -74,7 +74,7 @@ export default function Chrome({
   } | null>(null);
 
   const handleFileRenamed = (file: FileId, newName: string) => {
-    onFileRenamed(workspace, file, newName);
+    onRenameFile(workspace, file, newName);
     editorRef.current?.editor.focus();
   };
 
@@ -129,9 +129,9 @@ export default function Chrome({
           ?.dispose();
       }
 
-      onFileRemoved(workspace, id);
+      onRemoveFile(workspace, id);
     },
-    [workspace, files.index, onFileRemoved],
+    [workspace, files.index, onRemoveFile],
   );
 
   const checkResult = useCheckResult(files, workspace, secondaryTool);
@@ -144,9 +144,9 @@ export default function Chrome({
             files={files.index}
             theme={theme}
             selected={files.selected}
-            onAdd={(name) => onFileAdded(workspace, name)}
+            onAdd={(name) => onAddFile(workspace, name)}
             onRename={handleFileRenamed}
-            onSelected={onFileSelected}
+            onSelect={onSelectFile}
             onRemove={handleRemoved}
           />
           <PanelGroup direction="horizontal" autoSaveId="main">
@@ -167,8 +167,8 @@ export default function Chrome({
                     diagnostics={checkResult.diagnostics}
                     workspace={workspace}
                     onMount={handleEditorMount}
-                    onChange={(content) => onFileChanged(workspace, content)}
-                    onFileOpened={onFileSelected}
+                    onChange={(content) => onChangeFile(workspace, content)}
+                    onOpenFile={onSelectFile}
                   />
                   {checkResult.error ? (
                     <div

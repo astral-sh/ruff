@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import AstralButton from "./AstralButton";
 
-export default function ShareButton({ onShare }: { onShare?: () => void }) {
+export default function ShareButton({ onShare }: { onShare: () => void }) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -28,15 +28,11 @@ export default function ShareButton({ onShare }: { onShare?: () => void }) {
     <AstralButton
       type="button"
       className="relative flex-none leading-6 py-1.5 px-3 shadow-xs disabled:opacity-50"
-      disabled={!onShare || copied}
-      onClick={
-        onShare
-          ? () => {
-              setCopied(true);
-              onShare();
-            }
-          : undefined
-      }
+      disabled={copied}
+      onClick={() => {
+        setCopied(true);
+        onShare();
+      }}
     >
       <span
         className="absolute inset-0 flex items-center justify-center"
