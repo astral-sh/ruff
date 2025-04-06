@@ -11,17 +11,17 @@ export default function Header({
   theme,
   logo,
   version,
-  onThemeChanged,
-  onResetClicked,
-  onShareClicked,
+  onChangeTheme,
+  onReset,
+  onShare,
 }: {
   edit: number | null;
   theme: Theme;
   logo: "ruff" | "astral";
   version: string | null;
-  onThemeChanged: (theme: Theme) => void;
-  onResetClicked?(): void;
-  onShareClicked: () => void;
+  onChangeTheme: (theme: Theme) => void;
+  onReset?(): void;
+  onShare: () => void;
 }) {
   return (
     <div
@@ -49,14 +49,14 @@ export default function Header({
         <RepoButton />
         <Divider />
         <div className="max-sm:hidden flex">
-          <ResetButton onClicked={onResetClicked} />
+          <ResetButton onClicked={onReset} />
         </div>
         <div className="max-sm:hidden flex">
-          <ShareButton key={edit} onShare={onShareClicked} />
+          <ShareButton key={edit} onShare={onShare} />
         </div>
         <Divider />
 
-        <ThemeButton theme={theme} onChange={onThemeChanged} />
+        <ThemeButton theme={theme} onChange={onChangeTheme} />
       </div>
     </div>
   );

@@ -89,9 +89,9 @@ export default function Chrome() {
         theme={theme}
         logo="ruff"
         version={ruffVersion}
-        onThemeChanged={setTheme}
-        onShareClicked={handleShare}
-        onResetClicked={handleResetClicked}
+        onChangeTheme={setTheme}
+        onShare={handleShare}
+        onReset={handleResetClicked}
       />
 
       <div className="flex grow">

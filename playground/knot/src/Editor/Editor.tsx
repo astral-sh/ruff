@@ -38,7 +38,7 @@ type Props = {
   workspace: Workspace;
   onChange(content: string): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
-  onFileOpened(file: FileId): void;
+  onOpenFile(file: FileId): void;
 };
 
 export default function Editor({
@@ -51,7 +51,7 @@ export default function Editor({
   workspace,
   onChange,
   onMount,
-  onFileOpened,
+  onOpenFile,
 }: Props) {
   const serverRef = useRef<PlaygroundServer | null>(null);
 
@@ -59,7 +59,7 @@ export default function Editor({
     serverRef.current.update({
       files,
       workspace,
-      onFileOpened,
+      onOpenFile,
     });
   }
 
@@ -96,7 +96,7 @@ export default function Editor({
       const server = new PlaygroundServer(instance, {
         workspace,
         files,
-        onFileOpened,
+        onOpenFile,
       });
 
       server.updateDiagnostics(diagnostics);
@@ -105,7 +105,7 @@ export default function Editor({
       onMount(editor, instance);
     },
 
-    [files, onFileOpened, workspace, onMount, diagnostics],
+    [files, onOpenFile, workspace, onMount, diagnostics],
   );
 
   return (
@@ -134,7 +134,7 @@ export default function Editor({
 interface PlaygroundServerProps {
   workspace: Workspace;
   files: ReadonlyFiles;
-  onFileOpened: (file: FileId) => void;
+  onOpenFile: (file: FileId) => void;
 }
 
 class PlaygroundServer
@@ -334,7 +334,7 @@ class PlaygroundServer
     if (files.selected !== fileId) {
       source.setModel(model);
 
-      this.props.onFileOpened(fileId);
+      this.props.onOpenFile(fileId);
     }
 
     if (selectionOrPosition != null) {

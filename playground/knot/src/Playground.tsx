@@ -128,7 +128,7 @@ export default function Playground() {
     dispatchFiles({ type: "selectFile", id: file });
   }, []);
 
-  const handleResetClicked = useCallback(() => {
+  const handleReset = useCallback(() => {
     if (workspace == null) {
       return;
     }
@@ -158,9 +158,9 @@ export default function Playground() {
         theme={theme}
         logo="astral"
         version={version}
-        onThemeChanged={setTheme}
-        onShareClicked={handleShare}
-        onResetClicked={workspace == null ? undefined : handleResetClicked}
+        onChangeTheme={setTheme}
+        onShare={handleShare}
+        onReset={workspace == null ? undefined : handleReset}
       />
 
       <Suspense fallback={<Loading />}>
@@ -169,11 +169,11 @@ export default function Playground() {
           workspacePromise={workspacePromise}
           theme={theme}
           selectedFileName={fileName}
-          onFileAdded={handleFileAdded}
-          onFileRenamed={handleFileRenamed}
-          onFileRemoved={handleFileRemoved}
-          onFileSelected={handleFileSelected}
-          onFileChanged={handleFileChanged}
+          onAddFile={handleFileAdded}
+          onRenameFile={handleFileRenamed}
+          onRemoveFile={handleFileRemoved}
+          onSelectFile={handleFileSelected}
+          onChangeFile={handleFileChanged}
         />
       </Suspense>
       {error ? (
