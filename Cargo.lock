@@ -2608,7 +2608,6 @@ dependencies = [
  "red_knot_python_semantic",
  "ruff_db",
  "ruff_notebook",
- "ruff_python_ast",
  "ruff_source_file",
  "ruff_text_size",
  "rustc-hash 2.1.1",
