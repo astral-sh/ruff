@@ -83,6 +83,9 @@ from typing import Protocol
 
 class Foo(Protocol):
     def x(self, y: bool = ...): ...
+
+class GenericFoo[T](Protocol):
+    def x(self, y: bool = ...) -> T: ...
 ```
 
 ### In abstract method
