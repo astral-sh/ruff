@@ -171,6 +171,12 @@ bitflags! {
         ///
         /// If this flag is set - exclude attributes defined on `object` when looking up attributes.
         const MRO_NO_OBJECT_FALLBACK = 1 << 1;
+
+        /// When looking up an attribute on a class, we sometimes need to avoid
+        /// looking up attributes defined on `type` if this is the metaclass of the class.
+        ///
+        /// This is similar to no object fallback above
+        const META_CLASS_NO_TYPE_FALLBACK = 1 << 2;
     }
 }
 
@@ -187,6 +193,11 @@ impl MemberLookupPolicy {
     /// Exclude attributes defined on `object` when looking up attributes.
     pub(crate) const fn mro_no_object_fallback(self) -> bool {
         self.contains(Self::MRO_NO_OBJECT_FALLBACK)
+    }
+
+    /// Exclude attributes defined on `type` when looking up meta-class-attributes.
+    pub(crate) const fn meta_class_no_type_fallback(self) -> bool {
+        self.contains(Self::META_CLASS_NO_TYPE_FALLBACK)
     }
 }
 
@@ -471,6 +482,10 @@ impl<'db> Type<'db> {
     pub fn expect_class_literal(self) -> ClassLiteralType<'db> {
         self.into_class_literal()
             .expect("Expected a Type::ClassLiteral variant")
+    }
+
+    pub const fn is_subclass_of(&self) -> bool {
+        matches!(self, Type::SubclassOf(..))
     }
 
     pub const fn is_class_literal(&self) -> bool {
@@ -2540,10 +2555,14 @@ impl<'db> Type<'db> {
                 let custom_getattr_result = || {
                     // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
                     // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
-                    if self
-                        .into_instance()
-                        .is_some_and(|instance| instance.class.is_known(db, KnownClass::ModuleType))
-                    {
+                    // Same for `types.GenericAlias` - it's `__getattr__` method will delegate to `__origin__`
+                    // to allow looking up attributes on the original type. But in typeshed it's
+                    // return type is `Any`. It will need a special handling, so it remember the origin type
+                    // to properly resolve the attribute.
+                    if self.into_instance().is_some_and(|instance| {
+                        instance.class.is_known(db, KnownClass::ModuleType)
+                            || instance.class.is_known(db, KnownClass::GenericAlias)
+                    }) {
                         return Symbol::Unbound.into();
                     }
 
@@ -3618,27 +3637,47 @@ impl<'db> Type<'db> {
         // Note that we currently ignore `__new__` return type, since we do not support `Self`
         // and most builtin classes use it as return type annotation. We always return the instance type.
 
-        // Lookup `__new__` method in the MRO up to, but not including, `object`.
-        let new_call_outcome = if self
+        // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
+        // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
+        // a class, metaclass attribute would take precedence. But by avoiding `__new__` on `object`
+        // we would inadvertently unhide `__new__` on `type`, which is not what we want.
+        let new_call_outcome: Option<Result<Bindings<'db>, CallDunderError<'db>>> = match self
             .member_lookup_with_policy(
                 db,
                 "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             )
             .symbol
-            .is_unbound()
         {
+            Symbol::Type(dunder_callable, boundness) => {
+                let signatures = dunder_callable.signatures(db);
+                // `__new__` is a static method, so we much inject the `cls` argument.
+                let mut argument_types = argument_types.prepend_synthetic(self);
+
+                Some(
+                    match Bindings::match_parameters(signatures, &mut argument_types)
+                        .check_types(db, &mut argument_types)
+                    {
+                        Ok(bindings) => {
+                            if boundness == Boundness::PossiblyUnbound {
+                                Err(CallDunderError::PossiblyUnbound(Box::new(bindings)))
+                            } else {
+                                Ok(bindings)
+                            }
+                        }
+                        Err(err) => Err(err.into()),
+                    },
+                )
+            }
             // No explicit `__new__` method found
-            None
-        } else {
-            // `__new__` is a static method, so we much inject the `cls` argument.
-            Some(self.try_call_dunder(db, "__new__", argument_types.prepend_synthetic(self)))
+            Symbol::Unbound => None,
         };
 
         // TODO: we should use the actual return type of `__new__` to determine the instance type
         let instance_ty = self
             .to_instance(db)
-            .expect("Class literal type should always be convertible to instance type");
+            .expect("Class literal type and subclass-of types should always be convertible to instance type");
 
         let init_call_outcome = if new_call_outcome.is_none()
             || !instance_ty
@@ -3656,10 +3695,10 @@ impl<'db> Type<'db> {
         };
 
         match (new_call_outcome, init_call_outcome) {
+            // All calls are successful or not called at all
             (None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
-            (None, Some(Err(error))) => Err(CreateInstanceCallError::Init(instance_ty, error)),
-            (Some(Ok(_)), Some(Err(error))) => {
-                // custom `__new__` was called and succeeded, but `__init__` failed.
+            (None | Some(Ok(_)), Some(Err(error))) => {
+                // no custom `__new__` or it was called and succeeded, but `__init__` failed.
                 Err(CreateInstanceCallError::Init(instance_ty, error))
             }
             (Some(Err(error)), None | Some(Ok(_))) => {
@@ -4947,7 +4986,7 @@ impl<'db> CreateInstanceCallError<'db> {
                     ),
                 );
             }
-            CallDunderError::PossiblyUnbound(_) => {
+            CallDunderError::PossiblyUnbound(bindings) => {
                 context.report_lint(
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
@@ -4956,6 +4995,8 @@ impl<'db> CreateInstanceCallError<'db> {
                         context_expression_type.display(context.db()),
                     ),
                 );
+
+                bindings.report_diagnostics(context, context_expression_node);
             }
             CallDunderError::CallError(_, bindings) => {
                 bindings.report_diagnostics(context, context_expression_node);
@@ -4968,7 +5009,7 @@ impl<'db> CreateInstanceCallError<'db> {
                 // so this should never happen.
                 unreachable!("`__new__` method may not be called if missing");
             }
-            CallDunderError::PossiblyUnbound(_) => {
+            CallDunderError::PossiblyUnbound(bindings) => {
                 context.report_lint(
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
@@ -4977,6 +5018,8 @@ impl<'db> CreateInstanceCallError<'db> {
                         context_expression_type.display(context.db()),
                     ),
                 );
+
+                bindings.report_diagnostics(context, context_expression_node);
             }
             CallDunderError::CallError(_, bindings) => {
                 bindings.report_diagnostics(context, context_expression_node);

@@ -366,6 +366,11 @@ impl<'db> Class<'db> {
                         continue;
                     }
 
+                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
+                    {
+                        continue;
+                    }
+
                     lookup_result = lookup_result.or_else(|lookup_error| {
                         lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
                     });

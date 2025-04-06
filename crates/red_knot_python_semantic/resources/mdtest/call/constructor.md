@@ -1,9 +1,46 @@
 # Constructor
 
-## No init or new
+When classes are instantiated, Python calls the meta-class `__call__` method, which can either be
+customized by the user or `type.__call__` is used.
 
-Every class has `object` in it's MRO, so if no `__init__` method is provided, we fall back to
-`object.__init__`, which can only be called with zero arguments:
+The latter calls the `__new__` method of the class, which is responsible for creating the instance
+and then calls the `__init__` method on the resulting instance to initialize it with the same
+arguments.
+
+Both `__new__` and `__init__` are looked up using full descriptor protocol, but `__new__` is then
+called as an implicit static, rather than bound method with `cls` passed as the first argument.
+`__init__` has no special handling, it is fetched as bound method and is called just like any other
+method.
+
+`type.__call__` does other things too, but this is not yet handled by us.
+
+Since every class has `object` in it's MRO, the default implementations are `object.__new__` and
+`object.__init__`. They have some special behavior, namely:
+
+- If neither `__new__` nor `__init__` are defined anywhere in the MRO of class (except for `object`)
+    \- no arguments are accepted and `TypeError` is raised if any are passed.
+- If `__new__` is defined, but `__init__` is not - `object.__init__` will allow arbitrary arguments!
+
+As of today there are a number of behaviors that we do not support:
+
+- `__new__` is assumed to return an instance of the class on which it is called
+- User defined `__call__` on metaclass is ignored
+
+## Creating an instance of the `object` class itself
+
+Test the behavior of the `object` class itself. As implementation has to ignore `object` own methods
+as defined in typeshed due to behavior not expressible in typeshed (see above how `__init__` behaves
+differently depending on whether `__new__` is defined or not), we have to test the behavior of
+`object` itself.
+
+```py
+reveal_type(object())  # revealed: object
+
+# error: [too-many-positional-arguments] "Too many positional arguments to class `object`: expected 0, got 1"
+reveal_type(object(1))  # revealed: object
+```
+
+## No init or new
 
 ```py
 class Foo: ...
@@ -15,8 +52,6 @@ reveal_type(Foo(1))  # revealed: Foo
 ```
 
 ## `__new__` present on the class itself
-
-If the class has an `__new__` method, we can infer the signature of the constructor from it.
 
 ```py
 class Foo:
@@ -67,6 +102,8 @@ def _(flag: bool) -> None:
     reveal_type(Foo("1"))  # revealed: Foo
     # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
     reveal_type(Foo())  # revealed: Foo
+    # error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 1, got 2"
+    reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
 ## A descriptor in place of `__new__`
@@ -121,7 +158,9 @@ def _(flag: bool) -> None:
 
     # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+    # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+    # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
+    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
 ```
 
@@ -175,6 +214,8 @@ def _(flag: bool) -> None:
     reveal_type(Foo("1"))  # revealed: Foo
     # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
     reveal_type(Foo())  # revealed: Foo
+    # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+    reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
 ## A descriptor in place of `__init__`
@@ -231,6 +272,54 @@ def _(flag: bool) -> None:
 
     # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+    # TODO should be - error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
+    # but we currently infer the signature of `__call__` as unknown, so it accepts any arguments
+    # error: [call-non-callable] "Object of type `Callable` is not callable (possibly unbound `__call__` method)"
     reveal_type(Foo())  # revealed: Foo
+```
+
+## `__new__` and `__init__` both present
+
+### Identical signatures
+
+A common case is to have `__new__` and `__init__` with identical signatures (except for the first
+argument). We report errors for both `__new__` and `__init__` if the arguments are incorrect.
+
+At runtime `__new__` is called first and will fail without executing `__init__` if the arguments are
+incorrect. However, we decided that it is better to report errors for both methods, since after
+fixing the `__new__` method, the user may forget to fix the `__init__` method.
+
+```py
+class Foo:
+    def __new__(cls, x: int) -> "Foo":
+        return object.__new__(cls)
+
+    def __init__(self, x: int): ...
+
+# error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
+# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+reveal_type(Foo())  # revealed: Foo
+
+reveal_type(Foo(1))  # revealed: Foo
+```
+
+### Compatible signatures
+
+But they can also be compatible, but not identical. We should correctly report errors only for the
+mthod that would fail.
+
+```py
+class Foo:
+    def __new__(cls, *args, **kwargs):
+        return object.__new__(cls)
+
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+reveal_type(Foo())  # revealed: Foo
+reveal_type(Foo(1))  # revealed: Foo
+
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
+reveal_type(Foo(1, 2))  # revealed: Foo
 ```
