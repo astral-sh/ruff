@@ -6924,12 +6924,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Type::unknown();
                     };
 
-                    let bound_signature = signature.bind_self();
-                    if let Type::BoundMethod(_) = argument_type {
-                        signature = &bound_signature;
-                    }
+                    let revealed_signature = if argument_type.is_bound_method() {
+                        signature.bind_self()
+                    else {
+                        signature.clone()
+                    };
 
-                    Type::Callable(CallableType::new(db, signature.clone()))
+                    Type::Callable(CallableType::new(db, revealed_signature))
                 }
             },
 
