@@ -929,7 +929,9 @@ impl<'db> Binding<'db> {
                     .count()
                     // using saturating_sub to avoid negative values due to invalid syntax in source code
                     .saturating_sub(num_synthetic_args),
-                provided_positional_count: next_positional,
+                provided_positional_count: next_positional
+                    // using saturating_sub to avoid negative values due to invalid syntax in source code
+                    .saturating_sub(num_synthetic_args),
             });
         }
         let mut missing = vec![];

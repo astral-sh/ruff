@@ -1996,19 +1996,26 @@ impl<'db> Type<'db> {
     /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
     /// when called on an instance-like type, and metaclass attributes when called on a class-like type.
     ///
-    /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name, MemberLookupPolicy::default())`, except for the handling
+    /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name, policy)`, except for the handling
     /// of union and intersection types.
     #[salsa::tracked]
-    fn class_member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
+    fn class_member(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
         match self {
-            Type::Union(union) => union
-                .map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name.clone())),
-            Type::Intersection(inter) => inter
-                .map_with_boundness_and_qualifiers(db, |elem| elem.class_member(db, name.clone())),
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.class_member(db, name.clone(), policy)
+            }),
+            Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.class_member(db, name.clone(), policy)
+            }),
             _ => self
                 .to_meta_type(db)
-                .find_name_in_mro(db, name.as_str(), MemberLookupPolicy::default())
+                .find_name_in_mro(db, name.as_str(), policy)
                 .expect(
                     "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                 ),
@@ -2105,7 +2112,10 @@ impl<'db> Type<'db> {
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if let Type::ModuleLiteral(module) = self {
             module.static_member(db, name)
-        } else if let symbol @ Symbol::Type(_, _) = self.class_member(db, name.into()).symbol {
+        } else if let symbol @ Symbol::Type(_, _) = self
+            .class_member(db, name.into(), MemberLookupPolicy::default())
+            .symbol
+        {
             symbol
         } else if let Some(symbol @ Symbol::Type(_, _)) = self
             .find_name_in_mro(db, name, MemberLookupPolicy::default())
@@ -2138,7 +2148,9 @@ impl<'db> Type<'db> {
             instance.display(db),
             owner.display(db)
         );
-        let descr_get = self.class_member(db, "__get__".into()).symbol;
+        let descr_get = self
+            .class_member(db, "__get__".into(), MemberLookupPolicy::default())
+            .symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
@@ -2152,9 +2164,12 @@ impl<'db> Type<'db> {
                 })
                 .ok()?;
 
-            let descriptor_kind = if self.class_member(db, "__set__".into()).symbol.is_unbound()
+            let descriptor_kind = if self
+                .class_member(db, "__set__".into(), MemberLookupPolicy::default())
+                .symbol
+                .is_unbound()
                 && self
-                    .class_member(db, "__delete__".into())
+                    .class_member(db, "__delete__".into(), MemberLookupPolicy::default())
                     .symbol
                     .is_unbound()
             {
@@ -2270,6 +2285,7 @@ impl<'db> Type<'db> {
         name: &str,
         fallback: SymbolAndQualifiers<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
+        member_policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
         let (
             SymbolAndQualifiers {
@@ -2279,7 +2295,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.class_member(db, name.into()),
+            self.class_member(db, name.into(), member_policy),
             self,
             self.to_meta_type(db),
         );
@@ -2489,13 +2505,14 @@ impl<'db> Type<'db> {
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
 
-            Type::AlwaysFalsy | Type::AlwaysTruthy => self.class_member(db, name),
+            Type::AlwaysFalsy | Type::AlwaysTruthy => self.class_member(db, name, policy),
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
                 name_str,
                 Symbol::Unbound.into(),
                 InstanceFallbackShadowsNonDataDescriptor::No,
+                policy,
             ),
 
             Type::Instance(..)
@@ -2517,6 +2534,7 @@ impl<'db> Type<'db> {
                     name_str,
                     fallback,
                     InstanceFallbackShadowsNonDataDescriptor::No,
+                    policy,
                 );
 
                 let custom_getattr_result = || {
@@ -2591,6 +2609,7 @@ impl<'db> Type<'db> {
                     name_str,
                     class_attr_fallback,
                     InstanceFallbackShadowsNonDataDescriptor::Yes,
+                    policy,
                 )
             }
         }
@@ -3089,6 +3108,11 @@ impl<'db> Type<'db> {
             },
 
             Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
+                // TODO: currently we can't use typeshed to infer all calls using generic
+                // logic definedin `try_call_class_literal` (called from `infer_call_expression`).
+                // It has 3 main reasons: typeshed not 100% accurate, salsa queries and historical
+                // workarounds before `try_call_class_literal` was introduced.
+                // Some/most ofthe arms below should be removed eventually.
                 Some(KnownClass::Bool) => {
                     // ```py
                     // class bool(int):
@@ -3189,6 +3213,7 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
                 Some(KnownClass::TypeVar) => {
+                    // Added here to avoid salsa query cycle in typeshed definition
                     // TODO: signature depends on Python version, using 3.11 for now
                     // ```py
                     // class TypeVar:
@@ -3207,7 +3232,8 @@ impl<'db> Type<'db> {
                                 Parameter::variadic(Name::new_static("constraints"))
                                     .with_annotated_type(Type::any()),
                                 Parameter::keyword_only(Name::new_static("bound"))
-                                    .with_annotated_type(Type::any()),
+                                    .with_annotated_type(Type::any())
+                                    .with_default_type(Type::none(db)),
                                 Parameter::keyword_only(Name::new_static("covariant"))
                                     .with_annotated_type(KnownClass::Bool.to_instance(db))
                                     .with_default_type(Type::BooleanLiteral(false)),
@@ -3221,6 +3247,7 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
                 Some(KnownClass::Object) => {
+                    // // Added here to avoid salsa query cycle in typeshed definition
                     // ```py
                     // class object:
                     //    def __init__(self) -> None: ...
@@ -3573,19 +3600,20 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         argument_types: CallArgumentTypes<'_, 'db>,
     ) -> Result<Type<'db>, CreateInstanceCallError<'db>> {
-        debug_assert!(self.is_class_literal());
+        debug_assert!(matches!(self, Type::ClassLiteral(_) | Type::SubclassOf(_)));
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
         // The logic is roughly as follows:
         // 1. If `__new__` is defined anywhere in the MRO (except for `object`, since it is always
-        //    present), we call it and analyze outcome. If there is an error, we shirt circuit and avoid
-        //    checking `__init__` method. This matches the runtime behavior. If `__new__` call passes
-        //    we check `__init__`. As of now, we assume that `__new__` returns an instance of the
-        //    class, so we do not check the return type of `__new__` method. See below
-        // 2. If `__new__` is not found, we try to call `__init__`. Here, we allow it to fallback all
-        //    the way to `object` (single `self` argument call). This matches runtime behavior,
-        //    where `object.__init__` would only allow >=1 arguments if `__new__` is explicitly defined.
+        //    present), we call it and analyze outcome. We then analyze `__init__` call, but only
+        //    if it is defined somewhere except object. This is because `object.__init__`
+        //    allows arbitrary arguments if and only if `__new__` is defined, but typeshed
+        //    defines `__init__` for `object` with no arguments.
+        // 2. If `__new__` is not found, we call `__init__`. Here, we allow it to fallback all
+        //    the way to `object` (single `self` argument call). This time it is correct to
+        //    fallback to `object.__init__`, since it will indeed check that no arguments are
+        //    passed.
         //
         // Note that we currently ignore `__new__` return type, since we do not support `Self`
         // and most builtin classes use it as return type annotation. We always return the instance type.
@@ -3612,21 +3640,33 @@ impl<'db> Type<'db> {
             .to_instance(db)
             .expect("Class literal type should always be convertible to instance type");
 
-        let init_call_outcome = instance_ty.try_call_dunder(db, "__init__", argument_types);
+        let init_call_outcome = if new_call_outcome.is_none()
+            || !instance_ty
+                .member_lookup_with_policy(
+                    db,
+                    "__init__".into(),
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                )
+                .symbol
+                .is_unbound()
+        {
+            Some(instance_ty.try_call_dunder(db, "__init__", argument_types))
+        } else {
+            None
+        };
 
         match (new_call_outcome, init_call_outcome) {
-            (None, Ok(_)) => Ok(instance_ty),
-            (None, Err(error)) => Err(CreateInstanceCallError::Init(instance_ty, error)),
-            (Some(Ok(_)), Ok(_)) => Ok(instance_ty),
-            (Some(Ok(_)), Err(error)) => {
+            (None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
+            (None, Some(Err(error))) => Err(CreateInstanceCallError::Init(instance_ty, error)),
+            (Some(Ok(_)), Some(Err(error))) => {
                 // custom `__new__` was called and succeeded, but `__init__` failed.
                 Err(CreateInstanceCallError::Init(instance_ty, error))
             }
-            (Some(Err(error)), Ok(_)) => {
+            (Some(Err(error)), None | Some(Ok(_))) => {
                 // custom `__new__` was called and failed, but init is ok
                 Err(CreateInstanceCallError::New(instance_ty, error))
             }
-            (Some(Err(new_error)), Err(init_error)) => {
+            (Some(Err(new_error)), Some(Err(init_error))) => {
                 // custom `__new__` was called and failed, and `__init__` is also not ok
                 Err(CreateInstanceCallError::NewAndInit(
                     instance_ty,
@@ -4902,7 +4942,7 @@ impl<'db> CreateInstanceCallError<'db> {
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
-                        "`__init__` method is missing on type `{}`. Make sure your `object` in typeshed has it's defintion",
+                        "`__init__` method is missing on type `{}`. Make sure your `object` in typeshed has it's definition",
                         context_expression_type.display(context.db()),
                     ),
                 );
