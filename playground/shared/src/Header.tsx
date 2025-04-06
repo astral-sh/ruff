@@ -4,58 +4,59 @@ import ThemeButton from "./ThemeButton";
 import ShareButton from "./ShareButton";
 import { Theme } from "./theme";
 import VersionTag from "./VersionTag";
+import AstralButton from "./AstralButton";
 
 export default function Header({
   edit,
   theme,
   logo,
   version,
-  onChangeTheme,
-  onShare,
+  onThemeChanged,
+  onResetClicked,
+  onShareClicked,
 }: {
   edit: number | null;
   theme: Theme;
   logo: "ruff" | "astral";
   version: string | null;
-  onChangeTheme: (theme: Theme) => void;
-  onShare?: () => void;
+  onThemeChanged: (theme: Theme) => void;
+  onResetClicked?(): void;
+  onShareClicked: () => void;
 }) {
   return (
     <div
-      className={classNames(
-        "w-full",
-        "flex",
-        "justify-between",
-        "pl-5",
-        "sm:pl-1",
-        "pr-4",
-        "lg:pr-6",
-        "z-10",
-        "top-0",
-        "left-0",
-        "-mb-px",
-        "antialiased",
-        "border-b",
-        "border-gray-200",
-        "dark:border-b-radiate",
-        "dark:bg-galaxy",
-      )}
+      className="
+        w-full
+        flex
+        justify-between
+        antialiased
+        border-b
+        border-gray-200
+        dark:border-b-radiate
+        dark:bg-galaxy
+      "
     >
       <div className="py-4 pl-2">
         <Logo name={logo} className="fill-galaxy dark:fill-radiate" />
       </div>
-      <div className="flex items-center min-w-0">
+      <div className="flex items-center min-w-0 gap-4 mx-2">
         {version ? (
-          <div className="hidden sm:flex items-center">
+          <div className="hidden sm:flex">
             <VersionTag>v{version}</VersionTag>
           </div>
         ) : null}
         <Divider />
         <RepoButton />
         <Divider />
-        <ShareButton key={edit} onShare={onShare} />
+        <div className="max-sm:hidden flex">
+          <ResetButton onClicked={onResetClicked} />
+        </div>
+        <div className="max-sm:hidden flex">
+          <ShareButton key={edit} onShare={onShareClicked} />
+        </div>
         <Divider />
-        <ThemeButton theme={theme} onChange={onChangeTheme} />
+
+        <ThemeButton theme={theme} onChange={onThemeChanged} />
       </div>
     </div>
   );
@@ -63,7 +64,16 @@ export default function Header({
 
 function Divider() {
   return (
-    <div className="hidden sm:block mx-6 lg:mx-4 w-px h-8 bg-gray-200 dark:bg-gray-700" />
+    <div
+      className={classNames(
+        "max-sm:hidden",
+        "visible",
+        "w-px",
+        "h-8",
+        "bg-gray-200",
+        "dark:bg-gray-700",
+      )}
+    />
   );
 }
 
@@ -120,4 +130,17 @@ function Logo({
         </svg>
       );
   }
+}
+
+function ResetButton({ onClicked }: { onClicked?: () => void }) {
+  return (
+    <AstralButton
+      type="button"
+      className="relative flex-none leading-6 py-1.5 px-3 shadow-xs disabled:opacity-50"
+      disabled={onClicked == null}
+      onClick={onClicked}
+    >
+      Reset
+    </AstralButton>
+  );
 }

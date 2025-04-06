@@ -110,6 +110,7 @@ export default function Editor({
 
   return (
     <Moncao
+      key={files.playgroundRevision}
       onMount={handleMount}
       options={{
         fixedOverflowWidgets: true,

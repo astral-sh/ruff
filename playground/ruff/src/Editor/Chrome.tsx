@@ -65,6 +65,15 @@ export default function Chrome() {
     [pythonSource],
   );
 
+  const handleResetClicked = useCallback(() => {
+    const pythonSource = DEFAULT_PYTHON_SOURCE;
+    const settings = stringify(Workspace.defaultSettings());
+
+    persistLocal({ pythonSource, settingsSource: settings });
+    setPythonSource(pythonSource);
+    setSettings(settings);
+  }, []);
+
   const source: Source | null = useMemo(() => {
     if (pythonSource == null || settings == null) {
       return null;
@@ -80,8 +89,9 @@ export default function Chrome() {
         theme={theme}
         logo="ruff"
         version={ruffVersion}
-        onChangeTheme={setTheme}
-        onShare={handleShare}
+        onThemeChanged={setTheme}
+        onShareClicked={handleShare}
+        onResetClicked={handleResetClicked}
       />
 
       <div className="flex grow">
