@@ -73,3 +73,36 @@ from typing import Any
 def g(x: Any = "foo"):
     reveal_type(x)  # revealed: Any | Literal["foo"]
 ```
+
+## Stub functions
+
+### In Protocol
+
+```py
+from typing import Protocol
+
+class Foo(Protocol):
+    def x(self, y: bool = ...): ...
+```
+
+### In abstract method
+
+```py
+from abc import abstractmethod
+
+class Bar:
+    @abstractmethod
+    def x(self, y: bool = ...): ...
+```
+
+### In function overload
+
+```py
+from typing import overload
+
+@overload
+def x(y: None = ...) -> None: ...
+@overload
+def x(y: int) -> str: ...
+def x(y: int | None = None) -> str | None: ...
+```
