@@ -13,6 +13,7 @@ use ruff_source_file::OneIndexed;
 use ruff_source_file::{LineIndex, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+#[expect(dead_code)]
 pub(crate) struct NotebookRange {
     pub(crate) cell: notebook::CellId,
     pub(crate) range: types::Range,
@@ -34,6 +35,8 @@ pub(crate) trait ToRangeExt {
         index: &LineIndex,
         encoding: PositionEncoding,
     ) -> types::Range;
+
+    #[expect(dead_code)]
     fn to_notebook_range(
         &self,
         text: &str,

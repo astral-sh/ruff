@@ -1,5 +1,4 @@
-use std::borrow::Cow;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use lsp_types::Url;
@@ -22,6 +21,7 @@ pub(crate) struct Index {
     notebook_cells: FxHashMap<Url, Url>,
 
     /// Global settings provided by the client.
+    #[expect(dead_code)]
     global_settings: ClientSettings,
 }
 
@@ -34,12 +34,14 @@ impl Index {
         }
     }
 
+    #[expect(dead_code)]
     pub(super) fn text_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
         self.documents
             .iter()
             .filter_map(|(url, doc)| doc.as_text().and(Some(url)))
     }
 
+    #[expect(dead_code)]
     pub(super) fn notebook_document_urls(&self) -> impl Iterator<Item = &Url> + '_ {
         self.documents
             .iter()
@@ -82,6 +84,7 @@ impl Index {
         }
     }
 
+    #[expect(dead_code)]
     pub(super) fn update_notebook_document(
         &mut self,
         key: &DocumentKey,
@@ -114,10 +117,6 @@ impl Index {
 
         notebook.update(cells, metadata, new_version, encoding)?;
         Ok(())
-    }
-
-    pub(super) fn num_documents(&self) -> usize {
-        self.documents.len()
     }
 
     pub(crate) fn make_document_ref(&self, key: DocumentKey) -> Option<DocumentQuery> {
@@ -267,6 +266,7 @@ pub enum DocumentQuery {
 
 impl DocumentQuery {
     /// Retrieve the original key that describes this document query.
+    #[expect(dead_code)]
     pub(crate) fn make_key(&self) -> DocumentKey {
         match self {
             Self::Text { file_url, .. } => DocumentKey::Text(file_url.clone()),
@@ -286,14 +286,6 @@ impl DocumentQuery {
         }
     }
 
-    /// Get the source type of the document associated with this query.
-    pub(crate) fn source_type(&self) -> ruff_python_ast::PySourceType {
-        match self {
-            Self::Text { .. } => ruff_python_ast::PySourceType::from(self.virtual_file_path()),
-            Self::Notebook { .. } => ruff_python_ast::PySourceType::Ipynb,
-        }
-    }
-
     /// Get the version of document selected by this query.
     pub(crate) fn version(&self) -> DocumentVersion {
         match self {
@@ -309,27 +301,9 @@ impl DocumentQuery {
         }
     }
 
-    /// Get the path for the document selected by this query.
-    ///
-    /// Returns `None` if this is an unsaved (untitled) document.
-    ///
-    /// The path isn't guaranteed to point to a real path on the filesystem. This is the case
-    /// for unsaved (untitled) documents.
-    pub(crate) fn file_path(&self) -> Option<PathBuf> {
-        self.file_url().to_file_path().ok()
-    }
-
-    /// Get the path for the document selected by this query, ignoring whether the file exists on disk.
-    ///
-    /// Returns the URL's path if this is an unsaved (untitled) document.
-    pub(crate) fn virtual_file_path(&self) -> Cow<Path> {
-        self.file_path()
-            .map(Cow::Owned)
-            .unwrap_or_else(|| Cow::Borrowed(Path::new(self.file_url().path())))
-    }
-
     /// Attempt to access the single inner text document selected by the query.
     /// If this query is selecting an entire notebook document, this will return `None`.
+    #[expect(dead_code)]
     pub(crate) fn as_single_document(&self) -> Option<&TextDocument> {
         match self {
             Self::Text { document, .. } => Some(document),

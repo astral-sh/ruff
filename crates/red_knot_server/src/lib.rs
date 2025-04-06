@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::server::Server;
 use anyhow::Context;
 pub use document::{DocumentKey, NotebookDocument, PositionEncoding, TextDocument};
