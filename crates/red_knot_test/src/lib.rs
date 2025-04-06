@@ -162,6 +162,7 @@ fn run_test(
     let custom_typeshed_path = test.configuration().typeshed();
     let python_path = test.configuration().python();
     let python_version = test.configuration().python_version().unwrap_or_default();
+
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
     let mut has_custom_pyvenv_cfg_file = false;
@@ -178,7 +179,7 @@ fn run_test(
                 "Supported file types are: py (or python), pyi, text, cfg and ignore"
             );
 
-            let full_path = embedded.full_path(&project_root);
+            let mut full_path = embedded.full_path(&project_root);
 
             if let Some(typeshed_path) = custom_typeshed_path {
                 if let Ok(relative_path) = full_path.strip_prefix(typeshed_path.join("stdlib")) {
@@ -192,6 +193,24 @@ fn run_test(
                 if let Ok(relative_path) = full_path.strip_prefix(python_path) {
                     if relative_path.as_str() == "pyvenv.cfg" {
                         has_custom_pyvenv_cfg_file = true;
+                    } else {
+                        let mut new_path = SystemPathBuf::new();
+                        for component in full_path.components() {
+                            let component = component.as_str();
+                            if component == "<path-to-site-packages>" {
+                                if cfg!(target_os = "windows") {
+                                    new_path.push("Lib");
+                                    new_path.push("site-packages");
+                                } else {
+                                    new_path.push("lib");
+                                    new_path.push(format!("python{python_version}"));
+                                    new_path.push("site-packages");
+                                }
+                            } else {
+                                new_path.push(component);
+                            }
+                        }
+                        full_path = new_path;
                     }
                 }
             }

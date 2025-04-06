@@ -258,13 +258,13 @@ from foo import A
 reveal_type(A)  # revealed: Literal[A]
 ```
 
-`/src/.venv/lib/python3.13/site-packages/foo/__init__.py`:
+`/src/.venv/<path-to-site-packages>/foo/__init__.py`:
 
 ```py
 from .a import A as A
 ```
 
-`/src/.venv/lib/python3.13/site-packages/foo/a.py`:
+`/src/.venv/<path-to-site-packages>/foo/a.py`:
 
 ```py
 class A: ...
