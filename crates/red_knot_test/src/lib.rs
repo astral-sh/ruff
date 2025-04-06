@@ -161,6 +161,7 @@ fn run_test(
     let src_path = project_root.clone();
     let custom_typeshed_path = test.configuration().typeshed();
     let python_path = test.configuration().python();
+    let python_version = test.configuration().python_version().unwrap_or_default();
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
     let mut has_custom_pyvenv_cfg_file = false;
@@ -197,7 +198,7 @@ fn run_test(
 
             db.write_file(&full_path, &embedded.code).unwrap();
 
-            if !full_path.starts_with(&src_path) || !matches!(embedded.lang, "py" | "pyi") {
+            if !(full_path.starts_with(&src_path) && matches!(embedded.lang, "py" | "pyi")) {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
                 return None;
             }
@@ -234,7 +235,6 @@ fn run_test(
     if let Some(python_path) = python_path {
         if !has_custom_pyvenv_cfg_file {
             let pyvenv_cfg_file = python_path.join("pyvenv.cfg");
-            let python_version = test.configuration().python_version().unwrap_or_default();
             let home_directory = SystemPathBuf::from(format!("/Python{python_version}"));
             db.create_directory_all(&home_directory).unwrap();
             db.write_file(&pyvenv_cfg_file, format!("home = {home_directory}"))
@@ -245,7 +245,7 @@ fn run_test(
     let configuration = test.configuration();
 
     let settings = ProgramSettings {
-        python_version: configuration.python_version().unwrap_or_default(),
+        python_version,
         python_platform: configuration.python_platform().unwrap_or_default(),
         search_paths: SearchPathSettings {
             src_roots: vec![src_path],
