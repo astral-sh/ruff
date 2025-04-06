@@ -6911,7 +6911,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let signatures = argument_type.signatures(db);
 
                     // TODO overloads
-                    let Some(signature) = signatures.iter().flatten().next() else {
+                    let Some(mut signature) = signatures.iter().flatten().next() else {
                         self.context.report_lint(
                             &INVALID_TYPE_FORM,
                             arguments_slice,
@@ -6923,6 +6923,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                         return Type::unknown();
                     };
+
+                    let bound_signature = signature.bind_self();
+                    if let Type::BoundMethod(_) = argument_type {
+                        signature = &bound_signature;
+                    }
 
                     Type::Callable(CallableType::new(db, signature.clone()))
                 }
