@@ -182,13 +182,16 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            if let Some(exception) = call.arguments.find_argument_value("expected_exception", 0) {
-                if call
-                    .arguments
-                    .find_keyword("match")
-                    .is_none_or(|k| is_empty_or_null_string(&k.value))
+            if call.arguments.find_positional(1).is_none() {
+                if let Some(exception) = call.arguments.find_argument_value("expected_exception", 0)
                 {
-                    exception_needs_match(checker, exception);
+                    if call
+                        .arguments
+                        .find_keyword("match")
+                        .is_none_or(|k| is_empty_or_null_string(&k.value))
+                    {
+                        exception_needs_match(checker, exception);
+                    }
                 }
             }
         }
