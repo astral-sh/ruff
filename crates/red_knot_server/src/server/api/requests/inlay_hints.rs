@@ -6,6 +6,7 @@ use crate::DocumentSnapshot;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
 use red_knot_ide::get_inlay_hints;
+use red_knot_project::Db;
 use red_knot_project::ProjectDatabase;
 use ruff_db::source::{line_index, source_text};
 use ruff_text_size::Ranged;
@@ -31,6 +32,18 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             tracing::debug!("Failed to resolve file for {:?}", params);
             return Ok(None);
         };
+
+        let editor_options = db
+            .project()
+            .metadata(&db)
+            .options()
+            .editor
+            .clone()
+            .unwrap_or_default();
+
+        if !editor_options.inlay_hints.unwrap_or(false) {
+            return Ok(None);
+        }
 
         let inlay_hints = get_inlay_hints(&db, file);
 

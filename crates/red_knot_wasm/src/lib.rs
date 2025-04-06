@@ -279,6 +279,19 @@ impl Workspace {
     pub fn inlay_hints(&self, file_id: &FileHandle) -> Result<Vec<InlayHint>, Error> {
         let result = get_inlay_hints(&self.db, file_id.file);
 
+        let editor_options = self
+            .db
+            .project()
+            .metadata(&self.db)
+            .options()
+            .editor
+            .clone()
+            .unwrap_or_default();
+
+        if !editor_options.inlay_hints.unwrap_or(false) {
+            return Ok(Vec::new());
+        }
+
         Ok(result
             .into_iter()
             .map(|hint| {

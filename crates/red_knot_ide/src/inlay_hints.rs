@@ -1,5 +1,4 @@
-use crate::Db;
-use crate::RangedValue;
+use crate::{Db, RangedValue};
 use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{File, FileRange};
