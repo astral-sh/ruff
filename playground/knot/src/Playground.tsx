@@ -480,7 +480,11 @@ function updateFile(
 }
 
 function Loading() {
-  return <div className="align-middle  text-center my-2">Loading...</div>;
+  return (
+    <div className="align-middle text-current text-center my-2 dark:text-white">
+      Loading...
+    </div>
+  );
 }
 
 function restoreWorkspace(
