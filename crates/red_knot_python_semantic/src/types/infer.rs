@@ -6911,7 +6911,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let signatures = argument_type.signatures(db);
 
                     // TODO overloads
-                    let Some(mut signature) = signatures.iter().flatten().next() else {
+                    let Some(signature) = signatures.iter().flatten().next() else {
                         self.context.report_lint(
                             &INVALID_TYPE_FORM,
                             arguments_slice,
@@ -6926,7 +6926,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     let revealed_signature = if argument_type.is_bound_method() {
                         signature.bind_self()
-                    else {
+                    } else {
                         signature.clone()
                     };
 
