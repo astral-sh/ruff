@@ -5,7 +5,7 @@ use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 use std::fmt::Formatter;
@@ -70,20 +70,32 @@ impl<'db> InlayHintVisitor<'db> {
     fn hints(&self) -> &Vec<RangedValue<InlayHintContent<'db>>> {
         &self.hints
     }
+
+    fn add_hint(&mut self, range: TextRange, ty: Type<'db>) {
+        self.hints.push(RangedValue {
+            range: FileRange::new(self.file, range),
+            value: InlayHintContent::AssignStatement(ty),
+        });
+    }
 }
 
 impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        let file_range = |range: TextRange| FileRange::new(self.file, range);
-
         match stmt {
             Stmt::Assign(assign) => {
                 let ty = assign.value.inferred_type(&self.model);
                 for target in &assign.targets {
-                    self.hints.push(RangedValue {
-                        range: file_range(target.range()),
-                        value: InlayHintContent::AssignStatement(ty),
-                    });
+                    match target {
+                        Expr::Tuple(tuple) => {
+                            for element in &tuple.elts {
+                                let element_ty = element.inferred_type(&self.model);
+                                self.add_hint(element.range(), element_ty);
+                            }
+                        }
+                        _ => {
+                            self.add_hint(target.range(), ty);
+                        }
+                    }
                 }
                 return;
             }
@@ -102,6 +114,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
 mod tests {
     use super::*;
 
+    use red_knot_python_semantic::types::StringLiteralType;
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_text_size::TextSize;
@@ -136,6 +149,38 @@ mod tests {
             FileRange::new(
                 test_case.file,
                 TextRange::new(TextSize::from(0), TextSize::from(1))
+            )
+        );
+    }
+
+    #[test]
+    fn test_tuple_assignment() {
+        let test_case = test_case("x, y = (1, 'abc')");
+        let hints = get_inlay_hints(&test_case.db, test_case.file);
+        assert_eq!(hints.len(), 2);
+        assert_eq!(
+            hints[0].value,
+            InlayHintContent::AssignStatement(Type::IntLiteral(1))
+        );
+        assert_eq!(
+            hints[1].value,
+            InlayHintContent::AssignStatement(Type::StringLiteral(StringLiteralType::new(
+                &test_case.db,
+                "abc"
+            )))
+        );
+        assert_eq!(
+            hints[0].range,
+            FileRange::new(
+                test_case.file,
+                TextRange::new(TextSize::from(0), TextSize::from(1))
+            )
+        );
+        assert_eq!(
+            hints[1].range,
+            FileRange::new(
+                test_case.file,
+                TextRange::new(TextSize::from(3), TextSize::from(4))
             )
         );
     }
