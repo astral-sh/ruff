@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/invalid_annotation_function_py314.py
+input_file: crates/ruff_python_parser/resources/inline/ok/valid_annotation_function_py313.py
 ---
 ## AST
 
@@ -505,79 +505,3 @@ Module(
     },
 )
 ```
-## Semantic Syntax Errors
-
-  |
-1 | # parse_options: {"target-version": "3.14"}
-2 | def f() -> (y := 3): ...
-  |             ^^^^^^ Syntax Error: named expression cannot be used within a type annotation
-3 | def g(arg: (x := 1)): ...
-4 | def outer():
-  |
-
-
-  |
-1 | # parse_options: {"target-version": "3.14"}
-2 | def f() -> (y := 3): ...
-3 | def g(arg: (x := 1)): ...
-  |             ^^^^^^ Syntax Error: named expression cannot be used within a type annotation
-4 | def outer():
-5 |     def i(x: (yield 1)): ...
-  |
-
-
-  |
-3 | def g(arg: (x := 1)): ...
-4 | def outer():
-5 |     def i(x: (yield 1)): ...
-  |               ^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
-6 |     def k() -> (yield 1): ...
-7 |     def m(x: (yield from 1)): ...
-  |
-
-
-  |
-4 | def outer():
-5 |     def i(x: (yield 1)): ...
-6 |     def k() -> (yield 1): ...
-  |                 ^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
-7 |     def m(x: (yield from 1)): ...
-8 |     def o() -> (yield from 1): ...
-  |
-
-
-  |
-5 |     def i(x: (yield 1)): ...
-6 |     def k() -> (yield 1): ...
-7 |     def m(x: (yield from 1)): ...
-  |               ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
-8 |     def o() -> (yield from 1): ...
-9 | async def outer():
-  |
-
-
-   |
- 6 |     def k() -> (yield 1): ...
- 7 |     def m(x: (yield from 1)): ...
- 8 |     def o() -> (yield from 1): ...
-   |                 ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
- 9 | async def outer():
-10 |     def f() -> (await 1): ...
-   |
-
-
-   |
- 8 |     def o() -> (yield from 1): ...
- 9 | async def outer():
-10 |     def f() -> (await 1): ...
-   |                 ^^^^^^^ Syntax Error: await expression cannot be used within a type annotation
-11 |     def g(arg: (await 1)): ...
-   |
-
-
-   |
- 9 | async def outer():
-10 |     def f() -> (await 1): ...
-11 |     def g(arg: (await 1)): ...
-   |                 ^^^^^^^ Syntax Error: await expression cannot be used within a type annotation
-   |
