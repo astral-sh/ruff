@@ -1080,9 +1080,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "hooks", "filesystem", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.hooks.filesystem",
-            new_path: "airflow.providers.standard.hooks.filesystem",
+        ["airflow", "hooks", "filesystem", "FSHook"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.hooks.filesystem.FSHook",
             provider: "standard",
             version: "0.0.1"
         },

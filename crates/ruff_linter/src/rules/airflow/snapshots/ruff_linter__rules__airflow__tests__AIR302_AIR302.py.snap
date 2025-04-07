@@ -1713,7 +1713,7 @@ AIR302.py:438:1: AIR302 `airflow.triggers.file.FileTrigger` is moved into `stand
     |
     = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.file.FileTrigger` instead.
 
-AIR302.py:439:1: AIR302 Import path `airflow.hooks.filesystem` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:439:1: AIR302 `airflow.hooks.filesystem.FSHook` is moved into `standard` provider in Airflow 3.0;
     |
 437 | FileSensor()
 438 | FileTrigger()
@@ -1722,7 +1722,7 @@ AIR302.py:439:1: AIR302 Import path `airflow.hooks.filesystem` is moved into `st
 440 | PackageIndexHook()
 441 | SubprocessHook()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.hooks.filesystem` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.hooks.filesystem.FSHook` instead.
 
 AIR302.py:440:1: AIR302 `airflow.hooks.package_index.PackageIndexHook` is moved into `standard` provider in Airflow 3.0;
     |
