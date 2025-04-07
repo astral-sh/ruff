@@ -12,8 +12,8 @@ use ruff_python_ast::{
     self as ast,
     comparable::ComparableExpr,
     visitor::{walk_expr, Visitor},
-    Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
-    StmtImportFrom,
+    Expr, ExprContext, IrrefutablePatternKind, Pattern, PySourceType, PythonVersion, Stmt,
+    StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
@@ -50,8 +50,11 @@ pub struct SemanticSyntaxChecker {
 }
 
 impl SemanticSyntaxChecker {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(source_type: PySourceType) -> Self {
+        Self {
+            seen_futures_boundary: false,
+            in_async_context: source_type.is_ipynb(),
+        }
     }
 }
 
@@ -1336,7 +1339,7 @@ pub struct SemanticSyntaxCheckerVisitor<Ctx> {
 impl<Ctx> SemanticSyntaxCheckerVisitor<Ctx> {
     pub fn new(context: Ctx) -> Self {
         Self {
-            checker: SemanticSyntaxChecker::new(),
+            checker: SemanticSyntaxChecker::new(PySourceType::Python),
             context,
         }
     }

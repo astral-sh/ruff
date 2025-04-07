@@ -283,7 +283,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
-            semantic_checker: SemanticSyntaxChecker::new(),
+            semantic_checker: SemanticSyntaxChecker::new(source_type),
             semantic_errors: RefCell::default(),
         }
     }
