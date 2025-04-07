@@ -477,3 +477,8 @@ from airflow.sensors.time_sensor import TimeSensor, TimeSensorAsync
 
 TimeSensor()
 TimeSensorAsync()
+
+from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
+
+DateTimeSensor()
+DateTimeSensorAsync()

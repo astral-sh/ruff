@@ -1056,13 +1056,16 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "sensors", "date_time", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.sensors.date_time",
-            new_path: "airflow.providers.standard.time.sensors.date_time",
-            provider: "standard",
-            version: "0.0.1"
+        ["airflow", "sensors", "date_time", rest] => match *rest {
+            "DateTimeSensor" | "DateTimeSensorAsync" => Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.standard.time.sensors.date_time",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            _ => return,
         },
-        ["airflow", "sensors", "time_sensor", rest] =>match *rest {
+        ["airflow", "sensors", "time_sensor", rest] => match *rest {
             "TimeSensor" | "TimeSensorAsync" => Replacement::ProviderNameMoved {
                 name: rest.to_string(),
                 module: "airflow.providers.standard.time.sensors.time",

@@ -1957,5 +1957,25 @@ AIR302.py:479:1: AIR302 `airflow.sensors.time_sensor.TimeSensorAsync` is moved i
 478 | TimeSensor()
 479 | TimeSensorAsync()
     | ^^^^^^^^^^^^^^^ AIR302
+480 |
+481 | from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time.TimeSensorAsync` instead.
+
+AIR302.py:483:1: AIR302 `airflow.sensors.date_time.DateTimeSensor` is moved into `standard` provider in Airflow 3.0;
+    |
+481 | from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
+482 |
+483 | DateTimeSensor()
+    | ^^^^^^^^^^^^^^ AIR302
+484 | DateTimeSensorAsync()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.date_time.DateTimeSensor` instead.
+
+AIR302.py:484:1: AIR302 `airflow.sensors.date_time.DateTimeSensorAsync` is moved into `standard` provider in Airflow 3.0;
+    |
+483 | DateTimeSensor()
+484 | DateTimeSensorAsync()
+    | ^^^^^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.date_time.DateTimeSensorAsync` instead.
