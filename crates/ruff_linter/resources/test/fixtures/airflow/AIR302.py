@@ -39,7 +39,7 @@ from airflow.hooks.S3_hook import S3Hook, provide_bucket_name
 from airflow.hooks.samba_hook import SambaHook
 from airflow.hooks.slack_hook import SlackHook
 from airflow.hooks.sqlite_hook import SqliteHook
-from airflow.hooks.subprocess import SubprocessHook
+from airflow.hooks.subprocess import SubprocessHook, SubprocessResult, working_directory
 from airflow.hooks.webhdfs_hook import WebHDFSHook
 from airflow.hooks.zendesk_hook import ZendeskHook
 from airflow.kubernetes.k8s_model import K8SModel, append_to_pod
@@ -112,7 +112,7 @@ from airflow.operators.check_operator import (
     ThresholdCheckOperator,
     ValueCheckOperator,
 )
-from airflow.operators.datetime import BranchDateTimeOperator
+from airflow.operators.datetime import BranchDateTimeOperator, target_times_as_dates
 from airflow.operators.docker_operator import DockerOperator
 from airflow.operators.druid_check_operator import DruidCheckOperator
 from airflow.operators.dummy import DummyOperator, EmptyOperator
@@ -198,6 +198,7 @@ from airflow.operators.sql import (
 from airflow.operators.sqlite_operator import SqliteOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
+<<<<<<< HEAD
 from airflow.sensors.date_time import DateTimeSensor
 from airflow.sensors.date_time_sensor import DateTimeSensor
 from airflow.sensors.external_task import (
@@ -205,21 +206,24 @@ from airflow.sensors.external_task import (
     ExternalTaskSensor,
     ExternalTaskSensorLink,
 )
+=======
+from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
+from airflow.sensors.external_task import ExternalTaskMarker, ExternalTaskSensor
+>>>>>>> 2b4f9ad10 (test(AIR302): reorganize test cases)
 from airflow.sensors.filesystem import FileSensor
 from airflow.sensors.hive_partition_sensor import HivePartitionSensor
 from airflow.sensors.http_sensor import HttpSensor
 from airflow.sensors.metastore_partition_sensor import MetastorePartitionSensor
 from airflow.sensors.named_hive_partition_sensor import NamedHivePartitionSensor
-from airflow.sensors.s3_key_sensor import S3KeySensor
 from airflow.sensors.sql import SqlSensor
 from airflow.sensors.sql_sensor import SqlSensor2
-from airflow.sensors.time_delta import TimeDeltaSensor
-from airflow.sensors.time_sensor import TimeSensor
+from airflow.sensors.time_delta import TimeDeltaSensor, TimeDeltaSensorAsync, WaitSensor
+from airflow.sensors.time_sensor import TimeSensor, TimeSensorAsync
 from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
 from airflow.sensors.weekday import DayOfWeekSensor
-from airflow.triggers.external_task import WorkflowTrigger
+from airflow.triggers.external_task import DagStateTrigger, WorkflowTrigger
 from airflow.triggers.file import FileTrigger
-from airflow.triggers.temporal import DateTimeTrigger
+from airflow.triggers.temporal import DateTimeTrigger, TimeDeltaTrigger
 from airflow.www.security import FabAirflowSecurityManagerOverride
 
 # apache-airflow-providers-amazon
@@ -231,7 +235,7 @@ RedshiftToS3Operator()
 RedshiftToS3Transfer()
 S3FileTransformOperator()
 S3Hook()
-S3KeySensor()
+SSQLTableCheckOperator3KeySensor()
 S3ToRedshiftOperator()
 S3ToRedshiftTransfer()
 
@@ -427,7 +431,9 @@ BranchDateTimeOperator()
 BranchDayOfWeekOperator()
 BranchPythonOperator()
 DateTimeSensor()
-DateTimeTrigger()
+DateTimeSensorAsync()
+TimeSensor()
+TimeDeltaSensor()
 DayOfWeekSensor()
 DummyOperator()
 EmptyOperator()
@@ -446,44 +452,17 @@ TriggerDagRunOperator()
 WorkflowTrigger()
 PythonOperator()
 PythonVirtualenvOperator()
+DagStateTrigger()
 FileTrigger()
 DateTimeTrigger()
-
-
-from airflow.triggers.temporal import DateTimeTrigger, TimeDeltaTrigger
-
-DateTimeTrigger()
 TimeDeltaTrigger()
-
-from airflow.triggers.external_task import DagStateTrigger, WorkflowTrigger
-
-WorkflowTrigger()
-DagStateTrigger()
-
-from airflow.hooks.subprocess import SubprocessHook, SubprocessResult, working_directory
-
 SubprocessResult()
 working_directory()
 SubprocessHook()
-
-from airflow.sensors.time_delta import TimeDeltaSensor, TimeDeltaSensorAsync, WaitSensor
-
 TimeDeltaSensor()
 TimeDeltaSensorAsync()
 WaitSensor()
-
-
-from airflow.sensors.time_sensor import TimeSensor, TimeSensorAsync
-
 TimeSensor()
 TimeSensorAsync()
-
-from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
-
-DateTimeSensor()
-DateTimeSensorAsync()
-
-from airflow.operators.datetime import BranchDateTimeOperator, target_times_as_dates
-
 BranchDateTimeOperator()
 target_times_as_dates()
