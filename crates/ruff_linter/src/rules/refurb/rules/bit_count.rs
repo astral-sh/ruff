@@ -27,6 +27,10 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// y = 0b1111011.bit_count()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as the `bit_count()` method can be used when the argument
+/// to the `bin()` is an instance of a type that implements the `__index__` and `bit_count` methods.
+///
 /// ## Options
 /// - `target-version`
 ///
@@ -131,7 +135,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         }
 
         Expr::StringLiteral(inner) => (inner.value.is_implicit_concatenated(), false),
-        Expr::BytesLiteral(inner) => (inner.value.is_implicit_concatenated(), true),
+        Expr::BytesLiteral(inner) => (inner.value.is_implicit_concatenated(), false),
         Expr::FString(inner) => (inner.value.is_implicit_concatenated(), false),
 
         Expr::Await(_)
@@ -150,7 +154,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         | Expr::Compare(_)
         | Expr::Tuple(_)
         | Expr::Generator(_)
-        | Expr::IpyEscapeCommand(_) => (true, true),
+        | Expr::IpyEscapeCommand(_) => (true, false),
 
         Expr::Call(_)
         | Expr::Dict(_)
@@ -162,7 +166,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
         | Expr::Attribute(_)
-        | Expr::Subscript(_) => (false, true),
+        | Expr::Subscript(_) => (false, false),
     };
 
     let replacement = if parenthesize {
