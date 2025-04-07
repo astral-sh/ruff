@@ -125,7 +125,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 
     let [Expr::Subscript(ast::ExprSubscript {
         value: subscript_value,
-        slice,
+        slice: key,
         ..
     })] = targets.as_slice()
     else {
@@ -135,12 +135,15 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // If any references to a target variable are after the loop,
     // then removing the loop would cause a NameError
     let any_references_after_for_loop = |target: &Expr| {
-        let target_binding = checker
+        let Some(target_binding) = checker
             .semantic()
             .bindings
             .iter()
             .find(|binding| target.range() == binding.range)
-            .expect("for-loop target binding must exist");
+        else {
+            // All uses of this function will early-return if this returns true, so this must early-return the rule
+            return true;
+        };
 
         target_binding
             .references()
@@ -152,7 +155,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         Expr::Tuple(tuple) => {
             if !tuple
                 .iter()
-                .any(|element| ComparableExpr::from(slice) == ComparableExpr::from(element))
+                .any(|element| ComparableExpr::from(key) == ComparableExpr::from(element))
             {
                 return;
             }
@@ -168,7 +171,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             }
         }
         Expr::Name(_) => {
-            if ComparableExpr::from(slice) != ComparableExpr::from(target) {
+            if ComparableExpr::from(key) != ComparableExpr::from(target) {
                 return;
             }
             if ComparableExpr::from(value) != ComparableExpr::from(target) {
@@ -283,23 +286,23 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             DictComprehensionType::Update
         };
 
-        let mut diagnostic = Diagnostic::new(
+        let diagnostic = Diagnostic::new(
             ManualDictComprehension {
                 fix_type,
                 is_async: for_stmt.is_async,
             },
             *range,
-        );
-
-        diagnostic.set_fix(convert_to_dict_comprehension(
+        )
+        .with_fix(convert_to_dict_comprehension(
             fix_type,
             binding,
             for_stmt,
             if_test.map(std::convert::AsRef::as_ref),
-            slice.as_ref(),
+            key.as_ref(),
             value.as_ref(),
             checker,
         ));
+
         checker.report_diagnostic(diagnostic);
     } else {
         checker.report_diagnostic(Diagnostic::new(
