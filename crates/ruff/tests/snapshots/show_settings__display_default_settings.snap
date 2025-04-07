@@ -386,6 +386,18 @@ formatter.quote_style = double
 formatter.magic_trailing_comma = respect
 formatter.docstring_code_format = disabled
 formatter.docstring_code_line_width = dynamic
+formatter.pragma_tags = [
+	type:,
+	pyright:,
+	pylint:,
+	flake8:,
+	ruff:,
+	isort:,
+	nosec,
+]
+formatter.pragma_tags_case_insensitive = [
+	noqa,
+]
 
 # Analyze Settings
 analyze.exclude = []
