@@ -75,12 +75,10 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
             continue;
         };
 
-        if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-            if checker
-                .semantic()
-                .resolve_qualified_name(func)
-                .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "auto"]))
-            {
+        if is_call_to_enum_auto(checker, value) {
+            continue;
+        } else if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value.as_ref() {
+            if elts.iter().any(|elt| is_call_to_enum_auto(checker, elt)) {
                 continue;
             }
         }
@@ -100,6 +98,17 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
             );
             checker.report_diagnostic(diagnostic);
         }
+    }
+}
+
+fn is_call_to_enum_auto(checker: &Checker, expr: &Expr) -> bool {
+    if let Expr::Call(ast::ExprCall { func, .. }) = expr {
+        checker
+            .semantic()
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "auto"]))
+    } else {
+        false
     }
 }
 
