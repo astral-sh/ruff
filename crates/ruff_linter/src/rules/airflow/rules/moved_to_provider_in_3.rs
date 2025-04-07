@@ -1070,12 +1070,24 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "hooks", "subprocess", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.hooks.subprocess",
-            new_path: "airflow.providers.standard.hooks.subprocess",
-            provider: "standard",
-            version: "0.0.1"
-        },
+        ["airflow", "hooks", "subprocess", rest] => match *rest {
+            "SubprocessResult" => Replacement::ProviderName {
+                name: "airflow.providers.standard.hooks.subprocess.SubprocessResult",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            "working_directory" => Replacement::ProviderName {
+                name: "airflow.providers.standard.hooks.subprocess.working_directory",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            "SubprocessHook" => Replacement::ProviderName {
+                name: "airflow.providers.standard.hooks.subprocess.SubprocessHook",
+                provider: "standard",
+                version: "0.0.3"
+            },
+_ => return,
+        }
         ["airflow", "triggers", "external_task", rest] => match *rest {
             "WorkflowTrigger" => Replacement::ProviderName {
                 name: "airflow.providers.standard.triggers.external_task.WorkflowTrigger",

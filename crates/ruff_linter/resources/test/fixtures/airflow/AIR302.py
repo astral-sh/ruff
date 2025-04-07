@@ -459,3 +459,9 @@ from airflow.triggers.external_task import DagStateTrigger, WorkflowTrigger
 
 WorkflowTrigger()
 DagStateTrigger()
+
+from airflow.hooks.subprocess import SubprocessHook, SubprocessResult, working_directory
+
+SubprocessResult()
+working_directory()
+SubprocessHook()
