@@ -67,25 +67,6 @@ impl<'db> Signatures<'db> {
         }
     }
 
-    pub(crate) fn apply_specialization(
-        &self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Self {
-        let callable_type = self.callable_type.apply_specialization(db, specialization);
-        let signature_type = self.signature_type.apply_specialization(db, specialization);
-        let elements = self
-            .elements
-            .iter()
-            .map(|callable| callable.apply_specialization(db, specialization))
-            .collect();
-        Self {
-            callable_type,
-            signature_type,
-            elements,
-        }
-    }
-
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, CallableSignature<'db>> {
         self.elements.iter()
     }
@@ -201,26 +182,6 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
         self.bound_type = Some(bound_type);
         self
-    }
-
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let callable_type = self.callable_type.apply_specialization(db, specialization);
-        let signature_type = self.signature_type.apply_specialization(db, specialization);
-        let bound_type = self
-            .bound_type
-            .map(|ty| ty.apply_specialization(db, specialization));
-        let overloads = self
-            .overloads
-            .iter()
-            .map(|overload| overload.apply_specialization(db, specialization))
-            .collect();
-        Self {
-            callable_type,
-            signature_type,
-            dunder_call_is_possibly_unbound: self.dunder_call_is_possibly_unbound,
-            bound_type,
-            overloads,
-        }
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {

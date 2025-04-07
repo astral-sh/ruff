@@ -208,23 +208,6 @@ impl<'db> ClassType<'db> {
         self.class(db).definition(db)
     }
 
-    pub(crate) fn apply_specialization(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Self {
-        match self {
-            Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(GenericAlias::new(
-                db,
-                generic.origin(db),
-                generic
-                    .specialization(db)
-                    .apply_specialization(db, specialization),
-            )),
-        }
-    }
-
     fn specialize_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             Self::NonGeneric(_) => ty,

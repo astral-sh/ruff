@@ -1,4 +1,3 @@
-use crate::types::generics::Specialization;
 use crate::types::{todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::Db;
 use itertools::Either;
@@ -30,30 +29,6 @@ impl<'db> ClassBase<'db> {
         match self {
             ClassBase::Dynamic(_) => true,
             ClassBase::Class(_) => false,
-        }
-    }
-
-    /// Applies a specialization to this class base. This is used, for instance, when a generic
-    /// class inherits from a generic alias:
-    ///
-    /// ```py
-    /// class A[T]: ...
-    /// class B[U](A[U]): ...
-    /// ```
-    ///
-    /// `B` is a generic class, whose MRO includes the generic alias `A[U]`. If `B` is specialized
-    /// to `B[int]`, with specialization `{U: int}`, we can apply that specialization to the base
-    /// class. That results in `A[int]`, which is the corresponding entry in the MRO of `B[int]`.
-    pub(crate) fn apply_specialization(
-        self,
-        db: &'db dyn Db,
-        specialization: Specialization<'db>,
-    ) -> Self {
-        match self {
-            ClassBase::Dynamic(_) => self,
-            ClassBase::Class(class) => {
-                ClassBase::Class(class.apply_specialization(db, specialization))
-            }
         }
     }
 
