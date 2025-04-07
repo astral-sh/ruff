@@ -1180,6 +1180,74 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::Deferred);
     }
 
+    /// Returns `true` if the current scope is the function body scope of a method of a protocol
+    /// (that is, a class which directly inherits `typing.Protocol`.)
+    fn in_class_that_inherits_protocol_directly(&self) -> bool {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+        let Some(parent_scope_id) = current_scope.parent() else {
+            return false;
+        };
+        let parent_scope = self.index.scope(parent_scope_id);
+
+        let class_scope = match parent_scope.kind() {
+            ScopeKind::Class => parent_scope,
+            ScopeKind::Annotation => {
+                let Some(class_scope_id) = parent_scope.parent() else {
+                    return false;
+                };
+                let potentially_class_scope = self.index.scope(class_scope_id);
+
+                match potentially_class_scope.kind() {
+                    ScopeKind::Class => potentially_class_scope,
+                    _ => return false,
+                }
+            }
+            _ => return false,
+        };
+
+        let NodeWithScopeKind::Class(node_ref) = class_scope.node() else {
+            return false;
+        };
+
+        // TODO move this to `Class` once we add proper `Protocol` support
+        node_ref.bases().iter().any(|base| {
+            matches!(
+                self.file_expression_type(base),
+                Type::KnownInstance(KnownInstanceType::Protocol)
+            )
+        })
+    }
+
+    /// Returns `true` if the current scope is the function body scope of a function overload (that
+    /// is, the stub declaration decorated with `@overload`, not the implementation), or an
+    /// abstract method (decorated with `@abstractmethod`.)
+    fn in_function_overload_or_abstractmethod(&self) -> bool {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+
+        let function_scope = match current_scope.kind() {
+            ScopeKind::Function => current_scope,
+            _ => return false,
+        };
+
+        let NodeWithScopeKind::Function(node_ref) = function_scope.node() else {
+            return false;
+        };
+
+        node_ref.decorator_list.iter().any(|decorator| {
+            let decorator_type = self.file_expression_type(&decorator.expression);
+
+            match decorator_type {
+                Type::FunctionLiteral(function) => matches!(
+                    function.known(self.db()),
+                    Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
+                ),
+                _ => false,
+            }
+        })
+    }
+
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         // Parameters are odd: they are Definitions in the function body scope, but have no
         // constituent nodes that are part of the function body. In order to get diagnostics
@@ -1210,56 +1278,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            let is_overload_or_abstract = function.decorator_list.iter().any(|decorator| {
-                let decorator_type = self.file_expression_type(&decorator.expression);
-
-                match decorator_type {
-                    Type::FunctionLiteral(function) => matches!(
-                        function.known(self.db()),
-                        Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
-                    ),
-                    _ => false,
-                }
-            });
-
-            let class_inherits_protocol_directly = (|| -> bool {
-                let current_scope_id = self.scope().file_scope_id(self.db());
-                let current_scope = self.index.scope(current_scope_id);
-                let Some(parent_scope_id) = current_scope.parent() else {
-                    return false;
-                };
-                let parent_scope = self.index.scope(parent_scope_id);
-
-                let class_scope = match parent_scope.kind() {
-                    ScopeKind::Class => parent_scope,
-                    ScopeKind::Annotation => {
-                        let Some(class_scope_id) = parent_scope.parent() else {
-                            return false;
-                        };
-                        let potentially_class_scope = self.index.scope(class_scope_id);
-
-                        match potentially_class_scope.kind() {
-                            ScopeKind::Class => potentially_class_scope,
-                            _ => return false,
-                        }
-                    }
-                    _ => return false,
-                };
-
-                let NodeWithScopeKind::Class(node_ref) = class_scope.node() else {
-                    return false;
-                };
-
-                // TODO move this to `Class` once we add proper `Protocol` support
-                node_ref.bases().iter().any(|base| {
-                    matches!(
-                        self.file_expression_type(base),
-                        Type::KnownInstance(KnownInstanceType::Protocol)
-                    )
-                })
-            })();
-
-            if (self.in_stub() || is_overload_or_abstract || class_inherits_protocol_directly)
+            if (self.in_stub()
+                || self.in_function_overload_or_abstractmethod()
+                || self.in_class_that_inherits_protocol_directly())
                 && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
             {
@@ -1552,7 +1573,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         declared_ty: declared_ty.into(),
                         inferred_ty: UnionType::from_elements(self.db(), [declared_ty, default_ty]),
                     }
-                } else if self.in_stub()
+                } else if (self.in_stub()
+                    || self.in_function_overload_or_abstractmethod()
+                    || self.in_class_that_inherits_protocol_directly())
                     && default
                         .as_ref()
                         .is_some_and(|d| d.is_ellipsis_literal_expr())
