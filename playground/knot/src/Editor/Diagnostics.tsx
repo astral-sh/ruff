@@ -62,9 +62,11 @@ function Items({
     );
   }
 
+  const uniqueIds: Map<string, number> = new Map();
+
   return (
     <ul className="space-y-0.5 grow overflow-y-scroll">
-      {diagnostics.map((diagnostic, index) => {
+      {diagnostics.map((diagnostic) => {
         const position = diagnostic.range;
         const start = position?.start;
         const id = diagnostic.id;
@@ -72,8 +74,13 @@ function Items({
         const startLine = start?.line ?? 1;
         const startColumn = start?.column ?? 1;
 
+        const mostlyUniqueId = `${startLine}:${startColumn}-${id}`;
+
+        const disambiguator = uniqueIds.get(mostlyUniqueId) ?? 0;
+        uniqueIds.set(mostlyUniqueId, disambiguator + 1);
+
         return (
-          <li key={`${startLine}:${startColumn}-${id ?? index}`}>
+          <li key={`${mostlyUniqueId}-${disambiguator}`}>
             <button
               onClick={() => onGoTo(startLine, startColumn)}
               className="w-full text-start cursor-pointer select-text"

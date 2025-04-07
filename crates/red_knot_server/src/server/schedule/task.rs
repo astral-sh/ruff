@@ -17,6 +17,7 @@ type BackgroundFnBuilder<'s> = Box<dyn FnOnce(&Session) -> BackgroundFn + 's>;
 pub(in crate::server) enum BackgroundSchedule {
     /// The task should be run on the background thread designated
     /// for formatting actions. This is a high priority thread.
+    #[expect(dead_code)]
     Fmt,
     /// The task should be run on the general high-priority background
     /// thread.

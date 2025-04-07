@@ -1,4 +1,5 @@
 import {
+  ActionDispatch,
   Suspense,
   useCallback,
   useDeferredValue,
@@ -22,6 +23,7 @@ export default function Playground() {
   const [version, setVersion] = useState<string>("0.0.0");
   const [error, setError] = useState<string | null>(null);
   const workspacePromiseRef = useRef<Promise<Workspace> | null>(null);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
 
   let workspacePromise = workspacePromiseRef.current;
   if (workspacePromise == null) {
@@ -29,43 +31,14 @@ export default function Playground() {
       (fetched) => {
         setVersion(fetched.version);
         const workspace = new Workspace("/", {});
-
-        let hasSettings = false;
-
-        for (const [name, content] of Object.entries(fetched.workspace.files)) {
-          let handle = null;
-          if (name === SETTINGS_FILE_NAME) {
-            updateOptions(workspace, content, setError);
-            hasSettings = true;
-          } else {
-            handle = workspace.openFile(name, content);
-          }
-
-          dispatchFiles({ type: "add", handle, content, name });
-        }
-
-        if (!hasSettings) {
-          updateOptions(workspace, null, setError);
-        }
-
-        dispatchFiles({
-          type: "selectFileByName",
-          name: fetched.workspace.current,
-        });
-
+        restoreWorkspace(workspace, fetched.workspace, dispatchFiles, setError);
+        setWorkspace(workspace);
         return workspace;
       },
     );
   }
 
-  const [files, dispatchFiles] = useReducer(filesReducer, {
-    index: [],
-    contents: Object.create(null),
-    handles: Object.create(null),
-    nextId: 0,
-    revision: 0,
-    selected: null,
-  });
+  const [files, dispatchFiles] = useReducer(filesReducer, INIT_FILES_STATE);
 
   const fileName = useMemo(() => {
     return (
@@ -155,6 +128,29 @@ export default function Playground() {
     dispatchFiles({ type: "selectFile", id: file });
   }, []);
 
+  const handleReset = useCallback(() => {
+    if (workspace == null) {
+      return;
+    }
+
+    // Close all open files
+    for (const file of files.index) {
+      const handle = files.handles[file.id];
+
+      if (handle != null) {
+        try {
+          workspace.closeFile(handle);
+        } catch (e) {
+          setError(formatError(e));
+        }
+      }
+    }
+
+    dispatchFiles({ type: "reset" });
+
+    restoreWorkspace(workspace, DEFAULT_WORKSPACE, dispatchFiles, setError);
+  }, [files.handles, files.index, workspace]);
+
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
@@ -164,6 +160,7 @@ export default function Playground() {
         version={version}
         onChangeTheme={setTheme}
         onShare={handleShare}
+        onReset={workspace == null ? undefined : handleReset}
       />
 
       <Suspense fallback={<Loading />}>
@@ -172,11 +169,11 @@ export default function Playground() {
           workspacePromise={workspacePromise}
           theme={theme}
           selectedFileName={fileName}
-          onFileAdded={handleFileAdded}
-          onFileRenamed={handleFileRenamed}
-          onFileRemoved={handleFileRemoved}
-          onFileSelected={handleFileSelected}
-          onFileChanged={handleFileChanged}
+          onAddFile={handleFileAdded}
+          onRenameFile={handleFileRenamed}
+          onRemoveFile={handleFileRemoved}
+          onSelectFile={handleFileSelected}
+          onChangeFile={handleFileChanged}
         />
       </Suspense>
       {error ? (
@@ -207,6 +204,36 @@ export const DEFAULT_SETTINGS = JSON.stringify(
   null,
   4,
 );
+
+const DEFAULT_PROGRAM = `from typing import Literal
+
+type Style = Literal["italic", "bold", "underline"]
+
+# Add parameter annotations \`line: str, word: str, style: Style\` and a return
+# type annotation \`-> str\` to see if you can find the mistakes in this program.
+
+def with_style(line, word, style):
+    if style == "italic":
+        return line.replace(word, f"*{word}*")
+    elif style == "bold":
+        return line.replace(word, f"__{word}__")
+
+    position = line.find(word)
+    output = line + "\\n"
+    output += " " * position
+    output += "-" * len(word)
+
+
+print(with_style("Red Knot is a fast type checker for Python.", "fast", "underlined"))
+`;
+
+const DEFAULT_WORKSPACE = {
+  files: {
+    "main.py": DEFAULT_PROGRAM,
+    "knot.json": DEFAULT_SETTINGS,
+  },
+  current: "main.py",
+};
 
 /**
  * Persists the files to local storage. This is done deferred to avoid too frequent writes.
@@ -254,6 +281,13 @@ interface FilesState {
    * The revision. Gets incremented every time files changes.
    */
   revision: number;
+
+  /**
+   * Revision identifying this playground. Gets incremented every time the
+   * playground is reset.
+   */
+  playgroundRevision: number;
+
   nextId: FileId;
 }
 
@@ -276,7 +310,18 @@ export type FileAction =
       id: FileId;
     }
   | { type: "selectFile"; id: FileId }
-  | { type: "selectFileByName"; name: string };
+  | { type: "selectFileByName"; name: string }
+  | { type: "reset" };
+
+const INIT_FILES_STATE: ReadonlyFiles = {
+  index: [],
+  contents: Object.create(null),
+  handles: Object.create(null),
+  nextId: 0,
+  revision: 0,
+  selected: null,
+  playgroundRevision: 0,
+};
 
 function filesReducer(
   state: Readonly<FilesState>,
@@ -366,6 +411,14 @@ function filesReducer(
         selected,
       };
     }
+
+    case "reset": {
+      return {
+        ...INIT_FILES_STATE,
+        playgroundRevision: state.playgroundRevision + 1,
+        revision: state.revision + 1,
+      };
+    }
   }
 }
 
@@ -410,13 +463,7 @@ async function startPlayground(): Promise<InitializedPlayground> {
 
   const restored = await restore();
 
-  const workspace = restored ?? {
-    files: {
-      "main.py": "import os",
-      "knot.json": DEFAULT_SETTINGS,
-    },
-    current: "main.py",
-  };
+  const workspace = restored ?? DEFAULT_WORKSPACE;
 
   return {
     version: "0.0.0",
@@ -455,5 +502,42 @@ function updateFile(
 }
 
 function Loading() {
-  return <div className="align-middle  text-center my-2">Loading...</div>;
+  return (
+    <div className="align-middle text-current text-center my-2 dark:text-white">
+      Loading...
+    </div>
+  );
+}
+
+function restoreWorkspace(
+  workspace: Workspace,
+  state: {
+    files: { [name: string]: string };
+    current: string;
+  },
+  dispatchFiles: ActionDispatch<[FileAction]>,
+  setError: (error: string | null) => void,
+) {
+  let hasSettings = false;
+
+  for (const [name, content] of Object.entries(state.files)) {
+    let handle = null;
+    if (name === SETTINGS_FILE_NAME) {
+      updateOptions(workspace, content, setError);
+      hasSettings = true;
+    } else {
+      handle = workspace.openFile(name, content);
+    }
+
+    dispatchFiles({ type: "add", handle, content, name });
+  }
+
+  if (!hasSettings) {
+    updateOptions(workspace, null, setError);
+  }
+
+  dispatchFiles({
+    type: "selectFileByName",
+    name: state.current,
+  });
 }

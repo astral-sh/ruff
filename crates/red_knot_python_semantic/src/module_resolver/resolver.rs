@@ -1,6 +1,9 @@
 use std::borrow::Cow;
+use std::fmt;
 use std::iter::FusedIterator;
+use std::str::Split;
 
+use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
@@ -36,16 +39,21 @@ pub(crate) fn resolve_module_query<'db>(
     let name = module_name.name(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some((search_path, module_file, kind)) = resolve_name(db, name) else {
+    let Some((search_path, resolved_module)) = resolve_name(db, name) else {
         tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
 
-    let module = Module::new(name.clone(), kind, search_path, module_file);
-
     tracing::trace!(
         "Resolved module `{name}` to `{path}`",
-        path = module_file.path(db)
+        path = resolved_module.file.path(db)
+    );
+
+    let module = Module::new(
+        name.clone(),
+        resolved_module.kind,
+        search_path,
+        resolved_module.file,
     );
 
     Some(module)
@@ -581,12 +589,15 @@ struct ModuleNameIngredient<'db> {
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, ModuleKind)> {
+fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedModule)> {
     let program = Program::get(db);
     let python_version = program.python_version(db);
     let resolver_state = ResolverContext::new(db, python_version);
     let is_builtin_module =
         ruff_python_stdlib::sys::is_builtin_module(python_version.minor, name.as_str());
+
+    let name = RelaxedModuleName::new(name);
+    let stub_name = name.to_stub_package();
 
     for search_path in search_paths(db) {
         // When a builtin module is imported, standard module resolution is bypassed:
@@ -597,43 +608,108 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, File, Mod
             continue;
         }
 
-        let mut components = name.components();
-        let module_name = components.next_back()?;
-
-        match resolve_package(search_path, components, &resolver_state) {
-            Ok(resolved_package) => {
-                let mut package_path = resolved_package.path;
-
-                package_path.push(module_name);
-
-                // Check for a regular package first (highest priority)
-                package_path.push("__init__");
-                if let Some(regular_package) = resolve_file_module(&package_path, &resolver_state) {
-                    return Some((search_path.clone(), regular_package, ModuleKind::Package));
+        if !search_path.is_standard_library() {
+            match resolve_module_in_search_path(&resolver_state, &stub_name, search_path) {
+                Ok(resolved_module) => {
+                    if resolved_module.package_kind.is_root() && resolved_module.kind.is_module() {
+                        tracing::trace!("Search path '{search_path} contains a module named `{stub_name}` but a standalone module isn't a valid stub.");
+                    } else {
+                        return Some((search_path.clone(), resolved_module));
+                    }
                 }
-
-                // Check for a file module next
-                package_path.pop();
-                if let Some(file_module) = resolve_file_module(&package_path, &resolver_state) {
-                    return Some((search_path.clone(), file_module, ModuleKind::Module));
+                Err(PackageKind::Root) => {
+                    tracing::trace!(
+                        "Search path '{search_path}' contains no stub package named `{stub_name}`."
+                    );
                 }
-
-                // For regular packages, don't search the next search path. All files of that
-                // package must be in the same location
-                if resolved_package.kind.is_regular_package() {
+                Err(PackageKind::Regular) => {
+                    tracing::trace!(
+                        "Stub-package in `{search_path} doesn't contain module: `{name}`"
+                    );
+                    // stub exists, but the module doesn't.
+                    // TODO: Support partial packages.
                     return None;
                 }
-            }
-            Err(parent_kind) => {
-                if parent_kind.is_regular_package() {
-                    // For regular packages, don't search the next search path.
-                    return None;
+                Err(PackageKind::Namespace) => {
+                    tracing::trace!(
+                        "Stub-package in `{search_path} doesn't contain module: `{name}` but it is a namespace package, keep going."
+                    );
+                    // stub exists, but the module doesn't. But this is a namespace package,
+                    // keep searching the next search path for a stub package with the same name.
+                    continue;
                 }
             }
+        }
+
+        match resolve_module_in_search_path(&resolver_state, &name, search_path) {
+            Ok(resolved_module) => return Some((search_path.clone(), resolved_module)),
+            Err(kind) => match kind {
+                PackageKind::Root => {
+                    tracing::trace!(
+                        "Search path '{search_path}' contains no package named `{name}`."
+                    );
+                }
+                PackageKind::Regular => {
+                    // For regular packages, don't search the next search path. All files of that
+                    // package must be in the same location
+                    tracing::trace!("Package in `{search_path} doesn't contain module: `{name}`");
+                    return None;
+                }
+                PackageKind::Namespace => {
+                    tracing::trace!(
+                        "Package in `{search_path} doesn't contain module: `{name}` but it is a namespace package, keep going."
+                    );
+                }
+            },
         }
     }
 
     None
+}
+
+#[derive(Debug)]
+struct ResolvedModule {
+    kind: ModuleKind,
+    package_kind: PackageKind,
+    file: File,
+}
+
+fn resolve_module_in_search_path(
+    context: &ResolverContext,
+    name: &RelaxedModuleName,
+    search_path: &SearchPath,
+) -> Result<ResolvedModule, PackageKind> {
+    let mut components = name.components();
+    let module_name = components.next_back().unwrap();
+
+    let resolved_package = resolve_package(search_path, components, context)?;
+
+    let mut package_path = resolved_package.path;
+
+    package_path.push(module_name);
+
+    // Check for a regular package first (highest priority)
+    package_path.push("__init__");
+    if let Some(regular_package) = resolve_file_module(&package_path, context) {
+        return Ok(ResolvedModule {
+            file: regular_package,
+            kind: ModuleKind::Package,
+            package_kind: resolved_package.kind,
+        });
+    }
+
+    // Check for a file module next
+    package_path.pop();
+
+    if let Some(file_module) = resolve_file_module(&package_path, context) {
+        return Ok(ResolvedModule {
+            file: file_module,
+            kind: ModuleKind::Module,
+            package_kind: resolved_package.kind,
+        });
+    }
+
+    Err(resolved_package.kind)
 }
 
 /// If `module` exists on disk with either a `.pyi` or `.py` extension,
@@ -698,7 +774,7 @@ where
             // Pure modules hide namespace packages with the same name
             && resolve_file_module(&package_path, resolver_state).is_none()
         {
-            // A directory without an `__init__.py` is a namespace package, continue with the next folder.
+            // A directory without an `__init__.py(i)` is a namespace package, continue with the next folder.
             in_namespace_package = true;
         } else if in_namespace_package {
             // Package not found but it is part of a namespace package.
@@ -751,8 +827,8 @@ enum PackageKind {
 }
 
 impl PackageKind {
-    const fn is_regular_package(self) -> bool {
-        matches!(self, PackageKind::Regular)
+    pub(crate) const fn is_root(self) -> bool {
+        matches!(self, PackageKind::Root)
     }
 }
 
@@ -768,6 +844,34 @@ impl<'db> ResolverContext<'db> {
 
     pub(super) fn vendored(&self) -> &VendoredFileSystem {
         self.db.vendored()
+    }
+}
+
+/// A [`ModuleName`] but with relaxed semantics to allow `<package>-stubs.path`
+#[derive(Debug)]
+struct RelaxedModuleName(compact_str::CompactString);
+
+impl RelaxedModuleName {
+    fn new(name: &ModuleName) -> Self {
+        Self(name.as_str().into())
+    }
+
+    fn components(&self) -> Split<'_, char> {
+        self.0.split('.')
+    }
+
+    fn to_stub_package(&self) -> Self {
+        if let Some((package, rest)) = self.0.split_once('.') {
+            Self(format_compact!("{package}-stubs.{rest}"))
+        } else {
+            Self(format_compact!("{package}-stubs", package = self.0))
+        }
+    }
+}
+
+impl fmt::Display for RelaxedModuleName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 

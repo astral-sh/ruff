@@ -316,17 +316,6 @@ AIR301_context.py:111:5: AIR301 [*] `schedule_interval` is removed in Airflow 3.
 113 113 |     template_searchpath=["/templates"],
 114 114 | ) as dag:
 
-AIR301_context.py:115:13: AIR301 `airflow.operators.dummy.DummyOperator` is removed in Airflow 3.0
-    |
-113 |     template_searchpath=["/templates"],
-114 | ) as dag:
-115 |     task1 = DummyOperator(
-    |             ^^^^^^^^^^^^^ AIR301
-116 |         task_id="task1",
-117 |         params={
-    |
-    = help: Use `airflow.operators.empty.EmptyOperator` instead
-
 AIR301_context.py:135:23: AIR301 `next_ds` is removed in Airflow 3.0
     |
 134 | class CustomOperator(BaseOperator):

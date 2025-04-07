@@ -14,7 +14,7 @@ export interface Props {
 
   onRemove(id: FileId): void;
 
-  onSelected(id: FileId): void;
+  onSelect(id: FileId): void;
 
   onRename(id: FileId, newName: string): void;
 }
@@ -26,7 +26,7 @@ export function Files({
   onAdd,
   onRemove,
   onRename,
-  onSelected,
+  onSelect,
 }: Props) {
   const handleAdd = () => {
     let index: number | null = null;
@@ -54,7 +54,7 @@ export function Files({
           <FileEntry
             selected={selected === id}
             name={name}
-            onClicked={() => onSelected(id)}
+            onClicked={() => onSelect(id)}
             onRenamed={(newName) => {
               if (!files.some(({ name }) => name === newName)) {
                 onRename(id, newName);

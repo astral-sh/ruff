@@ -1180,6 +1180,74 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::Deferred);
     }
 
+    /// Returns `true` if the current scope is the function body scope of a method of a protocol
+    /// (that is, a class which directly inherits `typing.Protocol`.)
+    fn in_class_that_inherits_protocol_directly(&self) -> bool {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+        let Some(parent_scope_id) = current_scope.parent() else {
+            return false;
+        };
+        let parent_scope = self.index.scope(parent_scope_id);
+
+        let class_scope = match parent_scope.kind() {
+            ScopeKind::Class => parent_scope,
+            ScopeKind::Annotation => {
+                let Some(class_scope_id) = parent_scope.parent() else {
+                    return false;
+                };
+                let potentially_class_scope = self.index.scope(class_scope_id);
+
+                match potentially_class_scope.kind() {
+                    ScopeKind::Class => potentially_class_scope,
+                    _ => return false,
+                }
+            }
+            _ => return false,
+        };
+
+        let NodeWithScopeKind::Class(node_ref) = class_scope.node() else {
+            return false;
+        };
+
+        // TODO move this to `Class` once we add proper `Protocol` support
+        node_ref.bases().iter().any(|base| {
+            matches!(
+                self.file_expression_type(base),
+                Type::KnownInstance(KnownInstanceType::Protocol)
+            )
+        })
+    }
+
+    /// Returns `true` if the current scope is the function body scope of a function overload (that
+    /// is, the stub declaration decorated with `@overload`, not the implementation), or an
+    /// abstract method (decorated with `@abstractmethod`.)
+    fn in_function_overload_or_abstractmethod(&self) -> bool {
+        let current_scope_id = self.scope().file_scope_id(self.db());
+        let current_scope = self.index.scope(current_scope_id);
+
+        let function_scope = match current_scope.kind() {
+            ScopeKind::Function => current_scope,
+            _ => return false,
+        };
+
+        let NodeWithScopeKind::Function(node_ref) = function_scope.node() else {
+            return false;
+        };
+
+        node_ref.decorator_list.iter().any(|decorator| {
+            let decorator_type = self.file_expression_type(&decorator.expression);
+
+            match decorator_type {
+                Type::FunctionLiteral(function) => matches!(
+                    function.known(self.db()),
+                    Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
+                ),
+                _ => false,
+            }
+        })
+    }
+
     fn infer_function_body(&mut self, function: &ast::StmtFunctionDef) {
         // Parameters are odd: they are Definitions in the function body scope, but have no
         // constituent nodes that are part of the function body. In order to get diagnostics
@@ -1210,56 +1278,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            let is_overload_or_abstract = function.decorator_list.iter().any(|decorator| {
-                let decorator_type = self.file_expression_type(&decorator.expression);
-
-                match decorator_type {
-                    Type::FunctionLiteral(function) => matches!(
-                        function.known(self.db()),
-                        Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
-                    ),
-                    _ => false,
-                }
-            });
-
-            let class_inherits_protocol_directly = (|| -> bool {
-                let current_scope_id = self.scope().file_scope_id(self.db());
-                let current_scope = self.index.scope(current_scope_id);
-                let Some(parent_scope_id) = current_scope.parent() else {
-                    return false;
-                };
-                let parent_scope = self.index.scope(parent_scope_id);
-
-                let class_scope = match parent_scope.kind() {
-                    ScopeKind::Class => parent_scope,
-                    ScopeKind::Annotation => {
-                        let Some(class_scope_id) = parent_scope.parent() else {
-                            return false;
-                        };
-                        let potentially_class_scope = self.index.scope(class_scope_id);
-
-                        match potentially_class_scope.kind() {
-                            ScopeKind::Class => potentially_class_scope,
-                            _ => return false,
-                        }
-                    }
-                    _ => return false,
-                };
-
-                let NodeWithScopeKind::Class(node_ref) = class_scope.node() else {
-                    return false;
-                };
-
-                // TODO move this to `Class` once we add proper `Protocol` support
-                node_ref.bases().iter().any(|base| {
-                    matches!(
-                        self.file_expression_type(base),
-                        Type::KnownInstance(KnownInstanceType::Protocol)
-                    )
-                })
-            })();
-
-            if (self.in_stub() || is_overload_or_abstract || class_inherits_protocol_directly)
+            if (self.in_stub()
+                || self.in_function_overload_or_abstractmethod()
+                || self.in_class_that_inherits_protocol_directly())
                 && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
             {
@@ -1555,7 +1576,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                         declared_ty: declared_ty.into(),
                         inferred_ty: UnionType::from_elements(self.db(), [declared_ty, default_ty]),
                     }
-                } else if self.in_stub()
+                } else if (self.in_stub()
+                    || self.in_function_overload_or_abstractmethod()
+                    || self.in_class_that_inherits_protocol_directly())
                     && default
                         .as_ref()
                         .is_some_and(|d| d.is_ellipsis_literal_expr())
@@ -7003,7 +7026,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Type::unknown();
                     };
 
-                    Type::Callable(CallableType::new(db, signature.clone()))
+                    let revealed_signature = if argument_type.is_bound_method() {
+                        signature.bind_self()
+                    } else {
+                        signature.clone()
+                    };
+
+                    Type::Callable(CallableType::new(db, revealed_signature))
                 }
             },
 
@@ -7465,7 +7494,7 @@ impl StringPartsCollector {
 
 #[cfg(test)]
 mod tests {
-    use crate::db::tests::{setup_db, TestDb, TestDbBuilder};
+    use crate::db::tests::{setup_db, TestDb};
     use crate::semantic_index::definition::Definition;
     use crate::semantic_index::symbol::FileScopeId;
     use crate::semantic_index::{global_scope, semantic_index, symbol_table, use_def_map};
@@ -7473,7 +7502,7 @@ mod tests {
     use crate::types::check_types;
     use ruff_db::diagnostic::Diagnostic;
     use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::system::{DbWithWritableSystem as _, SystemPath};
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
 
     use super::*;
@@ -7627,26 +7656,6 @@ mod tests {
         assert_file_diagnostics(&db, "src/a.py", &[]);
 
         Ok(())
-    }
-
-    #[test]
-    fn relative_import_resolution_in_site_packages_when_site_packages_is_subdirectory_of_first_party_search_path(
-    ) {
-        let project_root = SystemPath::new("/src");
-        let foo_dot_py = project_root.join("foo.py");
-        let site_packages = project_root.join(".venv/lib/python3.13/site-packages");
-
-        let db = TestDbBuilder::new()
-            .with_site_packages_search_path(&site_packages)
-            .with_file(&foo_dot_py, "from bar import A")
-            .with_file(&site_packages.join("bar/__init__.py"), "from .a import *")
-            .with_file(&site_packages.join("bar/a.py"), "class A: ...")
-            .build()
-            .unwrap();
-
-        assert_file_diagnostics(&db, foo_dot_py.as_str(), &[]);
-        let a_symbol = get_symbol(&db, foo_dot_py.as_str(), &[], "A");
-        assert!(a_symbol.expect_type().is_class_literal());
     }
 
     #[test]

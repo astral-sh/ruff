@@ -224,7 +224,7 @@ impl Options {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct EnvironmentOptions {
-    /// Specifies the version of Python that will be used to execute the source code.
+    /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
     /// and `m` is the minor (e.g. "3.0" or "3.6").
     /// If a version is provided, knot will generate errors if the source code makes use of language features
@@ -233,7 +233,7 @@ pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub python_version: Option<RangedValue<PythonVersion>>,
 
-    /// Specifies the target platform that will be used to execute the source code.
+    /// Specifies the target platform that will be used to analyze the source code.
     /// If specified, Red Knot will tailor its use of type stub files,
     /// which conditionalize type definitions based on the platform.
     ///

@@ -115,6 +115,9 @@ from airflow.operators.check_operator import (
 from airflow.operators.datetime import BranchDateTimeOperator
 from airflow.operators.docker_operator import DockerOperator
 from airflow.operators.druid_check_operator import DruidCheckOperator
+from airflow.operators.dummy import DummyOperator, EmptyOperator
+from airflow.operators.email import EmailOperator
+from airflow.operators.email_operator import EmailOperator
 from airflow.operators.gcs_to_s3 import GCSToS3Operator
 from airflow.operators.google_api_to_s3_transfer import (
     GoogleApiToS3Operator,
@@ -153,6 +156,12 @@ from airflow.operators.presto_to_mysql import (
     PrestoToMySqlOperator,
     PrestoToMySqlTransfer,
 )
+from airflow.operators.python import (
+    BranchPythonOperator,
+    PythonOperator,
+    PythonVirtualenvOperator,
+    ShortCircuitOperator,
+)
 from airflow.operators.redshift_to_s3_operator import (
     RedshiftToS3Operator,
     RedshiftToS3Transfer,
@@ -190,7 +199,12 @@ from airflow.operators.sqlite_operator import SqliteOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
 from airflow.sensors.date_time import DateTimeSensor
-from airflow.sensors.external_task import ExternalTaskMarker, ExternalTaskSensor
+from airflow.sensors.date_time_sensor import DateTimeSensor
+from airflow.sensors.external_task import (
+    ExternalTaskMarker,
+    ExternalTaskSensor,
+    ExternalTaskSensorLink,
+)
 from airflow.sensors.filesystem import FileSensor
 from airflow.sensors.hive_partition_sensor import HivePartitionSensor
 from airflow.sensors.http_sensor import HttpSensor
@@ -405,19 +419,30 @@ SqliteOperator()
 # apache-airflow-providers-zendesk
 ZendeskHook()
 
+# apache-airflow-providers-smtp
+EmailOperator()
+
 # apache-airflow-providers-standard
-FileSensor()
-TriggerDagRunOperator()
-ExternalTaskMarker(), ExternalTaskSensor()
 BranchDateTimeOperator()
 BranchDayOfWeekOperator()
+BranchPythonOperator()
 DateTimeSensor()
-TimeSensor()
-TimeDeltaSensor()
+DateTimeTrigger()
 DayOfWeekSensor()
+DummyOperator()
+EmptyOperator()
+ExternalTaskMarker()
+ExternalTaskSensor()
+ExternalTaskSensorLink()
+FileSensor()
+FileTrigger()
 FSHook()
 PackageIndexHook()
 SubprocessHook()
+ShortCircuitOperator()
+TimeDeltaSensor()
+TimeSensor()
+TriggerDagRunOperator()
 WorkflowTrigger()
-FileTrigger()
-DateTimeTrigger()
+PythonOperator()
+PythonVirtualenvOperator()

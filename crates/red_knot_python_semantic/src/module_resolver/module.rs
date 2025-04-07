@@ -96,6 +96,9 @@ impl ModuleKind {
     pub const fn is_package(self) -> bool {
         matches!(self, ModuleKind::Package)
     }
+    pub const fn is_module(self) -> bool {
+        matches!(self, ModuleKind::Module)
+    }
 }
 
 /// Enumeration of various core stdlib modules in which important types are located

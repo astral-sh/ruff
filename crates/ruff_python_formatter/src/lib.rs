@@ -1,3 +1,6 @@
+use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
+use ruff_db::source::source_text;
 use thiserror::Error;
 use tracing::Level;
 
@@ -13,6 +16,7 @@ use crate::comments::{
     has_skip_comment, leading_comments, trailing_comments, Comments, SourceComment,
 };
 pub use crate::context::PyFormatContext;
+pub use crate::db::Db;
 pub use crate::options::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
     QuoteStyle,
@@ -25,6 +29,7 @@ pub(crate) mod builders;
 pub mod cli;
 mod comments;
 pub(crate) mod context;
+mod db;
 pub(crate) mod expression;
 mod generated;
 pub(crate) mod module;
@@ -96,7 +101,7 @@ where
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, salsa::Update, PartialEq, Eq)]
 pub enum FormatModuleError {
     #[error(transparent)]
     ParseError(#[from] ParseError),
@@ -124,6 +129,19 @@ pub fn format_module_ast<'a>(
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
+    format_node(parsed, comment_ranges, source, options)
+}
+
+fn format_node<'a, N>(
+    parsed: &'a Parsed<N>,
+    comment_ranges: &'a CommentRanges,
+    source: &'a str,
+    options: PyFormatOptions,
+) -> FormatResult<Formatted<PyFormatContext<'a>>>
+where
+    N: AsFormat<PyFormatContext<'a>>,
+    &'a N: Into<AnyNodeRef<'a>>,
+{
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
 
@@ -136,6 +154,28 @@ pub fn format_module_ast<'a>(
         .comments()
         .assert_all_formatted(source_code);
     Ok(formatted)
+}
+
+pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatModuleError> {
+    let options = db.format_options(file);
+
+    let parsed = parsed_module(db.upcast(), file);
+
+    if let Some(first) = parsed.errors().first() {
+        return Err(FormatModuleError::ParseError(first.clone()));
+    }
+
+    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let source = source_text(db.upcast(), file);
+
+    let formatted = format_node(parsed, &comment_ranges, &source, options)?;
+    let printed = formatted.print()?;
+
+    if printed.as_code() == &*source {
+        Ok(None)
+    } else {
+        Ok(Some(printed.into_code()))
+    }
 }
 
 /// Public function for generating a printable string of the debug comments.
