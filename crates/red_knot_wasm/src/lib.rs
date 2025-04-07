@@ -190,11 +190,7 @@ impl Workspace {
     }
 
     pub fn format(&self, file_id: &FileHandle) -> Result<Option<String>, Error> {
-        let formatted = formatted_file(&self.db, file_id.file)
-            .as_ref()
-            .map_err(into_error)?;
-
-        Ok(formatted.clone().into_reformatted())
+        formatted_file(&self.db, file_id.file).map_err(into_error)
     }
 
     /// Returns the token stream for `path` serialized as a string.

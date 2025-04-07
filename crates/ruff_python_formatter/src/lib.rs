@@ -156,8 +156,7 @@ where
     Ok(formatted)
 }
 
-#[salsa::tracked(return_ref)]
-pub fn formatted_file(db: &dyn Db, file: File) -> Result<FormattedFile, FormatModuleError> {
+pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatModuleError> {
     let options = db.format_options(file);
 
     let parsed = parsed_module(db.upcast(), file);
@@ -173,9 +172,9 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<FormattedFile, FormatMo
     let printed = formatted.print()?;
 
     if printed.as_code() == &*source {
-        Ok(FormattedFile::Formatted)
+        Ok(None)
     } else {
-        Ok(FormattedFile::Reformatted(printed.into_code()))
+        Ok(Some(printed.into_code()))
     }
 }
 
@@ -185,31 +184,6 @@ pub fn pretty_comments(module: &Mod, comment_ranges: &CommentRanges, source: &st
     let comments = Comments::from_ast(module, source_code, comment_ranges);
 
     std::format!("{comments:#?}", comments = comments.debug(source_code))
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, salsa::Update)]
-pub enum FormattedFile {
-    /// The file is already correctly formatted.
-    Formatted,
-
-    /// The file has been reformatted. The string is its newly formatted content.
-    Reformatted(String),
-}
-
-impl FormattedFile {
-    pub fn as_reformatted(&self) -> Option<&str> {
-        match self {
-            FormattedFile::Formatted => None,
-            FormattedFile::Reformatted(code) => Some(code),
-        }
-    }
-
-    pub fn into_reformatted(self) -> Option<String> {
-        match self {
-            FormattedFile::Formatted => None,
-            FormattedFile::Reformatted(code) => Some(code),
-        }
-    }
 }
 
 #[cfg(test)]
