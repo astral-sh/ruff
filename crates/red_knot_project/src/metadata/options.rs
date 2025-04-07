@@ -32,9 +32,6 @@ pub struct Options {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminal: Option<TerminalOptions>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub editor: Option<EditorOptions>,
 }
 
 impl Options {
@@ -409,15 +406,4 @@ impl OptionDiagnostic {
             Diagnostic::new(self.id, self.severity, &self.message)
         }
     }
-}
-
-#[derive(Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case", deny_unknown_fields)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-pub struct EditorOptions {
-    /// Whether to show inlay hints.
-    ///
-    /// Defaults to `false`.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub inlay_hints: Option<bool>,
 }

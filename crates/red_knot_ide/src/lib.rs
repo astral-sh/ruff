@@ -8,7 +8,7 @@ mod markup;
 pub use db::Db;
 pub use goto::goto_type_definition;
 pub use hover::hover;
-pub use inlay_hints::get_inlay_hints;
+pub use inlay_hints::inlay_hints;
 pub use markup::MarkupKind;
 
 use rustc_hash::FxHashSet;

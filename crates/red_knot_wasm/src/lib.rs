@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use red_knot_ide::{get_inlay_hints, goto_type_definition, hover, MarkupKind};
+use red_knot_ide::{goto_type_definition, hover, inlay_hints, MarkupKind};
 use red_knot_project::metadata::options::Options;
 use red_knot_project::metadata::value::ValueSource;
 use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -286,25 +286,15 @@ impl Workspace {
 
     #[wasm_bindgen(js_name = "inlayHints")]
     pub fn inlay_hints(&self, file_id: &FileHandle) -> Result<Vec<InlayHint>, Error> {
-        let result = get_inlay_hints(&self.db, file_id.file);
+        let result = inlay_hints(&self.db, file_id.file);
 
-        let editor_options = self
-            .db
-            .project()
-            .metadata(&self.db)
-            .options()
-            .editor
-            .clone()
-            .unwrap_or_default();
-
-        if !editor_options.inlay_hints.unwrap_or(false) {
-            return Ok(Vec::new());
-        }
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
 
         Ok(result
             .into_iter()
             .map(|hint| {
-                let source_range = Range::from_file_range(&self.db, hint.range);
+                let source_range = Range::from_text_range(hint.range, &index, &source);
 
                 InlayHint {
                     markdown: hint.display(&self.db).to_string(),

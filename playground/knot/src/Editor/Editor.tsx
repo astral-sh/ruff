@@ -200,20 +200,13 @@ class PlaygroundServer
 
     return {
       dispose: () => {},
-      hints: inlayHints.map(
-        (hint: {
-          position: { line: number; column: number };
-          markdown: string;
-        }) => {
-          return {
-            label: hint.markdown,
-            position: {
-              lineNumber: hint.position.line,
-              column: hint.position.column,
-            },
-          };
+      hints: inlayHints.map((hint) => ({
+        label: hint.markdown,
+        position: {
+          lineNumber: hint.position.line,
+          column: hint.position.column,
         },
-      ),
+      })),
     };
   }
 

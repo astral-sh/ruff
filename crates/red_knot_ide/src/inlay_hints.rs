@@ -1,13 +1,25 @@
-use crate::{Db, RangedValue};
+use crate::Db;
 use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::{HasType, SemanticModel};
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 use std::fmt::Formatter;
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct InlayHint<'db> {
+    pub range: TextRange,
+    pub content: InlayHintContent<'db>,
+}
+
+impl<'db> InlayHint<'db> {
+    pub const fn display(&self, db: &'db dyn Db) -> DisplayInlayHint<'_, 'db> {
+        self.content.display(db)
+    }
+}
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InlayHintContent<'db> {
@@ -39,41 +51,33 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
     }
 }
 
-pub fn inlay_hints(db: &dyn Db, file: File) -> Vec<RangedValue<InlayHintContent<'_>>> {
+pub fn inlay_hints(db: &dyn Db, file: File) -> Vec<InlayHint<'_>> {
     let mut visitor = InlayHintVisitor::new(db, file);
 
     let ast = parsed_module(db.upcast(), file);
 
     visitor.visit_body(ast.suite());
 
-    let hints = visitor.hints().clone();
-
-    hints
+    visitor.hints
 }
 
 struct InlayHintVisitor<'db> {
     model: SemanticModel<'db>,
-    file: File,
-    hints: Vec<RangedValue<InlayHintContent<'db>>>,
+    hints: Vec<InlayHint<'db>>,
 }
 
 impl<'db> InlayHintVisitor<'db> {
     fn new(db: &'db dyn Db, file: File) -> Self {
         Self {
             model: SemanticModel::new(db.upcast(), file),
-            file,
             hints: Vec::new(),
         }
     }
 
-    fn hints(&self) -> &Vec<RangedValue<InlayHintContent<'db>>> {
-        &self.hints
-    }
-
     fn add_hint(&mut self, range: TextRange, ty: Type<'db>) {
-        self.hints.push(RangedValue {
-            range: FileRange::new(self.file, range),
-            value: InlayHintContent::AssignStatement(ty),
+        self.hints.push(InlayHint {
+            range,
+            content: InlayHintContent::AssignStatement(ty),
         });
     }
 }
@@ -82,7 +86,6 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::Assign(assign) => {
-                let ty = assign.value.inferred_type(&self.model);
                 for target in &assign.targets {
                     match target {
                         Expr::Tuple(tuple) => {
@@ -92,6 +95,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
                             }
                         }
                         _ => {
+                            let ty = assign.value.inferred_type(&self.model);
                             self.add_hint(target.range(), ty);
                         }
                     }
@@ -137,32 +141,29 @@ mod tests {
     #[test]
     fn test_assign_statement() {
         let test_case = test_case("x = 1");
-        let hints = get_inlay_hints(&test_case.db, test_case.file);
+        let hints = inlay_hints(&test_case.db, test_case.file);
         assert_eq!(hints.len(), 1);
         assert_eq!(
-            hints[0].value,
+            hints[0].content,
             InlayHintContent::AssignStatement(Type::IntLiteral(1))
         );
         assert_eq!(
             hints[0].range,
-            FileRange::new(
-                test_case.file,
-                TextRange::new(TextSize::from(0), TextSize::from(1))
-            )
+            TextRange::new(TextSize::from(0), TextSize::from(1))
         );
     }
 
     #[test]
     fn test_tuple_assignment() {
         let test_case = test_case("x, y = (1, 'abc')");
-        let hints = get_inlay_hints(&test_case.db, test_case.file);
+        let hints = inlay_hints(&test_case.db, test_case.file);
         assert_eq!(hints.len(), 2);
         assert_eq!(
-            hints[0].value,
+            hints[0].content,
             InlayHintContent::AssignStatement(Type::IntLiteral(1))
         );
         assert_eq!(
-            hints[1].value,
+            hints[1].content,
             InlayHintContent::AssignStatement(Type::StringLiteral(StringLiteralType::new(
                 &test_case.db,
                 "abc"
@@ -170,24 +171,18 @@ mod tests {
         );
         assert_eq!(
             hints[0].range,
-            FileRange::new(
-                test_case.file,
-                TextRange::new(TextSize::from(0), TextSize::from(1))
-            )
+            TextRange::new(TextSize::from(0), TextSize::from(1))
         );
         assert_eq!(
             hints[1].range,
-            FileRange::new(
-                test_case.file,
-                TextRange::new(TextSize::from(3), TextSize::from(4))
-            )
+            TextRange::new(TextSize::from(3), TextSize::from(4))
         );
     }
 
     #[test]
     fn test_assign_statement_with_type_annotation() {
         let test_case = test_case("x: int = 1");
-        let hints = get_inlay_hints(&test_case.db, test_case.file);
+        let hints = inlay_hints(&test_case.db, test_case.file);
         assert_eq!(hints.len(), 0);
     }
 }
