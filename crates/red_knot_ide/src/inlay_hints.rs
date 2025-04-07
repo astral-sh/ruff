@@ -39,7 +39,7 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
     }
 }
 
-pub fn get_inlay_hints(db: &dyn Db, file: File) -> Vec<RangedValue<InlayHintContent<'_>>> {
+pub fn inlay_hints(db: &dyn Db, file: File) -> Vec<RangedValue<InlayHintContent<'_>>> {
     let mut visitor = InlayHintVisitor::new(db, file);
 
     let ast = parsed_module(db.upcast(), file);
