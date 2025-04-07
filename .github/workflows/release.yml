@@ -68,7 +68,7 @@ jobs:
         shell: bash
         run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/cargo-dist/releases/download/v0.28.3/cargo-dist-installer.sh | sh"
       - name: Cache dist
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cargo-dist-cache
           path: ~/.cargo/bin/dist
@@ -84,7 +84,7 @@ jobs:
           cat plan-dist-manifest.json
           echo "manifest=$(jq -c "." plan-dist-manifest.json)" >> "$GITHUB_OUTPUT"
       - name: "Upload dist-manifest.json"
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-plan-dist-manifest
           path: plan-dist-manifest.json
@@ -150,7 +150,7 @@ jobs:
 
           cp dist-manifest.json "$BUILD_MANIFEST_NAME"
       - name: "Upload artifacts"
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: artifacts-build-global
           path: |
@@ -196,7 +196,7 @@ jobs:
           cat dist-manifest.json
           echo "manifest=$(jq -c "." dist-manifest.json)" >> "$GITHUB_OUTPUT"
       - name: "Upload dist-manifest.json"
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           # Overwrite the previous copy
           name: artifacts-dist-manifest
