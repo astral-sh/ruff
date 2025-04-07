@@ -37,6 +37,7 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::{DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::visitor::{walk_expr, Visitor};
 use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -1735,7 +1736,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             // Inference of bases deferred in stubs
             // TODO also defer stringified generic type parameters
-            if self.are_all_types_deferred() {
+            if self.are_all_types_deferred()
+                || class_node
+                    .bases()
+                    .iter()
+                    .any(|base| contains_string_literal(base))
+            {
                 self.types.deferred.insert(definition);
             } else {
                 for base in class_node.bases() {
@@ -7490,6 +7496,21 @@ impl StringPartsCollector {
             Type::LiteralString
         }
     }
+}
+
+fn contains_string_literal(expr: &ast::Expr) -> bool {
+    struct ContainsStringLiteral(bool);
+
+    impl<'a> Visitor<'a> for ContainsStringLiteral {
+        fn visit_expr(&mut self, expr: &'a ast::Expr) {
+            self.0 |= matches!(expr, ast::Expr::StringLiteral(_));
+            walk_expr(self, expr);
+        }
+    }
+
+    let mut visitor = ContainsStringLiteral(false);
+    visitor.visit_expr(expr);
+    visitor.0
 }
 
 #[cfg(test)]
