@@ -3224,40 +3224,6 @@ impl<'db> Type<'db> {
                     );
                     Signatures::single(signature)
                 }
-                Some(KnownClass::TypeVar) => {
-                    // Added here to avoid salsa query cycle in typeshed definition
-                    // TODO: signature depends on Python version, using 3.11 for now
-                    // ```py
-                    // class TypeVar:
-                    //     elif sys.version_info >= (3, 11):
-                    //        def __new__(
-                    //            cls, name: str, *constraints: Any, bound: Any | None = None, covariant: bool = False,
-                    //            contravariant: bool = False
-                    //        ) -> Self: ...None: ...
-                    // ```
-                    let signature = CallableSignature::from_overloads(
-                        self,
-                        [Signature::new(
-                            Parameters::new([
-                                Parameter::positional_only(Some(Name::new_static("name")))
-                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
-                                Parameter::variadic(Name::new_static("constraints"))
-                                    .with_annotated_type(Type::any()),
-                                Parameter::keyword_only(Name::new_static("bound"))
-                                    .with_annotated_type(Type::any())
-                                    .with_default_type(Type::none(db)),
-                                Parameter::keyword_only(Name::new_static("covariant"))
-                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                    .with_default_type(Type::BooleanLiteral(false)),
-                                Parameter::keyword_only(Name::new_static("contravariant"))
-                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                    .with_default_type(Type::BooleanLiteral(false)),
-                            ]),
-                            Some(KnownClass::TypeVar.to_instance(db)),
-                        )],
-                    );
-                    Signatures::single(signature)
-                }
                 Some(KnownClass::Object) => {
                     // // Added here to avoid salsa query cycle in typeshed definition
                     // ```py

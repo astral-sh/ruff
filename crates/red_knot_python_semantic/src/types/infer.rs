@@ -4004,7 +4004,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                     KnownClass::Bool
                         | KnownClass::Str
                         | KnownClass::Type
-                        | KnownClass::TypeVar
                         | KnownClass::Object
                         | KnownClass::Property
                 )
