@@ -113,3 +113,41 @@ def foo():
     a = 1; result = {}; b = 2
     for idx, name in enumerate(fruit):
         result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result = {"kiwi": 3}
+    for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    (_, result) = (None, {"kiwi": 3})
+    for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result = {}
+    print(len(result))
+    for idx, name in enumerate(fruit):
+        result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    result = {}
+    for idx, name in enumerate(fruit):
+        if last_idx := idx % 3:
+            result[name] = idx  # PERF403
+
+
+def foo():
+    fruit = ["apple", "pear", "orange"]
+    indices = [0, 1, 2]
+    result = {}
+    for idx, name in indices, fruit:
+        result[name] = idx  # PERF403
