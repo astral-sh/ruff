@@ -4,16 +4,6 @@
   "description": "The options for the project.",
   "type": "object",
   "properties": {
-    "editor": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/EditorOptions"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "environment": {
       "description": "Configures the type checking environment.",
       "anyOf": [
@@ -77,19 +67,6 @@
           ]
         }
       ]
-    },
-    "EditorOptions": {
-      "type": "object",
-      "properties": {
-        "inlay-hints": {
-          "description": "Whether to show inlay hints.\n\nDefaults to `false`.",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        }
-      },
-      "additionalProperties": false
     },
     "EnvironmentOptions": {
       "type": "object",
