@@ -1737,10 +1737,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Inference of bases deferred in stubs
             // TODO also defer stringified generic type parameters
             if self.are_all_types_deferred()
-                || class_node
-                    .bases()
-                    .iter()
-                    .any(|base| contains_string_literal(base))
+                || class_node.bases().iter().any(contains_string_literal)
             {
                 self.types.deferred.insert(definition);
             } else {

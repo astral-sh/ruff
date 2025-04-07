@@ -106,9 +106,7 @@ reveal_type(getattr_static(C[int], "f"))  # revealed: Literal[<f specialized wit
 reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f` specialized with {T = int}>
 reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: Literal[<f specialized with {T = int}>]
 # revealed: <bound method `f` of `C[int]` specialized with {T = int}>
-reveal_type(
-    getattr_static(C[int], "f").__get__(C[int](), C[int])
-)
+reveal_type(getattr_static(C[int], "f").__get__(C[int](), C[int]))
 
 reveal_type(C[int].f)  # revealed: Literal[<f specialized with {T = int}>]
 reveal_type(C[int]().f)  # revealed: <bound method `f` of `C[int]` specialized with {T = int}>

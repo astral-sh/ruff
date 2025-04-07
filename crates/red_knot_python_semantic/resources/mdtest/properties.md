@@ -196,9 +196,9 @@ reveal_type(c.attr)  # revealed: Unknown
 
 ## Behind the scenes
 
-> TODO: This test is currently disabled pending [an upstream Salsa
-> fix](https://github.com/salsa-rs/salsa/pull/741). Once that has been merged, re-enable this test
-> by changing the language codes below back to `py`.
+> TODO: This test is currently disabled pending
+> [an upstream Salsa fix](https://github.com/salsa-rs/salsa/pull/741). Once that has been merged,
+> re-enable this test by changing the language codes below back to `py`.
 
 In this section, we trace through some of the steps that make properties work. We start with a
 simple class `C` and a property `attr`:
