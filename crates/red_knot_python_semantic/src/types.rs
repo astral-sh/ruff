@@ -1883,7 +1883,11 @@ impl<'db> Type<'db> {
     ///
     /// [descriptor guide]: https://docs.python.org/3/howto/descriptor.html#invocation-from-an-instance
     /// [`_PyType_Lookup`]: https://github.com/python/cpython/blob/e285232c76606e3be7bf216efb1be1e742423e4b/Objects/typeobject.c#L5223
-    fn find_name_in_mro(
+    fn find_name_in_mro(&self, db: &'db dyn Db, name: &str) -> Option<SymbolAndQualifiers<'db>> {
+        self.find_name_in_mro_with_policy(db, name, MemberLookupPolicy::default())
+    }
+
+    fn find_name_in_mro_with_policy(
         &self,
         db: &'db dyn Db,
         name: &str,
@@ -1891,7 +1895,7 @@ impl<'db> Type<'db> {
     ) -> Option<SymbolAndQualifiers<'db>> {
         match self {
             Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.find_name_in_mro(db, name, policy)
+                elem.find_name_in_mro_with_policy(db, name, policy)
                     // If some elements are classes, and some are not, we simply fall back to `Unbound` for the non-class
                     // elements instead of short-circuiting the whole result to `None`. We would need a more detailed
                     // return type otherwise, and since `find_name_in_mro` is usually called via `class_member`, this is
@@ -1900,7 +1904,7 @@ impl<'db> Type<'db> {
             })),
             Type::Intersection(inter) => {
                 Some(inter.map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.find_name_in_mro(db, name, policy)
+                    elem.find_name_in_mro_with_policy(db, name, policy)
                         // Fall back to Unbound, similar to the union case (see above).
                         .unwrap_or_default()
                 }))
@@ -1975,7 +1979,9 @@ impl<'db> Type<'db> {
             {
                 Some(Symbol::Unbound.into())
             }
-            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.find_name_in_mro(db, name, policy),
+            Type::SubclassOf(subclass_of_ty) => {
+                subclass_of_ty.find_name_in_mro_with_policy(db, name, policy)
+            }
 
             // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`, i.e. Type::Instance(type).
             // So looking up a name in the MRO of `Type::Instance(type)` is equivalent to looking up the name in the
@@ -1983,7 +1989,7 @@ impl<'db> Type<'db> {
             Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Type) => {
                 KnownClass::Object
                     .to_class_literal(db)
-                    .find_name_in_mro(db, name, policy)
+                    .find_name_in_mro_with_policy(db, name, policy)
             }
 
             Type::FunctionLiteral(_)
@@ -2011,10 +2017,14 @@ impl<'db> Type<'db> {
     /// Look up an attribute in the MRO of the meta-type of `self`. This returns class-level attributes
     /// when called on an instance-like type, and metaclass attributes when called on a class-like type.
     ///
-    /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name, policy)`, except for the handling
+    /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name)`, except for the handling
     /// of union and intersection types.
+    fn class_member(self, db: &'db dyn Db, name: Name) -> SymbolAndQualifiers<'db> {
+        self.class_member_with_policy(db, name, MemberLookupPolicy::default())
+    }
+
     #[salsa::tracked]
-    fn class_member(
+    fn class_member_with_policy(
         self,
         db: &'db dyn Db,
         name: Name,
@@ -2023,14 +2033,14 @@ impl<'db> Type<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.class_member(db, name.clone(), policy)
+                elem.class_member_with_policy(db, name.clone(), policy)
             }),
             Type::Intersection(inter) => inter.map_with_boundness_and_qualifiers(db, |elem| {
-                elem.class_member(db, name.clone(), policy)
+                elem.class_member_with_policy(db, name.clone(), policy)
             }),
             _ => self
                 .to_meta_type(db)
-                .find_name_in_mro(db, name.as_str(), policy)
+                .find_name_in_mro_with_policy(db, name.as_str(), policy)
                 .expect(
                     "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                 ),
@@ -2127,14 +2137,10 @@ impl<'db> Type<'db> {
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Symbol<'db> {
         if let Type::ModuleLiteral(module) = self {
             module.static_member(db, name)
-        } else if let symbol @ Symbol::Type(_, _) = self
-            .class_member(db, name.into(), MemberLookupPolicy::default())
-            .symbol
-        {
+        } else if let symbol @ Symbol::Type(_, _) = self.class_member(db, name.into()).symbol {
             symbol
-        } else if let Some(symbol @ Symbol::Type(_, _)) = self
-            .find_name_in_mro(db, name, MemberLookupPolicy::default())
-            .map(|inner| inner.symbol)
+        } else if let Some(symbol @ Symbol::Type(_, _)) =
+            self.find_name_in_mro(db, name).map(|inner| inner.symbol)
         {
             symbol
         } else {
@@ -2163,9 +2169,7 @@ impl<'db> Type<'db> {
             instance.display(db),
             owner.display(db)
         );
-        let descr_get = self
-            .class_member(db, "__get__".into(), MemberLookupPolicy::default())
-            .symbol;
+        let descr_get = self.class_member(db, "__get__".into()).symbol;
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
@@ -2179,12 +2183,9 @@ impl<'db> Type<'db> {
                 })
                 .ok()?;
 
-            let descriptor_kind = if self
-                .class_member(db, "__set__".into(), MemberLookupPolicy::default())
-                .symbol
-                .is_unbound()
+            let descriptor_kind = if self.class_member(db, "__set__".into()).symbol.is_unbound()
                 && self
-                    .class_member(db, "__delete__".into(), MemberLookupPolicy::default())
+                    .class_member(db, "__delete__".into())
                     .symbol
                     .is_unbound()
             {
@@ -2310,7 +2311,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.class_member(db, name.into(), member_policy),
+            self.class_member_with_policy(db, name.into(), member_policy),
             self,
             self.to_meta_type(db),
         );
@@ -2520,7 +2521,9 @@ impl<'db> Type<'db> {
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str).into(),
 
-            Type::AlwaysFalsy | Type::AlwaysTruthy => self.class_member(db, name, policy),
+            Type::AlwaysFalsy | Type::AlwaysTruthy => {
+                self.class_member_with_policy(db, name, policy)
+            }
 
             _ if policy.no_instance_fallback() => self.invoke_descriptor_protocol(
                 db,
@@ -2553,12 +2556,13 @@ impl<'db> Type<'db> {
                 );
 
                 let custom_getattr_result = || {
-                    // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
-                    // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
-                    // Same for `types.GenericAlias` - it's `__getattr__` method will delegate to `__origin__`
-                    // to allow looking up attributes on the original type. But in typeshed it's
-                    // return type is `Any`. It will need a special handling, so it remember the origin type
-                    // to properly resolve the attribute.
+                    // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
+                    // dynamic imports. We explicitly hide it here to prevent arbitrary attributes
+                    // from being available on modules. Same for `types.GenericAlias` - its
+                    // `__getattr__` method will delegate to `__origin__` to allow looking up
+                    // attributes on the original type. But in typeshed its return type is `Any`.
+                    // It will need a special handling, so it remember the origin type to properly
+                    // resolve the attribute.
                     if self.into_instance().is_some_and(|instance| {
                         instance.class.is_known(db, KnownClass::ModuleType)
                             || instance.class.is_known(db, KnownClass::GenericAlias)
@@ -2596,7 +2600,7 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                let class_attr_plain = self.find_name_in_mro(db, name_str, policy).expect(
+                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
 
@@ -4950,7 +4954,7 @@ impl<'db> ConstructorCallError<'db> {
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
-                        "`__init__` method is missing on type `{}`. Make sure your `object` in typeshed has it's definition",
+                        "`__init__` method is missing on type `{}`. Make sure your `object` in typeshed has its definition.",
                         context_expression_type.display(context.db()),
                     ),
                 );
@@ -4960,7 +4964,7 @@ impl<'db> ConstructorCallError<'db> {
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
-                        "Method `__init__` on type `{}` is possibly unbound",
+                        "Method `__init__` on type `{}` is possibly unbound.",
                         context_expression_type.display(context.db()),
                     ),
                 );
@@ -4983,7 +4987,7 @@ impl<'db> ConstructorCallError<'db> {
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
-                        "Method `__new__` on type `{}` is possibly unbound",
+                        "Method `__new__` on type `{}` is possibly unbound.",
                         context_expression_type.display(context.db()),
                     ),
                 );

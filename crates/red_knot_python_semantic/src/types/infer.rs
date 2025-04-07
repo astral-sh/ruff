@@ -100,7 +100,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{CallDunderError, ClassLiteralType, MemberLookupPolicy};
+use super::{CallDunderError, ClassLiteralType};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -2381,7 +2381,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
-                match object_ty.class_member(db, attribute.into(), MemberLookupPolicy::default()) {
+                match object_ty.class_member(db, attribute.into()) {
                     meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
                         if emit_diagnostics {
                             self.context.report_lint(
@@ -2400,9 +2400,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         qualifiers: _,
                     } => {
                         let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
-                            meta_attr_ty
-                                .class_member(db, "__set__".into(), MemberLookupPolicy::default())
-                                .symbol
+                            meta_attr_ty.class_member(db, "__set__".into()).symbol
                         {
                             let successful_call = meta_dunder_set
                                 .try_call(
@@ -2501,15 +2499,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                match object_ty.class_member(db, attribute.into(), MemberLookupPolicy::default()) {
+                match object_ty.class_member(db, attribute.into()) {
                     SymbolAndQualifiers {
                         symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
                         qualifiers: _,
                     } => {
                         let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
-                            meta_attr_ty
-                                .class_member(db, "__set__".into(), MemberLookupPolicy::default())
-                                .symbol
+                            meta_attr_ty.class_member(db, "__set__".into()).symbol
                         {
                             let successful_call = meta_dunder_set
                                 .try_call(
@@ -2546,7 +2542,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 class_attr_ty,
                                 class_attr_boundness,
                             ) = object_ty
-                                .find_name_in_mro(db, attribute, MemberLookupPolicy::default())
+                                .find_name_in_mro(db, attribute)
                                 .expect("called on Type::ClassLiteral or Type::SubclassOf")
                                 .symbol
                             {
@@ -2576,7 +2572,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ..
                     } => {
                         if let Symbol::Type(class_attr_ty, class_attr_boundness) = object_ty
-                            .find_name_in_mro(db, attribute, MemberLookupPolicy::default())
+                            .find_name_in_mro(db, attribute)
                             .expect("called on Type::ClassLiteral or Type::SubclassOf")
                             .symbol
                         {
@@ -5593,9 +5589,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Result<Type<'db>, CompareUnsupportedError<'db>> {
         let db = self.db();
 
-        let contains_dunder = right
-            .class_member(db, "__contains__".into(), MemberLookupPolicy::default())
-            .symbol;
+        let contains_dunder = right.class_member(db, "__contains__".into()).symbol;
         let compare_result_opt = match contains_dunder {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.

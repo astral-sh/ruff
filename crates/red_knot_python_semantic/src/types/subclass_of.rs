@@ -66,13 +66,13 @@ impl<'db> SubclassOfType<'db> {
         !self.is_dynamic()
     }
 
-    pub(crate) fn find_name_in_mro(
+    pub(crate) fn find_name_in_mro_with_policy(
         self,
         db: &'db dyn Db,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<SymbolAndQualifiers<'db>> {
-        Type::from(self.subclass_of).find_name_in_mro(db, name, policy)
+        Type::from(self.subclass_of).find_name_in_mro_with_policy(db, name, policy)
     }
 
     /// Return `true` if `self` is a subtype of `other`.
