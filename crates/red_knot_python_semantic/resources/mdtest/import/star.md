@@ -158,8 +158,15 @@ def J(): ...
 
 type K = int
 
-with () as L:  # error: [invalid-context-manager]
-    ...
+class ContextManagerThatMightNotRunToCompletion:
+    def __enter__(self) -> "ContextManagerThatMightNotRunToCompletion":
+        return self
+
+    def __exit__(self, *args) -> typing.Literal[True]:
+        return True
+
+with ContextManagerThatMightNotRunToCompletion() as L:
+    U = ...
 
 match 42:
     case {"something": M}:
@@ -176,6 +183,15 @@ match 42:
         ...
     case T:
         ...
+
+def boolean_condition() -> bool:
+    return True
+
+if boolean_condition():
+    V = ...
+
+while boolean_condition():
+    W = ...
 ```
 
 `b.py`:
@@ -206,10 +222,95 @@ print((
     R,  # TODO: could emit diagnostic about being possibly unbound
     S,  # TODO: could emit diagnostic about being possibly unbound
     T,  # TODO: could emit diagnostic about being possibly unbound
+    U,  # TODO: could emit diagnostic about being possibly unbound
+    V,  # TODO: could emit diagnostic about being possibly unbound
+    W,  # TODO: could emit diagnostic about being possibly unbound
     typing,
     OrderedDict,
     Foo,
 ))
+```
+
+### Esoteric possible redefinitions following definitely bound prior definitions
+
+There should be no complaint about the symbols being possibly unbound in `b.py` here: although the
+second definition might or might not take place, each symbol is definitely bound by a prior
+definition.
+
+`a.py`:
+
+```py
+from typing import Literal
+
+A = 1
+B = 2
+C = 3
+D = 4
+E = 5
+F = 6
+G = 7
+H = 8
+I = 9
+J = 10
+K = 11
+L = 12
+
+for A in [1]:
+    ...
+
+match 42:
+    case {"something": B}:
+        ...
+    case [*C]:
+        ...
+    case [D]:
+        ...
+    case E | F:
+        ...
+    case object(foo=G):
+        ...
+    case object(H):
+        ...
+    case I:
+        ...
+
+def boolean_condition() -> bool:
+    return True
+
+if boolean_condition():
+    J = ...
+
+while boolean_condition():
+    K = ...
+
+class ContextManagerThatMightNotRunToCompletion:
+    def __enter__(self) -> "ContextManagerThatMightNotRunToCompletion":
+        return self
+
+    def __exit__(self, *args) -> Literal[True]:
+        return True
+
+with ContextManagerThatMightNotRunToCompletion():
+    L = ...
+```
+
+`b.py`:
+
+```py
+from a import *
+
+print(A)
+print(B)
+print(C)
+print(D)
+print(E)
+print(F)
+print(G)
+print(H)
+print(I)
+print(J)
+print(K)
+print(L)
 ```
 
 ### Definitions in function-like scopes are not global definitions
@@ -428,9 +529,20 @@ else:
     Z: int = 42
 ```
 
+`aa.py`:
+
+```py
+import sys
+
+if sys.version_info >= (3, 12):
+    AA: bool = True
+```
+
 `b.py`:
 
 ```py
+import sys
+
 Z: bool = True
 
 from a import *
@@ -446,6 +558,15 @@ reveal_type(Y)  # revealed: Unknown
 # to be dead code given the `python-version` configuration.
 # Thus this should reveal `Literal[True]`.
 reveal_type(Z)  # revealed: Unknown
+
+if sys.version_info >= (3, 12):
+    from aa import *
+
+    # TODO: should reveal `Never`
+    reveal_type(AA)  # revealed: Unknown
+
+# error: [unresolved-reference]
+reveal_type(AA)  # revealed: Unknown
 ```
 
 ### Relative `*` imports
