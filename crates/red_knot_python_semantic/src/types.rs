@@ -3024,6 +3024,24 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
 
+                Some(KnownFunction::AssertNever) => {
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([Parameter::positional_only(Some(Name::new_static(
+                                "arg",
+                            )))
+                            // We need to set the type to `Any` here (instead of `Never`),
+                            // in order for every `assert_never` call to pass the argument
+                            // check. If we set it to `Never`, we'll get invalid-argument-type
+                            // errors instead of `type-assertion-failure` errors.
+                            .with_annotated_type(Type::any())]),
+                            Some(Type::none(db)),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
                 Some(KnownFunction::Cast) => {
                     let signature = CallableSignature::single(
                         self,
@@ -4890,6 +4908,8 @@ pub enum KnownFunction {
 
     /// `typing(_extensions).assert_type`
     AssertType,
+    /// `typing(_extensions).assert_never`
+    AssertNever,
     /// `typing(_extensions).cast`
     Cast,
     /// `typing(_extensions).overload`
@@ -4947,6 +4967,7 @@ impl KnownFunction {
         match self {
             Self::IsInstance | Self::IsSubclass | Self::Len | Self::Repr => module.is_builtins(),
             Self::AssertType
+            | Self::AssertNever
             | Self::Cast
             | Self::Overload
             | Self::RevealType
@@ -6407,6 +6428,7 @@ pub(crate) mod tests {
                 | KnownFunction::Overload
                 | KnownFunction::RevealType
                 | KnownFunction::AssertType
+                | KnownFunction::AssertNever
                 | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
 
                 KnownFunction::IsSingleton

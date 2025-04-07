@@ -682,7 +682,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `assert_type()` calls where the actual type
+    /// Checks for `assert_type()` and `assert_never()` calls where the actual type
     /// is not the same as the asserted type.
     ///
     /// ## Why is this bad?
