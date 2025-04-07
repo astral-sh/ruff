@@ -348,13 +348,13 @@ impl<'stmt> CFGBuilder<'stmt> {
                     let mut conditions = Vec::with_capacity(stmt_if.elif_else_clauses.len() + 2);
                     let mut has_else = false;
                     conditions.push(Condition::Test(&stmt_if.test));
-                    for case in stmt_if.elif_else_clauses.iter() {
+                    for case in &stmt_if.elif_else_clauses {
                         if let Some(test) = &case.test {
-                            conditions.push(Condition::Test(&test));
+                            conditions.push(Condition::Test(test));
                         } else {
                             has_else = true;
                             conditions.push(Condition::Else);
-                        };
+                        }
                     }
 
                     if has_else {
@@ -404,7 +404,7 @@ impl<'stmt> CFGBuilder<'stmt> {
                     // (depending on whether wildcard case is found)
                     let mut conditions = Vec::with_capacity(stmt_match.cases.len() + 1);
                     let mut has_wildcard = false;
-                    for case in stmt_match.cases.iter() {
+                    for case in &stmt_match.cases {
                         if case.pattern.is_wildcard() {
                             has_wildcard = true;
                         }
