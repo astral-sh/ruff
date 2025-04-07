@@ -3225,7 +3225,6 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
                 Some(KnownClass::Object) => {
-                    // // Added here to avoid salsa query cycle in typeshed definition
                     // ```py
                     // class object:
                     //    def __init__(self) -> None: ...
