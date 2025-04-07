@@ -198,18 +198,13 @@ from airflow.operators.sql import (
 from airflow.operators.sqlite_operator import SqliteOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
-<<<<<<< HEAD
-from airflow.sensors.date_time import DateTimeSensor
+from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
 from airflow.sensors.date_time_sensor import DateTimeSensor
 from airflow.sensors.external_task import (
     ExternalTaskMarker,
     ExternalTaskSensor,
     ExternalTaskSensorLink,
 )
-=======
-from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
-from airflow.sensors.external_task import ExternalTaskMarker, ExternalTaskSensor
->>>>>>> 2b4f9ad10 (test(AIR302): reorganize test cases)
 from airflow.sensors.filesystem import FileSensor
 from airflow.sensors.hive_partition_sensor import HivePartitionSensor
 from airflow.sensors.http_sensor import HttpSensor
