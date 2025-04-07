@@ -3997,7 +3997,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         if class.is_some_and(|class| {
             // For some known classes we have manual signatures defined and use the `try_call` path
             // below. TODO: it should be possible to move these special cases into the
-            // `try_call_class_literal` path instead, or even remove some entirely once we support
+            // `try_call_constructor` path instead, or even remove some entirely once we support
             // overloads fully.
             class.known(self.db()).is_none_or(|class| {
                 !matches!(
@@ -4015,7 +4015,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_argument_types(arguments, call_arguments, &argument_forms);
 
             return callable_type
-                .try_call_class_literal(self.db(), call_argument_types)
+                .try_call_constructor(self.db(), call_argument_types)
                 .unwrap_or_else(|err| {
                     err.report_diagnostic(&self.context, callable_type, call_expression.into());
                     err.return_type()

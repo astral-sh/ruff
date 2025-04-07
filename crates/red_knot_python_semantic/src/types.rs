@@ -3120,11 +3120,11 @@ impl<'db> Type<'db> {
             },
 
             Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
-                // TODO: Ideally we'd use `try_call_class_literal` for all constructor calls.
+                // TODO: Ideally we'd use `try_call_constructor` for all constructor calls.
                 // Currently we don't for a few special known types, either because their
                 // constructors are defined with overloads, or because we want to special case
                 // their return type beyond what typeshed provides (though this support could
-                // likely be moved into the `try_call_class_literal` path). Once we support
+                // likely be moved into the `try_call_constructor` path). Once we support
                 // overloads, re-evaluate the need for these arms.
                 Some(KnownClass::Bool) => {
                     // ```py
@@ -3309,7 +3309,7 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
 
-                // Most class literal constructor calls are handled by `try_call_class_literal` and
+                // Most class literal constructor calls are handled by `try_call_constructor` and
                 // not via getting the signature here. This signature can still be used in some
                 // cases (e.g. evaluating callable subtyping). TODO improve this definition
                 // (intersection of `__new__` and `__init__` signatures? and respect metaclass
@@ -3325,10 +3325,10 @@ impl<'db> Type<'db> {
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).signatures(db),
-                // Most type[] constructor calls are handled by `try_call_class_literal` and not
-                // via getting the signature here. This signature can still be used in some cases
-                // (e.g. evaluating callable subtyping). TODO improve this definition (intersection
-                // of `__new__` and `__init__` signatures? and respect metaclass `__call__`).
+                // Most type[] constructor calls are handled by `try_call_constructor` and not via
+                // getting the signature here. This signature can still be used in some cases (e.g.
+                // evaluating callable subtyping). TODO improve this definition (intersection of
+                // `__new__` and `__init__` signatures? and respect metaclass `__call__`).
                 ClassBase::Class(class) => Type::class_literal(class).signatures(db),
             },
 
@@ -3567,11 +3567,11 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Given the class literal type, try calling it (creating an instance) and return the
-    /// resulting instance type.
+    /// Given a class literal or non-dynamic SubclassOf type, try calling it (creating an instance)
+    /// and return the resulting instance type.
     ///
     /// Models `type.__call__` behavior.
-    /// TODO: model metaclass `__call__` behavior.
+    /// TODO: model metaclass `__call__`.
     ///
     /// E.g., for the following code, infer the type of `Foo()`:
     /// ```python
@@ -3580,7 +3580,7 @@ impl<'db> Type<'db> {
     ///
     /// Foo()
     /// ```
-    fn try_call_class_literal(
+    fn try_call_constructor(
         self,
         db: &'db dyn Db,
         argument_types: CallArgumentTypes<'_, 'db>,
