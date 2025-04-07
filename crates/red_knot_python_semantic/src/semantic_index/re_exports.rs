@@ -296,9 +296,66 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     }
                 }
             }
-            ast::Stmt::If(_) | ast::Stmt::With(_) | ast::Stmt::While(_) | ast::Stmt::For(_) => {
+
+            ast::Stmt::With(ast::StmtWith {
+                items,
+                body,
+                range: _,
+                is_async: _,
+            }) => {
+                for item in items {
+                    self.visit_with_item(item);
+                }
+
                 self.condition_counter += 1;
-                walk_stmt(self, stmt);
+                self.visit_body(body);
+                self.condition_counter -= 1;
+            }
+
+            ast::Stmt::If(ast::StmtIf {
+                test,
+                body,
+                elif_else_clauses,
+                range: _,
+            }) => {
+                self.visit_expr(test);
+
+                self.condition_counter += 1;
+                self.visit_body(body);
+                for elif_else in elif_else_clauses {
+                    self.visit_elif_else_clause(elif_else);
+                }
+                self.condition_counter -= 1;
+            }
+
+            ast::Stmt::While(ast::StmtWhile {
+                test,
+                body,
+                orelse,
+                range: _,
+            }) => {
+                self.visit_expr(test);
+
+                self.condition_counter += 1;
+                self.visit_body(body);
+                self.visit_body(orelse);
+                self.condition_counter -= 1;
+            }
+
+            ast::Stmt::For(ast::StmtFor {
+                target,
+                iter,
+                body,
+                orelse,
+                range: _,
+                is_async: _,
+            }) => {
+                self.visit_expr(iter);
+
+                self.condition_counter += 1;
+                self.visit_expr(target);
+                self.visit_body(body);
+                self.visit_body(orelse);
                 self.condition_counter -= 1;
             }
 
