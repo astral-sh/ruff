@@ -1625,7 +1625,7 @@ AIR302.py:430:1: AIR302 `airflow.triggers.temporal.DateTimeTrigger` is moved int
     |
     = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.temporal.DateTimeTrigger` instead.
 
-AIR302.py:431:1: AIR302 Import path `airflow.sensors.weekday` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:431:1: AIR302 `airflow.sensors.weekday.DayOfWeekSensor` is moved into `standard` provider in Airflow 3.0;
     |
 429 | DateTimeSensor()
 430 | DateTimeTrigger()
@@ -1634,7 +1634,7 @@ AIR302.py:431:1: AIR302 Import path `airflow.sensors.weekday` is moved into `sta
 432 | DummyOperator()
 433 | EmptyOperator()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.time.sensors.weekday` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.weekday.DayOfWeekSensor` instead.
 
 AIR302.py:432:1: AIR302 `airflow.operators.dummy.DummyOperator` is moved into `standard` provider in Airflow 3.0;
     |
