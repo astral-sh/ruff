@@ -65,10 +65,6 @@ impl<'db> InferContext<'db> {
         self.diagnostics.get_mut().extend(other);
     }
 
-    pub(crate) fn scope(&self) -> ScopeId<'db> {
-        self.scope
-    }
-
     /// Reports a lint located at `ranged`.
     pub(super) fn report_lint<T>(
         &self,

@@ -3273,9 +3273,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = resolve_star_import_definition(
             self.db(),
             self.file(),
-            self.scope(),
             definition_details,
-            self.index,
+            &self
+                .index
+                .symbol_table(self.scope().file_scope_id(self.db())),
         )
         .inspect_err(|err| {
             self.report_unresolved_import_from_module(definition_details.import(), *err);

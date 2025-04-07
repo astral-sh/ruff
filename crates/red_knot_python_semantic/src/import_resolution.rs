@@ -5,7 +5,7 @@ use crate::{
     db::Db,
     module_name::{ModuleName, ModuleNameResolutionError},
     module_resolver::resolve_module,
-    semantic_index::{definition::StarImportDefinitionKind, symbol::ScopeId, SemanticIndex},
+    semantic_index::{definition::StarImportDefinitionKind, symbol::SymbolTable},
     symbol::SymbolAndQualifiers,
     types::Type,
 };
@@ -13,16 +13,14 @@ use crate::{
 pub(crate) fn resolve_star_import_definition<'db>(
     db: &'db dyn Db,
     file: File,
-    scope: ScopeId<'db>,
     star_import_definition: &StarImportDefinitionKind,
-    semantic_index: &SemanticIndex<'db>,
+    symbol_table: &SymbolTable,
 ) -> Result<SymbolAndQualifiers<'db>, UnresolvedImportFromError> {
     let import_from = star_import_definition.import();
     let alias = star_import_definition.alias();
     let symbol_id = star_import_definition.symbol_id();
 
     let (_, module_type) = resolve_import_from_module(db, file, import_from, alias)?;
-    let symbol_table = semantic_index.symbol_table(scope.file_scope_id(db));
     let defined_name = symbol_table.symbol(symbol_id).name();
     let imported_symbol = module_type.member(db, defined_name);
 

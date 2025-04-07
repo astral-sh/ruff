@@ -356,6 +356,15 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
     }
 
+    pub(crate) fn public_bindings_prior_to_star_import(
+        &self,
+        star_import_definition: Definition<'db>,
+    ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
+        self.bindings_at_star_imports
+            .get(&star_import_definition)
+            .map(|symbol_state| self.bindings_iterator(symbol_state.bindings()))
+    }
+
     pub(crate) fn eager_bindings(
         &self,
         eager_bindings: ScopedEagerBindingsId,

@@ -1,9 +1,10 @@
 use ruff_db::files::File;
 
+use crate::import_resolution::resolve_star_import_definition;
 use crate::module_resolver::file_to_module;
-use crate::semantic_index::definition::{Definition, StarImportDefinitionKind};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
-use crate::semantic_index::{global_scope, use_def_map, DeclarationWithConstraint, SemanticIndex};
+use crate::semantic_index::{global_scope, use_def_map, DeclarationWithConstraint};
 use crate::semantic_index::{
     symbol_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
@@ -676,13 +677,38 @@ fn symbol_from_bindings_impl<'db>(
         |BindingWithConstraints {
              binding,
              narrowing_constraint,
-             visibility_constraint,
+             mut visibility_constraint,
          }| {
-            let binding = binding?;
+            let mut binding = binding?;
+
+            if binding.kind(db).is_star_import() {
+                let use_def_map = use_def_map(db, scope);
+
+                while let Some(star_import) = binding.kind(db).as_star_import() {
+                    if resolve_star_import_definition(
+                        db,
+                        scope.file(db),
+                        star_import,
+                        &symbol_table(db, scope),
+                    )
+                    .ok()
+                    .is_none_or(|symbol| symbol.symbol.is_unbound())
+                    {
+                        let prior_binding = use_def_map
+                            .public_bindings_prior_to_star_import(binding)?
+                            .next()?;
+                        binding = prior_binding.binding?;
+                        visibility_constraint = prior_binding.visibility_constraint;
+                    } else {
+                        break;
+                    }
+                }
+            }
 
             if is_non_exported(binding) {
                 return None;
             }
+
             let static_visibility =
                 visibility_constraints.evaluate(db, predicates, visibility_constraint);
 
