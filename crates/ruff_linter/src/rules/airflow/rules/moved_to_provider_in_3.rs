@@ -1086,9 +1086,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "hooks", "package_index", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.hooks.package_index",
-            new_path: "airflow.providers.standard.hooks.package_index",
+        ["airflow", "hooks", "package_index", "PackageIndexHook"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.hooks.package_index.PackageIndexHook",
             provider: "standard",
             version: "0.0.1"
         },

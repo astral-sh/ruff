@@ -1724,7 +1724,7 @@ AIR302.py:439:1: AIR302 Import path `airflow.hooks.filesystem` is moved into `st
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.hooks.filesystem` instead.
 
-AIR302.py:440:1: AIR302 Import path `airflow.hooks.package_index` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:440:1: AIR302 `airflow.hooks.package_index.PackageIndexHook` is moved into `standard` provider in Airflow 3.0;
     |
 438 | FileTrigger()
 439 | FSHook()
@@ -1733,7 +1733,7 @@ AIR302.py:440:1: AIR302 Import path `airflow.hooks.package_index` is moved into 
 441 | SubprocessHook()
 442 | ShortCircuitOperator()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.hooks.package_index` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.hooks.package_index.PackageIndexHook` instead.
 
 AIR302.py:441:1: AIR302 `airflow.hooks.subprocess.SubprocessHook` is moved into `standard` provider in Airflow 3.0;
     |
