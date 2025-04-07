@@ -454,3 +454,8 @@ from airflow.triggers.temporal import DateTimeTrigger, TimeDeltaTrigger
 
 DateTimeTrigger()
 TimeDeltaTrigger()
+
+from airflow.triggers.external_task import DagStateTrigger, WorkflowTrigger
+
+WorkflowTrigger()
+DagStateTrigger()

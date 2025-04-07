@@ -1790,7 +1790,7 @@ AIR302.py:445:1: AIR302 `airflow.operators.trigger_dagrun.TriggerDagRunOperator`
     |
     = help: Install `apache-airflow-provider-standard>=0.0.2` and use `airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator` instead.
 
-AIR302.py:446:1: AIR302 Import path `airflow.triggers.external_task` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:446:1: AIR302 `airflow.triggers.external_task.WorkflowTrigger` is moved into `standard` provider in Airflow 3.0;
     |
 444 | TimeSensor()
 445 | TriggerDagRunOperator()
@@ -1799,7 +1799,7 @@ AIR302.py:446:1: AIR302 Import path `airflow.triggers.external_task` is moved in
 447 | PythonOperator()
 448 | PythonVirtualenvOperator()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.3` and import from `airflow.providers.standard.triggers.external_task` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.external_task.WorkflowTrigger` instead.
 
 AIR302.py:447:1: AIR302 `airflow.operators.python.PythonOperator` is moved into `standard` provider in Airflow 3.0;
     |
@@ -1857,5 +1857,25 @@ AIR302.py:456:1: AIR302 `airflow.triggers.temporal.TimeDeltaTrigger` is moved in
 455 | DateTimeTrigger()
 456 | TimeDeltaTrigger()
     | ^^^^^^^^^^^^^^^^ AIR302
+457 |
+458 | from airflow.triggers.external_task import DagStateTrigger, WorkflowTrigger
     |
     = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.temporal.TimeDeltaTrigger` instead.
+
+AIR302.py:460:1: AIR302 `airflow.triggers.external_task.WorkflowTrigger` is moved into `standard` provider in Airflow 3.0;
+    |
+458 | from airflow.triggers.external_task import DagStateTrigger, WorkflowTrigger
+459 |
+460 | WorkflowTrigger()
+    | ^^^^^^^^^^^^^^^ AIR302
+461 | DagStateTrigger()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.external_task.WorkflowTrigger` instead.
+
+AIR302.py:461:1: AIR302 `airflow.triggers.external_task.DagStateTrigger` is moved into `standard` provider in Airflow 3.0;
+    |
+460 | WorkflowTrigger()
+461 | DagStateTrigger()
+    | ^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.external_task.DagStateTrigger` instead.

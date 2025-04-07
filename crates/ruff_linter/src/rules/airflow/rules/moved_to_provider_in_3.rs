@@ -1076,11 +1076,18 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "triggers", "external_task", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.triggers.external_task",
-            new_path: "airflow.providers.standard.triggers.external_task",
-            provider: "standard",
-            version: "0.0.3"
+        ["airflow", "triggers", "external_task", rest] => match *rest {
+            "WorkflowTrigger" => Replacement::ProviderName {
+                name: "airflow.providers.standard.triggers.external_task.WorkflowTrigger",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            "DagStateTrigger" => Replacement::ProviderName {
+                name: "airflow.providers.standard.triggers.external_task.DagStateTrigger",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            _ => return,
         },
         ["airflow", "triggers", "file", "FileTrigger"] => Replacement::ProviderName{
             name: "airflow.providers.standard.triggers.file.FileTrigger",
