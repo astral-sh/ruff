@@ -221,75 +221,76 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     }
 
-    let binding_stmt = binding.statement(checker.semantic());
-    let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
-        ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
-        ast::Stmt::Assign(assign) => Some(&assign.value),
-        _ => None,
-    });
-
-    // If the variable is an empty dict literal, then we might be able to replace it with a full dict comprehension.
-    // otherwise, it has to be replaced with a `dict.update`
-    let binding_is_empty_dict = binding_value.is_some_and(|binding_value| match binding_value {
-        // value = {}
-        Expr::Dict(dict_expr) => dict_expr.is_empty(),
-        // value = dict()
-        Expr::Call(call) => {
-            checker
-                .semantic()
-                .resolve_builtin_symbol(&call.func)
-                .is_some_and(|name| name == "dict")
-                && call.arguments.is_empty()
-        }
-        _ => false,
-    });
-
-    let assignment_in_same_statement = binding.source.is_some_and(|binding_source| {
-        let for_loop_parent = checker.semantic().current_statement_parent_id();
-        let binding_parent = checker.semantic().parent_statement_id(binding_source);
-        for_loop_parent == binding_parent
-    });
-    // If the binding is not a single name expression, it could be replaced with a dict comprehension,
-    // but not necessarily, so this needs to be manually fixed. This does not apply when using an update.
-    let binding_has_one_target = binding_stmt.is_some_and(|binding_stmt| match binding_stmt {
-        ast::Stmt::AnnAssign(_) => true,
-        ast::Stmt::Assign(assign) => assign.targets.len() == 1,
-        _ => false,
-    });
-    // If the binding gets used in between the assignment and the for loop, a comprehension is no longer safe
-
-    // If the binding is after the for loop, then it can't be fixed, and this check would panic,
-    // so we check that they are in the same statement first
-    let binding_unused_between = assignment_in_same_statement
-        && binding_stmt.is_some_and(|binding_stmt| {
-            let from_assign_to_loop = TextRange::new(binding_stmt.end(), for_stmt.start());
-            // Test if there's any reference to the result dictionary between its definition and the for loop.
-            // If there's at least one, then it's been accessed in the middle somewhere, so it's not safe to change into a comprehension
-            !binding
-                .references()
-                .map(|ref_id| checker.semantic().reference(ref_id).range())
-                .any(|text_range| from_assign_to_loop.contains_range(text_range))
-        });
-    // A dict update works in every context, while a dict comprehension only works when all the criteria are true
-    let fix_type = if binding_is_empty_dict
-        && assignment_in_same_statement
-        && binding_has_one_target
-        && binding_unused_between
-    {
-        DictComprehensionType::Comprehension
-    } else {
-        DictComprehensionType::Update
-    };
-
-    let mut diagnostic = Diagnostic::new(
-        ManualDictComprehension {
-            fix_type,
-            is_async: for_stmt.is_async,
-        },
-        *range,
-    );
-
     if checker.settings.preview.is_enabled() {
+        let binding_stmt = binding.statement(checker.semantic());
+        let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
+            ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
+            ast::Stmt::Assign(assign) => Some(&assign.value),
+            _ => None,
+        });
+
+        // If the variable is an empty dict literal, then we might be able to replace it with a full dict comprehension.
+        // otherwise, it has to be replaced with a `dict.update`
+        let binding_is_empty_dict =
+            binding_value.is_some_and(|binding_value| match binding_value {
+                // value = {}
+                Expr::Dict(dict_expr) => dict_expr.is_empty(),
+                // value = dict()
+                Expr::Call(call) => {
+                    checker
+                        .semantic()
+                        .resolve_builtin_symbol(&call.func)
+                        .is_some_and(|name| name == "dict")
+                        && call.arguments.is_empty()
+                }
+                _ => false,
+            });
+
+        let assignment_in_same_statement = binding.source.is_some_and(|binding_source| {
+            let for_loop_parent = checker.semantic().current_statement_parent_id();
+            let binding_parent = checker.semantic().parent_statement_id(binding_source);
+            for_loop_parent == binding_parent
+        });
+        // If the binding is not a single name expression, it could be replaced with a dict comprehension,
+        // but not necessarily, so this needs to be manually fixed. This does not apply when using an update.
+        let binding_has_one_target = binding_stmt.is_some_and(|binding_stmt| match binding_stmt {
+            ast::Stmt::AnnAssign(_) => true,
+            ast::Stmt::Assign(assign) => assign.targets.len() == 1,
+            _ => false,
+        });
+        // If the binding gets used in between the assignment and the for loop, a comprehension is no longer safe
+
+        // If the binding is after the for loop, then it can't be fixed, and this check would panic,
+        // so we check that they are in the same statement first
+        let binding_unused_between = assignment_in_same_statement
+            && binding_stmt.is_some_and(|binding_stmt| {
+                let from_assign_to_loop = TextRange::new(binding_stmt.end(), for_stmt.start());
+                // Test if there's any reference to the result dictionary between its definition and the for loop.
+                // If there's at least one, then it's been accessed in the middle somewhere, so it's not safe to change into a comprehension
+                !binding
+                    .references()
+                    .map(|ref_id| checker.semantic().reference(ref_id).range())
+                    .any(|text_range| from_assign_to_loop.contains_range(text_range))
+            });
+        // A dict update works in every context, while a dict comprehension only works when all the criteria are true
+        let fix_type = if binding_is_empty_dict
+            && assignment_in_same_statement
+            && binding_has_one_target
+            && binding_unused_between
+        {
+            DictComprehensionType::Comprehension
+        } else {
+            DictComprehensionType::Update
+        };
+
+        let mut diagnostic = Diagnostic::new(
+            ManualDictComprehension {
+                fix_type,
+                is_async: for_stmt.is_async,
+            },
+            *range,
+        );
+
         diagnostic.set_fix(convert_to_dict_comprehension(
             fix_type,
             binding,
@@ -299,8 +300,16 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             value.as_ref(),
             checker,
         ));
+        checker.report_diagnostic(diagnostic);
+    } else {
+        checker.report_diagnostic(Diagnostic::new(
+            ManualDictComprehension {
+                fix_type: DictComprehensionType::Comprehension,
+                is_async: for_stmt.is_async,
+            },
+            *range,
+        ));
     }
-    checker.report_diagnostic(diagnostic);
 }
 
 fn convert_to_dict_comprehension(
