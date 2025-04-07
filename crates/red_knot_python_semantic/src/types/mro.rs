@@ -26,14 +26,14 @@ use crate::Db;
 /// class D[U](C[U]): ...
 /// ```
 ///
-/// See [`Class::iter_mro`] for more details.
+/// See [`ClassType::iter_mro`] for more details.
 #[derive(PartialEq, Eq, Clone, Debug, salsa::Update)]
 pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
     /// Attempt to resolve the MRO of a given class. Because we derive the MRO from the list of
     /// base classes in the class definition, this operation is performed on a [class
-    /// literal][ClassLiteral], not a [class type][ClassType]. (You can _also_ get the MRO of a
+    /// literal][ClassLiteralType], not a [class type][ClassType]. (You can _also_ get the MRO of a
     /// class type, but this is done by first getting the MRO of the underlying class literal, and
     /// specializing each base class as needed if the class type is a generic alias.)
     ///
@@ -220,7 +220,7 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 ///
 /// Even for first-party code, where we will have to resolve the MRO for every class we encounter,
 /// loading the cached MRO comes with a certain amount of overhead, so it's best to avoid calling the
-/// Salsa-tracked [`Class::try_mro`] method unless it's absolutely necessary.
+/// Salsa-tracked [`ClassLiteralType::try_mro`] method unless it's absolutely necessary.
 pub(super) struct MroIterator<'db> {
     db: &'db dyn Db,
 
@@ -326,7 +326,7 @@ pub(super) enum MroErrorKind<'db> {
 
     /// The class has one or more duplicate bases.
     ///
-    /// This variant records the indices and [`Class`]es
+    /// This variant records the indices and [`ClassLiteralType`]s
     /// of the duplicate bases. The indices are the indices of nodes
     /// in the bases list of the class's [`StmtClassDef`](ruff_python_ast::StmtClassDef) node.
     /// Each index is the index of a node representing a duplicate base.
