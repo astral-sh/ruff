@@ -106,8 +106,8 @@ reveal_type(Hexagon().area)  # revealed: int | float
 
 ## Inconsistent stub packages
 
-Stub packages where one is a namespae package and the other is a regular package. Module resolution
-should stop after the first non-namespace stub package. This matches pyrights behavior.
+Stub packages where one is a namespace package and the other is a regular package. Module resolution
+should stop after the first non-namespace stub package. This matches Pyright's behavior.
 
 ```toml
 [environment]
@@ -166,7 +166,7 @@ reveal_type(Hexagon().area)  # revealed: Unknown
 
 The runtime package is a regular package but the stubs are namespace packages. Pyright skips the
 stub package if the "regular" package isn't a namespace package. I'm not aware that the behavior
-here is specificed, and using the stubs without probing the runtime package first requires slightly
+here is specified, and using the stubs without probing the runtime package first requires slightly
 fewer lookups.
 
 ```toml

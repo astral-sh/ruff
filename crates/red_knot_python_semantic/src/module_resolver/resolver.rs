@@ -39,17 +39,22 @@ pub(crate) fn resolve_module_query<'db>(
     let name = module_name.name(db);
     let _span = tracing::trace_span!("resolve_module", %name).entered();
 
-    let Some((search_path, module)) = resolve_name(db, name) else {
+    let Some((search_path, resolved_module)) = resolve_name(db, name) else {
         tracing::debug!("Module `{name}` not found in search paths");
         return None;
     };
 
     tracing::trace!(
         "Resolved module `{name}` to `{path}`",
-        path = module.file.path(db)
+        path = resolved_module.file.path(db)
     );
 
-    let module = Module::new(name.clone(), module.kind, search_path, module.file);
+    let module = Module::new(
+        name.clone(),
+        resolved_module.kind,
+        search_path,
+        resolved_module.file,
+    );
 
     Some(module)
 }
@@ -609,7 +614,9 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
                     return Some((search_path.clone(), ResolvedModule { kind, file }))
                 }
                 Err(PackageKind::Root) => {
-                    // stubs package doesn't exist, continue with the regular package
+                    tracing::trace!(
+                        "Search path '{search_path}' contains no stub package named `{stub_name}`."
+                    )
                 }
                 Err(PackageKind::Regular) => {
                     tracing::trace!(
@@ -624,7 +631,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
                         "Stub-package in `{search_path} doesn't contain module: `{name}` but it is a namespace package, keep going."
                     );
                     // stub exists, but the module doesn't. But this is a namespace package,
-                    // keep searchig the next search path for a stub package with the same name.
+                    // keep searching the next search path for a stub package with the same name.
                     continue;
                 }
             }
@@ -633,7 +640,11 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
         match resolve_module_in_search_path(&resolver_state, &name, search_path) {
             Ok((file, kind)) => return Some((search_path.clone(), ResolvedModule { kind, file })),
             Err(kind) => match kind {
-                PackageKind::Root => {}
+                PackageKind::Root => {
+                    tracing::trace!(
+                        "Search path '{search_path}' contains no package named `{name}`."
+                    )
+                }
                 PackageKind::Regular => {
                     // For regular packages, don't search the next search path. All files of that
                     // package must be in the same location
