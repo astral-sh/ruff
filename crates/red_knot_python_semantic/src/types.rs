@@ -2596,13 +2596,6 @@ impl<'db> Type<'db> {
             }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                // Make sure `__mro__` is always searched all the way to object.
-                let policy = if name == "__mro__" {
-                    policy & !MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                } else {
-                    policy
-                };
-
                 let class_attr_plain = self.find_name_in_mro(db, name_str, policy).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
