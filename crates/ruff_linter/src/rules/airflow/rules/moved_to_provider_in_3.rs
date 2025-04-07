@@ -887,13 +887,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "operators", "dagrun_operator" | "trigger_dagrun", rest @ ..        ] => match &rest {
-            ["TriggerDagRunLink"] => Replacement::ProviderName{
+        ["airflow", "operators", "dagrun_operator" | "trigger_dagrun", rest] => match *rest {
+            "TriggerDagRunLink" => Replacement::ProviderName{
                 name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunLink",
                 provider: "standard",
                 version: "0.0.2"
             },
-            ["TriggerDagRunOperator"] => Replacement::ProviderName{
+            "TriggerDagRunOperator" => Replacement::ProviderName{
                 name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator",
                 provider: "standard",
                 version: "0.0.2"
@@ -910,41 +910,41 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.3"
         },
-        ["airflow", "operators", "python_operator"| "python", rest @ ..] => match &rest {
-            ["BranchPythonOperator"] => Replacement::ProviderName{
+        ["airflow", "operators", "python_operator"| "python", rest ] => match *rest {
+            "BranchPythonOperator" => Replacement::ProviderName{
                 name: "airflow.providers.standard.operators.python.BranchPythonOperator",
                 provider: "standard",
                 version: "0.0.1"
             },
-            ["PythonOperator"] => Replacement::ProviderName{
+            "PythonOperator" => Replacement::ProviderName{
                 name: "airflow.providers.standard.operators.python.PythonOperator",
                 provider: "standard",
                 version: "0.0.1"
             },
-            ["PythonVirtualenvOperator"] => Replacement::ProviderName{
+            "PythonVirtualenvOperator" => Replacement::ProviderName{
                 name: "airflow.providers.standard.operators.python.PythonVirtualenvOperator",
                 provider: "standard",
                 version: "0.0.1"
             },
-            ["ShortCircuitOperator"] => Replacement::ProviderName{
+            "ShortCircuitOperator" => Replacement::ProviderName{
                 name: "airflow.providers.standard.operators.python.ShortCircuitOperator",
                 provider: "standard",
                 version: "0.0.1"
             },
             _ => return
         }
-        ["airflow", "sensors", "external_task_sensor" | "external_task", rest @..] => match &rest {
-            ["ExternalTaskSensor"] => Replacement::ProviderName{
+        ["airflow", "sensors", "external_task_sensor" | "external_task", rest] => match *rest {
+            "ExternalTaskSensor" => Replacement::ProviderName{
                 name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensor",
                 provider: "standard",
                 version: "0.0.3"
             },
-            ["ExternalTaskSensorLink"] => Replacement::ProviderName{
+            "ExternalTaskSensorLink" => Replacement::ProviderName{
                 name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensorLink",
                 provider: "standard",
                 version: "0.0.3"
             },
-            ["ExternalTaskMarker"] => Replacement::ProviderName{
+            "ExternalTaskMarker" => Replacement::ProviderName{
                 name: "airflow.providers.standard.sensors.external_task.ExternalTaskMarker",
                 provider: "standard",
                 version: "0.0.3"
