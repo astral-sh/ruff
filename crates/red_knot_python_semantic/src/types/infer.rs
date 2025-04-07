@@ -3995,9 +3995,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         if class.is_some_and(|class| {
-            // For some known classes we have manual signatures defined and use the
-            // following logic. Mostly due to salsa cycles or historical reasons.
-            // TODO: remove special cases and start relying on typeshed signatures
+            // For some known classes we have manual signatures defined and use the `try_call` path
+            // below. TODO: it should be possible to move these special cases into the
+            // `try_call_class_literal` path instead, or even remove some entirely once we support
+            // overloads fully.
             class.known(self.db()).is_none_or(|class| {
                 !matches!(
                     class,
