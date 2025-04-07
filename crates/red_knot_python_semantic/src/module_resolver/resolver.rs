@@ -610,13 +610,17 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
 
         if !search_path.is_standard_library() {
             match resolve_module_in_search_path(&resolver_state, &stub_name, search_path) {
-                Ok((file, kind)) => {
-                    return Some((search_path.clone(), ResolvedModule { kind, file }))
+                Ok(resolved_module) => {
+                    if resolved_module.package_kind.is_root() && resolved_module.kind.is_module() {
+                        tracing::trace!("Search path '{search_path} contains a module named `{stub_name}` but a standalone module isn't a valid stub.");
+                    } else {
+                        return Some((search_path.clone(), resolved_module));
+                    }
                 }
                 Err(PackageKind::Root) => {
                     tracing::trace!(
                         "Search path '{search_path}' contains no stub package named `{stub_name}`."
-                    )
+                    );
                 }
                 Err(PackageKind::Regular) => {
                     tracing::trace!(
@@ -638,12 +642,12 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
         }
 
         match resolve_module_in_search_path(&resolver_state, &name, search_path) {
-            Ok((file, kind)) => return Some((search_path.clone(), ResolvedModule { kind, file })),
+            Ok(resolved_module) => return Some((search_path.clone(), resolved_module)),
             Err(kind) => match kind {
                 PackageKind::Root => {
                     tracing::trace!(
                         "Search path '{search_path}' contains no package named `{name}`."
-                    )
+                    );
                 }
                 PackageKind::Regular => {
                     // For regular packages, don't search the next search path. All files of that
@@ -666,6 +670,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName) -> Option<(SearchPath, ResolvedM
 #[derive(Debug)]
 struct ResolvedModule {
     kind: ModuleKind,
+    package_kind: PackageKind,
     file: File,
 }
 
@@ -673,7 +678,7 @@ fn resolve_module_in_search_path(
     context: &ResolverContext,
     name: &RelaxedModuleName,
     search_path: &SearchPath,
-) -> Result<(File, ModuleKind), PackageKind> {
+) -> Result<ResolvedModule, PackageKind> {
     let mut components = name.components();
     let module_name = components.next_back().unwrap();
 
@@ -686,13 +691,22 @@ fn resolve_module_in_search_path(
     // Check for a regular package first (highest priority)
     package_path.push("__init__");
     if let Some(regular_package) = resolve_file_module(&package_path, context) {
-        return Ok((regular_package, ModuleKind::Package));
+        return Ok(ResolvedModule {
+            file: regular_package,
+            kind: ModuleKind::Package,
+            package_kind: resolved_package.kind,
+        });
     }
 
     // Check for a file module next
     package_path.pop();
+
     if let Some(file_module) = resolve_file_module(&package_path, context) {
-        return Ok((file_module, ModuleKind::Module));
+        return Ok(ResolvedModule {
+            file: file_module,
+            kind: ModuleKind::Module,
+            package_kind: resolved_package.kind,
+        });
     }
 
     Err(resolved_package.kind)
@@ -810,6 +824,12 @@ enum PackageKind {
     ///
     /// For example, `bar` in `foo.bar` if the `foo` directory contains no `__init__.py`.
     Namespace,
+}
+
+impl PackageKind {
+    pub(crate) const fn is_root(self) -> bool {
+        matches!(self, PackageKind::Root)
+    }
 }
 
 pub(super) struct ResolverContext<'db> {

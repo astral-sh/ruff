@@ -57,6 +57,31 @@ from foo import Foo
 reveal_type(Foo().name)  # revealed: str
 ```
 
+## `-stubs` named module
+
+A module named `<module>-stubs` isn't a stub package.
+
+```toml
+[environment]
+extra-paths = ["/packages"]
+```
+
+`/packages/foo-stubs.pyi`:
+
+```pyi
+class Foo:
+    name: str
+    age: int
+```
+
+`main.py`:
+
+```py
+from foo import Foo  # error: [unresolved-import]
+
+reveal_type(Foo().name)  # revealed: Unknown
+```
+
 ## Namespace package in different search paths
 
 A namespace package with multiple stub packages spread over multiple search paths.
