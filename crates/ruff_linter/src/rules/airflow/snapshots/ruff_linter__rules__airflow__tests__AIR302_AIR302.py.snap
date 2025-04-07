@@ -1592,7 +1592,7 @@ AIR302.py:426:1: AIR302 Import path `airflow.operators.datetime` is moved into `
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.time.operators.datetime` instead.
 
-AIR302.py:427:1: AIR302 Import path `airflow.operators.weekday` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:427:1: AIR302 `airflow.operators.weekday.BranchDayOfWeekOperator` is moved into `standard` provider in Airflow 3.0;
     |
 425 | # apache-airflow-providers-standard
 426 | BranchDateTimeOperator()
@@ -1601,7 +1601,7 @@ AIR302.py:427:1: AIR302 Import path `airflow.operators.weekday` is moved into `s
 428 | BranchPythonOperator()
 429 | DateTimeSensor()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.time.operators.weekday` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.operators.weekday.BranchDayOfWeekOperator` instead.
 
 AIR302.py:428:1: AIR302 `airflow.operators.python.BranchPythonOperator` is moved into `standard` provider in Airflow 3.0;
     |

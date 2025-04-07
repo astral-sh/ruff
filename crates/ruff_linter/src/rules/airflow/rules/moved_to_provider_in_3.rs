@@ -1050,9 +1050,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "operators", "weekday", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.operators.weekday",
-            new_path: "airflow.providers.standard.time.operators.weekday",
+        ["airflow", "operators", "weekday", "BranchDayOfWeekOperator"] => Replacement::ProviderName {
+            name: "airflow.providers.standard.time.operators.weekday.BranchDayOfWeekOperator",
             provider: "standard",
             version: "0.0.1"
         },
