@@ -1180,6 +1180,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         self.infer_annotation_expression(&type_alias.value, DeferredExpressionState::Deferred);
     }
 
+    /// Returns `true` if the current scope is the function body scope of a method of a protocol
+    /// (that is, a class which directly inherits `typing.Protocol`.)
     fn in_class_that_inherits_protocol_directly(&self) -> bool {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
@@ -1217,7 +1219,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         })
     }
 
-    fn in_function_overload_or_abstract(&self) -> bool {
+    /// Returns `true` if the current scope is the function body scope of a function overload (that
+    /// is, the stub declaration decorated with `@overload`, not the implementation), or an
+    /// abstract method (decorated with `@abstractmethod`.)
+    fn in_function_overload_or_abstractmethod(&self) -> bool {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
 
@@ -1274,7 +1279,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             if (self.in_stub()
-                || self.in_function_overload_or_abstract()
+                || self.in_function_overload_or_abstractmethod()
                 || self.in_class_that_inherits_protocol_directly())
                 && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
@@ -1569,7 +1574,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         inferred_ty: UnionType::from_elements(self.db(), [declared_ty, default_ty]),
                     }
                 } else if (self.in_stub()
-                    || self.in_function_overload_or_abstract()
+                    || self.in_function_overload_or_abstractmethod()
                     || self.in_class_that_inherits_protocol_directly())
                     && default
                         .as_ref()

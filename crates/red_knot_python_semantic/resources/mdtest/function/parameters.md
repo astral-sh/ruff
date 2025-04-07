@@ -83,6 +83,7 @@ from typing import Protocol
 
 class Foo(Protocol):
     def x(self, y: bool = ...): ...
+    def y[T](self, y: T = ...) -> T: ...
 
 class GenericFoo[T](Protocol):
     def x(self, y: bool = ...) -> T: ...
@@ -96,6 +97,8 @@ from abc import abstractmethod
 class Bar:
     @abstractmethod
     def x(self, y: bool = ...): ...
+    @abstractmethod
+    def y[T](self, y: T = ...) -> T: ...
 ```
 
 ### In function overload
