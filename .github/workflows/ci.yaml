@@ -143,7 +143,7 @@ jobs:
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
-          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':**/*' \
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- ':**' \
             ':!**/*.md' \
             ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' \
             ':!docs/**' \
