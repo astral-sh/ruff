@@ -32,3 +32,26 @@ flowchart TD
 	node3-->node2
 	node4-->node2
 ```
+
+## Function 1
+### Source
+```python
+def simpel_if(cond):
+    if cond:
+        return 1
+    return 2
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["if cond:
+        return 1"]
+	node1((("EXIT")))
+	node2["return 2"]
+	node3["return 1"]
+	node0-->|"cond"|node3
+	node0-->|"else"|node2
+	node2==>node1
+	node3==>node1
+```

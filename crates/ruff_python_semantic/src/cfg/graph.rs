@@ -338,7 +338,7 @@ impl<'stmt> CFGBuilder<'stmt> {
 
                     // Create a block for each elif clause
                     let mut case_blocks = Vec::with_capacity(stmt_if.elif_else_clauses.len() + 1);
-                    case_blocks.push(self.new_block());
+                    case_blocks.push(if_block);
                     for _ in 0..stmt_if.elif_else_clauses.len() {
                         case_blocks.push(self.new_block());
                     }
