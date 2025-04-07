@@ -471,3 +471,9 @@ from airflow.sensors.time_delta import TimeDeltaSensor, TimeDeltaSensorAsync, Wa
 TimeDeltaSensor()
 TimeDeltaSensorAsync()
 WaitSensor()
+
+
+from airflow.sensors.time_sensor import TimeSensor, TimeSensorAsync
+
+TimeSensor()
+TimeSensorAsync()

@@ -1768,7 +1768,7 @@ AIR302.py:443:1: AIR302 `airflow.sensors.time_delta.TimeDeltaSensor` is moved in
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time_delta.TimeDeltaSensor` instead.
 
-AIR302.py:444:1: AIR302 Import path `airflow.sensors.time_sensor` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:444:1: AIR302 `airflow.sensors.time_sensor.TimeSensor` is moved into `standard` provider in Airflow 3.0;
     |
 442 | ShortCircuitOperator()
 443 | TimeDeltaSensor()
@@ -1777,7 +1777,7 @@ AIR302.py:444:1: AIR302 Import path `airflow.sensors.time_sensor` is moved into 
 445 | TriggerDagRunOperator()
 446 | WorkflowTrigger()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.time.sensors.time` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time.TimeSensor` instead.
 
 AIR302.py:445:1: AIR302 `airflow.operators.trigger_dagrun.TriggerDagRunOperator` is moved into `standard` provider in Airflow 3.0;
     |
@@ -1941,3 +1941,21 @@ AIR302.py:473:1: AIR302 `airflow.sensors.time_delta.WaitSensor` is moved into `s
     | ^^^^^^^^^^ AIR302
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time_delta.WaitSensor` instead.
+
+AIR302.py:478:1: AIR302 `airflow.sensors.time_sensor.TimeSensor` is moved into `standard` provider in Airflow 3.0;
+    |
+476 | from airflow.sensors.time_sensor import TimeSensor, TimeSensorAsync
+477 |
+478 | TimeSensor()
+    | ^^^^^^^^^^ AIR302
+479 | TimeSensorAsync()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time.TimeSensor` instead.
+
+AIR302.py:479:1: AIR302 `airflow.sensors.time_sensor.TimeSensorAsync` is moved into `standard` provider in Airflow 3.0;
+    |
+478 | TimeSensor()
+479 | TimeSensorAsync()
+    | ^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time.TimeSensorAsync` instead.
