@@ -1,5 +1,5 @@
 use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{Expr, MatchCase, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 /// Returns the control flow graph associated to an array of statements
@@ -157,6 +157,11 @@ pub enum Condition<'stmt> {
     Always,
     /// A boolean test expression
     Test(&'stmt Expr),
+    /// A match case with its subject expression
+    Match {
+        subject: &'stmt Expr,
+        case: &'stmt MatchCase,
+    },
     /// Test whether `next` on iterator gives `StopIteration`
     NotStopIter(&'stmt Expr),
     /// A fallback case (else/wildcard case/etc.)
@@ -324,8 +329,119 @@ impl<'stmt> CFGBuilder<'stmt> {
                 }
 
                 // Switch statements
-                Stmt::If(_) => {}
-                Stmt::Match(_) => {}
+                Stmt::If(stmt_if) => {
+                    // Block to move to after processing loop
+                    let next_block = self.next_or_default_block(&stmts[end + 1..], self.exit);
+
+                    // Create a block for the if-test
+                    let if_block = self.new_block();
+
+                    // Create a block for each elif clause
+                    let mut case_blocks = Vec::with_capacity(stmt_if.elif_else_clauses.len() + 1);
+                    case_blocks.push(self.new_block());
+                    for _ in 0..stmt_if.elif_else_clauses.len() {
+                        case_blocks.push(self.new_block());
+                    }
+
+                    // Create edges to match cases and fallthrough
+                    // (depending on whether wildcard case is found)
+                    let mut conditions = Vec::with_capacity(stmt_if.elif_else_clauses.len() + 2);
+                    let mut has_else = false;
+                    conditions.push(Condition::Test(&stmt_if.test));
+                    for case in stmt_if.elif_else_clauses.iter() {
+                        if let Some(test) = &case.test {
+                            conditions.push(Condition::Test(&test));
+                        } else {
+                            has_else = true;
+                            conditions.push(Condition::Else);
+                        };
+                    }
+
+                    if has_else {
+                        let edges = Edges {
+                            conditions,
+                            targets: case_blocks.clone(),
+                        };
+                        self.set_current_block_stmts(&stmts[start..=end]);
+                        self.set_current_block_edges(edges);
+                    } else {
+                        conditions.push(Condition::Else);
+                        let edges = Edges {
+                            conditions,
+                            targets: [case_blocks.as_slice(), &[next_block]].concat(),
+                        };
+                        self.set_current_block_stmts(&stmts[start..=end]);
+                        self.set_current_block_edges(edges);
+                    }
+
+                    // Process if-branch
+                    self.move_to(if_block);
+                    self.update_exit(next_block);
+                    self.process_stmts(&stmt_if.body);
+
+                    // Process each case
+                    for (block, case) in case_blocks.iter().zip(stmt_if.elif_else_clauses.iter()) {
+                        self.move_to(*block);
+                        self.update_exit(next_block);
+                        self.process_stmts(&case.body);
+                    }
+
+                    // Cleanup
+                    self.move_to(next_block);
+                    start = end + 1;
+                }
+                Stmt::Match(stmt_match) => {
+                    // Block to move to after processing loop
+                    let next_block = self.next_or_default_block(&stmts[end + 1..], self.exit);
+
+                    // Create a block for each case
+                    let mut case_blocks = Vec::with_capacity(stmt_match.cases.len());
+                    for _ in 0..stmt_match.cases.len() {
+                        case_blocks.push(self.new_block());
+                    }
+
+                    // Create edges to match cases and fallthrough
+                    // (depending on whether wildcard case is found)
+                    let mut conditions = Vec::with_capacity(stmt_match.cases.len() + 1);
+                    let mut has_wildcard = false;
+                    for case in stmt_match.cases.iter() {
+                        if case.pattern.is_wildcard() {
+                            has_wildcard = true;
+                        }
+                        conditions.push(Condition::Match {
+                            subject: &stmt_match.subject,
+                            case,
+                        });
+                    }
+
+                    if has_wildcard {
+                        let edges = Edges {
+                            conditions,
+                            targets: case_blocks.clone(),
+                        };
+                        self.set_current_block_stmts(&stmts[start..=end]);
+                        self.set_current_block_edges(edges);
+                    } else {
+                        conditions.push(Condition::Else);
+                        let edges = Edges {
+                            conditions,
+                            targets: [case_blocks.as_slice(), &[next_block]].concat(),
+                        };
+                        self.set_current_block_stmts(&stmts[start..=end]);
+                        self.set_current_block_edges(edges);
+                    }
+
+                    // Process each case
+                    for (block, case) in case_blocks.iter().zip(stmt_match.cases.iter()) {
+                        self.move_to(*block);
+                        self.update_exit(next_block);
+                        self.process_stmts(&case.body);
+                    }
+
+                    // Cleanup
+                    self.move_to(next_block);
+                    start = end + 1;
+                }
 
                 // Exception handling statements
                 Stmt::Try(_) => {}

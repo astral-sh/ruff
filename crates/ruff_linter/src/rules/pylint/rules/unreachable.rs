@@ -130,6 +130,10 @@ fn taken(condition: &Condition, semantic: &SemanticModel) -> Option<bool> {
                 _ => None,
             }
         }
-        Condition::Else => None,
+        Condition::Else
+        | Condition::Match {
+            subject: _,
+            case: _,
+        } => None,
     }
 }
