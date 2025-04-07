@@ -412,7 +412,7 @@ AIR302.py:268:1: AIR302 `airflow.operators.sql.SQLThresholdCheckOperator` is mov
 269 | SQLValueCheckOperator()
 270 | SQLValueCheckOperator2()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql.SQLTableCheckOperator` instead.
+    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator` instead.
 
 AIR302.py:269:1: AIR302 `airflow.operators.check_operator.SQLValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -517,7 +517,7 @@ AIR302.py:285:1: AIR302 `airflow.hooks.druid_hook.DruidDbApiHook` is moved into 
 286 | DruidHook()
 287 | DruidCheckOperator()
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `DruidDbApiHook` instead.
+    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidDbApiHook` instead.
 
 AIR302.py:286:1: AIR302 `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` provider in Airflow 3.0;
     |
@@ -527,7 +527,7 @@ AIR302.py:286:1: AIR302 `airflow.hooks.druid_hook.DruidHook` is moved into `apac
     | ^^^^^^^^^ AIR302
 287 | DruidCheckOperator()
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `DruidHook` instead.
+    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidHook` instead.
 
 AIR302.py:287:1: AIR302 `airflow.operators.druid_check_operator.DruidCheckOperator` is moved into `apache-druid` provider in Airflow 3.0;
     |
@@ -935,7 +935,7 @@ AIR302.py:339:1: AIR302 `airflow.kubernetes.pod_generator.extend_object_field` i
 340 | get_logs_task_metadata()
 341 | label_safe_datestring_to_datetime()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.kubernetes.airflow.providers.cncf.kubernetes.pod_generator.extend_object_field` instead.
+    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.extend_object_field` instead.
 
 AIR302.py:340:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.get_logs_task_metadata` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1153,7 +1153,7 @@ AIR302.py:361:1: AIR302 `airflow.kubernetes.pod_launcher.PodLauncher` is moved i
 362 | PodLauncher2()
 363 | PodStatus()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher.PodLauncher` instead.
+    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodLauncher` instead.
 
 AIR302.py:362:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodLauncher` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1175,7 +1175,7 @@ AIR302.py:363:1: AIR302 `airflow.kubernetes.pod_launcher.PodStatus` is moved int
 364 | PodStatus2()
 365 | PodDefaults()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher.PodStatus` instead.
+    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodStatus` instead.
 
 AIR302.py:364:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodStatus` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1197,7 +1197,7 @@ AIR302.py:365:1: AIR302 `airflow.kubernetes.pod_generator.PodDefaults` is moved 
 366 | PodDefaults2()
 367 | PodDefaults3()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodDefaults` instead.
+    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.PodDefaults` instead.
 
 AIR302.py:366:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodDefaults` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1208,7 +1208,7 @@ AIR302.py:366:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodDefaults`
 367 | PodDefaults3()
 368 | PodGenerator()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodDefaults` instead.
+    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodDefaults` instead.
 
 AIR302.py:367:1: AIR302 `airflow.kubernetes.pod_generator_deprecated.PodDefaults` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
