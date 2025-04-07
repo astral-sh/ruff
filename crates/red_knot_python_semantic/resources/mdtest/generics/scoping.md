@@ -92,8 +92,8 @@ c.m2("string")
 ## Functions on generic classes are descriptors
 
 This repeats the tests in the [Functions as descriptors](./call/methods.md) test suite, but on a
-generic class. This ensures that we are carrying through any specializations through the entirety of
-the descriptor protocol, which is how `self` parameters are bound to instance methods.
+generic class. This ensures that we are carrying any specializations through the entirety of the
+descriptor protocol, which is how `self` parameters are bound to instance methods.
 
 ```py
 from inspect import getattr_static
