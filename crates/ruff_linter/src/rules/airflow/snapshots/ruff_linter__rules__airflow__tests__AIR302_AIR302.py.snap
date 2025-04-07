@@ -1582,7 +1582,7 @@ AIR302.py:423:1: AIR302 `airflow.operators.email_operator.EmailOperator` is move
     |
     = help: Install `apache-airflow-provider-smtp>=1.0.0` and use `airflow.providers.smtp.operators.smtp.EmailOperator` instead.
 
-AIR302.py:426:1: AIR302 Import path `airflow.operators.datetime` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:426:1: AIR302 `airflow.operators.datetime.BranchDateTimeOperator` is moved into `standard` provider in Airflow 3.0;
     |
 425 | # apache-airflow-providers-standard
 426 | BranchDateTimeOperator()
@@ -1590,7 +1590,7 @@ AIR302.py:426:1: AIR302 Import path `airflow.operators.datetime` is moved into `
 427 | BranchDayOfWeekOperator()
 428 | BranchPythonOperator()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.time.operators.datetime` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.operators.datetime.BranchDateTimeOperator` instead.
 
 AIR302.py:427:1: AIR302 `airflow.operators.weekday.BranchDayOfWeekOperator` is moved into `standard` provider in Airflow 3.0;
     |
@@ -1977,5 +1977,25 @@ AIR302.py:484:1: AIR302 `airflow.sensors.date_time.DateTimeSensorAsync` is moved
 483 | DateTimeSensor()
 484 | DateTimeSensorAsync()
     | ^^^^^^^^^^^^^^^^^^^ AIR302
+485 |
+486 | from airflow.operators.datetime import BranchDateTimeOperator, target_times_as_dates
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.date_time.DateTimeSensorAsync` instead.
+
+AIR302.py:488:1: AIR302 `airflow.operators.datetime.BranchDateTimeOperator` is moved into `standard` provider in Airflow 3.0;
+    |
+486 | from airflow.operators.datetime import BranchDateTimeOperator, target_times_as_dates
+487 |
+488 | BranchDateTimeOperator()
+    | ^^^^^^^^^^^^^^^^^^^^^^ AIR302
+489 | target_times_as_dates()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.operators.datetime.BranchDateTimeOperator` instead.
+
+AIR302.py:489:1: AIR302 `airflow.operators.datetime.target_times_as_dates` is moved into `standard` provider in Airflow 3.0;
+    |
+488 | BranchDateTimeOperator()
+489 | target_times_as_dates()
+    | ^^^^^^^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.operators.datetime.target_times_as_dates` instead.

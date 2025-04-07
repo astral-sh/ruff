@@ -482,3 +482,8 @@ from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
 
 DateTimeSensor()
 DateTimeSensorAsync()
+
+from airflow.operators.datetime import BranchDateTimeOperator, target_times_as_dates
+
+BranchDateTimeOperator()
+target_times_as_dates()

@@ -1044,11 +1044,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "operators", "datetime", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.operators.datetime",
-            new_path: "airflow.providers.standard.time.operators.datetime",
-            provider: "standard",
-            version: "0.0.1"
+        ["airflow", "operators", "datetime", rest] => match *rest {
+            "BranchDateTimeOperator" | "target_times_as_dates" => Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.standard.time.operators.datetime",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            _ => return,
         },
         ["airflow", "operators", "weekday", "BranchDayOfWeekOperator"] => Replacement::ProviderName {
             name: "airflow.providers.standard.time.operators.weekday.BranchDayOfWeekOperator",
