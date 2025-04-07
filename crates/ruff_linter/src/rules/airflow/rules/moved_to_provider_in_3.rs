@@ -403,13 +403,49 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
 
         // apache-airflow-providers-fab
-        ["airflow", "www", "security", "FabAirflowSecurityManagerOverride"] => Replacement::ProviderName {
-            name: "airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride",
-            provider: "fab",
-            version: "1.0.0"
+        ["airflow", "api", "auth", "backend", "basic_auth", rest] => match *rest {
+            "CLIENT_AUTH"| "init_app" | "auth_current_user" | "requires_authentication"=> Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth",
+                provider: "fab",
+                version: "1.0.0"
+            },
+            _ => return,
+        },
+        ["airflow", "api", "auth", "backend", "kerberos_auth", rest] => match *rest {
+            "log" | "CLIENT_AUTH"| "find_user" | "init_app" | "requires_authentication"=> Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
+                provider: "fab",
+                version: "1.0.0"
+            },
+            _ => return,
+        },
+        ["airflow", "auth", "managers", "fab", "api", "auth", "backend", "kerberos_auth", rest] => match *rest {
+            "log" | "CLIENT_AUTH"| "find_user" | "init_app" | "requires_authentication"=> Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
+                provider: "fab",
+                version: "1.0.0"
+            },
+            _ => return,
         },
         ["airflow", "auth", "managers", "fab", "fab_auth_manager", "FabAuthManager"] => Replacement::ProviderName{
             name: "airflow.providers.fab.auth_manager.security_manager.FabAuthManager",
+            provider: "fab",
+            version: "1.0.0"
+        },
+        ["airflow", "auth", "managers", "fab", "security_manager", "override", rest] => match *rest {
+            "MAX_NUM_DATABASE_USER_SESSIONS" | "FabAirflowSecurityManagerOverride" => Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.fab.auth_manager.security_manager.override",
+                provider: "fab",
+                version: "1.0.0"
+            },
+            _ => return,
+        },
+        ["airflow", "www", "security", "FabAirflowSecurityManagerOverride"] => Replacement::ProviderName {
+            name: "airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride",
             provider: "fab",
             version: "1.0.0"
         },
@@ -975,45 +1011,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             name: "airflow.providers.zendesk.hooks.zendesk.ZendeskHook",
             provider: "zendesk",
             version: "1.0.0"
-        },
-
-        // ImportPathMoved: for cases that the whole module has been moved
-        // apache-airflow-providers-fab
-        ["airflow", "api", "auth", "backend", "basic_auth", rest] => match *rest {
-            "CLIENT_AUTH"| "init_app" | "auth_current_user" | "requires_authentication"=> Replacement::ProviderNameMoved {
-                name: rest.to_string(),
-                module: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth",
-                provider: "fab",
-                version: "1.0.0"
-            },
-            _ => return,
-        },
-        ["airflow", "api", "auth", "backend", "kerberos_auth", rest] => match *rest {
-            "log" | "CLIENT_AUTH"| "find_user" | "init_app" | "requires_authentication"=> Replacement::ProviderNameMoved {
-                name: rest.to_string(),
-                module: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
-                provider: "fab",
-                version: "1.0.0"
-            },
-            _ => return,
-        },
-        ["airflow", "auth", "managers", "fab", "api", "auth", "backend", "kerberos_auth", rest] => match *rest {
-            "log" | "CLIENT_AUTH"| "find_user" | "init_app" | "requires_authentication"=> Replacement::ProviderNameMoved {
-                name: rest.to_string(),
-                module: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
-                provider: "fab",
-                version: "1.0.0"
-            },
-            _ => return,
-        },
-        ["airflow", "auth", "managers", "fab", "security_manager", "override", rest] => match *rest {
-            "MAX_NUM_DATABASE_USER_SESSIONS" | "FabAirflowSecurityManagerOverride" => Replacement::ProviderNameMoved {
-                name: rest.to_string(),
-                module: "airflow.providers.fab.auth_manager.security_manager.override",
-                provider: "fab",
-                version: "1.0.0"
-            },
-            _ => return,
         },
 
         // apache-airflow-providers-standard
