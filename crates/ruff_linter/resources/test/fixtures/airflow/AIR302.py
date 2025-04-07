@@ -465,3 +465,9 @@ from airflow.hooks.subprocess import SubprocessHook, SubprocessResult, working_d
 SubprocessResult()
 working_directory()
 SubprocessHook()
+
+from airflow.sensors.time_delta import TimeDeltaSensor, TimeDeltaSensorAsync, WaitSensor
+
+TimeDeltaSensor()
+TimeDeltaSensorAsync()
+WaitSensor()

@@ -1757,7 +1757,7 @@ AIR302.py:442:1: AIR302 `airflow.operators.python.ShortCircuitOperator` is moved
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.ShortCircuitOperator` instead.
 
-AIR302.py:443:1: AIR302 Import path `airflow.sensors.time_delta` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:443:1: AIR302 `airflow.sensors.time_delta.TimeDeltaSensor` is moved into `standard` provider in Airflow 3.0;
     |
 441 | SubprocessHook()
 442 | ShortCircuitOperator()
@@ -1766,7 +1766,7 @@ AIR302.py:443:1: AIR302 Import path `airflow.sensors.time_delta` is moved into `
 444 | TimeSensor()
 445 | TriggerDagRunOperator()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.time.sensors.time_delta` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time_delta.TimeDeltaSensor` instead.
 
 AIR302.py:444:1: AIR302 Import path `airflow.sensors.time_sensor` is moved into `standard` provider in Airflow 3.0;
     |
@@ -1908,5 +1908,36 @@ AIR302.py:467:1: AIR302 `airflow.hooks.subprocess.SubprocessHook` is moved into 
 466 | working_directory()
 467 | SubprocessHook()
     | ^^^^^^^^^^^^^^ AIR302
+468 |
+469 | from airflow.sensors.time_delta import TimeDeltaSensor, TimeDeltaSensorAsync, WaitSensor
     |
     = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.hooks.subprocess.SubprocessHook` instead.
+
+AIR302.py:471:1: AIR302 `airflow.sensors.time_delta.TimeDeltaSensor` is moved into `standard` provider in Airflow 3.0;
+    |
+469 | from airflow.sensors.time_delta import TimeDeltaSensor, TimeDeltaSensorAsync, WaitSensor
+470 |
+471 | TimeDeltaSensor()
+    | ^^^^^^^^^^^^^^^ AIR302
+472 | TimeDeltaSensorAsync()
+473 | WaitSensor()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time_delta.TimeDeltaSensor` instead.
+
+AIR302.py:472:1: AIR302 `airflow.sensors.time_delta.TimeDeltaSensorAsync` is moved into `standard` provider in Airflow 3.0;
+    |
+471 | TimeDeltaSensor()
+472 | TimeDeltaSensorAsync()
+    | ^^^^^^^^^^^^^^^^^^^^ AIR302
+473 | WaitSensor()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time_delta.TimeDeltaSensorAsync` instead.
+
+AIR302.py:473:1: AIR302 `airflow.sensors.time_delta.WaitSensor` is moved into `standard` provider in Airflow 3.0;
+    |
+471 | TimeDeltaSensor()
+472 | TimeDeltaSensorAsync()
+473 | WaitSensor()
+    | ^^^^^^^^^^ AIR302
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.time.sensors.time_delta.WaitSensor` instead.
