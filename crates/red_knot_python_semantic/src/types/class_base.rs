@@ -60,7 +60,7 @@ impl<'db> ClassBase<'db> {
         KnownClass::Object
             .to_class_literal(db)
             .into_class_type()
-            .map_or(Self::unknown(), |class| Self::Class(class))
+            .map_or(Self::unknown(), Self::Class)
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.

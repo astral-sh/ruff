@@ -208,7 +208,7 @@ impl<'db> ClassType<'db> {
         self.class(db).definition(db)
     }
 
-    fn specialize_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    fn specialize_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             Self::NonGeneric(_) => ty,
             Self::Generic(generic) => ty.apply_specialization(db, generic.specialization(db)),
@@ -216,7 +216,7 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if this class represents `known_class`
-    pub(crate) fn is_known(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+    pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.class(db).known == Some(known_class)
     }
 
@@ -356,7 +356,7 @@ impl<'db> ClassLiteralType<'db> {
     }
 
     /// Return `true` if this class represents `known_class`
-    pub(crate) fn is_known(&self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+    pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.class(db).known == Some(known_class)
     }
 
@@ -1347,7 +1347,7 @@ impl<'db> KnownClass {
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
             .into_class_type()
-            .map(|class| Type::instance(class))
+            .map(Type::instance)
             .unwrap_or_else(Type::unknown)
     }
 

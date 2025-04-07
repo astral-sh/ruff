@@ -117,7 +117,7 @@ impl Display for DisplayRepresentation<'_> {
                     {
                         format!(" specialized with {}", specialization.display(self.db))
                     } else {
-                        "".to_string()
+                        String::new()
                     },
                 )
             }
@@ -130,7 +130,7 @@ impl Display for DisplayRepresentation<'_> {
                     {
                         format!(" specialized with {}", specialization.display(self.db))
                     } else {
-                        "".to_string()
+                        String::new()
                     },
                 )
             }
@@ -249,7 +249,7 @@ pub struct DisplaySpecialization<'db> {
 impl Display for DisplaySpecialization<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.write_char('{')?;
-        for (idx, (var, ty)) in self.typevars.into_iter().zip(self.types).enumerate() {
+        for (idx, (var, ty)) in self.typevars.iter().zip(self.types).enumerate() {
             if idx > 0 {
                 f.write_str(", ")?;
             }
