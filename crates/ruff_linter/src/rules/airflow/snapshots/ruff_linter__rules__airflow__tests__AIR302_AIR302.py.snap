@@ -1702,7 +1702,7 @@ AIR302.py:437:1: AIR302 `airflow.sensors.filesystem.FileSensor` is moved into `s
     |
     = help: Install `apache-airflow-provider-standard>=0.0.2` and use `airflow.providers.standard.sensors.filesystem.FileSensor` instead.
 
-AIR302.py:438:1: AIR302 Import path `airflow.triggers.file` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:438:1: AIR302 `airflow.triggers.file.FileTrigger` is moved into `standard` provider in Airflow 3.0;
     |
 436 | ExternalTaskSensorLink()
 437 | FileSensor()
@@ -1711,7 +1711,7 @@ AIR302.py:438:1: AIR302 Import path `airflow.triggers.file` is moved into `stand
 439 | FSHook()
 440 | PackageIndexHook()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.3` and import from `airflow.providers.standard.triggers.file` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.file.FileTrigger` instead.
 
 AIR302.py:439:1: AIR302 Import path `airflow.hooks.filesystem` is moved into `standard` provider in Airflow 3.0;
     |
@@ -1823,7 +1823,7 @@ AIR302.py:448:1: AIR302 `airflow.operators.python.PythonVirtualenvOperator` is m
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.PythonVirtualenvOperator` instead.
 
-AIR302.py:449:1: AIR302 Import path `airflow.triggers.file` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:449:1: AIR302 `airflow.triggers.file.FileTrigger` is moved into `standard` provider in Airflow 3.0;
     |
 447 | PythonOperator()
 448 | PythonVirtualenvOperator()
@@ -1831,7 +1831,7 @@ AIR302.py:449:1: AIR302 Import path `airflow.triggers.file` is moved into `stand
     | ^^^^^^^^^^^ AIR302
 450 | DateTimeTrigger()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.3` and import from `airflow.providers.standard.triggers.file` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.file.FileTrigger` instead.
 
 AIR302.py:450:1: AIR302 `airflow.triggers.temporal.DateTimeTrigger` is moved into `standard` provider in Airflow 3.0;
     |
