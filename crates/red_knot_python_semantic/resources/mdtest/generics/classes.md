@@ -106,6 +106,10 @@ reveal_type(Constrained[IntSubclass]())  # revealed: Constrained[IntSubclass]
 
 reveal_type(Constrained[str]())  # revealed: Constrained[str]
 
+# TODO: error: [invalid-argument-type]
+# TODO: revealed: Unknown
+reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
+
 # error: [invalid-argument-type] "Object of type `object` cannot be assigned to parameter 1 (`T`) of class `Constrained`; expected type `int | str`"
 reveal_type(Constrained[object]())  # revealed: Unknown
 ```
