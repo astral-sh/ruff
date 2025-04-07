@@ -4983,11 +4983,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// This powers the `CallableTypeOf` special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        let mut signature = self.signature(db).clone();
-        if let Some(specialization) = self.specialization(db) {
-            signature.apply_specialization(db, specialization);
-        }
-        Type::Callable(CallableType::new(db, signature))
+        Type::Callable(CallableType::new(db, self.signature(db).clone()))
     }
 
     /// Returns the [`FileRange`] of the function's name.
