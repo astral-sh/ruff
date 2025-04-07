@@ -39,7 +39,7 @@ type Props = {
   workspace: Workspace;
   onChange(content: string): void;
   onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void;
-  onFileOpened(file: FileId): void;
+  onOpenFile(file: FileId): void;
 };
 
 export default function Editor({
@@ -52,7 +52,7 @@ export default function Editor({
   workspace,
   onChange,
   onMount,
-  onFileOpened,
+  onOpenFile,
 }: Props) {
   const serverRef = useRef<PlaygroundServer | null>(null);
 
@@ -60,7 +60,7 @@ export default function Editor({
     serverRef.current.update({
       files,
       workspace,
-      onFileOpened,
+      onOpenFile,
     });
   }
 
@@ -97,7 +97,7 @@ export default function Editor({
       const server = new PlaygroundServer(instance, {
         workspace,
         files,
-        onFileOpened,
+        onOpenFile,
       });
 
       server.updateDiagnostics(diagnostics);
@@ -106,11 +106,12 @@ export default function Editor({
       onMount(editor, instance);
     },
 
-    [files, onFileOpened, workspace, onMount, diagnostics],
+    [files, onOpenFile, workspace, onMount, diagnostics],
   );
 
   return (
     <Moncao
+      key={files.playgroundRevision}
       onMount={handleMount}
       options={{
         fixedOverflowWidgets: true,
@@ -134,7 +135,7 @@ export default function Editor({
 interface PlaygroundServerProps {
   workspace: Workspace;
   files: ReadonlyFiles;
-  onFileOpened: (file: FileId) => void;
+  onOpenFile: (file: FileId) => void;
 }
 
 class PlaygroundServer
@@ -142,12 +143,14 @@ class PlaygroundServer
     languages.TypeDefinitionProvider,
     editor.ICodeEditorOpener,
     languages.HoverProvider,
-    languages.InlayHintsProvider
+    languages.InlayHintsProvider,
+    languages.DocumentFormattingEditProvider
 {
   private typeDefinitionProviderDisposable: IDisposable;
   private editorOpenerDisposable: IDisposable;
   private hoverDisposable: IDisposable;
   private inlayHintsDisposable: IDisposable;
+  private formatDisposable: IDisposable;
 
   constructor(
     private monaco: Monaco,
@@ -164,6 +167,8 @@ class PlaygroundServer
       this,
     );
     this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
+    this.formatDisposable =
+      monaco.languages.registerDocumentFormattingEditProvider("python", this);
   }
 
   provideInlayHints(
@@ -395,7 +400,7 @@ class PlaygroundServer
     if (files.selected !== fileId) {
       source.setModel(model);
 
-      this.props.onFileOpened(fileId);
+      this.props.onOpenFile(fileId);
     }
 
     if (selectionOrPosition != null) {
@@ -414,11 +419,38 @@ class PlaygroundServer
     return true;
   }
 
+  provideDocumentFormattingEdits(
+    model: editor.ITextModel,
+  ): languages.ProviderResult<languages.TextEdit[]> {
+    if (this.props.files.selected == null) {
+      return null;
+    }
+
+    const fileHandle = this.props.files.handles[this.props.files.selected];
+
+    if (fileHandle == null) {
+      return null;
+    }
+
+    const formatted = this.props.workspace.format(fileHandle);
+    if (formatted != null) {
+      return [
+        {
+          range: model.getFullModelRange(),
+          text: formatted,
+        },
+      ];
+    }
+
+    return null;
+  }
+
   dispose() {
     this.hoverDisposable.dispose();
     this.editorOpenerDisposable.dispose();
     this.typeDefinitionProviderDisposable.dispose();
     this.inlayHintsDisposable.dispose();
+    this.formatDisposable.dispose();
   }
 }
 

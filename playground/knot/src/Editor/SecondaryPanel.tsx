@@ -109,7 +109,9 @@ function Run({ files, theme }: { files: ReadonlyFiles; theme: Theme }) {
   }
 
   return (
-    <Suspense fallback={<div className="text-center">Loading</div>}>
+    <Suspense
+      fallback={<div className="text-center dark:text-white">Loading</div>}
+    >
       <RunWithPyiodide
         theme={theme}
         files={files}

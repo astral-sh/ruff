@@ -7,7 +7,7 @@ use crate::TokenKind;
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct ParseError {
     pub error: ParseErrorType,
     pub location: TextRange,
@@ -49,7 +49,7 @@ impl ParseError {
 }
 
 /// Represents the different types of errors that can occur during parsing of an f-string.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FStringErrorType {
     /// Expected a right brace after an opened left brace.
     UnclosedLbrace,
@@ -85,7 +85,7 @@ impl std::fmt::Display for FStringErrorType {
 }
 
 /// Represents the different types of errors that can occur during parsing.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ParseErrorType {
     /// An unexpected error occurred.
     OtherError(String),
@@ -362,7 +362,7 @@ impl std::fmt::Display for LexicalError {
 }
 
 /// Represents the different types of errors that can occur during lexing.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexicalErrorType {
     // TODO: Can probably be removed, the places it is used seem to be able
     // to use the `UnicodeError` variant instead.

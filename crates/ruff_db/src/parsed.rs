@@ -2,10 +2,10 @@ use std::fmt::Formatter;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_python_ast::{ModModule, PySourceType};
+use ruff_python_ast::ModModule;
 use ruff_python_parser::{parse_unchecked_source, Parsed};
 
-use crate::files::{File, FilePath};
+use crate::files::File;
 use crate::source::source_text;
 use crate::Db;
 
@@ -25,17 +25,7 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     let _span = tracing::trace_span!("parsed_module", ?file).entered();
 
     let source = source_text(db, file);
-    let path = file.path(db);
-
-    let ty = match path {
-        FilePath::System(path) => path
-            .extension()
-            .map_or(PySourceType::Python, PySourceType::from_extension),
-        FilePath::Vendored(_) => PySourceType::Stub,
-        FilePath::SystemVirtual(path) => path
-            .extension()
-            .map_or(PySourceType::Python, PySourceType::from_extension),
-    };
+    let ty = file.source_type(db);
 
     ParsedModule::new(parse_unchecked_source(&source, ty))
 }

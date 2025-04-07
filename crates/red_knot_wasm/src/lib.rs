@@ -18,6 +18,7 @@ use ruff_db::system::{
 };
 use ruff_db::Upcast;
 use ruff_notebook::Notebook;
+use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::Ranged;
 use wasm_bindgen::prelude::*;
@@ -142,7 +143,11 @@ impl Workspace {
     }
 
     #[wasm_bindgen(js_name = "closeFile")]
-    pub fn close_file(&mut self, file_id: &FileHandle) -> Result<(), Error> {
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "It's intentional that the file handle is consumed because it is no longer valid after closing"
+    )]
+    pub fn close_file(&mut self, file_id: FileHandle) -> Result<(), Error> {
         let file = file_id.file;
 
         self.db.project().close_file(&mut self.db, file);
@@ -182,6 +187,10 @@ impl Workspace {
         let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
 
         Ok(format!("{:#?}", parsed.syntax()))
+    }
+
+    pub fn format(&self, file_id: &FileHandle) -> Result<Option<String>, Error> {
+        formatted_file(&self.db, file_id.file).map_err(into_error)
     }
 
     /// Returns the token stream for `path` serialized as a string.
