@@ -796,27 +796,7 @@ AIR302.py:319:1: AIR302 `airflow.operators.jdbc_operator.JdbcOperator` is moved 
     |
     = help: Install `apache-airflow-provider-jdbc>=1.0.0` and use `airflow.providers.jdbc.operators.jdbc.JdbcOperator` instead.
 
-AIR302.py:322:1: AIR302 Import path `airflow.api.auth.backend.basic_auth` is moved into `fab` provider in Airflow 3.0;
-    |
-321 | # apache-airflow-providers-fab
-322 | basic_auth, kerberos_auth
-    | ^^^^^^^^^^ AIR302
-323 | auth_current_user
-324 | backend_kerberos_auth
-    |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth` instead.
-
-AIR302.py:322:13: AIR302 Import path `airflow.api.auth.backend.kerberos_auth` is moved into `fab` provider in Airflow 3.0;
-    |
-321 | # apache-airflow-providers-fab
-322 | basic_auth, kerberos_auth
-    |             ^^^^^^^^^^^^^ AIR302
-323 | auth_current_user
-324 | backend_kerberos_auth
-    |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
-
-AIR302.py:323:1: AIR302 Import path `airflow.api.auth.backend.basic_auth` is moved into `fab` provider in Airflow 3.0;
+AIR302.py:323:1: AIR302 `airflow.api.auth.backend.basic_auth.auth_current_user` is moved into `fab` provider in Airflow 3.0;
     |
 321 | # apache-airflow-providers-fab
 322 | basic_auth, kerberos_auth
@@ -825,29 +805,7 @@ AIR302.py:323:1: AIR302 Import path `airflow.api.auth.backend.basic_auth` is mov
 324 | backend_kerberos_auth
 325 | fab_override
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth` instead.
-
-AIR302.py:324:1: AIR302 Import path `airflow.auth_manager.api.auth.backend.kerberos_auth` is moved into `fab` provider in Airflow 3.0;
-    |
-322 | basic_auth, kerberos_auth
-323 | auth_current_user
-324 | backend_kerberos_auth
-    | ^^^^^^^^^^^^^^^^^^^^^ AIR302
-325 | fab_override
-326 | FabAuthManager()
-    |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth` instead.
-
-AIR302.py:325:1: AIR302 Import path `airflow.auth.managers.fab.security_manager.override` is moved into `fab` provider in Airflow 3.0;
-    |
-323 | auth_current_user
-324 | backend_kerberos_auth
-325 | fab_override
-    | ^^^^^^^^^^^^ AIR302
-326 | FabAuthManager()
-327 | FabAirflowSecurityManagerOverride()
-    |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and import from `airflow.providers.fab.auth_manager.security_manager.override` instead.
+    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.auth_current_user` instead.
 
 AIR302.py:326:1: AIR302 `airflow.auth.managers.fab.fab_auth_manager.FabAuthManager` is moved into `fab` provider in Airflow 3.0;
     |

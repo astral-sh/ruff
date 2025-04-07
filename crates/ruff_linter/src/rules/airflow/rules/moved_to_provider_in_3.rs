@@ -46,14 +46,6 @@ impl Violation for Airflow3MovedToProvider {
             } => {
                 format!("`{deprecated}` is moved into `{provider}` provider in Airflow 3.0;")
             }
-            Replacement::ImportPathMoved {
-                original_path,
-                new_path: _,
-                provider,
-                version: _,
-            } => {
-                format!("Import path `{original_path}` is moved into `{provider}` provider in Airflow 3.0;")
-            }
             Replacement::ProviderNameMoved {
                 name: _,
                 module: _,
@@ -76,14 +68,6 @@ impl Violation for Airflow3MovedToProvider {
             Some(format!(
                 "Install `apache-airflow-provider-{provider}>={version}` and use `{name}` instead."
             ))
-        } else if let Replacement::ImportPathMoved {
-            original_path: _,
-            new_path,
-            provider,
-            version,
-        } = replacement
-        {
-            Some(format!("Install `apache-airflow-provider-{provider}>={version}` and import from `{new_path}` instead."))
         } else if let Replacement::ProviderNameMoved {
             name,
             module,
@@ -117,12 +101,6 @@ pub(crate) fn moved_to_provider_in_3(checker: &Checker, expr: &Expr) {
 enum Replacement {
     ProviderName {
         name: &'static str,
-        provider: &'static str,
-        version: &'static str,
-    },
-    ImportPathMoved {
-        original_path: &'static str,
-        new_path: &'static str,
         provider: &'static str,
         version: &'static str,
     },
@@ -1001,29 +979,41 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
         // ImportPathMoved: for cases that the whole module has been moved
         // apache-airflow-providers-fab
-        ["airflow", "api", "auth", "backend", "basic_auth", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.api.auth.backend.basic_auth",
-            new_path: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth",
-            provider: "fab",
-            version: "1.0.0"
+        ["airflow", "api", "auth", "backend", "basic_auth", rest] => match *rest {
+            "CLIENT_AUTH"| "init_app" | "auth_current_user" | "requires_authentication"=> Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth",
+                provider: "fab",
+                version: "1.0.0"
+            },
+            _ => return,
         },
-        ["airflow", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.api.auth.backend.kerberos_auth",
-            new_path: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
-            provider: "fab",
-            version: "1.0.0"
+        ["airflow", "api", "auth", "backend", "kerberos_auth", rest] => match *rest {
+            "log" | "CLIENT_AUTH"| "find_user" | "init_app" | "requires_authentication"=> Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
+                provider: "fab",
+                version: "1.0.0"
+            },
+            _ => return,
         },
-        ["airflow", "auth", "managers", "fab", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.auth_manager.api.auth.backend.kerberos_auth",
-            new_path: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
-            provider: "fab",
-            version: "1.0.0"
+        ["airflow", "auth", "managers", "fab", "api", "auth", "backend", "kerberos_auth", rest] => match *rest {
+            "log" | "CLIENT_AUTH"| "find_user" | "init_app" | "requires_authentication"=> Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
+                provider: "fab",
+                version: "1.0.0"
+            },
+            _ => return,
         },
-        ["airflow", "auth", "managers", "fab", "security_manager", "override", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.auth.managers.fab.security_manager.override",
-            new_path: "airflow.providers.fab.auth_manager.security_manager.override",
-            provider: "fab",
-            version: "1.0.0"
+        ["airflow", "auth", "managers", "fab", "security_manager", "override", rest] => match *rest {
+            "MAX_NUM_DATABASE_USER_SESSIONS" | "FabAirflowSecurityManagerOverride" => Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.fab.auth_manager.security_manager.override",
+                provider: "fab",
+                version: "1.0.0"
+            },
+            _ => return,
         },
 
         // apache-airflow-providers-standard
