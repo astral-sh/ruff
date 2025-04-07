@@ -3936,6 +3936,10 @@ impl<'db> Type<'db> {
                 Type::GenericAlias(GenericAlias::new(db, generic.origin(db), specialization))
             }
 
+            Type::PropertyInstance(property) => {
+                Type::PropertyInstance(property.apply_specialization(db, specialization))
+            }
+
             Type::Union(union) => union.map(db, |element| {
                 element.apply_specialization(db, specialization)
             }),
@@ -3957,9 +3961,6 @@ impl<'db> Type<'db> {
                     .iter(db)
                     .map(|ty| ty.apply_specialization(db, specialization)),
             ),
-
-            // XXX: Is this right?
-            Type::PropertyInstance(_) => self,
 
             Type::Dynamic(_)
             | Type::Never
