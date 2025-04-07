@@ -123,7 +123,7 @@ reveal_type(C[int].f(C[int](), 1))  # revealed: str
 class D[U](C[U]):
     pass
 
-reveal_type(D[int]().f)  # revealed: <bound method `f` of `D[int]` specialized with {T = U}>
+reveal_type(D[int]().f)  # revealed: <bound method `f` of `D[int]` specialized with {T = int}>
 ```
 
 ## Methods can mention other typevars
