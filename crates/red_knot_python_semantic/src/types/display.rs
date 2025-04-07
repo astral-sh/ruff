@@ -97,7 +97,7 @@ impl Display for DisplayRepresentation<'_> {
                 if let Some(specialization) = function.specialization(self.db) {
                     write!(
                         f,
-                        "<specialization of {name} with {specialization}>",
+                        "<{name} specialized with {specialization}>",
                         name = function.name(self.db),
                         specialization = specialization.display(self.db),
                     )
@@ -107,18 +107,31 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::Callable(callable) => callable.signature(self.db).display(self.db).fmt(f),
             Type::BoundMethod(bound_method) => {
+                let function = bound_method.function(self.db);
                 write!(
                     f,
-                    "<bound method `{method}` of `{instance}`>",
-                    method = bound_method.function(self.db).name(self.db),
-                    instance = bound_method.self_instance(self.db).display(self.db)
+                    "<bound method `{method}` of `{instance}`{specialization}>",
+                    method = function.name(self.db),
+                    instance = bound_method.self_instance(self.db).display(self.db),
+                    specialization = if let Some(specialization) = function.specialization(self.db)
+                    {
+                        format!(" specialized with {}", specialization.display(self.db))
+                    } else {
+                        "".to_string()
+                    },
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 write!(
                     f,
-                    "<method-wrapper `__get__` of `{function}`>",
-                    function = function.name(self.db)
+                    "<method-wrapper `__get__` of `{function}`{specialization}>",
+                    function = function.name(self.db),
+                    specialization = if let Some(specialization) = function.specialization(self.db)
+                    {
+                        format!(" specialized with {}", specialization.display(self.db))
+                    } else {
+                        "".to_string()
+                    },
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {

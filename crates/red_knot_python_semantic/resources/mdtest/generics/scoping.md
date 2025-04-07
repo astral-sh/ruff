@@ -82,12 +82,48 @@ class C[T]:
     def m2(self, x: T) -> T:
         return x
 
-c: C[int] = C()
+c: C[int] = C[int]()
 c.m1(1)
 c.m2(1)
-# TODO: expected type `int`
-# error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `T`"
+# error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `int`"
 c.m2("string")
+```
+
+## Functions on generic classes are descriptors
+
+This repeats the tests in the [Functions as descriptors](./call/methods.md) test suite, but on a
+generic class. This ensures that we are carrying through any specializations through the entirety of
+the descriptor protocol, which is how `self` parameters are bound to instance methods.
+
+```py
+from inspect import getattr_static
+
+class C[T]:
+    def f(self, x: T) -> str:
+        return "a"
+
+reveal_type(getattr_static(C[int], "f"))  # revealed: Literal[<f specialized with {T = int}>]
+reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f` specialized with {T = int}>
+reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: Literal[<f specialized with {T = int}>]
+reveal_type(getattr_static(C[int], "f").__get__(C[int](), C[int]))  # revealed: <bound method `f` of `C[int]` specialized with {T = int}>
+
+reveal_type(C[int].f)  # revealed: Literal[<f specialized with {T = int}>]
+reveal_type(C[int]().f)  # revealed: <bound method `f` of `C[int]` specialized with {T = int}>
+
+bound_method = C[int]().f
+reveal_type(bound_method.__self__)  # revealed: C[int]
+reveal_type(bound_method.__func__)  # revealed: Literal[<f specialized with {T = int}>]
+
+reveal_type(C[int]().f(1))  # revealed: str
+reveal_type(bound_method(1))  # revealed: str
+
+C[int].f(1)  # error: [missing-argument]
+reveal_type(C[int].f(C[int](), 1))  # revealed: str
+
+class D[U](C[U]):
+    pass
+
+reveal_type(D[int]().f)  # revealed: <bound method `f` of `D[int]` specialized with {T = U}>
 ```
 
 ## Methods can mention other typevars
@@ -122,7 +158,6 @@ class C[T]:
 c: C[int] = C()
 # TODO: no errors
 # TODO: revealed: str
-# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 reveal_type(c.m(1, "string"))  # revealed: S
 ```

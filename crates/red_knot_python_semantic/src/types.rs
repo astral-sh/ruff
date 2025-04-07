@@ -3297,11 +3297,6 @@ impl<'db> Type<'db> {
             Type::GenericAlias(_) => {
                 // TODO annotated return type on `__new__` or metaclass `__call__`
                 // TODO check call vs signatures of `__new__` and/or `__init__`
-                eprintln!(
-                    "==> instantiate generic alias {} to {}",
-                    self.display(db),
-                    self.to_instance(db).unwrap_or(Type::unknown()).display(db)
-                );
                 let signature = CallableSignature::single(
                     self,
                     Signature::new(Parameters::gradual_form(), self.to_instance(db)),
