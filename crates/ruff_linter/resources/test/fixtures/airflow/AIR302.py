@@ -446,3 +446,11 @@ TriggerDagRunOperator()
 WorkflowTrigger()
 PythonOperator()
 PythonVirtualenvOperator()
+FileTrigger()
+DateTimeTrigger()
+
+
+from airflow.triggers.temporal import DateTimeTrigger, TimeDeltaTrigger
+
+DateTimeTrigger()
+TimeDeltaTrigger()

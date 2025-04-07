@@ -1088,12 +1088,20 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.3"
         },
-        ["airflow", "triggers", "temporal", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.triggers.temporal",
-            new_path: "airflow.providers.standard.triggers.temporal",
-            provider: "standard",
-            version: "0.0.3"
-        },
+        ["airflow", "triggers", "temporal", rest] => match *rest {
+            "DateTimeTrigger" => Replacement::ProviderName {
+                name: "airflow.providers.standard.triggers.temporal.DateTimeTrigger",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            "TimeDeltaTrigger" => Replacement::ProviderName {
+                name: "airflow.providers.standard.triggers.temporal.TimeDeltaTrigger",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            _ => return,
+
+        }
         _ => return,
     };
     checker.report_diagnostic(Diagnostic::new(

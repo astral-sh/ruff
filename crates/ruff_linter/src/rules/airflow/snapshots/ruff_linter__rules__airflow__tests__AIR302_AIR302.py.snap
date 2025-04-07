@@ -1614,7 +1614,7 @@ AIR302.py:428:1: AIR302 `airflow.operators.python.BranchPythonOperator` is moved
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.BranchPythonOperator` instead.
 
-AIR302.py:430:1: AIR302 Import path `airflow.triggers.temporal` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:430:1: AIR302 `airflow.triggers.temporal.DateTimeTrigger` is moved into `standard` provider in Airflow 3.0;
     |
 428 | BranchPythonOperator()
 429 | DateTimeSensor()
@@ -1623,7 +1623,7 @@ AIR302.py:430:1: AIR302 Import path `airflow.triggers.temporal` is moved into `s
 431 | DayOfWeekSensor()
 432 | DummyOperator()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.3` and import from `airflow.providers.standard.triggers.temporal` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.temporal.DateTimeTrigger` instead.
 
 AIR302.py:431:1: AIR302 Import path `airflow.sensors.weekday` is moved into `standard` provider in Airflow 3.0;
     |
@@ -1808,6 +1808,7 @@ AIR302.py:447:1: AIR302 `airflow.operators.python.PythonOperator` is moved into 
 447 | PythonOperator()
     | ^^^^^^^^^^^^^^ AIR302
 448 | PythonVirtualenvOperator()
+449 | FileTrigger()
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.PythonOperator` instead.
 
@@ -1817,5 +1818,44 @@ AIR302.py:448:1: AIR302 `airflow.operators.python.PythonVirtualenvOperator` is m
 447 | PythonOperator()
 448 | PythonVirtualenvOperator()
     | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
+449 | FileTrigger()
+450 | DateTimeTrigger()
     |
     = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.PythonVirtualenvOperator` instead.
+
+AIR302.py:449:1: AIR302 Import path `airflow.triggers.file` is moved into `standard` provider in Airflow 3.0;
+    |
+447 | PythonOperator()
+448 | PythonVirtualenvOperator()
+449 | FileTrigger()
+    | ^^^^^^^^^^^ AIR302
+450 | DateTimeTrigger()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and import from `airflow.providers.standard.triggers.file` instead.
+
+AIR302.py:450:1: AIR302 `airflow.triggers.temporal.DateTimeTrigger` is moved into `standard` provider in Airflow 3.0;
+    |
+448 | PythonVirtualenvOperator()
+449 | FileTrigger()
+450 | DateTimeTrigger()
+    | ^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.temporal.DateTimeTrigger` instead.
+
+AIR302.py:455:1: AIR302 `airflow.triggers.temporal.DateTimeTrigger` is moved into `standard` provider in Airflow 3.0;
+    |
+453 | from airflow.triggers.temporal import DateTimeTrigger, TimeDeltaTrigger
+454 |
+455 | DateTimeTrigger()
+    | ^^^^^^^^^^^^^^^ AIR302
+456 | TimeDeltaTrigger()
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.temporal.DateTimeTrigger` instead.
+
+AIR302.py:456:1: AIR302 `airflow.triggers.temporal.TimeDeltaTrigger` is moved into `standard` provider in Airflow 3.0;
+    |
+455 | DateTimeTrigger()
+456 | TimeDeltaTrigger()
+    | ^^^^^^^^^^^^^^^^ AIR302
+    |
+    = help: Install `apache-airflow-provider-standard>=0.0.3` and use `airflow.providers.standard.triggers.temporal.TimeDeltaTrigger` instead.
