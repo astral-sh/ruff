@@ -3584,7 +3584,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         argument_types: CallArgumentTypes<'_, 'db>,
-    ) -> Result<Type<'db>, CreateInstanceCallError<'db>> {
+    ) -> Result<Type<'db>, ConstructorCallError<'db>> {
         debug_assert!(matches!(self, Type::ClassLiteral(_) | Type::SubclassOf(_)));
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
@@ -3621,7 +3621,7 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                // `__new__` is a static method, so we much inject the `cls` argument.
+                // `__new__` is a static method, so we must inject the `cls` argument.
                 let mut argument_types = argument_types.prepend_synthetic(self);
 
                 Some(
@@ -3668,15 +3668,15 @@ impl<'db> Type<'db> {
             (None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
             (None | Some(Ok(_)), Some(Err(error))) => {
                 // no custom `__new__` or it was called and succeeded, but `__init__` failed.
-                Err(CreateInstanceCallError::Init(instance_ty, error))
+                Err(ConstructorCallError::Init(instance_ty, error))
             }
             (Some(Err(error)), None | Some(Ok(_))) => {
                 // custom `__new__` was called and failed, but init is ok
-                Err(CreateInstanceCallError::New(instance_ty, error))
+                Err(ConstructorCallError::New(instance_ty, error))
             }
             (Some(Err(new_error)), Some(Err(init_error))) => {
                 // custom `__new__` was called and failed, and `__init__` is also not ok
-                Err(CreateInstanceCallError::NewAndInit(
+                Err(ConstructorCallError::NewAndInit(
                     instance_ty,
                     new_error,
                     init_error,
@@ -4920,13 +4920,13 @@ impl<'db> BoolError<'db> {
 
 /// Error returned if a class instantiation call failed
 #[derive(Debug)]
-enum CreateInstanceCallError<'db> {
+enum ConstructorCallError<'db> {
     Init(Type<'db>, CallDunderError<'db>),
     New(Type<'db>, CallDunderError<'db>),
     NewAndInit(Type<'db>, CallDunderError<'db>, CallDunderError<'db>),
 }
 
-impl<'db> CreateInstanceCallError<'db> {
+impl<'db> ConstructorCallError<'db> {
     fn return_type(&self) -> Type<'db> {
         match self {
             Self::Init(ty, _) => *ty,
