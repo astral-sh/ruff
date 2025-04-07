@@ -588,7 +588,7 @@ impl<'db> Class<'db> {
                     // The attribute is declared in the class body.
 
                     let bindings = use_def.public_bindings(symbol_id);
-                    let inferred = symbol_from_bindings(db, bindings);
+                    let inferred = symbol_from_bindings(db, body_scope, bindings);
                     let has_binding = !inferred.is_unbound();
 
                     if has_binding {

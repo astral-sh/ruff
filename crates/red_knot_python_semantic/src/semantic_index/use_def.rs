@@ -324,6 +324,11 @@ pub(crate) struct UseDefMap<'db> {
     /// eager scope.
     eager_bindings: EagerBindings,
 
+    /// Snapshot of the [`SymbolState`] for a given symbol immediately prior
+    /// to a star-import [`Definition`] that appears as though it may have provided
+    /// a binding for that symbol.
+    bindings_at_star_imports: FxHashMap<Definition<'db>, SymbolState>,
+
     /// Whether or not the start of the scope is visible.
     /// This is used to check if the function can implicitly return `None`.
     /// For example:
@@ -371,6 +376,15 @@ impl<'db> UseDefMap<'db> {
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         self.bindings_iterator(self.public_symbols[symbol].bindings())
+    }
+
+    /// Iterate over the public bindings that were visible for a symbol immediately prior
+    /// to a star-import [`Definition`] that may have created a binding for that symbol.
+    pub(crate) fn public_bindings_prior_to_star_import(
+        &self,
+        star_import_definition: Definition<'db>,
+    ) -> BindingWithConstraintsIterator<'_, 'db> {
+        self.bindings_iterator(self.bindings_at_star_imports[&star_import_definition].bindings())
     }
 
     pub(crate) fn eager_bindings(
@@ -635,6 +649,11 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
     eager_bindings: EagerBindings,
+
+    /// Snapshot of the [`SymbolState`] for a given symbol immediately prior
+    /// to a star-import [`Definition`] that appears as though it may have provided
+    /// a binding for that symbol.
+    bindings_at_star_imports: FxHashMap<Definition<'db>, SymbolState>,
 }
 
 impl Default for UseDefMapBuilder<'_> {
@@ -652,6 +671,7 @@ impl Default for UseDefMapBuilder<'_> {
             bindings_by_declaration: FxHashMap::default(),
             symbol_states: IndexVec::new(),
             eager_bindings: EagerBindings::default(),
+            bindings_at_star_imports: FxHashMap::default(),
         }
     }
 }
@@ -765,11 +785,16 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         symbol: ScopedSymbolId,
         definition: Definition<'db>,
+        is_star_import: bool,
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
         let def_id = self.all_definitions.push(Some(definition));
         let symbol_state = &mut self.symbol_states[symbol];
+        if is_star_import {
+            self.bindings_at_star_imports
+                .insert(definition, symbol_state.clone());
+        }
         symbol_state.record_declaration(def_id);
         symbol_state.record_binding(def_id, self.scope_start_visibility);
     }
@@ -884,6 +909,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_declaration.shrink_to_fit();
         self.eager_bindings.shrink_to_fit();
+        self.bindings_at_star_imports.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
@@ -896,6 +922,7 @@ impl<'db> UseDefMapBuilder<'db> {
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_bindings: self.eager_bindings,
+            bindings_at_star_imports: self.bindings_at_star_imports,
             scope_start_visibility: self.scope_start_visibility,
         }
     }

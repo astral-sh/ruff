@@ -1,5 +1,6 @@
 use ruff_db::files::File;
 
+use crate::import_resolution::resolve_star_import_definition;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
@@ -197,7 +198,7 @@ pub(crate) fn class_symbol<'db>(
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.public_bindings(symbol);
                 let inferred =
-                    symbol_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
+                    symbol_from_bindings_impl(db, bindings, RequiresExplicitReExport::No, scope);
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
@@ -355,9 +356,15 @@ fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_
 /// The type will be a union if there are multiple bindings with different types.
 pub(super) fn symbol_from_bindings<'db>(
     db: &'db dyn Db,
+    scope: ScopeId<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> Symbol<'db> {
-    symbol_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
+    symbol_from_bindings_impl(
+        db,
+        bindings_with_constraints,
+        RequiresExplicitReExport::No,
+        scope,
+    )
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -537,7 +544,8 @@ fn symbol_by_id<'db>(
             qualifiers,
         }) => {
             let bindings = use_def.public_bindings(symbol_id);
-            let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
+            let inferred =
+                symbol_from_bindings_impl(db, bindings, requires_explicit_reexport, scope);
 
             let symbol = match inferred {
                 // Symbol is possibly undeclared and definitely unbound
@@ -562,7 +570,8 @@ fn symbol_by_id<'db>(
             qualifiers: _,
         }) => {
             let bindings = use_def.public_bindings(symbol_id);
-            let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
+            let inferred =
+                symbol_from_bindings_impl(db, bindings, requires_explicit_reexport, scope);
 
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
             // modified externally, but those changes do not take effect. We therefore issue
@@ -643,6 +652,7 @@ fn symbol_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
+    scope: ScopeId<'db>,
 ) -> Symbol<'db> {
     let predicates = bindings_with_constraints.predicates;
     let visibility_constraints = bindings_with_constraints.visibility_constraints;
@@ -667,9 +677,33 @@ fn symbol_from_bindings_impl<'db>(
         |BindingWithConstraints {
              binding,
              narrowing_constraint,
-             visibility_constraint,
+             mut visibility_constraint,
          }| {
-            let binding = binding?;
+            let mut binding = binding?;
+
+            if binding.kind(db).is_star_import() {
+                let use_def_map = use_def_map(db, scope);
+
+                while let Some(star_import) = binding.kind(db).as_star_import() {
+                    if resolve_star_import_definition(
+                        db,
+                        scope.file(db),
+                        star_import,
+                        &symbol_table(db, scope),
+                    )
+                    .ok()
+                    .is_none_or(|symbol| symbol.symbol.is_unbound())
+                    {
+                        let prior_binding = use_def_map
+                            .public_bindings_prior_to_star_import(binding)
+                            .next()?;
+                        binding = prior_binding.binding?;
+                        visibility_constraint = prior_binding.visibility_constraint;
+                    } else {
+                        break;
+                    }
+                }
+            }
 
             if is_non_exported(binding) {
                 return None;

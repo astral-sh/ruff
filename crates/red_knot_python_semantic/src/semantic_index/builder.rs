@@ -398,6 +398,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
         let category = kind.category(self.file.is_stub(self.db.upcast()));
         let is_reexported = kind.is_reexported();
+        let is_star_import = kind.is_star_import();
 
         let definition = Definition::new(
             self.db,
@@ -425,7 +426,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(symbol, definition);
+                use_def.record_declaration_and_binding(symbol, definition, is_star_import);
             }
             DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),

@@ -179,8 +179,12 @@ match 42:
         ...
     case object(foo=R):
         ...
+
+match 56:
     case object(S):
         ...
+
+match 12345:
     case T:
         ...
 
@@ -379,15 +383,21 @@ reveal_type(s)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(t)  # revealed: Unknown
 
-# TODO: these should all reveal `Unknown | int`.
+# TODO: these should all reveal `Unknown | int` and should not emit errors.
 # (We don't generally model elsewhere in red-knot that bindings from walruses
 # "leak" from comprehension scopes into outer scopes, but we should.)
 # See https://github.com/astral-sh/ruff/issues/16954
+# error: [unresolved-reference]
 reveal_type(g)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(i)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(k)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(m)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(o)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(q)  # revealed: Unknown
 ```
 
@@ -549,24 +559,51 @@ from a import *
 
 reveal_type(X)  # revealed: bool
 
-# TODO: should emit error: [unresolved-reference]
+# error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
 
-# TODO: The `*` import should not be considered a redefinition
+# The `*` import should not be considered a redefinition
 # of the global variable in this module, as the symbol in
 # the `a` module is in a branch that is statically known
 # to be dead code given the `python-version` configuration.
-# Thus this should reveal `Literal[True]`.
-reveal_type(Z)  # revealed: Unknown
+# Thus this correctly reveals `Literal[True]` and does not have an error emitted
+reveal_type(Z)  # revealed: Literal[True]
 
 if sys.version_info >= (3, 12):
     from aa import *
 
-    # TODO: should reveal `Never`
+    # It's correct that this should not error because this branch is unreachable.
+    # TODO: should reveal `Never` (see https://github.com/astral-sh/ruff/issues/15967)
     reveal_type(AA)  # revealed: Unknown
 
 # error: [unresolved-reference]
 reveal_type(AA)  # revealed: Unknown
+```
+
+`c.py`:
+
+```py
+def coinflip() -> bool:
+    return True
+
+if coinflip():
+    Z: str = "Z"
+```
+
+`d.py`:
+
+```py
+Z = True
+
+from a import *
+from a import *
+from a import *
+
+reveal_type(Z)  # revealed: Literal[True]
+
+from c import *
+
+reveal_type(Z)  # revealed: Literal[True] | str
 ```
 
 ### Relative `*` imports
@@ -821,7 +858,7 @@ from a import *
 reveal_type(X)  # revealed: bool
 reveal_type(Y)  # revealed: bool
 
-# TODO: should error with [unresolved-reference]
+# error: [unresolved-reference]
 reveal_type(Z)  # revealed: Unknown
 ```
 
@@ -856,7 +893,7 @@ from a import *
 reveal_type(X)  # revealed: bool
 reveal_type(Y)  # revealed: bool
 
-# TODO should have an [unresolved-reference] diagnostic
+# error: [unresolved-reference]
 reveal_type(Z)  # revealed: Unknown
 ```
 
