@@ -3,8 +3,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::generate_comparison;
-use ruff_python_ast::helpers::{self, is_redundant_boolean_comparison};
+use ruff_python_ast::helpers::{self, is_redundant_boolean_comparison, generate_comparison};
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprRef};
 use ruff_text_size::Ranged;
 
@@ -168,6 +167,24 @@ impl AlwaysFixableViolation for TrueFalseComparison {
             (false, EqCmpOp::Eq) => format!("Replace with `not {cond}`"),
             (false, EqCmpOp::NotEq) => format!("Replace with `{cond}`"),
         }
+    }
+}
+
+
+fn build_conditional_string(source_slice: &str, kind: bool) -> String {
+    if kind {
+        source_slice.to_string()
+    } else {
+        format!("not {source_slice}")
+    }
+}
+
+// NOTE: Adding parenthesis if comparator is boolean and enclosed in parentheses
+fn maybe_wrap(content: String, needs_wrap: bool) -> String {
+    if needs_wrap {
+        format!("({content})")
+    } else {
+        content
     }
 }
 
@@ -345,20 +362,12 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         source,
                     )
                     .unwrap_or(comparator.range());
+        
                     let comparator_str = &source[comparator_range];
-
-                    let content = if kind {
-                        comparator_str.to_string()
-                    } else {
-                        format!("not {comparator_str}")
-                    };
-
-                    // NOTE: Adding parenthesis if left is boolean and enclosed in parentheses
-                    if compare.left.range().start() == compare.range().start() {
-                        content
-                    } else {
-                        format!("({content})")
-                    }
+                    let result = build_conditional_string(comparator_str, kind);
+        
+                    let needs_wrap = compare.left.range().start() != compare.range().start();
+                    maybe_wrap(result, needs_wrap)
                 } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
                     let left_range = parenthesized_range(
                         ExprRef::from(compare.left.as_ref()),
@@ -367,13 +376,12 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         source,
                     )
                     .unwrap_or(compare.left.range());
+        
                     let left_str = &source[left_range];
-
-                    if kind {
-                        left_str.to_string()
-                    } else {
-                        format!("not {left_str}")
-                    }
+                    let result = build_conditional_string(left_str, kind);
+        
+                    let needs_wrap = comparator.range().end() != compare.range().end();
+                    maybe_wrap(result, needs_wrap)
                 } else {
                     generate_comparison(
                         &compare.left,
