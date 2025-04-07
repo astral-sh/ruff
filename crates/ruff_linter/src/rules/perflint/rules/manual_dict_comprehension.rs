@@ -1,16 +1,15 @@
-use crate::checkers::ast::Checker;
-use crate::rules::perflint::helpers::comment_strings_in_range;
-use crate::rules::perflint::helpers::statement_deletion_range;
-use ruff_diagnostics::FixAvailability;
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{self as ast, Expr, Stmt};
-use ruff_python_semantic::analyze::typing::is_dict;
-use ruff_python_semantic::Binding;
+use ruff_python_ast::{
+    self as ast, comparable::ComparableExpr, helpers::any_over_expr, Expr, Stmt,
+};
+use ruff_python_semantic::{analyze::typing::is_dict, Binding};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::Checker;
+use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
+
 /// ## What it does
 /// Checks for `for` loops that can be replaced by a dictionary comprehension.
 ///
@@ -81,7 +80,7 @@ impl Violation for ManualDictComprehension {
 }
 
 /// PERF403
-pub(crate) fn manual_dict_comprehension(checker: &mut Checker, for_stmt: &ast::StmtFor) {
+pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
     let ast::StmtFor { body, target, .. } = for_stmt;
     let body = body.as_slice();
     let target = target.as_ref();
@@ -133,6 +132,22 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, for_stmt: &ast::S
         return;
     };
 
+    // If any references to a target variable are after the loop,
+    // then removing the loop would cause a NameError
+    let any_references_after_for_loop = |target: &Expr| {
+        let target_binding = checker
+            .semantic()
+            .bindings
+            .iter()
+            .find(|binding| target.range() == binding.range)
+            .expect("for-loop target binding must exist");
+
+        target_binding
+            .references()
+            .map(|reference| checker.semantic().reference(reference))
+            .any(|other_reference| other_reference.start() > for_stmt.end())
+    };
+
     match target {
         Expr::Tuple(tuple) => {
             if !tuple
@@ -148,44 +163,21 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, for_stmt: &ast::S
                 return;
             }
             // Make sure none of the variables are used outside the for loop
-            if tuple.iter().any(|target| {
-                let target_binding = checker
-                    .semantic()
-                    .bindings
-                    .iter()
-                    .find(|binding| target.range() == binding.range)
-                    .expect("for-loop target binding must exist");
-                // If any references to the loop target variable are after the loop,
-                // then converting it into a comprehension would cause a NameError
-                target_binding
-                    .references()
-                    .map(|reference| checker.semantic().reference(reference))
-                    .any(|other_reference| for_stmt.end() < other_reference.start())
-            }) {
+            if tuple.iter().any(any_references_after_for_loop) {
                 return;
             }
         }
-        Expr::Name(expr_name) => {
+        Expr::Name(_) => {
             if ComparableExpr::from(slice) != ComparableExpr::from(target) {
                 return;
             }
             if ComparableExpr::from(value) != ComparableExpr::from(target) {
                 return;
             }
-            // Make sure the target isn't used outside the for loop
-            let target_binding = checker
-                .semantic()
-                .bindings
-                .iter()
-                .find(|binding| expr_name.range() == binding.range)
-                .expect("for-loop target binding must exist");
-            // If any references to the loop target variable are after the loop,
-            // then converting it into a comprehension would cause a NameError
-            if target_binding
-                .references()
-                .map(|reference| checker.semantic().reference(reference))
-                .any(|other_reference| for_stmt.end() < other_reference.start())
-            {
+
+            // We know that `target` contains an ExprName, but closures can't take `&impl Ranged`,
+            // so we pass `target` itself instead of the inner ExprName
+            if any_references_after_for_loop(target) {
                 return;
             }
         }
@@ -228,6 +220,7 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, for_stmt: &ast::S
     }) {
         return;
     }
+
     let binding_stmt = binding.statement(checker.semantic());
     let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
         ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
@@ -251,13 +244,11 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, for_stmt: &ast::S
         _ => false,
     });
 
-    let assignment_in_same_statement = {
-        binding.source.is_some_and(|binding_source| {
-            let for_loop_parent = checker.semantic().current_statement_parent_id();
-            let binding_parent = checker.semantic().parent_statement_id(binding_source);
-            for_loop_parent == binding_parent
-        })
-    };
+    let assignment_in_same_statement = binding.source.is_some_and(|binding_source| {
+        let for_loop_parent = checker.semantic().current_statement_parent_id();
+        let binding_parent = checker.semantic().parent_statement_id(binding_source);
+        for_loop_parent == binding_parent
+    });
     // If the binding is not a single name expression, it could be replaced with a dict comprehension,
     // but not necessarily, so this needs to be manually fixed. This does not apply when using an update.
     let binding_has_one_target = binding_stmt.is_some_and(|binding_stmt| match binding_stmt {
@@ -265,15 +256,15 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, for_stmt: &ast::S
         ast::Stmt::Assign(assign) => assign.targets.len() == 1,
         _ => false,
     });
-    // If the binding gets used in between the assignment and the for loop, a list comprehension is no longer safe
+    // If the binding gets used in between the assignment and the for loop, a comprehension is no longer safe
 
     // If the binding is after the for loop, then it can't be fixed, and this check would panic,
     // so we check that they are in the same statement first
     let binding_unused_between = assignment_in_same_statement
         && binding_stmt.is_some_and(|binding_stmt| {
             let from_assign_to_loop = TextRange::new(binding_stmt.end(), for_stmt.start());
-            // Test if there's any reference to the list symbol between its definition and the for loop.
-            // if there's at least one, then it's been accessed in the middle somewhere, so it's not safe to change into a list comprehension
+            // Test if there's any reference to the result dictionary between its definition and the for loop.
+            // If there's at least one, then it's been accessed in the middle somewhere, so it's not safe to change into a comprehension
             !binding
                 .references()
                 .map(|ref_id| checker.semantic().reference(ref_id).range())
@@ -299,15 +290,13 @@ pub(crate) fn manual_dict_comprehension(checker: &mut Checker, for_stmt: &ast::S
     );
 
     if checker.settings.preview.is_enabled() {
-        // k: v inside the comprehension
-        let to_append = (slice.as_ref(), value.as_ref());
-
         diagnostic.set_fix(convert_to_dict_comprehension(
             fix_type,
             binding,
             for_stmt,
             if_test.map(std::convert::AsRef::as_ref),
-            to_append,
+            slice.as_ref(),
+            value.as_ref(),
             checker,
         ));
     }
@@ -319,7 +308,8 @@ fn convert_to_dict_comprehension(
     binding: &Binding,
     for_stmt: &ast::StmtFor,
     if_test: Option<&ast::Expr>,
-    to_append: (&Expr, &Expr),
+    key: &Expr,
+    value: &Expr,
     checker: &Checker,
 ) -> Fix {
     let locator = checker.locator();
@@ -349,12 +339,11 @@ fn convert_to_dict_comprehension(
     //      ...
     // ```
     // becomes
-    // [... for i in (a, b)]
-    let iter_str = if for_stmt
-        .iter
-        .as_ref()
-        .as_tuple_expr()
-        .is_some_and(|expr| !expr.parenthesized)
+    // {... for i in (a, b)}
+    let iter_str = if let Expr::Tuple(ast::ExprTuple {
+        parenthesized: false,
+        ..
+    }) = &*for_stmt.iter
     {
         format!("({})", locator.slice(for_stmt.iter.range()))
     } else {
@@ -369,8 +358,8 @@ fn convert_to_dict_comprehension(
     };
     let elt_str = format!(
         "{}: {}",
-        locator.slice(to_append.0.range()),
-        locator.slice(to_append.1.range())
+        locator.slice(key.range()),
+        locator.slice(value.range())
     );
 
     let comprehension_str = format!("{{{elt_str} {for_type} {target_str} in {iter_str}{if_str}}}");
@@ -378,11 +367,7 @@ fn convert_to_dict_comprehension(
     let for_loop_inline_comments = comment_strings_in_range(
         checker,
         for_stmt.range,
-        &[
-            to_append.0.range(),
-            to_append.1.range(),
-            for_stmt.iter.range(),
-        ],
+        &[key.range(), value.range(), for_stmt.iter.range()],
     );
 
     let newline = checker.stylist().line_ending().as_str();
@@ -392,9 +377,9 @@ fn convert_to_dict_comprehension(
         for_stmt.range.start(),
     ));
 
+    let variable_name = locator.slice(binding);
     match fix_type {
         DictComprehensionType::Update => {
-            let variable_name = locator.slice(binding);
             let indentation = if for_loop_inline_comments.is_empty() {
                 String::new()
             } else {
@@ -411,8 +396,6 @@ fn convert_to_dict_comprehension(
             Fix::unsafe_edit(Edit::range_replacement(text_to_replace, for_stmt.range))
         }
         DictComprehensionType::Comprehension => {
-            let variable_name = locator.slice(binding);
-
             let binding_stmt = binding
                 .statement(checker.semantic())
                 .expect("must be passed a binding with a statement");
