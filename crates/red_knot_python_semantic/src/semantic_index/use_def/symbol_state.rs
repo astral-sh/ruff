@@ -313,7 +313,7 @@ impl SymbolBindings {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolState {
     declarations: SymbolDeclarations,
     bindings: SymbolBindings,

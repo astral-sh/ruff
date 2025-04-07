@@ -4,7 +4,6 @@ use std::str::FromStr;
 
 use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
-use context::InferContext;
 use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE};
 use itertools::EitherOrBoth;
 use ruff_db::files::{File, FileRange};
@@ -34,6 +33,7 @@ use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
 use crate::types::call::{Bindings, CallArgumentTypes};
 pub(crate) use crate::types::class_base::ClassBase;
+pub(crate) use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};

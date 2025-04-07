@@ -389,11 +389,15 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// All other nodes can only ever be associated with exactly 1 or 0 [`Definition`]s.
     /// For any node other than an [`ast::Alias`] representing a `*` import,
     /// prefer to use `self.add_definition()`, which ensures that this invariant is maintained.
+    ///
+    /// Note that for all non-`*`-import definitions, `definition_availability` should always be
+    /// [`Availability::AlwaysAvailable`]; this parameter is only relevant for `*`-import
+    /// definitions.
     fn push_additional_definition(
         &mut self,
         symbol: ScopedSymbolId,
         definition_node: impl Into<DefinitionNodeRef<'db>>,
-        snapshot_prior_state: Availability,
+        definition_availability: Availability,
     ) -> (Definition<'db>, usize) {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
         #[allow(unsafe_code)]
@@ -412,9 +416,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             countme::Count::default(),
         );
 
-        let definition_key = definition_node.key();
         let num_definitions = {
-            let definitions = self.add_entry_for_definition_key(definition_key);
+            let definitions = self.add_entry_for_definition_key(definition_node.key());
             definitions.push(definition);
             definitions.len()
         };
@@ -429,12 +432,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(
-                    symbol,
-                    definition,
-                    snapshot_prior_state,
-                    definition_key,
-                );
+                use_def.record_declaration_and_binding(symbol, definition, definition_availability);
             }
             DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),

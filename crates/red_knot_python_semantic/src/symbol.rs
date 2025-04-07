@@ -1,9 +1,9 @@
 use ruff_db::files::File;
 
 use crate::module_resolver::file_to_module;
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, StarImportDefinitionKind};
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
-use crate::semantic_index::{global_scope, use_def_map, DeclarationWithConstraint};
+use crate::semantic_index::{global_scope, use_def_map, DeclarationWithConstraint, SemanticIndex};
 use crate::semantic_index::{
     symbol_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
@@ -643,6 +643,8 @@ fn symbol_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
+//    semantic_index: &SemanticIndex,
+//    scope: ScopeId<'db>,
 ) -> Symbol<'db> {
     let predicates = bindings_with_constraints.predicates;
     let visibility_constraints = bindings_with_constraints.visibility_constraints;
@@ -674,7 +676,6 @@ fn symbol_from_bindings_impl<'db>(
             if is_non_exported(binding) {
                 return None;
             }
-
             let static_visibility =
                 visibility_constraints.evaluate(db, predicates, visibility_constraint);
 

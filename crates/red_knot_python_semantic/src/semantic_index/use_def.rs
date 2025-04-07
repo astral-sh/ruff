@@ -276,7 +276,6 @@ use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
 
-use super::definition::DefinitionNodeKey;
 use super::re_exports::Availability;
 
 mod symbol_state;
@@ -324,7 +323,7 @@ pub(crate) struct UseDefMap<'db> {
     /// eager scope.
     eager_bindings: EagerBindings,
 
-    bindings_at_star_imports: FxHashMap<(DefinitionNodeKey, ScopedSymbolId), SymbolState>,
+    bindings_at_star_imports: FxHashMap<Definition<'db>, SymbolState>,
 
     /// Whether or not the start of the scope is visible.
     /// This is used to check if the function can implicitly return `None`.
@@ -576,7 +575,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// eager scope.
     eager_bindings: EagerBindings,
 
-    bindings_at_star_imports: FxHashMap<(DefinitionNodeKey, ScopedSymbolId), SymbolState>,
+    bindings_at_star_imports: FxHashMap<Definition<'db>, SymbolState>,
 }
 
 impl Default for UseDefMapBuilder<'_> {
@@ -696,7 +695,6 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol: ScopedSymbolId,
         definition: Definition<'db>,
         snapshot_required: Availability,
-        definition_key: DefinitionNodeKey,
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
@@ -704,7 +702,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let symbol_state = &mut self.symbol_states[symbol];
         if snapshot_required.is_possibly_unavailable() {
             self.bindings_at_star_imports
-                .insert((definition_key, symbol), symbol_state.clone());
+                .insert(definition, symbol_state.clone());
         }
         symbol_state.record_declaration(def_id);
         symbol_state.record_binding(def_id, self.scope_start_visibility);
