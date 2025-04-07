@@ -236,7 +236,6 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                     Some("max_active_tis_per_dag"),
                 ));
                 match qualified_name.segments() {
-                    // TODO: consider also "dagrun_operator"
                     ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
                         checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
