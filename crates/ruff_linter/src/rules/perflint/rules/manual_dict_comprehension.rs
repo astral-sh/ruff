@@ -135,12 +135,14 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // If any references to a target variable are after the loop,
     // then removing the loop would cause a NameError
     let any_references_after_for_loop = |target: &Expr| {
-        let Some(target_binding) = checker
+        let target_binding = checker
             .semantic()
             .bindings
             .iter()
-            .find(|binding| target.range() == binding.range)
-        else {
+            .find(|binding| target.range() == binding.range);
+        debug_assert!(target_binding.is_some());
+
+        let Some(target_binding) = target_binding else {
             // All uses of this function will early-return if this returns true, so this must early-return the rule
             return true;
         };
