@@ -54,6 +54,14 @@ impl Violation for Airflow3MovedToProvider {
             } => {
                 format!("Import path `{original_path}` is moved into `{provider}` provider in Airflow 3.0;")
             }
+            Replacement::ProviderNameMoved {
+                name: _,
+                module: _,
+                provider,
+                version: _,
+            } => {
+                format!("`{deprecated}` is moved into `{provider}` provider in Airflow 3.0;")
+            }
         }
     }
 
@@ -76,6 +84,14 @@ impl Violation for Airflow3MovedToProvider {
         } = replacement
         {
             Some(format!("Install `apache-airflow-provider-{provider}>={version}` and import from `{new_path}` instead."))
+        } else if let Replacement::ProviderNameMoved {
+            name,
+            module,
+            provider,
+            version,
+        } = replacement
+        {
+            Some(format!("Install `apache-airflow-provider-{provider}>={version}` and use `{module}.{name}` instead."))
         } else {
             None
         }
@@ -107,6 +123,12 @@ enum Replacement {
     ImportPathMoved {
         original_path: &'static str,
         new_path: &'static str,
+        provider: &'static str,
+        version: &'static str,
+    },
+    ProviderNameMoved {
+        name: String,
+        module: &'static str,
         provider: &'static str,
         version: &'static str,
     },
@@ -1071,31 +1093,18 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "0.0.1"
         },
         ["airflow", "hooks", "subprocess", rest] => match *rest {
-            "SubprocessResult" => Replacement::ProviderName {
-                name: "airflow.providers.standard.hooks.subprocess.SubprocessResult",
+            "SubprocessResult" | "working_directory" | "SubprocessHook" => Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.standard.hooks.subprocess",
                 provider: "standard",
                 version: "0.0.3"
             },
-            "working_directory" => Replacement::ProviderName {
-                name: "airflow.providers.standard.hooks.subprocess.working_directory",
-                provider: "standard",
-                version: "0.0.3"
-            },
-            "SubprocessHook" => Replacement::ProviderName {
-                name: "airflow.providers.standard.hooks.subprocess.SubprocessHook",
-                provider: "standard",
-                version: "0.0.3"
-            },
-_ => return,
+            _ => return,
         }
         ["airflow", "triggers", "external_task", rest] => match *rest {
-            "WorkflowTrigger" => Replacement::ProviderName {
-                name: "airflow.providers.standard.triggers.external_task.WorkflowTrigger",
-                provider: "standard",
-                version: "0.0.3"
-            },
-            "DagStateTrigger" => Replacement::ProviderName {
-                name: "airflow.providers.standard.triggers.external_task.DagStateTrigger",
+            "WorkflowTrigger" | "DagStateTrigger"=> Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.standard.triggers.external_task",
                 provider: "standard",
                 version: "0.0.3"
             },
@@ -1107,13 +1116,9 @@ _ => return,
             version: "0.0.3"
         },
         ["airflow", "triggers", "temporal", rest] => match *rest {
-            "DateTimeTrigger" => Replacement::ProviderName {
-                name: "airflow.providers.standard.triggers.temporal.DateTimeTrigger",
-                provider: "standard",
-                version: "0.0.3"
-            },
-            "TimeDeltaTrigger" => Replacement::ProviderName {
-                name: "airflow.providers.standard.triggers.temporal.TimeDeltaTrigger",
+            "DateTimeTrigger" | "TimeDeltaTrigger" => Replacement::ProviderNameMoved {
+                name: rest.to_string(),
+                module: "airflow.providers.standard.triggers.temporal",
                 provider: "standard",
                 version: "0.0.3"
             },
