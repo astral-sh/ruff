@@ -1,15 +1,19 @@
+use ruff_db::files::File;
 use ruff_python_ast as ast;
 
 use crate::{
+    db::Db,
     module_name::{ModuleName, ModuleNameResolutionError},
     module_resolver::resolve_module,
-    semantic_index::{definition::StarImportDefinitionKind, SemanticIndex},
+    semantic_index::{definition::StarImportDefinitionKind, symbol::ScopeId, SemanticIndex},
     symbol::SymbolAndQualifiers,
-    types::{InferContext, Type},
+    types::Type,
 };
 
 pub(crate) fn resolve_star_import_definition<'db>(
-    context: &InferContext<'db>,
+    db: &'db dyn Db,
+    file: File,
+    scope: ScopeId<'db>,
     star_import_definition: &StarImportDefinitionKind,
     semantic_index: &SemanticIndex<'db>,
 ) -> Result<SymbolAndQualifiers<'db>, UnresolvedImportFromError> {
@@ -17,10 +21,10 @@ pub(crate) fn resolve_star_import_definition<'db>(
     let alias = star_import_definition.alias();
     let symbol_id = star_import_definition.symbol_id();
 
-    let (_, module_type) = resolve_import_from_module(context, import_from, alias)?;
-    let symbol_table = semantic_index.symbol_table(context.scope().file_scope_id(context.db()));
+    let (_, module_type) = resolve_import_from_module(db, file, import_from, alias)?;
+    let symbol_table = semantic_index.symbol_table(scope.file_scope_id(db));
     let defined_name = symbol_table.symbol(symbol_id).name();
-    let imported_symbol = module_type.member(context.db(), defined_name);
+    let imported_symbol = module_type.member(db, defined_name);
 
     Ok(imported_symbol)
 }
@@ -28,15 +32,13 @@ pub(crate) fn resolve_star_import_definition<'db>(
 /// Resolve the [`ModuleName`], and the type of the module, being referred to by an
 /// [`ast::StmtImportFrom`] node. Emit a diagnostic if the module cannot be resolved.
 pub(crate) fn resolve_import_from_module<'db>(
-    context: &InferContext<'db>,
+    db: &'db dyn Db,
+    file: File,
     import_from: &ast::StmtImportFrom,
     alias: &ast::Alias,
 ) -> Result<(ModuleName, Type<'db>), UnresolvedImportFromError> {
     let ast::StmtImportFrom { module, level, .. } = import_from;
     let module = module.as_deref();
-
-    let db = context.db();
-    let file = context.file();
 
     tracing::trace!(
         "Resolving imported object `{}` from module `{}` into file `{}`",
@@ -68,7 +70,7 @@ pub(crate) fn resolve_import_from_module<'db>(
             }
         })?;
 
-    module_type_from_name(context, &module_name)
+    module_type_from_name(db, file, &module_name)
         .map(|module_type| (module_name, module_type))
         .ok_or(UnresolvedImportFromError::UnresolvedModule)
 }
@@ -82,11 +84,11 @@ fn format_import_from_module(level: u32, module: Option<&str>) -> String {
 }
 
 pub(crate) fn module_type_from_name<'db>(
-    context: &InferContext<'db>,
+    db: &'db dyn Db,
+    file: File,
     module_name: &ModuleName,
 ) -> Option<Type<'db>> {
-    resolve_module(context.db(), module_name)
-        .map(|module| Type::module_literal(context.db(), context.file(), module))
+    resolve_module(db, module_name).map(|module| Type::module_literal(db, file, module))
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

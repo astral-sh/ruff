@@ -1058,7 +1058,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = symbol_from_bindings(self.db(), prior_bindings)
+        let inferred_ty = symbol_from_bindings(self.db(), self.scope(), prior_bindings)
             .ignore_possibly_unbound()
             .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
@@ -3047,7 +3047,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         // Resolve the module being imported.
-        let Some(full_module_ty) = module_type_from_name(&self.context, &full_module_name) else {
+        let Some(full_module_ty) = module_type_from_name(self.db(), self.file(), &full_module_name)
+        else {
             report_unresolved_module(&self.context, alias, 0, Some(name));
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
@@ -3064,7 +3065,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             let topmost_parent_name =
                 ModuleName::new(full_module_name.components().next().unwrap()).unwrap();
             let Some(topmost_parent_ty) =
-                module_type_from_name(&self.context, &topmost_parent_name)
+                module_type_from_name(self.db(), self.file(), &topmost_parent_name)
             else {
                 self.add_unknown_declaration_with_binding(alias.into(), definition);
                 return;
@@ -3123,9 +3124,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // this node won't have any definitions associated with it -- but we need to
                 // make sure that we still emit the diagnostic for the unresolvable module,
                 // since this will cause the import to fail at runtime.
-                let _ = resolve_import_from_module(&self.context, import, alias).inspect_err(|err| {
-                    self.report_unresolved_import_from_module(import, *err);
-                });
+                let _ = resolve_import_from_module(self.db(), self.file(), import, alias)
+                    .inspect_err(|err| {
+                        self.report_unresolved_import_from_module(import, *err);
+                    });
             } else {
                 for definition in definitions {
                     self.extend(infer_definition_types(self.db(), *definition));
@@ -3194,7 +3196,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         );
 
         let (module_name, module_ty) =
-            match resolve_import_from_module(&self.context, import_from, alias) {
+            match resolve_import_from_module(self.db(), self.file(), import_from, alias) {
                 Ok((module_name, module_type)) => (module_name, module_type),
                 Err(err) => {
                     self.report_unresolved_import_from_module(import_from, err);
@@ -3242,7 +3244,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         if let Some(submodule_name) = ModuleName::new(name) {
             let mut full_submodule_name = module_name.clone();
             full_submodule_name.extend(&submodule_name);
-            if let Some(submodule_ty) = module_type_from_name(&self.context, &full_submodule_name) {
+            if let Some(submodule_ty) =
+                module_type_from_name(self.db(), self.file(), &full_submodule_name)
+            {
                 self.add_declaration_with_binding(
                     alias.into(),
                     definition,
@@ -3266,15 +3270,19 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
         definition_details: &StarImportDefinitionKind,
     ) {
-        let ty = resolve_star_import_definition(&self.context, definition_details, self.index)
-            .inspect_err(|err| {
-                self.report_unresolved_import_from_module(definition_details.import(), *err);
-            })
-            .ok()
-            .and_then(|symbol_with_qualifiers| {
-                symbol_with_qualifiers.symbol.ignore_possibly_unbound()
-            })
-            .unwrap_or(Type::unknown());
+        let ty = resolve_star_import_definition(
+            self.db(),
+            self.file(),
+            self.scope(),
+            definition_details,
+            self.index,
+        )
+        .inspect_err(|err| {
+            self.report_unresolved_import_from_module(definition_details.import(), *err);
+        })
+        .ok()
+        .and_then(|symbol_with_qualifiers| symbol_with_qualifiers.symbol.ignore_possibly_unbound())
+        .unwrap_or(Type::unknown());
 
         self.add_declaration_with_binding(
             definition_details.alias().into(),
@@ -4135,7 +4143,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If we're inferring types of deferred expressions, always treat them as public symbols
         let local_scope_symbol = if self.is_deferred() {
             if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
-                symbol_from_bindings(db, use_def.public_bindings(symbol_id))
+                symbol_from_bindings(db, self.scope(), use_def.public_bindings(symbol_id))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -4145,7 +4153,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         } else {
             let use_id = name_node.scoped_use_id(db, scope);
-            symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+            symbol_from_bindings(db, self.scope(), use_def.bindings_at_use(use_id))
         };
 
         let symbol = SymbolAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
@@ -4208,7 +4216,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         file_scope_id,
                     ) {
                         EagerBindingsResult::Found(bindings) => {
-                            return symbol_from_bindings(db, bindings).into();
+                            return symbol_from_bindings(db, self.scope(), bindings).into();
                         }
                         // There are no visible bindings here.
                         // Don't fall back to non-eager symbol resolution.
@@ -4249,7 +4257,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             file_scope_id,
                         ) {
                             EagerBindingsResult::Found(bindings) => {
-                                return symbol_from_bindings(db, bindings).into();
+                                return symbol_from_bindings(db, self.scope(), bindings).into();
                             }
                             // There are no visible bindings here.
                             EagerBindingsResult::NotFound => {
