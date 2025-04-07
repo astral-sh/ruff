@@ -194,7 +194,7 @@ AIR302.py:247:1: AIR302 `airflow.operators.sql.BaseSQLOperator` is moved into `c
     |
     = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.BaseSQLOperator` instead.
 
-AIR302.py:248:1: AIR302 Import path `airflow.operators.bash` is moved into `standard` provider in Airflow 3.0;
+AIR302.py:248:1: AIR302 `airflow.operators.bash.BashOperator` is moved into `standard` provider in Airflow 3.0;
     |
 246 | parse_boolean()
 247 | BaseSQLOperator()
@@ -203,7 +203,7 @@ AIR302.py:248:1: AIR302 Import path `airflow.operators.bash` is moved into `stan
 249 | LegacyBashOperator()
 250 | BranchSQLOperator()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.1` and import from `airflow.providers.standard.operators.bash` instead.
+    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.bash.BashOperator` instead.
 
 AIR302.py:249:1: AIR302 `airflow.operators.bash_operator.BashOperator` is moved into `standard` provider in Airflow 3.0;
     |

@@ -904,11 +904,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
 
         // apache-airflow-providers-standard
-        ["airflow", "operators", "bash_operator", "BashOperator"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.operators.bash.BashOperator",
-            provider: "standard",
-            version: "0.0.1"
-        },
         ["airflow", "operators", "dagrun_operator" | "trigger_dagrun", rest] => match *rest {
             "TriggerDagRunLink" => Replacement::ProviderName{
                 name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunLink",
@@ -1032,15 +1027,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-standard
-        ["airflow", "operators", "bash", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.operators.bash",
-            new_path: "airflow.providers.standard.operators.bash",
-            provider: "standard",
-            version: "0.0.1"
-        },
-        ["airflow", "operators", "bash_operator", ..] => Replacement::ImportPathMoved{
-            original_path: "airflow.operators.bash_operator",
-            new_path: "airflow.providers.standard.operators.bash",
+        ["airflow", "operators", "bash" | "bash_operator", "BashOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.operators.bash.BashOperator",
             provider: "standard",
             version: "0.0.1"
         },
