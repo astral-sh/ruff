@@ -62,10 +62,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BoundMethod(_), _) => Ordering::Less,
         (_, Type::BoundMethod(_)) => Ordering::Greater,
 
-        (Type::SpecializedCallable(left), Type::SpecializedCallable(right)) => left.cmp(right),
-        (Type::SpecializedCallable(_), _) => Ordering::Less,
-        (_, Type::SpecializedCallable(_)) => Ordering::Greater,
-
         (Type::MethodWrapper(left), Type::MethodWrapper(right)) => left.cmp(right),
         (Type::MethodWrapper(_), _) => Ordering::Less,
         (_, Type::MethodWrapper(_)) => Ordering::Greater,

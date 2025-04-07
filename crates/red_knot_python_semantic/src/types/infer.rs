@@ -1430,12 +1430,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Function(function))
             .to_scope_id(self.db(), self.file());
 
+        let specialization = None;
+
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
             &name.id,
             function_kind,
             body_scope,
             function_decorators,
+            specialization,
         ));
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
@@ -2367,7 +2370,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::FunctionLiteral(..)
             | Type::Callable(..)
             | Type::BoundMethod(_)
-            | Type::SpecializedCallable(_)
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
             | Type::TypeVar(..)
@@ -4472,7 +4474,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::BoundMethod(_)
-                | Type::SpecializedCallable(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
@@ -4748,7 +4749,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
-                | Type::SpecializedCallable(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)
@@ -4771,7 +4771,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
-                | Type::SpecializedCallable(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::ModuleLiteral(_)

@@ -93,7 +93,18 @@ impl Display for DisplayRepresentation<'_> {
                 ClassBase::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
-            Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
+            Type::FunctionLiteral(function) => {
+                if let Some(specialization) = function.specialization(self.db) {
+                    write!(
+                        f,
+                        "<specialization of {name} with {specialization}>",
+                        name = function.name(self.db),
+                        specialization = specialization.display(self.db),
+                    )
+                } else {
+                    f.write_str(function.name(self.db))
+                }
+            }
             Type::Callable(callable) => callable.signature(self.db).display(self.db).fmt(f),
             Type::BoundMethod(bound_method) => {
                 write!(
@@ -101,13 +112,6 @@ impl Display for DisplayRepresentation<'_> {
                     "<bound method `{method}` of `{instance}`>",
                     method = bound_method.function(self.db).name(self.db),
                     instance = bound_method.self_instance(self.db).display(self.db)
-                )
-            }
-            Type::SpecializedCallable(specialized) => {
-                write!(
-                    f,
-                    "<specialization of {callable}>",
-                    callable = specialized.callable_type(self.db).display(self.db),
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {

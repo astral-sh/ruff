@@ -301,7 +301,11 @@ impl<'db> Signature<'db> {
         }
     }
 
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+    pub(crate) fn apply_specialization(
+        &self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
         let parameters = self.parameters.apply_specialization(db, specialization);
         let return_ty = self
             .return_ty

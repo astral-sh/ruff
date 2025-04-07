@@ -122,10 +122,6 @@ impl<'db> ClassBase<'db> {
             | Type::TypeVar(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy => None,
-            Type::SpecializedCallable(specialized) => {
-                Self::try_from_type(db, specialized.callable_type(db))
-                    .map(|ty| ty.apply_specialization(db, specialized.specialization(db)))
-            }
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::TypeAliasType(_)

@@ -241,6 +241,18 @@ pub struct PropertyInstanceType<'db> {
     setter: Option<Type<'db>>,
 }
 
+impl<'db> PropertyInstanceType<'db> {
+    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let getter = self
+            .getter(db)
+            .map(|ty| ty.apply_specialization(db, specialization));
+        let setter = self
+            .setter(db)
+            .map(|ty| ty.apply_specialization(db, specialization));
+        Self::new(db, getter, setter)
+    }
+}
+
 /// Representation of a type: a set of possible values at runtime.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
@@ -261,10 +273,6 @@ pub enum Type<'db> {
     /// the `self` parameter, and return a `MethodType & Callable[[int], str]`.
     /// One drawback would be that we could not show the bound instance when that type is displayed.
     BoundMethod(BoundMethodType<'db>),
-    /// Represents the specialization of a callable that has access to generic typevars, either
-    /// because it is itself a generic function, or because it appears in the body of a generic
-    /// class.
-    SpecializedCallable(SpecializedCallableType<'db>),
     /// Represents a specific instance of `types.MethodWrapperType`.
     ///
     /// TODO: consider replacing this with `Callable & types.MethodWrapperType` type?
@@ -399,10 +407,6 @@ impl<'db> Type<'db> {
                 .types(db)
                 .iter()
                 .any(|ty| ty.contains_todo(db)),
-
-            Self::SpecializedCallable(specialized) => {
-                specialized.callable_type(db).contains_todo(db)
-            }
 
             Self::Callable(callable) => {
                 let signature = callable.signature(db);
@@ -662,9 +666,6 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
             Type::Tuple(tuple) => Type::Tuple(tuple.normalized(db)),
             Type::Callable(callable) => Type::Callable(callable.normalized(db)),
-            Type::SpecializedCallable(specialized) => {
-                Type::SpecializedCallable(specialized.normalized(db))
-            }
             Type::LiteralString
             | Type::Instance(_)
             | Type::PropertyInstance(_)
@@ -875,10 +876,6 @@ impl<'db> Type<'db> {
             (Type::FunctionLiteral(_), _) => KnownClass::FunctionType
                 .to_instance(db)
                 .is_subtype_of(db, target),
-
-            (Type::SpecializedCallable(specialized), _) => {
-                specialized.callable_type(db).is_subtype_of(db, target)
-            }
 
             // The same reasoning applies for these special callable types:
             (Type::BoundMethod(_), _) => KnownClass::MethodType
@@ -1596,17 +1593,6 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .is_disjoint_from(db, other),
 
-            (
-                Type::SpecializedCallable(self_specialized),
-                Type::SpecializedCallable(other_specialized),
-            ) => {
-                self_specialized
-                    .callable_type(db)
-                    .is_disjoint_from(db, other_specialized.callable_type(db))
-                    || self_specialized.specialization(db) != other_specialized.specialization(db)
-            }
-            (Type::SpecializedCallable(_), _) | (_, Type::SpecializedCallable(_)) => false,
-
             (Type::MethodWrapper(_), other) | (other, Type::MethodWrapper(_)) => {
                 KnownClass::MethodWrapperType
                     .to_instance(db)
@@ -1748,9 +1734,6 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .all(|elem| elem.is_fully_static(db)),
-            Type::SpecializedCallable(specialized) => {
-                specialized.callable_type(db).is_fully_static(db)
-            }
             Type::Callable(callable) => callable.is_fully_static(db),
         }
     }
@@ -1813,9 +1796,6 @@ impl<'db> Type<'db> {
                 // False
                 // ```
                 false
-            }
-            Type::SpecializedCallable(specialized) => {
-                specialized.callable_type(db).is_singleton(db)
             }
             Type::MethodWrapper(_) => {
                 // Just a special case of `BoundMethod` really
@@ -1885,10 +1865,6 @@ impl<'db> Type<'db> {
                     .iter()
                     .all(|constraint| constraint.is_single_valued(db)),
             },
-
-            Type::SpecializedCallable(specialized) => {
-                specialized.callable_type(db).is_single_valued(db)
-            }
 
             Type::SubclassOf(..) => {
                 // TODO: Same comment as above for `is_singleton`
@@ -2023,13 +1999,6 @@ impl<'db> Type<'db> {
                     .find_name_in_mro(db, name)
             }
 
-            Type::SpecializedCallable(specialized) => specialized
-                .callable_type(db)
-                .find_name_in_mro(db, name)
-                .map(|sq| {
-                    sq.map_type(|ty| ty.apply_specialization(db, specialized.specialization(db)))
-                }),
-
             Type::FunctionLiteral(_)
             | Type::Callable(_)
             | Type::BoundMethod(_)
@@ -2110,10 +2079,6 @@ impl<'db> Type<'db> {
             Type::BoundMethod(_) => KnownClass::MethodType
                 .to_instance(db)
                 .instance_member(db, name),
-            Type::SpecializedCallable(specialized) => specialized
-                .callable_type(db)
-                .instance_member(db, name)
-                .map_type(|ty| ty.apply_specialization(db, specialized.specialization(db))),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType
                 .to_instance(db)
                 .instance_member(db, name),
@@ -2511,10 +2476,6 @@ impl<'db> Type<'db> {
                         })
                 }
             },
-            Type::SpecializedCallable(specialized) => specialized
-                .callable_type(db)
-                .member_lookup_with_policy(db, name, policy)
-                .map_type(|ty| ty.apply_specialization(db, specialized.specialization(db))),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType
                 .to_instance(db)
                 .member(db, &name),
@@ -2812,10 +2773,6 @@ impl<'db> Type<'db> {
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
 
-            Type::SpecializedCallable(specialized) => specialized
-                .callable_type(db)
-                .try_bool_impl(db, allow_short_circuit)?,
-
             Type::ClassLiteral(class) => class
                 .metaclass_instance_type(db)
                 .try_bool_impl(db, allow_short_circuit)?,
@@ -2933,11 +2890,6 @@ impl<'db> Type<'db> {
                     .with_bound_type(bound_method.self_instance(db));
                 Signatures::single(signature)
             }
-
-            Type::SpecializedCallable(specialized) => specialized
-                .callable_type(db)
-                .signatures(db)
-                .apply_specialization(db, specialized.specialization(db)),
 
             Type::MethodWrapper(
                 MethodWrapperKind::FunctionTypeDunderGet(_)
@@ -3612,10 +3564,6 @@ impl<'db> Type<'db> {
                 Some(builder.build())
             }
             Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance()")),
-            Type::SpecializedCallable(specialized) => specialized
-                .callable_type(db)
-                .to_instance(db)
-                .map(|ty| ty.apply_specialization(db, specialized.specialization(db))),
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::FunctionLiteral(_)
@@ -3697,11 +3645,6 @@ impl<'db> Type<'db> {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(*self)],
                 fallback_type: Type::unknown(),
             }),
-
-            Type::SpecializedCallable(specialized) => specialized
-                .callable_type(db)
-                .in_type_expression(db)
-                .map(|ty| ty.apply_specialization(db, specialized.specialization(db))),
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
@@ -3900,10 +3843,6 @@ impl<'db> Type<'db> {
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
-            Type::SpecializedCallable(specialized) => specialized
-                .callable_type(db)
-                .to_meta_type(db)
-                .apply_specialization(db, specialized.specialization(db)),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
             Type::Callable(_) => KnownClass::Type.to_instance(db),
@@ -3959,16 +3898,36 @@ impl<'db> Type<'db> {
         match self {
             Type::TypeVar(typevar) => specialization.get(db, typevar).unwrap_or(self),
 
-            // Callables need this extra wrapper that will apply the specialization to the
-            // callable's parameters and return types. That is done lazily if and when the callable
-            // is actually called.
-            Type::FunctionLiteral(_)
-            | Type::Callable(_)
-            | Type::BoundMethod(_)
-            | Type::SpecializedCallable(_)
-            | Type::WrapperDescriptor(_)
-            | Type::MethodWrapper(_) => {
-                Type::SpecializedCallable(SpecializedCallableType::new(db, self, specialization))
+            Type::FunctionLiteral(function) => {
+                Type::FunctionLiteral(function.apply_specialization(db, specialization))
+            }
+
+            Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
+                db,
+                method.function(db).apply_specialization(db, specialization),
+                method.self_instance(db),
+            )),
+
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+                Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
+                    function.apply_specialization(db, specialization),
+                ))
+            }
+
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
+                Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(
+                    property.apply_specialization(db, specialization),
+                ))
+            }
+
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
+                Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(
+                    property.apply_specialization(db, specialization),
+                ))
+            }
+
+            Type::Callable(callable) => {
+                Type::Callable(callable.apply_specialization(db, specialization))
             }
 
             Type::GenericAlias(generic) => {
@@ -4007,6 +3966,7 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
+            | Type::WrapperDescriptor(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SubclassOf(_)
@@ -4072,7 +4032,6 @@ impl<'db> Type<'db> {
             Self::BoundMethod(method) => {
                 Some(TypeDefinition::Function(method.function(db).definition(db)))
             }
-            Self::SpecializedCallable(specialized) => specialized.callable_type(db).definition(db),
             Self::FunctionLiteral(function) => {
                 Some(TypeDefinition::Function(function.definition(db)))
             }
@@ -5007,6 +4966,11 @@ pub struct FunctionType<'db> {
 
     /// A set of special decorators that were applied to this function
     decorators: FunctionDecorators,
+
+    /// A specialization that should be applied to the function's parameter and return types,
+    /// either because the function is itself generic, or because it appears in the body of a
+    /// generic class.
+    specialization: Option<Specialization<'db>>,
 }
 
 #[salsa::tracked]
@@ -5019,7 +4983,12 @@ impl<'db> FunctionType<'db> {
     ///
     /// This powers the `CallableTypeOf` special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(db, self.signature(db).clone()))
+        let signature = if let Some(specialization) = self.specialization(db) {
+            self.signature(db).apply_specialization(db, specialization)
+        } else {
+            self.signature(db).clone()
+        };
+        Type::Callable(CallableType::new(db, signature))
     }
 
     /// Returns the [`FileRange`] of the function's name.
@@ -5060,10 +5029,14 @@ impl<'db> FunctionType<'db> {
         let internal_signature = self.internal_signature(db);
 
         if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-            Signature::todo("return type of overloaded function")
-        } else {
-            internal_signature
+            return Signature::todo("return type of overloaded function");
         }
+
+        if let Some(specialization) = self.specialization(db) {
+            return internal_signature.apply_specialization(db, specialization);
+        }
+
+        internal_signature
     }
 
     /// Typed internally-visible signature for this function.
@@ -5085,6 +5058,21 @@ impl<'db> FunctionType<'db> {
 
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
         self.known(db) == Some(known_function)
+    }
+
+    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let specialization = match self.specialization(db) {
+            Some(existing) => existing.apply_specialization(db, specialization),
+            None => specialization,
+        };
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            Some(specialization),
+        )
     }
 }
 
@@ -5218,26 +5206,6 @@ impl<'db> BoundMethodType<'db> {
     }
 }
 
-/// Represents the specialization of a callable that has access to generic typevars, either because
-/// it is itself a generic function, or because it appears in the body of a generic class.
-#[salsa::tracked(debug)]
-pub struct SpecializedCallableType<'db> {
-    /// The callable that has been specialized. (Note that this is not [`CallableType`] since there
-    /// are other types that are callable.)
-    pub callable_type: Type<'db>,
-
-    /// The specialization of any generic typevars that are visible to the callable.
-    pub specialization: Specialization<'db>,
-}
-
-impl<'db> SpecializedCallableType<'db> {
-    fn normalized(self, db: &'db dyn Db) -> Self {
-        let callable_type = self.callable_type(db).normalized(db);
-        let specialization = self.specialization(db).normalized(db);
-        SpecializedCallableType::new(db, callable_type, specialization)
-    }
-}
-
 /// This type represents the set of all callable objects with a certain signature.
 /// It can be written in type expressions using `typing.Callable`.
 /// `lambda` expressions are inferred directly as `CallableType`s; all function-literal types
@@ -5271,6 +5239,11 @@ impl<'db> CallableType<'db> {
             .return_ty
             .map(|return_ty| return_ty.normalized(db));
         CallableType::new(db, Signature::new(parameters, return_ty))
+    }
+
+    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let signature = self.signature(db).apply_specialization(db, specialization);
+        Self::new(db, signature)
     }
 
     /// Returns `true` if this is a fully static callable type.
