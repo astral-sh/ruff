@@ -420,14 +420,14 @@ fn convert_to_dict_comprehension(
             let (binding_stmt_deletion_range, binding_is_multiple_stmts) =
                 statement_deletion_range(checker, binding_stmt_range);
 
-            let mut comments_to_move = for_loop_inline_comments;
-            if !binding_is_multiple_stmts {
-                comments_to_move.extend(comment_strings_in_range(
-                    checker,
-                    binding_stmt_deletion_range,
-                    &[],
-                ));
-            }
+            let comments_to_move = if binding_is_multiple_stmts {
+                for_loop_inline_comments
+            } else {
+                let mut new_comments =
+                    comment_strings_in_range(checker, binding_stmt_deletion_range, &[]);
+                new_comments.extend(for_loop_inline_comments);
+                new_comments
+            };
 
             let indentation = if comments_to_move.is_empty() {
                 String::new()

@@ -169,9 +169,9 @@ PERF403.py:106:9: PERF403 [*] Use a dictionary comprehension instead of a for-lo
 100     |-        # comment 1
 101     |-    }
 102     |-    for idx, name in enumerate(
-    99  |+    # comment 3
-    100 |+    # comment 4
-    101 |+    # comment 1
+    99  |+    # comment 1
+    100 |+    # comment 3
+    101 |+    # comment 4
     102 |+    result: dict[str, int] = {name: idx for idx, name in enumerate(
 103 103 |         fruit  # comment 2
 104     |-    ):
