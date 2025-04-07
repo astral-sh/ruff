@@ -456,7 +456,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         name: Download Ruff binary to test
         id: download-cached-binary
         with:
@@ -525,7 +525,7 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         name: Download comparison Ruff binary
         id: ruff-target
         with:
@@ -784,7 +784,7 @@ jobs:
           # installation fails on 3.13 and newer
           python-version: "3.12"
 
-      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4
+      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         name: Download development ruff binary
         id: ruff-target
         with:
