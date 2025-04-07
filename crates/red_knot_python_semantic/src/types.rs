@@ -3600,13 +3600,16 @@ impl<'db> Type<'db> {
         //    fallback to `object.__init__`, since it will indeed check that no arguments are
         //    passed.
         //
-        // Note that we currently ignore `__new__` return type, since we do not support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance type.
+        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
+        // and most builtin classes use it as return type annotation. We always return the instance
+        // type.
 
         // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
         // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
-        // a class, metaclass attribute would take precedence. But by avoiding `__new__` on `object`
-        // we would inadvertently unhide `__new__` on `type`, which is not what we want.
+        // a class, metaclass attribute would take precedence. But by avoiding `__new__` on
+        // `object` we would inadvertently unhide `__new__` on `type`, which is not what we want.
+        // An alternative might be to not skip `object.__new__` but instead mark it such that it's
+        // easy to check if that's the one we found?
         let new_call_outcome: Option<Result<Bindings<'db>, CallDunderError<'db>>> = match self
             .member_lookup_with_policy(
                 db,
