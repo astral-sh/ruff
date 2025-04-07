@@ -72,6 +72,6 @@ pub(crate) fn comparison_of_constant(
             );
 
             checker.report_diagnostic(diagnostic);
-        };
+        }
     }
 }

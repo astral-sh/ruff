@@ -1,4 +1,6 @@
-use ruff_benchmark::criterion::{
+use ruff_benchmark::criterion;
+
+use criterion::{
     criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
 };
 use ruff_benchmark::{
@@ -87,7 +89,7 @@ fn benchmark_linter(mut group: BenchmarkGroup, settings: &LinterSettings) {
                         );
 
                         // Assert that file contains no parse errors
-                        assert!(!result.has_syntax_error);
+                        assert!(!result.has_syntax_errors());
                     },
                     criterion::BatchSize::SmallInput,
                 );

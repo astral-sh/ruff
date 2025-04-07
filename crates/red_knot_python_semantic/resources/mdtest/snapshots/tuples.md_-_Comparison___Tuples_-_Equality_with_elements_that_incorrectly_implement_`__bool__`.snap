@@ -12,12 +12,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/tuples.
 ## mdtest_snippet.py
 
 ```
-1 | class A:
-2 |     def __eq__(self, other) -> NotBoolable:
-3 |         return NotBoolable()
-4 | 
-5 | class NotBoolable:
-6 |     __bool__ = None
+1 | class NotBoolable:
+2 |     __bool__: None = None
+3 | 
+4 | class A:
+5 |     def __eq__(self, other) -> NotBoolable:
+6 |         return NotBoolable()
 7 | 
 8 | # error: [unsupported-bool-conversion]
 9 | (A(),) == (A(),)

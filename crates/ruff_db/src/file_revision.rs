@@ -1,3 +1,5 @@
+use crate::system::file_time_now;
+
 /// A number representing the revision of a file.
 ///
 /// Two revisions that don't compare equal signify that the file has been modified.
@@ -16,7 +18,7 @@ impl FileRevision {
     }
 
     pub fn now() -> Self {
-        Self::from(filetime::FileTime::now())
+        Self::from(file_time_now())
     }
 
     pub const fn zero() -> Self {
@@ -53,13 +55,12 @@ impl From<filetime::FileTime> for FileRevision {
 
 #[cfg(test)]
 mod tests {
-    use filetime::FileTime;
 
     use super::*;
 
     #[test]
     fn revision_from_file_time() {
-        let file_time = FileTime::now();
+        let file_time = file_time_now();
         let revision = FileRevision::from(file_time);
 
         let revision = revision.as_u128();

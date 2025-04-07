@@ -37,16 +37,13 @@ def foo() -> int:
     return 42
 
 def decorator(func) -> Callable[[], int]:
-    # TODO: no error
-    # error: [invalid-return-type]
     return foo
 
 @decorator
 def bar() -> str:
     return "bar"
 
-# TODO: should reveal `int`, as the decorator replaces `bar` with `foo`
-reveal_type(bar())  # revealed: @Todo(return type of decorated function)
+reveal_type(bar())  # revealed: int
 ```
 
 ## Invalid callable

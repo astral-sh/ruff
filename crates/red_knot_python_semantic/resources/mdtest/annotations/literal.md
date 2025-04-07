@@ -36,7 +36,7 @@ def f():
     reveal_type(a7)  # revealed: None
     reveal_type(a8)  # revealed: Literal[1]
     # TODO: This should be Color.RED
-    reveal_type(b1)  # revealed: Unknown | Literal[0]
+    reveal_type(b1)  # revealed: @Todo(Attribute access on enum classes)
 
 # error: [invalid-type-form]
 invalid1: Literal[3 + 4]
@@ -127,6 +127,13 @@ Literal: _SpecialForm
 ```py
 from other import Literal
 
+# TODO: can we add a subdiagnostic here saying something like:
+#
+#     `other.Literal` and `typing.Literal` have similar names, but are different symbols and don't have the same semantics
+#
+# ?
+#
+# error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
 a1: Literal[26]
 
 def f():
@@ -149,7 +156,7 @@ def f():
 ```py
 from typing import Literal
 
-# error: [invalid-type-form] "`Literal` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`typing.Literal` requires at least one argument when used in a type expression"
 def _(x: Literal):
     reveal_type(x)  # revealed: Unknown
 ```

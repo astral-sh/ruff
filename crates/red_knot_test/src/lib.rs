@@ -5,8 +5,10 @@ use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{Program, ProgramSettings, PythonPath, SearchPathSettings};
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait, OldParseDiagnostic};
+use red_knot_python_semantic::{
+    Program, ProgramSettings, PythonPath, SearchPathSettings, SysPrefixPathOrigin,
+};
+use ruff_db::diagnostic::{create_parse_diagnostic, Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -34,6 +36,7 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
+    output_format: OutputFormat,
 ) {
     let source = std::fs::read_to_string(absolute_fixture_path).unwrap();
     let suite = match test_parser::parse(short_title, &source) {
@@ -59,7 +62,10 @@ pub fn run(
 
         if let Err(failures) = run_test(&mut db, relative_fixture_path, snapshot_path, &test) {
             any_failures = true;
-            println!("\n{}\n", test.name().bold().underline());
+
+            if output_format.is_cli() {
+                println!("\n{}\n", test.name().bold().underline());
+            }
 
             let md_index = LineIndex::from_source_text(&source);
 
@@ -72,27 +78,54 @@ pub fn run(
                         source_map.to_absolute_line_number(relative_line_number);
 
                     for failure in failures {
-                        let line_info =
-                            format!("{relative_fixture_path}:{absolute_line_number}").cyan();
-                        println!("  {line_info} {failure}");
+                        match output_format {
+                            OutputFormat::Cli => {
+                                let line_info =
+                                    format!("{relative_fixture_path}:{absolute_line_number}")
+                                        .cyan();
+                                println!("  {line_info} {failure}");
+                            }
+                            OutputFormat::GitHub => println!(
+                                "::error file={absolute_fixture_path},line={absolute_line_number}::{failure}"
+                            ),
+                        }
                     }
                 }
             }
 
             let escaped_test_name = test.name().replace('\'', "\\'");
 
-            println!(
-                "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
-            );
-            println!(
-                "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
-            );
+            if output_format.is_cli() {
+                println!(
+                    "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
+                );
+                println!(
+                    "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
+                );
+            }
         }
     }
 
     println!("\n{}\n", "-".repeat(50));
 
     assert!(!any_failures, "Some tests failed.");
+}
+
+/// Defines the format in which mdtest should print an error to the terminal
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OutputFormat {
+    /// The format `cargo test` should use by default.
+    Cli,
+    /// A format that will provide annotations from GitHub Actions
+    /// if mdtest fails on a PR.
+    /// See <https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/workflow-commands-for-github-actions#setting-an-error-message>
+    GitHub,
+}
+
+impl OutputFormat {
+    const fn is_cli(self) -> bool {
+        matches!(self, OutputFormat::Cli)
+    }
 }
 
 fn run_test(
@@ -127,8 +160,12 @@ fn run_test(
 
     let src_path = project_root.clone();
     let custom_typeshed_path = test.configuration().typeshed();
+    let python_path = test.configuration().python();
+    let python_version = test.configuration().python_version().unwrap_or_default();
+
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
+    let mut has_custom_pyvenv_cfg_file = false;
 
     let test_files: Vec<_> = test
         .files()
@@ -138,11 +175,11 @@ fn run_test(
             }
 
             assert!(
-                matches!(embedded.lang, "py" | "pyi" | "python" | "text"),
-                "Supported file types are: py (or python), pyi, text, and ignore"
+                matches!(embedded.lang, "py" | "pyi" | "python" | "text" | "cfg"),
+                "Supported file types are: py (or python), pyi, text, cfg and ignore"
             );
 
-            let full_path = embedded.full_path(&project_root);
+            let mut full_path = embedded.full_path(&project_root);
 
             if let Some(typeshed_path) = custom_typeshed_path {
                 if let Ok(relative_path) = full_path.strip_prefix(typeshed_path.join("stdlib")) {
@@ -152,11 +189,35 @@ fn run_test(
                         typeshed_files.push(relative_path.to_path_buf());
                     }
                 }
+            } else if let Some(python_path) = python_path {
+                if let Ok(relative_path) = full_path.strip_prefix(python_path) {
+                    if relative_path.as_str() == "pyvenv.cfg" {
+                        has_custom_pyvenv_cfg_file = true;
+                    } else {
+                        let mut new_path = SystemPathBuf::new();
+                        for component in full_path.components() {
+                            let component = component.as_str();
+                            if component == "<path-to-site-packages>" {
+                                if cfg!(target_os = "windows") {
+                                    new_path.push("Lib");
+                                    new_path.push("site-packages");
+                                } else {
+                                    new_path.push("lib");
+                                    new_path.push(format!("python{python_version}"));
+                                    new_path.push("site-packages");
+                                }
+                            } else {
+                                new_path.push(component);
+                            }
+                        }
+                        full_path = new_path;
+                    }
+                }
             }
 
             db.write_file(&full_path, &embedded.code).unwrap();
 
-            if !full_path.starts_with(&src_path) || embedded.lang == "text" {
+            if !(full_path.starts_with(&src_path) && matches!(embedded.lang, "py" | "pyi")) {
                 // These files need to be written to the file system (above), but we don't run any checks on them.
                 return None;
             }
@@ -190,18 +251,34 @@ fn run_test(
         }
     }
 
+    if let Some(python_path) = python_path {
+        if !has_custom_pyvenv_cfg_file {
+            let pyvenv_cfg_file = python_path.join("pyvenv.cfg");
+            let home_directory = SystemPathBuf::from(format!("/Python{python_version}"));
+            db.create_directory_all(&home_directory).unwrap();
+            db.write_file(&pyvenv_cfg_file, format!("home = {home_directory}"))
+                .unwrap();
+        }
+    }
+
+    let configuration = test.configuration();
+
     let settings = ProgramSettings {
-        python_version: test.configuration().python_version().unwrap_or_default(),
-        python_platform: test.configuration().python_platform().unwrap_or_default(),
+        python_version,
+        python_platform: configuration.python_platform().unwrap_or_default(),
         search_paths: SearchPathSettings {
             src_roots: vec![src_path],
-            extra_paths: test
-                .configuration()
-                .extra_paths()
-                .unwrap_or_default()
-                .to_vec(),
+            extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
-            python_path: PythonPath::KnownSitePackages(vec![]),
+            python_path: configuration
+                .python()
+                .map(|sys_prefix| {
+                    PythonPath::SysPrefix(
+                        sys_prefix.to_path_buf(),
+                        SysPrefixPathOrigin::PythonCliFlag,
+                    )
+                })
+                .unwrap_or(PythonPath::KnownSitePackages(vec![])),
         },
     };
 
@@ -220,15 +297,10 @@ fn run_test(
         .filter_map(|test_file| {
             let parsed = parsed_module(db, test_file.file);
 
-            let mut diagnostics: Vec<Box<_>> = parsed
+            let mut diagnostics: Vec<Diagnostic> = parsed
                 .errors()
                 .iter()
-                .cloned()
-                .map(|error| {
-                    let diagnostic: Box<dyn OldDiagnosticTrait> =
-                        Box::new(OldParseDiagnostic::new(test_file.file, error));
-                    diagnostic
-                })
+                .map(|error| create_parse_diagnostic(test_file.file, error))
                 .collect();
 
             let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
@@ -239,13 +311,13 @@ fn run_test(
                     match info.location {
                         Some(location) => messages.push(format!("panicked at {location}")),
                         None => messages.push("panicked at unknown location".to_string()),
-                    };
+                    }
                     match info.payload {
                         Some(payload) => messages.push(payload),
                         // Mimic the default panic hook's rendering of the panic payload if it's
                         // not a string.
                         None => messages.push("Box<dyn Any>".to_string()),
-                    };
+                    }
                     if let Some(backtrace) = info.backtrace {
                         if std::env::var("RUST_BACKTRACE").is_ok() {
                             messages.extend(backtrace.to_string().split('\n').map(String::from));
@@ -258,19 +330,15 @@ fn run_test(
                     });
                 }
             };
-            diagnostics.extend(type_diagnostics.into_iter().map(|diagnostic| {
-                let diagnostic: Box<dyn OldDiagnosticTrait> = Box::new((*diagnostic).clone());
-                diagnostic
-            }));
+            diagnostics.extend(type_diagnostics.into_iter().cloned());
 
-            let failure =
-                match matcher::match_file(db, test_file.file, diagnostics.iter().map(|d| &**d)) {
-                    Ok(()) => None,
-                    Err(line_failures) => Some(FileFailures {
-                        backtick_offsets: test_file.backtick_offsets,
-                        by_line: line_failures,
-                    }),
-                };
+            let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
+                Ok(()) => None,
+                Err(line_failures) => Some(FileFailures {
+                    backtick_offsets: test_file.backtick_offsets,
+                    by_line: line_failures,
+                }),
+            };
             if test.should_snapshot_diagnostics() {
                 snapshot_diagnostics.extend(diagnostics);
             }
@@ -324,11 +392,11 @@ struct TestFile {
     backtick_offsets: Vec<BacktickOffsets>,
 }
 
-fn create_diagnostic_snapshot<D: OldDiagnosticTrait>(
+fn create_diagnostic_snapshot(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     test: &parser::MarkdownTest,
-    diagnostics: impl IntoIterator<Item = D>,
+    diagnostics: impl IntoIterator<Item = Diagnostic>,
 ) -> String {
     let display_config = DisplayDiagnosticConfig::default().color(false);
 
@@ -368,7 +436,7 @@ fn create_diagnostic_snapshot<D: OldDiagnosticTrait>(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        writeln!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
+        write!(snapshot, "{}", diag.display(db, &display_config)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot

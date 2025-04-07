@@ -1,7 +1,7 @@
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
-use crate::types::{TypeCheckDiagnostic, TypeCheckDiagnostics};
+use crate::types::TypeCheckDiagnostics;
 use crate::{declare_lint, lint::LintId, Db};
-use ruff_db::diagnostic::DiagnosticId;
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Span};
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_python_parser::TokenKind;
 use ruff_python_trivia::Cursor;
@@ -145,7 +145,7 @@ pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut Type
 fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
     if context.is_lint_disabled(&UNKNOWN_RULE) {
         return;
-    };
+    }
 
     for unknown in &context.suppressions.unknown {
         match &unknown.reason {
@@ -174,7 +174,7 @@ fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
                     format_args!("Unknown rule `{prefixed}`. Did you mean `{suggestion}`?"),
                 );
             }
-        };
+        }
     }
 }
 
@@ -267,7 +267,7 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
                 suppression.range,
                 format_args!("Unused `{kind}` without a code", kind = suppression.kind),
             ),
-        };
+        }
     }
 }
 
@@ -319,14 +319,11 @@ impl<'a> CheckSuppressionsContext<'a> {
             return;
         };
 
-        self.diagnostics.push(TypeCheckDiagnostic {
-            id: DiagnosticId::Lint(lint.name()),
-            message: message.to_string(),
-            range,
-            severity,
-            file: self.file,
-            secondary_messages: vec![],
-        });
+        let id = DiagnosticId::Lint(lint.name());
+        let mut diag = Diagnostic::new(id, severity, "");
+        let span = Span::from(self.file).with_range(range);
+        diag.annotate(Annotation::primary(span).message(message));
+        self.diagnostics.push(diag);
     }
 }
 

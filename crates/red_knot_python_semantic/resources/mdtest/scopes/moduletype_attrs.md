@@ -12,10 +12,7 @@ reveal_type(__file__)  # revealed: str | None
 reveal_type(__loader__)  # revealed: LoaderProtocol | None
 reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
-
-# TODO: Should be `ModuleSpec | None`
-# (needs support for `*` imports)
-reveal_type(__spec__)  # revealed: Unknown | None
+reveal_type(__spec__)  # revealed: ModuleSpec | None
 
 reveal_type(__path__)  # revealed: @Todo(generics)
 
@@ -61,9 +58,8 @@ reveal_type(typing.__eq__)  # revealed: <bound method `__eq__` of `ModuleType`>
 
 reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
 
-# TODO: needs support for attribute access on instances, properties and generics;
-# should be `dict[str, Any]`
-reveal_type(typing.__dict__)  # revealed: @Todo(@property)
+# TODO: needs support generics; should be `dict[str, Any]`:
+reveal_type(typing.__dict__)  # revealed: @Todo(generics)
 ```
 
 Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType` to help out with
@@ -95,10 +91,9 @@ reveal_type(__dict__)  # revealed: Literal["foo"]
 import foo
 from foo import __dict__ as foo_dict
 
-# TODO: needs support for attribute access on instances, properties, and generics;
-# should be `dict[str, Any]` for both of these:
-reveal_type(foo.__dict__)  # revealed: @Todo(@property)
-reveal_type(foo_dict)  # revealed: @Todo(@property)
+# TODO: needs support generics; should be `dict[str, Any]` for both of these:
+reveal_type(foo.__dict__)  # revealed: @Todo(generics)
+reveal_type(foo_dict)  # revealed: @Todo(generics)
 ```
 
 ## Conditionally global or `ModuleType` attribute

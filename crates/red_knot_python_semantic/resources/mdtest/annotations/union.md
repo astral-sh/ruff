@@ -59,3 +59,13 @@ def f():
     # revealed: int | str
     reveal_type(a)
 ```
+
+## Invalid
+
+```py
+from typing import Union
+
+# error: [invalid-type-form] "`typing.Union` requires at least one argument when used in a type expression"
+def f(x: Union) -> None:
+    reveal_type(x)  # revealed: Unknown
+```

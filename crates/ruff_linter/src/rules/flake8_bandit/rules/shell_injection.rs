@@ -287,6 +287,19 @@ impl Violation for UnixCommandWildcardInjection {
     }
 }
 
+/// Check if an expression is a trusted input for subprocess.run.
+/// We assume that any str or list[str] literal can be trusted.
+fn is_trusted_input(arg: &Expr) -> bool {
+    match arg {
+        Expr::StringLiteral(_) => true,
+        Expr::List(ast::ExprList { elts, .. }) => {
+            elts.iter().all(|elt| matches!(elt, Expr::StringLiteral(_)))
+        }
+        Expr::Named(named) => is_trusted_input(&named.value),
+        _ => false,
+    }
+}
+
 /// S602, S603, S604, S605, S606, S607, S609
 pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
     let call_kind = get_call_kind(&call.func, checker.semantic());
@@ -310,24 +323,14 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                     }
                 }
                 // S603
-                Some(ShellKeyword {
-                    truthiness:
-                        Truthiness::False | Truthiness::Falsey | Truthiness::None | Truthiness::Unknown,
-                }) => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        ));
-                    }
-                }
-                // S603
-                None => {
-                    if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
-                        checker.report_diagnostic(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue,
-                            call.func.range(),
-                        ));
+                _ => {
+                    if !is_trusted_input(arg) || checker.settings.preview.is_disabled() {
+                        if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
+                            checker.report_diagnostic(Diagnostic::new(
+                                SubprocessWithoutShellEqualsTrue,
+                                call.func.range(),
+                            ));
+                        }
                     }
                 }
             }

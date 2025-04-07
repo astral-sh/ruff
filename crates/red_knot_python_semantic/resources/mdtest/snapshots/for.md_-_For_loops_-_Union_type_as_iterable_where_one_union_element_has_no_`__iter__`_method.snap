@@ -50,7 +50,7 @@ info: revealed-type
 12 |     # error: [not-iterable]
 13 |     for x in Test() if flag else 42:
 14 |         reveal_type(x)  # revealed: int
-   |         -------------- info: Revealed type is `int`
+   |         ^^^^^^^^^^^^^^ Revealed type is `int`
    |
 
 ```

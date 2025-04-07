@@ -227,6 +227,13 @@ pub(crate) fn check_noqa(
         );
     }
 
+    if settings.rules.enabled(Rule::InvalidRuleCode)
+        && !per_file_ignores.contains(Rule::InvalidRuleCode)
+        && !exemption.enumerates(Rule::InvalidRuleCode)
+    {
+        ruff::rules::invalid_noqa_code(diagnostics, &noqa_directives, locator, &settings.external);
+    }
+
     ignored_diagnostics.sort_unstable();
     ignored_diagnostics
 }

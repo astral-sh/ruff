@@ -61,7 +61,7 @@ static_assert(is_disjoint_from(B2, FinalSubclass))
 ## Tuple types
 
 ```py
-from typing_extensions import Literal
+from typing_extensions import Literal, Never
 from knot_extensions import TypeOf, is_disjoint_from, static_assert
 
 static_assert(is_disjoint_from(tuple[()], TypeOf[object]))
@@ -196,7 +196,7 @@ static_assert(is_disjoint_from(None, Intersection[int, Not[str]]))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from knot_extensions import TypeOf, is_disjoint_from, static_assert
+from knot_extensions import Intersection, Not, TypeOf, is_disjoint_from, static_assert, AlwaysFalsy, AlwaysTruthy
 
 static_assert(is_disjoint_from(Literal[True], Literal[False]))
 static_assert(is_disjoint_from(Literal[True], Literal[1]))
@@ -223,6 +223,25 @@ static_assert(not is_disjoint_from(Literal[1], Literal[1]))
 static_assert(not is_disjoint_from(Literal["a"], Literal["a"]))
 static_assert(not is_disjoint_from(Literal["a"], LiteralString))
 static_assert(not is_disjoint_from(Literal["a"], str))
+
+# TODO: No errors
+# error: [static-assert-error]
+static_assert(is_disjoint_from(AlwaysFalsy, Intersection[LiteralString, Not[Literal[""]]]))
+# error: [static-assert-error]
+static_assert(is_disjoint_from(Intersection[Not[Literal[True]], Not[Literal[False]]], bool))
+# error: [static-assert-error]
+static_assert(is_disjoint_from(Intersection[AlwaysFalsy, Not[Literal[False]]], bool))
+# error: [static-assert-error]
+static_assert(is_disjoint_from(Intersection[AlwaysTruthy, Not[Literal[True]]], bool))
+
+# TODO: No errors
+# The condition `is_disjoint(T, Not[T])` must still be satisfied after the following transformations:
+# `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
+# error: [static-assert-error]
+static_assert(is_disjoint_from(Intersection[LiteralString, AlwaysTruthy], Not[LiteralString] | AlwaysFalsy))
+# `LiteralString & ~AlwaysFalsy`  -> `LiteralString & ~Literal[""]`
+# error: [static-assert-error]
+static_assert(is_disjoint_from(Intersection[LiteralString, Not[AlwaysFalsy]], Not[LiteralString] | AlwaysFalsy))
 ```
 
 ### Class, module and function literals
@@ -333,4 +352,42 @@ class UsesMeta1(metaclass=Meta1): ...
 class UsesMeta2(metaclass=Meta2): ...
 
 static_assert(is_disjoint_from(type[UsesMeta1], type[UsesMeta2]))
+```
+
+## Callables
+
+No two callable types are disjoint because there exists a non-empty callable type
+`(*args: object, **kwargs: object) -> Never` that is a subtype of all fully static callable types.
+As such, for any two callable types, it is possible to conceive of a runtime callable object that
+would inhabit both types simultaneously.
+
+```py
+from knot_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from typing_extensions import Callable, Literal, Never
+
+def mixed(a: int, /, b: str, *args: int, c: int = 2, **kwargs: int) -> None: ...
+
+static_assert(not is_disjoint_from(Callable[[], Never], CallableTypeOf[mixed]))
+static_assert(not is_disjoint_from(Callable[[int, str], float], CallableTypeOf[mixed]))
+
+# Using gradual form
+static_assert(not is_disjoint_from(Callable[..., None], Callable[[], None]))
+static_assert(not is_disjoint_from(Callable[..., None], Callable[..., None]))
+static_assert(not is_disjoint_from(Callable[..., None], Callable[[Literal[1]], None]))
+
+# Using `Never`
+static_assert(not is_disjoint_from(Callable[[], Never], Callable[[], Never]))
+static_assert(not is_disjoint_from(Callable[[Never], str], Callable[[Never], int]))
+```
+
+A callable type is disjoint from all literal types.
+
+```py
+from knot_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from typing_extensions import Callable, Literal, Never
+
+static_assert(is_disjoint_from(Callable[[], None], Literal[""]))
+static_assert(is_disjoint_from(Callable[[], None], Literal[b""]))
+static_assert(is_disjoint_from(Callable[[], None], Literal[1]))
+static_assert(is_disjoint_from(Callable[[], None], Literal[True]))
 ```

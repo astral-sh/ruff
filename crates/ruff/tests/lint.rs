@@ -2244,6 +2244,7 @@ requires-python = ">= 3.11"
         	matplotlib.pyplot = plt,
         	networkx = nx,
         	numpy = np,
+        	numpy.typing = npt,
         	pandas = pd,
         	panel = pn,
         	plotly.express = px,
@@ -2554,6 +2555,7 @@ requires-python = ">= 3.11"
         	matplotlib.pyplot = plt,
         	networkx = nx,
         	numpy = np,
+        	numpy.typing = npt,
         	pandas = pd,
         	panel = pn,
         	plotly.express = px,
@@ -2916,6 +2918,7 @@ from typing import Union;foo: Union[int, str] = 1
         	matplotlib.pyplot = plt,
         	networkx = nx,
         	numpy = np,
+        	numpy.typing = npt,
         	pandas = pd,
         	panel = pn,
         	plotly.express = px,
@@ -3294,6 +3297,7 @@ from typing import Union;foo: Union[int, str] = 1
         	matplotlib.pyplot = plt,
         	networkx = nx,
         	numpy = np,
+        	numpy.typing = npt,
         	pandas = pd,
         	panel = pn,
         	plotly.express = px,
@@ -3620,6 +3624,7 @@ from typing import Union;foo: Union[int, str] = 1
         	matplotlib.pyplot = plt,
         	networkx = nx,
         	numpy = np,
+        	numpy.typing = npt,
         	pandas = pd,
         	panel = pn,
         	plotly.express = px,
@@ -3946,6 +3951,7 @@ from typing import Union;foo: Union[int, str] = 1
         	matplotlib.pyplot = plt,
         	networkx = nx,
         	numpy = np,
+        	numpy.typing = npt,
         	pandas = pd,
         	panel = pn,
         	plotly.express = px,
@@ -4229,6 +4235,7 @@ from typing import Union;foo: Union[int, str] = 1
         	matplotlib.pyplot = plt,
         	networkx = nx,
         	numpy = np,
+        	numpy.typing = npt,
         	pandas = pd,
         	panel = pn,
         	plotly.express = px,
@@ -4565,6 +4572,7 @@ from typing import Union;foo: Union[int, str] = 1
         	matplotlib.pyplot = plt,
         	networkx = nx,
         	numpy = np,
+        	numpy.typing = npt,
         	pandas = pd,
         	panel = pn,
         	plotly.express = px,
@@ -5488,6 +5496,71 @@ fn cookiecutter_globbing_no_project_root() -> Result<()> {
 		warning: No Python files found under the given path(s)
 		");
     });
+
+    Ok(())
+}
+
+/// Test that semantic syntax errors (1) are emitted, (2) are not cached, (3) don't affect the
+/// reporting of normal diagnostics, and (4) are not suppressed by `select = []` (or otherwise
+/// disabling all AST-based rules).
+#[test]
+fn semantic_syntax_errors() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let contents = "[(x := 1) for x in foo]";
+    fs::write(tempdir.path().join("main.py"), contents)?;
+
+    let mut cmd = Command::new(get_cargo_bin(BIN_NAME));
+    // inline STDIN_BASE_OPTIONS to remove --no-cache
+    cmd.args(["check", "--output-format", "concise"])
+        .arg("--preview")
+        .arg("--quiet") // suppress `debug build without --no-cache` warnings
+        .current_dir(&tempdir);
+
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:20: F821 Undefined name `foo`
+
+    ----- stderr -----
+    "
+    );
+
+    // this should *not* be cached, like normal parse errors
+    assert_cmd_snapshot!(
+        cmd,
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    main.py:1:20: F821 Undefined name `foo`
+
+    ----- stderr -----
+    "
+    );
+
+    // ensure semantic errors are caught even without AST-based rules selected
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "lint.select = []"])
+            .arg("--preview")
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:3: SyntaxError: assignment expression cannot rebind comprehension variable
+    Found 1 error.
+
+    ----- stderr -----
+    "
+    );
 
     Ok(())
 }

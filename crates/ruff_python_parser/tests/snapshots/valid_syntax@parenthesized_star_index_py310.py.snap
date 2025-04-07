@@ -1,0 +1,141 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/parenthesized_star_index_py310.py
+snapshot_kind: text
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..94,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 44..93,
+                    targets: [
+                        Subscript(
+                            ExprSubscript {
+                                range: 44..89,
+                                value: Name(
+                                    ExprName {
+                                        range: 44..47,
+                                        id: Name("out"),
+                                        ctx: Load,
+                                    },
+                                ),
+                                slice: Tuple(
+                                    ExprTuple {
+                                        range: 48..88,
+                                        elts: [
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 49..81,
+                                                    value: Generator(
+                                                        ExprGenerator {
+                                                            range: 50..81,
+                                                            elt: Call(
+                                                                ExprCall {
+                                                                    range: 51..62,
+                                                                    func: Name(
+                                                                        ExprName {
+                                                                            range: 51..56,
+                                                                            id: Name("slice"),
+                                                                            ctx: Load,
+                                                                        },
+                                                                    ),
+                                                                    arguments: Arguments {
+                                                                        range: 56..62,
+                                                                        args: [
+                                                                            NoneLiteral(
+                                                                                ExprNoneLiteral {
+                                                                                    range: 57..61,
+                                                                                },
+                                                                            ),
+                                                                        ],
+                                                                        keywords: [],
+                                                                    },
+                                                                },
+                                                            ),
+                                                            generators: [
+                                                                Comprehension {
+                                                                    range: 63..80,
+                                                                    target: Name(
+                                                                        ExprName {
+                                                                            range: 67..68,
+                                                                            id: Name("_"),
+                                                                            ctx: Store,
+                                                                        },
+                                                                    ),
+                                                                    iter: Call(
+                                                                        ExprCall {
+                                                                            range: 72..80,
+                                                                            func: Name(
+                                                                                ExprName {
+                                                                                    range: 72..77,
+                                                                                    id: Name("range"),
+                                                                                    ctx: Load,
+                                                                                },
+                                                                            ),
+                                                                            arguments: Arguments {
+                                                                                range: 77..80,
+                                                                                args: [
+                                                                                    NumberLiteral(
+                                                                                        ExprNumberLiteral {
+                                                                                            range: 78..79,
+                                                                                            value: Int(
+                                                                                                2,
+                                                                                            ),
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                                keywords: [],
+                                                                            },
+                                                                        },
+                                                                    ),
+                                                                    ifs: [],
+                                                                    is_async: false,
+                                                                },
+                                                            ],
+                                                            parenthesized: true,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 83..87,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 84..87,
+                                                            id: Name("ind"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
+                                    },
+                                ),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 92..93,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

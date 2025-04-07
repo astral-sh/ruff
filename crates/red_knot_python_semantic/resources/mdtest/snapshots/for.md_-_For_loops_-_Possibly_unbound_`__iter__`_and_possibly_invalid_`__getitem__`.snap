@@ -73,7 +73,7 @@ info: revealed-type
 31 |     for x in Iterable1():
 32 |         # TODO: `bytes | str` might be better
 33 |         reveal_type(x)  # revealed: bytes | str | Unknown
-   |         -------------- info: Revealed type is `bytes | str | Unknown`
+   |         ^^^^^^^^^^^^^^ Revealed type is `bytes | str | Unknown`
 34 |
 35 |     # error: [not-iterable]
    |
@@ -86,8 +86,7 @@ error: lint:not-iterable
    |
 35 |     # error: [not-iterable]
 36 |     for y in Iterable2():
-   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it may not have an `__iter__` method and its `__getitem__` method (with type `<bound method `__getitem__` of `Iterable2`> | <bound method `__getitem__` of `Iterable2`>`)
-                            may have an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
+   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it may not have an `__iter__` method and its `__getitem__` method (with type `<bound method `__getitem__` of `Iterable2`> | <bound method `__getitem__` of `Iterable2`>`) may have an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
 37 |         reveal_type(y)  # revealed: bytes | str | int
    |
 
@@ -100,7 +99,7 @@ info: revealed-type
 35 |     # error: [not-iterable]
 36 |     for y in Iterable2():
 37 |         reveal_type(y)  # revealed: bytes | str | int
-   |         -------------- info: Revealed type is `bytes | str | int`
+   |         ^^^^^^^^^^^^^^ Revealed type is `bytes | str | int`
    |
 
 ```

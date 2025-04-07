@@ -32,10 +32,11 @@ error: lint:invalid-argument-type
 7 | foo("a", "b", "c")
   |     ^^^ Object of type `Literal["a"]` cannot be assigned to parameter 1 (`x`) of function `foo`; expected type `int`
   |
- ::: /src/mdtest_snippet.py:1:9
+info
+ --> /src/mdtest_snippet.py:1:9
   |
 1 | def foo(x: int, y: int, z: int) -> int:
-  |         ------ info: parameter declared in function definition here
+  |         ------ parameter declared in function definition here
 2 |     return x * y * z
   |
 
@@ -50,10 +51,11 @@ error: lint:invalid-argument-type
 7 | foo("a", "b", "c")
   |          ^^^ Object of type `Literal["b"]` cannot be assigned to parameter 2 (`y`) of function `foo`; expected type `int`
   |
- ::: /src/mdtest_snippet.py:1:17
+info
+ --> /src/mdtest_snippet.py:1:17
   |
 1 | def foo(x: int, y: int, z: int) -> int:
-  |                 ------ info: parameter declared in function definition here
+  |                 ------ parameter declared in function definition here
 2 |     return x * y * z
   |
 
@@ -68,10 +70,11 @@ error: lint:invalid-argument-type
 7 | foo("a", "b", "c")
   |               ^^^ Object of type `Literal["c"]` cannot be assigned to parameter 3 (`z`) of function `foo`; expected type `int`
   |
- ::: /src/mdtest_snippet.py:1:25
+info
+ --> /src/mdtest_snippet.py:1:25
   |
 1 | def foo(x: int, y: int, z: int) -> int:
-  |                         ------ info: parameter declared in function definition here
+  |                         ------ parameter declared in function definition here
 2 |     return x * y * z
   |
 

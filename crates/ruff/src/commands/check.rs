@@ -174,7 +174,7 @@ pub(crate) fn check(
     caches.persist()?;
 
     let duration = start.elapsed();
-    debug!("Checked {:?} files in: {:?}", checked_files, duration);
+    debug!("Checked {checked_files:?} files in: {duration:?}");
 
     Ok(all_diagnostics)
 }

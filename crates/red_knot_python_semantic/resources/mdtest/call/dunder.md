@@ -204,6 +204,28 @@ def _(flag: bool):
     reveal_type(d[0])  # revealed: str | bytes
 ```
 
+## Calling a union of types without dunder methods
+
+We add instance attributes here to make sure that we don't treat the implicit dunder calls here like
+regular method calls.
+
+```py
+def external_getitem(instance, key: int) -> str:
+    return str(key)
+
+class NotSubscriptable1:
+    def __init__(self, value: int):
+        self.__getitem__ = external_getitem
+
+class NotSubscriptable2:
+    def __init__(self, value: int):
+        self.__getitem__ = external_getitem
+
+def _(union: NotSubscriptable1 | NotSubscriptable2):
+    # error: [non-subscriptable]
+    union[0]
+```
+
 ## Calling a possibly-unbound dunder method
 
 ```py

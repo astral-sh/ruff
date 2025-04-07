@@ -11,7 +11,7 @@ use ruff_python_ast::PythonVersion;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{vendored_typeshed_versions, TypeshedVersions};
-use crate::site_packages::VirtualEnvironment;
+use crate::site_packages::{SitePackagesDiscoveryError, SysPrefixPathOrigin, VirtualEnvironment};
 use crate::{Program, PythonPath, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
@@ -96,18 +96,13 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
         FilePath::SystemVirtual(_) => return None,
     };
 
-    let mut search_paths = search_paths(db);
-
-    let module_name = loop {
-        let candidate = search_paths.next()?;
+    let module_name = search_paths(db).find_map(|candidate| {
         let relative_path = match path {
             SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
             SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
-        };
-        if let Some(relative_path) = relative_path {
-            break relative_path.to_module_name()?;
-        }
-    };
+        }?;
+        relative_path.to_module_name()
+    })?;
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
@@ -115,7 +110,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
     // in which case we ignore it.
     let module = resolve_module(db, &module_name)?;
 
-    if file == module.file() {
+    if file.path(db) == module.file().path(db) {
         Some(module)
     } else {
         // This path is for a module with the same name but with a different precedence. For example:
@@ -131,6 +126,15 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module> {
 
 pub(crate) fn search_paths(db: &dyn Db) -> SearchPathIterator {
     Program::get(db).search_paths(db).iter(db)
+}
+
+/// Searches for a `.venv` directory in `project_root` that contains a `pyvenv.cfg` file.
+fn discover_venv_in(system: &dyn System, project_root: &SystemPath) -> Option<SystemPathBuf> {
+    let virtual_env_directory = project_root.join(".venv");
+
+    system
+        .is_file(&virtual_env_directory.join("pyvenv.cfg"))
+        .then_some(virtual_env_directory)
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -223,14 +227,49 @@ impl SearchPaths {
         static_paths.push(stdlib_path);
 
         let site_packages_paths = match python_path {
-            PythonPath::SysPrefix(sys_prefix) => {
+            PythonPath::SysPrefix(sys_prefix, origin) => {
+                tracing::debug!(
+                    "Discovering site-packages paths from sys-prefix `{sys_prefix}` ({origin}')"
+                );
                 // TODO: We may want to warn here if the venv's python version is older
                 //  than the one resolved in the program settings because it indicates
                 //  that the `target-version` is incorrectly configured or that the
                 //  venv is out of date.
-                VirtualEnvironment::new(sys_prefix, system)
+                VirtualEnvironment::new(sys_prefix, *origin, system)
                     .and_then(|venv| venv.site_packages_directories(system))?
             }
+
+            PythonPath::Discover(root) => {
+                tracing::debug!("Discovering virtual environment in `{root}`");
+                let virtual_env_path = discover_venv_in(db.system(), root);
+                if let Some(virtual_env_path) = virtual_env_path {
+                    tracing::debug!("Found `.venv` folder at `{}`", virtual_env_path);
+
+                    let handle_invalid_virtual_env = |error: SitePackagesDiscoveryError| {
+                        tracing::debug!(
+                            "Ignoring automatically detected virtual environment at `{}`: {}",
+                            virtual_env_path,
+                            error
+                        );
+                        vec![]
+                    };
+
+                    match VirtualEnvironment::new(
+                        virtual_env_path.clone(),
+                        SysPrefixPathOrigin::LocalVenv,
+                        system,
+                    ) {
+                        Ok(venv) => venv
+                            .site_packages_directories(system)
+                            .unwrap_or_else(handle_invalid_virtual_env),
+                        Err(error) => handle_invalid_virtual_env(error),
+                    }
+                } else {
+                    tracing::debug!("No virtual environment found");
+                    vec![]
+                }
+            }
+
             PythonPath::KnownSitePackages(paths) => paths
                 .iter()
                 .map(|path| canonicalize(path, system))
@@ -534,7 +573,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
 /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
 ///
 /// This is needed because Salsa requires that all query arguments are salsa ingredients.
-#[salsa::interned]
+#[salsa::interned(debug)]
 struct ModuleNameIngredient<'db> {
     #[return_ref]
     pub(super) name: ModuleName,
@@ -1924,5 +1963,34 @@ not_a_directory
             .ends_with("src/a/__init__.py"),);
 
         Ok(())
+    }
+
+    #[test]
+    fn file_to_module_where_one_search_path_is_subdirectory_of_other() {
+        let project_directory = SystemPathBuf::from("/project");
+        let site_packages = project_directory.join(".venv/lib/python3.13/site-packages");
+        let installed_foo_module = site_packages.join("foo/__init__.py");
+
+        let mut db = TestDb::new();
+        db.write_file(&installed_foo_module, "").unwrap();
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersion::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_roots: vec![project_directory],
+                    custom_typeshed: None,
+                    python_path: PythonPath::KnownSitePackages(vec![site_packages.clone()]),
+                },
+            },
+        )
+        .unwrap();
+
+        let foo_module_file = File::new(&db, FilePath::System(installed_foo_module));
+        let module = file_to_module(&db, foo_module_file).unwrap();
+        assert_eq!(module.search_path(), &site_packages);
     }
 }

@@ -1,0 +1,68 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/decorator_float_literal_py38.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..66,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 45..65,
+                    is_async: false,
+                    decorator_list: [
+                        Decorator {
+                            range: 45..50,
+                            expression: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 46..50,
+                                    value: Float(
+                                        3.14,
+                                    ),
+                                },
+                            ),
+                        },
+                    ],
+                    name: Identifier {
+                        id: Name("bar"),
+                        range: 55..58,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 58..60,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 62..65,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 62..65,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+1 | # parse_options: { "target-version": "3.8" }
+2 | @3.14
+  |  ^^^^ Syntax Error: Cannot use a float literal outside function call arguments in a decorator on Python 3.8 (syntax was added in Python 3.9)
+3 | def bar(): ...
+  |

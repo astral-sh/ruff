@@ -355,7 +355,7 @@ def compute_chained_comparison():
 
 ```py
 class NotBoolable:
-    __bool__ = 5
+    __bool__: int = 5
 
 class Comparable:
     def __lt__(self, other) -> NotBoolable:
@@ -382,12 +382,12 @@ arbitrary objects to a `bool`, but a comparison of tuples will fail if the resul
 pair of elements at equivalent positions cannot be converted to a `bool`:
 
 ```py
+class NotBoolable:
+    __bool__: None = None
+
 class A:
     def __eq__(self, other) -> NotBoolable:
         return NotBoolable()
-
-class NotBoolable:
-    __bool__ = None
 
 # error: [unsupported-bool-conversion]
 (A(),) == (A(),)

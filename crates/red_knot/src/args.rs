@@ -50,6 +50,8 @@ pub(crate) struct CheckCommand {
 
     /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
     ///
+    /// If not specified, Red Knot will look at the `VIRTUAL_ENV` environment variable.
+    ///
     /// Red Knot will search in the path's `site-packages` directories for type information and
     /// third-party imports.
     ///
@@ -78,6 +80,10 @@ pub(crate) struct CheckCommand {
     /// The format to use for printing diagnostic messages.
     #[arg(long)]
     pub(crate) output_format: Option<OutputFormat>,
+
+    /// Control when colored output is used.
+    #[arg(long, value_name = "WHEN")]
+    pub(crate) color: Option<TerminalColor>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
     #[arg(long, conflicts_with = "exit_zero", default_missing_value = "true", num_args=0..1)]
@@ -246,4 +252,18 @@ impl From<OutputFormat> for ruff_db::diagnostic::DiagnosticFormat {
             OutputFormat::Concise => Self::Concise,
         }
     }
+}
+
+/// Control when colored output is used.
+#[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
+pub(crate) enum TerminalColor {
+    /// Display colors if the output goes to an interactive terminal.
+    #[default]
+    Auto,
+
+    /// Always display colors.
+    Always,
+
+    /// Never display colors.
+    Never,
 }

@@ -119,7 +119,7 @@ pub(crate) fn get_section_contexts<'a>(
                 Ordering::Greater => return google_sections,
                 Ordering::Less => return numpy_sections,
                 Ordering::Equal => {}
-            };
+            }
 
             // 0 sections of either convention? Default to numpy
             if google_sections.len() == 0 {

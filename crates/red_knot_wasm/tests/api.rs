@@ -1,15 +1,12 @@
 #![cfg(target_arch = "wasm32")]
 
+use red_knot_wasm::{Position, Workspace};
 use wasm_bindgen_test::wasm_bindgen_test;
-
-use red_knot_wasm::{PythonVersion, Settings, Workspace};
 
 #[wasm_bindgen_test]
 fn check() {
-    let settings = Settings {
-        python_version: PythonVersion::Py312,
-    };
-    let mut workspace = Workspace::new("/", &settings).expect("Workspace to be created");
+    let mut workspace =
+        Workspace::new("/", js_sys::JSON::parse("{}").unwrap()).expect("Workspace to be created");
 
     workspace
         .open_file("test.py", "import random22\n")
@@ -17,17 +14,14 @@ fn check() {
 
     let result = workspace.check().expect("Check to succeed");
 
+    assert_eq!(result.len(), 1);
+
+    let diagnostic = &result[0];
+
+    assert_eq!(diagnostic.id(), "lint:unresolved-import");
     assert_eq!(
-        result,
-        vec![
-            "\
-error: lint:unresolved-import
- --> /test.py:1:8
-  |
-1 | import random22
-  |        ^^^^^^^^ Cannot resolve import `random22`
-  |
-",
-        ],
+        diagnostic.to_range(&workspace).unwrap().start,
+        Position { line: 1, column: 8 }
     );
+    assert_eq!(diagnostic.message(), "Cannot resolve import `random22`");
 }

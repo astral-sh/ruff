@@ -9,8 +9,8 @@ use ruff_python_literal::escape::AsciiEscape;
 use crate::types::class_base::ClassBase;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    CallableType, ClassLiteralType, InstanceType, IntersectionType, KnownClass, StringLiteralType,
-    Type, UnionType,
+    ClassLiteralType, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
+    StringLiteralType, Type, UnionType, WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -33,18 +33,19 @@ pub struct DisplayType<'db> {
 impl Display for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         let representation = self.ty.representation(self.db);
-        if matches!(
-            self.ty,
+        match self.ty {
+            Type::ClassLiteral(literal) if literal.class().is_known(self.db, KnownClass::Any) => {
+                write!(f, "typing.Any")
+            }
             Type::IntLiteral(_)
-                | Type::BooleanLiteral(_)
-                | Type::StringLiteral(_)
-                | Type::BytesLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::FunctionLiteral(_)
-        ) {
-            write!(f, "Literal[{representation}]")
-        } else {
-            representation.fmt(f)
+            | Type::BooleanLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::FunctionLiteral(_) => {
+                write!(f, "Literal[{representation}]")
+            }
+            _ => representation.fmt(f),
         }
     }
 }
@@ -76,6 +77,7 @@ impl Display for DisplayRepresentation<'_> {
                 };
                 f.write_str(representation)
             }
+            Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())
             }
@@ -89,10 +91,8 @@ impl Display for DisplayRepresentation<'_> {
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => f.write_str(function.name(self.db)),
-            Type::Callable(CallableType::General(callable)) => {
-                callable.signature(self.db).display(self.db).fmt(f)
-            }
-            Type::Callable(CallableType::BoundMethod(bound_method)) => {
+            Type::Callable(callable) => callable.signature(self.db).display(self.db).fmt(f),
+            Type::BoundMethod(bound_method) => {
                 write!(
                     f,
                     "<bound method `{method}` of `{instance}`>",
@@ -100,15 +100,26 @@ impl Display for DisplayRepresentation<'_> {
                     instance = bound_method.self_instance(self.db).display(self.db)
                 )
             }
-            Type::Callable(CallableType::MethodWrapperDunderGet(function)) => {
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 write!(
                     f,
                     "<method-wrapper `__get__` of `{function}`>",
                     function = function.name(self.db)
                 )
             }
-            Type::Callable(CallableType::WrapperDescriptorDunderGet) => {
-                f.write_str("<wrapper-descriptor `__get__` of `function` objects>")
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
+                write!(f, "<method-wrapper `__get__` of `property` object>",)
+            }
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => {
+                write!(f, "<method-wrapper `__set__` of `property` object>",)
+            }
+            Type::WrapperDescriptor(kind) => {
+                let (method, object) = match kind {
+                    WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
+                    WrapperDescriptorKind::PropertyDunderGet => ("__get__", "property"),
+                    WrapperDescriptorKind::PropertyDunderSet => ("__set__", "property"),
+                };
+                write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
             }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
@@ -153,6 +164,9 @@ impl Display for DisplayRepresentation<'_> {
                     elements.display(self.db).fmt(f)?;
                 }
                 f.write_str("]")
+            }
+            Type::TypeVar(typevar) => {
+                write!(f, "{}", typevar.name(self.db))
             }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
@@ -292,7 +306,10 @@ impl Display for DisplayUnionType<'_> {
                     db: self.db,
                 });
             } else {
-                join.entry(&element.display(self.db));
+                join.entry(&DisplayMaybeParenthesizedType {
+                    ty: *element,
+                    db: self.db,
+                });
             }
         }
 
@@ -404,7 +421,26 @@ impl Display for DisplayMaybeNegatedType<'_> {
         if self.negated {
             f.write_str("~")?;
         }
-        self.ty.display(self.db).fmt(f)
+        DisplayMaybeParenthesizedType {
+            ty: self.ty,
+            db: self.db,
+        }
+        .fmt(f)
+    }
+}
+
+struct DisplayMaybeParenthesizedType<'db> {
+    ty: Type<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayMaybeParenthesizedType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Type::Callable(_) | Type::MethodWrapper(_) = self.ty {
+            write!(f, "({})", self.ty.display(self.db))
+        } else {
+            self.ty.display(self.db).fmt(f)
+        }
     }
 }
 
@@ -476,8 +512,7 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::types::{
-        KnownClass, Parameter, ParameterKind, Parameters, Signature, SliceLiteralType,
-        StringLiteralType, Type,
+        KnownClass, Parameter, Parameters, Signature, SliceLiteralType, StringLiteralType, Type,
     };
     use crate::Db;
 
@@ -574,14 +609,10 @@ mod tests {
         assert_eq!(
             display_signature(
                 &db,
-                [Parameter::new(
-                    None,
-                    Some(Type::none(&db)),
-                    ParameterKind::PositionalOrKeyword { default_ty: None }
-                )],
+                [Parameter::positional_only(None).with_annotated_type(Type::none(&db))],
                 Some(Type::none(&db))
             ),
-            "(None) -> None"
+            "(None, /) -> None"
         );
 
         // Two parameters where one has annotation and the other doesn't.
@@ -589,20 +620,11 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        Some(Name::new_static("x")),
-                        None,
-                        ParameterKind::PositionalOrKeyword {
-                            default_ty: Some(KnownClass::Int.to_instance(&db))
-                        }
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("y")),
-                        Some(KnownClass::Str.to_instance(&db)),
-                        ParameterKind::PositionalOrKeyword {
-                            default_ty: Some(KnownClass::Str.to_instance(&db))
-                        }
-                    )
+                    Parameter::positional_or_keyword(Name::new_static("x"))
+                        .with_default_type(KnownClass::Int.to_instance(&db)),
+                    Parameter::positional_or_keyword(Name::new_static("y"))
+                        .with_annotated_type(KnownClass::Str.to_instance(&db))
+                        .with_default_type(KnownClass::Str.to_instance(&db)),
                 ],
                 Some(Type::none(&db))
             ),
@@ -614,16 +636,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        Some(Name::new_static("x")),
-                        None,
-                        ParameterKind::PositionalOnly { default_ty: None }
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("y")),
-                        None,
-                        ParameterKind::PositionalOnly { default_ty: None }
-                    )
+                    Parameter::positional_only(Some(Name::new_static("x"))),
+                    Parameter::positional_only(Some(Name::new_static("y"))),
                 ],
                 Some(Type::none(&db))
             ),
@@ -635,16 +649,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        Some(Name::new_static("x")),
-                        None,
-                        ParameterKind::PositionalOnly { default_ty: None }
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("y")),
-                        None,
-                        ParameterKind::PositionalOrKeyword { default_ty: None }
-                    )
+                    Parameter::positional_only(Some(Name::new_static("x"))),
+                    Parameter::positional_or_keyword(Name::new_static("y")),
                 ],
                 Some(Type::none(&db))
             ),
@@ -656,16 +662,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        Some(Name::new_static("x")),
-                        None,
-                        ParameterKind::KeywordOnly { default_ty: None }
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("y")),
-                        None,
-                        ParameterKind::KeywordOnly { default_ty: None }
-                    )
+                    Parameter::keyword_only(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
                 ],
                 Some(Type::none(&db))
             ),
@@ -677,16 +675,8 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        Some(Name::new_static("x")),
-                        None,
-                        ParameterKind::PositionalOrKeyword { default_ty: None }
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("y")),
-                        None,
-                        ParameterKind::KeywordOnly { default_ty: None }
-                    )
+                    Parameter::positional_or_keyword(Name::new_static("x")),
+                    Parameter::keyword_only(Name::new_static("y")),
                 ],
                 Some(Type::none(&db))
             ),
@@ -698,68 +688,28 @@ mod tests {
             display_signature(
                 &db,
                 [
-                    Parameter::new(
-                        Some(Name::new_static("a")),
-                        None,
-                        ParameterKind::PositionalOnly { default_ty: None },
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("b")),
-                        Some(KnownClass::Int.to_instance(&db)),
-                        ParameterKind::PositionalOnly { default_ty: None },
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("c")),
-                        None,
-                        ParameterKind::PositionalOnly {
-                            default_ty: Some(Type::IntLiteral(1)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("d")),
-                        Some(KnownClass::Int.to_instance(&db)),
-                        ParameterKind::PositionalOnly {
-                            default_ty: Some(Type::IntLiteral(2)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("e")),
-                        None,
-                        ParameterKind::PositionalOrKeyword {
-                            default_ty: Some(Type::IntLiteral(3)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("f")),
-                        Some(KnownClass::Int.to_instance(&db)),
-                        ParameterKind::PositionalOrKeyword {
-                            default_ty: Some(Type::IntLiteral(4)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("args")),
-                        Some(Type::object(&db)),
-                        ParameterKind::Variadic,
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("g")),
-                        None,
-                        ParameterKind::KeywordOnly {
-                            default_ty: Some(Type::IntLiteral(5)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("h")),
-                        Some(KnownClass::Int.to_instance(&db)),
-                        ParameterKind::KeywordOnly {
-                            default_ty: Some(Type::IntLiteral(6)),
-                        },
-                    ),
-                    Parameter::new(
-                        Some(Name::new_static("kwargs")),
-                        Some(KnownClass::Str.to_instance(&db)),
-                        ParameterKind::KeywordVariadic,
-                    ),
+                    Parameter::positional_only(Some(Name::new_static("a"))),
+                    Parameter::positional_only(Some(Name::new_static("b")))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db)),
+                    Parameter::positional_only(Some(Name::new_static("c")))
+                        .with_default_type(Type::IntLiteral(1)),
+                    Parameter::positional_only(Some(Name::new_static("d")))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_default_type(Type::IntLiteral(2)),
+                    Parameter::positional_or_keyword(Name::new_static("e"))
+                        .with_default_type(Type::IntLiteral(3)),
+                    Parameter::positional_or_keyword(Name::new_static("f"))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_default_type(Type::IntLiteral(4)),
+                    Parameter::variadic(Name::new_static("args"))
+                        .with_annotated_type(Type::object(&db)),
+                    Parameter::keyword_only(Name::new_static("g"))
+                        .with_default_type(Type::IntLiteral(5)),
+                    Parameter::keyword_only(Name::new_static("h"))
+                        .with_annotated_type(KnownClass::Int.to_instance(&db))
+                        .with_default_type(Type::IntLiteral(6)),
+                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                        .with_annotated_type(KnownClass::Str.to_instance(&db)),
                 ],
                 Some(KnownClass::Bytes.to_instance(&db))
             ),

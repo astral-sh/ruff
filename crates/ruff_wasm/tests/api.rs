@@ -27,7 +27,7 @@ fn empty_config() {
         [ExpandedMessage {
             code: Some(Rule::IfTuple.noqa_code().to_string()),
             message: "If test is a tuple, which is always `True`".to_string(),
-            location: SourceLocation {
+            start_location: SourceLocation {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(3)
             },
@@ -48,7 +48,7 @@ fn syntax_error() {
         [ExpandedMessage {
             code: None,
             message: "SyntaxError: Expected an expression".to_string(),
-            location: SourceLocation {
+            start_location: SourceLocation {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(3)
             },
@@ -69,7 +69,7 @@ fn unsupported_syntax_error() {
         [ExpandedMessage {
             code: None,
             message: "SyntaxError: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)".to_string(),
-            location: SourceLocation {
+            start_location: SourceLocation {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(0)
             },

@@ -3,9 +3,10 @@ use std::sync::Arc;
 
 use crate::DEFAULT_LINT_REGISTRY;
 use crate::{Project, ProjectMetadata};
+use red_knot_ide::Db as IdeDb;
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
 use red_knot_python_semantic::{Db as SemanticDb, Program};
-use ruff_db::diagnostic::OldDiagnosticTrait;
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
@@ -55,13 +56,12 @@ impl ProjectDatabase {
     }
 
     /// Checks all open files in the project and its dependencies.
-    pub fn check(&self) -> Result<Vec<Box<dyn OldDiagnosticTrait>>, Cancelled> {
+    pub fn check(&self) -> Result<Vec<Diagnostic>, Cancelled> {
         self.with_db(|db| db.project().check(db))
     }
 
-    pub fn check_file(&self, file: File) -> Result<Vec<Box<dyn OldDiagnosticTrait>>, Cancelled> {
-        let _span = tracing::debug_span!("check_file", file=%file.path(self)).entered();
-
+    #[tracing::instrument(level = "debug", skip(self))]
+    pub fn check_file(&self, file: File) -> Result<Vec<Diagnostic>, Cancelled> {
         self.with_db(|db| self.project().check_file(db, file))
     }
 
@@ -103,6 +103,19 @@ impl Upcast<dyn SourceDb> for ProjectDatabase {
         self
     }
 }
+
+impl Upcast<dyn IdeDb> for ProjectDatabase {
+    fn upcast(&self) -> &(dyn IdeDb + 'static) {
+        self
+    }
+
+    fn upcast_mut(&mut self) -> &mut (dyn IdeDb + 'static) {
+        self
+    }
+}
+
+#[salsa::db]
+impl IdeDb for ProjectDatabase {}
 
 #[salsa::db]
 impl SemanticDb for ProjectDatabase {
@@ -146,7 +159,7 @@ impl salsa::Database for ProjectDatabase {
         }
 
         let event = event();
-        if matches!(event.kind, salsa::EventKind::WillCheckCancellation { .. }) {
+        if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
             return;
         }
 

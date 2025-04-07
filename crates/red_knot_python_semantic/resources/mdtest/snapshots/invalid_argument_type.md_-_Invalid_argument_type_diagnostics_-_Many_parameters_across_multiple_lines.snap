@@ -33,12 +33,13 @@ error: lint:invalid-argument-type
 8 | foo(1, "hello", 3)  # error: [invalid-argument-type]
   |        ^^^^^^^ Object of type `Literal["hello"]` cannot be assigned to parameter 2 (`y`) of function `foo`; expected type `int`
   |
- ::: /src/mdtest_snippet.py:3:5
+info
+ --> /src/mdtest_snippet.py:3:5
   |
 1 | def foo(
 2 |     x: int,
 3 |     y: int,
-  |     ------ info: parameter declared in function definition here
+  |     ------ parameter declared in function definition here
 4 |     z: int,
 5 | ) -> int:
   |

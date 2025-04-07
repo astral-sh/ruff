@@ -337,9 +337,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::UndocumentedWarn) {
                 flake8_logging::rules::undocumented_warn(checker, expr);
             }
-            if checker.enabled(Rule::LoadBeforeGlobalDeclaration) {
-                pylint::rules::load_before_global_declaration(checker, id, expr);
-            }
         }
         Expr::Attribute(attribute) => {
             if attribute.ctx == ExprContext::Load {
@@ -1752,5 +1749,5 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         _ => {}
-    };
+    }
 }

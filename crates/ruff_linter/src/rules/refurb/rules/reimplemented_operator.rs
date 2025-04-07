@@ -273,7 +273,7 @@ fn itemgetter_op(expr: &ExprSubscript, params: &Parameters, locator: &Locator) -
     // The argument to the lambda must match the subscripted value, as in: `lambda x: x[1]`.
     if !is_same_expression(arg, &expr.value) {
         return None;
-    };
+    }
 
     // The subscripted expression can't contain references to the argument, as in: `lambda x: x[x]`.
     if any_over_expr(expr.slice.as_ref(), &|expr| is_same_expression(arg, expr)) {

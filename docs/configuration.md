@@ -737,6 +737,9 @@ Miscellaneous:
           Path to the cache directory [env: RUFF_CACHE_DIR=]
       --stdin-filename <STDIN_FILENAME>
           The name of the file when passing it through stdin
+      --exit-non-zero-on-format
+          Exit with a non-zero status code if any files were modified via
+          format, even if all files were formatted successfully
 
 File selection:
       --respect-gitignore

@@ -40,6 +40,9 @@ export default {
     const { DEV, PLAYGROUND } = env;
 
     const headers = DEV ? DEVELOPMENT_HEADERS : PRODUCTION_HEADERS;
+    if (!DEV && request.headers.get("origin") === "https://playknot.ruff.rs") {
+      headers["Access-Control-Allow-Origin"] = "https://playknot.ruff.rs";
+    }
 
     switch (request.method) {
       case "GET": {
@@ -55,7 +58,7 @@ export default {
         }
 
         const playground = await PLAYGROUND.get(key);
-        if (playground === null) {
+        if (playground == null) {
           return new Response("Not Found", {
             status: 404,
             headers,

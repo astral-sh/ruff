@@ -8,10 +8,10 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, ScopedExpressionId};
 use crate::semantic_index::symbol::ScopeId;
 use crate::types::{infer_expression_types, todo_type, Type, TypeCheckDiagnostics};
-use crate::unpack::UnpackValue;
+use crate::unpack::{UnpackKind, UnpackValue};
 use crate::Db;
 
-use super::context::{InferContext, WithDiagnostics};
+use super::context::InferContext;
 use super::diagnostic::INVALID_ASSIGNMENT;
 use super::{TupleType, UnionType};
 
@@ -42,30 +42,33 @@ impl<'db> Unpacker<'db> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_ty = infer_expression_types(self.db(), value.expression())
+        let value_type = infer_expression_types(self.db(), value.expression())
             .expression_type(value.scoped_expression_id(self.db(), self.scope));
 
-        let value_ty = match value {
-            UnpackValue::Assign(expression) => {
+        let value_type = match value.kind() {
+            UnpackKind::Assign => {
                 if self.context.in_stub()
-                    && expression.node_ref(self.db()).is_ellipsis_literal_expr()
+                    && value
+                        .expression()
+                        .node_ref(self.db())
+                        .is_ellipsis_literal_expr()
                 {
                     Type::unknown()
                 } else {
-                    value_ty
+                    value_type
                 }
             }
-            UnpackValue::Iterable(_) => value_ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+            UnpackKind::Iterable => value_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, value_type, value.as_any_node_ref(self.db()));
                 err.fallback_element_type(self.db())
             }),
-            UnpackValue::ContextManager(_) => value_ty.try_enter(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, value.as_any_node_ref(self.db()));
+            UnpackKind::ContextManager => value_type.try_enter(self.db()).unwrap_or_else(|err| {
+                err.report_diagnostic(&self.context, value_type, value.as_any_node_ref(self.db()));
                 err.fallback_enter_type(self.db())
             }),
         };
 
-        self.unpack_inner(target, value.as_any_node_ref(self.db()), value_ty);
+        self.unpack_inner(target, value.as_any_node_ref(self.db()), value_type);
     }
 
     fn unpack_inner(
@@ -113,8 +116,10 @@ impl<'db> Unpacker<'db> {
                             // it's worth it.
                             TupleType::from_elements(
                                 self.db(),
-                                std::iter::repeat(Type::LiteralString)
-                                    .take(string_literal_ty.python_len(self.db())),
+                                std::iter::repeat_n(
+                                    Type::LiteralString,
+                                    string_literal_ty.python_len(self.db()),
+                                ),
                             )
                         }
                         _ => ty,
@@ -165,7 +170,7 @@ impl<'db> Unpacker<'db> {
                             Type::LiteralString
                         } else {
                             ty.try_iterate(self.db()).unwrap_or_else(|err| {
-                                err.report_diagnostic(&self.context, value_expr);
+                                err.report_diagnostic(&self.context, ty, value_expr);
                                 err.fallback_element_type(self.db())
                             })
                         };
@@ -280,10 +285,9 @@ impl<'db> UnpackResult<'db> {
     pub(crate) fn expression_type(&self, expr_id: ScopedExpressionId) -> Type<'db> {
         self.targets[&expr_id]
     }
-}
 
-impl WithDiagnostics for UnpackResult<'_> {
-    fn diagnostics(&self) -> &TypeCheckDiagnostics {
+    /// Returns the diagnostics in this unpacking assignment.
+    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
         &self.diagnostics
     }
 }

@@ -219,7 +219,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     5 |     x = a
     6 |
     7 | print(x)  # possibly-unresolved-reference
-      |       - Name `x` used when possibly not defined
+      |       ^ Name `x` used when possibly not defined
       |
 
     Found 2 diagnostics
@@ -244,7 +244,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:5
       |
     2 | y = 4 / 0
-      |     ----- Cannot divide object of type `Literal[4]` by zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
     4 | for a in range(0, y):
       |
@@ -306,7 +306,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     7 |     x = a
     8 |
     9 | print(x)  # possibly-unresolved-reference
-      |       - Name `x` used when possibly not defined
+      |       ^ Name `x` used when possibly not defined
       |
 
     Found 3 diagnostics
@@ -331,7 +331,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:8
       |
     2 | import does_not_exit
-      |        ------------- Cannot resolve import `does_not_exit`
+      |        ^^^^^^^^^^^^^ Cannot resolve import `does_not_exit`
     3 |
     4 | y = 4 / 0
       |
@@ -342,7 +342,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     2 | import does_not_exit
     3 |
     4 | y = 4 / 0
-      |     ----- Cannot divide object of type `Literal[4]` by zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     5 |
     6 | for a in range(0, y):
       |
@@ -393,7 +393,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     5 |     x = a
     6 |
     7 | print(x)  # possibly-unresolved-reference
-      |       - Name `x` used when possibly not defined
+      |       ^ Name `x` used when possibly not defined
       |
 
     Found 2 diagnostics
@@ -419,7 +419,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:5
       |
     2 | y = 4 / 0
-      |     ----- Cannot divide object of type `Literal[4]` by zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
     4 | for a in range(0, y):
       |
@@ -456,7 +456,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
       |
     2 | [tool.knot.rules]
     3 | division-by-zer = "warn" # incorrect rule name
-      | --------------- Unknown lint rule `division-by-zer`
+      | ^^^^^^^^^^^^^^^ Unknown lint rule `division-by-zer`
       |
 
     Found 1 diagnostic
@@ -498,7 +498,7 @@ fn exit_code_only_warnings() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
       |
 
     Found 1 diagnostic
@@ -528,7 +528,7 @@ fn exit_code_only_info() -> anyhow::Result<()> {
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | -------------- info: Revealed type is `Literal[1]`
+      | ^^^^^^^^^^^^^^ Revealed type is `Literal[1]`
       |
 
     Found 1 diagnostic
@@ -558,7 +558,7 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | -------------- info: Revealed type is `Literal[1]`
+      | ^^^^^^^^^^^^^^ Revealed type is `Literal[1]`
       |
 
     Found 1 diagnostic
@@ -581,7 +581,7 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
       |
 
     Found 1 diagnostic
@@ -613,7 +613,7 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
      --> <temp_dir>/test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
       |
 
     Found 1 diagnostic
@@ -642,7 +642,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
     3 | print(4[1])  # [non-subscriptable]
       |
 
@@ -680,7 +680,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
      --> <temp_dir>/test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
     3 | print(4[1])  # [non-subscriptable]
       |
 
@@ -718,7 +718,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
      --> <temp_dir>/test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
-      |       - Name `x` used when not defined
+      |       ^ Name `x` used when not defined
     3 | print(4[1])  # [non-subscriptable]
       |
 
@@ -778,7 +778,7 @@ fn user_configuration() -> anyhow::Result<()> {
      --> <temp_dir>/project/main.py:2:5
       |
     2 | y = 4 / 0
-      |     ----- Cannot divide object of type `Literal[4]` by zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
     4 | for a in range(0, y):
       |
@@ -789,7 +789,7 @@ fn user_configuration() -> anyhow::Result<()> {
     5 |     x = a
     6 |
     7 | print(x)
-      |       - Name `x` used when possibly not defined
+      |       ^ Name `x` used when possibly not defined
       |
 
     Found 2 diagnostics
@@ -820,7 +820,7 @@ fn user_configuration() -> anyhow::Result<()> {
      --> <temp_dir>/project/main.py:2:5
       |
     2 | y = 4 / 0
-      |     ----- Cannot divide object of type `Literal[4]` by zero
+      |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
     4 | for a in range(0, y):
       |

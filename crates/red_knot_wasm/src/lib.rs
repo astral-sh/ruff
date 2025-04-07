@@ -1,20 +1,26 @@
 use std::any::Any;
 
-use js_sys::Error;
-use wasm_bindgen::prelude::*;
-
-use red_knot_project::metadata::options::{EnvironmentOptions, Options};
-use red_knot_project::metadata::value::RangedValue;
+use js_sys::{Error, JsString};
+use red_knot_ide::{goto_type_definition, hover, MarkupKind};
+use red_knot_project::metadata::options::Options;
+use red_knot_project::metadata::value::ValueSource;
+use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait};
-use ruff_db::files::{system_path_to_file, File};
+use red_knot_python_semantic::Program;
+use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
+use ruff_db::files::{system_path_to_file, File, FileRange};
+use ruff_db::source::{line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
     CaseSensitivity, DirectoryEntry, GlobError, MemoryFileSystem, Metadata, PatternError, System,
     SystemPath, SystemPathBuf, SystemVirtualPath,
 };
+use ruff_db::Upcast;
 use ruff_notebook::Notebook;
+use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
+use ruff_text_size::Ranged;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
 pub fn run() {
@@ -41,41 +47,70 @@ pub struct Workspace {
 #[wasm_bindgen]
 impl Workspace {
     #[wasm_bindgen(constructor)]
-    pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
+    pub fn new(root: &str, options: JsValue) -> Result<Workspace, Error> {
+        let options = Options::deserialize_with(
+            ValueSource::Cli,
+            serde_wasm_bindgen::Deserializer::from(options),
+        )
+        .map_err(into_error)?;
+
         let system = WasmSystem::new(SystemPath::new(root));
 
-        let mut workspace =
-            ProjectMetadata::discover(SystemPath::new(root), &system).map_err(into_error)?;
+        let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
+            .map_err(into_error)?;
 
-        workspace.apply_cli_options(Options {
-            environment: Some(EnvironmentOptions {
-                python_version: Some(RangedValue::cli(settings.python_version.into())),
-                ..EnvironmentOptions::default()
-            }),
-            ..Options::default()
-        });
-
-        let db = ProjectDatabase::new(workspace, system.clone()).map_err(into_error)?;
+        let db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
 
         Ok(Self { db, system })
     }
 
-    #[wasm_bindgen(js_name = "openFile")]
-    pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
-        self.system
-            .fs
-            .write_file_all(path, contents)
+    #[wasm_bindgen(js_name = "updateOptions")]
+    pub fn update_options(&mut self, options: JsValue) -> Result<(), Error> {
+        let options = Options::deserialize_with(
+            ValueSource::Cli,
+            serde_wasm_bindgen::Deserializer::from(options),
+        )
+        .map_err(into_error)?;
+
+        let project = ProjectMetadata::from_options(
+            options,
+            self.db.project().root(&self.db).to_path_buf(),
+            None,
+        )
+        .map_err(into_error)?;
+
+        let program_settings = project.to_program_settings(&self.system);
+        Program::get(&self.db)
+            .update_from_settings(&mut self.db, program_settings)
             .map_err(into_error)?;
 
-        let file = system_path_to_file(&self.db, path).expect("File to exist");
-        file.sync(&mut self.db);
+        self.db.project().reload(&mut self.db, project);
+
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "openFile")]
+    pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
+        let path = SystemPath::absolute(path, self.db.project().root(&self.db));
+
+        self.system
+            .fs
+            .write_file_all(&path, contents)
+            .map_err(into_error)?;
+
+        self.db.apply_changes(
+            vec![ChangeEvent::Created {
+                path: path.clone(),
+                kind: CreatedKind::File,
+            }],
+            None,
+        );
+
+        let file = system_path_to_file(&self.db, &path).expect("File to exist");
 
         self.db.project().open_file(&mut self.db, file);
 
-        Ok(FileHandle {
-            file,
-            path: SystemPath::new(path).to_path_buf(),
-        })
+        Ok(FileHandle { path, file })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
@@ -89,7 +124,19 @@ impl Workspace {
             .write_file(&file_id.path, contents)
             .map_err(into_error)?;
 
-        file_id.file.sync(&mut self.db);
+        self.db.apply_changes(
+            vec![
+                ChangeEvent::Changed {
+                    path: file_id.path.to_path_buf(),
+                    kind: ChangedKind::FileContent,
+                },
+                ChangeEvent::Changed {
+                    path: file_id.path.to_path_buf(),
+                    kind: ChangedKind::FileMetadata,
+                },
+            ],
+            None,
+        );
 
         Ok(())
     }
@@ -104,32 +151,30 @@ impl Workspace {
             .remove_file(&file_id.path)
             .map_err(into_error)?;
 
-        file.sync(&mut self.db);
+        self.db.apply_changes(
+            vec![ChangeEvent::Deleted {
+                path: file_id.path.to_path_buf(),
+                kind: DeletedKind::File,
+            }],
+            None,
+        );
 
         Ok(())
     }
 
     /// Checks a single file.
     #[wasm_bindgen(js_name = "checkFile")]
-    pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<String>, Error> {
+    pub fn check_file(&self, file_id: &FileHandle) -> Result<Vec<Diagnostic>, Error> {
         let result = self.db.check_file(file_id.file).map_err(into_error)?;
 
-        let display_config = DisplayDiagnosticConfig::default().color(false);
-        Ok(result
-            .into_iter()
-            .map(|diagnostic| diagnostic.display(&self.db, &display_config).to_string())
-            .collect())
+        Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
     /// Checks all open files
-    pub fn check(&self) -> Result<Vec<String>, Error> {
+    pub fn check(&self) -> Result<Vec<Diagnostic>, Error> {
         let result = self.db.check().map_err(into_error)?;
 
-        let display_config = DisplayDiagnosticConfig::default().color(false);
-        Ok(result
-            .into_iter()
-            .map(|diagnostic| diagnostic.display(&self.db, &display_config).to_string())
-            .collect())
+        Ok(result.into_iter().map(Diagnostic::wrap).collect())
     }
 
     /// Returns the parsed AST for `path`
@@ -152,6 +197,83 @@ impl Workspace {
 
         Ok(source_text.to_string())
     }
+
+    #[wasm_bindgen(js_name = "gotoTypeDefinition")]
+    pub fn goto_type_definition(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = index.offset(
+            OneIndexed::new(position.line).ok_or_else(|| {
+                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
+            })?,
+            OneIndexed::new(position.column).ok_or_else(|| {
+                Error::new(
+                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                )
+            })?,
+            &source,
+        );
+
+        let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        let source_range = Range::from_text_range(targets.file_range().range(), &index, &source);
+
+        let links: Vec<_> = targets
+            .into_iter()
+            .map(|target| LocationLink {
+                path: target.file().path(&self.db).to_string(),
+                full_range: Range::from_file_range(
+                    &self.db,
+                    FileRange::new(target.file(), target.full_range()),
+                ),
+                selection_range: Some(Range::from_file_range(
+                    &self.db,
+                    FileRange::new(target.file(), target.focus_range()),
+                )),
+                origin_selection_range: Some(source_range),
+            })
+            .collect();
+
+        Ok(links)
+    }
+
+    #[wasm_bindgen]
+    pub fn hover(&self, file_id: &FileHandle, position: Position) -> Result<Option<Hover>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = index.offset(
+            OneIndexed::new(position.line).ok_or_else(|| {
+                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
+            })?,
+            OneIndexed::new(position.column).ok_or_else(|| {
+                Error::new(
+                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                )
+            })?,
+            &source,
+        );
+
+        let Some(range_info) = hover(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        let source_range = Range::from_text_range(range_info.file_range().range(), &index, &source);
+
+        Ok(Some(Hover {
+            markdown: range_info
+                .display(&self.db, MarkupKind::Markdown)
+                .to_string(),
+            range: source_range,
+        }))
+    }
 }
 
 pub(crate) fn into_error<E: std::fmt::Display>(err: E) -> Error {
@@ -171,45 +293,183 @@ impl FileHandle {
     pub fn js_to_string(&self) -> String {
         format!("file(id: {:?}, path: {})", self.file, self.path)
     }
-}
 
-#[wasm_bindgen]
-pub struct Settings {
-    pub python_version: PythonVersion,
-}
-#[wasm_bindgen]
-impl Settings {
-    #[wasm_bindgen(constructor)]
-    pub fn new(python_version: PythonVersion) -> Self {
-        Self { python_version }
+    pub fn path(&self) -> String {
+        self.path.to_string()
     }
 }
 
 #[wasm_bindgen]
-#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub enum PythonVersion {
-    Py37,
-    Py38,
-    #[default]
-    Py39,
-    Py310,
-    Py311,
-    Py312,
-    Py313,
+pub struct Diagnostic {
+    #[wasm_bindgen(readonly)]
+    inner: diagnostic::Diagnostic,
 }
 
-impl From<PythonVersion> for ruff_python_ast::PythonVersion {
-    fn from(value: PythonVersion) -> Self {
-        match value {
-            PythonVersion::Py37 => Self::PY37,
-            PythonVersion::Py38 => Self::PY38,
-            PythonVersion::Py39 => Self::PY39,
-            PythonVersion::Py310 => Self::PY310,
-            PythonVersion::Py311 => Self::PY311,
-            PythonVersion::Py312 => Self::PY312,
-            PythonVersion::Py313 => Self::PY313,
+#[wasm_bindgen]
+impl Diagnostic {
+    fn wrap(diagnostic: diagnostic::Diagnostic) -> Self {
+        Self { inner: diagnostic }
+    }
+
+    #[wasm_bindgen]
+    pub fn message(&self) -> JsString {
+        JsString::from(self.inner.primary_message())
+    }
+
+    #[wasm_bindgen]
+    pub fn id(&self) -> JsString {
+        JsString::from(self.inner.id().to_string())
+    }
+
+    #[wasm_bindgen]
+    pub fn severity(&self) -> Severity {
+        Severity::from(self.inner.severity())
+    }
+
+    #[wasm_bindgen(js_name = "textRange")]
+    pub fn text_range(&self) -> Option<TextRange> {
+        self.inner
+            .primary_span()
+            .and_then(|span| Some(TextRange::from(span.range()?)))
+    }
+
+    #[wasm_bindgen(js_name = "toRange")]
+    pub fn to_range(&self, workspace: &Workspace) -> Option<Range> {
+        self.inner.primary_span().and_then(|span| {
+            Some(Range::from_file_range(
+                &workspace.db,
+                FileRange::new(span.file(), span.range()?),
+            ))
+        })
+    }
+
+    #[wasm_bindgen]
+    pub fn display(&self, workspace: &Workspace) -> JsString {
+        let config = DisplayDiagnosticConfig::default().color(false);
+        self.inner
+            .display(workspace.db.upcast(), &config)
+            .to_string()
+            .into()
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Range {
+    pub start: Position,
+    pub end: Position,
+}
+
+impl Range {
+    fn from_file_range(db: &dyn Db, file_range: FileRange) -> Self {
+        let index = line_index(db.upcast(), file_range.file());
+        let source = source_text(db.upcast(), file_range.file());
+
+        Self::from_text_range(file_range.range(), &index, &source)
+    }
+
+    fn from_text_range(
+        text_range: ruff_text_size::TextRange,
+        line_index: &LineIndex,
+        source: &str,
+    ) -> Self {
+        let start = line_index.source_location(text_range.start(), source);
+        let end = line_index.source_location(text_range.end(), source);
+        Self::from((start, end))
+    }
+}
+
+impl From<(SourceLocation, SourceLocation)> for Range {
+    fn from((start, end): (SourceLocation, SourceLocation)) -> Self {
+        Self {
+            start: start.into(),
+            end: end.into(),
         }
     }
+}
+
+#[wasm_bindgen]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct Position {
+    /// One indexed line number
+    pub line: usize,
+
+    /// One indexed column number (the nth character on the line)
+    pub column: usize,
+}
+
+#[wasm_bindgen]
+impl Position {
+    #[wasm_bindgen(constructor)]
+    pub fn new(line: usize, column: usize) -> Self {
+        Self { line, column }
+    }
+}
+
+impl From<SourceLocation> for Position {
+    fn from(location: SourceLocation) -> Self {
+        Self {
+            line: location.row.get(),
+            column: location.column.get(),
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Copy, Clone, Hash, PartialEq, Eq)]
+pub enum Severity {
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<ruff_db::diagnostic::Severity> for Severity {
+    fn from(value: ruff_db::diagnostic::Severity) -> Self {
+        match value {
+            ruff_db::diagnostic::Severity::Info => Self::Info,
+            ruff_db::diagnostic::Severity::Warning => Self::Warning,
+            ruff_db::diagnostic::Severity::Error => Self::Error,
+            ruff_db::diagnostic::Severity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub struct TextRange {
+    pub start: u32,
+    pub end: u32,
+}
+
+impl From<ruff_text_size::TextRange> for TextRange {
+    fn from(value: ruff_text_size::TextRange) -> Self {
+        Self {
+            start: value.start().into(),
+            end: value.end().into(),
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub struct LocationLink {
+    /// The target file path
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+
+    /// The full range of the target
+    pub full_range: Range,
+    /// The target's range that should be selected/highlighted
+    pub selection_range: Option<Range>,
+    /// The range of the origin.
+    pub origin_selection_range: Option<Range>,
+}
+
+#[wasm_bindgen]
+pub struct Hover {
+    #[wasm_bindgen(getter_with_clone)]
+    pub markdown: String,
+
+    pub range: Range,
 }
 
 #[derive(Debug, Clone)]
@@ -307,17 +567,4 @@ impl System for WasmSystem {
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::PythonVersion;
-
-    #[test]
-    fn same_default_as_python_version() {
-        assert_eq!(
-            ruff_python_ast::PythonVersion::from(PythonVersion::default()),
-            ruff_python_ast::PythonVersion::default()
-        );
-    }
 }

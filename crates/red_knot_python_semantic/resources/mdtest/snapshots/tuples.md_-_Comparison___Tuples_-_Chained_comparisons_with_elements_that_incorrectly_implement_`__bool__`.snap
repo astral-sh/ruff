@@ -13,7 +13,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/tuples.
 
 ```
  1 | class NotBoolable:
- 2 |     __bool__ = 5
+ 2 |     __bool__: int = 5
  3 | 
  4 | class Comparable:
  5 |     def __lt__(self, other) -> NotBoolable:

@@ -71,7 +71,7 @@ def _(flag: bool):
 
     a = NonCallable()
     # error: [call-non-callable] "Object of type `Literal[1]` is not callable"
-    reveal_type(a())  # revealed: int | Unknown
+    reveal_type(a())  # revealed: Unknown | int
 ```
 
 ## Call binding errors

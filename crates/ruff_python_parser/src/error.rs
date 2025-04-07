@@ -452,6 +452,14 @@ pub enum StarTupleKind {
     Yield,
 }
 
+/// The type of PEP 701 f-string error for [`UnsupportedSyntaxErrorKind::Pep701FString`].
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+pub enum FStringKind {
+    Backslash,
+    Comment,
+    NestedQuote,
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum UnparenthesizedNamedExprKind {
     SequenceIndex,
@@ -601,7 +609,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEP 614]: https://peps.python.org/pep-0614/
     /// [`dotted_name`]: https://docs.python.org/3.8/reference/compound_stmts.html#grammar-token-dotted-name
     /// [decorator grammar]: https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-decorator
-    RelaxedDecorator,
+    RelaxedDecorator(RelaxedDecoratorError),
 
     /// Represents the use of a [PEP 570] positional-only parameter before Python 3.8.
     ///
@@ -660,6 +668,74 @@ pub enum UnsupportedSyntaxErrorKind {
     TypeParameterList,
     TypeAliasStatement,
     TypeParamDefault,
+
+    /// Represents the use of a [PEP 701] f-string before Python 3.12.
+    ///
+    /// ## Examples
+    ///
+    /// As described in the PEP, each of these cases were invalid before Python 3.12:
+    ///
+    /// ```python
+    /// # nested quotes
+    /// f'Magic wand: { bag['wand'] }'
+    ///
+    /// # escape characters
+    /// f"{'\n'.join(a)}"
+    ///
+    /// # comments
+    /// f'''A complex trick: {
+    ///     bag['bag']  # recursive bags!
+    /// }'''
+    ///
+    /// # arbitrary nesting
+    /// f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"
+    /// ```
+    ///
+    /// These restrictions were lifted in Python 3.12, meaning that all of these examples are now
+    /// valid.
+    ///
+    /// [PEP 701]: https://peps.python.org/pep-0701/
+    Pep701FString(FStringKind),
+
+    /// Represents the use of a parenthesized `with` item before Python 3.9.
+    ///
+    /// ## Examples
+    ///
+    /// As described in [BPO 12782], `with` uses like this were not allowed on Python 3.8:
+    ///
+    /// ```python
+    /// with (open("a_really_long_foo") as foo,
+    ///       open("a_really_long_bar") as bar):
+    ///     pass
+    /// ```
+    ///
+    /// because parentheses were not allowed within the `with` statement itself (see [this comment]
+    /// in particular). However, parenthesized expressions were still allowed, including the cases
+    /// below, so the issue can be pretty subtle and relates specifically to parenthesized items
+    /// with `as` bindings.
+    ///
+    /// ```python
+    /// with (foo, bar): ...  # okay
+    /// with (
+    ///   open('foo.txt')) as foo: ...  # also okay
+    /// with (
+    ///   foo,
+    ///   bar,
+    ///   baz,
+    /// ): ...  # also okay, just a tuple
+    /// with (
+    ///   foo,
+    ///   bar,
+    ///   baz,
+    /// ) as tup: ...  # also okay, binding the tuple
+    /// ```
+    ///
+    /// This restriction was lifted in 3.9 but formally included in the [release notes] for 3.10.
+    ///
+    /// [BPO 12782]: https://github.com/python/cpython/issues/56991
+    /// [this comment]: https://github.com/python/cpython/issues/56991#issuecomment-1093555141
+    /// [release notes]: https://docs.python.org/3/whatsnew/3.10.html#summary-release-highlights
+    ParenthesizedContextManager,
 
     /// Represents the use of a [PEP 646] star expression in an index.
     ///
@@ -768,7 +844,28 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::StarTuple(StarTupleKind::Yield) => {
                 "Cannot use iterable unpacking in yield expressions"
             }
-            UnsupportedSyntaxErrorKind::RelaxedDecorator => "Unsupported expression in decorators",
+            UnsupportedSyntaxErrorKind::RelaxedDecorator(relaxed_decorator_error) => {
+                return match relaxed_decorator_error {
+                    RelaxedDecoratorError::CallExpression => {
+                        write!(
+                            f,
+                            "Cannot use a call expression in a decorator on Python {} \
+                            unless it is the top-level expression or it occurs \
+                            in the argument list of a top-level call expression \
+                            (relaxed decorator syntax was {changed})",
+                            self.target_version,
+                            changed = self.kind.changed_version(),
+                        )
+                    }
+                    RelaxedDecoratorError::Other(description) => write!(
+                        f,
+                        "Cannot use {description} outside function call arguments in a decorator on Python {} \
+                        (syntax was {changed})",
+                        self.target_version,
+                        changed = self.kind.changed_version(),
+                    ),
+                }
+            }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 "Cannot use positional-only parameter separator"
             }
@@ -776,6 +873,18 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeAliasStatement => "Cannot use `type` alias statement",
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash) => {
+                "Cannot use an escape sequence (backslash) in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment) => {
+                "Cannot use comments in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote) => {
+                "Cannot reuse outer quote character in f-strings"
+            }
+            UnsupportedSyntaxErrorKind::ParenthesizedContextManager => {
+                "Cannot use parentheses within a `with` statement"
             }
             UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
                 "Cannot use star expression in index"
@@ -793,6 +902,12 @@ impl Display for UnsupportedSyntaxError {
             changed = self.kind.changed_version(),
         )
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RelaxedDecoratorError {
+    CallExpression,
+    Other(&'static str),
 }
 
 /// Represents the kind of change in Python syntax between versions.
@@ -822,7 +937,9 @@ impl UnsupportedSyntaxErrorKind {
                 Change::Added(PythonVersion::PY39)
             }
             UnsupportedSyntaxErrorKind::StarTuple(_) => Change::Added(PythonVersion::PY38),
-            UnsupportedSyntaxErrorKind::RelaxedDecorator => Change::Added(PythonVersion::PY39),
+            UnsupportedSyntaxErrorKind::RelaxedDecorator { .. } => {
+                Change::Added(PythonVersion::PY39)
+            }
             UnsupportedSyntaxErrorKind::PositionalOnlyParameter => {
                 Change::Added(PythonVersion::PY38)
             }
@@ -832,6 +949,10 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::TypeParameterList => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeAliasStatement => Change::Added(PythonVersion::PY312),
             UnsupportedSyntaxErrorKind::TypeParamDefault => Change::Added(PythonVersion::PY313),
+            UnsupportedSyntaxErrorKind::Pep701FString(_) => Change::Added(PythonVersion::PY312),
+            UnsupportedSyntaxErrorKind::ParenthesizedContextManager => {
+                Change::Added(PythonVersion::PY39)
+            }
             UnsupportedSyntaxErrorKind::StarExpressionInIndex => {
                 Change::Added(PythonVersion::PY311)
             }

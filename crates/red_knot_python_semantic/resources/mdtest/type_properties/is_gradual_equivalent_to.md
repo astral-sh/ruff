@@ -42,12 +42,16 @@ static_assert(is_gradual_equivalent_to(str | int, int | str))
 static_assert(
     is_gradual_equivalent_to(Intersection[str, int, Not[bytes], Not[None]], Intersection[int, str, Not[None], Not[bytes]])
 )
-# TODO: `~type[Any]` shoudld be gradually equivalent to `~type[Unknown]`
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(Intersection[str | int, Not[type[Any]]], Intersection[int | str, Not[type[Unknown]]]))
 
 static_assert(not is_gradual_equivalent_to(str | int, int | str | bytes))
 static_assert(not is_gradual_equivalent_to(str | int | bytes, int | str | dict))
+
+# TODO: No errors
+# error: [static-assert-error]
+static_assert(is_gradual_equivalent_to(Unknown, Unknown | Any))
+# error: [static-assert-error]
+static_assert(is_gradual_equivalent_to(Unknown, Intersection[Unknown, Any]))
 ```
 
 ## Tuples
@@ -64,8 +68,12 @@ static_assert(not is_gradual_equivalent_to(tuple[str, int], tuple[int, str]))
 
 ## Callable
 
+The examples provided below are only a subset of the possible cases and only include the ones with
+gradual types. The cases with fully static types and using different combinations of parameter kinds
+are covered in the [equivalence tests](./is_equivalent_to.md#callable).
+
 ```py
-from knot_extensions import Unknown, CallableTypeFromFunction, is_gradual_equivalent_to, static_assert
+from knot_extensions import Unknown, CallableTypeOf, is_gradual_equivalent_to, static_assert
 from typing import Any, Callable
 
 static_assert(is_gradual_equivalent_to(Callable[..., int], Callable[..., int]))
@@ -84,16 +92,16 @@ type of `Any`.
 def f1():
     return
 
-static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f1], Callable[[], Any]))
+static_assert(is_gradual_equivalent_to(CallableTypeOf[f1], Callable[[], Any]))
 ```
 
 And, similarly for parameters with no annotations.
 
 ```py
-def f2(a, b) -> None:
+def f2(a, b, /) -> None:
     return
 
-static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[f2], Callable[[Any, Any], None]))
+static_assert(is_gradual_equivalent_to(CallableTypeOf[f2], Callable[[Any, Any], None]))
 ```
 
 Additionally, as per the spec, a function definition that includes both `*args` and `**kwargs`
@@ -107,12 +115,12 @@ def variadic_without_annotation(*args, **kwargs):
 def variadic_with_annotation(*args: Any, **kwargs: Any) -> Any:
     return
 
-static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[variadic_without_annotation], Callable[..., Any]))
-static_assert(is_gradual_equivalent_to(CallableTypeFromFunction[variadic_with_annotation], Callable[..., Any]))
+static_assert(is_gradual_equivalent_to(CallableTypeOf[variadic_without_annotation], Callable[..., Any]))
+static_assert(is_gradual_equivalent_to(CallableTypeOf[variadic_with_annotation], Callable[..., Any]))
 ```
 
-But, a function with either `*args` or `**kwargs` is not gradual equivalent to a callable with `...`
-as the parameter type.
+But, a function with either `*args` or `**kwargs` (and not both) is not gradual equivalent to a
+callable with `...` as the parameter type.
 
 ```py
 def variadic_args(*args):
@@ -121,8 +129,32 @@ def variadic_args(*args):
 def variadic_kwargs(**kwargs):
     return
 
-static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_args], Callable[..., Any]))
-static_assert(not is_gradual_equivalent_to(CallableTypeFromFunction[variadic_kwargs], Callable[..., Any]))
+static_assert(not is_gradual_equivalent_to(CallableTypeOf[variadic_args], Callable[..., Any]))
+static_assert(not is_gradual_equivalent_to(CallableTypeOf[variadic_kwargs], Callable[..., Any]))
+```
+
+Parameter names, default values, and it's kind should also be considered when checking for gradual
+equivalence.
+
+```py
+def f1(a): ...
+def f2(b): ...
+
+static_assert(not is_gradual_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f2]))
+
+def f3(a=1): ...
+def f4(a=2): ...
+def f5(a): ...
+
+static_assert(is_gradual_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f4]))
+static_assert(
+    is_gradual_equivalent_to(CallableTypeOf[f3] | bool | CallableTypeOf[f4], CallableTypeOf[f4] | bool | CallableTypeOf[f3])
+)
+static_assert(not is_gradual_equivalent_to(CallableTypeOf[f3], CallableTypeOf[f5]))
+
+def f6(a, /): ...
+
+static_assert(not is_gradual_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f6]))
 ```
 
 [materializations]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-materialize

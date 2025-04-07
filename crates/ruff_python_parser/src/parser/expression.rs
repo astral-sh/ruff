@@ -7,17 +7,19 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
-    IpyEscapeKind, Number, Operator, StringFlags, UnaryOp,
+    IpyEscapeKind, Number, Operator, OperatorPrecedence, StringFlags, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::error::{StarTupleKind, UnparenthesizedNamedExprKind};
+use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
 use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
-use crate::{FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
+use crate::{
+    FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
+};
 
 use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
 
@@ -226,7 +228,7 @@ impl<'src> Parser<'src> {
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
     fn parse_simple_expression(&mut self, context: ExpressionContext) -> ParsedExpr {
-        self.parse_binary_expression_or_higher(OperatorPrecedence::Initial, context)
+        self.parse_binary_expression_or_higher(OperatorPrecedence::None, context)
     }
 
     /// Parses a binary expression using the [Pratt parsing algorithm].
@@ -358,7 +360,7 @@ impl<'src> Parser<'src> {
             TokenKind::Star => {
                 let starred_expr = self.parse_starred_expression(context);
 
-                if left_precedence > OperatorPrecedence::Initial
+                if left_precedence > OperatorPrecedence::None
                     || !context.is_starred_expression_allowed()
                 {
                     self.add_error(ParseErrorType::InvalidStarredExpressionUsage, &starred_expr);
@@ -391,7 +393,7 @@ impl<'src> Parser<'src> {
             TokenKind::Yield => {
                 let expr = self.parse_yield_expression();
 
-                if left_precedence > OperatorPrecedence::Initial
+                if left_precedence > OperatorPrecedence::None
                     || !context.is_yield_expression_allowed()
                 {
                     self.add_error(ParseErrorType::InvalidYieldExpressionUsage, &expr);
@@ -873,14 +875,23 @@ impl<'src> Parser<'src> {
 
         // test_err star_slices
         // array[*start:*end]
-        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &slice {
+
+        // test_ok parenthesized_star_index_py310
+        // # parse_options: {"target-version": "3.10"}
+        // out[(*(slice(None) for _ in range(2)), *ind)] = 1
+        if let Expr::Tuple(ast::ExprTuple {
+            elts,
+            parenthesized: false,
+            ..
+        }) = &slice
+        {
             for elt in elts.iter().filter(|elt| elt.is_starred_expr()) {
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::StarExpressionInIndex,
                     elt.range(),
                 );
             }
-        };
+        }
 
         ast::ExprSubscript {
             value: Box::new(value),
@@ -1393,11 +1404,87 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::FStringEnd);
 
+        // test_ok pep701_f_string_py312
+        // # parse_options: {"target-version": "3.12"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+
+        // test_ok pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f"outer {'# not a comment'}"
+        // f'outer {x:{"# not a comment"} }'
+        // f"""{f'''{f'{"# not a comment"}'}'''}"""
+        // f"""{f'''# before expression {f'# aro{f"#{1+1}#"}und #'}'''} # after expression"""
+        // f"escape outside of \t {expr}\n"
+        // f"test\"abcd"
+
+        // test_err pep701_f_string_py311
+        // # parse_options: {"target-version": "3.11"}
+        // f'Magic wand: { bag['wand'] }'     # nested quotes
+        // f"{'\n'.join(a)}"                  # escape sequence
+        // f'''A complex trick: {
+        //     bag['bag']                     # comment
+        // }'''
+        // f"{f"{f"{f"{f"{f"{1+1}"}"}"}"}"}"  # arbitrary nesting
+        // f"{f'''{"nested"} inner'''} outer" # nested (triple) quotes
+        // f"test {a \
+        //     } more"                        # line continuation
+        // f"""{f"""{x}"""}"""                # mark the whole triple quote
+        // f"{'\n'.join(['\t', '\v', '\r'])}"  # multiple escape sequences, multiple errors
+
+        let range = self.node_range(start);
+
+        if !self.options.target_version.supports_pep_701() {
+            let quote_bytes = flags.quote_str().as_bytes();
+            let quote_len = flags.quote_len();
+            for expr in elements.expressions() {
+                for slash_position in memchr::memchr_iter(b'\\', self.source[expr.range].as_bytes())
+                {
+                    let slash_position = TextSize::try_from(slash_position).unwrap();
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
+                        TextRange::at(expr.range.start() + slash_position, '\\'.text_len()),
+                    );
+                }
+
+                if let Some(quote_position) =
+                    memchr::memmem::find(self.source[expr.range].as_bytes(), quote_bytes)
+                {
+                    let quote_position = TextSize::try_from(quote_position).unwrap();
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
+                        TextRange::at(expr.range.start() + quote_position, quote_len),
+                    );
+                }
+            }
+
+            self.check_fstring_comments(range);
+        }
+
         ast::FString {
             elements,
-            range: self.node_range(start),
+            range,
             flags: ast::FStringFlags::from(flags),
         }
+    }
+
+    /// Check `range` for comment tokens and report an `UnsupportedSyntaxError` for each one found.
+    fn check_fstring_comments(&mut self, range: TextRange) {
+        self.unsupported_syntax_errors
+            .extend(self.tokens.in_range(range).iter().filter_map(|token| {
+                token.kind().is_comment().then_some(UnsupportedSyntaxError {
+                    kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                    range: token.range(),
+                    target_version: self.options.target_version,
+                })
+            }));
     }
 
     /// Parses a list of f-string elements.
@@ -2027,7 +2114,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::For);
         } else {
             self.bump(TokenKind::For);
-        };
+        }
 
         let mut target =
             self.parse_expression_list(ExpressionContext::starred_conditional().with_in_excluded());
@@ -2518,57 +2605,6 @@ impl Ranged for ParsedExpr {
     }
 }
 
-/// Represents the precedence levels for various operators and expressions of Python.
-/// Variants at the top have lower precedence and variants at the bottom have
-/// higher precedence.
-///
-/// Note: Some expressions like if-else, named expression (`:=`), lambda, subscription,
-/// slicing, call and attribute reference expressions, that are mentioned in the link
-/// below are better handled in other parts of the parser.
-///
-/// See: <https://docs.python.org/3/reference/expressions.html#operator-precedence>
-#[derive(Debug, Ord, Eq, PartialEq, PartialOrd, Copy, Clone)]
-pub(super) enum OperatorPrecedence {
-    /// The initial precedence when parsing an expression.
-    Initial,
-    /// Precedence of boolean `or` operator.
-    Or,
-    /// Precedence of boolean `and` operator.
-    And,
-    /// Precedence of boolean `not` unary operator.
-    Not,
-    /// Precedence of comparisons operators (`<`, `<=`, `>`, `>=`, `!=`, `==`),
-    /// memberships tests (`in`, `not in`) and identity tests (`is` `is not`).
-    ComparisonsMembershipIdentity,
-    /// Precedence of `Bitwise OR` (`|`) operator.
-    BitOr,
-    /// Precedence of `Bitwise XOR` (`^`) operator.
-    BitXor,
-    /// Precedence of `Bitwise AND` (`&`) operator.
-    BitAnd,
-    /// Precedence of left and right shift operators (`<<`, `>>`).
-    LeftRightShift,
-    /// Precedence of addition (`+`) and subtraction (`-`) operators.
-    AddSub,
-    /// Precedence of multiplication (`*`), matrix multiplication (`@`), division (`/`), floor
-    /// division (`//`) and remainder operators (`%`).
-    MulDivRemain,
-    /// Precedence of positive (`+`), negative (`-`), `Bitwise NOT` (`~`) unary operators.
-    PosNegBitNot,
-    /// Precedence of exponentiation operator (`**`).
-    Exponent,
-    /// Precedence of `await` expression.
-    Await,
-}
-
-impl OperatorPrecedence {
-    /// Returns `true` if the precedence is right-associative i.e., the operations are evaluated
-    /// from right to left.
-    fn is_right_associative(self) -> bool {
-        matches!(self, OperatorPrecedence::Exponent)
-    }
-}
-
 #[derive(Debug)]
 enum BinaryLikeOperator {
     Boolean(BoolOp),
@@ -2596,45 +2632,6 @@ impl BinaryLikeOperator {
             BinaryLikeOperator::Boolean(bool_op) => OperatorPrecedence::from(*bool_op),
             BinaryLikeOperator::Comparison(_) => OperatorPrecedence::ComparisonsMembershipIdentity,
             BinaryLikeOperator::Binary(bin_op) => OperatorPrecedence::from(*bin_op),
-        }
-    }
-}
-
-impl From<BoolOp> for OperatorPrecedence {
-    #[inline]
-    fn from(op: BoolOp) -> Self {
-        match op {
-            BoolOp::And => OperatorPrecedence::And,
-            BoolOp::Or => OperatorPrecedence::Or,
-        }
-    }
-}
-
-impl From<UnaryOp> for OperatorPrecedence {
-    #[inline]
-    fn from(op: UnaryOp) -> Self {
-        match op {
-            UnaryOp::Not => OperatorPrecedence::Not,
-            _ => OperatorPrecedence::PosNegBitNot,
-        }
-    }
-}
-
-impl From<Operator> for OperatorPrecedence {
-    #[inline]
-    fn from(op: Operator) -> Self {
-        match op {
-            Operator::Add | Operator::Sub => OperatorPrecedence::AddSub,
-            Operator::Mult
-            | Operator::Div
-            | Operator::FloorDiv
-            | Operator::Mod
-            | Operator::MatMult => OperatorPrecedence::MulDivRemain,
-            Operator::BitAnd => OperatorPrecedence::BitAnd,
-            Operator::BitOr => OperatorPrecedence::BitOr,
-            Operator::BitXor => OperatorPrecedence::BitXor,
-            Operator::LShift | Operator::RShift => OperatorPrecedence::LeftRightShift,
-            Operator::Pow => OperatorPrecedence::Exponent,
         }
     }
 }

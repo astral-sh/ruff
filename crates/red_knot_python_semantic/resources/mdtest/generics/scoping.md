@@ -113,7 +113,7 @@ class Legacy(Generic[T]):
 
 legacy: Legacy[int] = Legacy()
 # TODO: revealed: str
-reveal_type(legacy.m(1, "string"))  # revealed: @Todo(Invalid or unsupported `Instance` in `Type::to_type_expression`)
+reveal_type(legacy.m(1, "string"))  # revealed: @Todo(Support for `typing.TypeVar` instances in type expressions)
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:

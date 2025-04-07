@@ -1,17 +1,16 @@
-use std::fmt::Formatter;
+use std::{fmt::Formatter, sync::Arc};
 
 use thiserror::Error;
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::TextRange;
 
-pub use crate::diagnostic::old::{
-    OldDiagnosticTrait, OldDisplayDiagnostic, OldParseDiagnostic, OldSecondaryDiagnosticMessage,
-};
+pub use self::render::DisplayDiagnostic;
+pub use crate::diagnostic::old::OldSecondaryDiagnosticMessage;
 use crate::files::File;
 use crate::Db;
 
-use self::render::{DisplayDiagnostic, FileResolver};
+use self::render::FileResolver;
 
 // This module should not be exported. We are planning to migrate off
 // the APIs in this module.
@@ -30,7 +29,7 @@ pub struct Diagnostic {
     /// The actual diagnostic.
     ///
     /// We box the diagnostic since it is somewhat big.
-    inner: Box<DiagnosticInner>,
+    inner: Arc<DiagnosticInner>,
 }
 
 impl Diagnostic {
@@ -57,14 +56,12 @@ impl Diagnostic {
         message: impl std::fmt::Display + 'a,
     ) -> Diagnostic {
         let message = message.to_string().into_boxed_str();
-        let inner = Box::new(DiagnosticInner {
+        let inner = Arc::new(DiagnosticInner {
             id,
             severity,
             message,
             annotations: vec![],
             subs: vec![],
-            #[cfg(debug_assertions)]
-            printed: false,
         });
         Diagnostic { inner }
     }
@@ -76,7 +73,7 @@ impl Diagnostic {
     /// should be constructed via [`Annotation::primary`]. A diagnostic with no
     /// primary annotations is allowed, but its rendering may be sub-optimal.
     pub fn annotate(&mut self, ann: Annotation) {
-        self.inner.annotations.push(ann);
+        Arc::make_mut(&mut self.inner).annotations.push(ann);
     }
 
     /// Adds an "info" sub-diagnostic with the given message.
@@ -101,46 +98,69 @@ impl Diagnostic {
     /// to it. For the simpler case of a sub-diagnostic with only a message,
     /// using a method like [`Diagnostic::info`] may be more convenient.
     pub fn sub(&mut self, sub: SubDiagnostic) {
-        self.inner.subs.push(sub);
+        Arc::make_mut(&mut self.inner).subs.push(sub);
     }
 
-    /// Print this diagnostic to the given writer.
+    /// Return a `std::fmt::Display` implementation that renders this
+    /// diagnostic into a human readable format.
     ///
-    /// This also marks the diagnostic as having been printed. If a
-    /// diagnostic is not rendered this way, then it will panic when
-    /// it's dropped when `debug_assertions` is enabled.
-    pub fn print(
-        &mut self,
-        db: &dyn Db,
-        config: &DisplayDiagnosticConfig,
-        mut wtr: impl std::io::Write,
-    ) -> std::io::Result<()> {
+    /// Note that this `Display` impl includes a trailing line terminator, so
+    /// callers should prefer using this with `write!` instead of `writeln!`.
+    pub fn display<'a>(
+        &'a self,
+        db: &'a dyn Db,
+        config: &'a DisplayDiagnosticConfig,
+    ) -> DisplayDiagnostic<'a> {
         let resolver = FileResolver::new(db);
-        let display = DisplayDiagnostic::new(&resolver, config, self);
-        let result = writeln!(wtr, "{display}");
-        // NOTE: This is called specifically even if
-        // `writeln!` fails. The reasoning here is that
-        // the `Drop` impl panicking is meant as a guard
-        // against *programmers* forgetting to print a
-        // diagnostic. We should not punish them if they
-        // remember to do that when the operation itself
-        // failed for some reason. ---AG
-        self.printed();
-        result
+        DisplayDiagnostic::new(resolver, config, self)
     }
 
-    /// Mark this diagnostic as having been printed.
+    /// Returns the identifier for this diagnostic.
+    pub fn id(&self) -> DiagnosticId {
+        self.inner.id
+    }
+
+    /// Returns the primary message for this diagnostic.
     ///
-    /// If a diagnostic has not been marked as printed before being dropped,
-    /// then its `Drop` implementation will panic in debug mode.
-    pub(crate) fn printed(&mut self) {
-        #[cfg(debug_assertions)]
-        {
-            self.inner.printed = true;
-            for sub in &mut self.inner.subs {
-                sub.printed();
-            }
+    /// A diagnostic always has a message, but it may be empty.
+    pub fn primary_message(&self) -> &str {
+        if !self.inner.message.is_empty() {
+            return &self.inner.message;
         }
+        // FIXME: As a special case, while we're migrating Red Knot
+        // to the new diagnostic data model, we'll look for a primary
+        // message from the primary annotation. This is because most
+        // Red Knot diagnostics are created with an empty diagnostic
+        // message and instead attach the message to the annotation.
+        // Fixing this will require touching basically every diagnostic
+        // in Red Knot, so we do it this way for now to match the old
+        // semantics. ---AG
+        self.primary_annotation()
+            .and_then(|ann| ann.message.as_deref())
+            .unwrap_or_default()
+    }
+
+    /// Returns the severity of this diagnostic.
+    ///
+    /// Note that this may be different than the severity of sub-diagnostics.
+    pub fn severity(&self) -> Severity {
+        self.inner.severity
+    }
+
+    /// Returns the "primary" annotation of this diagnostic if one exists.
+    ///
+    /// When there are multiple primary annotation, then the first one that was
+    /// added to this diagnostic is returned.
+    pub fn primary_annotation(&self) -> Option<&Annotation> {
+        self.inner.annotations.iter().find(|ann| ann.is_primary)
+    }
+
+    /// Returns the "primary" span of this diagnostic if one exists.
+    ///
+    /// When there are multiple primary spans, then the first one that was
+    /// added to this diagnostic is returned.
+    pub fn primary_span(&self) -> Option<Span> {
+        self.primary_annotation().map(|ann| ann.span.clone())
     }
 }
 
@@ -151,29 +171,6 @@ struct DiagnosticInner {
     message: Box<str>,
     annotations: Vec<Annotation>,
     subs: Vec<SubDiagnostic>,
-    /// This will make the `Drop` impl panic if a `Diagnostic` hasn't
-    /// been printed to stderr. This is usually a bug, so we want it to
-    /// be loud. But only when `debug_assertions` is enabled.
-    #[cfg(debug_assertions)]
-    printed: bool,
-}
-
-impl Drop for DiagnosticInner {
-    fn drop(&mut self) {
-        #[cfg(debug_assertions)]
-        {
-            if self.printed || std::thread::panicking() {
-                return;
-            }
-            panic!(
-                "diagnostic `{id}` with severity `{severity:?}` and message `{message}` \
-                 did not get printed to stderr before being dropped",
-                id = self.id,
-                severity = self.severity,
-                message = self.message,
-            );
-        }
-    }
 }
 
 /// A collection of information subservient to a diagnostic.
@@ -210,8 +207,6 @@ impl SubDiagnostic {
             severity,
             message,
             annotations: vec![],
-            #[cfg(debug_assertions)]
-            printed: false,
         });
         SubDiagnostic { inner }
     }
@@ -230,17 +225,6 @@ impl SubDiagnostic {
     pub fn annotate(&mut self, ann: Annotation) {
         self.inner.annotations.push(ann);
     }
-
-    /// Mark this sub-diagnostic as having been printed.
-    ///
-    /// If a sub-diagnostic has not been marked as printed before being
-    /// dropped, then its `Drop` implementation will panic in debug mode.
-    pub(crate) fn printed(&mut self) {
-        #[cfg(debug_assertions)]
-        {
-            self.inner.printed = true;
-        }
-    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -248,28 +232,6 @@ struct SubDiagnosticInner {
     severity: Severity,
     message: Box<str>,
     annotations: Vec<Annotation>,
-    /// This will make the `Drop` impl panic if a `SubDiagnostic` hasn't
-    /// been printed to stderr. This is usually a bug, so we want it to
-    /// be loud. But only when `debug_assertions` is enabled.
-    #[cfg(debug_assertions)]
-    printed: bool,
-}
-
-impl Drop for SubDiagnosticInner {
-    fn drop(&mut self) {
-        #[cfg(debug_assertions)]
-        {
-            if self.printed || std::thread::panicking() {
-                return;
-            }
-            panic!(
-                "sub-diagnostic with severity `{severity:?}` and message `{message}` \
-                 did not get printed to stderr before being dropped",
-                severity = self.severity,
-                message = self.message,
-            );
-        }
-    }
 }
 
 /// A pointer to a subsequence in the end user's input.
@@ -644,4 +606,17 @@ pub enum DiagnosticFormat {
     ///
     /// This may use color when printing to a `tty`.
     Concise,
+}
+
+/// Creates a `Diagnostic` from a parse error.
+///
+/// This should _probably_ be a method on `ruff_python_parser::ParseError`, but
+/// at time of writing, `ruff_db` depends on `ruff_python_parser` instead of
+/// the other way around. And since we want to do this conversion in a couple
+/// places, it makes sense to centralize it _somewhere_. So it's here for now.
+pub fn create_parse_diagnostic(file: File, err: &ruff_python_parser::ParseError) -> Diagnostic {
+    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+    let span = Span::from(file).with_range(err.location);
+    diag.annotate(Annotation::primary(span).message(&err.error));
+    diag
 }

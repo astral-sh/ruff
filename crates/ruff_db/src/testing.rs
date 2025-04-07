@@ -223,7 +223,7 @@ fn query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }
@@ -258,7 +258,7 @@ fn query_was_not_run_fails_if_query_was_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }
@@ -321,7 +321,7 @@ fn query_was_run_fails_if_query_was_not_run() {
     use crate::tests::TestDb;
     use salsa::prelude::*;
 
-    #[salsa::input]
+    #[salsa::input(debug)]
     struct Input {
         text: String,
     }

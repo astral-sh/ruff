@@ -61,5 +61,5 @@ pub(crate) fn unintentional_type_annotation(
             }
         }
         _ => {}
-    };
+    }
 }

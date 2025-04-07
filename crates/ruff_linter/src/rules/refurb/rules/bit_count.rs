@@ -74,7 +74,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
 
     if !call.arguments.keywords.is_empty() {
         return;
-    };
+    }
     let [arg] = &*call.arguments.args else {
         return;
     };
@@ -100,7 +100,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
 
     if !arguments.keywords.is_empty() {
         return;
-    };
+    }
     let [arg] = &*arguments.args else {
         return;
     };
@@ -110,6 +110,10 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         return;
     }
 
+    // If is a starred expression, it returns.
+    if arg.is_starred_expr() {
+        return;
+    }
     // Extract, e.g., `x` in `bin(x)`.
     let literal_text = checker.locator().slice(arg);
 

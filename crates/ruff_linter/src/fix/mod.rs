@@ -3,10 +3,11 @@ use std::collections::BTreeSet;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, IsolationLevel, SourceMap};
+use ruff_diagnostics::{Edit, Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::linter::FixTable;
+use crate::message::{DiagnosticMessage, Message};
 use crate::registry::{AsRule, Rule};
 use crate::settings::types::UnsafeFixes;
 use crate::Locator;
@@ -26,16 +27,17 @@ pub(crate) struct FixResult {
 
 /// Fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
-    diagnostics: &[Diagnostic],
+    messages: &[Message],
     locator: &Locator,
     unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
     let required_applicability = unsafe_fixes.required_applicability();
 
-    let mut with_fixes = diagnostics
+    let mut with_fixes = messages
         .iter()
-        .filter(|diagnostic| {
-            diagnostic
+        .filter_map(Message::as_diagnostic_message)
+        .filter(|message| {
+            message
                 .fix
                 .as_ref()
                 .is_some_and(|fix| fix.applies(required_applicability))
@@ -51,7 +53,7 @@ pub(crate) fn fix_file(
 
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
-    diagnostics: impl Iterator<Item = &'a Diagnostic>,
+    diagnostics: impl Iterator<Item = &'a DiagnosticMessage>,
     locator: &'a Locator<'a>,
 ) -> FixResult {
     let mut output = String::with_capacity(locator.len());
@@ -161,22 +163,30 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
 
 #[cfg(test)]
 mod tests {
-    use ruff_diagnostics::{Diagnostic, Edit, Fix, SourceMarker};
+    use ruff_diagnostics::{Edit, Fix, SourceMarker};
+    use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{Ranged, TextSize};
 
     use crate::fix::{apply_fixes, FixResult};
+    use crate::message::DiagnosticMessage;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::Locator;
 
     #[allow(deprecated)]
-    fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
+    fn create_diagnostics(
+        filename: &str,
+        source: &str,
+        edit: impl IntoIterator<Item = Edit>,
+    ) -> Vec<DiagnosticMessage> {
         edit.into_iter()
-            .map(|edit| Diagnostic {
+            .map(|edit| DiagnosticMessage {
                 // The choice of rule here is arbitrary.
                 kind: MissingNewlineAtEndOfFile.into(),
                 range: edit.range(),
                 fix: Some(Fix::safe_edit(edit)),
                 parent: None,
+                file: SourceFileBuilder::new(filename, source).finish(),
+                noqa_offset: TextSize::default(),
             })
             .collect()
     }
@@ -184,7 +194,7 @@ mod tests {
     #[test]
     fn empty_file() {
         let locator = Locator::new(r"");
-        let diagnostics = create_diagnostics([]);
+        let diagnostics = create_diagnostics("<filename>", locator.contents(), []);
         let FixResult {
             code,
             fixes,
@@ -205,10 +215,14 @@ print("hello world")
 "#
             .trim(),
         );
-        let diagnostics = create_diagnostics([Edit::insertion(
-            "import sys\n".to_string(),
-            TextSize::new(10),
-        )]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [Edit::insertion(
+                "import sys\n".to_string(),
+                TextSize::new(10),
+            )],
+        );
         let FixResult {
             code,
             fixes,
@@ -243,11 +257,15 @@ class A(object):
 "
             .trim(),
         );
-        let diagnostics = create_diagnostics([Edit::replacement(
-            "Bar".to_string(),
-            TextSize::new(8),
-            TextSize::new(14),
-        )]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [Edit::replacement(
+                "Bar".to_string(),
+                TextSize::new(8),
+                TextSize::new(14),
+            )],
+        );
         let FixResult {
             code,
             fixes,
@@ -280,7 +298,11 @@ class A(object):
 "
             .trim(),
         );
-        let diagnostics = create_diagnostics([Edit::deletion(TextSize::new(7), TextSize::new(15))]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [Edit::deletion(TextSize::new(7), TextSize::new(15))],
+        );
         let FixResult {
             code,
             fixes,
@@ -313,10 +335,14 @@ class A(object, object, object):
 "
             .trim(),
         );
-        let diagnostics = create_diagnostics([
-            Edit::deletion(TextSize::from(8), TextSize::from(16)),
-            Edit::deletion(TextSize::from(22), TextSize::from(30)),
-        ]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [
+                Edit::deletion(TextSize::from(8), TextSize::from(16)),
+                Edit::deletion(TextSize::from(22), TextSize::from(30)),
+            ],
+        );
         let FixResult {
             code,
             fixes,
@@ -352,10 +378,14 @@ class A(object):
 "
             .trim(),
         );
-        let diagnostics = create_diagnostics([
-            Edit::deletion(TextSize::from(7), TextSize::from(15)),
-            Edit::replacement("ignored".to_string(), TextSize::from(9), TextSize::from(11)),
-        ]);
+        let diagnostics = create_diagnostics(
+            "<filename>",
+            locator.contents(),
+            [
+                Edit::deletion(TextSize::from(7), TextSize::from(15)),
+                Edit::replacement("ignored".to_string(), TextSize::from(9), TextSize::from(11)),
+            ],
+        );
         let FixResult {
             code,
             fixes,

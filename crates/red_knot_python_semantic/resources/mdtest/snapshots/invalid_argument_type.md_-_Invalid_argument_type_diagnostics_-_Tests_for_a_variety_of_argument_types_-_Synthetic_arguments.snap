@@ -30,11 +30,12 @@ error: lint:invalid-argument-type
 6 | c("wrong")  # error: [invalid-argument-type]
   |   ^^^^^^^ Object of type `Literal["wrong"]` cannot be assigned to parameter 2 (`x`) of bound method `__call__`; expected type `int`
   |
- ::: /src/mdtest_snippet.py:2:24
+info
+ --> /src/mdtest_snippet.py:2:24
   |
 1 | class C:
 2 |     def __call__(self, x: int) -> int:
-  |                        ------ info: parameter declared in function definition here
+  |                        ------ parameter declared in function definition here
 3 |         return 1
   |
 

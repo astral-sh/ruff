@@ -29,10 +29,11 @@ error: lint:invalid-argument-type
 4 | foo(1, 2, z="hello")  # error: [invalid-argument-type]
   |           ^^^^^^^^^ Object of type `Literal["hello"]` cannot be assigned to parameter `z` of function `foo`; expected type `int`
   |
- ::: /src/mdtest_snippet.py:1:28
+info
+ --> /src/mdtest_snippet.py:1:28
   |
 1 | def foo(x: int, y: int, *, z: int = 0) -> int:
-  |                            ---------- info: parameter declared in function definition here
+  |                            ---------- parameter declared in function definition here
 2 |     return x * y * z
   |
 

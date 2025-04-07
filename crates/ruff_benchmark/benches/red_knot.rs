@@ -1,21 +1,22 @@
 #![allow(clippy::disallowed_names)]
+use ruff_benchmark::criterion;
 
-use std::borrow::Cow;
 use std::ops::Range;
 
+use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use rayon::ThreadPoolBuilder;
+use rustc_hash::FxHashSet;
+
 use red_knot_project::metadata::options::{EnvironmentOptions, Options};
 use red_knot_project::metadata::value::RangedValue;
 use red_knot_project::watch::{ChangeEvent, ChangedKind};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
-use ruff_benchmark::criterion::{criterion_group, criterion_main, BatchSize, Criterion};
 use ruff_benchmark::TestFile;
-use ruff_db::diagnostic::{DiagnosticId, OldDiagnosticTrait, Severity};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::source::source_text;
 use ruff_db::system::{MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHashSet;
 
 struct Case {
     db: ProjectDatabase,
@@ -54,27 +55,17 @@ type KeyDiagnosticFields = (
     DiagnosticId,
     Option<&'static str>,
     Option<Range<usize>>,
-    Cow<'static, str>,
+    &'static str,
     Severity,
 );
 
-static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
-    // We don't support `*` imports yet:
-    (
-        DiagnosticId::lint("unresolved-import"),
-        Some("/src/tomllib/_parser.py"),
-        Some(192..200),
-        Cow::Borrowed("Module `collections.abc` has no member `Iterable`"),
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("unused-ignore-comment"),
-        Some("/src/tomllib/_parser.py"),
-        Some(22299..22333),
-        Cow::Borrowed("Unused blanket `type: ignore` directive"),
-        Severity::Warning,
-    ),
-];
+static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[(
+    DiagnosticId::lint("unused-ignore-comment"),
+    Some("/src/tomllib/_parser.py"),
+    Some(22299..22333),
+    "Unused blanket `type: ignore` directive",
+    Severity::Warning,
+)];
 
 fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
@@ -201,21 +192,21 @@ fn benchmark_cold(criterion: &mut Criterion) {
 }
 
 #[track_caller]
-fn assert_diagnostics(db: &dyn Db, diagnostics: &[Box<dyn OldDiagnosticTrait>]) {
+fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic]) {
     let normalized: Vec<_> = diagnostics
         .iter()
         .map(|diagnostic| {
             (
                 diagnostic.id(),
                 diagnostic
-                    .span()
+                    .primary_span()
                     .map(|span| span.file())
                     .map(|file| file.path(db).as_str()),
                 diagnostic
-                    .span()
+                    .primary_span()
                     .and_then(|span| span.range())
                     .map(Range::<usize>::from),
-                diagnostic.message(),
+                diagnostic.primary_message(),
                 diagnostic.severity(),
             )
         })

@@ -25,19 +25,19 @@ env:
 jobs:
   mypy_primer:
     name: Run mypy_primer
-    runs-on: ubuntu-24.04
+    runs-on: depot-ubuntu-22.04-16
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2
         with:
           workspaces: "ruff"
       - name: Install Rust toolchain
@@ -45,7 +45,7 @@ jobs:
 
       - name: Install mypy_primer
         run: |
-          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support"
+          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support-v3"
 
       - name: Run mypy_primer
         shell: bash
@@ -68,7 +68,7 @@ jobs:
             --type-checker knot \
             --old base_commit \
             --new "$GITHUB_SHA" \
-            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow|isort|itsdangerous|rich|packaging|pybind11|pyinstrument)$' \
+            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow|isort|itsdangerous|rich|packaging|pybind11|pyinstrument|typeshed-stats|scrapy|werkzeug|bidict)$' \
             --output concise \
             --debug > mypy_primer.diff || [ $? -eq 1 ]
 
@@ -81,13 +81,13 @@ jobs:
           echo ${{ github.event.number }} > pr-number
 
       - name: Upload diff
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: mypy_primer_diff
           path: mypy_primer.diff
 
       - name: Upload pr-number
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: pr-number
           path: pr-number

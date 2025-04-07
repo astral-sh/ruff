@@ -1,5 +1,5 @@
 use compact_str::CompactString;
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
@@ -974,7 +974,7 @@ impl<'src> Parser<'src> {
 
         ast::StmtTypeAlias {
             name: Box::new(name),
-            type_params,
+            type_params: type_params.map(Box::new),
             value: Box::new(value.expr),
             range: self.node_range(start),
         }
@@ -1028,7 +1028,7 @@ impl<'src> Parser<'src> {
                         ..
                     }) = &**slice
                     {
-                        buffer.push_str(&format!("{integer}"));
+                        let _ = write!(buffer, "{integer}");
                     } else {
                         parser.add_error(
                             ParseErrorType::OtherError(
@@ -1891,7 +1891,6 @@ impl<'src> Parser<'src> {
                 // test_ok function_def_valid_return_expr
                 // def foo() -> int | str: ...
                 // def foo() -> lambda x: x: ...
-                // def foo() -> (yield x): ...
                 // def foo() -> int if True else str: ...
 
                 // test_err function_def_invalid_return_expr
@@ -2066,8 +2065,49 @@ impl<'src> Parser<'src> {
             return vec![];
         }
 
+        let open_paren_range = self.current_token_range();
+
         if self.at(TokenKind::Lpar) {
             if let Some(items) = self.try_parse_parenthesized_with_items() {
+                // test_ok tuple_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // with (
+                //   foo,
+                //   bar,
+                //   baz,
+                // ) as tup: ...
+
+                // test_err tuple_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // # these cases are _syntactically_ valid before Python 3.9 because the `with` item
+                // # is parsed as a tuple, but this will always cause a runtime error, so we flag it
+                // # anyway
+                // with (foo, bar): ...
+                // with (
+                //   open('foo.txt')) as foo: ...
+                // with (
+                //   foo,
+                //   bar,
+                //   baz,
+                // ): ...
+                // with (foo,): ...
+
+                // test_ok parenthesized_context_manager_py39
+                // # parse_options: {"target-version": "3.9"}
+                // with (foo as x, bar as y): ...
+                // with (foo, bar as y): ...
+                // with (foo as x, bar): ...
+
+                // test_err parenthesized_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // with (foo as x, bar as y): ...
+                // with (foo, bar as y): ...
+                // with (foo as x, bar): ...
+                self.add_unsupported_syntax_error(
+                    UnsupportedSyntaxErrorKind::ParenthesizedContextManager,
+                    open_paren_range,
+                );
+
                 self.expect(TokenKind::Rpar);
                 items
             } else {
@@ -2705,17 +2745,45 @@ impl<'src> Parser<'src> {
                 // # parse_options: { "target-version": "3.7" }
                 // @(x := lambda x: x)(foo)
                 // def bar(): ...
-                let allowed_decorator = match &parsed_expr.expr {
+
+                // test_err decorator_dict_literal_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @{3: 3}
+                // def bar(): ...
+
+                // test_err decorator_float_literal_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @3.14
+                // def bar(): ...
+
+                // test_ok decorator_await_expression_py39
+                // # parse_options: { "target-version": "3.9" }
+                // async def foo():
+                //     @await bar
+                //     def baz(): ...
+
+                // test_err decorator_await_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // async def foo():
+                //     @await bar
+                //     def baz(): ...
+
+                // test_err decorator_non_toplevel_call_expression_py38
+                // # parse_options: { "target-version": "3.8" }
+                // @foo().bar()
+                // def baz(): ...
+
+                let relaxed_decorator_error = match &parsed_expr.expr {
                     Expr::Call(expr_call) => {
-                        helpers::is_name_or_attribute_expression(&expr_call.func)
+                        helpers::detect_invalid_pre_py39_decorator_node(&expr_call.func)
                     }
-                    expr => helpers::is_name_or_attribute_expression(expr),
+                    expr => helpers::detect_invalid_pre_py39_decorator_node(expr),
                 };
 
-                if !allowed_decorator {
+                if let Some((error, range)) = relaxed_decorator_error {
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::RelaxedDecorator,
-                        parsed_expr.range(),
+                        UnsupportedSyntaxErrorKind::RelaxedDecorator(error),
+                        range,
                     );
                 }
             }
@@ -2890,13 +2958,26 @@ impl<'src> Parser<'src> {
                             // # parse_options: {"target-version": "3.11"}
                             // def foo(*args: *Ts): ...
 
+                            // test_ok param_with_star_annotation_py310
+                            // # parse_options: {"target-version": "3.10"}
+                            // # regression tests for https://github.com/astral-sh/ruff/issues/16874
+                            // # starred parameters are fine, just not the annotation
+                            // from typing import Annotated, Literal
+                            // def foo(*args: Ts): ...
+                            // def foo(*x: Literal["this should allow arbitrary strings"]): ...
+                            // def foo(*x: Annotated[str, "this should allow arbitrary strings"]): ...
+                            // def foo(*args: str, **kwds: int): ...
+                            // def union(*x: A | B): ...
+
                             // test_err param_with_star_annotation_py310
                             // # parse_options: {"target-version": "3.10"}
                             // def foo(*args: *Ts): ...
-                            self.add_unsupported_syntax_error(
-                                UnsupportedSyntaxErrorKind::StarAnnotation,
-                                parsed_expr.range(),
-                            );
+                            if parsed_expr.is_starred_expr() {
+                                self.add_unsupported_syntax_error(
+                                    UnsupportedSyntaxErrorKind::StarAnnotation,
+                                    parsed_expr.range(),
+                                );
+                            }
 
                             parsed_expr
                         }
@@ -2904,7 +2985,6 @@ impl<'src> Parser<'src> {
                             // test_ok param_with_annotation
                             // def foo(arg: int): ...
                             // def foo(arg: lambda x: x): ...
-                            // def foo(arg: (yield x)): ...
                             // def foo(arg: (x := int)): ...
 
                             // test_err param_with_invalid_annotation
