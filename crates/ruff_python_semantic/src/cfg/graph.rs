@@ -380,7 +380,12 @@ impl<'stmt> CFGBuilder<'stmt> {
                     self.process_stmts(&stmt_if.body);
 
                     // Process each case
-                    for (block, case) in case_blocks.iter().zip(stmt_if.elif_else_clauses.iter()) {
+                    for (block, case) in case_blocks
+                        .iter()
+                        // Skip `if` block
+                        .skip(1)
+                        .zip(stmt_if.elif_else_clauses.iter())
+                    {
                         self.move_to(*block);
                         self.update_exit(next_block);
                         self.process_stmts(&case.body);
