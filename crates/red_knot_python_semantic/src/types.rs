@@ -4982,11 +4982,10 @@ impl<'db> FunctionType<'db> {
     ///
     /// This powers the `CallableTypeOf` special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        let signature = if let Some(specialization) = self.specialization(db) {
-            self.signature(db).apply_specialization(db, specialization)
-        } else {
-            self.signature(db).clone()
-        };
+        let mut signature = self.signature(db).clone();
+        if let Some(specialization) = self.specialization(db) {
+            signature.apply_specialization(db, specialization);
+        }
         Type::Callable(CallableType::new(db, signature))
     }
 
@@ -5025,14 +5024,14 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
-        let internal_signature = self.internal_signature(db);
+        let mut internal_signature = self.internal_signature(db);
 
         if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
             return Signature::todo("return type of overloaded function");
         }
 
         if let Some(specialization) = self.specialization(db) {
-            return internal_signature.apply_specialization(db, specialization);
+            internal_signature.apply_specialization(db, specialization);
         }
 
         internal_signature
@@ -5241,7 +5240,8 @@ impl<'db> CallableType<'db> {
     }
 
     fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let signature = self.signature(db).apply_specialization(db, specialization);
+        let mut signature = self.signature(db).clone();
+        signature.apply_specialization(db, specialization);
         Self::new(db, signature)
     }
 

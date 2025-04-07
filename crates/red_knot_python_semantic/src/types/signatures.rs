@@ -263,18 +263,14 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_specialization(
-        &self,
+        &mut self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
-    ) -> Self {
-        let parameters = self.parameters.apply_specialization(db, specialization);
-        let return_ty = self
+    ) {
+        self.parameters.apply_specialization(db, specialization);
+        self.return_ty = self
             .return_ty
             .map(|ty| ty.apply_specialization(db, specialization));
-        Self {
-            parameters,
-            return_ty,
-        }
     }
 
     /// Return the parameters in this signature.
@@ -461,16 +457,10 @@ impl<'db> Parameters<'db> {
         )
     }
 
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let value = self
-            .value
-            .iter()
-            .map(|param| param.apply_specialization(db, specialization))
-            .collect();
-        Self {
-            value,
-            is_gradual: self.is_gradual,
-        }
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        self.value
+            .iter_mut()
+            .for_each(|param| param.apply_specialization(db, specialization));
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -634,16 +624,11 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let annotated_type = self
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        self.annotated_type = self
             .annotated_type
             .map(|ty| ty.apply_specialization(db, specialization));
-        let kind = self.kind.apply_specialization(db, specialization);
-        Self {
-            annotated_type,
-            kind,
-            form: self.form,
-        }
+        self.kind.apply_specialization(db, specialization);
     }
 
     /// Strip information from the parameter so that two equivalent parameters compare equal.
@@ -833,22 +818,14 @@ pub(crate) enum ParameterKind<'db> {
 }
 
 impl<'db> ParameterKind<'db> {
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
         match self {
-            Self::PositionalOnly { name, default_type } => Self::PositionalOnly {
-                name: name.clone(),
-                default_type: default_type.map(|ty| ty.apply_specialization(db, specialization)),
-            },
-            Self::PositionalOrKeyword { name, default_type } => Self::PositionalOrKeyword {
-                name: name.clone(),
-                default_type: default_type.map(|ty| ty.apply_specialization(db, specialization)),
-            },
-            Self::Variadic { name } => Self::Variadic { name: name.clone() },
-            Self::KeywordOnly { name, default_type } => Self::KeywordOnly {
-                name: name.clone(),
-                default_type: default_type.map(|ty| ty.apply_specialization(db, specialization)),
-            },
-            Self::KeywordVariadic { name } => Self::KeywordVariadic { name: name.clone() },
+            Self::PositionalOnly { default_type, .. }
+            | Self::PositionalOrKeyword { default_type, .. }
+            | Self::KeywordOnly { default_type, .. } => {
+                *default_type = default_type.map(|ty| ty.apply_specialization(db, specialization));
+            }
+            Self::Variadic { .. } | Self::KeywordVariadic { .. } => {}
         }
     }
 }
