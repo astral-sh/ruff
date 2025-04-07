@@ -3120,11 +3120,11 @@ impl<'db> Type<'db> {
             },
 
             Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
-                // TODO: currently we can't use typeshed to infer all calls using generic
-                // logic definedin `try_call_class_literal` (called from `infer_call_expression`).
-                // It has 3 main reasons: typeshed not 100% accurate, salsa queries and historical
-                // workarounds before `try_call_class_literal` was introduced.
-                // Some/most ofthe arms below should be removed eventually.
+                // TODO: currently we can't use typeshed to infer all calls using generic logic
+                // defined in `try_call_class_literal` (called from `infer_call_expression`). It
+                // has 3 main reasons: typeshed not 100% accurate, salsa queries and historical
+                // workarounds before `try_call_class_literal` was introduced. Some/most of the
+                // arms below should be removed eventually.
                 Some(KnownClass::Bool) => {
                     // ```py
                     // class bool(int):
