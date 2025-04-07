@@ -81,13 +81,13 @@ jobs:
           echo ${{ github.event.number }} > pr-number
 
       - name: Upload diff
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mypy_primer_diff
           path: mypy_primer.diff
 
       - name: Upload pr-number
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pr-number
           path: pr-number
