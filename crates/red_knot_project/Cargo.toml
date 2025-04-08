@@ -16,7 +16,9 @@ ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["cache", "serde"] }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde"] }
+ruff_python_formatter = { workspace = true, optional = true }
 ruff_text_size = { workspace = true }
+red_knot_ide = { workspace = true }
 red_knot_python_semantic = { workspace = true, features = ["serde"] }
 red_knot_vendored = { workspace = true }
 
@@ -42,8 +44,13 @@ insta = { workspace = true, features = ["redactions", "ron"] }
 [features]
 default = ["zstd"]
 deflate = ["red_knot_vendored/deflate"]
-schemars = ["dep:schemars", "ruff_db/schemars", "red_knot_python_semantic/schemars"]
+schemars = [
+    "dep:schemars",
+    "ruff_db/schemars",
+    "red_knot_python_semantic/schemars",
+]
 zstd = ["red_knot_vendored/zstd"]
+format = ["ruff_python_formatter"]
 
 [lints]
 workspace = true

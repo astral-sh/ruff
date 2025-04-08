@@ -3124,7 +3124,7 @@ lambda: fu
 
     #[test]
     fn redefined_by_gen_exp() {
-        // Re-using a global name as the loop variable for a generator
+        // Reusing a global name as the loop variable for a generator
         // expression results in a redefinition warning.
         flakes(
             "import fu; (1 for fu in range(1))",
@@ -4259,6 +4259,24 @@ lambda: fu
 
             class Y(NamedTuple):
                 y: NamedTuple("v", [("vv", int)])
+        "#,
+            &[],
+        );
+    }
+
+    #[test]
+    fn gh_issue_17196_regression_test() {
+        flakes(
+            r#"
+            from typing import Annotated
+
+            def type_annotations_from_tuple():
+                annos = (str, "foo", "bar")
+                return Annotated[annos]
+
+            def type_annotations_from_filtered_tuple():
+                annos = (str, None, "foo", None, "bar")
+                return Annotated[tuple([a for a in annos if a is not None])]
         "#,
             &[],
         );

@@ -4,8 +4,7 @@ import ThemeButton from "./ThemeButton";
 import ShareButton from "./ShareButton";
 import { Theme } from "./theme";
 import VersionTag from "./VersionTag";
-
-export type Tab = "Source" | "Settings";
+import AstralButton from "./AstralButton";
 
 export default function Header({
   edit,
@@ -13,6 +12,7 @@ export default function Header({
   logo,
   version,
   onChangeTheme,
+  onReset,
   onShare,
 }: {
   edit: number | null;
@@ -20,43 +20,42 @@ export default function Header({
   logo: "ruff" | "astral";
   version: string | null;
   onChangeTheme: (theme: Theme) => void;
-  onShare?: () => void;
+  onReset?(): void;
+  onShare: () => void;
 }) {
   return (
     <div
-      className={classNames(
-        "w-full",
-        "flex",
-        "justify-between",
-        "pl-5",
-        "sm:pl-1",
-        "pr-4",
-        "lg:pr-6",
-        "z-10",
-        "top-0",
-        "left-0",
-        "-mb-px",
-        "antialiased",
-        "border-b",
-        "border-gray-200",
-        "dark:border-b-radiate",
-        "dark:bg-galaxy",
-      )}
+      className="
+        w-full
+        flex
+        justify-between
+        antialiased
+        border-b
+        border-gray-200
+        dark:border-b-radiate
+        dark:bg-galaxy
+      "
     >
       <div className="py-4 pl-2">
         <Logo name={logo} className="fill-galaxy dark:fill-radiate" />
       </div>
-      <div className="flex items-center min-w-0">
+      <div className="flex items-center min-w-0 gap-4 mx-2">
         {version ? (
-          <div className="hidden sm:flex items-center">
+          <div className="hidden sm:flex">
             <VersionTag>v{version}</VersionTag>
           </div>
         ) : null}
         <Divider />
         <RepoButton />
         <Divider />
-        <ShareButton key={edit} onShare={onShare} />
+        <div className="max-sm:hidden flex">
+          <ResetButton onClicked={onReset} />
+        </div>
+        <div className="max-sm:hidden flex">
+          <ShareButton key={edit} onShare={onShare} />
+        </div>
         <Divider />
+
         <ThemeButton theme={theme} onChange={onChangeTheme} />
       </div>
     </div>
@@ -65,7 +64,16 @@ export default function Header({
 
 function Divider() {
   return (
-    <div className="hidden sm:block mx-6 lg:mx-4 w-px h-8 bg-gray-200 dark:bg-gray-700" />
+    <div
+      className={classNames(
+        "max-sm:hidden",
+        "visible",
+        "w-px",
+        "h-8",
+        "bg-gray-200",
+        "dark:bg-gray-700",
+      )}
+    />
   );
 }
 
@@ -102,36 +110,37 @@ function Logo({
           className={className}
         >
           <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
+            fillRule="evenodd"
+            clipRule="evenodd"
             d="M431.998 9.98526C431.998 4.47055 436.469 0 441.984 0H522.013C527.528 0 531.998 4.47056 531.998 9.98526V100H485.998V70H477.998V100H431.998V9.98526ZM493.998 46V38H469.998V46H493.998Z"
-            fill="#30173D"
           />
           <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
+            fillRule="evenodd"
+            clipRule="evenodd"
             d="M0 9.98526C0 4.47055 4.47055 0 9.98526 0H90.0147C95.5294 0 99.9999 4.47056 99.9999 9.98526V100H54V70H46V100H0V9.98526ZM62 46V38H38V46H62Z"
-            fill="#30173D"
           />
+          <path d="M107.998 9.98526C107.998 4.47055 112.469 0 117.983 0H198.013C203.527 0 207.998 4.47055 207.998 9.98526V30H161.998V22H153.998V38H198.013C203.527 38 207.998 42.4706 207.998 47.9853V90.0147C207.998 95.5294 203.527 100 198.013 100H117.983C112.469 100 107.998 95.5294 107.998 90.0147V70L153.998 70V78H161.998V62L117.983 62C112.469 62 107.998 57.5294 107.998 52.0147V9.98526Z" />
+          <path d="M315.998 16H269.998V0H223.998V16H215.998V54H223.998V90.0147C223.998 95.5294 228.469 100 233.983 100H315.998V62H269.998V54H306.013C311.527 54 315.998 49.5294 315.998 44.0147V16Z" />
           <path
-            d="M107.998 9.98526C107.998 4.47055 112.469 0 117.983 0H198.013C203.527 0 207.998 4.47055 207.998 9.98526V30H161.998V22H153.998V38H198.013C203.527 38 207.998 42.4706 207.998 47.9853V90.0147C207.998 95.5294 203.527 100 198.013 100H117.983C112.469 100 107.998 95.5294 107.998 90.0147V70L153.998 70V78H161.998V62L117.983 62C112.469 62 107.998 57.5294 107.998 52.0147V9.98526Z"
-            fill="#30173D"
-          />
-          <path
-            d="M315.998 16H269.998V0H223.998V16H215.998V54H223.998V90.0147C223.998 95.5294 228.469 100 233.983 100H315.998V62H269.998V54H306.013C311.527 54 315.998 49.5294 315.998 44.0147V16Z"
-            fill="#30173D"
-          />
-          <path
-            fill-rule="evenodd"
-            clip-rule="evenodd"
+            fillRule="evenodd"
+            clipRule="evenodd"
             d="M423.998 9.98526C423.998 4.47055 419.528 0 414.013 0H323.998V100H369.998V70H377.998V100H423.998V62H403.998V54H414.013C419.528 54 423.998 49.5294 423.998 44.0147V9.98526ZM385.998 38V46H361.998V38H385.998Z"
-            fill="#30173D"
           />
-          <path
-            d="M585.999 62L639.998 62V100H539.999V2.18557e-06L585.999 0L585.999 62Z"
-            fill="#30173D"
-          />
+          <path d="M585.999 62L639.998 62V100H539.999V2.18557e-06L585.999 0L585.999 62Z" />
         </svg>
       );
   }
+}
+
+function ResetButton({ onClicked }: { onClicked?: () => void }) {
+  return (
+    <AstralButton
+      type="button"
+      className="relative flex-none leading-6 py-1.5 px-3 shadow-xs disabled:opacity-50"
+      disabled={onClicked == null}
+      onClick={onClicked}
+    >
+      Reset
+    </AstralButton>
+  );
 }

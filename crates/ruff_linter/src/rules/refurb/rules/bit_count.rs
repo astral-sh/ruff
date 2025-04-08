@@ -74,7 +74,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
 
     if !call.arguments.keywords.is_empty() {
         return;
-    };
+    }
     let [arg] = &*call.arguments.args else {
         return;
     };
@@ -100,7 +100,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
 
     if !arguments.keywords.is_empty() {
         return;
-    };
+    }
     let [arg] = &*arguments.args else {
         return;
     };

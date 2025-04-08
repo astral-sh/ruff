@@ -33,25 +33,23 @@ impl MarkdownTestConfig {
     }
 
     pub(crate) fn python_version(&self) -> Option<PythonVersion> {
-        self.environment.as_ref().and_then(|env| env.python_version)
+        self.environment.as_ref()?.python_version
     }
 
     pub(crate) fn python_platform(&self) -> Option<PythonPlatform> {
-        self.environment
-            .as_ref()
-            .and_then(|env| env.python_platform.clone())
+        self.environment.as_ref()?.python_platform.clone()
     }
 
     pub(crate) fn typeshed(&self) -> Option<&SystemPath> {
-        self.environment
-            .as_ref()
-            .and_then(|env| env.typeshed.as_deref())
+        self.environment.as_ref()?.typeshed.as_deref()
     }
 
     pub(crate) fn extra_paths(&self) -> Option<&[SystemPathBuf]> {
-        self.environment
-            .as_ref()
-            .and_then(|env| env.extra_paths.as_deref())
+        self.environment.as_ref()?.extra_paths.as_deref()
+    }
+
+    pub(crate) fn python(&self) -> Option<&SystemPath> {
+        self.environment.as_ref()?.python.as_deref()
     }
 }
 
@@ -69,6 +67,15 @@ pub(crate) struct Environment {
 
     /// Additional search paths to consider when resolving modules.
     pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,
+
+    /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
+    ///
+    /// Red Knot will search in the path's `site-packages` directories for type information and
+    /// third-party imports.
+    ///
+    /// This option is commonly used to specify the path to a virtual environment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub python: Option<SystemPathBuf>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

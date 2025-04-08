@@ -24,7 +24,7 @@ try:
     help()
 except* OSError as e:
     # TODO: more precise would be `ExceptionGroup[OSError]` --Alex
-    # (needs homogenous tuples + generics)
+    # (needs homogeneous tuples + generics)
     reveal_type(e)  # revealed: BaseExceptionGroup
 ```
 
@@ -35,7 +35,7 @@ try:
     help()
 except* (TypeError, AttributeError) as e:
     # TODO: more precise would be `ExceptionGroup[TypeError | AttributeError]` --Alex
-    # (needs homogenous tuples + generics)
+    # (needs homogeneous tuples + generics)
     reveal_type(e)  # revealed: BaseExceptionGroup
 ```
 

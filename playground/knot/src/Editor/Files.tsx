@@ -1,7 +1,8 @@
-import { FileId } from "./Chrome";
 import { Icons, Theme } from "shared";
 import classNames from "classnames";
 import { useState } from "react";
+import { FileId } from "../Playground";
+import { type FileHandle } from "red_knot_wasm";
 
 export interface Props {
   // The file names
@@ -13,7 +14,7 @@ export interface Props {
 
   onRemove(id: FileId): void;
 
-  onSelected(id: FileId): void;
+  onSelect(id: FileId): void;
 
   onRename(id: FileId, newName: string): void;
 }
@@ -25,7 +26,7 @@ export function Files({
   onAdd,
   onRemove,
   onRename,
-  onSelected,
+  onSelect,
 }: Props) {
   const handleAdd = () => {
     let index: number | null = null;
@@ -53,7 +54,7 @@ export function Files({
           <FileEntry
             selected={selected === id}
             name={name}
-            onClicked={() => onSelected(id)}
+            onClicked={() => onSelect(id)}
             onRenamed={(newName) => {
               if (!files.some(({ name }) => name === newName)) {
                 onRename(id, newName);
@@ -138,6 +139,19 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
     }
   };
 
+  const extension = name.split(".").pop()?.toLowerCase();
+
+  const icon =
+    extension === "py" || extension === "pyi" ? (
+      <Icons.Python width={12} height={12} />
+    ) : extension === "json" ? (
+      <Icons.Json width={12} height={12} />
+    ) : extension === "ipynb" ? (
+      <Icons.Jupyter width={12} height={12} />
+    ) : (
+      <Icons.File width={12} height={12} />
+    );
+
   return (
     <button
       onClick={() => {
@@ -150,7 +164,7 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
       className="flex gap-2 items-center py-4 cursor-pointer"
     >
       <span className="inline-block flex-none" aria-hidden>
-        <Icons.Python width={12} height={12} />
+        {icon}
       </span>
       {newName == null ? (
         <span className="inline-block">{name}</span>
@@ -168,7 +182,8 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
 
             switch (event.key) {
               case "Enter":
-                handleRenamed(newName);
+                event.currentTarget.blur();
+                event.preventDefault();
                 return;
               case "Escape":
                 setNewName(null);
@@ -181,4 +196,9 @@ function FileEntry({ name, onClicked, onRenamed, selected }: FileEntryProps) {
       )}
     </button>
   );
+}
+
+export function isPythonFile(handle: FileHandle): boolean {
+  const extension = handle?.path().toLowerCase().split(".").pop() ?? "";
+  return ["py", "pyi", "pyw"].includes(extension);
 }

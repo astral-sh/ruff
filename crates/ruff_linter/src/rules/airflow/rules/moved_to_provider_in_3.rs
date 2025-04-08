@@ -82,7 +82,7 @@ impl Violation for Airflow3MovedToProvider {
     }
 }
 
-/// AIR303
+/// AIR302
 pub(crate) fn moved_to_provider_in_3(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
@@ -171,7 +171,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "sensors", "s3_key_sensor", "S3KeySensor"] => Replacement::ProviderName{
-            name: "S3KeySensor",
+            name: "airflow.providers.amazon.aws.sensors.s3.S3KeySensor",
             provider: "amazon",
             version: "1.0.0"
         },
@@ -407,7 +407,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             name: "airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride",
             provider: "fab",
             version: "1.0.0"
-            },
+        },
         ["airflow", "auth", "managers", "fab", "fab_auth_manager", "FabAuthManager"] => Replacement::ProviderName{
             name: "airflow.providers.fab.auth_manager.security_manager.FabAuthManager",
             provider: "fab",
@@ -873,26 +873,93 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
 
+        // apache-airflow-providers-smtp
+        ["airflow", "operators", "email_operator" | "email", "EmailOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.smtp.operators.smtp.EmailOperator",
+            provider: "smtp",
+            version: "1.0.0",
+        },
+
+
         // apache-airflow-providers-standard
+        ["airflow", "operators", "bash_operator", "BashOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.operators.bash.BashOperator",
+            provider: "standard",
+            version: "0.0.1"
+        },
+        ["airflow", "operators", "dagrun_operator" | "trigger_dagrun", rest] => match *rest {
+            "TriggerDagRunLink" => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunLink",
+                provider: "standard",
+                version: "0.0.2"
+            },
+            "TriggerDagRunOperator" => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator",
+                provider: "standard",
+                version: "0.0.2"
+            },
+            _ => return
+        }
+        ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.operators.empty.EmptyOperator",
+            provider: "standard",
+            version: "0.0.2"
+        },
+        ["airflow", "operators", "latest_only_operator" | "latest_only", "LatestOnlyOperator"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.operators.latest_only.LatestOnlyOperator",
+            provider: "standard",
+            version: "0.0.3"
+        },
+        ["airflow", "operators", "python_operator"| "python", rest ] => match *rest {
+            "BranchPythonOperator" => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.python.BranchPythonOperator",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            "PythonOperator" => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.python.PythonOperator",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            "PythonVirtualenvOperator" => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.python.PythonVirtualenvOperator",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            "ShortCircuitOperator" => Replacement::ProviderName{
+                name: "airflow.providers.standard.operators.python.ShortCircuitOperator",
+                provider: "standard",
+                version: "0.0.1"
+            },
+            _ => return
+        }
+        ["airflow", "sensors", "external_task_sensor" | "external_task", rest] => match *rest {
+            "ExternalTaskSensor" => Replacement::ProviderName{
+                name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensor",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            "ExternalTaskSensorLink" => Replacement::ProviderName{
+                name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensorLink",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            "ExternalTaskMarker" => Replacement::ProviderName{
+                name: "airflow.providers.standard.sensors.external_task.ExternalTaskMarker",
+                provider: "standard",
+                version: "0.0.3"
+            },
+            _ => return
+        }
         ["airflow", "sensors", "filesystem", "FileSensor"] => Replacement::ProviderName{
             name: "airflow.providers.standard.sensors.filesystem.FileSensor",
             provider: "standard",
             version: "0.0.2"
         },
-        ["airflow", "operators", "trigger_dagrun", "TriggerDagRunOperator"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.operators.trigger_dagrun.TriggerDagRunOperator",
+        ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => Replacement::ProviderName{
+            name: "airflow.providers.standard.sensors.time_delta.TimeDeltaSensor",
             provider: "standard",
-            version: "0.0.2"
-        },
-        ["airflow", "sensors", "external_task", "ExternalTaskMarker"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.sensors.external_task.ExternalTaskMarker",
-            provider: "standard",
-            version: "0.0.3"
-        },
-        ["airflow", "sensors", "external_task", "ExternalTaskSensor"] => Replacement::ProviderName{
-            name: "airflow.providers.standard.sensors.external_task.ExternalTaskSensor",
-            provider: "standard",
-            version: "0.0.3"
+            version: "0.1.0"
         },
 
         // apache-airflow-providers-sqlite
@@ -920,14 +987,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "api", "auth", "backend", "basic_auth", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.api.auth.backend.basic_auth",
             new_path: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth",
-            provider:"fab",
+            provider: "fab",
             version: "1.0.0"
         },
         ["airflow", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
-            original_path:"airflow.api.auth.backend.kerberos_auth",
+            original_path: "airflow.api.auth.backend.kerberos_auth",
             new_path: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
             provider: "fab",
-            version:"1.0.0"
+            version: "1.0.0"
         },
         ["airflow", "auth", "managers", "fab", "api", "auth", "backend", "kerberos_auth", ..] => Replacement::ImportPathMoved{
             original_path: "airflow.auth_manager.api.auth.backend.kerberos_auth",

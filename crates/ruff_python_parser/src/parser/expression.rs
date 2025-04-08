@@ -875,14 +875,23 @@ impl<'src> Parser<'src> {
 
         // test_err star_slices
         // array[*start:*end]
-        if let Expr::Tuple(ast::ExprTuple { elts, .. }) = &slice {
+
+        // test_ok parenthesized_star_index_py310
+        // # parse_options: {"target-version": "3.10"}
+        // out[(*(slice(None) for _ in range(2)), *ind)] = 1
+        if let Expr::Tuple(ast::ExprTuple {
+            elts,
+            parenthesized: false,
+            ..
+        }) = &slice
+        {
             for elt in elts.iter().filter(|elt| elt.is_starred_expr()) {
                 self.add_unsupported_syntax_error(
                     UnsupportedSyntaxErrorKind::StarExpressionInIndex,
                     elt.range(),
                 );
             }
-        };
+        }
 
         ast::ExprSubscript {
             value: Box::new(value),
@@ -1453,7 +1462,7 @@ impl<'src> Parser<'src> {
                         UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
                         TextRange::at(expr.range.start() + quote_position, quote_len),
                     );
-                };
+                }
             }
 
             self.check_fstring_comments(range);
@@ -2105,7 +2114,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::For);
         } else {
             self.bump(TokenKind::For);
-        };
+        }
 
         let mut target =
             self.parse_expression_list(ExpressionContext::starred_conditional().with_in_excluded());

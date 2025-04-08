@@ -114,7 +114,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;
-                };
+                }
             }
             // `elif`
             Some(Expr::Compare(ast::ExprCompare {
@@ -140,7 +140,7 @@ pub(crate) fn if_else_block_instead_of_dict_lookup(checker: &Checker, stmt_if: &
                     contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
                 }) {
                     return;
-                };
+                }
 
                 // The `expr` was checked to be a literal above, so this is safe.
                 literals.insert(literal_expr.into());

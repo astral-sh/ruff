@@ -131,7 +131,7 @@ impl<'a> Iterator for AssertionWithRangeIterator<'a> {
             let comment = &self.file_assertions.source[inner_next];
             if let Some(assertion) = UnparsedAssertion::from_comment(comment) {
                 return Some(AssertionWithRange(assertion, inner_next));
-            };
+            }
         }
     }
 }

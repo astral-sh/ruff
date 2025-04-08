@@ -551,6 +551,7 @@ reveal_type(C().x)  # revealed: str
 class C:
     def __init__(self) -> None:
         # error: [too-many-positional-arguments]
+        # error: [invalid-argument-type]
         self.x: int = len(1, 2, 3)
 ```
 
@@ -697,10 +698,10 @@ class Base:
         self.defined_in_init: str | None = "value in base"
 
 class Intermediate(Base):
-    # Re-declaring base class attributes with the *same *type is fine:
+    # Redeclaring base class attributes with the *same *type is fine:
     base_class_attribute_1: str | None = None
 
-    # Re-declaring them with a *narrower type* is unsound, because modifications
+    # Redeclaring them with a *narrower type* is unsound, because modifications
     # through a `Base` reference could violate that constraint.
     #
     # Mypy does not report an error here, but pyright does: "… overrides symbol
@@ -712,7 +713,7 @@ class Intermediate(Base):
     # TODO: This should be an error
     base_class_attribute_2: str
 
-    # Re-declaring attributes with a *wider type* directly violates LSP.
+    # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #
@@ -1540,7 +1541,7 @@ integers are instances of that class:
 
 ```py
 reveal_type((2).bit_length)  # revealed: <bound method `bit_length` of `Literal[2]`>
-reveal_type((2).denominator)  # revealed: @Todo(@property)
+reveal_type((2).denominator)  # revealed: Literal[1]
 ```
 
 Some attributes are special-cased, however:
@@ -1706,6 +1707,37 @@ reveal_type(C.a_range)  # revealed: range
 reveal_type(C.a_slice)  # revealed: slice
 reveal_type(C.a_type)  # revealed: type
 reveal_type(C.a_none)  # revealed: None
+```
+
+## Enum classes
+
+Enums are not supported yet; attribute access on an enum class is inferred as `Todo`.
+
+```py
+import enum
+
+reveal_type(enum.Enum.__members__)  # revealed: @Todo(Attribute access on enum classes)
+
+class Foo(enum.Enum):
+    BAR = 1
+
+reveal_type(Foo.BAR)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Foo.BAR.value)  # revealed: @Todo(Attribute access on enum classes)
+reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes)
+```
+
+## `super()`
+
+`super()` is not supported yet, but we do not emit false positives on `super()` calls.
+
+```py
+class Foo:
+    def bar(self) -> int:
+        return 42
+
+class Bar(Foo):
+    def bar(self) -> int:
+        return super().bar()
 ```
 
 ## References

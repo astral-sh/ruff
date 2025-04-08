@@ -1,13 +1,15 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use red_knot_project::metadata::options::{EnvironmentOptions, Options};
-use red_knot_project::metadata::value::RangedValue;
+use red_knot_ide::{goto_type_definition, hover, MarkupKind};
+use red_knot_project::metadata::options::Options;
+use red_knot_project::metadata::value::ValueSource;
 use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use red_knot_project::ProjectMetadata;
 use red_knot_project::{Db, ProjectDatabase};
-use ruff_db::diagnostic::{DisplayDiagnosticConfig, OldDiagnosticTrait};
-use ruff_db::files::{system_path_to_file, File};
+use red_knot_python_semantic::Program;
+use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
+use ruff_db::files::{system_path_to_file, File, FileRange};
 use ruff_db::source::{line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
@@ -16,7 +18,9 @@ use ruff_db::system::{
 };
 use ruff_db::Upcast;
 use ruff_notebook::Notebook;
-use ruff_source_file::SourceLocation;
+use ruff_python_formatter::formatted_file;
+use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
+use ruff_text_size::Ranged;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -39,62 +43,75 @@ pub fn run() {
 pub struct Workspace {
     db: ProjectDatabase,
     system: WasmSystem,
-    options: Options,
 }
 
 #[wasm_bindgen]
 impl Workspace {
     #[wasm_bindgen(constructor)]
-    pub fn new(root: &str, settings: &Settings) -> Result<Workspace, Error> {
+    pub fn new(root: &str, options: JsValue) -> Result<Workspace, Error> {
+        let options = Options::deserialize_with(
+            ValueSource::Cli,
+            serde_wasm_bindgen::Deserializer::from(options),
+        )
+        .map_err(into_error)?;
+
         let system = WasmSystem::new(SystemPath::new(root));
 
-        let mut workspace =
-            ProjectMetadata::discover(SystemPath::new(root), &system).map_err(into_error)?;
+        let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
+            .map_err(into_error)?;
 
-        let options = Options {
-            environment: Some(EnvironmentOptions {
-                python_version: Some(RangedValue::cli(settings.python_version.into())),
-                ..EnvironmentOptions::default()
-            }),
-            ..Options::default()
-        };
+        let db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
 
-        workspace.apply_cli_options(options.clone());
+        Ok(Self { db, system })
+    }
 
-        let db = ProjectDatabase::new(workspace, system.clone()).map_err(into_error)?;
+    #[wasm_bindgen(js_name = "updateOptions")]
+    pub fn update_options(&mut self, options: JsValue) -> Result<(), Error> {
+        let options = Options::deserialize_with(
+            ValueSource::Cli,
+            serde_wasm_bindgen::Deserializer::from(options),
+        )
+        .map_err(into_error)?;
 
-        Ok(Self {
-            db,
-            system,
+        let project = ProjectMetadata::from_options(
             options,
-        })
+            self.db.project().root(&self.db).to_path_buf(),
+            None,
+        )
+        .map_err(into_error)?;
+
+        let program_settings = project.to_program_settings(&self.system);
+        Program::get(&self.db)
+            .update_from_settings(&mut self.db, program_settings)
+            .map_err(into_error)?;
+
+        self.db.project().reload(&mut self.db, project);
+
+        Ok(())
     }
 
     #[wasm_bindgen(js_name = "openFile")]
     pub fn open_file(&mut self, path: &str, contents: &str) -> Result<FileHandle, Error> {
-        let path = SystemPath::new(path);
+        let path = SystemPath::absolute(path, self.db.project().root(&self.db));
 
         self.system
             .fs
-            .write_file_all(path, contents)
+            .write_file_all(&path, contents)
             .map_err(into_error)?;
 
         self.db.apply_changes(
             vec![ChangeEvent::Created {
-                path: path.to_path_buf(),
+                path: path.clone(),
                 kind: CreatedKind::File,
             }],
-            Some(&self.options),
+            None,
         );
 
-        let file = system_path_to_file(&self.db, path).expect("File to exist");
+        let file = system_path_to_file(&self.db, &path).expect("File to exist");
 
         self.db.project().open_file(&mut self.db, file);
 
-        Ok(FileHandle {
-            file,
-            path: path.to_path_buf(),
-        })
+        Ok(FileHandle { path, file })
     }
 
     #[wasm_bindgen(js_name = "updateFile")]
@@ -119,14 +136,18 @@ impl Workspace {
                     kind: ChangedKind::FileMetadata,
                 },
             ],
-            Some(&self.options),
+            None,
         );
 
         Ok(())
     }
 
     #[wasm_bindgen(js_name = "closeFile")]
-    pub fn close_file(&mut self, file_id: &FileHandle) -> Result<(), Error> {
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "It's intentional that the file handle is consumed because it is no longer valid after closing"
+    )]
+    pub fn close_file(&mut self, file_id: FileHandle) -> Result<(), Error> {
         let file = file_id.file;
 
         self.db.project().close_file(&mut self.db, file);
@@ -140,7 +161,7 @@ impl Workspace {
                 path: file_id.path.to_path_buf(),
                 kind: DeletedKind::File,
             }],
-            Some(&self.options),
+            None,
         );
 
         Ok(())
@@ -168,6 +189,10 @@ impl Workspace {
         Ok(format!("{:#?}", parsed.syntax()))
     }
 
+    pub fn format(&self, file_id: &FileHandle) -> Result<Option<String>, Error> {
+        formatted_file(&self.db, file_id.file).map_err(into_error)
+    }
+
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
         let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
@@ -180,6 +205,83 @@ impl Workspace {
         let source_text = ruff_db::source::source_text(&self.db, file_id.file);
 
         Ok(source_text.to_string())
+    }
+
+    #[wasm_bindgen(js_name = "gotoTypeDefinition")]
+    pub fn goto_type_definition(
+        &self,
+        file_id: &FileHandle,
+        position: Position,
+    ) -> Result<Vec<LocationLink>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = index.offset(
+            OneIndexed::new(position.line).ok_or_else(|| {
+                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
+            })?,
+            OneIndexed::new(position.column).ok_or_else(|| {
+                Error::new(
+                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                )
+            })?,
+            &source,
+        );
+
+        let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
+            return Ok(Vec::new());
+        };
+
+        let source_range = Range::from_text_range(targets.file_range().range(), &index, &source);
+
+        let links: Vec<_> = targets
+            .into_iter()
+            .map(|target| LocationLink {
+                path: target.file().path(&self.db).to_string(),
+                full_range: Range::from_file_range(
+                    &self.db,
+                    FileRange::new(target.file(), target.full_range()),
+                ),
+                selection_range: Some(Range::from_file_range(
+                    &self.db,
+                    FileRange::new(target.file(), target.focus_range()),
+                )),
+                origin_selection_range: Some(source_range),
+            })
+            .collect();
+
+        Ok(links)
+    }
+
+    #[wasm_bindgen]
+    pub fn hover(&self, file_id: &FileHandle, position: Position) -> Result<Option<Hover>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = index.offset(
+            OneIndexed::new(position.line).ok_or_else(|| {
+                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
+            })?,
+            OneIndexed::new(position.column).ok_or_else(|| {
+                Error::new(
+                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                )
+            })?,
+            &source,
+        );
+
+        let Some(range_info) = hover(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        let source_range = Range::from_text_range(range_info.file_range().range(), &index, &source);
+
+        Ok(Some(Hover {
+            markdown: range_info
+                .display(&self.db, MarkupKind::Markdown)
+                .to_string(),
+            range: source_range,
+        }))
     }
 }
 
@@ -200,35 +302,27 @@ impl FileHandle {
     pub fn js_to_string(&self) -> String {
         format!("file(id: {:?}, path: {})", self.file, self.path)
     }
-}
 
-#[wasm_bindgen]
-pub struct Settings {
-    pub python_version: PythonVersion,
-}
-#[wasm_bindgen]
-impl Settings {
-    #[wasm_bindgen(constructor)]
-    pub fn new(python_version: PythonVersion) -> Self {
-        Self { python_version }
+    pub fn path(&self) -> String {
+        self.path.to_string()
     }
 }
 
 #[wasm_bindgen]
 pub struct Diagnostic {
     #[wasm_bindgen(readonly)]
-    inner: Box<dyn OldDiagnosticTrait>,
+    inner: diagnostic::Diagnostic,
 }
 
 #[wasm_bindgen]
 impl Diagnostic {
-    fn wrap(diagnostic: Box<dyn OldDiagnosticTrait>) -> Self {
+    fn wrap(diagnostic: diagnostic::Diagnostic) -> Self {
         Self { inner: diagnostic }
     }
 
     #[wasm_bindgen]
     pub fn message(&self) -> JsString {
-        JsString::from(&*self.inner.message())
+        JsString::from(self.inner.primary_message())
     }
 
     #[wasm_bindgen]
@@ -241,26 +335,20 @@ impl Diagnostic {
         Severity::from(self.inner.severity())
     }
 
-    #[wasm_bindgen]
+    #[wasm_bindgen(js_name = "textRange")]
     pub fn text_range(&self) -> Option<TextRange> {
         self.inner
-            .span()
+            .primary_span()
             .and_then(|span| Some(TextRange::from(span.range()?)))
     }
 
-    #[wasm_bindgen]
+    #[wasm_bindgen(js_name = "toRange")]
     pub fn to_range(&self, workspace: &Workspace) -> Option<Range> {
-        self.inner.span().and_then(|span| {
-            let line_index = line_index(workspace.db.upcast(), span.file());
-            let source = source_text(workspace.db.upcast(), span.file());
-            let text_range = span.range()?;
-
-            Some(Range {
-                start: line_index
-                    .source_location(text_range.start(), &source)
-                    .into(),
-                end: line_index.source_location(text_range.end(), &source).into(),
-            })
+        self.inner.primary_span().and_then(|span| {
+            Some(Range::from_file_range(
+                &workspace.db,
+                FileRange::new(span.file(), span.range()?),
+            ))
         })
     }
 
@@ -281,11 +369,30 @@ pub struct Range {
     pub end: Position,
 }
 
-impl From<SourceLocation> for Position {
-    fn from(location: SourceLocation) -> Self {
+impl Range {
+    fn from_file_range(db: &dyn Db, file_range: FileRange) -> Self {
+        let index = line_index(db.upcast(), file_range.file());
+        let source = source_text(db.upcast(), file_range.file());
+
+        Self::from_text_range(file_range.range(), &index, &source)
+    }
+
+    fn from_text_range(
+        text_range: ruff_text_size::TextRange,
+        line_index: &LineIndex,
+        source: &str,
+    ) -> Self {
+        let start = line_index.source_location(text_range.start(), source);
+        let end = line_index.source_location(text_range.end(), source);
+        Self::from((start, end))
+    }
+}
+
+impl From<(SourceLocation, SourceLocation)> for Range {
+    fn from((start, end): (SourceLocation, SourceLocation)) -> Self {
         Self {
-            line: location.row.to_zero_indexed(),
-            character: location.column.to_zero_indexed(),
+            start: start.into(),
+            end: end.into(),
         }
     }
 }
@@ -293,8 +400,28 @@ impl From<SourceLocation> for Position {
 #[wasm_bindgen]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub struct Position {
+    /// One indexed line number
     pub line: usize,
-    pub character: usize,
+
+    /// One indexed column number (the nth character on the line)
+    pub column: usize,
+}
+
+#[wasm_bindgen]
+impl Position {
+    #[wasm_bindgen(constructor)]
+    pub fn new(line: usize, column: usize) -> Self {
+        Self { line, column }
+    }
+}
+
+impl From<SourceLocation> for Position {
+    fn from(location: SourceLocation) -> Self {
+        Self {
+            line: location.row.get(),
+            column: location.column.get(),
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -333,30 +460,25 @@ impl From<ruff_text_size::TextRange> for TextRange {
 }
 
 #[wasm_bindgen]
-#[derive(Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub enum PythonVersion {
-    Py37,
-    Py38,
-    #[default]
-    Py39,
-    Py310,
-    Py311,
-    Py312,
-    Py313,
+pub struct LocationLink {
+    /// The target file path
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+
+    /// The full range of the target
+    pub full_range: Range,
+    /// The target's range that should be selected/highlighted
+    pub selection_range: Option<Range>,
+    /// The range of the origin.
+    pub origin_selection_range: Option<Range>,
 }
 
-impl From<PythonVersion> for ruff_python_ast::PythonVersion {
-    fn from(value: PythonVersion) -> Self {
-        match value {
-            PythonVersion::Py37 => Self::PY37,
-            PythonVersion::Py38 => Self::PY38,
-            PythonVersion::Py39 => Self::PY39,
-            PythonVersion::Py310 => Self::PY310,
-            PythonVersion::Py311 => Self::PY311,
-            PythonVersion::Py312 => Self::PY312,
-            PythonVersion::Py313 => Self::PY313,
-        }
-    }
+#[wasm_bindgen]
+pub struct Hover {
+    #[wasm_bindgen(getter_with_clone)]
+    pub markdown: String,
+
+    pub range: Range,
 }
 
 #[derive(Debug, Clone)]
@@ -454,17 +576,4 @@ impl System for WasmSystem {
 
 fn not_found() -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::NotFound, "No such file or directory")
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::PythonVersion;
-
-    #[test]
-    fn same_default_as_python_version() {
-        assert_eq!(
-            ruff_python_ast::PythonVersion::from(PythonVersion::default()),
-            ruff_python_ast::PythonVersion::default()
-        );
-    }
 }

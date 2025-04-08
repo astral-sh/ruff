@@ -175,7 +175,7 @@ pub(crate) fn missing_whitespace_around_operator(
             TokenKind::Lpar | TokenKind::Lambda => parens += 1,
             TokenKind::Rpar => parens = parens.saturating_sub(1),
             _ => {}
-        };
+        }
 
         let needs_space = if kind == TokenKind::Equal
             && (parens > 0 || fstrings > 0 || definition_state.in_type_params())

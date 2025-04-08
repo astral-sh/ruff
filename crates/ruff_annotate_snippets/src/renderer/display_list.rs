@@ -315,7 +315,7 @@ impl DisplaySet<'_> {
                         None => {
                             buffer.putc(line_offset, lineno_width + 1, '|', *lineno_color);
                         }
-                    };
+                    }
                 }
                 if let DisplaySourceLine::Content { text, .. } = line {
                     // The width of the line number, a space, pipe, and a space
@@ -474,7 +474,7 @@ impl DisplaySet<'_> {
                             // 3 │       X0 Y0 Z0
                             //   │ ┏━━━━━┛  │  │     < We are writing these lines
                             //   │ ┃┌───────┘  │     < by reverting the "depth" of
-                            //   │ ┃│┌─────────┘     < their multilne spans.
+                            //   │ ┃│┌─────────┘     < their multiline spans.
                             // 4 │ ┃││   X1 Y1 Z1
                             // 5 │ ┃││   X2 Y2 Z2
                             //   │ ┃│└────╿──│──┘ `Z` label
@@ -937,7 +937,7 @@ impl From<snippet::Level> for DisplayAnnotationType {
     }
 }
 
-/// Information whether the header is the initial one or a consequitive one
+/// Information whether the header is the initial one or a consecutive one
 /// for multi-slice cases.
 // TODO: private
 #[derive(Debug, Clone, PartialEq)]
@@ -1753,7 +1753,7 @@ fn format_inline_marks(
             DisplayMarkType::AnnotationThrough(depth) => {
                 buf.putc(line, 3 + lineno_width + depth, '|', *annotation_style);
             }
-        };
+        }
     }
     Ok(())
 }

@@ -124,7 +124,7 @@ pub(crate) fn replace_str_enum(checker: &Checker, class_def: &ast::StmtClassDef)
     // If the class does not inherit both `str` and `enum.Enum`, exit early.
     if !inherits_str || !inherits_enum {
         return;
-    };
+    }
 
     let mut diagnostic = Diagnostic::new(
         ReplaceStrEnum {

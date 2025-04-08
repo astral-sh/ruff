@@ -1170,7 +1170,7 @@ impl<'a> Generator<'a> {
                 } else {
                     self.unparse_expr(value, precedence::MAX);
                     self.p(".");
-                };
+                }
                 self.p_id(attr);
             }
             Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {

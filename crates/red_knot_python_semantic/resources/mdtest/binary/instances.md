@@ -14,43 +14,43 @@ We support inference for all Python's binary operators: `+`, `-`, `*`, `@`, `/`,
 
 ```py
 class A:
-    def __add__(self, other) -> A:
+    def __add__(self, other) -> "A":
         return self
 
-    def __sub__(self, other) -> A:
+    def __sub__(self, other) -> "A":
         return self
 
-    def __mul__(self, other) -> A:
+    def __mul__(self, other) -> "A":
         return self
 
-    def __matmul__(self, other) -> A:
+    def __matmul__(self, other) -> "A":
         return self
 
-    def __truediv__(self, other) -> A:
+    def __truediv__(self, other) -> "A":
         return self
 
-    def __floordiv__(self, other) -> A:
+    def __floordiv__(self, other) -> "A":
         return self
 
-    def __mod__(self, other) -> A:
+    def __mod__(self, other) -> "A":
         return self
 
-    def __pow__(self, other) -> A:
+    def __pow__(self, other) -> "A":
         return self
 
-    def __lshift__(self, other) -> A:
+    def __lshift__(self, other) -> "A":
         return self
 
-    def __rshift__(self, other) -> A:
+    def __rshift__(self, other) -> "A":
         return self
 
-    def __and__(self, other) -> A:
+    def __and__(self, other) -> "A":
         return self
 
-    def __xor__(self, other) -> A:
+    def __xor__(self, other) -> "A":
         return self
 
-    def __or__(self, other) -> A:
+    def __or__(self, other) -> "A":
         return self
 
 class B: ...
@@ -76,43 +76,43 @@ We also support inference for reflected operations:
 
 ```py
 class A:
-    def __radd__(self, other) -> A:
+    def __radd__(self, other) -> "A":
         return self
 
-    def __rsub__(self, other) -> A:
+    def __rsub__(self, other) -> "A":
         return self
 
-    def __rmul__(self, other) -> A:
+    def __rmul__(self, other) -> "A":
         return self
 
-    def __rmatmul__(self, other) -> A:
+    def __rmatmul__(self, other) -> "A":
         return self
 
-    def __rtruediv__(self, other) -> A:
+    def __rtruediv__(self, other) -> "A":
         return self
 
-    def __rfloordiv__(self, other) -> A:
+    def __rfloordiv__(self, other) -> "A":
         return self
 
-    def __rmod__(self, other) -> A:
+    def __rmod__(self, other) -> "A":
         return self
 
-    def __rpow__(self, other) -> A:
+    def __rpow__(self, other) -> "A":
         return self
 
-    def __rlshift__(self, other) -> A:
+    def __rlshift__(self, other) -> "A":
         return self
 
-    def __rrshift__(self, other) -> A:
+    def __rrshift__(self, other) -> "A":
         return self
 
-    def __rand__(self, other) -> A:
+    def __rand__(self, other) -> "A":
         return self
 
-    def __rxor__(self, other) -> A:
+    def __rxor__(self, other) -> "A":
         return self
 
-    def __ror__(self, other) -> A:
+    def __ror__(self, other) -> "A":
         return self
 
 class B: ...
@@ -157,11 +157,11 @@ the right-hand side is not a subtype of the left-hand side, `lhs.__add__` will t
 
 ```py
 class A:
-    def __add__(self, other: B) -> int:
+    def __add__(self, other: "B") -> int:
         return 42
 
 class B:
-    def __radd__(self, other: A) -> str:
+    def __radd__(self, other: "A") -> str:
         return "foo"
 
 reveal_type(A() + B())  # revealed:  int
@@ -169,10 +169,10 @@ reveal_type(A() + B())  # revealed:  int
 # Edge case: C is a subtype of C, *but* if the two sides are of *equal* types,
 # the lhs *still* takes precedence
 class C:
-    def __add__(self, other: C) -> int:
+    def __add__(self, other: "C") -> int:
         return 42
 
-    def __radd__(self, other: C) -> str:
+    def __radd__(self, other: "C") -> str:
         return "foo"
 
 reveal_type(C() + C())  # revealed: int
@@ -237,11 +237,11 @@ well.
 
 ```py
 class A:
-    def __sub__(self, other: A) -> A:
+    def __sub__(self, other: "A") -> "A":
         return A()
 
 class B:
-    def __rsub__(self, other: A) -> B:
+    def __rsub__(self, other: A) -> "B":
         return B()
 
 reveal_type(A() - B())  # revealed: B
@@ -300,10 +300,10 @@ its instance super-type.
 
 ```py
 class A:
-    def __add__(self, other) -> A:
+    def __add__(self, other) -> "A":
         return self
 
-    def __radd__(self, other) -> A:
+    def __radd__(self, other) -> "A":
         return self
 
 reveal_type(A() + 1)  # revealed: A
@@ -312,7 +312,7 @@ reveal_type(1 + A())  # revealed: A
 reveal_type(A() + "foo")  # revealed: A
 # TODO should be `A` since `str.__add__` doesn't support `A` instances
 # TODO overloads
-reveal_type("foo" + A())  # revealed: @Todo(return type of decorated function)
+reveal_type("foo" + A())  # revealed: @Todo(return type of overloaded function)
 
 reveal_type(A() + b"foo")  # revealed: A
 # TODO should be `A` since `bytes.__add__` doesn't support `A` instances
@@ -320,7 +320,7 @@ reveal_type(b"foo" + A())  # revealed: bytes
 
 reveal_type(A() + ())  # revealed: A
 # TODO this should be `A`, since `tuple.__add__` doesn't support `A` instances
-reveal_type(() + A())  # revealed: @Todo(return type of decorated function)
+reveal_type(() + A())  # revealed: @Todo(return type of overloaded function)
 
 literal_string_instance = "foo" * 1_000_000_000
 # the test is not testing what it's meant to be testing if this isn't a `LiteralString`:
@@ -329,7 +329,7 @@ reveal_type(literal_string_instance)  # revealed: LiteralString
 reveal_type(A() + literal_string_instance)  # revealed: A
 # TODO should be `A` since `str.__add__` doesn't support `A` instances
 # TODO overloads
-reveal_type(literal_string_instance + A())  # revealed: @Todo(return type of decorated function)
+reveal_type(literal_string_instance + A())  # revealed: @Todo(return type of overloaded function)
 ```
 
 ## Operations involving instances of classes inheriting from `Any`
@@ -369,6 +369,39 @@ a = NotBoolable()
 
 # error: [unsupported-bool-conversion]
 10 and a and True
+```
+
+## Operations on class objects
+
+When operating on class objects, the corresponding dunder methods are looked up on the metaclass.
+
+```py
+from __future__ import annotations
+
+class Meta(type):
+    def __add__(self, other: Meta) -> int:
+        return 1
+
+    def __lt__(self, other: Meta) -> bool:
+        return True
+
+    def __getitem__(self, key: int) -> str:
+        return "a"
+
+class A(metaclass=Meta): ...
+class B(metaclass=Meta): ...
+
+reveal_type(A + B)  # revealed: int
+# error: [unsupported-operator] "Operator `-` is unsupported between objects of type `Literal[A]` and `Literal[B]`"
+reveal_type(A - B)  # revealed: Unknown
+
+reveal_type(A < B)  # revealed: bool
+reveal_type(A > B)  # revealed: bool
+
+# error: [unsupported-operator] "Operator `<=` is not supported for types `Literal[A]` and `Literal[B]`"
+reveal_type(A <= B)  # revealed: Unknown
+
+reveal_type(A[0])  # revealed: str
 ```
 
 ## Unsupported
@@ -433,7 +466,7 @@ the unreflected dunder of the left-hand operand. For context, see
 
 ```py
 class Foo:
-    def __radd__(self, other: Foo) -> Foo:
+    def __radd__(self, other: "Foo") -> "Foo":
         return self
 
 # error: [unsupported-operator]

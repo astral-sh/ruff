@@ -89,7 +89,7 @@
           ]
         },
         "python-platform": {
-          "description": "Specifies the target platform that will be used to execute the source code. If specified, Red Knot will tailor its use of type stub files, which conditionalize type definitions based on the platform.\n\nIf no platform is specified, knot will use `all` or the current platform in the LSP use case.",
+          "description": "Specifies the target platform that will be used to analyze the source code. If specified, Red Knot will tailor its use of type stub files, which conditionalize type definitions based on the platform.\n\nIf no platform is specified, knot will use `all` or the current platform in the LSP use case.",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonPlatform"
@@ -100,7 +100,7 @@
           ]
         },
         "python-version": {
-          "description": "Specifies the version of Python that will be used to execute the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. \"3.0\" or \"3.6\"). If a version is provided, knot will generate errors if the source code makes use of language features that are not supported in that version. It will also tailor its use of type stub files, which conditionalizes type definitions based on the version.",
+          "description": "Specifies the version of Python that will be used to analyze the source code. The version should be specified as a string in the format `M.m` where `M` is the major version and `m` is the minor (e.g. \"3.0\" or \"3.6\"). If a version is provided, knot will generate errors if the source code makes use of language features that are not supported in that version. It will also tailor its use of type stub files, which conditionalizes type definitions based on the version.",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonVersion"
@@ -604,6 +604,16 @@
           "title": "detects raw strings in type annotation positions",
           "description": "## What it does\nChecks for raw-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like Red Knot can't analyse type annotations that use raw-string notation.\n\n## Examples\n```python\ndef test(): -> r\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
           "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "redundant-cast": {
+          "title": "detects redundant `cast` calls",
+          "description": "## What it does\nDetects redundant `cast` calls where the value already has the target type.\n\n## Why is this bad?\nThese casts have no effect and can be removed.\n\n## Example\n```python\ndef f() -> int:\n    return 10\n\ncast(int, f())  # Redundant\n```",
+          "default": "warn",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

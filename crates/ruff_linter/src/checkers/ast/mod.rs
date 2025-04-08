@@ -26,6 +26,9 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::debug;
+use ruff_python_parser::semantic_errors::{
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, IsolationLevel};
@@ -63,6 +66,8 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
+use crate::rules::pyflakes::rules::LateFutureImport;
+use crate::rules::pylint::rules::LoadBeforeGlobalDeclaration;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa, Locator};
@@ -223,8 +228,13 @@ pub(crate) struct Checker<'a> {
     last_stmt_end: TextSize,
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
-    /// The target [`PythonVersion`] for version-dependent checks
+    /// The target [`PythonVersion`] for version-dependent checks.
     target_version: PythonVersion,
+    /// Helper visitor for detecting semantic syntax errors.
+    #[allow(clippy::struct_field_names)]
+    semantic_checker: SemanticSyntaxChecker,
+    /// Errors collected by the `semantic_checker`.
+    semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
 
 impl<'a> Checker<'a> {
@@ -272,6 +282,8 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
+            semantic_checker: SemanticSyntaxChecker::new(),
+            semantic_errors: RefCell::default(),
         }
     }
 }
@@ -512,10 +524,79 @@ impl<'a> Checker<'a> {
     pub(crate) const fn target_version(&self) -> PythonVersion {
         self.target_version
     }
+
+    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
+        let mut checker = std::mem::take(&mut self.semantic_checker);
+        f(&mut checker, self);
+        self.semantic_checker = checker;
+    }
+}
+
+impl SemanticSyntaxContext for Checker<'_> {
+    fn seen_docstring_boundary(&self) -> bool {
+        self.semantic.seen_module_docstring_boundary()
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        self.target_version
+    }
+
+    fn global(&self, name: &str) -> Option<TextRange> {
+        self.semantic.global(name)
+    }
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        match error.kind {
+            SemanticSyntaxErrorKind::LateFutureImport => {
+                if self.settings.rules.enabled(Rule::LateFutureImport) {
+                    self.report_diagnostic(Diagnostic::new(LateFutureImport, error.range));
+                }
+            }
+            SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start } => {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::LoadBeforeGlobalDeclaration)
+                {
+                    self.report_diagnostic(Diagnostic::new(
+                        LoadBeforeGlobalDeclaration {
+                            name,
+                            row: self.compute_source_row(start),
+                        },
+                        error.range,
+                    ));
+                }
+            }
+            SemanticSyntaxErrorKind::ReboundComprehensionVariable
+            | SemanticSyntaxErrorKind::DuplicateTypeParameter
+            | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
+            | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
+            | SemanticSyntaxErrorKind::SingleStarredAssignment
+            | SemanticSyntaxErrorKind::WriteToDebug(_)
+            | SemanticSyntaxErrorKind::InvalidExpression(..)
+            | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
+            | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
+            | SemanticSyntaxErrorKind::InvalidStarExpression => {
+                if self.settings.preview.is_enabled() {
+                    self.semantic_errors.borrow_mut().push(error);
+                }
+            }
+        }
+    }
+
+    fn source(&self) -> &str {
+        self.source()
+    }
+
+    fn future_annotations_or_stub(&self) -> bool {
+        self.semantic.future_annotations_or_stub()
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
 
@@ -550,17 +631,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     {
                         self.semantic.flags |= SemanticModelFlags::FUTURE_ANNOTATIONS;
                     }
-                } else {
-                    self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 }
             }
             Stmt::Import(_) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
-                self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
             }
             _ => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
-                self.semantic.flags |= SemanticModelFlags::FUTURES_BOUNDARY;
                 if !(self.semantic.seen_import_boundary()
                     || stmt.is_ipy_escape_command_stmt()
                     || helpers::is_assignment_to_a_dunder(stmt)
@@ -1093,7 +1170,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
             }
             _ => visitor::walk_stmt(self, stmt),
-        };
+        }
 
         if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
             match stmt {
@@ -1131,6 +1208,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+
         // Step 0: Pre-processing
         if self.source_type.is_stub()
             && self.semantic.in_class_base()
@@ -1594,7 +1673,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 }
                                 self.visit_expr_context(ctx);
                             } else {
-                                debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                if self.semantic.in_type_definition() {
+                                    // this should potentially trigger some kind of violation in the
+                                    // future, since it would indicate an invalid type expression
+                                    debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                }
+                                // even if the expression is invalid as a type expression, we should
+                                // still visit it so we don't accidentally treat variables as unused
+                                self.visit_expr(slice);
+                                self.visit_expr_context(ctx);
                             }
                         }
                         Some(typing::SubscriptKind::TypedDict) => {
@@ -1653,7 +1740,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.semantic.pop_scope();
             }
             _ => {}
-        };
+        }
 
         // Step 4: Analysis
         match expr {
@@ -2674,7 +2761,7 @@ pub(crate) fn check_ast(
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
     target_version: PythonVersion,
-) -> Vec<Diagnostic> {
+) -> (Vec<Diagnostic>, Vec<SemanticSyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)
         .and_then(|package| to_module_path(package, path));
@@ -2739,5 +2826,11 @@ pub(crate) fn check_ast(
     checker.analyze.scopes.push(ScopeId::global());
     analyze::deferred_scopes(&checker);
 
-    checker.diagnostics.take()
+    let Checker {
+        diagnostics,
+        semantic_errors,
+        ..
+    } = checker;
+
+    (diagnostics.into_inner(), semantic_errors.into_inner())
 }

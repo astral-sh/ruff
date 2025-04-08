@@ -518,8 +518,8 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 ///
 /// We prefer parentheses at least in the following cases:
 /// * The expression contains more than one unparenthesized expression with the same precedence. For example,
-///     the expression `a * b * c` contains two multiply operations. We prefer parentheses in that case.
-///     `(a * b) * c` or `a * b + c` are okay, because the subexpression is parenthesized, or the expression uses operands with a lower precedence
+///   the expression `a * b * c` contains two multiply operations. We prefer parentheses in that case.
+///   `(a * b) * c` or `a * b + c` are okay, because the subexpression is parenthesized, or the expression uses operands with a lower precedence
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
@@ -787,7 +787,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
             | Expr::IpyEscapeCommand(_) => {
                 return;
             }
-        };
+        }
 
         walk_expr(self, expr);
     }

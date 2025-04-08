@@ -60,23 +60,21 @@ impl<'db> Unpack<'db> {
 
 /// The expression that is being unpacked.
 #[derive(Clone, Copy, Debug, Hash, salsa::Update)]
-pub(crate) enum UnpackValue<'db> {
-    /// An iterable expression like the one in a `for` loop or a comprehension.
-    Iterable(Expression<'db>),
-    /// An context manager expression like the one in a `with` statement.
-    ContextManager(Expression<'db>),
-    /// An expression that is being assigned to a target.
-    Assign(Expression<'db>),
+pub(crate) struct UnpackValue<'db> {
+    /// The kind of unpack expression
+    kind: UnpackKind,
+    /// The expression we are unpacking
+    expression: Expression<'db>,
 }
 
 impl<'db> UnpackValue<'db> {
+    pub(crate) fn new(kind: UnpackKind, expression: Expression<'db>) -> Self {
+        Self { kind, expression }
+    }
+
     /// Returns the underlying [`Expression`] that is being unpacked.
     pub(crate) const fn expression(self) -> Expression<'db> {
-        match self {
-            UnpackValue::Assign(expr)
-            | UnpackValue::Iterable(expr)
-            | UnpackValue::ContextManager(expr) => expr,
-        }
+        self.expression
     }
 
     /// Returns the [`ScopedExpressionId`] of the underlying expression.
@@ -94,4 +92,27 @@ impl<'db> UnpackValue<'db> {
     pub(crate) fn as_any_node_ref(self, db: &'db dyn Db) -> AnyNodeRef<'db> {
         self.expression().node_ref(db).node().into()
     }
+
+    pub(crate) const fn kind(self) -> UnpackKind {
+        self.kind
+    }
+}
+
+#[derive(Clone, Copy, Debug, Hash, salsa::Update)]
+pub(crate) enum UnpackKind {
+    /// An iterable expression like the one in a `for` loop or a comprehension.
+    Iterable,
+    /// An context manager expression like the one in a `with` statement.
+    ContextManager,
+    /// An expression that is being assigned to a target.
+    Assign,
+}
+
+/// The position of the target element in an unpacking.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update)]
+pub(crate) enum UnpackPosition {
+    /// The target element is in the first position of the unpacking.
+    First,
+    /// The target element is in the position other than the first position of the unpacking.
+    Other,
 }

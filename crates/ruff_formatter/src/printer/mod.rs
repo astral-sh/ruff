@@ -362,9 +362,7 @@ impl<'a> Printer<'a> {
                 stack.push(TagKind::FitsExpanded, args);
             }
 
-            FormatElement::Tag(
-                tag @ (StartLabelled(_) | StartEntry | StartBestFittingEntry { .. }),
-            ) => {
+            FormatElement::Tag(tag @ (StartLabelled(_) | StartEntry | StartBestFittingEntry)) => {
                 stack.push(tag.kind(), args);
             }
 
@@ -386,7 +384,7 @@ impl<'a> Printer<'a> {
             ) => {
                 stack.pop(tag.kind())?;
             }
-        };
+        }
 
         Ok(())
     }
@@ -894,7 +892,7 @@ struct PrinterState<'a> {
     line_suffixes: LineSuffixes<'a>,
     verbatim_markers: Vec<TextRange>,
     group_modes: GroupModes,
-    // Re-used queue to measure if a group fits. Optimisation to avoid re-allocating a new
+    // Reused queue to measure if a group fits. Optimisation to avoid re-allocating a new
     // vec every time a group gets measured
     fits_stack: Vec<StackFrame>,
     fits_queue: Vec<std::slice::Iter<'a, FormatElement>>,
@@ -1416,7 +1414,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
                 | StartVerbatim(_)
                 | StartLabelled(_)
                 | StartEntry
-                | StartBestFittingEntry { .. }),
+                | StartBestFittingEntry),
             ) => {
                 self.stack.push(tag.kind(), args);
             }

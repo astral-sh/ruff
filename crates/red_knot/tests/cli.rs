@@ -6,9 +6,9 @@ use std::process::Command;
 use tempfile::TempDir;
 
 /// Specifying an option on the CLI should take precedence over the same setting in the
-/// project's configuration.
+/// project's configuration. Here, this is tested for the Python version.
 #[test]
-fn config_override() -> anyhow::Result<()> {
+fn config_override_python_version() -> anyhow::Result<()> {
     let case = TestCase::with_files([
         (
             "pyproject.toml",
@@ -50,6 +50,67 @@ fn config_override() -> anyhow::Result<()> {
     exit_code: 0
     ----- stdout -----
     All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// Same as above, but for the Python platform.
+#[test]
+fn config_override_python_platform() -> anyhow::Result<()> {
+    let case = TestCase::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.knot.environment]
+            python-platform = "linux"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            import sys
+            from typing_extensions import reveal_type
+
+            reveal_type(sys.platform)
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    info: revealed-type
+     --> <temp_dir>/test.py:5:1
+      |
+    3 | from typing_extensions import reveal_type
+    4 |
+    5 | reveal_type(sys.platform)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^ Revealed type is `Literal["linux"]`
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
+
+    assert_cmd_snapshot!(case.command().arg("--python-platform").arg("all"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    info: revealed-type
+     --> <temp_dir>/test.py:5:1
+      |
+    3 | from typing_extensions import reveal_type
+    4 |
+    5 | reveal_type(sys.platform)
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^ Revealed type is `LiteralString`
+      |
+
+    Found 1 diagnostic
 
     ----- stderr -----
     ");

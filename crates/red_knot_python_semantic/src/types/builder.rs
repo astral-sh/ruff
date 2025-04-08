@@ -26,7 +26,7 @@
 //!     eliminate the supertype from the intersection).
 //!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
 
-use crate::types::{IntersectionType, KnownClass, Type, UnionType};
+use crate::types::{IntersectionType, KnownClass, Type, TypeVarBoundOrConstraints, UnionType};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
@@ -110,25 +110,14 @@ impl<'db> UnionBuilder<'db> {
                         return self.collapse_to_object();
                     }
                 }
-                match to_remove[..] {
-                    [] => self.elements.push(to_add),
-                    [index] => self.elements[index] = to_add,
-                    _ => {
-                        let mut current_index = 0;
-                        let mut to_remove = to_remove.into_iter();
-                        let mut next_to_remove_index = to_remove.next();
-                        self.elements.retain(|_| {
-                            let retain = if Some(current_index) == next_to_remove_index {
-                                next_to_remove_index = to_remove.next();
-                                false
-                            } else {
-                                true
-                            };
-                            current_index += 1;
-                            retain
-                        });
-                        self.elements.push(to_add);
+                if let Some((&first, rest)) = to_remove.split_first() {
+                    self.elements[first] = to_add;
+                    // We iterate in descending order to keep remaining indices valid after `swap_remove`.
+                    for &index in rest.iter().rev() {
+                        self.elements.swap_remove(index);
                     }
+                } else {
+                    self.elements.push(to_add);
                 }
             }
         }
@@ -496,7 +485,101 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
+    /// Tries to simplify any constrained typevars in the intersection:
+    ///
+    /// - If the intersection contains a positive entry for exactly one of the constraints, we can
+    ///   remove the typevar (effectively replacing it with that one positive constraint).
+    ///
+    /// - If the intersection contains negative entries for all but one of the constraints, we can
+    ///   remove the negative constraints and replace the typevar with the remaining positive
+    ///   constraint.
+    ///
+    /// - If the intersection contains negative entries for all of the constraints, the overall
+    ///   intersection is `Never`.
+    fn simplify_constrained_typevars(&mut self, db: &'db dyn Db) {
+        let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
+        let mut positive_to_remove = SmallVec::<[usize; 1]>::new();
+
+        for (typevar_index, ty) in self.positive.iter().enumerate() {
+            let Type::TypeVar(typevar) = ty else {
+                continue;
+            };
+            let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
+                typevar.bound_or_constraints(db)
+            else {
+                continue;
+            };
+
+            // Determine which constraints appear as positive entries in the intersection. Note
+            // that we shouldn't have duplicate entries in the positive or negative lists, so we
+            // don't need to worry about finding any particular constraint more than once.
+            let constraints = constraints.elements(db);
+            let mut positive_constraint_count = 0;
+            for positive in &self.positive {
+                // This linear search should be fine as long as we don't encounter typevars with
+                // thousands of constraints.
+                positive_constraint_count += constraints
+                    .iter()
+                    .filter(|c| c.is_subtype_of(db, *positive))
+                    .count();
+            }
+
+            // If precisely one constraint appears as a positive element, we can replace the
+            // typevar with that positive constraint.
+            if positive_constraint_count == 1 {
+                positive_to_remove.push(typevar_index);
+                continue;
+            }
+
+            // Determine which constraints appear as negative entries in the intersection.
+            let mut to_remove = Vec::with_capacity(constraints.len());
+            let mut remaining_constraints: Vec<_> = constraints.iter().copied().map(Some).collect();
+            for (negative_index, negative) in self.negative.iter().enumerate() {
+                // This linear search should be fine as long as we don't encounter typevars with
+                // thousands of constraints.
+                let matching_constraints = constraints
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| c.is_subtype_of(db, *negative));
+                for (constraint_index, _) in matching_constraints {
+                    to_remove.push(negative_index);
+                    remaining_constraints[constraint_index] = None;
+                }
+            }
+
+            let mut iter = remaining_constraints.into_iter().flatten();
+            let Some(remaining_constraint) = iter.next() else {
+                // All of the typevar constraints have been removed, so the entire intersection is
+                // `Never`.
+                *self = Self::default();
+                self.positive.insert(Type::Never);
+                return;
+            };
+
+            let more_than_one_remaining_constraint = iter.next().is_some();
+            if more_than_one_remaining_constraint {
+                // This typevar cannot be simplified.
+                continue;
+            }
+
+            // Only one typevar constraint remains. Remove all of the negative constraints, and
+            // replace the typevar itself with the remaining positive constraint.
+            to_add.push(remaining_constraint);
+            positive_to_remove.push(typevar_index);
+        }
+
+        // We don't need to sort the positive list, since we only append to it in increasing order.
+        for index in positive_to_remove.into_iter().rev() {
+            self.positive.swap_remove_index(index);
+        }
+
+        for remaining_constraint in to_add {
+            self.add_positive(db, remaining_constraint);
+        }
+    }
+
     fn build(mut self, db: &'db dyn Db) -> Type<'db> {
+        self.simplify_constrained_typevars(db);
         match (self.positive.len(), self.negative.len()) {
             (0, 0) => Type::object(db),
             (1, 0) => self.positive[0],

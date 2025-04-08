@@ -1,0 +1,220 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/single_star_in_tuple.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..84,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..20,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 4..5,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 5..7,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 9..20,
+                                value: Yield(
+                                    ExprYield {
+                                        range: 9..20,
+                                        value: Some(
+                                            Tuple(
+                                                ExprTuple {
+                                                    range: 15..20,
+                                                    elts: [
+                                                        Starred(
+                                                            ExprStarred {
+                                                                range: 16..18,
+                                                                value: Name(
+                                                                    ExprName {
+                                                                        range: 17..18,
+                                                                        id: Name("x"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                    ],
+                                                    ctx: Load,
+                                                    parenthesized: true,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 21..42,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 25..26,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 26..28,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Return(
+                            StmtReturn {
+                                range: 30..42,
+                                value: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 37..42,
+                                            elts: [
+                                                Starred(
+                                                    ExprStarred {
+                                                        range: 38..40,
+                                                        value: Name(
+                                                            ExprName {
+                                                                range: 39..40,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: true,
+                                        },
+                                    ),
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 43..62,
+                    is_async: false,
+                    target: Name(
+                        ExprName {
+                            range: 47..48,
+                            id: Name("_"),
+                            ctx: Store,
+                        },
+                    ),
+                    iter: Tuple(
+                        ExprTuple {
+                            range: 52..57,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 53..55,
+                                        value: Name(
+                                            ExprName {
+                                                range: 54..55,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 59..62,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 59..62,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+            For(
+                StmtFor {
+                    range: 63..83,
+                    is_async: false,
+                    target: Tuple(
+                        ExprTuple {
+                            range: 67..72,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 68..70,
+                                        value: Name(
+                                            ExprName {
+                                                range: 69..70,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ],
+                            ctx: Store,
+                            parenthesized: true,
+                        },
+                    ),
+                    iter: Name(
+                        ExprName {
+                            range: 76..78,
+                            id: Name("xs"),
+                            ctx: Load,
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 80..83,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 80..83,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                },
+            ),
+        ],
+    },
+)
+```

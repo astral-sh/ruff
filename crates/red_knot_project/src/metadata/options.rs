@@ -2,14 +2,13 @@ use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSou
 use crate::Db;
 use red_knot_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
 use red_knot_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings};
-use ruff_db::diagnostic::{DiagnosticFormat, DiagnosticId, OldDiagnosticTrait, Severity, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
 use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -37,9 +36,17 @@ pub struct Options {
 
 impl Options {
     pub(crate) fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, KnotTomlError> {
-        let _guard = ValueSourceGuard::new(source);
+        let _guard = ValueSourceGuard::new(source, true);
         let options = toml::from_str(content)?;
         Ok(options)
+    }
+
+    pub fn deserialize_with<'de, D>(source: ValueSource, deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let _guard = ValueSourceGuard::new(source, false);
+        Self::deserialize(deserializer)
     }
 
     pub(crate) fn to_program_settings(
@@ -113,7 +120,7 @@ impl Options {
                         .ok()
                         .map(PythonPath::from_virtual_env_var)
                 })
-                .unwrap_or_else(|| PythonPath::KnownSitePackages(vec![])),
+                .unwrap_or_else(|| PythonPath::Discover(project_root.to_path_buf())),
         }
     }
 
@@ -217,7 +224,7 @@ impl Options {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct EnvironmentOptions {
-    /// Specifies the version of Python that will be used to execute the source code.
+    /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
     /// and `m` is the minor (e.g. "3.0" or "3.6").
     /// If a version is provided, knot will generate errors if the source code makes use of language features
@@ -226,7 +233,7 @@ pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub python_version: Option<RangedValue<PythonVersion>>,
 
-    /// Specifies the target platform that will be used to execute the source code.
+    /// Specifies the target platform that will be used to analyze the source code.
     /// If specified, Red Knot will tailor its use of type stub files,
     /// which conditionalize type definitions based on the platform.
     ///
@@ -389,22 +396,14 @@ impl OptionDiagnostic {
     fn with_span(self, span: Option<Span>) -> Self {
         OptionDiagnostic { span, ..self }
     }
-}
 
-impl OldDiagnosticTrait for OptionDiagnostic {
-    fn id(&self) -> DiagnosticId {
-        self.id
-    }
-
-    fn message(&self) -> Cow<str> {
-        Cow::Borrowed(&self.message)
-    }
-
-    fn span(&self) -> Option<Span> {
-        self.span.clone()
-    }
-
-    fn severity(&self) -> Severity {
-        self.severity
+    pub(crate) fn to_diagnostic(&self) -> Diagnostic {
+        if let Some(ref span) = self.span {
+            let mut diag = Diagnostic::new(self.id, self.severity, "");
+            diag.annotate(Annotation::primary(span.clone()).message(&self.message));
+            diag
+        } else {
+            Diagnostic::new(self.id, self.severity, &self.message)
+        }
     }
 }

@@ -57,11 +57,29 @@ def f() -> int:
 ### In Protocol
 
 ```py
-from typing import Protocol
+from typing import Protocol, TypeVar
 
 class Bar(Protocol):
+    def f(self) -> int: ...
+
+class Baz(Bar):
+    # error: [invalid-return-type]
+    def f(self) -> int: ...
+
+T = TypeVar("T")
+
+class Qux(Protocol[T]):
     # TODO: no error
     # error: [invalid-return-type]
+    def f(self) -> int: ...
+
+class Foo(Protocol):
+    def f[T](self, v: T) -> T: ...
+
+t = (Protocol, int)
+reveal_type(t[0])  # revealed: typing.Protocol
+
+class Lorem(t[0]):
     def f(self) -> int: ...
 ```
 
@@ -72,14 +90,23 @@ from abc import ABC, abstractmethod
 
 class Foo(ABC):
     @abstractmethod
-    # TODO: no error
-    # error: [invalid-return-type]
     def f(self) -> int: ...
     # This currently does not produce an error (which is correct), but not for the right reason: We
     # are still checking the body of the stub function against the return type, but are currently
     # treating TypeVars as Any when checking assignability.
     @abstractmethod
     def g[T](self, x: T) -> T: ...
+
+class Bar[T](ABC):
+    @abstractmethod
+    def f(self) -> int: ...
+    @abstractmethod
+    def g[T](self, x: T) -> T: ...
+
+# error: [invalid-return-type]
+def f() -> int: ...
+@abstractmethod  # Semantically meaningless, accepted nevertheless
+def g() -> int: ...
 ```
 
 ### In overload
@@ -244,4 +271,67 @@ def f(cond: bool) -> int:
         return 1
     if cond:
         return 2
+```
+
+## NotImplemented
+
+### Default Python version
+
+`NotImplemented` is a special symbol in Python. It is commonly used to control the fallback behavior
+of special dunder methods. You can find more details in the
+[documentation](https://docs.python.org/3/library/numbers.html#implementing-the-arithmetic-operations).
+
+```py
+from __future__ import annotations
+
+class A:
+    def __add__(self, o: A) -> A:
+        return NotImplemented
+```
+
+However, as shown below, `NotImplemented` should not cause issues with the declared return type.
+
+```py
+def f() -> int:
+    return NotImplemented
+
+def f(cond: bool) -> int:
+    if cond:
+        return 1
+    else:
+        return NotImplemented
+
+def f(x: int) -> int | str:
+    if x < 0:
+        return -1
+    elif x == 0:
+        return NotImplemented
+    else:
+        return "test"
+
+def f(cond: bool) -> str:
+    return "hello" if cond else NotImplemented
+
+def f(cond: bool) -> int:
+    # error: [invalid-return-type] "Object of type `Literal["hello"]` is not assignable to return type `int`"
+    return "hello" if cond else NotImplemented
+```
+
+### Python 3.10+
+
+Unlike Ellipsis, `_NotImplementedType` remains in `builtins.pyi` regardless of the Python version.
+Even if `builtins._NotImplementedType` is fully replaced by `types.NotImplementedType` in the
+future, it should still work as expected.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+def f() -> int:
+    return NotImplemented
+
+def f(cond: bool) -> str:
+    return "hello" if cond else NotImplemented
 ```

@@ -1016,6 +1016,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "059") => (RuleGroup::Preview, rules::ruff::rules::UnusedUnpackedVariable),
         (Ruff, "100") => (RuleGroup::Stable, rules::ruff::rules::UnusedNOQA),
         (Ruff, "101") => (RuleGroup::Stable, rules::ruff::rules::RedirectedNOQA),
+        (Ruff, "102") => (RuleGroup::Preview, rules::ruff::rules::InvalidRuleCode),
 
         (Ruff, "200") => (RuleGroup::Stable, rules::ruff::rules::InvalidPyprojectToml),
         #[cfg(any(feature = "test-rules", test))]
@@ -1068,9 +1069,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // airflow
         (Airflow, "001") => (RuleGroup::Stable, rules::airflow::rules::AirflowVariableNameTaskIdMismatch),
-        (Airflow, "301") => (RuleGroup::Preview, rules::airflow::rules::AirflowDagNoScheduleArgument),
-        (Airflow, "302") => (RuleGroup::Preview, rules::airflow::rules::Airflow3Removal),
-        (Airflow, "303") => (RuleGroup::Preview, rules::airflow::rules::Airflow3MovedToProvider),
+        (Airflow, "002") => (RuleGroup::Preview, rules::airflow::rules::AirflowDagNoScheduleArgument),
+        (Airflow, "301") => (RuleGroup::Preview, rules::airflow::rules::Airflow3Removal),
+        (Airflow, "302") => (RuleGroup::Preview, rules::airflow::rules::Airflow3MovedToProvider),
 
         // perflint
         (Perflint, "101") => (RuleGroup::Stable, rules::perflint::rules::UnnecessaryListCast),

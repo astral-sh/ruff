@@ -1,0 +1,64 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/debug_shadow_match.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..33,
+        body: [
+            Match(
+                StmtMatch {
+                    range: 0..32,
+                    subject: Name(
+                        ExprName {
+                            range: 6..7,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 13..32,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 18..27,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("__debug__"),
+                                            range: 18..27,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 29..32,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 29..32,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | match x:
+2 |     case __debug__: ...
+  |          ^^^^^^^^^ Syntax Error: cannot assign to `__debug__`
+  |

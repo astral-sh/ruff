@@ -114,6 +114,10 @@ impl<'db> ScopeId<'db> {
         self.node(db).scope_kind().is_function_like()
     }
 
+    pub(crate) fn is_type_parameter(self, db: &'db dyn Db) -> bool {
+        self.node(db).scope_kind().is_type_parameter()
+    }
+
     pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
         self.scope(db).node()
     }
@@ -171,19 +175,19 @@ impl FileScopeId {
 pub struct Scope {
     parent: Option<FileScopeId>,
     node: NodeWithScopeKind,
-    descendents: Range<FileScopeId>,
+    descendants: Range<FileScopeId>,
 }
 
 impl Scope {
     pub(super) fn new(
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
-        descendents: Range<FileScopeId>,
+        descendants: Range<FileScopeId>,
     ) -> Self {
         Scope {
             parent,
             node,
-            descendents,
+            descendants,
         }
     }
 
@@ -199,12 +203,12 @@ impl Scope {
         self.node().scope_kind()
     }
 
-    pub fn descendents(&self) -> Range<FileScopeId> {
-        self.descendents.clone()
+    pub fn descendants(&self) -> Range<FileScopeId> {
+        self.descendants.clone()
     }
 
-    pub(super) fn extend_descendents(&mut self, children_end: FileScopeId) {
-        self.descendents = self.descendents.start..children_end;
+    pub(super) fn extend_descendants(&mut self, children_end: FileScopeId) {
+        self.descendants = self.descendants.start..children_end;
     }
 
     pub(crate) fn is_eager(&self) -> bool {
@@ -226,9 +230,8 @@ pub enum ScopeKind {
 impl ScopeKind {
     pub(crate) fn is_eager(self) -> bool {
         match self {
-            ScopeKind::Class | ScopeKind::Comprehension => true,
-            ScopeKind::Module
-            | ScopeKind::Annotation
+            ScopeKind::Module | ScopeKind::Class | ScopeKind::Comprehension => true,
+            ScopeKind::Annotation
             | ScopeKind::Function
             | ScopeKind::Lambda
             | ScopeKind::TypeAlias => false,
@@ -251,10 +254,14 @@ impl ScopeKind {
     pub(crate) fn is_class(self) -> bool {
         matches!(self, ScopeKind::Class)
     }
+
+    pub(crate) fn is_type_parameter(self) -> bool {
+        matches!(self, ScopeKind::Annotation | ScopeKind::TypeAlias)
+    }
 }
 
 /// Symbol table for a specific [`Scope`].
-#[derive(Debug, Default, salsa::Update)]
+#[derive(Default, salsa::Update)]
 pub struct SymbolTable {
     /// The symbols in this scope.
     symbols: IndexVec<ScopedSymbolId, Symbol>,
@@ -314,6 +321,16 @@ impl PartialEq for SymbolTable {
 }
 
 impl Eq for SymbolTable {}
+
+impl std::fmt::Debug for SymbolTable {
+    /// Exclude the `symbols_by_name` field from the debug output.
+    /// It's very noisy and not useful for debugging.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SymbolTable")
+            .field(&self.symbols)
+            .finish_non_exhaustive()
+    }
+}
 
 #[derive(Debug, Default)]
 pub(super) struct SymbolTableBuilder {

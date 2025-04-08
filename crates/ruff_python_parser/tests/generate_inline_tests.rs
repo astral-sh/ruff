@@ -22,7 +22,7 @@ fn project_root() -> PathBuf {
 
 #[test]
 fn generate_inline_tests() -> Result<()> {
-    let parser_dir = project_root().join("crates/ruff_python_parser/src/parser");
+    let parser_dir = project_root().join("crates/ruff_python_parser/src/");
     let tests = TestCollection::try_from(parser_dir.as_path())?;
 
     let mut test_files = TestFiles::default();

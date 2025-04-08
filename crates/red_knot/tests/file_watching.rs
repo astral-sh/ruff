@@ -12,7 +12,7 @@ use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{
-    OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard,
+    file_time_now, OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard,
 };
 use ruff_db::{Db as _, Upcast};
 use ruff_python_ast::PythonVersion;
@@ -462,7 +462,7 @@ fn update_file(path: impl AsRef<SystemPath>, content: &str) -> anyhow::Result<()
 
         std::thread::sleep(Duration::from_nanos(10));
 
-        filetime::set_file_handle_times(&file, None, Some(filetime::FileTime::now()))?;
+        filetime::set_file_handle_times(&file, None, Some(file_time_now()))?;
     }
 }
 
@@ -1125,11 +1125,11 @@ print(sys.last_exc, os.getegid())
 
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(
-        diagnostics[0].message(),
+        diagnostics[0].primary_message(),
         "Type `<module 'sys'>` has no attribute `last_exc`"
     );
     assert_eq!(
-        diagnostics[1].message(),
+        diagnostics[1].primary_message(),
         "Type `<module 'os'>` has no attribute `getegid`"
     );
 

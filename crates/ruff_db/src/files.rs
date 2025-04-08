@@ -7,6 +7,7 @@ pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
 use ruff_python_ast::PySourceType;
+use ruff_text_size::{Ranged, TextRange};
 use salsa::plumbing::AsId;
 use salsa::{Durability, Setter};
 
@@ -423,9 +424,19 @@ impl File {
 
     /// Returns `true` if the file should be analyzed as a type stub.
     pub fn is_stub(self, db: &dyn Db) -> bool {
-        self.path(db)
-            .extension()
-            .is_some_and(|extension| PySourceType::from_extension(extension).is_stub())
+        self.source_type(db).is_stub()
+    }
+
+    pub fn source_type(self, db: &dyn Db) -> PySourceType {
+        match self.path(db) {
+            FilePath::System(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
+            FilePath::Vendored(_) => PySourceType::Stub,
+            FilePath::SystemVirtual(path) => path
+                .extension()
+                .map_or(PySourceType::Python, PySourceType::from_extension),
+        }
     }
 }
 
@@ -509,6 +520,30 @@ impl fmt::Display for FileError {
 }
 
 impl std::error::Error for FileError {}
+
+/// Range with its corresponding file.
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub struct FileRange {
+    file: File,
+    range: TextRange,
+}
+
+impl FileRange {
+    pub const fn new(file: File, range: TextRange) -> Self {
+        Self { file, range }
+    }
+
+    pub const fn file(&self) -> File {
+        self.file
+    }
+}
+
+impl Ranged for FileRange {
+    #[inline]
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
 
 #[cfg(test)]
 mod tests {

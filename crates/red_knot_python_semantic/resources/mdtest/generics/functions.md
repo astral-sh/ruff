@@ -99,7 +99,7 @@ def good_return[T: int](x: T) -> T:
     return x
 
 def bad_return[T: int](x: T) -> T:
-    # TODO: error: int is not assignable to T
+    # error: [invalid-return-type] "Object of type `int` is not assignable to return type `T`"
     return x + 1
 ```
 
