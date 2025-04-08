@@ -761,41 +761,12 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
 
         // apache-airflow-providers-standard
-        ["airflow", "hooks", "filesystem", "FSHook"] => Replacement::ProviderName {
-            name: "airflow.providers.standard.hooks.filesystem.FSHook",
-            provider: "standard",
-            version: "0.0.1"
-        },
-        ["airflow", "hooks", "package_index", "PackageIndexHook"] => Replacement::ProviderName {
-            name: "airflow.providers.standard.hooks.package_index.PackageIndexHook",
-            provider: "standard",
-            version: "0.0.1"
-        },
-        ["airflow", "hooks", "subprocess", rest @ (
-            "SubprocessHook" |
-            "SubprocessResult" |
-            "working_directory"
-        )] => Replacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.standard.hooks.subprocess",
-            provider: "standard",
-            version: "0.0.3"
-        },
-        ["airflow", "operators", "bash" | "bash_operator", "BashOperator"] => Replacement::ProviderName {
+        ["airflow", "operators", "bash_operator", "BashOperator"] => Replacement::ProviderName {
             name: "airflow.providers.standard.operators.bash.BashOperator",
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "operators", "datetime", rest@ (
-            "BranchDateTimeOperator" |
-            "target_times_as_dates"
-        )] => Replacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.standard.time.operators.datetime",
-            provider: "standard",
-            version: "0.0.1"
-        },
-        ["airflow", "operators", "dagrun_operator" | "trigger_dagrun", rest@ (
+        ["airflow", "operators", "dagrun_operator", rest@ (
             "TriggerDagRunLink" |
             "TriggerDagRunOperator"
         )] => Replacement::SourceModuleMovedToProvider {
@@ -809,12 +780,12 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.2"
         },
-        ["airflow", "operators", "latest_only_operator" | "latest_only", "LatestOnlyOperator"] => Replacement::ProviderName {
+        ["airflow", "operators", "latest_only_operator", "LatestOnlyOperator"] => Replacement::ProviderName {
             name: "airflow.providers.standard.operators.latest_only.LatestOnlyOperator",
             provider: "standard",
             version: "0.0.3"
         },
-        ["airflow", "operators", "python_operator"| "python", rest @ (
+        ["airflow", "operators", "python_operator", rest @ (
             "BranchPythonOperator" |
             "PythonOperator" |
             "PythonVirtualenvOperator" |
@@ -825,79 +796,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "operators", "weekday", "BranchDayOfWeekOperator"] => Replacement::ProviderName {
-            name: "airflow.providers.standard.time.operators.weekday.BranchDayOfWeekOperator",
-            provider: "standard",
-            version: "0.0.1"
-        },
-        ["airflow", "sensors", "date_time", rest @ (
-            "DateTimeSensor" |
-            "DateTimeSensorAsync"
-        )] => Replacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.standard.time.sensors.date_time",
-            provider: "standard",
-            version: "0.0.1"
-        },
-        ["airflow", "sensors", "external_task_sensor" | "external_task", rest @ (
+        ["airflow", "sensors", "external_task_sensor", rest @ (
             "ExternalTaskMarker" |
             "ExternalTaskSensor" |
             "ExternalTaskSensorLink"
         )] => Replacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.sensors.external_task",
-            provider: "standard",
-            version: "0.0.3"
-        },
-        ["airflow", "sensors", "filesystem", "FileSensor"] => Replacement::ProviderName {
-            name: "airflow.providers.standard.sensors.filesystem.FileSensor",
-            provider: "standard",
-            version: "0.0.2"
-        },
-        ["airflow", "sensors", "time_sensor", rest @ (
-            "TimeSensor" |
-            "TimeSensorAsync"
-        )] => Replacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.standard.time.sensors.time",
-            provider: "standard",
-            version: "0.0.1"
-        },
-        ["airflow", "sensors", "time_delta", rest @ (
-            "TimeDeltaSensor" |
-            "TimeDeltaSensorAsync" |
-            "WaitSensor"
-        )] => Replacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.standard.time.sensors.time_delta",
-            provider: "standard",
-            version: "0.0.1"
-        },
-        ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => Replacement::ProviderName {
-            name: "airflow.providers.standard.time.sensors.weekday.DayOfWeekSensor",
-            provider: "standard",
-            version: "0.0.1"
-        },
-        ["airflow", "triggers", "external_task", rest@ (
-            "DagStateTrigger" |
-            "WorkflowTrigger"
-        )] => Replacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.standard.triggers.external_task",
-            provider: "standard",
-            version: "0.0.3"
-        },
-        ["airflow", "triggers", "file", "FileTrigger"] => Replacement::ProviderName {
-            name: "airflow.providers.standard.triggers.file.FileTrigger",
-            provider: "standard",
-            version: "0.0.3"
-        },
-        ["airflow", "triggers", "temporal", rest @ (
-            "DateTimeTrigger" |
-            "TimeDeltaTrigger"
-        )] => Replacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.standard.triggers.temporal",
             provider: "standard",
             version: "0.0.3"
         },

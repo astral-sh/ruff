@@ -1,0 +1,42 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR312.py:10:1: AIR312 `airflow.operators.python.BranchPythonOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+ 8 | )
+ 9 |
+10 | BranchPythonOperator()
+   | ^^^^^^^^^^^^^^^^^^^^ AIR312
+11 | PythonOperator()
+12 | PythonVirtualenvOperator()
+   |
+   = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.BranchPythonOperator` instead.
+
+AIR312.py:11:1: AIR312 `airflow.operators.python.PythonOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+10 | BranchPythonOperator()
+11 | PythonOperator()
+   | ^^^^^^^^^^^^^^ AIR312
+12 | PythonVirtualenvOperator()
+13 | ShortCircuitOperator()
+   |
+   = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.PythonOperator` instead.
+
+AIR312.py:12:1: AIR312 `airflow.operators.python.PythonVirtualenvOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+10 | BranchPythonOperator()
+11 | PythonOperator()
+12 | PythonVirtualenvOperator()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR312
+13 | ShortCircuitOperator()
+   |
+   = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.PythonVirtualenvOperator` instead.
+
+AIR312.py:13:1: AIR312 `airflow.operators.python.ShortCircuitOperator` is moved into `standard` provider in Airflow 3.0;
+   |
+11 | PythonOperator()
+12 | PythonVirtualenvOperator()
+13 | ShortCircuitOperator()
+   | ^^^^^^^^^^^^^^^^^^^^ AIR312
+   |
+   = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.ShortCircuitOperator` instead.
