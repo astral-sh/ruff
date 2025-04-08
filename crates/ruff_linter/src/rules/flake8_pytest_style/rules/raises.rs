@@ -173,8 +173,11 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestRaisesWithoutException) {
-            // positional only `expected_exception` argument
-            if call.arguments.find_positional(0).is_none() {
+            if call
+                .arguments
+                .find_argument("expected_exception", 0)
+                .is_none()
+            {
                 checker.report_diagnostic(Diagnostic::new(
                     PytestRaisesWithoutException,
                     call.func.range(),
