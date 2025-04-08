@@ -880,6 +880,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_definitions.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
+        self.reachability_by_use.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_declaration.shrink_to_fit();
         self.eager_bindings.shrink_to_fit();
