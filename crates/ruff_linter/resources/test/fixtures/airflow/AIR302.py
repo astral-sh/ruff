@@ -319,7 +319,16 @@ JdbcHook()
 JdbcOperator()
 
 # apache-airflow-providers-fab
-basic_auth, kerberos_auth
+basic_auth.CLIENT_AUTH
+basic_auth.init_app
+basic_auth.auth_current_user
+basic_auth.requires_authentication
+
+kerberos_auth.log
+kerberos_auth.CLIENT_AUTH
+kerberos_auth.find_user
+kerberos_auth.init_app
+kerberos_auth.requires_authentication
 auth_current_user
 backend_kerberos_auth
 fab_override
