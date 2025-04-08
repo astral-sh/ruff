@@ -752,7 +752,9 @@ fn symbol_from_bindings_impl<'db>(
 
     if let Some(first) = types.next() {
         let boundness = match unbound_visibility {
-            Truthiness::AlwaysTrue => return Symbol::Unbound,
+            Truthiness::AlwaysTrue => {
+                unreachable!("If we have at least one binding, the scope-start should not be definitely visible")
+            }
             Truthiness::AlwaysFalse => Boundness::Bound,
             Truthiness::Ambiguous => Boundness::PossiblyUnbound,
         };
@@ -841,7 +843,9 @@ fn symbol_from_declarations_impl<'db>(
         };
         if conflicting.is_empty() {
             let boundness = match undeclared_visibility {
-                Truthiness::AlwaysTrue => return Ok(Symbol::Unbound.into()),
+                Truthiness::AlwaysTrue => {
+                    unreachable!("If we have at least one declaration, the scope-start should not be definitely visible")
+                }
                 Truthiness::AlwaysFalse => Boundness::Bound,
                 Truthiness::Ambiguous => Boundness::PossiblyUnbound,
             };

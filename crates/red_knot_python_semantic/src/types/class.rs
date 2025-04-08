@@ -418,7 +418,8 @@ impl<'db> Class<'db> {
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        class_symbol(db, self.body_scope(db), name)
+        let body_scope = self.body_scope(db);
+        class_symbol(db, body_scope, name)
     }
 
     /// Returns the `name` attribute of an instance of this class.
