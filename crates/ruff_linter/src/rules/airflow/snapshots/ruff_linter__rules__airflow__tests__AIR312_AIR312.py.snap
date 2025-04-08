@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR312.py:10:1: AIR312 `airflow.operators.python.BranchPythonOperator` is moved into `standard` provider in Airflow 3.0;
+AIR312.py:10:1: AIR312 `airflow.operators.python.BranchPythonOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in future version.
    |
  8 | )
  9 |
@@ -12,7 +12,7 @@ AIR312.py:10:1: AIR312 `airflow.operators.python.BranchPythonOperator` is moved 
    |
    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.BranchPythonOperator` instead.
 
-AIR312.py:11:1: AIR312 `airflow.operators.python.PythonOperator` is moved into `standard` provider in Airflow 3.0;
+AIR312.py:11:1: AIR312 `airflow.operators.python.PythonOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in future version.
    |
 10 | BranchPythonOperator()
 11 | PythonOperator()
@@ -22,7 +22,7 @@ AIR312.py:11:1: AIR312 `airflow.operators.python.PythonOperator` is moved into `
    |
    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.PythonOperator` instead.
 
-AIR312.py:12:1: AIR312 `airflow.operators.python.PythonVirtualenvOperator` is moved into `standard` provider in Airflow 3.0;
+AIR312.py:12:1: AIR312 `airflow.operators.python.PythonVirtualenvOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in future version.
    |
 10 | BranchPythonOperator()
 11 | PythonOperator()
@@ -32,7 +32,7 @@ AIR312.py:12:1: AIR312 `airflow.operators.python.PythonVirtualenvOperator` is mo
    |
    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.python.PythonVirtualenvOperator` instead.
 
-AIR312.py:13:1: AIR312 `airflow.operators.python.ShortCircuitOperator` is moved into `standard` provider in Airflow 3.0;
+AIR312.py:13:1: AIR312 `airflow.operators.python.ShortCircuitOperator` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in future version.
    |
 11 | PythonOperator()
 12 | PythonVirtualenvOperator()

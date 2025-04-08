@@ -45,41 +45,40 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
                 name: _,
                 provider,
                 version: _,
-            } => {
-                format!("`{deprecated}` is deprecated and moved into `{provider}` provider in Airflow 3.0; It works for now but sugg")
             }
-            ProviderReplacement::SourceModuleMovedToProvider {
+            | ProviderReplacement::SourceModuleMovedToProvider {
                 name: _,
                 module: _,
                 provider,
                 version: _,
             } => {
-                format!("`{deprecated}` is moved into `{provider}` provider in Airflow 3.0;")
+                format!("`{deprecated}` is deprecated and moved into `{provider}` provider in Airflow 3.0; \
+                         It still works in Airflow 3.0 but is expected to be removed in future version."
+                )
             }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
         let Airflow3SuggestedToMoveToProvider { replacement, .. } = self;
-        if let ProviderReplacement::ProviderName {
+        match replacement {
+         ProviderReplacement::ProviderName {
             name,
             provider,
             version,
-        } = replacement
-        {
+        } => {
             Some(format!(
                 "Install `apache-airflow-provider-{provider}>={version}` and use `{name}` instead."
             ))
-        } else if let ProviderReplacement::SourceModuleMovedToProvider {
-            name,
-            module,
-            provider,
-            version,
-        } = replacement
-        {
-            Some(format!("Install `apache-airflow-provider-{provider}>={version}` and use `{module}.{name}` instead."))
-        } else {
-            None
+        },
+        ProviderReplacement::SourceModuleMovedToProvider {
+                name,
+                module,
+                provider,
+                version,
+            } => {
+                Some(format!("Install `apache-airflow-provider-{provider}>={version}` and use `{module}.{name}` instead."))
+            }
         }
     }
 }

@@ -44,10 +44,8 @@ impl Violation for Airflow3MovedToProvider {
                 name: _,
                 provider,
                 version: _,
-            } => {
-                format!("`{deprecated}` is moved into `{provider}` provider in Airflow 3.0;")
             }
-            ProviderReplacement::SourceModuleMovedToProvider {
+            | ProviderReplacement::SourceModuleMovedToProvider {
                 name: _,
                 module: _,
                 provider,
@@ -60,25 +58,24 @@ impl Violation for Airflow3MovedToProvider {
 
     fn fix_title(&self) -> Option<String> {
         let Airflow3MovedToProvider { replacement, .. } = self;
-        if let ProviderReplacement::ProviderName {
-            name,
-            provider,
-            version,
-        } = replacement
-        {
-            Some(format!(
-                "Install `apache-airflow-provider-{provider}>={version}` and use `{name}` instead."
-            ))
-        } else if let ProviderReplacement::SourceModuleMovedToProvider {
-            name,
-            module,
-            provider,
-            version,
-        } = replacement
-        {
-            Some(format!("Install `apache-airflow-provider-{provider}>={version}` and use `{module}.{name}` instead."))
-        } else {
-            None
+        match replacement {
+            ProviderReplacement::ProviderName {
+                name,
+                provider,
+                version,
+            } => {
+                Some(format!(
+                    "Install `apache-airflow-provider-{provider}>={version}` and use `{name}` instead."
+                ))
+            },
+            ProviderReplacement::SourceModuleMovedToProvider {
+                name,
+                module,
+                provider,
+                version,
+            } => {
+                Some(format!("Install `apache-airflow-provider-{provider}>={version}` and use `{module}.{name}` instead."))
+            } ,
         }
     }
 }
