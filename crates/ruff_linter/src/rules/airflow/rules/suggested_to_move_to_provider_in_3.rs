@@ -1,3 +1,4 @@
+use crate::rules::airflow::helpers::ProviderReplacement;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute};
@@ -81,21 +82,6 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
             None
         }
     }
-}
-
-#[derive(Debug, Eq, PartialEq)]
-enum ProviderReplacement {
-    ProviderName {
-        name: &'static str,
-        provider: &'static str,
-        version: &'static str,
-    },
-    SourceModuleMovedToProvider {
-        name: String,
-        module: &'static str,
-        provider: &'static str,
-        version: &'static str,
-    },
 }
 
 // AIR312

@@ -15,6 +15,21 @@ pub(crate) enum Replacement {
     },
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) enum ProviderReplacement {
+    ProviderName {
+        name: &'static str,
+        provider: &'static str,
+        version: &'static str,
+    },
+    SourceModuleMovedToProvider {
+        name: String,
+        module: &'static str,
+        provider: &'static str,
+        version: &'static str,
+    },
+}
+
 pub(crate) fn is_guarded_by_try_except(
     expr: &Expr,
     replacement: &Replacement,
