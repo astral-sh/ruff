@@ -181,14 +181,14 @@ match 42:
         ...
 
 match 56:
-    case x if x:
+    case x if something_unresolvable:  # error: [unresolved-reference]
         ...
 
     case object(S):
         ...
 
 match 12345:
-    case x if x:
+    case x if something_unresolvable:  # error: [unresolved-reference]
         ...
 
     case T:
