@@ -119,6 +119,32 @@ impl SemanticSyntaxChecker {
 
     fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
+            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+                if ctx.python_version() > PythonVersion::PY313 {
+                    // test_ok valid_annotation_py313
+                    // # parse_options: {"target-version": "3.13"}
+                    // a: (x := 1)
+                    // def outer():
+                    //     b: (yield 1)
+                    //     c: (yield from 1)
+                    // async def outer():
+                    //     d: (await 1)
+
+                    // test_err invalid_annotation_py314
+                    // # parse_options: {"target-version": "3.14"}
+                    // a: (x := 1)
+                    // def outer():
+                    //     b: (yield 1)
+                    //     c: (yield from 1)
+                    // async def outer():
+                    //     d: (await 1)
+                    let mut visitor = InvalidExpressionVisitor {
+                        position: InvalidExpressionPosition::TypeAnnotation,
+                        ctx,
+                    };
+                    visitor.visit_expr(annotation);
+                }
+            }
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 type_params,
                 parameters,
