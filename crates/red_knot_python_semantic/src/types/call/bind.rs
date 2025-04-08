@@ -20,8 +20,8 @@ use crate::types::diagnostic::{
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, ClassLiteralType, FunctionDecorators, KnownClass, KnownFunction,
-    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, TypeVarBoundOrConstraints,
-    TypeVarInstance, UnionType, WrapperDescriptorKind,
+    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, TupleType,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
@@ -287,54 +287,76 @@ impl<'db> Bindings<'db> {
                     }
                 }
 
-                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => {
-                    match overload.parameter_types() {
-                        [Some(property @ Type::PropertyInstance(_)), Some(instance), ..]
-                            if instance.is_none(db) =>
+                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => match overload
+                    .parameter_types()
+                {
+                    [Some(property @ Type::PropertyInstance(_)), Some(instance), ..]
+                        if instance.is_none(db) =>
+                    {
+                        overload.set_return_type(*property);
+                    }
+                    [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))), ..]
+                        if property.getter(db).is_some_and(|getter| {
+                            getter
+                                .into_function_literal()
+                                .is_some_and(|f| f.name(db) == "__name__")
+                        }) =>
+                    {
+                        overload.set_return_type(Type::string_literal(db, type_alias.name(db)));
+                    }
+                    [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), ..] => {
+                        match property
+                            .getter(db)
+                            .and_then(|getter| getter.into_function_literal())
+                            .map(|f| f.name(db).as_str())
                         {
-                            overload.set_return_type(*property);
+                            Some("__name__") => {
+                                overload
+                                    .set_return_type(Type::string_literal(db, typevar.name(db)));
+                            }
+                            Some("__bound__") => {
+                                overload.set_return_type(
+                                    typevar.upper_bound(db).unwrap_or_else(|| Type::none(db)),
+                                );
+                            }
+                            Some("__constraints__") => {
+                                overload.set_return_type(TupleType::from_elements(
+                                    db,
+                                    typevar.constraints(db).into_iter().flatten(),
+                                ));
+                            }
+                            Some("__default__") => {
+                                overload.set_return_type(
+                                    typevar.default_ty(db).unwrap_or_else(|| {
+                                        KnownClass::NoDefaultType.to_instance(db)
+                                    }),
+                                );
+                            }
+                            _ => {}
                         }
-                        [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))), ..]
-                            if property.getter(db).is_some_and(|getter| {
-                                getter
-                                    .into_function_literal()
-                                    .is_some_and(|f| f.name(db) == "__name__")
-                            }) =>
-                        {
-                            overload.set_return_type(Type::string_literal(db, type_alias.name(db)));
-                        }
-                        [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeVar(type_var))), ..]
-                            if property.getter(db).is_some_and(|getter| {
-                                getter
-                                    .into_function_literal()
-                                    .is_some_and(|f| f.name(db) == "__name__")
-                            }) =>
-                        {
-                            overload.set_return_type(Type::string_literal(db, type_var.name(db)));
-                        }
-                        [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
-                            if let Some(getter) = property.getter(db) {
-                                if let Ok(return_ty) = getter
-                                    .try_call(db, CallArgumentTypes::positional([*instance]))
-                                    .map(|binding| binding.return_type(db))
-                                {
-                                    overload.set_return_type(return_ty);
-                                } else {
-                                    overload.errors.push(BindingError::InternalCallError(
-                                        "calling the getter failed",
-                                    ));
-                                    overload.set_return_type(Type::unknown());
-                                }
+                    }
+                    [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
+                        if let Some(getter) = property.getter(db) {
+                            if let Ok(return_ty) = getter
+                                .try_call(db, CallArgumentTypes::positional([*instance]))
+                                .map(|binding| binding.return_type(db))
+                            {
+                                overload.set_return_type(return_ty);
                             } else {
                                 overload.errors.push(BindingError::InternalCallError(
-                                    "property has no getter",
+                                    "calling the getter failed",
                                 ));
-                                overload.set_return_type(Type::Never);
+                                overload.set_return_type(Type::unknown());
                             }
+                        } else {
+                            overload
+                                .errors
+                                .push(BindingError::InternalCallError("property has no getter"));
+                            overload.set_return_type(Type::Never);
                         }
-                        _ => {}
                     }
-                }
+                    _ => {}
+                },
 
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
                     match overload.parameter_types() {
