@@ -25,7 +25,7 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
-    StarImportPredicate,
+    StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
@@ -1193,14 +1193,14 @@ where
                         for export in exported_names {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
-                            let star_import = StarImportPredicate::new(
+                            let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
                                 self.file,
                                 symbol_id,
                                 referenced_module,
                             );
                             let predicate = Predicate {
-                                node: PredicateNode::StarImport(star_import),
+                                node: PredicateNode::StarImportPlaceholder(star_import),
                                 is_positive: true,
                             };
                             let pre_definition = self.flow_snapshot();

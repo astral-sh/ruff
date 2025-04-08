@@ -53,7 +53,7 @@ pub(crate) struct Predicate<'db> {
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
     Pattern(PatternPredicate<'db>),
-    StarImport(StarImportPredicate<'db>),
+    StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
 
 /// Pattern kinds for which we support type narrowing and/or static visibility analysis.
@@ -88,8 +88,48 @@ impl<'db> PatternPredicate<'db> {
     }
 }
 
+/// A "placeholder predicate" that is used to model the fact that the boundness of a
+/// (possible) definition or declaration caused by a `*` import cannot be fully determined
+/// until type-inference time. This is essentially the same as a standard visibility constraint,
+/// so we reuse the [`Predicate`] infrastructure to model it.
+///
+/// To illustrate, say we have a module `a.py` like so:
+///
+/// ```py
+/// if <condition>:
+///     class A: ...
+/// ```
+///
+/// and we have a module `b.py` like so:
+///
+/// ```py
+/// A = 1
+///
+/// from a import *
+/// ```
+///
+/// Since we cannot know whether or not <test> is true at semantic-index time,
+/// we record a definition for `A` in `b.py` as a result of the `from a import *`
+/// statement, but place a predicate on it to record the fact that we don't yet
+/// know whether this definition will be visible from all control-flow paths or not.
+/// Essentially, we model `b.py` as something similar to this:
+///
+/// ```py
+/// A = 1
+///
+/// if <star_import_placeholder_predicate>:
+///     from a import A
+/// ```
+///
+/// At type-check time, the placeholder predicate for the `A` definition is evaluated by
+/// attempting to resolve the `A` symbol in `a.py`'s global namespace:
+/// - If it resolves to a definitely bound symbol, then the predicate resolves to [`Truthiness::AlwaysTrue`]
+/// - If it resolves to an unbound symbol, then the predicate resolves to [`Truthiness::AlwaysFalse`]
+/// - If it resolves to a possibly bound symbol, then the predicate resolves to [`Truthiness::Ambiguous`]
+///
+/// [Truthiness]: [crate::types::Truthiness]
 #[salsa::tracked(debug)]
-pub(crate) struct StarImportPredicate<'db> {
+pub(crate) struct StarImportPlaceholderPredicate<'db> {
     pub(crate) importing_file: File,
 
     pub(crate) symbol_id: ScopedSymbolId,
@@ -97,7 +137,7 @@ pub(crate) struct StarImportPredicate<'db> {
     pub(crate) referenced_file: File,
 }
 
-impl<'db> StarImportPredicate<'db> {
+impl<'db> StarImportPlaceholderPredicate<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         // `StarImportPredicate`s are only created for valid `*`-import definitions,
         // and valid `*`-import definitions can only ever exist in the global scope.

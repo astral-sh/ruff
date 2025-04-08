@@ -652,7 +652,7 @@ impl VisibilityConstraints {
                 ty.bool(db).negate_if(!predicate.is_positive)
             }
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
-            PredicateNode::StarImport(star_import) => {
+            PredicateNode::StarImportPlaceholder(star_import) => {
                 let symbol_table = symbol_table(db, star_import.scope(db));
                 let symbol_name = symbol_table.symbol(star_import.symbol_id(db)).name();
                 match imported_symbol(db, star_import.referenced_file(db), symbol_name).symbol {

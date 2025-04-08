@@ -51,7 +51,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
             }
         }
         PredicateNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern),
-        PredicateNode::StarImport(_) => return None,
+        PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
         constraints.get(&definition.symbol(db)).copied()
@@ -238,7 +238,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
             PredicateNode::Pattern(pattern) => self.evaluate_pattern_predicate(pattern),
-            PredicateNode::StarImport(_) => return None,
+            PredicateNode::StarImportPlaceholder(_) => return None,
         };
         if let Some(mut constraints) = constraints {
             constraints.shrink_to_fit();
@@ -314,7 +314,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
-            PredicateNode::StarImport(definition) => definition.scope(self.db),
+            PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }
 
