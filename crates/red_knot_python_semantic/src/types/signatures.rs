@@ -210,7 +210,7 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub struct Signature<'db> {
     /// The generic context for this overload, if it is generic.
-    generic_context: Option<GenericContext<'db>>,
+    pub(crate) generic_context: Option<GenericContext<'db>>,
 
     /// Parameters, in source order.
     ///
@@ -260,6 +260,7 @@ impl<'db> Signature<'db> {
     /// Return a typed signature from a function definition.
     pub(super) fn from_function(
         db: &'db dyn Db,
+        generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
     ) -> Self {
@@ -271,11 +272,8 @@ impl<'db> Signature<'db> {
             }
         });
 
-        // TODO: Detect if a function definition is generic. For PEP 695 we can look at the
-        // function definition syntactically. For legacy typevars we'll have to infer the type of
-        // each parameter annotation.
         Self {
-            generic_context: None,
+            generic_context,
             parameters: Parameters::from_parameters(
                 db,
                 definition,

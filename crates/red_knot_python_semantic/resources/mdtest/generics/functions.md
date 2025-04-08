@@ -51,25 +51,10 @@ the inferred type to e.g. `int`.
 def f[T](x: T) -> T:
     return x
 
-# TODO: no error
-# TODO: revealed: int or Literal[1]
-# error: [invalid-argument-type]
-reveal_type(f(1))  # revealed: T
-
-# TODO: no error
-# TODO: revealed: float
-# error: [invalid-argument-type]
-reveal_type(f(1.0))  # revealed: T
-
-# TODO: no error
-# TODO: revealed: bool or Literal[true]
-# error: [invalid-argument-type]
-reveal_type(f(True))  # revealed: T
-
-# TODO: no error
-# TODO: revealed: str or Literal["string"]
-# error: [invalid-argument-type]
-reveal_type(f("string"))  # revealed: T
+reveal_type(f(1))  # revealed: Literal[1]
+reveal_type(f(1.0))  # revealed: float
+reveal_type(f(True))  # revealed: Literal[True]
+reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
 ## Inferring “deep” generic parameter types
@@ -82,7 +67,7 @@ def f[T](x: list[T]) -> T:
     return x[0]
 
 # TODO: revealed: float
-reveal_type(f([1.0, 2.0]))  # revealed: T
+reveal_type(f([1.0, 2.0]))  # revealed: Unknown
 ```
 
 ## Typevar constraints
@@ -162,61 +147,39 @@ parameters simultaneously.
 def two_params[T](x: T, y: T) -> T:
     return x
 
-# TODO: no error
 # TODO: revealed: str
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(two_params("a", "b"))  # revealed: T
+reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 
-# TODO: no error
 # TODO: revealed: str | int
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(two_params("a", 1))  # revealed: T
+reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
 ```py
 def param_with_union[T](x: T | int, y: T) -> T:
     return y
 
-# TODO: no error
 # TODO: revealed: str
-# error: [invalid-argument-type]
-reveal_type(param_with_union(1, "a"))  # revealed: T
+reveal_type(param_with_union(1, "a"))  # revealed: Literal["a"]
 
-# TODO: no error
 # TODO: revealed: str
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(param_with_union("a", "a"))  # revealed: T
+reveal_type(param_with_union("a", "a"))  # revealed: Literal["a"]
 
-# TODO: no error
 # TODO: revealed: int
-# error: [invalid-argument-type]
-reveal_type(param_with_union(1, 1))  # revealed: T
+reveal_type(param_with_union(1, 1))  # revealed: Literal[1]
 
-# TODO: no error
 # TODO: revealed: str | int
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(param_with_union("a", 1))  # revealed: T
+reveal_type(param_with_union("a", 1))  # revealed: Literal["a", 1]
 ```
 
 ```py
 def tuple_param[T, S](x: T | S, y: tuple[T, S]) -> tuple[T, S]:
     return y
 
-# TODO: no error
 # TODO: revealed: tuple[str, int]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[T, S]
+reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 
-# TODO: no error
 # TODO: revealed: tuple[str, int]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[T, S]
+reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
 
 ## Inferring nested generic function calls
@@ -231,15 +194,9 @@ def f[T](x: T) -> tuple[T, int]:
 def g[T](x: T) -> T | None:
     return x
 
-# TODO: no error
 # TODO: revealed: tuple[str | None, int]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(f(g("a")))  # revealed: tuple[T, int]
+reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 
-# TODO: no error
 # TODO: revealed: tuple[str, int] | None
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(g(f("a")))  # revealed: T | None
+reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```

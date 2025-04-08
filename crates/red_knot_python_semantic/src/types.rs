@@ -35,7 +35,7 @@ use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
 use crate::types::call::{Bindings, CallArgumentTypes};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
-use crate::types::generics::Specialization;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
@@ -4334,6 +4334,10 @@ impl<'db> TypeVarInstance<'db> {
             None
         }
     }
+
+    pub(crate) fn default_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.default_ty(db).unwrap_or(Type::unknown())
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
@@ -4971,6 +4975,9 @@ pub struct FunctionType<'db> {
     /// A set of special decorators that were applied to this function
     decorators: FunctionDecorators,
 
+    /// The generic context of a generic function.
+    generic_context: Option<GenericContext<'db>>,
+
     /// A specialization that should be applied to the function's parameter and return types,
     /// either because the function is itself generic, or because it appears in the body of a
     /// generic class.
@@ -5052,7 +5059,7 @@ impl<'db> FunctionType<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
         let definition = self.definition(db);
-        Signature::from_function(db, definition, function_stmt_node)
+        Signature::from_function(db, self.generic_context(db), definition, function_stmt_node)
     }
 
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
@@ -5070,6 +5077,7 @@ impl<'db> FunctionType<'db> {
             self.known(db),
             self.body_scope(db),
             self.decorators(db),
+            None, // If the function was generic before, it isn't anymore
             Some(specialization),
         )
     }

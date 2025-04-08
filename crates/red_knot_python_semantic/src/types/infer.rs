@@ -1444,6 +1444,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
+        let generic_context = type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(self.db(), self.index, type_params)
+        });
+
         let function_kind =
             KnownFunction::try_from_definition_and_name(self.db(), definition, name);
 
@@ -1460,6 +1464,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             function_kind,
             body_scope,
             function_decorators,
+            generic_context,
             specialization,
         ));
 

@@ -1,10 +1,11 @@
 use ruff_python_ast as ast;
+use rustc_hash::FxHashMap;
 
 use crate::semantic_index::SemanticIndex;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     declaration_type, KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance,
-    UnionType,
+    UnionBuilder, UnionType,
 };
 use crate::Db;
 
@@ -139,5 +140,116 @@ impl<'db> Specialization<'db> {
             .zip(self.types(db))
             .find(|(var, _)| **var == typevar)
             .map(|(_, ty)| *ty)
+    }
+}
+
+/// Performs type inference between parameter annotations and argument types, producing a
+/// specialization of a generic function.
+pub(crate) struct SpecializationBuilder<'db> {
+    db: &'db dyn Db,
+    generic_context: GenericContext<'db>,
+    types: FxHashMap<TypeVarInstance<'db>, UnionBuilder<'db>>,
+}
+
+impl<'db> SpecializationBuilder<'db> {
+    pub(crate) fn new(db: &'db dyn Db, generic_context: GenericContext<'db>) -> Self {
+        Self {
+            db,
+            generic_context,
+            types: FxHashMap::default(),
+        }
+    }
+
+    pub(crate) fn build(mut self) -> Specialization<'db> {
+        let types = self
+            .generic_context
+            .variables(self.db)
+            .iter()
+            .map(|variable| {
+                self.types
+                    .remove(variable)
+                    .map(UnionBuilder::build)
+                    .unwrap_or(variable.default_type(self.db))
+            })
+            .collect();
+        Specialization::new(self.db, self.generic_context, types)
+    }
+
+    fn add_type_mapping(&mut self, typevar: TypeVarInstance<'db>, ty: Type<'db>) {
+        let builder = self
+            .types
+            .entry(typevar)
+            .or_insert_with(|| UnionBuilder::new(self.db));
+        builder.add_in_place(ty);
+    }
+
+    pub(crate) fn infer(&mut self, formal: Type<'db>, actual: Type<'db>) {
+        // If the actual type is already assignable to the formal type, then return without adding
+        // any new type mappings. (Note that if the formal type contains any typevars, this check
+        // will fail, since no non-typevar types are assignable to a typevar.)
+        //
+        // In particular, this handles a case like
+        //
+        // ```py
+        // def f[T](t: T | None): ...
+        //
+        // f(None)
+        // ```
+        //
+        // without specializing `T` to `None`.
+        if actual.is_assignable_to(self.db, formal) {
+            return;
+        }
+
+        match (formal, actual) {
+            (Type::TypeVar(typevar), _) => self.add_type_mapping(typevar, actual),
+
+            (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
+                let formal_elements = formal_tuple.elements(self.db);
+                let actual_elements = actual_tuple.elements(self.db);
+                if formal_elements.len() == actual_elements.len() {
+                    for (formal_element, actual_element) in
+                        formal_elements.iter().zip(actual_elements)
+                    {
+                        self.infer(*formal_element, *actual_element);
+                    }
+                }
+            }
+
+            (Type::Union(formal), _) => {
+                // TODO: We haven't implemented a full unification solver yet. If typevars appear
+                // in multiple union elements, we ideally want to express that _only one_ of them
+                // needs to match, and that we should infer the smallest type mapping that allows
+                // that.
+                //
+                // For now, we punt on handling multiple typevar elements. Instead, if _precisely
+                // one_ union element _is_ a typevar (not _contains_ a typevar), then we go ahead
+                // and add a mapping between that typevar and the actual type. (Note that we've
+                // already handled above the case where the actual is assignable to a _non-typevar_
+                // union element.)
+                let mut typevars = formal.iter(self.db).filter_map(|ty| match ty {
+                    Type::TypeVar(typevar) => Some(*typevar),
+                    _ => None,
+                });
+                let typevar = typevars.next();
+                let additional_typevars = typevars.next();
+                if let (Some(typevar), None) = (typevar, additional_typevars) {
+                    self.add_type_mapping(typevar, actual);
+                }
+            }
+
+            (Type::Intersection(formal), _) => {
+                // The actual type must be assignable to every (positive) element of the
+                // formal intersection, so we must infer type mappings for each of them. (The
+                // actual type must also be disjoint from every negative element of the
+                // intersection, but that doesn't help us infer any type mappings.)
+                for positive in formal.iter_positive(self.db) {
+                    self.infer(positive, actual);
+                }
+            }
+
+            // TODO: Add more forms that we can structurally induct into: type[C], callables
+            _ => {}
+        }
     }
 }

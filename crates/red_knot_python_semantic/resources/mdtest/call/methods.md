@@ -410,29 +410,19 @@ def does_nothing[T](f: T) -> T:
 
 class C:
     @classmethod
-    # TODO: no error should be emitted here (needs support for generics)
-    # error: [invalid-argument-type]
     @does_nothing
     def f1(cls: type[C], x: int) -> str:
         return "a"
-    # TODO: no error should be emitted here (needs support for generics)
-    # error: [invalid-argument-type]
+
     @does_nothing
     @classmethod
     def f2(cls: type[C], x: int) -> str:
         return "a"
 
-# TODO: All of these should be `str` (and not emit an error), once we support generics
-
-# error: [call-non-callable]
-reveal_type(C.f1(1))  # revealed: Unknown
-# error: [call-non-callable]
-reveal_type(C().f1(1))  # revealed: Unknown
-
-# error: [call-non-callable]
-reveal_type(C.f2(1))  # revealed: Unknown
-# error: [call-non-callable]
-reveal_type(C().f2(1))  # revealed: Unknown
+reveal_type(C.f1(1))  # revealed: str
+reveal_type(C().f1(1))  # revealed: str
+reveal_type(C.f2(1))  # revealed: str
+reveal_type(C().f2(1))  # revealed: str
 ```
 
 [functions and methods]: https://docs.python.org/3/howto/descriptor.html#functions-and-methods

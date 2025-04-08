@@ -16,6 +16,7 @@ use crate::types::diagnostic::{
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
+use crate::types::generics::SpecializationBuilder;
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, FunctionDecorators, KnownClass, KnownFunction, KnownInstanceType,
@@ -964,6 +965,23 @@ impl<'db> Binding<'db> {
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) {
         let parameters = signature.parameters();
+        let specialization = signature.generic_context.map(|generic_context| {
+            let mut builder = SpecializationBuilder::new(db, generic_context);
+            for (argument_index, (_, argument_type)) in argument_types.iter().enumerate() {
+                let Some(parameter_index) = self.argument_parameters[argument_index] else {
+                    // There was an error with argument when matching parameters, so don't bother
+                    // type-checking it.
+                    continue;
+                };
+                let parameter = &parameters[parameter_index];
+                let Some(expected_type) = parameter.annotated_type() else {
+                    continue;
+                };
+                builder.infer(expected_type, argument_type);
+            }
+            builder.build()
+        });
+
         let mut num_synthetic_args = 0;
         let get_argument_index = |argument_index: usize, num_synthetic_args: usize| {
             if argument_index >= num_synthetic_args {
@@ -986,7 +1004,10 @@ impl<'db> Binding<'db> {
                 continue;
             };
             let parameter = &parameters[parameter_index];
-            if let Some(expected_ty) = parameter.annotated_type() {
+            if let Some(mut expected_ty) = parameter.annotated_type() {
+                if let Some(specialization) = specialization {
+                    expected_ty = expected_ty.apply_specialization(db, specialization);
+                }
                 if !argument_type.is_assignable_to(db, expected_ty) {
                     let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                         && !parameter.is_variadic();
@@ -1007,6 +1028,10 @@ impl<'db> Binding<'db> {
                 let union = UnionType::from_elements(db, [existing, argument_type]);
                 self.parameter_tys[parameter_index] = Some(union);
             }
+        }
+
+        if let Some(specialization) = specialization {
+            self.return_ty = self.return_ty.apply_specialization(db, specialization);
         }
     }
 
