@@ -4022,6 +4022,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 }
                             }
                         }
+                        KnownFunction::AssertNever => {
+                            if let [Some(actual_ty)] = overload.parameter_types() {
+                                if !actual_ty.is_equivalent_to(self.db(), Type::Never) {
+                                    self.context.report_lint(
+                                        &TYPE_ASSERTION_FAILURE,
+                                        call_expression,
+                                        format_args!(
+                                            "Expected type `Never`, got `{}` instead",
+                                            actual_ty.display(self.db()),
+                                        ),
+                                    );
+                                }
+                            }
+                        }
                         KnownFunction::StaticAssert => {
                             if let [Some(parameter_ty), message] = overload.parameter_types() {
                                 let truthiness = match parameter_ty.try_bool(self.db()) {
