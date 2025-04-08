@@ -13,6 +13,10 @@ pub(crate) enum Replacement {
         path: &'static str,
         name: &'static str,
     },
+    SourceModuleMoved {
+        name: String,
+        module: &'static str,
+    },
 }
 
 pub(crate) fn is_guarded_by_try_except(

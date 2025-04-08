@@ -321,7 +321,7 @@ AIR301_names.py:118:1: AIR301 `airflow.datasets.manager.DatasetManager` is remov
 119 | dataset_manager
 120 | resolve_dataset_manager
     |
-    = help: Use `airflow.assets.AssetManager` instead
+    = help: Use `airflow.assets.manager.AssetManager` instead
 
 AIR301_names.py:119:1: AIR301 `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
     |
