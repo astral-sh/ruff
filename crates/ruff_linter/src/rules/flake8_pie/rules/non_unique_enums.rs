@@ -1,3 +1,4 @@
+use ruff_python_semantic::SemanticModel;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::Diagnostic;
@@ -75,15 +76,15 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
             continue;
         };
 
-        if is_call_to_enum_auto(checker, value) {
+        if is_call_to_enum_auto(semantic, value) {
             continue;
         } else if let Expr::Tuple(ast::ExprTuple { elts, .. }) = value.as_ref() {
-            if elts.iter().any(|elt| is_call_to_enum_auto(checker, elt)) {
+            if elts.iter().any(|elt| is_call_to_enum_auto(semantic, elt)) {
                 continue;
             }
         }
 
-        if checker.source_type.is_stub() && member_has_unknown_value(checker, value) {
+        if checker.source_type.is_stub() && member_has_unknown_value(semantic, value) {
             continue;
         }
 
@@ -101,27 +102,24 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
     }
 }
 
-fn is_call_to_enum_auto(checker: &Checker, expr: &Expr) -> bool {
-    if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-        checker
-            .semantic()
-            .resolve_qualified_name(func)
+fn is_call_to_enum_auto(semantic: &SemanticModel, expr: &Expr) -> bool {
+    expr.as_call_expr().is_some_and(|call| {
+        semantic
+            .resolve_qualified_name(&call.func)
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "auto"]))
-    } else {
-        false
-    }
+    })
 }
 
 /// Whether the value is a bare ellipsis literal (`A = ...`)
 /// or a casted one (`A = cast(SomeType, ...)`).
-fn member_has_unknown_value(checker: &Checker, expr: &Expr) -> bool {
+fn member_has_unknown_value(semantic: &SemanticModel, expr: &Expr) -> bool {
     match expr {
         Expr::EllipsisLiteral(_) => true,
 
         Expr::Call(ExprCall {
             func, arguments, ..
         }) => {
-            if !checker.semantic().match_typing_expr(func, "cast") {
+            if !semantic.match_typing_expr(func, "cast") {
                 return false;
             }
 
