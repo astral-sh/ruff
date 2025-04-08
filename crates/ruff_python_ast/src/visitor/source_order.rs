@@ -1,8 +1,9 @@
 use crate::{
-    Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, ElifElseClause,
-    ExceptHandler, Expr, FString, FStringElement, Keyword, MatchCase, Mod, Operator, Parameter,
-    ParameterWithDefault, Parameters, Pattern, PatternArguments, PatternKeyword, Singleton, Stmt,
-    StringLiteral, TypeParam, TypeParams, UnaryOp, WithItem,
+    Alias, Arguments, BoolOp, BytesLiteral, CmpOp, Comprehension, Decorator, DictItem,
+    ElifElseClause, ExceptHandler, Expr, FString, FStringElement, FStringPart, FStringValue,
+    Keyword, MatchCase, Mod, Operator, Parameter, ParameterWithDefault, Parameters, Pattern,
+    PatternArguments, PatternKeyword, Singleton, Stmt, StringLiteral, TypeParam, TypeParams,
+    UnaryOp, WithItem,
 };
 use crate::{AnyNodeRef, Identifier};
 
@@ -157,6 +158,11 @@ pub trait SourceOrderVisitor<'a> {
     }
 
     #[inline]
+    fn visit_f_string_value(&mut self, f_string: &'a FStringValue) {
+        walk_f_string_value(self, f_string);
+    }
+
+    #[inline]
     fn visit_f_string_element(&mut self, f_string_element: &'a FStringElement) {
         walk_f_string_element(self, f_string_element);
     }
@@ -174,6 +180,11 @@ pub trait SourceOrderVisitor<'a> {
     #[inline]
     fn visit_identifier(&mut self, identifier: &'a Identifier) {
         walk_identifier(self, identifier);
+    }
+
+    #[inline]
+    fn visit_dict_item(&mut self, dict_item: &'a DictItem) {
+        walk_dict_item(self, dict_item);
     }
 }
 
@@ -551,6 +562,23 @@ where
 }
 
 #[inline]
+pub fn walk_f_string_value<'a, V>(visitor: &mut V, f_string: &'a FStringValue)
+where
+    V: SourceOrderVisitor<'a> + ?Sized,
+{
+    for f_string_part in f_string {
+        match f_string_part {
+            FStringPart::Literal(string_literal) => {
+                visitor.visit_string_literal(string_literal);
+            }
+            FStringPart::FString(f_string) => {
+                visitor.visit_f_string(f_string);
+            }
+        }
+    }
+}
+
+#[inline]
 pub fn walk_string_literal<'a, V>(visitor: &mut V, string_literal: &'a StringLiteral)
 where
     V: SourceOrderVisitor<'a> + ?Sized,
@@ -596,4 +624,16 @@ pub fn walk_identifier<'a, V: SourceOrderVisitor<'a> + ?Sized>(
         identifier.visit_source_order(visitor);
     }
     visitor.leave_node(node);
+}
+
+#[inline]
+pub fn walk_dict_item<'a, V: SourceOrderVisitor<'a> + ?Sized>(
+    visitor: &mut V,
+    dict_item: &'a DictItem,
+) {
+    let DictItem { key, value } = dict_item;
+    if let Some(key) = key {
+        visitor.visit_expr(key);
+    }
+    visitor.visit_expr(value);
 }

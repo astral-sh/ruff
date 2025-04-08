@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/param_with_default.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -120,18 +119,18 @@ Module(
                                     If(
                                         ExprIf {
                                             range: 38..54,
-                                            test: BooleanLiteral(
-                                                ExprBooleanLiteral {
-                                                    range: 43..47,
-                                                    value: true,
-                                                },
-                                            ),
                                             body: NumberLiteral(
                                                 ExprNumberLiteral {
                                                     range: 38..39,
                                                     value: Int(
                                                         1,
                                                     ),
+                                                },
+                                            ),
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 43..47,
+                                                    value: true,
                                                 },
                                             ),
                                             orelse: NumberLiteral(

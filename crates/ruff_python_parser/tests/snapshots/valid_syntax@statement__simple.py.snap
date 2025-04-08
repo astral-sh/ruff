@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/simple.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -124,17 +123,17 @@ Module(
                     value: If(
                         ExprIf {
                             range: 120..133,
-                            test: Name(
-                                ExprName {
-                                    range: 125..126,
-                                    id: Name("b"),
-                                    ctx: Load,
-                                },
-                            ),
                             body: Name(
                                 ExprName {
                                     range: 120..121,
                                     id: Name("a"),
+                                    ctx: Load,
+                                },
+                            ),
+                            test: Name(
+                                ExprName {
+                                    range: 125..126,
+                                    id: Name("b"),
                                     ctx: Load,
                                 },
                             ),

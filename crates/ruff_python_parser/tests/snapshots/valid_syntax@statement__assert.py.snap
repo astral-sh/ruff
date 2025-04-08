@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/assert.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -158,17 +157,17 @@ Module(
                     test: If(
                         ExprIf {
                             range: 83..99,
-                            test: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    range: 88..92,
-                                    value: true,
-                                },
-                            ),
                             body: Name(
                                 ExprName {
                                     range: 83..84,
                                     id: Name("x"),
                                     ctx: Load,
+                                },
+                            ),
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 88..92,
+                                    value: true,
                                 },
                             ),
                             orelse: Name(
@@ -304,17 +303,17 @@ Module(
                         If(
                             ExprIf {
                                 range: 169..185,
-                                test: BooleanLiteral(
-                                    ExprBooleanLiteral {
-                                        range: 174..178,
-                                        value: true,
-                                    },
-                                ),
                                 body: Name(
                                     ExprName {
                                         range: 169..170,
                                         id: Name("x"),
                                         ctx: Load,
+                                    },
+                                ),
+                                test: BooleanLiteral(
+                                    ExprBooleanLiteral {
+                                        range: 174..178,
+                                        value: true,
                                     },
                                 ),
                                 orelse: Name(

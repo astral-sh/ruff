@@ -532,17 +532,17 @@ Module(
                     iter: If(
                         ExprIf {
                             range: 368..384,
-                            test: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    range: 373..377,
-                                    value: true,
-                                },
-                            ),
                             body: Name(
                                 ExprName {
                                     range: 368..369,
                                     id: Name("x"),
                                     ctx: Load,
+                                },
+                            ),
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 373..377,
+                                    value: true,
                                 },
                             ),
                             orelse: Name(

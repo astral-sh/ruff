@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/generator.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -467,17 +466,17 @@ Module(
                             elt: If(
                                 ExprIf {
                                     range: 301..314,
-                                    test: Name(
-                                        ExprName {
-                                            range: 306..307,
-                                            id: Name("y"),
-                                            ctx: Load,
-                                        },
-                                    ),
                                     body: Name(
                                         ExprName {
                                             range: 301..302,
                                             id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    test: Name(
+                                        ExprName {
+                                            range: 306..307,
+                                            id: Name("y"),
                                             ctx: Load,
                                         },
                                     ),
@@ -580,13 +579,6 @@ Module(
                                                                 If(
                                                                     ExprIf {
                                                                         range: 383..420,
-                                                                        test: Name(
-                                                                            ExprName {
-                                                                                range: 405..410,
-                                                                                id: Name("limit"),
-                                                                                ctx: Load,
-                                                                            },
-                                                                        ),
                                                                         body: BinOp(
                                                                             ExprBinOp {
                                                                                 range: 383..401,
@@ -618,6 +610,13 @@ Module(
                                                                                 ),
                                                                             },
                                                                         ),
+                                                                        test: Name(
+                                                                            ExprName {
+                                                                                range: 405..410,
+                                                                                id: Name("limit"),
+                                                                                ctx: Load,
+                                                                            },
+                                                                        ),
                                                                         orelse: NoneLiteral(
                                                                             ExprNoneLiteral {
                                                                                 range: 416..420,
@@ -628,13 +627,6 @@ Module(
                                                                 If(
                                                                     ExprIf {
                                                                         range: 430..472,
-                                                                        test: Name(
-                                                                            ExprName {
-                                                                                range: 456..462,
-                                                                                id: Name("offset"),
-                                                                                ctx: Load,
-                                                                            },
-                                                                        ),
                                                                         body: BinOp(
                                                                             ExprBinOp {
                                                                                 range: 431..451,
@@ -664,6 +656,13 @@ Module(
                                                                                         ctx: Load,
                                                                                     },
                                                                                 ),
+                                                                            },
+                                                                        ),
+                                                                        test: Name(
+                                                                            ExprName {
+                                                                                range: 456..462,
+                                                                                id: Name("offset"),
+                                                                                ctx: Load,
                                                                             },
                                                                         ),
                                                                         orelse: NoneLiteral(

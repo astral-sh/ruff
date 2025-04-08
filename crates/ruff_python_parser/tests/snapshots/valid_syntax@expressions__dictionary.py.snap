@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/dictionary.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -944,17 +943,17 @@ Module(
                                     value: If(
                                         ExprIf {
                                             range: 498..514,
-                                            test: BooleanLiteral(
-                                                ExprBooleanLiteral {
-                                                    range: 503..507,
-                                                    value: true,
-                                                },
-                                            ),
                                             body: Name(
                                                 ExprName {
                                                     range: 498..499,
                                                     id: Name("x"),
                                                     ctx: Load,
+                                                },
+                                            ),
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 503..507,
+                                                    value: true,
                                                 },
                                             ),
                                             orelse: Name(
@@ -981,17 +980,17 @@ Module(
                             key: If(
                                 ExprIf {
                                     range: 517..533,
-                                    test: BooleanLiteral(
-                                        ExprBooleanLiteral {
-                                            range: 522..526,
-                                            value: true,
-                                        },
-                                    ),
                                     body: Name(
                                         ExprName {
                                             range: 517..518,
                                             id: Name("x"),
                                             ctx: Load,
+                                        },
+                                    ),
+                                    test: BooleanLiteral(
+                                        ExprBooleanLiteral {
+                                            range: 522..526,
+                                            value: true,
                                         },
                                     ),
                                     orelse: Name(
