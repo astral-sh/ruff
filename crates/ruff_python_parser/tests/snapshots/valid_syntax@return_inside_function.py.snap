@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/return_inside_function
 ```
 Module(
     ModModule {
-        range: 0..18,
+        range: 0..34,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -42,6 +42,35 @@ Module(
                                         },
                                     ),
                                 ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 18..33,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 22..23,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 23..25,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Return(
+                            StmtReturn {
+                                range: 27..33,
+                                value: None,
                             },
                         ),
                     ],

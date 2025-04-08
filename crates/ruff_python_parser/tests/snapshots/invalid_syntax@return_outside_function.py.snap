@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/return_outside_functi
 ```
 Module(
     ModModule {
-        range: 0..9,
+        range: 0..16,
         body: [
             Return(
                 StmtReturn {
@@ -24,6 +24,12 @@ Module(
                     ),
                 },
             ),
+            Return(
+                StmtReturn {
+                    range: 9..15,
+                    value: None,
+                },
+            ),
         ],
     },
 )
@@ -33,4 +39,12 @@ Module(
   |
 1 | return 1
   | ^^^^^^^^ Syntax Error: `return` statement outside of a function
+2 | return
+  |
+
+
+  |
+1 | return 1
+2 | return
+  | ^^^^^^ Syntax Error: `return` statement outside of a function
   |

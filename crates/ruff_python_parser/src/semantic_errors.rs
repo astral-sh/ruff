@@ -118,19 +118,20 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
-            Stmt::Return(ast::StmtReturn {
-                value: Some(value),
-                range,
-            }) => {
-                // test_err single_star_return
-                // def f(): return *x
-                Self::invalid_star_expression(value, ctx);
+            Stmt::Return(ast::StmtReturn { value, range }) => {
+                if let Some(value) = value {
+                    // test_err single_star_return
+                    // def f(): return *x
+                    Self::invalid_star_expression(value, ctx);
+                }
                 if !self.in_function_scope {
                     // test_ok return_inside_function
                     // def f(): return 1
+                    // def f(): return
 
                     // test_err return_outside_function
                     // return 1
+                    // return
                     Self::add_error(ctx, SemanticSyntaxErrorKind::ReturnOutsideFunction, *range);
                 }
             }

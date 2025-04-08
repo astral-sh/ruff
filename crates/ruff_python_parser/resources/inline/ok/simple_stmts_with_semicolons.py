@@ -1,1 +1,2 @@
-return; import a; from x import y; z; type T = int
+def outer():
+    return; import a; from x import y; z; type T = int

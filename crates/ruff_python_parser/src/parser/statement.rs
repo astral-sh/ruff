@@ -254,7 +254,8 @@ impl<'src> Parser<'src> {
         }
 
         // test_ok simple_stmts_with_semicolons
-        // return; import a; from x import y; z; type T = int
+        // def outer():
+        //     return; import a; from x import y; z; type T = int
         stmts
     }
 
