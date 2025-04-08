@@ -461,8 +461,27 @@ Module(
   |
 1 | class F[T](y := list): ...
 2 | class I[T]((yield 1)): ...
+  |             ^^^^^^^ Syntax Error: `yield` statement outside of a function
+3 | class J[T]((yield from 1)): ...
+4 | class K[T: (yield 1)]: ...      # yield in TypeVar
+  |
+
+
+  |
+1 | class F[T](y := list): ...
+2 | class I[T]((yield 1)): ...
 3 | class J[T]((yield from 1)): ...
   |             ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
+4 | class K[T: (yield 1)]: ...      # yield in TypeVar
+5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
+  |
+
+
+  |
+1 | class F[T](y := list): ...
+2 | class I[T]((yield 1)): ...
+3 | class J[T]((yield from 1)): ...
+  |             ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
 4 | class K[T: (yield 1)]: ...      # yield in TypeVar
 5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
   |
@@ -473,6 +492,16 @@ Module(
 3 | class J[T]((yield from 1)): ...
 4 | class K[T: (yield 1)]: ...      # yield in TypeVar
   |             ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar bound
+5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
+6 | class M[T]((await 1)): ...
+  |
+
+
+  |
+2 | class I[T]((yield 1)): ...
+3 | class J[T]((yield from 1)): ...
+4 | class K[T: (yield 1)]: ...      # yield in TypeVar
+  |             ^^^^^^^ Syntax Error: `yield` statement outside of a function
 5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
 6 | class M[T]((await 1)): ...
   |
@@ -498,8 +527,25 @@ Module(
 
 
   |
+4 | class K[T: (yield 1)]: ...      # yield in TypeVar
+5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
+6 | class M[T]((await 1)): ...
+  |             ^^^^^^^ Syntax Error: `await` statement outside of a function
+7 | class N[T: (await 1)]: ...
+  |
+
+
+  |
 5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
 6 | class M[T]((await 1)): ...
 7 | class N[T: (await 1)]: ...
   |             ^^^^^^^ Syntax Error: await expression cannot be used within a TypeVar bound
+  |
+
+
+  |
+5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
+6 | class M[T]((await 1)): ...
+7 | class N[T: (await 1)]: ...
+  |             ^^^^^^^ Syntax Error: `await` statement outside of a function
   |

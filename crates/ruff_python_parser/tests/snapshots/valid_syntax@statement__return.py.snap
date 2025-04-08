@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/return.py
 ```
 Module(
     ModModule {
-        range: 0..167,
+        range: 0..184,
         body: [
             Return(
                 StmtReturn {
@@ -262,44 +262,67 @@ Module(
                     ),
                 },
             ),
-            Return(
-                StmtReturn {
-                    range: 133..147,
-                    value: Some(
-                        Await(
-                            ExprAwait {
-                                range: 140..147,
-                                value: Name(
-                                    ExprName {
-                                        range: 146..147,
-                                        id: Name("x"),
-                                        ctx: Load,
-                                    },
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 133..164,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 137..142,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 142..144,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Return(
+                            StmtReturn {
+                                range: 150..164,
+                                value: Some(
+                                    Await(
+                                        ExprAwait {
+                                            range: 157..164,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 163..164,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
                                 ),
                             },
                         ),
-                    ),
+                    ],
                 },
             ),
             Return(
                 StmtReturn {
-                    range: 148..166,
+                    range: 165..183,
                     value: Some(
                         Lambda(
                             ExprLambda {
-                                range: 155..166,
+                                range: 172..183,
                                 parameters: Some(
                                     Parameters {
-                                        range: 162..163,
+                                        range: 179..180,
                                         posonlyargs: [],
                                         args: [
                                             ParameterWithDefault {
-                                                range: 162..163,
+                                                range: 179..180,
                                                 parameter: Parameter {
-                                                    range: 162..163,
+                                                    range: 179..180,
                                                     name: Identifier {
                                                         id: Name("x"),
-                                                        range: 162..163,
+                                                        range: 179..180,
                                                     },
                                                     annotation: None,
                                                 },
@@ -313,7 +336,7 @@ Module(
                                 ),
                                 body: Name(
                                     ExprName {
-                                        range: 165..166,
+                                        range: 182..183,
                                         id: Name("y"),
                                         ctx: Load,
                                     },

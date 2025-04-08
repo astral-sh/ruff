@@ -68,26 +68,27 @@ except* TypeError as e:
 except* OSError as e:
     print(f"caught {type(e)} with nested {e.exceptions}")
 
-try:
-    pass
-except "exception":
-    pass
-except 1:
-    pass
-except True:
-    pass
-except 1 + 1:
-    pass
-except a | b:
-    pass
-except x and y:
-    pass
-except await x:
-    pass
-except lambda x: x:
-    pass
-except x if True else y:
-    pass
+def outer():
+    try:
+        pass
+    except "exception":
+        pass
+    except 1:
+        pass
+    except True:
+        pass
+    except 1 + 1:
+        pass
+    except a | b:
+        pass
+    except x and y:
+        pass
+    except await x:
+        pass
+    except lambda x: x:
+        pass
+    except x if True else y:
+        pass
 
 if True:
     try:

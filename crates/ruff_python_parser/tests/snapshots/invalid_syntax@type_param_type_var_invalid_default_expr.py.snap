@@ -393,8 +393,27 @@ Module(
   |
 1 | type X[T = *int] = int
 2 | type X[T = yield x] = int
+  |            ^^^^^^^ Syntax Error: `yield` statement outside of a function
+3 | type X[T = (yield x)] = int
+4 | type X[T = yield from x] = int
+  |
+
+
+  |
+1 | type X[T = *int] = int
+2 | type X[T = yield x] = int
 3 | type X[T = (yield x)] = int
   |             ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar default
+4 | type X[T = yield from x] = int
+5 | type X[T = x := int] = int
+  |
+
+
+  |
+1 | type X[T = *int] = int
+2 | type X[T = yield x] = int
+3 | type X[T = (yield x)] = int
+  |             ^^^^^^^ Syntax Error: `yield` statement outside of a function
 4 | type X[T = yield from x] = int
 5 | type X[T = x := int] = int
   |
@@ -405,6 +424,16 @@ Module(
 3 | type X[T = (yield x)] = int
 4 | type X[T = yield from x] = int
   |            ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar default
+5 | type X[T = x := int] = int
+6 | type X[T: int = *int] = int
+  |
+
+
+  |
+2 | type X[T = yield x] = int
+3 | type X[T = (yield x)] = int
+4 | type X[T = yield from x] = int
+  |            ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
 5 | type X[T = x := int] = int
 6 | type X[T: int = *int] = int
   |

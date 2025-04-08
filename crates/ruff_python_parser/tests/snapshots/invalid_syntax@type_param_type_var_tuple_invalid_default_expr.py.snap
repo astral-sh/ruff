@@ -334,9 +334,28 @@ Module(
 
 
   |
+1 | type X[*Ts = *int] = int
+2 | type X[*Ts = *int or str] = int
+3 | type X[*Ts = yield x] = int
+  |              ^^^^^^^ Syntax Error: `yield` statement outside of a function
+4 | type X[*Ts = yield from x] = int
+5 | type X[*Ts = x := int] = int
+  |
+
+
+  |
 2 | type X[*Ts = *int or str] = int
 3 | type X[*Ts = yield x] = int
 4 | type X[*Ts = yield from x] = int
   |              ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVarTuple default
+5 | type X[*Ts = x := int] = int
+  |
+
+
+  |
+2 | type X[*Ts = *int or str] = int
+3 | type X[*Ts = yield x] = int
+4 | type X[*Ts = yield from x] = int
+  |              ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
 5 | type X[*Ts = x := int] = int
   |

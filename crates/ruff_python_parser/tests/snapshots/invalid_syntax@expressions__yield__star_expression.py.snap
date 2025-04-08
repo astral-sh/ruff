@@ -122,3 +122,20 @@ Module(
 3 |
 4 | yield *x and y, z
   |
+
+
+  |
+1 | # Cannot use starred expression here
+2 | yield (*x)
+  | ^^^^^^^^^^ Syntax Error: `yield` statement outside of a function
+3 |
+4 | yield *x and y, z
+  |
+
+
+  |
+2 | yield (*x)
+3 |
+4 | yield *x and y, z
+  | ^^^^^^^^^^^^^^^^^ Syntax Error: `yield` statement outside of a function
+  |

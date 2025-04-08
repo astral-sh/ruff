@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_invalid_subject_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -200,5 +199,16 @@ Module(
 5 |     case _: ...
 6 | match yield x:
   |       ^^^^^^^ Syntax Error: Yield expression cannot be used here
+7 |     case _: ...
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+4 | match *x and y, z:
+5 |     case _: ...
+6 | match yield x:
+  |       ^^^^^^^ Syntax Error: `yield` statement outside of a function
 7 |     case _: ...
   |
