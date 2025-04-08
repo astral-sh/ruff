@@ -10,7 +10,7 @@ arguments.
 Both `__new__` and `__init__` are looked up using full descriptor protocol, but `__new__` is then
 called as an implicit static, rather than bound method with `cls` passed as the first argument.
 `__init__` has no special handling, it is fetched as bound method and is called just like any other
-method.
+dunder method.
 
 `type.__call__` does other things too, but this is not yet handled by us.
 
