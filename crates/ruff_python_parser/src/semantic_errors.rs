@@ -11,7 +11,10 @@ use std::fmt::Display;
 use ruff_python_ast::{
     self as ast,
     comparable::ComparableExpr,
-    visitor::{source_order::SourceOrderVisitor, walk_expr, Visitor},
+    visitor::{
+        source_order::{self, SourceOrderVisitor},
+        walk_expr, Visitor,
+    },
     Expr, ExprContext, IrrefutablePatternKind, Pattern, PySourceType, PythonVersion, Stmt,
     StmtExpr, StmtImportFrom,
 };
@@ -1311,10 +1314,16 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
     }
 }
 
+struct Ident {
+    range: TextRange,
+    scope: u32,
+}
+
 struct TryExceptVisitor<'a, Ctx> {
     /// Context used for emitting errors.
     ctx: &'a Ctx,
-    identifiers: FxHashMap<ast::name::Name, TextRange>,
+    identifiers: FxHashMap<ast::name::Name, Ident>,
+    scope_depth: u32,
 }
 
 impl<'a, Ctx> TryExceptVisitor<'a, Ctx> {
@@ -1322,6 +1331,7 @@ impl<'a, Ctx> TryExceptVisitor<'a, Ctx> {
         Self {
             ctx,
             identifiers: FxHashMap::default(),
+            scope_depth: 0,
         }
     }
 }
@@ -1331,84 +1341,107 @@ where
     Ctx: SemanticSyntaxContext,
 {
     fn visit_identifier(&mut self, identifier: &ast::Identifier) {
-        self.identifiers
-            .insert(identifier.id.clone(), identifier.range);
+        self.identifiers.insert(
+            identifier.id.clone(),
+            Ident {
+                range: identifier.range,
+                scope: self.scope_depth,
+            },
+        );
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
         if let Expr::Name(ast::ExprName { range, id, ctx: _ }) = expr {
-            self.identifiers.insert(id.clone(), *range);
+            self.identifiers.insert(
+                id.clone(),
+                Ident {
+                    range: *range,
+                    scope: self.scope_depth,
+                },
+            );
         }
-        ast::visitor::source_order::walk_expr(self, expr);
+        source_order::walk_expr(self, expr);
     }
 
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        if let Stmt::Global(ast::StmtGlobal { names, .. }) = stmt {
-            for name in names {
-                if let Some(range) = self.identifiers.get(&name.id) {
-                    // test_ok global_in_try_py312
-                    // # parse_options: {"target-version": "3.12"}
-                    // a = 10
-                    // def g():
-                    //     try:
-                    //         1 / 0
-                    //     except:
-                    //         a = 1
-                    //     else:
-                    //         global a
+        match stmt {
+            Stmt::FunctionDef(_) => {
+                self.scope_depth += 1;
+                source_order::walk_stmt(self, stmt);
+                self.scope_depth -= 1;
+                return;
+            }
+            Stmt::Global(ast::StmtGlobal { names, .. }) => {
+                for name in names {
+                    if let Some(ident) = self.identifiers.get(&name.id) {
+                        if ident.scope < self.scope_depth {
+                            continue;
+                        }
+                        // test_ok global_in_try_py312
+                        // # parse_options: {"target-version": "3.12"}
+                        // a = 10
+                        // def g():
+                        //     try:
+                        //         1 / 0
+                        //     except:
+                        //         a = 1
+                        //     else:
+                        //         global a
 
-                    // test_ok global_in_try_py313
-                    // # parse_options: {"target-version": "3.13"}
-                    // a = 10
-                    // def f():
-                    //     try:
-                    //         pass
-                    //     except:
-                    //         global a
-                    //     else:
-                    //         print(a)
+                        // test_ok global_in_try_py313
+                        // # parse_options: {"target-version": "3.13"}
+                        // a = 10
+                        // def f():
+                        //     try:
+                        //         pass
+                        //     except:
+                        //         global a
+                        //     else:
+                        //         print(a)
 
-                    // test_err global_in_try_py312
-                    // # parse_options: {"target-version": "3.12"}
-                    // a = 10
-                    // def f():
-                    //     try:
-                    //         pass
-                    //     except:
-                    //         global a
-                    //     else:
-                    //         print(a)
+                        // test_err global_in_try_py312
+                        // # parse_options: {"target-version": "3.12"}
+                        // a = 10
+                        // def f():
+                        //     try:
+                        //         pass
+                        //     except:
+                        //         global a
+                        //     else:
+                        //         print(a)
 
-                    // test_err global_in_try_py313
-                    // # parse_options: {"target-version": "3.13"}
-                    // a = 10
-                    // def g():
-                    //     try:
-                    //         1 / 0
-                    //     except:
-                    //         a = 1
-                    //     else:
-                    //         global a
+                        // test_err global_in_try_py313
+                        // # parse_options: {"target-version": "3.13"}
+                        // a = 10
+                        // def g():
+                        //     try:
+                        //         1 / 0
+                        //     except:
+                        //         a = 1
+                        //     else:
+                        //         global a
 
-                    // test_ok global_in_nested_function
-                    // try: ...
-                    // except ImportError:
-                    //     x = 1
-                    //     def f():
-                    //         global x
-                    //         x = 2
-                    SemanticSyntaxChecker::add_error(
-                        self.ctx,
-                        SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
-                            name: name.id.to_string(),
-                            start: stmt.start(),
-                        },
-                        *range,
-                    );
+                        // test_ok global_in_nested_function
+                        // try: ...
+                        // except ImportError:
+                        //     x = 1
+                        //     def f():
+                        //         global x
+                        //         x = 2
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
+                                name: name.id.to_string(),
+                                start: stmt.start(),
+                            },
+                            ident.range,
+                        );
+                    }
                 }
             }
+            _ => (),
         }
-        ast::visitor::source_order::walk_stmt(self, stmt);
+        source_order::walk_stmt(self, stmt);
     }
 }
 
