@@ -246,11 +246,31 @@ impl std::fmt::Display for TodoType {
 /// It can be created by specifying a custom message: `todo_type!("PEP 604 not supported")`.
 #[cfg(debug_assertions)]
 macro_rules! todo_type {
-    ($message:literal) => {
+    ($message:literal) => {{
+        const _: () = {
+            let s = $message;
+
+            if !s.is_ascii() {
+                panic!("todo_type! message must be ASCII");
+            }
+
+            let bytes = s.as_bytes();
+            let mut i = 0;
+            while i < bytes.len() {
+                // Check each byte for '(' or ')'
+                let ch = bytes[i];
+
+                assert!(
+                    !40u8.eq_ignore_ascii_case(&ch) && !41u8.eq_ignore_ascii_case(&ch),
+                    "todo_type! message must not contain parentheses",
+                );
+                i += 1;
+            }
+        };
         $crate::types::Type::Dynamic($crate::types::DynamicType::Todo($crate::types::TodoType(
             $message,
         )))
-    };
+    }};
     ($message:ident) => {
         $crate::types::Type::Dynamic($crate::types::DynamicType::Todo($crate::types::TodoType(
             $message,
@@ -3858,7 +3878,7 @@ impl<'db> Type<'db> {
                 }
                 Some(builder.build())
             }
-            Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance()")),
+            Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
             | Type::FunctionLiteral(_)
