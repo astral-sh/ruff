@@ -54,18 +54,14 @@ impl Violation for Airflow3Removal {
             replacement,
         } = self;
         match replacement {
-            Replacement::None => format!("`{deprecated}` is removed in Airflow 3.0"),
-            Replacement::Name(_) => {
+            Replacement::None
+            | Replacement::Name(_)
+            | Replacement::AutoImport { module: _, name: _ }
+            | Replacement::SourceModuleMoved { module: _, name: _ } => {
                 format!("`{deprecated}` is removed in Airflow 3.0")
             }
             Replacement::Message(message) => {
                 format!("`{deprecated}` is removed in Airflow 3.0; {message}")
-            }
-            Replacement::AutoImport { path: _, name: _ } => {
-                format!("`{deprecated}` is removed in Airflow 3.0")
-            }
-            Replacement::SourceModuleMoved { name: _, module: _ } => {
-                format!("`{deprecated}` is removed in Airflow 3.0")
             }
         }
     }
@@ -74,8 +70,10 @@ impl Violation for Airflow3Removal {
         let Airflow3Removal { replacement, .. } = self;
         match replacement {
             Replacement::Name(name) => Some(format!("Use `{name}` instead")),
-            Replacement::AutoImport { path, name } => Some(format!("Use `{path}.{name}` instead")),
-            Replacement::SourceModuleMoved { name, module } => {
+            Replacement::AutoImport { module, name } => {
+                Some(format!("Use `{module}.{name}` instead"))
+            }
+            Replacement::SourceModuleMoved { module, name } => {
                 Some(format!("Use `{module}.{name}` instead"))
             }
             _ => None,
@@ -581,7 +579,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
         ["airflow", "api_connexion", "security", "requires_access_dataset"] => {
             Replacement::AutoImport {
-                path: "airflow.api_connexion.security",
+                module: "airflow.api_connexion.security",
                 name: "requires_access_asset",
             }
         }
@@ -601,8 +599,8 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         // airflow.configuration
         ["airflow", "configuration", rest @ ("as_dict" | "get" | "getboolean" | "getfloat" | "getint" | "has_option"
         | "remove_option" | "set")] => Replacement::SourceModuleMoved {
-            name: (*rest).to_string(),
             module: "airflow.configuration.conf",
+            name: (*rest).to_string(),
         },
 
         // airflow.contrib.*
@@ -622,7 +620,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
         // airflow.datasets
         ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::AutoImport {
-            path: "airflow.sdk",
+            module: "airflow.sdk",
             name: "Asset",
         },
         ["airflow", "datasets", rest] => match *rest {
@@ -670,8 +668,8 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         // airflow.models.baseoperator
         ["airflow", "models", "baseoperator", rest] => match *rest {
             "chain" | "chain_linear" | "cross_downstream" => Replacement::SourceModuleMoved {
-                name: (*rest).to_string(),
                 module: "airflow.sdk",
+                name: (*rest).to_string(),
             },
             "BaseOperatorLink" => {
                 Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
@@ -881,10 +879,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         range,
     );
 
-    if let Replacement::AutoImport { path, name } = replacement {
+    if let Replacement::AutoImport { module, name } = replacement {
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(path, name),
+                &ImportRequest::import_from(module, name),
                 expr.start(),
                 checker.semantic(),
             )?;
