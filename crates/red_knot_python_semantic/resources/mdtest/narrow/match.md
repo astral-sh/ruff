@@ -39,8 +39,7 @@ match x:
     case A():
         reveal_type(x)  # revealed: A
     case B():
-        # TODO could be `B & ~A`
-        reveal_type(x)  # revealed: B
+        reveal_type(x)  # revealed: B & ~A
 
 reveal_type(x)  # revealed: object
 ```
@@ -88,7 +87,7 @@ match x:
     case 6.0:
         reveal_type(x)  # revealed: float
     case 1j:
-        reveal_type(x)  # revealed: complex
+        reveal_type(x)  # revealed: complex & ~float
     case b"foo":
         reveal_type(x)  # revealed: Literal[b"foo"]
 
@@ -134,11 +133,11 @@ match x:
     case "foo" | 42 | None:
         reveal_type(x)  # revealed: Literal["foo", 42] | None
     case "foo" | tuple():
-        reveal_type(x)  # revealed: Literal["foo"] | tuple
+        reveal_type(x)  # revealed: tuple
     case True | False:
         reveal_type(x)  # revealed: bool
     case 3.14 | 2.718 | 1.414:
-        reveal_type(x)  # revealed: float
+        reveal_type(x)  # revealed: float & ~tuple
 
 reveal_type(x)  # revealed: object
 ```

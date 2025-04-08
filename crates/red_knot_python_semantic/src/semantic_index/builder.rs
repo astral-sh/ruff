@@ -1572,50 +1572,65 @@ where
                     return;
                 }
 
-                let after_subject = self.flow_snapshot();
+                let has_catchall = cases
+                    .last()
+                    .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard());
+
+                let mut no_case_matched = self.flow_snapshot();
                 let mut vis_constraints = vec![];
                 let mut post_case_snapshots = vec![];
-                for (i, case) in cases.iter().enumerate() {
-                    if i != 0 {
-                        post_case_snapshots.push(self.flow_snapshot());
-                        self.flow_restore(after_subject.clone());
-                    }
+                let mut match_predicate;
 
+                for (i, case) in cases.iter().enumerate() {
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
-                    let predicate = self.add_pattern_narrowing_constraint(
+                    no_case_matched = self.flow_snapshot();
+                    match_predicate = self.add_pattern_narrowing_constraint(
                         subject_expr,
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-                    self.record_reachability_constraint(predicate);
-                    if let Some(guard) = &case.guard {
+                    self.record_reachability_constraint(match_predicate);
+
+                    let match_success_guard_failure = case.guard.as_ref().map(|guard| {
                         let guard_expr = self.add_standalone_expression(guard);
                         self.visit_expr(guard);
+                        let post_match_success = self.flow_snapshot();
                         let predicate = Predicate {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
                         };
+                        self.record_negated_narrowing_constraint(predicate);
+                        let match_success_guard_failure = self.flow_snapshot();
+                        self.flow_restore(post_match_success);
                         self.record_narrowing_constraint(predicate);
-                    }
+                        match_success_guard_failure
+                    });
+
                     self.visit_body(&case.body);
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
-                    let vis_constraint_id = self.record_visibility_constraint(predicate);
+                    let vis_constraint_id = self.record_visibility_constraint(match_predicate);
                     vis_constraints.push(vis_constraint_id);
+
+                    post_case_snapshots.push(self.flow_snapshot());
+
+                    if i != cases.len() - 1 || !has_catchall {
+                        // We need to restore the state after each case, but not after the last one.
+                        // The last one will just become the state that we merge the other snapshots into
+                        self.flow_restore(no_case_matched.clone());
+                        self.record_negated_narrowing_constraint(match_predicate);
+                        if let Some(match_success_guard_failure) = match_success_guard_failure {
+                            self.flow_merge(match_success_guard_failure);
+                        }
+                    }
                 }
 
                 // If there is no final wildcard match case, pretend there is one. This is similar to how
                 // we add an implicit `else` block in if-elif chains, in case it's not present.
-                if !cases
-                    .last()
-                    .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
-                {
-                    post_case_snapshots.push(self.flow_snapshot());
-                    self.flow_restore(after_subject.clone());
-
+                if !has_catchall {
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
@@ -1625,7 +1640,7 @@ where
                     self.flow_merge(post_clause_state);
                 }
 
-                self.simplify_visibility_constraints(after_subject);
+                self.simplify_visibility_constraints(no_case_matched);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
