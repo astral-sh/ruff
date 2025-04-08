@@ -104,7 +104,7 @@ impl Display for DisplayRepresentation<'_> {
                     f,
                     "def {name}{specialization}{signature}",
                     name = function.name(self.db),
-                    signature = signature.bind_self().display(self.db)
+                    signature = signature.display(self.db)
                 )
             }
             Type::Callable(callable) => callable.signature(self.db).display(self.db).fmt(f),
