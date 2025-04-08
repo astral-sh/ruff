@@ -1,14 +1,10 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::Expr;
-use ruff_text_size::Ranged;
-
-use crate::checkers::ast::Checker;
 
 #[derive(Debug, PartialEq, Eq)]
-enum DeferralKeyword {
+pub(crate) enum DeferralKeyword {
     Yield,
     YieldFrom,
     Await,
@@ -47,7 +43,7 @@ impl fmt::Display for DeferralKeyword {
 /// [autoawait]: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html
 #[derive(ViolationMetadata)]
 pub(crate) struct YieldOutsideFunction {
-    keyword: DeferralKeyword,
+    pub(crate) keyword: DeferralKeyword,
 }
 
 impl Violation for YieldOutsideFunction {
@@ -55,32 +51,5 @@ impl Violation for YieldOutsideFunction {
     fn message(&self) -> String {
         let YieldOutsideFunction { keyword } = self;
         format!("`{keyword}` statement outside of a function")
-    }
-}
-
-/// F704
-pub(crate) fn yield_outside_function(checker: &Checker, expr: &Expr) {
-    let scope = checker.semantic().current_scope();
-    if scope.kind.is_module() || scope.kind.is_class() {
-        let keyword = match expr {
-            Expr::Yield(_) => DeferralKeyword::Yield,
-            Expr::YieldFrom(_) => DeferralKeyword::YieldFrom,
-            Expr::Await(_) => DeferralKeyword::Await,
-            _ => return,
-        };
-
-        // `await` is allowed at the top level of a Jupyter notebook.
-        // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
-        if scope.kind.is_module()
-            && checker.source_type.is_ipynb()
-            && keyword == DeferralKeyword::Await
-        {
-            return;
-        }
-
-        checker.report_diagnostic(Diagnostic::new(
-            YieldOutsideFunction { keyword },
-            expr.range(),
-        ));
     }
 }

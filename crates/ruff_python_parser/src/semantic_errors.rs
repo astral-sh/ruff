@@ -25,6 +25,8 @@ pub struct Checkpoint {
 
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
+    source_type: PySourceType,
+
     /// The checker has traversed past the `__future__` import boundary.
     ///
     /// For example, the checker could be visiting `x` in:
@@ -47,13 +49,18 @@ pub struct SemanticSyntaxChecker {
     /// Note that this should be updated *after* checking the current statement or expression
     /// because the parent context is what matters.
     in_async_context: bool,
+
+    /// The checker is currently inside of a function scope.
+    in_function_scope: bool,
 }
 
 impl SemanticSyntaxChecker {
     pub fn new(source_type: PySourceType) -> Self {
         Self {
+            source_type,
             seen_futures_boundary: false,
             in_async_context: source_type.is_ipynb(),
+            in_function_scope: false,
         }
     }
 }
@@ -522,6 +529,7 @@ impl SemanticSyntaxChecker {
             Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
                 self.in_async_context = *is_async;
                 self.seen_futures_boundary = true;
+                self.in_function_scope = true;
             }
             _ => {
                 self.seen_futures_boundary = true;
@@ -549,6 +557,9 @@ impl SemanticSyntaxChecker {
             | Expr::SetComp(ast::ExprSetComp { generators, .. })
             | Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
                 self.in_async_context = generators.iter().any(|g| g.is_async);
+            }
+            Expr::Lambda(_) => {
+                self.in_function_scope = true;
             }
             _ => {}
         }
@@ -652,8 +663,41 @@ impl SemanticSyntaxChecker {
                 // test_err single_star_yield
                 // def f(): yield *x
                 Self::invalid_star_expression(value, ctx);
+                self.yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
+            }
+            Expr::YieldFrom(_) => {
+                self.yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
+            }
+            Expr::Await(_) => {
+                self.yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
             }
             _ => {}
+        }
+    }
+
+    /// F704
+    fn yield_outside_function<Ctx: SemanticSyntaxContext>(
+        &self,
+        ctx: &Ctx,
+        expr: &Expr,
+        kind: YieldOutsideFunctionKind,
+    ) {
+        if !self.in_function_scope && !self.source_type.is_ipynb() {
+            // test_err yield_outside_function
+            // yield 1
+            // yield from 1
+            // await 1
+
+            // test_ok yield_inside_function
+            // def f():
+            //     yield 1
+            //     yield from 1
+            //     await 1
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::YieldOutsideFunction(kind),
+                expr.range(),
+            );
         }
     }
 
@@ -825,6 +869,9 @@ impl Display for SemanticSyntaxError {
                     "cannot use an asynchronous comprehension outside of an asynchronous \
                                 function on Python {python_version} (syntax was added in 3.11)",
                 )
+            }
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
+                write!(f, "`{kind}` statement outside of a function")
             }
         }
     }
@@ -1044,6 +1091,26 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [BPO 33346]: https://github.com/python/cpython/issues/77527
     AsyncComprehensionOutsideAsyncFunction(PythonVersion),
+
+    /// Represents the use of `yield`, `yield from`, or `await` outside of a function scope.
+    YieldOutsideFunction(YieldOutsideFunctionKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YieldOutsideFunctionKind {
+    Yield,
+    YieldFrom,
+    Await,
+}
+
+impl Display for YieldOutsideFunctionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            YieldOutsideFunctionKind::Yield => "yield",
+            YieldOutsideFunctionKind::YieldFrom => "yield from",
+            YieldOutsideFunctionKind::Await => "await",
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
