@@ -104,7 +104,7 @@ else:
 from b import f
 
 # TODO: We should disambiguate in such cases, showing `Literal[b.f, c.f]`.
-reveal_type(f)  # revealed: Literal[f, f]
+reveal_type(f)  # revealed: Literal[def f() -> Unknown, def f() -> Unknown]
 ```
 
 ## Reimport with stub declaration
