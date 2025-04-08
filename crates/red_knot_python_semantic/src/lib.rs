@@ -14,7 +14,6 @@ pub use site_packages::SysPrefixPathOrigin;
 
 pub mod ast_node_ref;
 mod db;
-mod import_resolution;
 pub mod lint;
 pub(crate) mod list;
 mod module_name;

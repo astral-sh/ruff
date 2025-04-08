@@ -1183,9 +1183,15 @@ where
                             continue;
                         };
 
-                        for export in exported_names(self.db, module.file()) {
+                        let referenced_module = module.file();
+
+                        for export in exported_names(self.db, referenced_module) {
                             let symbol_id = self.add_symbol(export.clone());
-                            let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
+                            let node_ref = StarImportDefinitionNodeRef {
+                                node,
+                                symbol_id,
+                                referenced_module,
+                            };
                             self.push_additional_definition(symbol_id, node_ref);
                         }
 

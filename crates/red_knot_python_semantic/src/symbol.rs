@@ -1,6 +1,5 @@
 use ruff_db::files::File;
 
-use crate::import_resolution::resolve_star_import_definition;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
@@ -12,7 +11,7 @@ use crate::types::{
     binding_type, declaration_type, infer_narrowing_constraint, todo_type, IntersectionBuilder,
     KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
 };
-use crate::{resolve_module, Db, KnownModule, Module, Program};
+use crate::{resolve_module, Db, KnownModule, Program};
 
 pub(crate) use implicit_globals::module_type_implicit_global_symbol;
 
@@ -256,7 +255,7 @@ pub(crate) fn global_symbol<'db>(
 /// Infers the public type of an imported symbol.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
-    module: &Module,
+    file: File,
     name: &str,
 ) -> SymbolAndQualifiers<'db> {
     // If it's not found in the global scope, check if it's present as an instance on
@@ -274,7 +273,7 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    external_symbol_impl(db, module.file(), name).or_fall_back_to(db, || {
+    external_symbol_impl(db, file, name).or_fall_back_to(db, || {
         if name == "__getattr__" {
             Symbol::Unbound.into()
         } else {
@@ -312,7 +311,7 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
-        .map(|module| imported_symbol(db, &module, symbol))
+        .map(|module| imported_symbol(db, module.file(), symbol))
         .unwrap_or_default()
 }
 
@@ -681,19 +680,14 @@ fn symbol_from_bindings_impl<'db>(
          }| {
             let mut binding = binding?;
 
-            if binding.kind(db).is_star_import() {
+            if let Some(star_import) = binding.kind(db).as_star_import() {
                 let use_def_map = use_def_map(db, scope);
+                let symbol_table = symbol_table(db, scope);
+                let defined_name = symbol_table.symbol(star_import.symbol_id()).name();
 
                 while let Some(star_import) = binding.kind(db).as_star_import() {
-                    if resolve_star_import_definition(
-                        db,
-                        scope.file(db),
-                        star_import,
-                        &symbol_table(db, scope),
-                    )
-                    .ok()
-                    .is_none_or(|symbol| symbol.symbol.is_unbound())
-                    {
+                    let symbol = imported_symbol(db, star_import.referenced_module(), defined_name);
+                    if symbol.symbol.is_unbound() {
                         let prior_binding = use_def_map
                             .public_bindings_prior_to_star_import(binding)
                             .next()?;
