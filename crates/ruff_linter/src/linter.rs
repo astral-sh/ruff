@@ -943,18 +943,34 @@ mod tests {
         Ok(())
     }
 
+    /// Wrapper around `test_contents_syntax_errors` for testing a snippet of code instead of a
+    /// file.
+    fn test_snippet_syntax_errors(
+        contents: &str,
+        settings: &settings::LinterSettings,
+    ) -> Vec<Message> {
+        let contents = dedent(contents);
+        test_contents_syntax_errors(
+            &SourceKind::Python(contents.to_string()),
+            Path::new("<filename>"),
+            settings,
+        )
+    }
+
     /// A custom test runner that prints syntax errors in addition to other diagnostics. Adapted
     /// from `flakes` in pyflakes/mod.rs.
-    fn check_syntax_errors(contents: &str, settings: &settings::LinterSettings) -> Vec<Message> {
-        let contents = dedent(contents);
-        let source_type = PySourceType::default();
-        let source_kind = SourceKind::Python(contents.to_string());
+    fn test_contents_syntax_errors(
+        source_kind: &SourceKind,
+        path: &Path,
+        settings: &settings::LinterSettings,
+    ) -> Vec<Message> {
+        let source_type = PySourceType::from(path);
         let options =
             ParseOptions::from(source_type).with_target_version(settings.unresolved_target_version);
         let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("PySourceType always parses into a module");
-        let locator = Locator::new(&contents);
+        let locator = Locator::new(source_kind.source_code());
         let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
         let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
         let directives = directives::extract_directives(
@@ -964,7 +980,7 @@ mod tests {
             &indexer,
         );
         let mut messages = check_path(
-            Path::new("<filename>"),
+            path,
             None,
             &locator,
             &stylist,
@@ -1012,7 +1028,7 @@ mod tests {
         python_version: PythonVersion,
     ) {
         let snapshot = format!("async_comprehension_in_sync_comprehension_{name}_{python_version}");
-        let messages = check_syntax_errors(
+        let messages = test_snippet_syntax_errors(
             contents,
             &settings::LinterSettings {
                 rules: settings::rule_table::RuleTable::empty(),
@@ -1022,5 +1038,26 @@ mod tests {
             },
         );
         assert_messages!(snapshot, messages);
+    }
+
+    #[test_case(PythonVersion::PY310)]
+    #[test_case(PythonVersion::PY311)]
+    fn test_async_comprehension_notebook(python_version: PythonVersion) -> Result<()> {
+        let snapshot =
+            format!("async_comprehension_in_sync_comprehension_notebook_{python_version}");
+        let path = Path::new("resources/test/fixtures/syntax_errors/async_comprehension.ipynb");
+        let messages = test_contents_syntax_errors(
+            &SourceKind::IpyNotebook(Notebook::from_path(path)?),
+            path,
+            &settings::LinterSettings {
+                unresolved_target_version: python_version,
+                rules: settings::rule_table::RuleTable::empty(),
+                preview: settings::types::PreviewMode::Enabled,
+                ..Default::default()
+            },
+        );
+        assert_messages!(snapshot, messages);
+
+        Ok(())
     }
 }
