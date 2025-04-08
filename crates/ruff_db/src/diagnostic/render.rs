@@ -76,7 +76,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 }
                 write!(f, ":")?;
             }
-            return writeln!(f, " {message}", message = self.diag.primary_message());
+            return writeln!(f, " {}", self.diag.concise_message());
         }
 
         let resolved = Resolved::new(&self.resolver, self.diag);

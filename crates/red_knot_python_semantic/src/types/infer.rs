@@ -4105,15 +4105,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                     match known_function {
                         KnownFunction::RevealType => {
                             if let [Some(revealed_type)] = overload.parameter_types() {
-                                if let Some(mut reporter) = self.context.report(
-                                    DiagnosticId::RevealedType,
-                                    Severity::Info,
-                                    "",
-                                ) {
+                                if let Some(builder) = self
+                                    .context
+                                    .report(DiagnosticId::RevealedType, Severity::Info)
+                                {
+                                    let mut reporter = builder.build("Revealed type");
                                     let span = self.context.span(call_expression);
                                     reporter.diagnostic().annotate(
                                         Annotation::primary(span).message(format_args!(
-                                            "Revealed type is `{}`",
+                                            "`{}`",
                                             revealed_type.display(self.db())
                                         )),
                                     );
