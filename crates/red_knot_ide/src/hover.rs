@@ -1,4 +1,4 @@
-use crate::goto::find_goto_target;
+use crate::goto::{find_goto_target, GotoTarget};
 use crate::{Db, MarkupKind, RangedValue};
 use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::SemanticModel;
@@ -11,6 +11,12 @@ use std::fmt::Formatter;
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover>> {
     let parsed = parsed_module(db.upcast(), file);
     let goto_target = find_goto_target(parsed, offset)?;
+
+    if let GotoTarget::Expression(expr) = goto_target {
+        if expr.is_literal_expr() {
+            return None;
+        }
+    }
 
     let model = SemanticModel::new(db.upcast(), file);
     let ty = goto_target.inferred_type(&model)?;
@@ -494,6 +500,57 @@ mod tests {
           |                           source
           |
         ");
+    }
+
+    #[test]
+    fn hover_whitespace() {
+        let test = cursor_test(
+            r#"
+        class C:
+            <CURSOR>
+            foo: str = 'bar'
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_literal_int() {
+        let test = cursor_test(
+            r#"
+        print(
+            0 + 1<CURSOR>
+        )
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_literal_ellipsis() {
+        let test = cursor_test(
+            r#"
+        print(
+            .<CURSOR>..
+        )
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_docstring() {
+        let test = cursor_test(
+            r#"
+        def f():
+            """Lorem ipsum dolor sit amet.<CURSOR>"""
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
     }
 
     impl CursorTest {
