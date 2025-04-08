@@ -1596,18 +1596,27 @@ fn docstring_format_source(
     Ok(formatted.print()?)
 }
 
-/// If the last line of the docstring is `content" """` or `content\ """`, we need a chaperone space
-/// that avoids `content""""` and `content\"""`. This does only applies to un-escaped or escaping
-///  backslashes, so `content\\ """` or `content\""""` don't need a space while `content\\\ """` does.
+fn count_consecutive_chars_from_end(s: &str, target: char) -> usize {
+    s.chars().rev().take_while(|c| *c == target).count()
+}
+
+/// If the last line of the docstring is `content""""` or `content\"""`, we need a chaperone space
+/// that avoids `content""""` and `content\"""`. This only applies to un-escaped backslashes,
+/// so `content\\"""` doesn't need a space while `content\\\"""` does.
 pub(super) fn needs_chaperone_space(flags: AnyStringFlags, trim_end: &str) -> bool {
-    if (flags.is_triple_quoted()
-        && trim_end.ends_with(&std::format!("\\{}", flags.quote_style().as_char())))
-        || trim_end.ends_with('\\')
-    {
-        trim_end.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
-    } else {
-        flags.is_triple_quoted() && trim_end.ends_with(flags.quote_style().as_char())
+    if trim_end.ends_with(flags.quote_style().as_char()) || trim_end.ends_with('\\') {
+        if count_consecutive_chars_from_end(trim_end, '\\') % 2 == 1 {
+            // Odd backslash count; chaperone avoids escaping closing quotes
+            return true;
+        }
+        if let Some(before_quote) = trim_end.get(..trim_end.len() - 1) {
+            if count_consecutive_chars_from_end(before_quote, '\\') % 2 == 0 {
+                // Even backslash count preceding quote; chaperone avoids dangling
+                return true;
+            }
+        }
     }
+    false
 }
 
 #[derive(Copy, Clone, Debug)]
