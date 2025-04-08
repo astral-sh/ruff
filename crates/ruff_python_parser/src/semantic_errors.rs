@@ -1334,6 +1334,16 @@ impl<'a, Ctx> TryExceptVisitor<'a, Ctx> {
             scope_depth: 0,
         }
     }
+
+    fn add_identifier(&mut self, name: ast::name::Name, range: TextRange) {
+        self.identifiers.insert(
+            name,
+            Ident {
+                range,
+                scope: self.scope_depth,
+            },
+        );
+    }
 }
 
 impl<Ctx> SourceOrderVisitor<'_> for TryExceptVisitor<'_, Ctx>
@@ -1341,24 +1351,12 @@ where
     Ctx: SemanticSyntaxContext,
 {
     fn visit_identifier(&mut self, identifier: &ast::Identifier) {
-        self.identifiers.insert(
-            identifier.id.clone(),
-            Ident {
-                range: identifier.range,
-                scope: self.scope_depth,
-            },
-        );
+        self.add_identifier(identifier.id.clone(), identifier.range);
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
         if let Expr::Name(ast::ExprName { range, id, ctx: _ }) = expr {
-            self.identifiers.insert(
-                id.clone(),
-                Ident {
-                    range: *range,
-                    scope: self.scope_depth,
-                },
-            );
+            self.add_identifier(id.clone(), *range);
         }
         source_order::walk_expr(self, expr);
     }
