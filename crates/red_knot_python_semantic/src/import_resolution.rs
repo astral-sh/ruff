@@ -30,7 +30,7 @@ pub(crate) fn resolve_star_import_definition<'db>(
 }
 
 /// Resolve the [`ModuleName`], and the type of the module, being referred to by an
-/// [`ast::StmtImportFrom`] node. Emit a diagnostic if the module cannot be resolved.
+/// [`ast::StmtImportFrom`] node.
 pub(crate) fn resolve_import_from_module<'db>(
     db: &'db dyn Db,
     file: File,
