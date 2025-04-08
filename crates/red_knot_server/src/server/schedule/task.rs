@@ -21,6 +21,7 @@ pub(in crate::server) enum BackgroundSchedule {
     Fmt,
     /// The task should be run on the general high-priority background
     /// thread. Reserved for actions caused by the user typing (e.g.syntax highlighting).
+    #[expect(dead_code)]
     LatencySensitive,
     /// The task should be run on a regular-priority background thread.
     /// The default for any request that isn't in the critical path of the user typing.
