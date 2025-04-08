@@ -14,7 +14,7 @@ use smallvec::{smallvec, SmallVec};
 
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
-use crate::types::generics::Specialization;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::todo_type;
 use crate::Db;
 use ruff_python_ast::{self as ast, name::Name};
@@ -162,6 +162,7 @@ impl<'db> CallableSignature<'db> {
     /// Return a signature for a dynamic callable
     pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
         let signature = Signature {
+            generic_context: None,
             parameters: Parameters::gradual_form(),
             return_ty: Some(signature_type),
         };
@@ -173,6 +174,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn todo(reason: &'static str) -> Self {
         let signature_type = todo_type!(reason);
         let signature = Signature {
+            generic_context: None,
             parameters: Parameters::todo(),
             return_ty: Some(signature_type),
         };
@@ -207,6 +209,9 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 /// The signature of one of the overloads of a callable.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub struct Signature<'db> {
+    /// The generic context for this overload, if it is generic.
+    generic_context: Option<GenericContext<'db>>,
+
     /// Parameters, in source order.
     ///
     /// The ordering of parameters in a valid signature must be: first positional-only parameters,
@@ -224,6 +229,19 @@ pub struct Signature<'db> {
 impl<'db> Signature<'db> {
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Option<Type<'db>>) -> Self {
         Self {
+            generic_context: None,
+            parameters,
+            return_ty,
+        }
+    }
+
+    pub(crate) fn new_generic(
+        generic_context: Option<GenericContext<'db>>,
+        parameters: Parameters<'db>,
+        return_ty: Option<Type<'db>>,
+    ) -> Self {
+        Self {
+            generic_context,
             parameters,
             return_ty,
         }
@@ -233,6 +251,7 @@ impl<'db> Signature<'db> {
     #[allow(unused_variables)] // 'reason' only unused in debug builds
     pub(crate) fn todo(reason: &'static str) -> Self {
         Signature {
+            generic_context: None,
             parameters: Parameters::todo(),
             return_ty: Some(todo_type!(reason)),
         }
@@ -252,7 +271,11 @@ impl<'db> Signature<'db> {
             }
         });
 
+        // TODO: Detect if a function definition is generic. For PEP 695 we can look at the
+        // function definition syntactically. For legacy typevars we'll have to infer the type of
+        // each parameter annotation.
         Self {
+            generic_context: None,
             parameters: Parameters::from_parameters(
                 db,
                 definition,
@@ -280,6 +303,7 @@ impl<'db> Signature<'db> {
 
     pub(crate) fn bind_self(&self) -> Self {
         Self {
+            generic_context: self.generic_context,
             parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
             return_ty: self.return_ty,
         }

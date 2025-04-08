@@ -360,6 +360,13 @@ impl<'db> ClassLiteralType<'db> {
         self.class(db).known == Some(known_class)
     }
 
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        match self {
+            Self::NonGeneric(_) => None,
+            Self::Generic(generic) => Some(generic.generic_context(db)),
+        }
+    }
+
     /// Return `true` if this class represents the builtin class `object`
     pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Object)

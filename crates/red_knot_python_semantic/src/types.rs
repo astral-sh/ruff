@@ -3292,7 +3292,11 @@ impl<'db> Type<'db> {
                 _ => {
                     let signature = CallableSignature::single(
                         self,
-                        Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                        Signature::new_generic(
+                            class.generic_context(db),
+                            Parameters::gradual_form(),
+                            self.to_instance(db),
+                        ),
                     );
                     Signatures::single(signature)
                 }
