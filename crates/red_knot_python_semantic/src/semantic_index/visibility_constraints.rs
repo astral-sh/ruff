@@ -182,6 +182,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
+use crate::semantic_index::symbol_table;
+use crate::symbol::imported_symbol;
 use crate::types::{infer_expression_type, Truthiness, Type};
 use crate::Db;
 
@@ -650,6 +652,19 @@ impl VisibilityConstraints {
                 ty.bool(db).negate_if(!predicate.is_positive)
             }
             PredicateNode::Pattern(inner) => Self::analyze_single_pattern_predicate(db, inner),
+            PredicateNode::StarImport(star_import) => {
+                let symbol_table = symbol_table(db, star_import.scope(db));
+                let symbol_name = symbol_table.symbol(star_import.symbol_id(db)).name();
+                match imported_symbol(db, star_import.referenced_file(db), symbol_name).symbol {
+                    crate::symbol::Symbol::Type(_, crate::symbol::Boundness::Bound) => {
+                        Truthiness::AlwaysTrue
+                    }
+                    crate::symbol::Symbol::Type(_, crate::symbol::Boundness::PossiblyUnbound) => {
+                        Truthiness::Ambiguous
+                    }
+                    crate::symbol::Symbol::Unbound => Truthiness::AlwaysFalse,
+                }
+            }
         }
     }
 }

@@ -232,7 +232,6 @@ pub(crate) struct ImportDefinitionNodeRef<'a> {
 pub(crate) struct StarImportDefinitionNodeRef<'a> {
     pub(crate) node: &'a ast::StmtImportFrom,
     pub(crate) symbol_id: ScopedSymbolId,
-    pub(crate) referenced_module: File,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -312,15 +311,10 @@ impl<'db> DefinitionNodeRef<'db> {
                 is_reexported,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
-                let StarImportDefinitionNodeRef {
-                    node,
-                    symbol_id,
-                    referenced_module,
-                } = star_import;
+                let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
                 DefinitionKind::StarImport(StarImportDefinitionKind {
                     node: AstNodeRef::new(parsed, node),
                     symbol_id,
-                    referenced_module,
                 })
             }
             DefinitionNodeRef::Function(function) => {
@@ -434,11 +428,7 @@ impl<'db> DefinitionNodeRef<'db> {
 
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
-            Self::ImportStar(StarImportDefinitionNodeRef {
-                node,
-                symbol_id: _,
-                referenced_module: _,
-            }) => node
+            Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
                 .names
                 .iter()
                 .find(|alias| &alias.name == "*")
@@ -569,10 +559,6 @@ impl DefinitionKind<'_> {
         }
     }
 
-    pub(crate) const fn is_star_import(&self) -> bool {
-        matches!(self, DefinitionKind::StarImport(_))
-    }
-
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the symbol being defined i.e.,
@@ -700,7 +686,6 @@ impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
 pub struct StarImportDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
     symbol_id: ScopedSymbolId,
-    referenced_module: File,
 }
 
 impl StarImportDefinitionKind {
@@ -724,10 +709,6 @@ impl StarImportDefinitionKind {
 
     pub(crate) fn symbol_id(&self) -> ScopedSymbolId {
         self.symbol_id
-    }
-
-    pub(crate) fn referenced_module(&self) -> File {
-        self.referenced_module
     }
 }
 

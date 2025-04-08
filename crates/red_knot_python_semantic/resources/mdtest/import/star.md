@@ -212,23 +212,23 @@ print((
     D,
     E,
     F,
-    G,  # TODO: could emit diagnostic about being possibly unbound
+    G,  # error: [possibly-unresolved-reference]
     H,
     I,
     J,
     K,
     L,
-    M,  # TODO: could emit diagnostic about being possibly unbound
-    N,  # TODO: could emit diagnostic about being possibly unbound
-    O,  # TODO: could emit diagnostic about being possibly unbound
-    P,  # TODO: could emit diagnostic about being possibly unbound
-    Q,  # TODO: could emit diagnostic about being possibly unbound
-    R,  # TODO: could emit diagnostic about being possibly unbound
-    S,  # TODO: could emit diagnostic about being possibly unbound
-    T,  # TODO: could emit diagnostic about being possibly unbound
-    U,  # TODO: could emit diagnostic about being possibly unbound
-    V,  # TODO: could emit diagnostic about being possibly unbound
-    W,  # TODO: could emit diagnostic about being possibly unbound
+    M,  # error: [possibly-unresolved-reference]
+    N,  # error: [possibly-unresolved-reference]
+    O,  # error: [possibly-unresolved-reference]
+    P,  # error: [possibly-unresolved-reference]
+    Q,  # error: [possibly-unresolved-reference]
+    R,  # error: [possibly-unresolved-reference]
+    S,  # error: [possibly-unresolved-reference]
+    T,  # error: [possibly-unresolved-reference]
+    U,  # error: [possibly-unresolved-reference]
+    V,  # error: [possibly-unresolved-reference]
+    W,  # error: [possibly-unresolved-reference]
     typing,
     OrderedDict,
     Foo,

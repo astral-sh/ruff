@@ -1056,7 +1056,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
         let prior_bindings = use_def.bindings_at_declaration(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
-        let inferred_ty = symbol_from_bindings(self.db(), prior_bindings, self.scope())
+        let inferred_ty = symbol_from_bindings(self.db(), prior_bindings)
             .ignore_possibly_unbound()
             .unwrap_or(Type::Never);
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
@@ -4270,7 +4270,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If we're inferring types of deferred expressions, always treat them as public symbols
         let (local_scope_symbol, report_unresolved_usage) = if self.is_deferred() {
             let symbol = if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
-                symbol_from_bindings(db, use_def.public_bindings(symbol_id), self.scope())
+                symbol_from_bindings(db, use_def.public_bindings(symbol_id))
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -4282,7 +4282,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             (symbol, true)
         } else {
             let use_id = name_node.scoped_use_id(db, scope);
-            let symbol = symbol_from_bindings(db, use_def.bindings_at_use(use_id), self.scope());
+            let symbol = symbol_from_bindings(db, use_def.bindings_at_use(use_id));
             let report_unresolved_usage = use_def.is_symbol_use_reachable(db, use_id);
             (symbol, report_unresolved_usage)
         };
@@ -4347,7 +4347,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         file_scope_id,
                     ) {
                         EagerBindingsResult::Found(bindings) => {
-                            return symbol_from_bindings(db, bindings, self.scope()).into();
+                            return symbol_from_bindings(db, bindings).into();
                         }
                         // There are no visible bindings here.
                         // Don't fall back to non-eager symbol resolution.
@@ -4369,7 +4369,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol(db, symbol_name, enclosing_scope_id);
+                    return symbol(db, enclosing_scope_id, symbol_name);
                 }
             }
 
@@ -4388,7 +4388,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             file_scope_id,
                         ) {
                             EagerBindingsResult::Found(bindings) => {
-                                return symbol_from_bindings(db, bindings, self.scope()).into();
+                                return symbol_from_bindings(db, bindings).into();
                             }
                             // There are no visible bindings here.
                             EagerBindingsResult::NotFound => {
@@ -7552,7 +7552,7 @@ mod tests {
             assert_eq!(scope.name(db), *expected_scope_name);
         }
 
-        symbol(db, symbol_name, scope).symbol
+        symbol(db, scope, symbol_name).symbol
     }
 
     #[track_caller]

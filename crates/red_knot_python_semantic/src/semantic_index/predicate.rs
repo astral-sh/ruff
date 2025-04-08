@@ -13,7 +13,8 @@ use ruff_python_ast::Singleton;
 
 use crate::db::Db;
 use crate::semantic_index::expression::Expression;
-use crate::semantic_index::symbol::{FileScopeId, ScopeId};
+use crate::semantic_index::global_scope;
+use crate::semantic_index::symbol::{FileScopeId, ScopeId, ScopedSymbolId};
 
 // A scoped identifier for each `Predicate` in a scope.
 #[newtype_index]
@@ -52,6 +53,7 @@ pub(crate) struct Predicate<'db> {
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
     Pattern(PatternPredicate<'db>),
+    StarImport(StarImportPredicate<'db>),
 }
 
 /// Pattern kinds for which we support type narrowing and/or static visibility analysis.
@@ -83,5 +85,22 @@ pub(crate) struct PatternPredicate<'db> {
 impl<'db> PatternPredicate<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
+    }
+}
+
+#[salsa::tracked(debug)]
+pub(crate) struct StarImportPredicate<'db> {
+    pub(crate) importing_file: File,
+
+    pub(crate) symbol_id: ScopedSymbolId,
+
+    pub(crate) referenced_file: File,
+}
+
+impl<'db> StarImportPredicate<'db> {
+    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        // `StarImportPredicate`s are only created for valid `*`-import definitions,
+        // and valid `*`-import definitions can only ever exist in the global scope.
+        global_scope(db, self.importing_file(db))
     }
 }

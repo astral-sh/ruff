@@ -25,6 +25,7 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
+    StarImportPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
@@ -398,7 +399,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
         let category = kind.category(self.file.is_stub(self.db.upcast()));
         let is_reexported = kind.is_reexported();
-        let is_star_import = kind.is_star_import();
 
         let definition = Definition::new(
             self.db,
@@ -426,7 +426,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(symbol, definition, is_star_import);
+                use_def.record_declaration_and_binding(symbol, definition);
             }
             DefinitionCategory::Declaration => use_def.record_declaration(symbol, definition),
             DefinitionCategory::Binding => use_def.record_binding(symbol, definition),
@@ -1184,15 +1184,34 @@ where
                         };
 
                         let referenced_module = module.file();
+                        let exported_names = exported_names(self.db, referenced_module);
 
-                        for export in exported_names(self.db, referenced_module) {
+                        if exported_names.is_empty() {
+                            continue;
+                        }
+
+                        let no_star_definitions = self.flow_snapshot();
+
+                        for export in exported_names {
                             let symbol_id = self.add_symbol(export.clone());
-                            let node_ref = StarImportDefinitionNodeRef {
-                                node,
+                            let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
+                            let star_import = StarImportPredicate::new(
+                                self.db,
+                                self.file,
                                 symbol_id,
                                 referenced_module,
+                            );
+                            let predicate = Predicate {
+                                node: PredicateNode::StarImport(star_import),
+                                is_positive: true,
                             };
                             self.push_additional_definition(symbol_id, node_ref);
+                            let constraint_id = self.record_visibility_constraint(predicate);
+                            let post_definition = self.flow_snapshot();
+                            self.flow_restore(no_star_definitions.clone());
+                            self.record_negated_visibility_constraint(constraint_id);
+                            self.flow_merge(post_definition);
+                            self.simplify_visibility_constraints(no_star_definitions.clone());
                         }
 
                         continue;

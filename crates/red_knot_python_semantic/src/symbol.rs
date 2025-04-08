@@ -164,8 +164,8 @@ pub(crate) type LookupResult<'db> = Result<TypeAndQualifiers<'db>, LookupError<'
 /// `scope`.
 pub(crate) fn symbol<'db>(
     db: &'db dyn Db,
-    name: &str,
     scope: ScopeId<'db>,
+    name: &str,
 ) -> SymbolAndQualifiers<'db> {
     symbol_impl(db, scope, name, RequiresExplicitReExport::No)
 }
@@ -174,8 +174,8 @@ pub(crate) fn symbol<'db>(
 /// `scope`.
 pub(crate) fn class_symbol<'db>(
     db: &'db dyn Db,
-    name: &str,
     scope: ScopeId<'db>,
+    name: &str,
 ) -> SymbolAndQualifiers<'db> {
     symbol_table(db, scope)
         .symbol_id_by_name(name)
@@ -197,7 +197,7 @@ pub(crate) fn class_symbol<'db>(
                 let use_def = use_def_map(db, scope);
                 let bindings = use_def.public_bindings(symbol);
                 let inferred =
-                    symbol_from_bindings_impl(db, bindings, RequiresExplicitReExport::No, scope);
+                    symbol_from_bindings_impl(db, bindings, RequiresExplicitReExport::No);
 
                 // TODO: we should not need to calculate inferred type second time. This is a temporary
                 // solution until the notion of Boundness and Declaredness is split. See #16036, #16264
@@ -356,14 +356,8 @@ fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_
 pub(super) fn symbol_from_bindings<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
-    scope: ScopeId<'db>,
 ) -> Symbol<'db> {
-    symbol_from_bindings_impl(
-        db,
-        bindings_with_constraints,
-        RequiresExplicitReExport::No,
-        scope,
-    )
+    symbol_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -543,8 +537,7 @@ fn symbol_by_id<'db>(
             qualifiers,
         }) => {
             let bindings = use_def.public_bindings(symbol_id);
-            let inferred =
-                symbol_from_bindings_impl(db, bindings, requires_explicit_reexport, scope);
+            let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
             let symbol = match inferred {
                 // Symbol is possibly undeclared and definitely unbound
@@ -569,8 +562,7 @@ fn symbol_by_id<'db>(
             qualifiers: _,
         }) => {
             let bindings = use_def.public_bindings(symbol_id);
-            let inferred =
-                symbol_from_bindings_impl(db, bindings, requires_explicit_reexport, scope);
+            let inferred = symbol_from_bindings_impl(db, bindings, requires_explicit_reexport);
 
             // `__slots__` is a symbol with special behavior in Python's runtime. It can be
             // modified externally, but those changes do not take effect. We therefore issue
@@ -651,7 +643,6 @@ fn symbol_from_bindings_impl<'db>(
     db: &'db dyn Db,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
-    scope: ScopeId<'db>,
 ) -> Symbol<'db> {
     let predicates = bindings_with_constraints.predicates;
     let visibility_constraints = bindings_with_constraints.visibility_constraints;
@@ -676,28 +667,9 @@ fn symbol_from_bindings_impl<'db>(
         |BindingWithConstraints {
              binding,
              narrowing_constraint,
-             mut visibility_constraint,
+             visibility_constraint,
          }| {
-            let mut binding = binding?;
-
-            if let Some(star_import) = binding.kind(db).as_star_import() {
-                let use_def_map = use_def_map(db, scope);
-                let symbol_table = symbol_table(db, scope);
-                let defined_name = symbol_table.symbol(star_import.symbol_id()).name();
-
-                while let Some(star_import) = binding.kind(db).as_star_import() {
-                    let symbol = imported_symbol(db, star_import.referenced_module(), defined_name);
-                    if symbol.symbol.is_unbound() {
-                        let prior_binding = use_def_map
-                            .public_bindings_prior_to_star_import(binding)
-                            .next()?;
-                        binding = prior_binding.binding?;
-                        visibility_constraint = prior_binding.visibility_constraint;
-                    } else {
-                        break;
-                    }
-                }
-            }
+            let binding = binding?;
 
             if is_non_exported(binding) {
                 return None;
@@ -780,9 +752,7 @@ fn symbol_from_bindings_impl<'db>(
 
     if let Some(first) = types.next() {
         let boundness = match unbound_visibility {
-            Truthiness::AlwaysTrue => {
-                unreachable!("If we have at least one binding, the scope-start should not be definitely visible")
-            }
+            Truthiness::AlwaysTrue => return Symbol::Unbound,
             Truthiness::AlwaysFalse => Boundness::Bound,
             Truthiness::Ambiguous => Boundness::PossiblyUnbound,
         };
@@ -871,9 +841,7 @@ fn symbol_from_declarations_impl<'db>(
         };
         if conflicting.is_empty() {
             let boundness = match undeclared_visibility {
-                Truthiness::AlwaysTrue => {
-                    unreachable!("If we have at least one declaration, the scope-start should not be definitely visible")
-                }
+                Truthiness::AlwaysTrue => return Ok(Symbol::Unbound.into()),
                 Truthiness::AlwaysFalse => Boundness::Bound,
                 Truthiness::Ambiguous => Boundness::PossiblyUnbound,
             };

@@ -418,7 +418,7 @@ impl<'db> Class<'db> {
     /// directly. Use [`Class::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        class_symbol(db, name, self.body_scope(db))
+        class_symbol(db, self.body_scope(db), name)
     }
 
     /// Returns the `name` attribute of an instance of this class.
@@ -485,8 +485,8 @@ impl<'db> Class<'db> {
     /// "implicitly" defined in a method of the class that corresponds to `class_body_scope`.
     fn implicit_instance_attribute(
         db: &'db dyn Db,
-        name: &str,
         class_body_scope: ScopeId<'db>,
+        name: &str,
     ) -> Option<Type<'db>> {
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
@@ -587,14 +587,14 @@ impl<'db> Class<'db> {
                     // The attribute is declared in the class body.
 
                     let bindings = use_def.public_bindings(symbol_id);
-                    let inferred = symbol_from_bindings(db, bindings, body_scope);
+                    let inferred = symbol_from_bindings(db, bindings);
                     let has_binding = !inferred.is_unbound();
 
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
                         if let Some(implicit_ty) =
-                            Self::implicit_instance_attribute(db, name, body_scope)
+                            Self::implicit_instance_attribute(db, body_scope, name)
                         {
                             if declaredness == Boundness::Bound {
                                 // If a symbol is definitely declared, and we see
@@ -628,7 +628,7 @@ impl<'db> Class<'db> {
                             declared.with_qualifiers(qualifiers)
                         } else {
                             if let Some(implicit_ty) =
-                                Self::implicit_instance_attribute(db, name, body_scope)
+                                Self::implicit_instance_attribute(db, body_scope, name)
                             {
                                 Symbol::Type(
                                     UnionType::from_elements(db, [declared_ty, implicit_ty]),
@@ -649,7 +649,7 @@ impl<'db> Class<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_instance_attribute(db, name, body_scope)
+                    Self::implicit_instance_attribute(db, body_scope, name)
                         .map_or(Symbol::Unbound, Symbol::bound)
                         .into()
                 }
@@ -662,7 +662,7 @@ impl<'db> Class<'db> {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_instance_attribute(db, name, body_scope)
+            Self::implicit_instance_attribute(db, body_scope, name)
                 .map_or(Symbol::Unbound, Symbol::bound)
                 .into()
         }
