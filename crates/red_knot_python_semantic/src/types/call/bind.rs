@@ -19,7 +19,8 @@ use crate::types::diagnostic::{
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, ClassLiteralType, FunctionDecorators, KnownClass, KnownFunction,
-    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
+    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
@@ -612,13 +613,20 @@ impl<'db> Bindings<'db> {
                             }
 
                             (None, Some(_constraints)) => {
-                                Some(TypeVarBoundOrConstraints::Constraints(TupleType::new(
+                                // We don't use UnionType::from_elements or UnionBuilder here,
+                                // because we don't want to simplify the list of constraints like
+                                // we do with the elements of an actual union type.
+                                // TODO: Consider using a new `OneOfType` connective here instead,
+                                // since that more accurately represents the actual semantics of
+                                // typevar constraints.
+                                let elements = UnionType::new(
                                     db,
                                     overload
                                         .arguments_for_parameter(argument_types, 1)
                                         .map(|(_, ty)| ty)
                                         .collect::<Box<_>>(),
-                                )))
+                                );
+                                Some(TypeVarBoundOrConstraints::Constraints(elements))
                             }
 
                             // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
