@@ -86,6 +86,7 @@ impl<'db> ClassBase<'db> {
             | Type::ModuleLiteral(_)
             | Type::SubclassOf(_)
             | Type::TypeVar(_)
+            | Type::BoundSuper(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy => None,
             Type::KnownInstance(known_instance) => match known_instance {
