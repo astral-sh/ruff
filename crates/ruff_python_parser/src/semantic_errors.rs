@@ -682,23 +682,27 @@ impl SemanticSyntaxChecker {
         expr: &Expr,
         kind: YieldOutsideFunctionKind,
     ) {
-        if !self.in_function_scope && !self.source_type.is_ipynb() {
-            // test_err yield_outside_function
-            // yield 1
-            // yield from 1
-            // await 1
-
-            // test_ok yield_inside_function
-            // def f():
-            //     yield 1
-            //     yield from 1
-            //     await 1
-            Self::add_error(
-                ctx,
-                SemanticSyntaxErrorKind::YieldOutsideFunction(kind),
-                expr.range(),
-            );
+        if self.in_function_scope {
+            return;
         }
+        if self.source_type.is_ipynb() && matches!(kind, YieldOutsideFunctionKind::Await) {
+            return;
+        }
+        // test_err yield_outside_function
+        // yield 1
+        // yield from 1
+        // await 1
+
+        // test_ok yield_inside_function
+        // def f():
+        //     yield 1
+        //     yield from 1
+        //     await 1
+        Self::add_error(
+            ctx,
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind),
+            expr.range(),
+        );
     }
 
     /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
