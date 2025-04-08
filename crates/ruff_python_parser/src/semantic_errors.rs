@@ -1363,7 +1363,7 @@ where
 
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::FunctionDef(_) => {
+            Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
                 self.scope_depth += 1;
                 source_order::walk_stmt(self, stmt);
                 self.scope_depth -= 1;
@@ -1424,6 +1424,14 @@ where
                         // except ImportError:
                         //     x = 1
                         //     def f():
+                        //         global x
+                        //         x = 2
+
+                        // test_ok global_in_nested_class
+                        // try: ...
+                        // except ImportError:
+                        //     x = 1
+                        //     class f():
                         //         global x
                         //         x = 2
                         SemanticSyntaxChecker::add_error(
