@@ -3940,49 +3940,43 @@ impl<'db> TypeInferenceBuilder<'db> {
         ))
     }
 
-    /// Returns the symbol of the first parameter if the scope is function-like (function or lambda).
+    /// Returns the type of the first parameter if the scope is function-like (function or lambda).
     /// Returns `None` if the scope is not function-like, or if there are no parameters.
-    fn first_param_symbol_in_scope(&self, scope: ScopeId) -> Option<Symbol<'db>> {
-        let file_scope_id = scope.file_scope_id(self.db());
-        let symbol_table = self.index.symbol_table(file_scope_id);
-        let use_def = self.index.use_def_map(file_scope_id);
-
-        let first_param_name = match scope.node(self.db()) {
-            NodeWithScopeKind::Function(f) => f.parameters.iter().next().map(|p| p.name().as_str()),
-            NodeWithScopeKind::Lambda(l) => l
-                .parameters
-                .as_ref()?
-                .args
-                .first()
-                .map(|p| p.name().as_str()),
+    fn first_param_type_in_scope(&self, scope: ScopeId) -> Option<Type<'db>> {
+        let first_param = match scope.node(self.db()) {
+            NodeWithScopeKind::Function(f) => f.parameters.iter().next(),
+            NodeWithScopeKind::Lambda(l) => l.parameters.as_ref()?.iter().next(),
             _ => None,
         }?;
 
-        let scoped_symbol = symbol_table.symbol_id_by_name(first_param_name)?;
-        let bindings = use_def.public_bindings(scoped_symbol);
-        Some(symbol_from_bindings(self.db(), bindings))
+        if first_param.annotation().is_none() {
+            return Some(Type::unknown());
+        }
+
+        let definition = self.index.expect_single_definition(first_param);
+
+        Some(
+            infer_definition_types(self.db(), definition)
+                .declaration_type(definition)
+                .inner_type(),
+        )
     }
 
-    /// Returns the symbol of the nearest enclosing class for the given scope.
+    /// Returns the type of the nearest enclosing class for the given scope.
     ///
     /// This function walks up the ancestor scopes starting from the given scope,
     /// and finds the closest class definition.
     ///
     /// Returns `None` if no enclosing class is found.
-    fn enclosing_class_symbol(&self, scope: ScopeId) -> Option<Symbol<'db>> {
+    fn enclosing_class_symbol(&self, scope: ScopeId) -> Option<Type<'db>> {
         self.index
             .ancestor_scopes(scope.file_scope_id(self.db()))
             .find_map(|(_, ancestor_scope)| {
                 if let NodeWithScopeKind::Class(class) = ancestor_scope.node() {
-                    // The class name is resolved in its parent scope
-                    let parent_scope_id = ancestor_scope.parent()?;
-                    let parent_symbol_table = self.index.symbol_table(parent_scope_id);
-                    let parent_use_def = self.index.use_def_map(parent_scope_id);
+                    let definition = self.index.expect_single_definition(class.node());
+                    let result = infer_definition_types(self.db(), definition);
 
-                    let scoped_symbol =
-                        parent_symbol_table.symbol_id_by_name(class.name.as_str())?;
-                    let bindings = parent_use_def.public_bindings(scoped_symbol);
-                    Some(symbol_from_bindings(self.db(), bindings))
+                    Some(result.declaration_type(definition).inner_type())
                 } else {
                     None
                 }
@@ -4152,33 +4146,56 @@ impl<'db> TypeInferenceBuilder<'db> {
                             // In this case, we need to infer the two arguments:
                             //   1. The nearest enclosing class
                             //   2. The first parameter of the current function (`self` or `cls`)
-                            if matches!(overload.parameter_types(), [None, None]) {
-                                let scope = self.scope();
+                            match overload.parameter_types() {
+                                [None, None] => {
+                                    let scope = self.scope();
 
-                                let enclosing_class = match self.enclosing_class_symbol(scope) {
-                                    Some(Symbol::Type(Type::ClassLiteral(class), _)) => {
-                                        class.class()
-                                    }
-                                    _ => {
+                                    let Some(enclosing_class) = self.enclosing_class_symbol(scope)
+                                    else {
                                         overload.set_return_type(Type::unknown());
                                         // TODO: add proper diagnostic
                                         continue;
-                                    }
-                                };
+                                    };
 
-                                let Some(Symbol::Type(first_param, _)) =
-                                    self.first_param_symbol_in_scope(scope)
-                                else {
-                                    overload.set_return_type(Type::unknown());
-                                    // TODO: add proper diagnostic
-                                    continue;
-                                };
+                                    let Some(first_param) = self.first_param_type_in_scope(scope)
+                                    else {
+                                        overload.set_return_type(Type::unknown());
+                                        // TODO: add proper diagnostic
+                                        continue;
+                                    };
 
-                                overload.set_return_type(BoundSuperType::build(
-                                    self.db(),
-                                    enclosing_class,
-                                    first_param,
-                                ));
+                                    let bound_super = BoundSuperType::build(
+                                        self.db(),
+                                        enclosing_class,
+                                        first_param,
+                                    )
+                                    .unwrap_or_else(|err| {
+                                        err.report_diagnostic(
+                                            &self.context,
+                                            call_expression.into(),
+                                        );
+                                        Type::unknown()
+                                    });
+
+                                    overload.set_return_type(bound_super);
+                                }
+                                [Some(pivot_class_type), Some(owner_type)] => {
+                                    let bound_super = BoundSuperType::build(
+                                        self.db(),
+                                        *pivot_class_type,
+                                        *owner_type,
+                                    )
+                                    .unwrap_or_else(|err| {
+                                        err.report_diagnostic(
+                                            &self.context,
+                                            call_expression.into(),
+                                        );
+                                        Type::unknown()
+                                    });
+
+                                    overload.set_return_type(bound_super);
+                                }
+                                _ => (),
                             }
                         }
                         _ => (),
