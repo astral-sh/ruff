@@ -975,11 +975,6 @@ impl<'db> Type<'db> {
             (Type::Dynamic(_), _) => true,
             (_, Type::Dynamic(_)) => true,
 
-            // TODO: For now we are treating a TypeVar as Any, and allowing it to be assignable-to
-            // and assignable-from any other type.
-            (_, Type::KnownInstance(KnownInstanceType::TypeVar(_))) => true,
-            (Type::KnownInstance(KnownInstanceType::TypeVar(_)), _) => true,
-
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
             (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
@@ -2491,17 +2486,13 @@ impl<'db> Type<'db> {
                 );
 
                 let custom_getattr_result = || {
-                    if let Some(instance) = self.into_instance() {
-                        match instance.class.known(db) {
-                            // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
-                            // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
-                            Some(KnownClass::ModuleType) => return Symbol::Unbound.into(),
-
-                            // TODO: For now we are treating a TypeVar as Any.
-                            Some(KnownClass::TypeVar) => return Symbol::bound(Type::any()).into(),
-
-                            _ => {}
-                        }
+                    // Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with dynamic imports.
+                    // We explicitly hide it here to prevent arbitrary attributes from being available on modules.
+                    if self
+                        .into_instance()
+                        .is_some_and(|instance| instance.class.is_known(db, KnownClass::ModuleType))
+                    {
+                        return Symbol::Unbound.into();
                     }
 
                     self.try_call_dunder(
