@@ -57,6 +57,16 @@ impl<'db> InferContext<'db> {
         self.file
     }
 
+    /// Create a span with the range of the given expression
+    /// in the file being currently type checked.
+    ///
+    /// If you're creating a diagnostic with snippets in files
+    /// other than this one, you should create the span directly
+    /// and not use this convenience API.
+    pub(crate) fn span<T: Ranged>(&self, ranged: T) -> Span {
+        Span::from(self.file()).with_range(ranged.range())
+    }
+
     pub(crate) fn db(&self) -> &'db dyn Db {
         self.db
     }
@@ -87,7 +97,7 @@ impl<'db> InferContext<'db> {
     ) where
         T: Ranged,
     {
-        let Some(mut reporter) = self.lint(lint, "") else {
+        let Some(builder) = self.lint(lint) else {
             return;
         };
         let mut reporter = builder.build("");
@@ -99,32 +109,7 @@ impl<'db> InferContext<'db> {
         diag.annotate(Annotation::primary(span).message(message));
     }
 
-    /// Adds a new diagnostic.
-    ///
-    /// The diagnostic does not get added if the rule isn't enabled for this file.
-    pub(super) fn report_diagnostic<T>(
-        &self,
-        ranged: T,
-        id: DiagnosticId,
-        severity: Severity,
-        message: fmt::Arguments,
-        secondary_messages: &[OldSecondaryDiagnosticMessage],
-    ) where
-        T: Ranged,
-    {
-        let Some(mut reporter) = self.report(id, severity, "") else {
-            return;
-        };
-        let mut reporter = builder.build("");
-        let diag = reporter.diagnostic();
-        for secondary_msg in secondary_messages {
-            diag.sub(secondary_msg.to_sub_diagnostic());
-        }
-        let span = Span::from(self.file).with_range(ranged.range());
-        diag.annotate(Annotation::primary(span).message(message));
-    }
-
-    /// Optionally return a reporter builder for adding a lint diagnostic.
+    /// Optionally return a reporter for adding a lint diagnostic.
     ///
     /// If the current context believes a diagnostic should be reported for
     /// the given lint, then a reporter is returned that enables building up a

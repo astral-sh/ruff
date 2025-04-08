@@ -34,7 +34,7 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 use itertools::{Either, Itertools};
-use ruff_db::diagnostic::{DiagnosticId, Severity};
+use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::{walk_expr, Visitor};
@@ -4105,16 +4105,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                     match known_function {
                         KnownFunction::RevealType => {
                             if let [Some(revealed_type)] = overload.parameter_types() {
-                                self.context.report_diagnostic(
-                                    call_expression,
+                                if let Some(mut reporter) = self.context.report(
                                     DiagnosticId::RevealedType,
                                     Severity::Info,
-                                    format_args!(
-                                        "Revealed type is `{}`",
-                                        revealed_type.display(self.db())
-                                    ),
-                                    &[],
-                                );
+                                    "",
+                                ) {
+                                    let span = self.context.span(call_expression);
+                                    reporter.diagnostic().annotate(
+                                        Annotation::primary(span).message(format_args!(
+                                            "Revealed type is `{}`",
+                                            revealed_type.display(self.db())
+                                        )),
+                                    );
+                                }
                             }
                         }
                         KnownFunction::AssertType => {
