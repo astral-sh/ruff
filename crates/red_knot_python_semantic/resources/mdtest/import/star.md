@@ -181,10 +181,16 @@ match 42:
         ...
 
 match 56:
+    case x if x:
+        ...
+
     case object(S):
         ...
 
 match 12345:
+    case x if x:
+        ...
+
     case T:
         ...
 
@@ -213,7 +219,7 @@ print((
     E,
     F,
     G,  # error: [possibly-unresolved-reference]
-    H,
+    H,  # error: [possibly-unresolved-reference]
     I,
     J,
     K,
@@ -226,7 +232,7 @@ print((
     R,  # error: [possibly-unresolved-reference]
     S,  # error: [possibly-unresolved-reference]
     T,  # error: [possibly-unresolved-reference]
-    U,  # error: [possibly-unresolved-reference]
+    U,  # TODO: could emit [possibly-unresolved-reference here] (https://github.com/astral-sh/ruff/issues/16996)
     V,  # error: [possibly-unresolved-reference]
     W,  # error: [possibly-unresolved-reference]
     typing,

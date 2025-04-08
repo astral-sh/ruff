@@ -1190,8 +1190,6 @@ where
                             continue;
                         }
 
-                        let no_star_definitions = self.flow_snapshot();
-
                         for export in exported_names {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
@@ -1205,13 +1203,14 @@ where
                                 node: PredicateNode::StarImport(star_import),
                                 is_positive: true,
                             };
+                            let pre_definition = self.flow_snapshot();
                             self.push_additional_definition(symbol_id, node_ref);
                             let constraint_id = self.record_visibility_constraint(predicate);
                             let post_definition = self.flow_snapshot();
-                            self.flow_restore(no_star_definitions.clone());
+                            self.flow_restore(pre_definition.clone());
                             self.record_negated_visibility_constraint(constraint_id);
                             self.flow_merge(post_definition);
-                            self.simplify_visibility_constraints(no_star_definitions.clone());
+                            self.simplify_visibility_constraints(pre_definition);
                         }
 
                         continue;
