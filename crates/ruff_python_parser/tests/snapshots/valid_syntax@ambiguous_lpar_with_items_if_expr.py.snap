@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/ambiguous_lpar_with_items_if_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -20,17 +19,17 @@ Module(
                             context_expr: If(
                                 ExprIf {
                                     range: 5..23,
-                                    test: BooleanLiteral(
-                                        ExprBooleanLiteral {
-                                            range: 12..16,
-                                            value: true,
-                                        },
-                                    ),
                                     body: Name(
                                         ExprName {
                                             range: 6..7,
                                             id: Name("x"),
                                             ctx: Load,
+                                        },
+                                    ),
+                                    test: BooleanLiteral(
+                                        ExprBooleanLiteral {
+                                            range: 12..16,
+                                            value: true,
                                         },
                                     ),
                                     orelse: Name(
@@ -69,12 +68,6 @@ Module(
                             context_expr: If(
                                 ExprIf {
                                     range: 34..66,
-                                    test: BooleanLiteral(
-                                        ExprBooleanLiteral {
-                                            range: 55..59,
-                                            value: true,
-                                        },
-                                    ),
                                     body: Generator(
                                         ExprGenerator {
                                             range: 34..51,
@@ -107,6 +100,12 @@ Module(
                                                 },
                                             ],
                                             parenthesized: true,
+                                        },
+                                    ),
+                                    test: BooleanLiteral(
+                                        ExprBooleanLiteral {
+                                            range: 55..59,
+                                            value: true,
                                         },
                                     ),
                                     orelse: Name(
@@ -145,12 +144,6 @@ Module(
                             context_expr: If(
                                 ExprIf {
                                     range: 77..115,
-                                    test: BooleanLiteral(
-                                        ExprBooleanLiteral {
-                                            range: 104..108,
-                                            value: true,
-                                        },
-                                    ),
                                     body: Generator(
                                         ExprGenerator {
                                             range: 77..100,
@@ -183,6 +176,12 @@ Module(
                                                 },
                                             ],
                                             parenthesized: true,
+                                        },
+                                    ),
+                                    test: BooleanLiteral(
+                                        ExprBooleanLiteral {
+                                            range: 104..108,
+                                            value: true,
                                         },
                                     ),
                                     orelse: Name(
@@ -221,12 +220,6 @@ Module(
                             context_expr: If(
                                 ExprIf {
                                     range: 126..147,
-                                    test: BooleanLiteral(
-                                        ExprBooleanLiteral {
-                                            range: 136..140,
-                                            value: true,
-                                        },
-                                    ),
                                     body: Subscript(
                                         ExprSubscript {
                                             range: 126..132,
@@ -246,6 +239,12 @@ Module(
                                                 },
                                             ),
                                             ctx: Load,
+                                        },
+                                    ),
+                                    test: BooleanLiteral(
+                                        ExprBooleanLiteral {
+                                            range: 136..140,
+                                            value: true,
                                         },
                                     ),
                                     orelse: Name(

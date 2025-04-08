@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/list_comprehension.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -703,17 +702,17 @@ Module(
                                     iter: If(
                                         ExprIf {
                                             range: 314..330,
-                                            test: BooleanLiteral(
-                                                ExprBooleanLiteral {
-                                                    range: 319..323,
-                                                    value: true,
-                                                },
-                                            ),
                                             body: Name(
                                                 ExprName {
                                                     range: 314..315,
                                                     id: Name("l"),
                                                     ctx: Load,
+                                                },
+                                            ),
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 319..323,
+                                                    value: true,
                                                 },
                                             ),
                                             orelse: Name(
@@ -767,12 +766,6 @@ Module(
                                     iter: If(
                                         ExprIf {
                                             range: 351..373,
-                                            test: BooleanLiteral(
-                                                ExprBooleanLiteral {
-                                                    range: 362..366,
-                                                    value: true,
-                                                },
-                                            ),
                                             body: Await(
                                                 ExprAwait {
                                                     range: 351..358,
@@ -783,6 +776,12 @@ Module(
                                                             ctx: Load,
                                                         },
                                                     ),
+                                                },
+                                            ),
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 362..366,
+                                                    value: true,
                                                 },
                                             ),
                                             orelse: Name(
@@ -839,17 +838,17 @@ Module(
                                             value: If(
                                                 ExprIf {
                                                     range: 400..416,
-                                                    test: BooleanLiteral(
-                                                        ExprBooleanLiteral {
-                                                            range: 405..409,
-                                                            value: true,
-                                                        },
-                                                    ),
                                                     body: Name(
                                                         ExprName {
                                                             range: 400..401,
                                                             id: Name("x"),
                                                             ctx: Load,
+                                                        },
+                                                    ),
+                                                    test: BooleanLiteral(
+                                                        ExprBooleanLiteral {
+                                                            range: 405..409,
+                                                            value: true,
                                                         },
                                                     ),
                                                     orelse: Name(
@@ -918,17 +917,17 @@ Module(
                                                     If(
                                                         ExprIf {
                                                             range: 438..455,
-                                                            test: BooleanLiteral(
-                                                                ExprBooleanLiteral {
-                                                                    range: 443..447,
-                                                                    value: true,
-                                                                },
-                                                            ),
                                                             body: Name(
                                                                 ExprName {
                                                                     range: 438..439,
                                                                     id: Name("x"),
                                                                     ctx: Load,
+                                                                },
+                                                            ),
+                                                            test: BooleanLiteral(
+                                                                ExprBooleanLiteral {
+                                                                    range: 443..447,
+                                                                    value: true,
                                                                 },
                                                             ),
                                                             orelse: List(

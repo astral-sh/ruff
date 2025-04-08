@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/annotated_assignment.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -175,17 +174,17 @@ Module(
                     annotation: If(
                         ExprIf {
                             range: 59..79,
-                            test: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    range: 66..70,
-                                    value: true,
-                                },
-                            ),
                             body: Name(
                                 ExprName {
                                     range: 59..62,
                                     id: Name("int"),
                                     ctx: Load,
+                                },
+                            ),
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 66..70,
+                                    value: true,
                                 },
                             ),
                             orelse: Name(

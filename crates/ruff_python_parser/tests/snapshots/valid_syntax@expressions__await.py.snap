@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/await.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -332,12 +331,6 @@ Module(
                     value: If(
                         ExprIf {
                             range: 121..146,
-                            test: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    range: 132..136,
-                                    value: true,
-                                },
-                            ),
                             body: Await(
                                 ExprAwait {
                                     range: 121..128,
@@ -348,6 +341,12 @@ Module(
                                             ctx: Load,
                                         },
                                     ),
+                                },
+                            ),
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 132..136,
+                                    value: true,
                                 },
                             ),
                             orelse: NoneLiteral(

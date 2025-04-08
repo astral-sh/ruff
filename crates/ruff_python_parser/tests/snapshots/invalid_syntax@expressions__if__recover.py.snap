@@ -15,6 +15,13 @@ Module(
                     value: If(
                         ExprIf {
                             range: 26..43,
+                            body: Name(
+                                ExprName {
+                                    range: 26..27,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
                             test: Starred(
                                 ExprStarred {
                                     range: 31..36,
@@ -25,13 +32,6 @@ Module(
                                             ctx: Load,
                                         },
                                     ),
-                                    ctx: Load,
-                                },
-                            ),
-                            body: Name(
-                                ExprName {
-                                    range: 26..27,
-                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
@@ -52,6 +52,13 @@ Module(
                     value: If(
                         ExprIf {
                             range: 44..67,
+                            body: Name(
+                                ExprName {
+                                    range: 44..45,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
                             test: Lambda(
                                 ExprLambda {
                                     range: 49..60,
@@ -87,13 +94,6 @@ Module(
                                     ),
                                 },
                             ),
-                            body: Name(
-                                ExprName {
-                                    range: 44..45,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             orelse: Name(
                                 ExprName {
                                     range: 66..67,
@@ -111,6 +111,13 @@ Module(
                     value: If(
                         ExprIf {
                             range: 68..87,
+                            body: Name(
+                                ExprName {
+                                    range: 68..69,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
                             test: Yield(
                                 ExprYield {
                                     range: 73..80,
@@ -123,13 +130,6 @@ Module(
                                             },
                                         ),
                                     ),
-                                },
-                            ),
-                            body: Name(
-                                ExprName {
-                                    range: 68..69,
-                                    id: Name("x"),
-                                    ctx: Load,
                                 },
                             ),
                             orelse: Name(
@@ -149,6 +149,13 @@ Module(
                     value: If(
                         ExprIf {
                             range: 88..112,
+                            body: Name(
+                                ExprName {
+                                    range: 88..89,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
                             test: YieldFrom(
                                 ExprYieldFrom {
                                     range: 93..105,
@@ -159,13 +166,6 @@ Module(
                                             ctx: Load,
                                         },
                                     ),
-                                },
-                            ),
-                            body: Name(
-                                ExprName {
-                                    range: 88..89,
-                                    id: Name("x"),
-                                    ctx: Load,
                                 },
                             ),
                             orelse: Name(
@@ -185,17 +185,17 @@ Module(
                     value: If(
                         ExprIf {
                             range: 142..164,
-                            test: Name(
-                                ExprName {
-                                    range: 147..151,
-                                    id: Name("expr"),
-                                    ctx: Load,
-                                },
-                            ),
                             body: Name(
                                 ExprName {
                                     range: 142..143,
                                     id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            test: Name(
+                                ExprName {
+                                    range: 147..151,
+                                    id: Name("expr"),
                                     ctx: Load,
                                 },
                             ),
@@ -222,17 +222,17 @@ Module(
                     value: If(
                         ExprIf {
                             range: 165..187,
-                            test: Name(
-                                ExprName {
-                                    range: 170..174,
-                                    id: Name("expr"),
-                                    ctx: Load,
-                                },
-                            ),
                             body: Name(
                                 ExprName {
                                     range: 165..166,
                                     id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            test: Name(
+                                ExprName {
+                                    range: 170..174,
+                                    id: Name("expr"),
                                     ctx: Load,
                                 },
                             ),
@@ -260,17 +260,17 @@ Module(
                     value: If(
                         ExprIf {
                             range: 188..215,
-                            test: Name(
-                                ExprName {
-                                    range: 193..197,
-                                    id: Name("expr"),
-                                    ctx: Load,
-                                },
-                            ),
                             body: Name(
                                 ExprName {
                                     range: 188..189,
                                     id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            test: Name(
+                                ExprName {
+                                    range: 193..197,
+                                    id: Name("expr"),
                                     ctx: Load,
                                 },
                             ),
