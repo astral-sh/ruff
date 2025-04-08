@@ -44,13 +44,13 @@ error: lint:not-iterable
 ```
 
 ```
-info: revealed-type
+info: revealed-type: Revealed type
   --> /src/mdtest_snippet.py:14:9
    |
 12 |     # error: [not-iterable]
 13 |     for x in Test() if flag else 42:
 14 |         reveal_type(x)  # revealed: int
-   |         ^^^^^^^^^^^^^^ Revealed type is `int`
+   |         ^^^^^^^^^^^^^^ `int`
    |
 
 ```
