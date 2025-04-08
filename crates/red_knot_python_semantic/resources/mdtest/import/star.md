@@ -563,17 +563,16 @@ reveal_type(X)  # revealed: bool
 reveal_type(Y)  # revealed: Unknown
 
 # The `*` import should not be considered a redefinition
-# of the global variable in this module, as the symbol in
+# of the global variable `Z` in this module, as the symbol in
 # the `a` module is in a branch that is statically known
 # to be dead code given the `python-version` configuration.
-# Thus this correctly reveals `Literal[True]` and does not have an error emitted
+# Thus the type of `Z` remains `Literal[True]` despite the `*` import
 reveal_type(Z)  # revealed: Literal[True]
 
 if sys.version_info >= (3, 12):
     from aa import *
 
     # It's correct that this should not error because this branch is unreachable.
-    # TODO: should reveal `Never` (see https://github.com/astral-sh/ruff/issues/15967)
     reveal_type(AA)  # revealed: Unknown
 
 # error: [unresolved-reference]
