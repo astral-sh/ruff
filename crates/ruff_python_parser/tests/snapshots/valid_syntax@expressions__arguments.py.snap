@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/arguments.py
 ```
 Module(
     ModModule {
-        range: 0..805,
+        range: 0..844,
         body: [
             Expr(
                 StmtExpr {
@@ -835,90 +835,113 @@ Module(
                     ),
                 },
             ),
-            Expr(
-                StmtExpr {
-                    range: 403..418,
-                    value: Call(
-                        ExprCall {
-                            range: 403..418,
-                            func: Name(
-                                ExprName {
-                                    range: 403..407,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 407..418,
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 408..417,
-                                        arg: Some(
-                                            Identifier {
-                                                id: Name("x"),
-                                                range: 408..409,
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 403..431,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 407..412,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 412..414,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 416..431,
+                                value: Call(
+                                    ExprCall {
+                                        range: 416..431,
+                                        func: Name(
+                                            ExprName {
+                                                range: 416..420,
+                                                id: Name("call"),
+                                                ctx: Load,
                                             },
                                         ),
-                                        value: Await(
-                                            ExprAwait {
-                                                range: 410..417,
-                                                value: Name(
-                                                    ExprName {
-                                                        range: 416..417,
-                                                        id: Name("y"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ),
+                                        arguments: Arguments {
+                                            range: 420..431,
+                                            args: [],
+                                            keywords: [
+                                                Keyword {
+                                                    range: 421..430,
+                                                    arg: Some(
+                                                        Identifier {
+                                                            id: Name("x"),
+                                                            range: 421..422,
+                                                        },
+                                                    ),
+                                                    value: Await(
+                                                        ExprAwait {
+                                                            range: 423..430,
+                                                            value: Name(
+                                                                ExprName {
+                                                                    range: 429..430,
+                                                                    id: Name("y"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ],
+                                        },
                                     },
-                                ],
+                                ),
                             },
-                        },
-                    ),
+                        ),
+                    ],
                 },
             ),
             Expr(
                 StmtExpr {
-                    range: 419..438,
+                    range: 432..451,
                     value: Call(
                         ExprCall {
-                            range: 419..438,
+                            range: 432..451,
                             func: Name(
                                 ExprName {
-                                    range: 419..423,
+                                    range: 432..436,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 423..438,
+                                range: 436..451,
                                 args: [],
                                 keywords: [
                                     Keyword {
-                                        range: 424..437,
+                                        range: 437..450,
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
-                                                range: 424..425,
+                                                range: 437..438,
                                             },
                                         ),
                                         value: Lambda(
                                             ExprLambda {
-                                                range: 426..437,
+                                                range: 439..450,
                                                 parameters: Some(
                                                     Parameters {
-                                                        range: 433..434,
+                                                        range: 446..447,
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {
-                                                                range: 433..434,
+                                                                range: 446..447,
                                                                 parameter: Parameter {
-                                                                    range: 433..434,
+                                                                    range: 446..447,
                                                                     name: Identifier {
                                                                         id: Name("y"),
-                                                                        range: 433..434,
+                                                                        range: 446..447,
                                                                     },
                                                                     annotation: None,
                                                                 },
@@ -932,7 +955,7 @@ Module(
                                                 ),
                                                 body: Name(
                                                     ExprName {
-                                                        range: 436..437,
+                                                        range: 449..450,
                                                         id: Name("y"),
                                                         ctx: Load,
                                                     },
@@ -948,42 +971,42 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 439..455,
+                    range: 452..468,
                     value: Call(
                         ExprCall {
-                            range: 439..455,
+                            range: 452..468,
                             func: Name(
                                 ExprName {
-                                    range: 439..443,
+                                    range: 452..456,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 443..455,
+                                range: 456..468,
                                 args: [],
                                 keywords: [
                                     Keyword {
-                                        range: 444..454,
+                                        range: 457..467,
                                         arg: Some(
                                             Identifier {
                                                 id: Name("x"),
-                                                range: 444..445,
+                                                range: 457..458,
                                             },
                                         ),
                                         value: Named(
                                             ExprNamed {
-                                                range: 447..453,
+                                                range: 460..466,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 447..448,
+                                                        range: 460..461,
                                                         id: Name("y"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 452..453,
+                                                        range: 465..466,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -1000,27 +1023,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 476..491,
+                    range: 489..504,
                     value: Call(
                         ExprCall {
-                            range: 476..491,
+                            range: 489..504,
                             func: Name(
                                 ExprName {
-                                    range: 476..480,
+                                    range: 489..493,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 480..491,
+                                range: 493..504,
                                 args: [
                                     Yield(
                                         ExprYield {
-                                            range: 482..489,
+                                            range: 495..502,
                                             value: Some(
                                                 Name(
                                                     ExprName {
-                                                        range: 488..489,
+                                                        range: 501..502,
                                                         id: Name("x"),
                                                         ctx: Load,
                                                     },
@@ -1037,26 +1060,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 492..512,
+                    range: 505..525,
                     value: Call(
                         ExprCall {
-                            range: 492..512,
+                            range: 505..525,
                             func: Name(
                                 ExprName {
-                                    range: 492..496,
+                                    range: 505..509,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 496..512,
+                                range: 509..525,
                                 args: [
                                     YieldFrom(
                                         ExprYieldFrom {
-                                            range: 498..510,
+                                            range: 511..523,
                                             value: Name(
                                                 ExprName {
-                                                    range: 509..510,
+                                                    range: 522..523,
                                                     id: Name("x"),
                                                     ctx: Load,
                                                 },
@@ -1072,33 +1095,33 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 533..545,
+                    range: 546..558,
                     value: Call(
                         ExprCall {
-                            range: 533..545,
+                            range: 546..558,
                             func: Name(
                                 ExprName {
-                                    range: 533..537,
+                                    range: 546..550,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 537..545,
+                                range: 550..558,
                                 args: [
                                     Named(
                                         ExprNamed {
-                                            range: 538..544,
+                                            range: 551..557,
                                             target: Name(
                                                 ExprName {
-                                                    range: 538..539,
+                                                    range: 551..552,
                                                     id: Name("x"),
                                                     ctx: Store,
                                                 },
                                             ),
                                             value: NumberLiteral(
                                                 ExprNumberLiteral {
-                                                    range: 543..544,
+                                                    range: 556..557,
                                                     value: Int(
                                                         1,
                                                     ),
@@ -1115,36 +1138,36 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 546..572,
+                    range: 559..585,
                     value: Call(
                         ExprCall {
-                            range: 546..572,
+                            range: 559..585,
                             func: Name(
                                 ExprName {
-                                    range: 546..550,
+                                    range: 559..563,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 550..572,
+                                range: 563..585,
                                 args: [
                                     Generator(
                                         ExprGenerator {
-                                            range: 551..571,
+                                            range: 564..584,
                                             elt: Named(
                                                 ExprNamed {
-                                                    range: 551..557,
+                                                    range: 564..570,
                                                     target: Name(
                                                         ExprName {
-                                                            range: 551..552,
+                                                            range: 564..565,
                                                             id: Name("x"),
                                                             ctx: Store,
                                                         },
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 556..557,
+                                                            range: 569..570,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -1154,17 +1177,17 @@ Module(
                                             ),
                                             generators: [
                                                 Comprehension {
-                                                    range: 558..571,
+                                                    range: 571..584,
                                                     target: Name(
                                                         ExprName {
-                                                            range: 562..563,
+                                                            range: 575..576,
                                                             id: Name("i"),
                                                             ctx: Store,
                                                         },
                                                     ),
                                                     iter: Name(
                                                         ExprName {
-                                                            range: 567..571,
+                                                            range: 580..584,
                                                             id: Name("iter"),
                                                             ctx: Load,
                                                         },
@@ -1185,38 +1208,38 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 596..610,
+                    range: 609..623,
                     value: Call(
                         ExprCall {
-                            range: 596..610,
+                            range: 609..623,
                             func: Name(
                                 ExprName {
-                                    range: 596..600,
+                                    range: 609..613,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 600..610,
+                                range: 613..623,
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            range: 601..609,
+                                            range: 614..622,
                                             value: BoolOp(
                                                 ExprBoolOp {
-                                                    range: 602..609,
+                                                    range: 615..622,
                                                     op: And,
                                                     values: [
                                                         Name(
                                                             ExprName {
-                                                                range: 602..603,
+                                                                range: 615..616,
                                                                 id: Name("x"),
                                                                 ctx: Load,
                                                             },
                                                         ),
                                                         Name(
                                                             ExprName {
-                                                                range: 608..609,
+                                                                range: 621..622,
                                                                 id: Name("y"),
                                                                 ctx: Load,
                                                             },
@@ -1236,29 +1259,29 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 611..623,
+                    range: 624..636,
                     value: Call(
                         ExprCall {
-                            range: 611..623,
+                            range: 624..636,
                             func: Name(
                                 ExprName {
-                                    range: 611..615,
+                                    range: 624..628,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 615..623,
+                                range: 628..636,
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            range: 616..622,
+                                            range: 629..635,
                                             value: BinOp(
                                                 ExprBinOp {
-                                                    range: 617..622,
+                                                    range: 630..635,
                                                     left: Name(
                                                         ExprName {
-                                                            range: 617..618,
+                                                            range: 630..631,
                                                             id: Name("x"),
                                                             ctx: Load,
                                                         },
@@ -1266,7 +1289,7 @@ Module(
                                                     op: BitOr,
                                                     right: Name(
                                                         ExprName {
-                                                            range: 621..622,
+                                                            range: 634..635,
                                                             id: Name("y"),
                                                             ctx: Load,
                                                         },
@@ -1283,81 +1306,104 @@ Module(
                     ),
                 },
             ),
-            Expr(
-                StmtExpr {
-                    range: 624..638,
-                    value: Call(
-                        ExprCall {
-                            range: 624..638,
-                            func: Name(
-                                ExprName {
-                                    range: 624..628,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 628..638,
-                                args: [
-                                    Starred(
-                                        ExprStarred {
-                                            range: 629..637,
-                                            value: Await(
-                                                ExprAwait {
-                                                    range: 630..637,
-                                                    value: Name(
-                                                        ExprName {
-                                                            range: 636..637,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                            ctx: Load,
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 637..664,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 641..646,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 646..648,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 650..664,
+                                value: Call(
+                                    ExprCall {
+                                        range: 650..664,
+                                        func: Name(
+                                            ExprName {
+                                                range: 650..654,
+                                                id: Name("call"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 654..664,
+                                            args: [
+                                                Starred(
+                                                    ExprStarred {
+                                                        range: 655..663,
+                                                        value: Await(
+                                                            ExprAwait {
+                                                                range: 656..663,
+                                                                value: Name(
+                                                                    ExprName {
+                                                                        range: 662..663,
+                                                                        id: Name("x"),
+                                                                        ctx: Load,
+                                                                    },
+                                                                ),
+                                                            },
+                                                        ),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            keywords: [],
                                         },
-                                    ),
-                                ],
-                                keywords: [],
+                                    },
+                                ),
                             },
-                        },
-                    ),
+                        ),
+                    ],
                 },
             ),
             Expr(
                 StmtExpr {
-                    range: 639..657,
+                    range: 665..683,
                     value: Call(
                         ExprCall {
-                            range: 639..657,
+                            range: 665..683,
                             func: Name(
                                 ExprName {
-                                    range: 639..643,
+                                    range: 665..669,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 643..657,
+                                range: 669..683,
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            range: 644..656,
+                                            range: 670..682,
                                             value: Lambda(
                                                 ExprLambda {
-                                                    range: 645..656,
+                                                    range: 671..682,
                                                     parameters: Some(
                                                         Parameters {
-                                                            range: 652..653,
+                                                            range: 678..679,
                                                             posonlyargs: [],
                                                             args: [
                                                                 ParameterWithDefault {
-                                                                    range: 652..653,
+                                                                    range: 678..679,
                                                                     parameter: Parameter {
-                                                                        range: 652..653,
+                                                                        range: 678..679,
                                                                         name: Identifier {
                                                                             id: Name("x"),
-                                                                            range: 652..653,
+                                                                            range: 678..679,
                                                                         },
                                                                         annotation: None,
                                                                     },
@@ -1371,7 +1417,7 @@ Module(
                                                     ),
                                                     body: Name(
                                                         ExprName {
-                                                            range: 655..656,
+                                                            range: 681..682,
                                                             id: Name("x"),
                                                             ctx: Load,
                                                         },
@@ -1390,42 +1436,42 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 658..681,
+                    range: 684..707,
                     value: Call(
                         ExprCall {
-                            range: 658..681,
+                            range: 684..707,
                             func: Name(
                                 ExprName {
-                                    range: 658..662,
+                                    range: 684..688,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 662..681,
+                                range: 688..707,
                                 args: [
                                     Starred(
                                         ExprStarred {
-                                            range: 663..680,
+                                            range: 689..706,
                                             value: If(
                                                 ExprIf {
-                                                    range: 664..680,
+                                                    range: 690..706,
                                                     test: BooleanLiteral(
                                                         ExprBooleanLiteral {
-                                                            range: 669..673,
+                                                            range: 695..699,
                                                             value: true,
                                                         },
                                                     ),
                                                     body: Name(
                                                         ExprName {
-                                                            range: 664..665,
+                                                            range: 690..691,
                                                             id: Name("x"),
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     orelse: Name(
                                                         ExprName {
-                                                            range: 679..680,
+                                                            range: 705..706,
                                                             id: Name("y"),
                                                             ctx: Load,
                                                         },
@@ -1444,27 +1490,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 700..709,
+                    range: 726..735,
                     value: Call(
                         ExprCall {
-                            range: 700..709,
+                            range: 726..735,
                             func: Name(
                                 ExprName {
-                                    range: 700..704,
+                                    range: 726..730,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 704..709,
+                                range: 730..735,
                                 args: [],
                                 keywords: [
                                     Keyword {
-                                        range: 705..708,
+                                        range: 731..734,
                                         arg: None,
                                         value: Name(
                                             ExprName {
-                                                range: 707..708,
+                                                range: 733..734,
                                                 id: Name("x"),
                                                 ctx: Load,
                                             },
@@ -1478,39 +1524,39 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 710..725,
+                    range: 736..751,
                     value: Call(
                         ExprCall {
-                            range: 710..725,
+                            range: 736..751,
                             func: Name(
                                 ExprName {
-                                    range: 710..714,
+                                    range: 736..740,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 714..725,
+                                range: 740..751,
                                 args: [],
                                 keywords: [
                                     Keyword {
-                                        range: 715..724,
+                                        range: 741..750,
                                         arg: None,
                                         value: BoolOp(
                                             ExprBoolOp {
-                                                range: 717..724,
+                                                range: 743..750,
                                                 op: And,
                                                 values: [
                                                     Name(
                                                         ExprName {
-                                                            range: 717..718,
+                                                            range: 743..744,
                                                             id: Name("x"),
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     Name(
                                                         ExprName {
-                                                            range: 723..724,
+                                                            range: 749..750,
                                                             id: Name("y"),
                                                             ctx: Load,
                                                         },
@@ -1525,84 +1571,107 @@ Module(
                     ),
                 },
             ),
-            Expr(
-                StmtExpr {
-                    range: 726..741,
-                    value: Call(
-                        ExprCall {
-                            range: 726..741,
-                            func: Name(
-                                ExprName {
-                                    range: 726..730,
-                                    id: Name("call"),
-                                    ctx: Load,
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 730..741,
-                                args: [],
-                                keywords: [
-                                    Keyword {
-                                        range: 731..740,
-                                        arg: None,
-                                        value: Await(
-                                            ExprAwait {
-                                                range: 733..740,
-                                                value: Name(
-                                                    ExprName {
-                                                        range: 739..740,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 752..780,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 756..761,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 761..763,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 765..780,
+                                value: Call(
+                                    ExprCall {
+                                        range: 765..780,
+                                        func: Name(
+                                            ExprName {
+                                                range: 765..769,
+                                                id: Name("call"),
+                                                ctx: Load,
                                             },
                                         ),
+                                        arguments: Arguments {
+                                            range: 769..780,
+                                            args: [],
+                                            keywords: [
+                                                Keyword {
+                                                    range: 770..779,
+                                                    arg: None,
+                                                    value: Await(
+                                                        ExprAwait {
+                                                            range: 772..779,
+                                                            value: Name(
+                                                                ExprName {
+                                                                    range: 778..779,
+                                                                    id: Name("x"),
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ],
+                                        },
                                     },
-                                ],
+                                ),
                             },
-                        },
-                    ),
+                        ),
+                    ],
                 },
             ),
             Expr(
                 StmtExpr {
-                    range: 742..766,
+                    range: 781..805,
                     value: Call(
                         ExprCall {
-                            range: 742..766,
+                            range: 781..805,
                             func: Name(
                                 ExprName {
-                                    range: 742..746,
+                                    range: 781..785,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 746..766,
+                                range: 785..805,
                                 args: [],
                                 keywords: [
                                     Keyword {
-                                        range: 747..765,
+                                        range: 786..804,
                                         arg: None,
                                         value: If(
                                             ExprIf {
-                                                range: 749..765,
+                                                range: 788..804,
                                                 test: BooleanLiteral(
                                                     ExprBooleanLiteral {
-                                                        range: 754..758,
+                                                        range: 793..797,
                                                         value: true,
                                                     },
                                                 ),
                                                 body: Name(
                                                     ExprName {
-                                                        range: 749..750,
+                                                        range: 788..789,
                                                         id: Name("x"),
                                                         ctx: Load,
                                                     },
                                                 ),
                                                 orelse: Name(
                                                     ExprName {
-                                                        range: 764..765,
+                                                        range: 803..804,
                                                         id: Name("y"),
                                                         ctx: Load,
                                                     },
@@ -1618,31 +1687,31 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 767..784,
+                    range: 806..823,
                     value: Call(
                         ExprCall {
-                            range: 767..784,
+                            range: 806..823,
                             func: Name(
                                 ExprName {
-                                    range: 767..771,
+                                    range: 806..810,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 771..784,
+                                range: 810..823,
                                 args: [],
                                 keywords: [
                                     Keyword {
-                                        range: 772..783,
+                                        range: 811..822,
                                         arg: None,
                                         value: Yield(
                                             ExprYield {
-                                                range: 775..782,
+                                                range: 814..821,
                                                 value: Some(
                                                     Name(
                                                         ExprName {
-                                                            range: 781..782,
+                                                            range: 820..821,
                                                             id: Name("x"),
                                                             ctx: Load,
                                                         },
@@ -1659,39 +1728,39 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 785..804,
+                    range: 824..843,
                     value: Call(
                         ExprCall {
-                            range: 785..804,
+                            range: 824..843,
                             func: Name(
                                 ExprName {
-                                    range: 785..789,
+                                    range: 824..828,
                                     id: Name("call"),
                                     ctx: Load,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 789..804,
+                                range: 828..843,
                                 args: [],
                                 keywords: [
                                     Keyword {
-                                        range: 790..803,
+                                        range: 829..842,
                                         arg: None,
                                         value: Lambda(
                                             ExprLambda {
-                                                range: 792..803,
+                                                range: 831..842,
                                                 parameters: Some(
                                                     Parameters {
-                                                        range: 799..800,
+                                                        range: 838..839,
                                                         posonlyargs: [],
                                                         args: [
                                                             ParameterWithDefault {
-                                                                range: 799..800,
+                                                                range: 838..839,
                                                                 parameter: Parameter {
-                                                                    range: 799..800,
+                                                                    range: 838..839,
                                                                     name: Identifier {
                                                                         id: Name("x"),
-                                                                        range: 799..800,
+                                                                        range: 838..839,
                                                                     },
                                                                     annotation: None,
                                                                 },
@@ -1705,7 +1774,7 @@ Module(
                                                 ),
                                                 body: Name(
                                                     ExprName {
-                                                        range: 802..803,
+                                                        range: 841..842,
                                                         id: Name("x"),
                                                         ctx: Load,
                                                     },

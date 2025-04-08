@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/for.py
 ```
 Module(
     ModModule {
-        range: 0..523,
+        range: 0..540,
         body: [
             For(
                 StmtFor {
@@ -419,70 +419,93 @@ Module(
                     orelse: [],
                 },
             ),
-            For(
-                StmtFor {
-                    range: 296..322,
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 296..339,
                     is_async: false,
-                    target: Name(
-                        ExprName {
-                            range: 300..306,
-                            id: Name("target"),
-                            ctx: Store,
-                        },
-                    ),
-                    iter: Await(
-                        ExprAwait {
-                            range: 310..317,
-                            value: Name(
-                                ExprName {
-                                    range: 316..317,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ),
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 300..305,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 305..307,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
                     body: [
-                        Expr(
-                            StmtExpr {
-                                range: 319..322,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 319..322,
+                        For(
+                            StmtFor {
+                                range: 313..339,
+                                is_async: false,
+                                target: Name(
+                                    ExprName {
+                                        range: 317..323,
+                                        id: Name("target"),
+                                        ctx: Store,
                                     },
                                 ),
+                                iter: Await(
+                                    ExprAwait {
+                                        range: 327..334,
+                                        value: Name(
+                                            ExprName {
+                                                range: 333..334,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 336..339,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 336..339,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                orelse: [],
                             },
                         ),
                     ],
-                    orelse: [],
                 },
             ),
             For(
                 StmtFor {
-                    range: 323..353,
+                    range: 340..370,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            range: 327..333,
+                            range: 344..350,
                             id: Name("target"),
                             ctx: Store,
                         },
                     ),
                     iter: Lambda(
                         ExprLambda {
-                            range: 337..348,
+                            range: 354..365,
                             parameters: Some(
                                 Parameters {
-                                    range: 344..345,
+                                    range: 361..362,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 344..345,
+                                            range: 361..362,
                                             parameter: Parameter {
-                                                range: 344..345,
+                                                range: 361..362,
                                                 name: Identifier {
                                                     id: Name("x"),
-                                                    range: 344..345,
+                                                    range: 361..362,
                                                 },
                                                 annotation: None,
                                             },
@@ -496,7 +519,7 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
-                                    range: 347..348,
+                                    range: 364..365,
                                     id: Name("x"),
                                     ctx: Load,
                                 },
@@ -506,10 +529,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 350..353,
+                                range: 367..370,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 350..353,
+                                        range: 367..370,
                                     },
                                 ),
                             },
@@ -520,34 +543,34 @@ Module(
             ),
             For(
                 StmtFor {
-                    range: 354..389,
+                    range: 371..406,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            range: 358..364,
+                            range: 375..381,
                             id: Name("target"),
                             ctx: Store,
                         },
                     ),
                     iter: If(
                         ExprIf {
-                            range: 368..384,
+                            range: 385..401,
                             test: BooleanLiteral(
                                 ExprBooleanLiteral {
-                                    range: 373..377,
+                                    range: 390..394,
                                     value: true,
                                 },
                             ),
                             body: Name(
                                 ExprName {
-                                    range: 368..369,
+                                    range: 385..386,
                                     id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
                             orelse: Name(
                                 ExprName {
-                                    range: 383..384,
+                                    range: 400..401,
                                     id: Name("y"),
                                     ctx: Load,
                                 },
@@ -557,10 +580,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 386..389,
+                                range: 403..406,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 386..389,
+                                        range: 403..406,
                                     },
                                 ),
                             },
@@ -571,10 +594,10 @@ Module(
             ),
             If(
                 StmtIf {
-                    range: 391..522,
+                    range: 408..539,
                     test: Name(
                         ExprName {
-                            range: 394..395,
+                            range: 411..412,
                             id: Name("x"),
                             ctx: Load,
                         },
@@ -582,18 +605,18 @@ Module(
                     body: [
                         For(
                             StmtFor {
-                                range: 401..433,
+                                range: 418..450,
                                 is_async: false,
                                 target: Name(
                                     ExprName {
-                                        range: 405..411,
+                                        range: 422..428,
                                         id: Name("target"),
                                         ctx: Store,
                                     },
                                 ),
                                 iter: Name(
                                     ExprName {
-                                        range: 415..419,
+                                        range: 432..436,
                                         id: Name("iter"),
                                         ctx: Load,
                                     },
@@ -601,7 +624,7 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            range: 429..433,
+                                            range: 446..450,
                                         },
                                     ),
                                 ],
@@ -611,12 +634,12 @@ Module(
                     ],
                     elif_else_clauses: [
                         ElifElseClause {
-                            range: 508..522,
+                            range: 525..539,
                             test: None,
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 518..522,
+                                        range: 535..539,
                                     },
                                 ),
                             ],

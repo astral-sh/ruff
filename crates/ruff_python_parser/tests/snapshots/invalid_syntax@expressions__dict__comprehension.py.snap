@@ -825,3 +825,24 @@ Module(
 17 | {x: y for x in data if lambda y: y}
    |                        ^^^^^^^^^^^ Syntax Error: Lambda expression cannot be used here
    |
+
+
+## Semantic Syntax Errors
+
+   |
+ 7 | # Invalid iter
+ 8 | {x: y for x in *y}
+ 9 | {x: y for x in yield y}
+   |                ^^^^^^^ Syntax Error: `yield` statement outside of a function
+10 | {x: y for x in yield from y}
+11 | {x: y for x in lambda y: y}
+   |
+
+
+   |
+ 8 | {x: y for x in *y}
+ 9 | {x: y for x in yield y}
+10 | {x: y for x in yield from y}
+   |                ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
+11 | {x: y for x in lambda y: y}
+   |

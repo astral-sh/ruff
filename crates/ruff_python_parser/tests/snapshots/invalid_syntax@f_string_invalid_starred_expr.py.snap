@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/f_string_invalid_starred_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -202,4 +201,14 @@ Module(
 3 | f"{*x and y}"
 4 | f"{*yield x}"
   |     ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+2 | f"{*}"
+3 | f"{*x and y}"
+4 | f"{*yield x}"
+  |     ^^^^^^^ Syntax Error: `yield` statement outside of a function
   |

@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/unary_op.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..276,
+        range: 0..297,
         body: [
             Expr(
                 StmtExpr {
@@ -208,88 +207,111 @@ Module(
                     ),
                 },
             ),
-            Expr(
-                StmtExpr {
-                    range: 84..93,
-                    value: UnaryOp(
-                        ExprUnaryOp {
-                            range: 84..93,
-                            op: USub,
-                            operand: Await(
-                                ExprAwait {
-                                    range: 86..93,
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            range: 92..93,
-                                            value: Int(
-                                                1,
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                        },
-                    ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 84..130,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 88..93,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 93..95,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 101..110,
+                                value: UnaryOp(
+                                    ExprUnaryOp {
+                                        range: 101..110,
+                                        op: USub,
+                                        operand: Await(
+                                            ExprAwait {
+                                                range: 103..110,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 109..110,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                range: 115..130,
+                                value: UnaryOp(
+                                    ExprUnaryOp {
+                                        range: 115..130,
+                                        op: UAdd,
+                                        operand: BinOp(
+                                            ExprBinOp {
+                                                range: 117..130,
+                                                left: Await(
+                                                    ExprAwait {
+                                                        range: 117..124,
+                                                        value: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 123..124,
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                                op: Pow,
+                                                right: UnaryOp(
+                                                    ExprUnaryOp {
+                                                        range: 128..130,
+                                                        op: USub,
+                                                        operand: NumberLiteral(
+                                                            ExprNumberLiteral {
+                                                                range: 129..130,
+                                                                value: Int(
+                                                                    2,
+                                                                ),
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
                 },
             ),
             Expr(
                 StmtExpr {
-                    range: 94..109,
+                    range: 131..138,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            range: 94..109,
-                            op: UAdd,
-                            operand: BinOp(
-                                ExprBinOp {
-                                    range: 96..109,
-                                    left: Await(
-                                        ExprAwait {
-                                            range: 96..103,
-                                            value: NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 102..103,
-                                                    value: Int(
-                                                        1,
-                                                    ),
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                    op: Pow,
-                                    right: UnaryOp(
-                                        ExprUnaryOp {
-                                            range: 107..109,
-                                            op: USub,
-                                            operand: NumberLiteral(
-                                                ExprNumberLiteral {
-                                                    range: 108..109,
-                                                    value: Int(
-                                                        2,
-                                                    ),
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                },
-                            ),
-                        },
-                    ),
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    range: 110..117,
-                    value: UnaryOp(
-                        ExprUnaryOp {
-                            range: 110..117,
+                            range: 131..138,
                             op: Invert,
                             operand: Tuple(
                                 ExprTuple {
-                                    range: 111..117,
+                                    range: 132..138,
                                     elts: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 112..113,
+                                                range: 133..134,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -297,7 +319,7 @@ Module(
                                         ),
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 115..116,
+                                                range: 136..137,
                                                 value: Int(
                                                     2,
                                                 ),
@@ -314,17 +336,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 118..124,
+                    range: 139..145,
                     value: BinOp(
                         ExprBinOp {
-                            range: 118..124,
+                            range: 139..145,
                             left: UnaryOp(
                                 ExprUnaryOp {
-                                    range: 118..120,
+                                    range: 139..141,
                                     op: USub,
                                     operand: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 119..120,
+                                            range: 140..141,
                                             value: Int(
                                                 1,
                                             ),
@@ -335,7 +357,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 123..124,
+                                    range: 144..145,
                                     value: Int(
                                         2,
                                     ),
@@ -347,24 +369,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 212..246,
+                    range: 233..267,
                     value: BoolOp(
                         ExprBoolOp {
-                            range: 212..246,
+                            range: 233..267,
                             op: Or,
                             values: [
                                 BoolOp(
                                     ExprBoolOp {
-                                        range: 212..223,
+                                        range: 233..244,
                                         op: And,
                                         values: [
                                             UnaryOp(
                                                 ExprUnaryOp {
-                                                    range: 212..217,
+                                                    range: 233..238,
                                                     op: Not,
                                                     operand: Name(
                                                         ExprName {
-                                                            range: 216..217,
+                                                            range: 237..238,
                                                             id: Name("a"),
                                                             ctx: Load,
                                                         },
@@ -373,7 +395,7 @@ Module(
                                             ),
                                             Name(
                                                 ExprName {
-                                                    range: 222..223,
+                                                    range: 243..244,
                                                     id: Name("b"),
                                                     ctx: Load,
                                                 },
@@ -383,19 +405,19 @@ Module(
                                 ),
                                 BoolOp(
                                     ExprBoolOp {
-                                        range: 227..246,
+                                        range: 248..267,
                                         op: And,
                                         values: [
                                             UnaryOp(
                                                 ExprUnaryOp {
-                                                    range: 227..236,
+                                                    range: 248..257,
                                                     op: Not,
                                                     operand: BinOp(
                                                         ExprBinOp {
-                                                            range: 231..236,
+                                                            range: 252..257,
                                                             left: Name(
                                                                 ExprName {
-                                                                    range: 231..232,
+                                                                    range: 252..253,
                                                                     id: Name("c"),
                                                                     ctx: Load,
                                                                 },
@@ -403,7 +425,7 @@ Module(
                                                             op: BitOr,
                                                             right: Name(
                                                                 ExprName {
-                                                                    range: 235..236,
+                                                                    range: 256..257,
                                                                     id: Name("d"),
                                                                     ctx: Load,
                                                                 },
@@ -414,11 +436,11 @@ Module(
                                             ),
                                             UnaryOp(
                                                 ExprUnaryOp {
-                                                    range: 241..246,
+                                                    range: 262..267,
                                                     op: Not,
                                                     operand: Name(
                                                         ExprName {
-                                                            range: 245..246,
+                                                            range: 266..267,
                                                             id: Name("e"),
                                                             ctx: Load,
                                                         },
@@ -435,24 +457,24 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 247..259,
+                    range: 268..280,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            range: 247..259,
+                            range: 268..280,
                             op: Not,
                             operand: Named(
                                 ExprNamed {
-                                    range: 252..258,
+                                    range: 273..279,
                                     target: Name(
                                         ExprName {
-                                            range: 252..253,
+                                            range: 273..274,
                                             id: Name("x"),
                                             ctx: Store,
                                         },
                                     ),
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 257..258,
+                                            range: 278..279,
                                             value: Int(
                                                 1,
                                             ),
@@ -466,17 +488,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 260..275,
+                    range: 281..296,
                     value: UnaryOp(
                         ExprUnaryOp {
-                            range: 260..275,
+                            range: 281..296,
                             op: Not,
                             operand: BinOp(
                                 ExprBinOp {
-                                    range: 264..275,
+                                    range: 285..296,
                                     left: Name(
                                         ExprName {
-                                            range: 264..265,
+                                            range: 285..286,
                                             id: Name("a"),
                                             ctx: Load,
                                         },
@@ -484,11 +506,11 @@ Module(
                                     op: BitOr,
                                     right: UnaryOp(
                                         ExprUnaryOp {
-                                            range: 269..274,
+                                            range: 290..295,
                                             op: Not,
                                             operand: Name(
                                                 ExprName {
-                                                    range: 273..274,
+                                                    range: 294..295,
                                                     id: Name("b"),
                                                     ctx: Load,
                                                 },

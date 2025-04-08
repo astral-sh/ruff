@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/while_stmt_invalid_test_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -189,4 +188,15 @@ Module(
 3 | while a, b: ...
 4 | while a := 1, b: ...
   |             ^ Syntax Error: Expected ':', found ','
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | while *x: ...
+2 | while yield x: ...
+  |       ^^^^^^^ Syntax Error: `yield` statement outside of a function
+3 | while a, b: ...
+4 | while a := 1, b: ...
   |

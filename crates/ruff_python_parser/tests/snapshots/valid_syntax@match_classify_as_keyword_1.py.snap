@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/match_classify_as_keyword_1.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..358,
+        range: 0..379,
         body: [
             Match(
                 StmtMatch {
@@ -458,74 +457,22 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    range: 284..318,
-                    subject: Await(
-                        ExprAwait {
-                            range: 290..301,
-                            value: Call(
-                                ExprCall {
-                                    range: 296..301,
-                                    func: Name(
-                                        ExprName {
-                                            range: 296..299,
-                                            id: Name("foo"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                    arguments: Arguments {
-                                        range: 299..301,
-                                        args: [],
-                                        keywords: [],
-                                    },
-                                },
-                            ),
-                        },
-                    ),
-                    cases: [
-                        MatchCase {
-                            range: 307..318,
-                            pattern: MatchAs(
-                                PatternMatchAs {
-                                    range: 312..313,
-                                    pattern: None,
-                                    name: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
-                                        range: 315..318,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                range: 315..318,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                    ],
-                },
-            ),
-            Match(
-                StmtMatch {
-                    range: 319..357,
+                    range: 284..322,
                     subject: Lambda(
                         ExprLambda {
-                            range: 325..340,
+                            range: 290..305,
                             parameters: Some(
                                 Parameters {
-                                    range: 332..335,
+                                    range: 297..300,
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
-                                            range: 332..335,
+                                            range: 297..300,
                                             parameter: Parameter {
-                                                range: 332..335,
+                                                range: 297..300,
                                                 name: Identifier {
                                                     id: Name("foo"),
-                                                    range: 332..335,
+                                                    range: 297..300,
                                                 },
                                                 annotation: None,
                                             },
@@ -539,7 +486,7 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
-                                    range: 337..340,
+                                    range: 302..305,
                                     id: Name("foo"),
                                     ctx: Load,
                                 },
@@ -548,10 +495,10 @@ Module(
                     ),
                     cases: [
                         MatchCase {
-                            range: 346..357,
+                            range: 311..322,
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 351..352,
+                                    range: 316..317,
                                     pattern: None,
                                     name: None,
                                 },
@@ -560,16 +507,91 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        range: 354..357,
+                                        range: 319..322,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                range: 354..357,
+                                                range: 319..322,
                                             },
                                         ),
                                     },
                                 ),
                             ],
                         },
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 323..378,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 327..332,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 332..334,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Match(
+                            StmtMatch {
+                                range: 340..378,
+                                subject: Await(
+                                    ExprAwait {
+                                        range: 346..357,
+                                        value: Call(
+                                            ExprCall {
+                                                range: 352..357,
+                                                func: Name(
+                                                    ExprName {
+                                                        range: 352..355,
+                                                        id: Name("foo"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                arguments: Arguments {
+                                                    range: 355..357,
+                                                    args: [],
+                                                    keywords: [],
+                                                },
+                                            },
+                                        ),
+                                    },
+                                ),
+                                cases: [
+                                    MatchCase {
+                                        range: 367..378,
+                                        pattern: MatchAs(
+                                            PatternMatchAs {
+                                                range: 372..373,
+                                                pattern: None,
+                                                name: None,
+                                            },
+                                        ),
+                                        guard: None,
+                                        body: [
+                                            Expr(
+                                                StmtExpr {
+                                                    range: 375..378,
+                                                    value: EllipsisLiteral(
+                                                        ExprEllipsisLiteral {
+                                                            range: 375..378,
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ],
+                            },
+                        ),
                     ],
                 },
             ),

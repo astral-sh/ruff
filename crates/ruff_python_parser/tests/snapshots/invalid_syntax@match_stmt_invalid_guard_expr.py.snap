@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/match_stmt_invalid_guard_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -209,4 +208,14 @@ Module(
 5 | match x:
 6 |     case y if yield x: ...
   |               ^^^^^^^ Syntax Error: Yield expression cannot be used here
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+4 |     case y if (*a): ...
+5 | match x:
+6 |     case y if yield x: ...
+  |               ^^^^^^^ Syntax Error: `yield` statement outside of a function
   |

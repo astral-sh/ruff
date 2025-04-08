@@ -328,8 +328,27 @@ Module(
   |
 1 | type X[**P = *int] = int
 2 | type X[**P = yield x] = int
+  |              ^^^^^^^ Syntax Error: `yield` statement outside of a function
+3 | type X[**P = yield from x] = int
+4 | type X[**P = x := int] = int
+  |
+
+
+  |
+1 | type X[**P = *int] = int
+2 | type X[**P = yield x] = int
 3 | type X[**P = yield from x] = int
   |              ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a ParamSpec default
+4 | type X[**P = x := int] = int
+5 | type X[**P = *int] = int
+  |
+
+
+  |
+1 | type X[**P = *int] = int
+2 | type X[**P = yield x] = int
+3 | type X[**P = yield from x] = int
+  |              ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
 4 | type X[**P = x := int] = int
 5 | type X[**P = *int] = int
   |

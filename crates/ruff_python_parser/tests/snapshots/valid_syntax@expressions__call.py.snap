@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/call.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..349,
+        range: 0..362,
         body: [
             Expr(
                 StmtExpr {
@@ -414,49 +413,72 @@ Module(
                     ),
                 },
             ),
-            Expr(
-                StmtExpr {
-                    range: 234..245,
-                    value: Call(
-                        ExprCall {
-                            range: 234..245,
-                            func: Yield(
-                                ExprYield {
-                                    range: 235..242,
-                                    value: Some(
-                                        Name(
-                                            ExprName {
-                                                range: 241..242,
-                                                id: Name("x"),
-                                                ctx: Load,
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 234..258,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 238..243,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 243..245,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 247..258,
+                                value: Call(
+                                    ExprCall {
+                                        range: 247..258,
+                                        func: Yield(
+                                            ExprYield {
+                                                range: 248..255,
+                                                value: Some(
+                                                    Name(
+                                                        ExprName {
+                                                            range: 254..255,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ),
                                             },
                                         ),
-                                    ),
-                                },
-                            ),
-                            arguments: Arguments {
-                                range: 243..245,
-                                args: [],
-                                keywords: [],
+                                        arguments: Arguments {
+                                            range: 256..258,
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
                             },
-                        },
-                    ),
+                        ),
+                    ],
                 },
             ),
             Expr(
                 StmtExpr {
-                    range: 306..312,
+                    range: 319..325,
                     value: Call(
                         ExprCall {
-                            range: 306..312,
+                            range: 319..325,
                             func: BooleanLiteral(
                                 ExprBooleanLiteral {
-                                    range: 306..310,
+                                    range: 319..323,
                                     value: true,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 310..312,
+                                range: 323..325,
                                 args: [],
                                 keywords: [],
                             },
@@ -466,18 +488,18 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 313..320,
+                    range: 326..333,
                     value: Call(
                         ExprCall {
-                            range: 313..320,
+                            range: 326..333,
                             func: BooleanLiteral(
                                 ExprBooleanLiteral {
-                                    range: 313..318,
+                                    range: 326..331,
                                     value: false,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 318..320,
+                                range: 331..333,
                                 args: [],
                                 keywords: [],
                             },
@@ -487,17 +509,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 321..327,
+                    range: 334..340,
                     value: Call(
                         ExprCall {
-                            range: 321..327,
+                            range: 334..340,
                             func: NoneLiteral(
                                 ExprNoneLiteral {
-                                    range: 321..325,
+                                    range: 334..338,
                                 },
                             ),
                             arguments: Arguments {
-                                range: 325..327,
+                                range: 338..340,
                                 args: [],
                                 keywords: [],
                             },
@@ -507,17 +529,17 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 328..338,
+                    range: 341..351,
                     value: Call(
                         ExprCall {
-                            range: 328..338,
+                            range: 341..351,
                             func: StringLiteral(
                                 ExprStringLiteral {
-                                    range: 328..336,
+                                    range: 341..349,
                                     value: StringLiteralValue {
                                         inner: Single(
                                             StringLiteral {
-                                                range: 328..336,
+                                                range: 341..349,
                                                 value: "string",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Double,
@@ -530,7 +552,7 @@ Module(
                                 },
                             ),
                             arguments: Arguments {
-                                range: 336..338,
+                                range: 349..351,
                                 args: [],
                                 keywords: [],
                             },
@@ -540,20 +562,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 339..342,
+                    range: 352..355,
                     value: Call(
                         ExprCall {
-                            range: 339..342,
+                            range: 352..355,
                             func: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 339..340,
+                                    range: 352..353,
                                     value: Int(
                                         1,
                                     ),
                                 },
                             ),
                             arguments: Arguments {
-                                range: 340..342,
+                                range: 353..355,
                                 args: [],
                                 keywords: [],
                             },
@@ -563,20 +585,20 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 343..348,
+                    range: 356..361,
                     value: Call(
                         ExprCall {
-                            range: 343..348,
+                            range: 356..361,
                             func: NumberLiteral(
                                 ExprNumberLiteral {
-                                    range: 343..346,
+                                    range: 356..359,
                                     value: Float(
                                         1.0,
                                     ),
                                 },
                             ),
                             arguments: Arguments {
-                                range: 346..348,
+                                range: 359..361,
                                 args: [],
                                 keywords: [],
                             },

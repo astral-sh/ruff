@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/assert_invalid_test_expr.py
-snapshot_kind: text
 ---
 ## AST
 
@@ -146,4 +145,15 @@ Module(
 3 | assert yield x
 4 | assert x := 1
   |          ^^ Syntax Error: Expected a statement
+  |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | assert *x
+2 | assert assert x
+3 | assert yield x
+  |        ^^^^^^^ Syntax Error: `yield` statement outside of a function
+4 | assert x := 1
   |
