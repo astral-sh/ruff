@@ -3710,6 +3710,9 @@ impl<'db> Type<'db> {
                 Some(KnownClass::GenericAlias) => Ok(todo_type!(
                     "Support for `typing.GenericAlias` instances in type expressions"
                 )),
+                Some(KnownClass::UnionType) => Ok(todo_type!(
+                    "Support for `types.UnionType` instances in type expressions"
+                )),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
                         *self
