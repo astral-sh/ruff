@@ -42,7 +42,7 @@ impl<'db> Unpacker<'db> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type = infer_expression_types(self.db(), value.expression())
+        let value_type = infer_expression_types(self.db(), value.expression(), None)
             .expression_type(value.scoped_expression_id(self.db(), self.scope));
 
         let value_type = match value.kind() {

@@ -396,7 +396,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             return None;
         }
         let scope = self.scope();
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, None);
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
@@ -512,7 +512,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let scope = self.scope();
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, None);
 
         let callable_ty =
             inference.expression_type(expr_call.func.scoped_expression_id(self.db, scope));
@@ -617,7 +617,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         expression: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.db, expression);
+        let inference = infer_expression_types(self.db, expression, None);
         let scope = self.scope();
         let mut sub_constraints = expr_bool_op
             .values

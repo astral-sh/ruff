@@ -10,6 +10,7 @@ use super::{
     InferContext, Signature, Signatures, Type,
 };
 use crate::db::Db;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
@@ -93,12 +94,13 @@ impl<'db> Bindings<'db> {
         mut self,
         db: &'db dyn Db,
         argument_types: &mut CallArgumentTypes<'_, 'db>,
+        containing_assignment: Option<Definition<'db>>,
     ) -> Result<Self, CallError<'db>> {
         for (signature, element) in self.signatures.iter().zip(&mut self.elements) {
             element.check_types(db, signature, argument_types);
         }
 
-        self.evaluate_known_cases(db, argument_types);
+        self.evaluate_known_cases(db, argument_types, containing_assignment);
 
         // In order of precedence:
         //
@@ -206,6 +208,7 @@ impl<'db> Bindings<'db> {
         &mut self,
         db: &'db dyn Db,
         argument_types: &CallArgumentTypes<'_, 'db>,
+        containing_assignment: Option<Definition<'db>>,
     ) {
         // Each special case listed here should have a corresponding clause in `Type::signatures`.
         for binding in &mut self.elements {
@@ -593,19 +596,26 @@ impl<'db> Bindings<'db> {
                     }
 
                     Some(KnownClass::TypeVar) => {
-                        let [Some(name), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
+                        let Some(containing_assignment) = containing_assignment else {
+                            // TODO: Raise a diagnostic if TypeVar is called without being
+                            // immediately assigned to local variable.
+                            continue;
+                        };
+
+                        let [Some(_name), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
                             overload.parameter_types()
                         else {
                             continue;
                         };
 
-                        // TODO: TypeVar can only be called when the result is immediately
-                        // assigned to a variable. Ideally we would use the `name` from the
-                        // lvalue of this assignment instead of constructing a new one.
-                        let Some(name) = name.into_string_literal() else {
-                            continue;
+                        // TypeVar can only be called when the result is immediately assigned to a
+                        // variable. Reuse the name that is being assigned to.
+                        // TODO: Raise a diagnostic if the name parameter doesn't match the name
+                        // being assigned to.
+                        let name = match containing_assignment.kind(db) {
+                            DefinitionKind::Assignment(assignment) => assignment.name().id.clone(),
+                            _ => continue,
                         };
-                        let name = ast::name::Name::new(name.value(db));
 
                         let bound_or_constraint = match (bound, constraints) {
                             (Some(bound), None) => {
@@ -637,7 +647,13 @@ impl<'db> Bindings<'db> {
                         };
 
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
-                            TypeVarInstance::new(db, name, bound_or_constraint, *default),
+                            TypeVarInstance::new(
+                                db,
+                                name,
+                                containing_assignment,
+                                bound_or_constraint,
+                                *default,
+                            ),
                         )));
                     }
 
