@@ -1389,6 +1389,14 @@ where
                     //         a = 1
                     //     else:
                     //         global a
+
+                    // test_ok global_in_nested_function
+                    // try: ...
+                    // except ImportError:
+                    //     x = 1
+                    //     def f():
+                    //         global x
+                    //         x = 2
                     SemanticSyntaxChecker::add_error(
                         self.ctx,
                         SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
