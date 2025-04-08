@@ -173,7 +173,8 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
     if is_pytest_raises(&call.func, checker.semantic()) {
         if checker.enabled(Rule::PytestRaisesWithoutException) {
-            if call.arguments.is_empty() {
+            // positional only `expected_exception` argument
+            if call.arguments.find_positional(0).is_none() {
                 checker.report_diagnostic(Diagnostic::new(
                     PytestRaisesWithoutException,
                     call.func.range(),
@@ -182,7 +183,13 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
         }
 
         if checker.enabled(Rule::PytestRaisesTooBroad) {
-            if call.arguments.find_positional(1).is_none() {
+            // Pytest.raises has two overloads
+            // ```py
+            // with raises(expected_exception: type[E] | tuple[type[E], ...], *, match: str | Pattern[str] | None = ...) → RaisesContext[E] as excinfo
+            // with raises(expected_exception: type[E] | tuple[type[E], ...], func: Callable[[...], Any], *args: Any, **kwargs: Any) → ExceptionInfo[E] as excinfo
+            // ```
+            // Don't raise this diagnostic if the call matches the second overload (has a second positional argument or an argument named `func`)
+            if call.arguments.find_argument("func", 1).is_none() {
                 if let Some(exception) = call.arguments.find_argument_value("expected_exception", 0)
                 {
                     if call
