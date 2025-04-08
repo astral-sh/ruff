@@ -518,7 +518,7 @@ impl<'db> Bindings<'db> {
                     }
 
                     Some(KnownFunction::Overload) => {
-                        overload.set_return_type(todo_type!("overload(..) return type"));
+                        overload.set_return_type(todo_type!("overload[..] return type"));
                     }
 
                     Some(KnownFunction::GetattrStatic) => {
