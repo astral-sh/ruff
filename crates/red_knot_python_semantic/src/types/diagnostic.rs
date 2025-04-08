@@ -37,6 +37,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_RAISE);
+    registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
@@ -437,6 +438,40 @@ declare_lint! {
     /// - [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)
     pub(crate) static INVALID_RAISE = {
         summary: "detects `raise` statements that raise invalid exceptions or use invalid causes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects `super()` calls where the second argument is not a instance or subclass
+    /// of the first argument.
+    ///
+    /// ## Why is this bad?
+    /// `super(type, obj)` expects its second argument to satisfy one of the following:
+    /// - `isinstance(obj, type) is True`
+    /// - `issubclass(obj, type) is True`
+    ///
+    /// Violating this relationship will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A:
+    ///     ...
+    /// class B(A):
+    ///     ...
+    ///
+    /// super(A, B())  # it's okay! `A` satisfies `isinstance(B(), A)`
+    ///
+    /// super(B, A())  # error: `A()` does not satisfy `isinstance(A(), B)`
+    /// super(B, A)  # error: `A` does not satisfy `issubclass(A, B)`
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+    pub(crate) static INVALID_SUPER_ARGUMENT = {
+        summary: "detects invalid arguments for super()",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1115,6 +1150,23 @@ pub(super) fn report_implicit_return_type(
         format_args!(
             "Function can implicitly return `None`, which is not assignable to return type `{}`",
             expected_ty.display(context.db())
+        ),
+    );
+}
+
+pub(super) fn report_invalid_super_argument(
+    context: &InferContext,
+    node: AnyNodeRef,
+    pivot_ty: Type,
+    owner_ty: Type,
+) {
+    context.report_lint(
+        &INVALID_SUPER_ARGUMENT,
+        node,
+        format_args!(
+            "Second argument `{}` is not an instance or subclass of `{}` in `super()` call",
+            owner_ty.display(context.db()),
+            pivot_ty.display(context.db())
         ),
     );
 }

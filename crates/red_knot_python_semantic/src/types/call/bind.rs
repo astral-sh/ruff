@@ -18,9 +18,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    todo_type, BoundMethodType, BoundSuperType, ClassLiteralType, FunctionDecorators, KnownClass,
-    KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType,
-    WrapperDescriptorKind,
+    todo_type, BoundMethodType, ClassLiteralType, FunctionDecorators, KnownClass, KnownFunction,
+    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
@@ -585,15 +584,6 @@ impl<'db> Bindings<'db> {
                     Some(KnownClass::Type) if overload_index == 0 => {
                         if let [Some(arg)] = overload.parameter_types() {
                             overload.set_return_type(arg.to_meta_type(db));
-                        }
-                    }
-
-                    // def __init__(self, t: Any, obj: Any, /) -> None: ...
-                    Some(KnownClass::Super) if overload_index == 0 => {
-                        if let [Some(Type::ClassLiteral(ClassLiteralType { class: t })), Some(obj)] =
-                            overload.parameter_types()
-                        {
-                            overload.set_return_type(BoundSuperType::build(db, *t, *obj));
                         }
                     }
 

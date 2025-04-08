@@ -64,24 +64,24 @@ current method’s first parameter (typically `self` or `cls`).
 
 ```py
 from __future__ import annotations
-from knot_extensions import TypeOf
 
 class A:
     def __init__(self, a: int): ...
     @classmethod
     def f(cls): ...
 
-# TODO: This should work the same even without explicitly annotating `self`.
 class B(A):
-    def __init__(self: B, a: int):
-        reveal_type(super())  # revealed: <super: Literal[B], B>
-        reveal_type(super().__init__)  # revealed: <bound method `__init__` of `B`>
+    def __init__(self, a: int):
+        reveal_type(super())  # revealed: <super: Literal[B], Unknown>
+        # TODO: Once `Self` is supported, this should be `<bound method `__init__` of `B`>`
+        reveal_type(super().__init__)  # revealed: Unknown
         super().__init__(a)
 
     @classmethod
-    def f(cls: TypeOf[B]):
-        reveal_type(super())  # revealed: <super: Literal[B], Literal[B]>
-        reveal_type(super().f)  # revealed: <bound method `f` of `Literal[B]`>
+    def f(cls):
+        reveal_type(super())  # revealed: <super: Literal[B], Unknown>
+        # TODO: Once `Self` is supported, this should be `<bound method `f` of `Literal[B]`>`
+        reveal_type(super().f)  # revealed: Unknown
         super().f()
 ```
 
@@ -102,18 +102,23 @@ class B(A):
     b: int = 2
 
 reveal_type(super(B))  # revealed: super
-super(B).a  # error: [unresolved-attribute] "Type `super` has no attribute `a`"
-super(B).b  # error: [unresolved-attribute] "Type `super` has no attribute `b`"
 ```
 
-#### Dynamic Types
+## Dynamic Types
 
 ```py
+class A:
+    a: int = 1
+
 def f(x):
     reveal_type(x)  # revealed: Unknown
-    reveal_type(super(x, x))  # revealed: super
-    reveal_type(super(int, x))  # revealed: super
-    super(x, x).x  # error: [unresolved-attribute] "Type `super` has no attribute `x`"
+    reveal_type(super(x, x))  # revealed: <super: Unknown, Unknown>
+    reveal_type(super(int, x))  # revealed: <super: Literal[int], Unknown>
+    reveal_type(super(x, int()))  # revealed: <super: Unknown, int>
+
+    reveal_type(super(x, x).a)  # revealed: Unknown
+    reveal_type(super(A, x).a)  # revealed: Unknown
+    reveal_type(super(x, A()).a)  # revealed: int
 ```
 
 ## Implicit Bound Super in Complex Structure
@@ -121,22 +126,21 @@ def f(x):
 ```py
 from __future__ import annotations
 
-# TODO: This should work the same even without explicitly annotating `self`.
 class A:
-    def test(self: A):
-        reveal_type(super())  # revealed: <super: Literal[A], A>
+    def test(self):
+        reveal_type(super())  # revealed: <super: Literal[A], Unknown>
 
     class B:
-        def test(self: A.B):
-            reveal_type(super())  # revealed: <super: Literal[B], B>
+        def test(self):
+            reveal_type(super())  # revealed: <super: Literal[B], Unknown>
 
             class C(A.B):
-                def test(self: C):
-                    reveal_type(super())  # revealed: <super: Literal[C], C>
+                def test(self):
+                    reveal_type(super())  # revealed: <super: Literal[C], Unknown>
 
             def inner(t: C):
                 reveal_type(super())  # revealed: <super: Literal[B], C>
-            lambda x: reveal_type(super())  # revealed: super
+            lambda x: reveal_type(super())  # revealed: <super: Literal[B], Unknown>
 ```
 
 ## Built-ins and Literals
@@ -199,21 +203,26 @@ class A:
 
 ### Failing Condition Checks
 
-TODO: Proper diagnostics should be provided in these cases.
-
 ```py
 # does not satisfy `isinstance(str(), int)`
+# error: [invalid-super-argument] "Second argument `Literal[""]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[""])` call"
 reveal_type(super(int, str()))  # revealed: Unknown
+
 # does not satisfy `issubclass(str, int)`
+# error: [invalid-super-argument] "Second argument `Literal[str]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[str])` call"
 reveal_type(super(int, str))  # revealed: Unknown
 
 class A: ...
 class B(A): ...
 
+# error: [invalid-super-argument] "Second argument `A` is not an instance or subclass of `Literal[B]` in `super(Literal[B], A)` call"
 reveal_type(super(B, A()))  # revealed: Unknown
+# error: [invalid-super-argument] "Second argument `object` is not an instance or subclass of `Literal[B]` in `super(Literal[B], object)` call"
 reveal_type(super(B, object()))  # revealed: Unknown
 
+# error: [invalid-super-argument] "Second argument `Literal[A]` is not an instance or subclass of `Literal[B]` in `super(Literal[B], Literal[A])` call"
 reveal_type(super(B, A))  # revealed: Unknown
+# error: [invalid-super-argument] "Second argument `Literal[object]` is not an instance or subclass of `Literal[B]` in `super(Literal[B], Literal[object])` call"
 reveal_type(super(B, object))  # revealed: Unknown
 ```
 
@@ -226,11 +235,10 @@ class A:
     def __init__(self, a: int):
         self.a = a
 
-# TODO: This should work the same even without explicitly annotating `self`.
 class B(A):
-    def __init__(self: B, a: int):
+    def __init__(self, a: int):
         super().__init__(a)
-        # error: [unresolved-attribute] "Type `<super: Literal[B], B>` has no attribute `a`"
+        # TODO: it should occur `unresolved-attribute` error
         super().a
 ```
 
