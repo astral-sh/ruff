@@ -165,8 +165,8 @@ pub(crate) type LookupResult<'db> = Result<TypeAndQualifiers<'db>, LookupError<'
 /// `scope`.
 pub(crate) fn symbol<'db>(
     db: &'db dyn Db,
-    scope: ScopeId<'db>,
     name: &str,
+    scope: ScopeId<'db>,
 ) -> SymbolAndQualifiers<'db> {
     symbol_impl(db, scope, name, RequiresExplicitReExport::No)
 }
@@ -175,8 +175,8 @@ pub(crate) fn symbol<'db>(
 /// `scope`.
 pub(crate) fn class_symbol<'db>(
     db: &'db dyn Db,
-    scope: ScopeId<'db>,
     name: &str,
+    scope: ScopeId<'db>,
 ) -> SymbolAndQualifiers<'db> {
     symbol_table(db, scope)
         .symbol_id_by_name(name)
@@ -356,8 +356,8 @@ fn core_module_scope(db: &dyn Db, core_module: KnownModule) -> Option<ScopeId<'_
 /// The type will be a union if there are multiple bindings with different types.
 pub(super) fn symbol_from_bindings<'db>(
     db: &'db dyn Db,
-    scope: ScopeId<'db>,
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    scope: ScopeId<'db>,
 ) -> Symbol<'db> {
     symbol_from_bindings_impl(
         db,
