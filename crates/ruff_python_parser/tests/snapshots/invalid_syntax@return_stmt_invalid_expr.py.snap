@@ -194,10 +194,37 @@ Module(
 
   |
 1 | return *
+  | ^^^^^^^^ Syntax Error: `return` statement outside of a function
+2 | return yield x
+3 | return yield from x
+  |
+
+
+  |
+1 | return *
+2 | return yield x
+  | ^^^^^^^^^^^^^^ Syntax Error: `return` statement outside of a function
+3 | return yield from x
+4 | return x := 1
+  |
+
+
+  |
+1 | return *
 2 | return yield x
   |        ^^^^^^^ Syntax Error: `yield` statement outside of a function
 3 | return yield from x
 4 | return x := 1
+  |
+
+
+  |
+1 | return *
+2 | return yield x
+3 | return yield from x
+  | ^^^^^^^^^^^^^^^^^^^ Syntax Error: `return` statement outside of a function
+4 | return x := 1
+5 | return *x and y
   |
 
 
@@ -212,8 +239,25 @@ Module(
 
 
   |
+2 | return yield x
+3 | return yield from x
+4 | return x := 1
+  | ^^^^^^^^ Syntax Error: `return` statement outside of a function
+5 | return *x and y
+  |
+
+
+  |
 3 | return yield from x
 4 | return x := 1
 5 | return *x and y
   |        ^^^^^^^^ Syntax Error: can't use starred expression here
+  |
+
+
+  |
+3 | return yield from x
+4 | return x := 1
+5 | return *x and y
+  | ^^^^^^^^^^^^^^^ Syntax Error: `return` statement outside of a function
   |
