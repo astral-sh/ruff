@@ -100,7 +100,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::CallDunderError;
+use super::{CallDunderError, ClassLiteralType};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -2380,10 +2380,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::WrapperDescriptor(_)
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => match object_ty.class_member(db, attribute.into()) {
-                meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
-                    if emit_diagnostics {
-                        self.context.report_lint(
+            | Type::AlwaysFalsy => {
+                match object_ty.class_member(db, attribute.into()) {
+                    meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
+                        if emit_diagnostics {
+                            self.context.report_lint(
                                 &INVALID_ATTRIBUTE_ACCESS,
                                 target,
                                 format_args!(
@@ -2391,26 +2392,30 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     ty = object_ty.display(self.db()),
                                 ),
                             );
+                        }
+                        false
                     }
-                    false
-                }
-                SymbolAndQualifiers {
-                    symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
-                    qualifiers: _,
-                } => {
-                    let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
-                        meta_attr_ty.class_member(db, "__set__".into()).symbol
-                    {
-                        let successful_call = meta_dunder_set
-                            .try_call(
-                                db,
-                                CallArgumentTypes::positional([meta_attr_ty, object_ty, value_ty]),
-                            )
-                            .is_ok();
+                    SymbolAndQualifiers {
+                        symbol: Symbol::Type(meta_attr_ty, meta_attr_boundness),
+                        qualifiers: _,
+                    } => {
+                        let assignable_to_meta_attr = if let Symbol::Type(meta_dunder_set, _) =
+                            meta_attr_ty.class_member(db, "__set__".into()).symbol
+                        {
+                            let successful_call = meta_dunder_set
+                                .try_call(
+                                    db,
+                                    CallArgumentTypes::positional([
+                                        meta_attr_ty,
+                                        object_ty,
+                                        value_ty,
+                                    ]),
+                                )
+                                .is_ok();
 
-                        if !successful_call && emit_diagnostics {
-                            // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                            self.context.report_lint(
+                            if !successful_call && emit_diagnostics {
+                                // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
+                                self.context.report_lint(
                                 &INVALID_ASSIGNMENT,
                                 target,
                                 format_args!(
@@ -2418,15 +2423,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     object_ty.display(db)
                                 ),
                             );
-                        }
+                            }
 
-                        successful_call
-                    } else {
-                        ensure_assignable_to(meta_attr_ty)
-                    };
+                            successful_call
+                        } else {
+                            ensure_assignable_to(meta_attr_ty)
+                        };
 
-                    let assignable_to_instance_attribute =
-                        if meta_attr_boundness == Boundness::PossiblyUnbound {
+                        let assignable_to_instance_attribute = if meta_attr_boundness
+                            == Boundness::PossiblyUnbound
+                        {
                             let (assignable, boundness) =
                                 if let Symbol::Type(instance_attr_ty, instance_attr_boundness) =
                                     object_ty.instance_member(db, attribute).symbol
@@ -2453,43 +2459,44 @@ impl<'db> TypeInferenceBuilder<'db> {
                             true
                         };
 
-                    assignable_to_meta_attr && assignable_to_instance_attribute
-                }
+                        assignable_to_meta_attr && assignable_to_instance_attribute
+                    }
 
-                SymbolAndQualifiers {
-                    symbol: Symbol::Unbound,
-                    ..
-                } => {
-                    if let Symbol::Type(instance_attr_ty, instance_attr_boundness) =
-                        object_ty.instance_member(db, attribute).symbol
-                    {
-                        if instance_attr_boundness == Boundness::PossiblyUnbound {
-                            report_possibly_unbound_attribute(
-                                &self.context,
-                                target,
-                                attribute,
-                                object_ty,
-                            );
-                        }
-
-                        ensure_assignable_to(instance_attr_ty)
-                    } else {
-                        if emit_diagnostics {
-                            self.context.report_lint(
-                                &UNRESOLVED_ATTRIBUTE,
-                                target,
-                                format_args!(
-                                    "Unresolved attribute `{}` on type `{}`.",
+                    SymbolAndQualifiers {
+                        symbol: Symbol::Unbound,
+                        ..
+                    } => {
+                        if let Symbol::Type(instance_attr_ty, instance_attr_boundness) =
+                            object_ty.instance_member(db, attribute).symbol
+                        {
+                            if instance_attr_boundness == Boundness::PossiblyUnbound {
+                                report_possibly_unbound_attribute(
+                                    &self.context,
+                                    target,
                                     attribute,
-                                    object_ty.display(db)
-                                ),
-                            );
-                        }
+                                    object_ty,
+                                );
+                            }
 
-                        false
+                            ensure_assignable_to(instance_attr_ty)
+                        } else {
+                            if emit_diagnostics {
+                                self.context.report_lint(
+                                    &UNRESOLVED_ATTRIBUTE,
+                                    target,
+                                    format_args!(
+                                        "Unresolved attribute `{}` on type `{}`.",
+                                        attribute,
+                                        object_ty.display(db)
+                                    ),
+                                );
+                            }
+
+                            false
+                        }
                     }
                 }
-            },
+            }
 
             Type::ClassLiteral(..) | Type::SubclassOf(..) => {
                 match object_ty.class_member(db, attribute.into()) {
@@ -3970,8 +3977,48 @@ impl<'db> TypeInferenceBuilder<'db> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments = Self::parse_arguments(arguments);
-        let function_type = self.infer_expression(func);
-        let signatures = function_type.signatures(self.db());
+        let callable_type = self.infer_expression(func);
+
+        // For class literals we model the entire class instantiation logic, so it is handled
+        // in a separate function.
+        let class = match callable_type {
+            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+                ClassBase::Dynamic(_) => None,
+                ClassBase::Class(class) => Some(class),
+            },
+            Type::ClassLiteral(ClassLiteralType { class }) => Some(class),
+            _ => None,
+        };
+
+        if class.is_some_and(|class| {
+            // For some known classes we have manual signatures defined and use the `try_call` path
+            // below. TODO: it should be possible to move these special cases into the
+            // `try_call_constructor` path instead, or even remove some entirely once we support
+            // overloads fully.
+            class.known(self.db()).is_none_or(|class| {
+                !matches!(
+                    class,
+                    KnownClass::Bool
+                        | KnownClass::Str
+                        | KnownClass::Type
+                        | KnownClass::Object
+                        | KnownClass::Property
+                )
+            })
+        }) {
+            let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
+            let call_argument_types =
+                self.infer_argument_types(arguments, call_arguments, &argument_forms);
+
+            return callable_type
+                .try_call_constructor(self.db(), call_argument_types)
+                .unwrap_or_else(|err| {
+                    err.report_diagnostic(&self.context, callable_type, call_expression.into());
+                    err.return_type()
+                });
+        }
+
+        let signatures = callable_type.signatures(self.db());
         let bindings = Bindings::match_parameters(signatures, &mut call_arguments);
         let mut call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
