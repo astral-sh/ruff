@@ -593,15 +593,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.configuration
-        ["airflow", "configuration", rest @ ..] => match &rest {
-            ["get"] => Replacement::Name("airflow.configuration.conf.get"),
-            ["getboolean"] => Replacement::Name("airflow.configuration.conf.getboolean"),
-            ["getfloat"] => Replacement::Name("airflow.configuration.conf.getfloat"),
-            ["getint"] => Replacement::Name("airflow.configuration.conf.getint"),
-            ["has_option"] => Replacement::Name("airflow.configuration.conf.has_option"),
-            ["remove_option"] => Replacement::Name("airflow.configuration.conf.remove_option"),
-            ["as_dict"] => Replacement::Name("airflow.configuration.conf.as_dict"),
-            ["set"] => Replacement::Name("airflow.configuration.conf.set"),
+        ["airflow", "configuration", rest] => match *rest {
+            "get" => Replacement::Name("airflow.configuration.conf.get"),
+            "getboolean" => Replacement::Name("airflow.configuration.conf.getboolean"),
+            "getfloat" => Replacement::Name("airflow.configuration.conf.getfloat"),
+            "getint" => Replacement::Name("airflow.configuration.conf.getint"),
+            "has_option" => Replacement::Name("airflow.configuration.conf.has_option"),
+            "remove_option" => Replacement::Name("airflow.configuration.conf.remove_option"),
+            "as_dict" => Replacement::Name("airflow.configuration.conf.as_dict"),
+            "set" => Replacement::Name("airflow.configuration.conf.set"),
             _ => return,
         },
 
@@ -644,6 +644,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.listeners.spec
+        // TODO: this is removed
         ["airflow", "listeners", "spec", "dataset", rest @ ..] => match &rest {
             ["on_dataset_created"] => {
                 Replacement::Name("airflow.listeners.spec.asset.on_asset_created")
@@ -655,27 +656,26 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.metrics.validators
-        ["airflow", "metrics", "validators", rest @ ..] => match &rest {
-            ["AllowListValidator"] => {
+        ["airflow", "metrics", "validators", rest] => match *rest {
+            "AllowListValidator" => {
                 Replacement::Name("airflow.metrics.validators.PatternAllowListValidator")
             }
-            ["BlockListValidator"] => {
+            "BlockListValidator" => {
                 Replacement::Name("airflow.metrics.validators.PatternBlockListValidator")
             }
             _ => return,
         },
 
         // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", "chain"] => Replacement::Name("airflow.sdk.chain"),
-        ["airflow", "models", "baseoperator", "chain_linear"] => {
-            Replacement::Name("airflow.sdk.chain_linear")
-        }
-        ["airflow", "models", "baseoperator", "cross_downstream"] => {
-            Replacement::Name("airflow.sdk.cross_downstream")
-        }
-        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => {
-            Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
-        }
+        ["airflow", "models", "baseoperator", rest] => match *rest {
+            "chain" => Replacement::Name("airflow.sdk.chain"),
+            "chain_linear" => Replacement::Name("airflow.sdk.chain_linear"),
+            "cross_downstream" => Replacement::Name("airflow.sdk.cross_downstream"),
+            "BaseOperatorLink" => {
+                Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
+            }
+            _ => return,
+        },
 
         // airflow.notifications
         ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
@@ -765,11 +765,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.www
+        // TODO: www has been removed
         ["airflow", "www", "auth", "has_access"] => {
             Replacement::Name("airflow.www.auth.has_access_*")
         }
         ["airflow", "www", "auth", "has_access_dataset"] => {
-            Replacement::Name("airflow.www.auth.has_access_dataset.has_access_asset")
+            Replacement::Name("airflow.www.auth.has_access_dataset")
         }
         ["airflow", "www", "utils", "get_sensitive_variables_fields"] => {
             Replacement::Name("airflow.utils.log.secrets_masker.get_sensitive_variables_fields")
