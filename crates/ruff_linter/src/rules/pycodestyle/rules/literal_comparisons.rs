@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::{self, is_redundant_boolean_comparison, generate_comparison};
+use ruff_python_ast::helpers::{self, generate_comparison, is_redundant_boolean_comparison};
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprRef};
 use ruff_text_size::Ranged;
 
@@ -169,7 +169,6 @@ impl AlwaysFixableViolation for TrueFalseComparison {
         }
     }
 }
-
 
 fn build_conditional_string(source_slice: &str, kind: bool) -> String {
     if kind {
@@ -362,10 +361,10 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         source,
                     )
                     .unwrap_or(comparator.range());
-        
+
                     let comparator_str = &source[comparator_range];
                     let result = build_conditional_string(comparator_str, kind);
-        
+
                     let needs_wrap = compare.left.range().start() != compare.range().start();
                     maybe_wrap(result, needs_wrap)
                 } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
@@ -376,10 +375,10 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         source,
                     )
                     .unwrap_or(compare.left.range());
-        
+
                     let left_str = &source[left_range];
                     let result = build_conditional_string(left_str, kind);
-        
+
                     let needs_wrap = comparator.range().end() != compare.range().end();
                     maybe_wrap(result, needs_wrap)
                 } else {
