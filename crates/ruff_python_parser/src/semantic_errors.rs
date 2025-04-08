@@ -119,11 +119,20 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::Return(ast::StmtReturn {
-                value: Some(value), ..
+                value: Some(value),
+                range,
             }) => {
                 // test_err single_star_return
                 // def f(): return *x
                 Self::invalid_star_expression(value, ctx);
+                if !self.in_function_scope {
+                    // test_ok return_inside_function
+                    // def f(): return 1
+
+                    // test_err return_outside_function
+                    // return 1
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::ReturnOutsideFunction, *range);
+                }
             }
             Stmt::For(ast::StmtFor { target, iter, .. }) => {
                 // test_err single_star_for
@@ -877,6 +886,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
                 write!(f, "`{kind}` statement outside of a function")
             }
+            SemanticSyntaxErrorKind::ReturnOutsideFunction => {
+                f.write_str("`return` statement outside of a function")
+            }
         }
     }
 }
@@ -1098,6 +1110,9 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of `yield`, `yield from`, or `await` outside of a function scope.
     YieldOutsideFunction(YieldOutsideFunctionKind),
+
+    /// Represents the use of `return` outside of a function scope.
+    ReturnOutsideFunction,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

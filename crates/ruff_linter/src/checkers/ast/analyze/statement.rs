@@ -380,9 +380,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         Stmt::Return(_) => {
-            if checker.enabled(Rule::ReturnOutsideFunction) {
-                pyflakes::rules::return_outside_function(checker, stmt);
-            }
             if checker.enabled(Rule::ReturnInInit) {
                 pylint::rules::return_in_init(checker, stmt);
             }

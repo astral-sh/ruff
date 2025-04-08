@@ -67,7 +67,9 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
-use crate::rules::pyflakes::rules::{DeferralKeyword, LateFutureImport, YieldOutsideFunction};
+use crate::rules::pyflakes::rules::{
+    DeferralKeyword, LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
+};
 use crate::rules::pylint::rules::LoadBeforeGlobalDeclaration;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
@@ -584,6 +586,11 @@ impl SemanticSyntaxContext for Checker<'_> {
                         },
                         error.range,
                     ));
+                }
+            }
+            SemanticSyntaxErrorKind::ReturnOutsideFunction => {
+                if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
+                    self.report_diagnostic(Diagnostic::new(ReturnOutsideFunction, error.range));
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
