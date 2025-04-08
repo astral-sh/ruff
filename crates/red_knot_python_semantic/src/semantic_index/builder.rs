@@ -1184,13 +1184,8 @@ where
                         };
 
                         let referenced_module = module.file();
-                        let exported_names = exported_names(self.db, referenced_module);
 
-                        if exported_names.is_empty() {
-                            continue;
-                        }
-
-                        for export in exported_names {
+                        for export in exported_names(self.db, referenced_module) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
