@@ -964,6 +964,8 @@ impl<'db> Binding<'db> {
         signature: &Signature<'db>,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) {
+        // If this overload is generic, first see if we can infer a specialization of the function
+        // from the arguments that were passed in.
         let parameters = signature.parameters();
         let specialization = signature.generic_context.map(|generic_context| {
             let mut builder = SpecializationBuilder::new(db, generic_context);
