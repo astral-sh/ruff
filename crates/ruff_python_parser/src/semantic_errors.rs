@@ -593,8 +593,40 @@ impl SemanticSyntaxChecker {
                 // test_err single_star_yield
                 // def f(): yield *x
                 Self::invalid_star_expression(value, ctx);
+                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
+            }
+            Expr::YieldFrom(_) => {
+                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
+            }
+            Expr::Await(_) => {
+                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
             }
             _ => {}
+        }
+    }
+
+    /// F704
+    fn yield_outside_function<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        expr: &Expr,
+        kind: YieldOutsideFunctionKind,
+    ) {
+        if !ctx.in_function_scope() && !ctx.in_notebook() {
+            // test_err yield_outside_function
+            // yield 1
+            // yield from 1
+            // await 1
+
+            // test_ok yield_inside_function
+            // def f():
+            //     yield 1
+            //     yield from 1
+            //     await 1
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::YieldOutsideFunction(kind),
+                expr.range(),
+            );
         }
     }
 
@@ -757,6 +789,9 @@ impl Display for SemanticSyntaxError {
                     "cannot use an asynchronous comprehension outside of an asynchronous \
                                 function on Python {python_version} (syntax was added in 3.11)",
                 )
+            }
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
+                write!(f, "`{kind}` statement outside of a function")
             }
         }
     }
@@ -1013,6 +1048,26 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [BPO 33346]: https://github.com/python/cpython/issues/77527
     AsyncComprehensionOutsideAsyncFunction(PythonVersion),
+
+    /// Represents the use of `yield`, `yield from`, or `await` outside of a function scope.
+    YieldOutsideFunction(YieldOutsideFunctionKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YieldOutsideFunctionKind {
+    Yield,
+    YieldFrom,
+    Await,
+}
+
+impl Display for YieldOutsideFunctionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            YieldOutsideFunctionKind::Yield => "yield",
+            YieldOutsideFunctionKind::YieldFrom => "yield from",
+            YieldOutsideFunctionKind::Await => "await",
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1355,6 +1410,9 @@ pub trait SemanticSyntaxContext {
 
     /// Returns `true` if the visitor is at the top-level module scope.
     fn in_module_scope(&self) -> bool;
+
+    /// Returns `true` if the visitor is in a function scope.
+    fn in_function_scope(&self) -> bool;
 
     /// Returns `true` if the source file is a Jupyter notebook.
     fn in_notebook(&self) -> bool;

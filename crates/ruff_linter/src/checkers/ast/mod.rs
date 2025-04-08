@@ -28,6 +28,7 @@ use itertools::Itertools;
 use log::debug;
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    YieldOutsideFunctionKind,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -66,7 +67,7 @@ use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
-use crate::rules::pyflakes::rules::LateFutureImport;
+use crate::rules::pyflakes::rules::{DeferralKeyword, LateFutureImport, YieldOutsideFunction};
 use crate::rules::pylint::rules::LoadBeforeGlobalDeclaration;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
@@ -567,6 +568,20 @@ impl SemanticSyntaxContext for Checker<'_> {
                     ));
                 }
             }
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
+                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
+                    self.report_diagnostic(Diagnostic::new(
+                        YieldOutsideFunction {
+                            keyword: match kind {
+                                YieldOutsideFunctionKind::Yield => DeferralKeyword::Yield,
+                                YieldOutsideFunctionKind::YieldFrom => DeferralKeyword::YieldFrom,
+                                YieldOutsideFunctionKind::Await => DeferralKeyword::Await,
+                            },
+                        },
+                        error.range,
+                    ));
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
@@ -619,6 +634,12 @@ impl SemanticSyntaxContext for Checker<'_> {
 
     fn in_notebook(&self) -> bool {
         self.source_type.is_ipynb()
+    }
+
+    fn in_function_scope(&self) -> bool {
+        self.semantic
+            .current_scopes()
+            .any(|scope| scope.kind.is_function())
     }
 }
 

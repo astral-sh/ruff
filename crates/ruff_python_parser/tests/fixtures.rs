@@ -500,6 +500,11 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
         f(&mut checker, self);
         self.checker = checker;
     }
+
+    /// Returns an iterator over all scopes, starting from the current [`Scope`].
+    fn scopes(&self) -> impl Iterator<Item = &Scope> {
+        self.scopes.iter().rev()
+    }
 }
 
 impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
@@ -549,6 +554,11 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         self.scopes
             .last()
             .is_some_and(|scope| matches!(scope, Scope::Module))
+    }
+
+    fn in_function_scope(&self) -> bool {
+        self.scopes()
+            .any(|scope| matches!(scope, Scope::Function { .. }))
     }
 
     fn in_notebook(&self) -> bool {
