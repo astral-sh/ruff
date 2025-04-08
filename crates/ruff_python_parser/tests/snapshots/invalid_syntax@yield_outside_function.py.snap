@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/yield_outside_functio
 ```
 Module(
     ModModule {
-        range: 0..29,
+        range: 0..35,
         body: [
             Expr(
                 StmtExpr {
@@ -65,6 +65,17 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    range: 29..34,
+                    value: Yield(
+                        ExprYield {
+                            range: 29..34,
+                            value: None,
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -84,6 +95,7 @@ Module(
 2 | yield from 1
   | ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
 3 | await 1
+4 | yield
   |
 
 
@@ -92,4 +104,13 @@ Module(
 2 | yield from 1
 3 | await 1
   | ^^^^^^^ Syntax Error: `await` statement outside of a function
+4 | yield
+  |
+
+
+  |
+2 | yield from 1
+3 | await 1
+4 | yield
+  | ^^^^^ Syntax Error: `yield` statement outside of a function
   |

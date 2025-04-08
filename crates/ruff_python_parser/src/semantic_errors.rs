@@ -587,12 +587,12 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Expr::Yield(ast::ExprYield {
-                value: Some(value), ..
-            }) => {
-                // test_err single_star_yield
-                // def f(): yield *x
-                Self::invalid_star_expression(value, ctx);
+            Expr::Yield(ast::ExprYield { value, .. }) => {
+                if let Some(value) = value {
+                    // test_err single_star_yield
+                    // def f(): yield *x
+                    Self::invalid_star_expression(value, ctx);
+                }
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
             }
             Expr::YieldFrom(_) => {
@@ -621,12 +621,14 @@ impl SemanticSyntaxChecker {
         // yield 1
         // yield from 1
         // await 1
+        // yield
 
         // test_ok yield_inside_function
         // def f():
         //     yield 1
         //     yield from 1
         //     await 1
+        //     yield
         Self::add_error(
             ctx,
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind),
