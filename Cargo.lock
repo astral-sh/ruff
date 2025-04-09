@@ -3442,7 +3442,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.19.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=c999c713d757b857b13f23fe38acc40ec5b4134c#c999c713d757b857b13f23fe38acc40ec5b4134c"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=b165ba7bd1b2a0112ce574a082ab8ea5102252ac#b165ba7bd1b2a0112ce574a082ab8ea5102252ac"
 dependencies = [
  "boxcar",
  "compact_str 0.8.1",
@@ -3465,12 +3465,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.19.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=c999c713d757b857b13f23fe38acc40ec5b4134c#c999c713d757b857b13f23fe38acc40ec5b4134c"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=b165ba7bd1b2a0112ce574a082ab8ea5102252ac#b165ba7bd1b2a0112ce574a082ab8ea5102252ac"
 
 [[package]]
 name = "salsa-macros"
 version = "0.19.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=c999c713d757b857b13f23fe38acc40ec5b4134c#c999c713d757b857b13f23fe38acc40ec5b4134c"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=b165ba7bd1b2a0112ce574a082ab8ea5102252ac#b165ba7bd1b2a0112ce574a082ab8ea5102252ac"
 dependencies = [
  "heck",
  "proc-macro2",
