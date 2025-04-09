@@ -1604,18 +1604,18 @@ fn count_consecutive_chars_from_end(s: &str, target: char) -> usize {
 /// that avoids `content""""` and `content\"""`. This only applies to un-escaped backslashes,
 /// so `content\\"""` doesn't need a space while `content\\\"""` does.
 pub(super) fn needs_chaperone_space(flags: AnyStringFlags, trim_end: &str) -> bool {
-    if trim_end.ends_with(flags.quote_style().as_char()) || trim_end.ends_with('\\') {
-        if count_consecutive_chars_from_end(trim_end, '\\') % 2 == 1 {
-            // Odd backslash count; chaperone avoids escaping closing quotes
+    if count_consecutive_chars_from_end(trim_end, '\\') % 2 == 1 {
+        // Odd backslash count; chaperone avoids escaping closing quotes
+        return true;
+    }
+
+    if let Some(before_quote) = trim_end.strip_suffix(flags.quote_style().as_char()) {
+        if count_consecutive_chars_from_end(before_quote, '\\') % 2 == 0 {
+            // Even backslash count preceding quote; chaperone avoids dangling
             return true;
         }
-        if let Some(before_quote) = trim_end.get(..trim_end.len() - 1) {
-            if count_consecutive_chars_from_end(before_quote, '\\') % 2 == 0 {
-                // Even backslash count preceding quote; chaperone avoids dangling
-                return true;
-            }
-        }
     }
+
     false
 }
 
