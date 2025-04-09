@@ -1468,17 +1468,17 @@ Module(
                                     If(
                                         ExprIf {
                                             range: 1049..1065,
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 1054..1058,
+                                                    value: true,
+                                                },
+                                            ),
                                             body: Name(
                                                 ExprName {
                                                     range: 1049..1050,
                                                     id: Name("x"),
                                                     ctx: Load,
-                                                },
-                                            ),
-                                            test: BooleanLiteral(
-                                                ExprBooleanLiteral {
-                                                    range: 1054..1058,
-                                                    value: true,
                                                 },
                                             ),
                                             orelse: Name(

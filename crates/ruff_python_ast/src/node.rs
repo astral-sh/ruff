@@ -22,6 +22,23 @@ impl ast::ElifElseClause {
         visitor.visit_body(body);
     }
 }
+
+impl ast::ExprDict {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprDict { items, range: _ } = self;
+
+        for ast::DictItem { key, value } in items {
+            if let Some(key) = key {
+                visitor.visit_expr(key);
+            }
+            visitor.visit_expr(value);
+        }
+    }
+}
+
 impl ast::ExprBoolOp {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
@@ -105,6 +122,26 @@ impl ast::FStringLiteralElement {
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ast::FStringLiteralElement { range: _, value: _ } = self;
+    }
+}
+
+impl ast::ExprFString {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ast::ExprFString { value, range: _ } = self;
+
+        for f_string_part in value {
+            match f_string_part {
+                ast::FStringPart::Literal(string_literal) => {
+                    visitor.visit_string_literal(string_literal);
+                }
+                ast::FStringPart::FString(f_string) => {
+                    visitor.visit_f_string(f_string);
+                }
+            }
+        }
     }
 }
 

@@ -6918,8 +6918,8 @@ pub struct ExprLambda {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprIf {
     pub range: ruff_text_size::TextRange,
-    pub body: Box<Expr>,
     pub test: Box<Expr>,
+    pub body: Box<Expr>,
     pub orelse: Box<Expr>,
 }
 
@@ -7667,27 +7667,14 @@ impl ExprIf {
         V: SourceOrderVisitor<'a> + ?Sized,
     {
         let ExprIf {
-            body,
             test,
+            body,
             orelse,
             range: _,
         } = self;
         visitor.visit_expr(body);
         visitor.visit_expr(test);
         visitor.visit_expr(orelse);
-    }
-}
-
-impl ExprDict {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ExprDict { items, range: _ } = self;
-
-        for elm in items {
-            visitor.visit_dict_item(elm);
-        }
     }
 }
 
@@ -7824,16 +7811,6 @@ impl ExprCall {
         } = self;
         visitor.visit_expr(func);
         visitor.visit_arguments(arguments);
-    }
-}
-
-impl ExprFString {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ExprFString { value, range: _ } = self;
-        visitor.visit_f_string_value(value);
     }
 }
 

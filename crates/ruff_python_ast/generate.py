@@ -124,6 +124,7 @@ class Node:
     fields: list[Field] | None
     derives: list[str]
     custom_source_order: bool
+    source_order: list[str] | None
 
     def __init__(self, group: Group, node_name: str, node: dict[str, Any]) -> None:
         self.name = node_name
@@ -136,13 +137,32 @@ class Node:
         self.custom_source_order = node.get("custom_source_order", False)
         self.derives = node.get("derives", [])
         self.doc = node.get("doc")
+        self.source_order = node.get("source_order")
+
+    def fields_in_source_order(self) -> list[Field]:
+        if self.fields is None:
+            return []
+        if self.source_order is None:
+            return list(filter(lambda x: not x.skip_source_order(), self.fields))
+
+        fields = []
+        for field_name in self.source_order:
+            field = None
+            for field in self.fields:
+                if field.skip_source_order():
+                    continue
+                if field.name == field_name:
+                    field = field
+                    break
+            fields.append(field)
+        return fields
 
 
 @dataclass
 class Field:
     name: str
     ty: str
-    skip_source_order: bool
+    _skip_visit: bool
     is_annotation: bool
     parsed_ty: FieldType
 
@@ -150,8 +170,19 @@ class Field:
         self.name = field["name"]
         self.ty = field["type"]
         self.parsed_ty = FieldType(self.ty)
-        self.skip_source_order = field.get("skip_source_order", False)
+        self._skip_visit = field.get("skip_visit", False)
         self.is_annotation = field.get("is_annotation", False)
+
+    def skip_source_order(self) -> bool:
+        return self._skip_visit or self.parsed_ty.inner in [
+            "str",
+            "ExprContext",
+            "Name",
+            "u32",
+            "bool",
+            "Number",
+            "IpyEscapeKind",
+        ]
 
 
 # Extracts the type argument from the given rust type with AST field type syntax.
@@ -778,16 +809,13 @@ def write_source_order(out: list[str], ast: Ast) -> None:
             body = ""
 
             for field in node.fields:
-                if field.skip_source_order:
+                if field.skip_source_order():
                     fields_list += f"{field.name}: _,\n"
                 else:
                     fields_list += f"{field.name},\n"
             fields_list += "range: _,\n"
 
-            for field in node.fields:
-                if field.skip_source_order:
-                    continue
-
+            for field in node.fields_in_source_order():
                 visitor = type_to_visitor_function[field.parsed_ty.inner]
                 if field.is_annotation:
                     visitor = annotation_visitor_function
@@ -807,12 +835,8 @@ def write_source_order(out: list[str], ast: Ast) -> None:
                 else:
                     body += f"visitor.{visitor.name}({field.name});\n"
 
-            fields_in_visit = list(
-                filter(lambda x: not x.skip_source_order, node.fields)
-            )
-            all_fields_skipped = len(fields_in_visit) == 0
             visitor_arg_name = "visitor"
-            if all_fields_skipped:
+            if len(node.fields_in_source_order()) == 0:
                 visitor_arg_name = "_"
 
             out.append(f"""

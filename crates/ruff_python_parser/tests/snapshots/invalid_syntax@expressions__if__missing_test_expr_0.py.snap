@@ -15,18 +15,18 @@ Module(
                     value: If(
                         ExprIf {
                             range: 51..55,
-                            body: Name(
-                                ExprName {
-                                    range: 51..52,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             test: Name(
                                 ExprName {
                                     range: 55..55,
                                     id: Name(""),
                                     ctx: Invalid,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 51..52,
+                                    id: Name("x"),
+                                    ctx: Load,
                                 },
                             ),
                             orelse: Name(
