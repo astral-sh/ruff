@@ -3512,9 +3512,14 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        argument_types: CallArgumentTypes<'_, 'db>,
+        mut argument_types: CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
-        self.try_call_dunder_with_policy(db, name, argument_types, MemberLookupPolicy::empty())
+        self.try_call_dunder_with_policy(
+            db,
+            name,
+            &mut argument_types,
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+        )
     }
 
     /// Same as `try_call_dunder`, but allows specifying a policy for the member lookup. In
@@ -3525,21 +3530,17 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         name: &str,
-        mut argument_types: CallArgumentTypes<'_, 'db>,
+        argument_types: &mut CallArgumentTypes<'_, 'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match self
-            .member_lookup_with_policy(
-                db,
-                name.into(),
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK | policy,
-            )
+            .member_lookup_with_policy(db, name.into(), policy)
             .symbol
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, &mut argument_types)
-                    .check_types(db, &mut argument_types)?;
+                let bindings = Bindings::match_parameters(signatures, argument_types)
+                    .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -3737,36 +3738,20 @@ impl<'db> Type<'db> {
         // `object` we would inadvertently unhide `__new__` on `type`, which is not what we want.
         // An alternative might be to not skip `object.__new__` but instead mark it such that it's
         // easy to check if that's the one we found?
-        let new_call_outcome: Option<Result<Bindings<'db>, CallDunderError<'db>>> = match self
-            .member_lookup_with_policy(
+        // Note that `__new__` is a static method, so we must inject the `cls` argument.
+        let new_call_outcome = argument_types.with_self(Some(self), |argument_types| {
+            let result = self.try_call_dunder_with_policy(
                 db,
-                "__new__".into(),
+                "__new__",
+                argument_types,
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .symbol
-        {
-            Symbol::Type(dunder_callable, boundness) => {
-                let signatures = dunder_callable.signatures(db);
-                // `__new__` is a static method, so we must inject the `cls` argument.
-                Some(argument_types.with_self(Some(self), |argument_types| {
-                    match Bindings::match_parameters(signatures, argument_types)
-                        .check_types(db, argument_types)
-                    {
-                        Ok(bindings) => {
-                            if boundness == Boundness::PossiblyUnbound {
-                                Err(CallDunderError::PossiblyUnbound(Box::new(bindings)))
-                            } else {
-                                Ok(bindings)
-                            }
-                        }
-                        Err(err) => Err(err.into()),
-                    }
-                }))
+            );
+            match result {
+                Err(CallDunderError::MethodNotAvailable) => None,
+                _ => Some(result),
             }
-            // No explicit `__new__` method found
-            Symbol::Unbound => None,
-        };
+        });
 
         // TODO: we should use the actual return type of `__new__` to determine the instance type
         let instance_ty = self

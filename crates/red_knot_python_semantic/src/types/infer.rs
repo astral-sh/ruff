@@ -2509,14 +2509,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let result = object_ty.try_call_dunder_with_policy(
                                 db,
                                 "__setattr__",
-                                CallArgumentTypes::positional([
+                                &mut CallArgumentTypes::positional([
                                     Type::StringLiteral(StringLiteralType::new(
                                         db,
                                         Box::from(attribute),
                                     )),
                                     value_ty,
                                 ]),
-                                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                                    | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                             );
 
                             match result {
