@@ -656,42 +656,47 @@ impl SemanticSyntaxChecker {
         if python_version >= PythonVersion::PY311 {
             return;
         }
-        for generator in generators {
-            if generator.is_async && !ctx.in_async_context() {
-                // test_ok nested_async_comprehension_py311
-                // # parse_options: {"target-version": "3.11"}
-                // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
-                // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
-                // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+        // async allowed at notebook top-level
+        if ctx.in_notebook() && ctx.in_module_scope() {
+            return;
+        }
+        if ctx.in_async_context() {
+            return;
+        }
+        for generator in generators.iter().filter(|gen| gen.is_async) {
+            // test_ok nested_async_comprehension_py311
+            // # parse_options: {"target-version": "3.11"}
+            // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+            // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+            // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
 
-                // test_ok nested_async_comprehension_py310
-                // # parse_options: {"target-version": "3.10"}
-                // # this case fails if exit_expr doesn't run
-                // async def f():
-                //     [_ for n in range(3)]
-                //     [_ async for n in range(3)]
-                // # and this fails without exit_stmt
-                // async def f():
-                //     def g(): ...
-                //     [_ async for n in range(3)]
+            // test_ok nested_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // # this case fails if exit_expr doesn't run
+            // async def f():
+            //     [_ for n in range(3)]
+            //     [_ async for n in range(3)]
+            // # and this fails without exit_stmt
+            // async def f():
+            //     def g(): ...
+            //     [_ async for n in range(3)]
 
-                // test_ok all_async_comprehension_py310
-                // # parse_options: {"target-version": "3.10"}
-                // async def test(): return [[x async for x in elements(n)] async for n in range(3)]
+            // test_ok all_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def test(): return [[x async for x in elements(n)] async for n in range(3)]
 
-                // test_err nested_async_comprehension_py310
-                // # parse_options: {"target-version": "3.10"}
-                // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
-                // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
-                // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
-                // async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
-                // async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
-                Self::add_error(
-                    ctx,
-                    SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version),
-                    generator.range,
-                );
-            }
+            // test_err nested_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+            // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+            // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+            // async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
+            // async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version),
+                generator.range,
+            );
         }
     }
 }
@@ -1314,6 +1319,12 @@ pub trait SemanticSyntaxContext {
 
     /// Returns `true` if the visitor is currently in an async context.
     fn in_async_context(&self) -> bool;
+
+    /// Returns `true` if the visitor is at the top-level module scope.
+    fn in_module_scope(&self) -> bool;
+
+    /// Returns `true` if the source file is a Jupyter notebook.
+    fn in_notebook(&self) -> bool;
 
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 }

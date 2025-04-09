@@ -596,6 +596,14 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn in_async_context(&self) -> bool {
         self.semantic.in_async_context()
     }
+
+    fn in_module_scope(&self) -> bool {
+        self.semantic.current_scope().kind.is_module()
+    }
+
+    fn in_notebook(&self) -> bool {
+        self.source_type.is_ipynb()
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
