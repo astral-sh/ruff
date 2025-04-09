@@ -4236,7 +4236,12 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
             | Type::ModuleLiteral(_)
+            // A non-generic class never needs to be specialized. A generic class is specialized
+            // explicitly (via a subscript expression) or implicitly (via a call), and not because
+            // some other generic context's specialization is applied to it.
             | Type::ClassLiteral(_)
+            // SubclassOf contains a ClassType, which has already been specialized if needed, like
+            // above with BoundMethod's self_instance.
             | Type::SubclassOf(_)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
@@ -4244,6 +4249,8 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
+            // Instance contains a ClassType, which has already been specialized if needed, like
+            // above with BoundMethod's self_instance.
             | Type::Instance(_)
             | Type::KnownInstance(_) => self,
         }
