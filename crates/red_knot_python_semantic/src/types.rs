@@ -4161,6 +4161,14 @@ impl<'db> Type<'db> {
                 Type::FunctionLiteral(function.apply_specialization(db, specialization))
             }
 
+            // Note that we don't need to apply the specialization to `self_instance`, since it
+            // must either be a non-generic class literal (which cannot have any typevars to
+            // specialize) or a generic alias (which has already been fully specialized). For a
+            // generic alias, the specialization being applied here must be for some _other_
+            // generic context nested within the generic alias's class literal, which the generic
+            // alias's context cannot refer to. (The _method_ does need to be specialized, since it
+            // might be a nested generic method, whose generic context is what is now being
+            // specialized.)
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
                 method.function(db).apply_specialization(db, specialization),
