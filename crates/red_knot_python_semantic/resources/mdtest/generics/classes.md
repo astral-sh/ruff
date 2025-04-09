@@ -101,7 +101,7 @@ class Constrained[T: (int, str)]: ...
 reveal_type(Constrained[int]())  # revealed: Constrained[int]
 
 # TODO: error: [invalid-argument-type]
-# TODO: revealed: Unknown
+# TODO: revealed: Constrained[Unknown]
 reveal_type(Constrained[IntSubclass]())  # revealed: Constrained[IntSubclass]
 
 reveal_type(Constrained[str]())  # revealed: Constrained[str]
