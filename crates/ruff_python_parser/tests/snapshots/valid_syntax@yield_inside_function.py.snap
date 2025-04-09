@@ -7,11 +7,11 @@ input_file: crates/ruff_python_parser/resources/inline/ok/yield_inside_function.
 ```
 Module(
     ModModule {
-        range: 0..94,
+        range: 0..60,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    range: 0..93,
+                    range: 0..59,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
@@ -92,70 +92,6 @@ Module(
                                     ExprYield {
                                         range: 54..59,
                                         value: None,
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 64..93,
-                                value: ListComp(
-                                    ExprListComp {
-                                        range: 64..93,
-                                        elt: Yield(
-                                            ExprYield {
-                                                range: 66..73,
-                                                value: Some(
-                                                    Name(
-                                                        ExprName {
-                                                            range: 72..73,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        ),
-                                        generators: [
-                                            Comprehension {
-                                                range: 75..92,
-                                                target: Name(
-                                                    ExprName {
-                                                        range: 79..80,
-                                                        id: Name("x"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                iter: Call(
-                                                    ExprCall {
-                                                        range: 84..92,
-                                                        func: Name(
-                                                            ExprName {
-                                                                range: 84..89,
-                                                                id: Name("range"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        arguments: Arguments {
-                                                            range: 89..92,
-                                                            args: [
-                                                                NumberLiteral(
-                                                                    ExprNumberLiteral {
-                                                                        range: 90..91,
-                                                                        value: Int(
-                                                                            3,
-                                                                        ),
-                                                                    },
-                                                                ),
-                                                            ],
-                                                            keywords: [],
-                                                        },
-                                                    },
-                                                ),
-                                                ifs: [],
-                                                is_async: false,
-                                            },
-                                        ],
                                     },
                                 ),
                             },

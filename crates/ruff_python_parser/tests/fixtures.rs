@@ -466,6 +466,16 @@ enum Scope {
     Comprehension { is_async: bool },
 }
 
+impl Scope {
+    fn is_module(&self) -> bool {
+        matches!(self, Self::Module)
+    }
+
+    fn is_function(&self) -> bool {
+        matches!(self, Self::Function { .. })
+    }
+}
+
 struct SemanticSyntaxCheckerVisitor<'a> {
     checker: SemanticSyntaxChecker,
     diagnostics: RefCell<Vec<SemanticSyntaxError>>,
@@ -504,6 +514,10 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
     /// Returns an iterator over all scopes, starting from the current [`Scope`].
     fn scopes(&self) -> impl Iterator<Item = &Scope> {
         self.scopes.iter().rev()
+    }
+
+    fn current_scope(&self) -> &Scope {
+        self.scopes().next().unwrap()
     }
 }
 
@@ -551,14 +565,11 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_module_scope(&self) -> bool {
-        self.scopes
-            .last()
-            .is_some_and(|scope| matches!(scope, Scope::Module))
+        self.current_scope().is_module()
     }
 
     fn in_function_scope(&self) -> bool {
-        self.scopes()
-            .any(|scope| matches!(scope, Scope::Function { .. }))
+        self.current_scope().is_function()
     }
 
     fn in_notebook(&self) -> bool {

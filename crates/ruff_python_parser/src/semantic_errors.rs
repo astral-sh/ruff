@@ -623,6 +623,7 @@ impl SemanticSyntaxChecker {
         {
             return;
         }
+
         // test_err yield_outside_function
         // yield 1
         // yield from 1
@@ -636,7 +637,6 @@ impl SemanticSyntaxChecker {
         //     yield from 1
         //     await 1
         //     yield
-        //     [(yield x) for x in range(3)]
         Self::add_error(
             ctx,
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind),

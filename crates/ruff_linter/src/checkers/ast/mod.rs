@@ -637,9 +637,8 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn in_function_scope(&self) -> bool {
-        self.semantic
-            .current_scopes()
-            .any(|scope| scope.kind.is_function())
+        let kind = &self.semantic.current_scope().kind;
+        kind.is_function() || kind.is_lambda()
     }
 }
 
