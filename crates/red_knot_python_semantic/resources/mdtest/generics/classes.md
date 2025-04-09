@@ -193,7 +193,6 @@ scope for the method.
 class C[T]:
     def method[U](self, u: U) -> U:
         return u
-
     # error: [unresolved-reference]
     def cannot_use_outside_of_method(self, u: U): ...
 
@@ -204,7 +203,7 @@ c: C[int] = C[int]()
 # TODO: no error
 # TODO: revealed: str or Literal["string"]
 # error: [invalid-argument-type]
-reveal_type(c.method("string")) # revealed: U
+reveal_type(c.method("string"))  # revealed: U
 ```
 
 ## Cyclic class definition
