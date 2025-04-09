@@ -10,6 +10,7 @@ use super::{
     InferContext, Signature, Signatures, Type,
 };
 use crate::db::Db;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
@@ -19,7 +20,8 @@ use crate::types::diagnostic::{
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, ClassLiteralType, FunctionDecorators, KnownClass, KnownFunction,
-    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
+    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, TupleType,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
@@ -92,12 +94,13 @@ impl<'db> Bindings<'db> {
         mut self,
         db: &'db dyn Db,
         argument_types: &mut CallArgumentTypes<'_, 'db>,
+        containing_assignment: Option<Definition<'db>>,
     ) -> Result<Self, CallError<'db>> {
         for (signature, element) in self.signatures.iter().zip(&mut self.elements) {
             element.check_types(db, signature, argument_types);
         }
 
-        self.evaluate_known_cases(db);
+        self.evaluate_known_cases(db, argument_types, containing_assignment);
 
         // In order of precedence:
         //
@@ -201,7 +204,12 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(&mut self, db: &'db dyn Db) {
+    fn evaluate_known_cases(
+        &mut self,
+        db: &'db dyn Db,
+        argument_types: &CallArgumentTypes<'_, 'db>,
+        containing_assignment: Option<Definition<'db>>,
+    ) {
         // Each special case listed here should have a corresponding clause in `Type::signatures`.
         for binding in &mut self.elements {
             let binding_type = binding.callable_type;
@@ -279,54 +287,76 @@ impl<'db> Bindings<'db> {
                     }
                 }
 
-                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => {
-                    match overload.parameter_types() {
-                        [Some(property @ Type::PropertyInstance(_)), Some(instance), ..]
-                            if instance.is_none(db) =>
+                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => match overload
+                    .parameter_types()
+                {
+                    [Some(property @ Type::PropertyInstance(_)), Some(instance), ..]
+                        if instance.is_none(db) =>
+                    {
+                        overload.set_return_type(*property);
+                    }
+                    [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))), ..]
+                        if property.getter(db).is_some_and(|getter| {
+                            getter
+                                .into_function_literal()
+                                .is_some_and(|f| f.name(db) == "__name__")
+                        }) =>
+                    {
+                        overload.set_return_type(Type::string_literal(db, type_alias.name(db)));
+                    }
+                    [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), ..] => {
+                        match property
+                            .getter(db)
+                            .and_then(|getter| getter.into_function_literal())
+                            .map(|f| f.name(db).as_str())
                         {
-                            overload.set_return_type(*property);
+                            Some("__name__") => {
+                                overload
+                                    .set_return_type(Type::string_literal(db, typevar.name(db)));
+                            }
+                            Some("__bound__") => {
+                                overload.set_return_type(
+                                    typevar.upper_bound(db).unwrap_or_else(|| Type::none(db)),
+                                );
+                            }
+                            Some("__constraints__") => {
+                                overload.set_return_type(TupleType::from_elements(
+                                    db,
+                                    typevar.constraints(db).into_iter().flatten(),
+                                ));
+                            }
+                            Some("__default__") => {
+                                overload.set_return_type(
+                                    typevar.default_ty(db).unwrap_or_else(|| {
+                                        KnownClass::NoDefaultType.to_instance(db)
+                                    }),
+                                );
+                            }
+                            _ => {}
                         }
-                        [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))), ..]
-                            if property.getter(db).is_some_and(|getter| {
-                                getter
-                                    .into_function_literal()
-                                    .is_some_and(|f| f.name(db) == "__name__")
-                            }) =>
-                        {
-                            overload.set_return_type(Type::string_literal(db, type_alias.name(db)));
-                        }
-                        [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeVar(type_var))), ..]
-                            if property.getter(db).is_some_and(|getter| {
-                                getter
-                                    .into_function_literal()
-                                    .is_some_and(|f| f.name(db) == "__name__")
-                            }) =>
-                        {
-                            overload.set_return_type(Type::string_literal(db, type_var.name(db)));
-                        }
-                        [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
-                            if let Some(getter) = property.getter(db) {
-                                if let Ok(return_ty) = getter
-                                    .try_call(db, CallArgumentTypes::positional([*instance]))
-                                    .map(|binding| binding.return_type(db))
-                                {
-                                    overload.set_return_type(return_ty);
-                                } else {
-                                    overload.errors.push(BindingError::InternalCallError(
-                                        "calling the getter failed",
-                                    ));
-                                    overload.set_return_type(Type::unknown());
-                                }
+                    }
+                    [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
+                        if let Some(getter) = property.getter(db) {
+                            if let Ok(return_ty) = getter
+                                .try_call(db, CallArgumentTypes::positional([*instance]))
+                                .map(|binding| binding.return_type(db))
+                            {
+                                overload.set_return_type(return_ty);
                             } else {
                                 overload.errors.push(BindingError::InternalCallError(
-                                    "property has no getter",
+                                    "calling the getter failed",
                                 ));
-                                overload.set_return_type(Type::Never);
+                                overload.set_return_type(Type::unknown());
                             }
+                        } else {
+                            overload
+                                .errors
+                                .push(BindingError::InternalCallError("property has no getter"));
+                            overload.set_return_type(Type::Never);
                         }
-                        _ => {}
                     }
-                }
+                    _ => {}
+                },
 
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
                     match overload.parameter_types() {
@@ -585,6 +615,68 @@ impl<'db> Bindings<'db> {
                         if let [Some(arg)] = overload.parameter_types() {
                             overload.set_return_type(arg.to_meta_type(db));
                         }
+                    }
+
+                    Some(KnownClass::TypeVar) => {
+                        let Some(containing_assignment) = containing_assignment else {
+                            // TODO: Raise a diagnostic if TypeVar is called without being
+                            // immediately assigned to local variable.
+                            continue;
+                        };
+
+                        let [Some(_name), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
+                            overload.parameter_types()
+                        else {
+                            continue;
+                        };
+
+                        // TypeVar can only be called when the result is immediately assigned to a
+                        // variable. Reuse the name that is being assigned to.
+                        // TODO: Raise a diagnostic if the name parameter doesn't match the name
+                        // being assigned to.
+                        let name = match containing_assignment.kind(db) {
+                            DefinitionKind::Assignment(assignment) => assignment.name().id.clone(),
+                            _ => continue,
+                        };
+
+                        let bound_or_constraint = match (bound, constraints) {
+                            (Some(bound), None) => {
+                                Some(TypeVarBoundOrConstraints::UpperBound(*bound))
+                            }
+
+                            (None, Some(_constraints)) => {
+                                // We don't use UnionType::from_elements or UnionBuilder here,
+                                // because we don't want to simplify the list of constraints like
+                                // we do with the elements of an actual union type.
+                                // TODO: Consider using a new `OneOfType` connective here instead,
+                                // since that more accurately represents the actual semantics of
+                                // typevar constraints.
+                                let elements = UnionType::new(
+                                    db,
+                                    overload
+                                        .arguments_for_parameter(argument_types, 1)
+                                        .map(|(_, ty)| ty)
+                                        .collect::<Box<_>>(),
+                                );
+                                Some(TypeVarBoundOrConstraints::Constraints(elements))
+                            }
+
+                            // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
+                            // constrained
+                            (Some(_), Some(_)) => continue,
+
+                            (None, None) => None,
+                        };
+
+                        overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
+                            TypeVarInstance::new(
+                                db,
+                                name,
+                                containing_assignment,
+                                bound_or_constraint,
+                                *default,
+                            ),
+                        )));
                     }
 
                     Some(KnownClass::Property) => {
@@ -1026,6 +1118,20 @@ impl<'db> Binding<'db> {
 
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
+    }
+
+    pub(crate) fn arguments_for_parameter<'a>(
+        &'a self,
+        argument_types: &'a CallArgumentTypes<'a, 'db>,
+        parameter_index: usize,
+    ) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + 'a {
+        argument_types
+            .iter()
+            .zip(&self.argument_parameters)
+            .filter(move |(_, argument_parameter)| {
+                argument_parameter.is_some_and(|ap| ap == parameter_index)
+            })
+            .map(|(arg_and_type, _)| arg_and_type)
     }
 
     fn report_diagnostics(
