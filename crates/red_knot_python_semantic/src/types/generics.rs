@@ -68,7 +68,7 @@ impl<'db> GenericContext<'db> {
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 // TODO: This should be a new type variant where only these exact types are
-                // assignable, and not subclasses of them.
+                // assignable, and not subclasses of them, nor a union of them.
                 parameter = parameter
                     .with_annotated_type(UnionType::from_elements(db, constraints.iter(db)));
             }
@@ -84,6 +84,11 @@ impl<'db> GenericContext<'db> {
             .map(|typevar| typevar.default_ty(db).unwrap_or(Type::unknown()))
             .collect();
         self.specialize(db, types)
+    }
+
+    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        let types = vec![Type::unknown(); self.variables(db).len()];
+        self.specialize(db, types.into())
     }
 
     pub(crate) fn specialize(

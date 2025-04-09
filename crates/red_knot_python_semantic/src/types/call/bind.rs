@@ -925,8 +925,14 @@ impl<'db> Binding<'db> {
                     first_excess_argument_index,
                     num_synthetic_args,
                 ),
-                expected_positional_count: parameters.positional().count(),
-                provided_positional_count: next_positional,
+                expected_positional_count: parameters
+                    .positional()
+                    .count()
+                    // using saturating_sub to avoid negative values due to invalid syntax in source code
+                    .saturating_sub(num_synthetic_args),
+                provided_positional_count: next_positional
+                    // using saturating_sub to avoid negative values due to invalid syntax in source code
+                    .saturating_sub(num_synthetic_args),
             });
         }
         let mut missing = vec![];

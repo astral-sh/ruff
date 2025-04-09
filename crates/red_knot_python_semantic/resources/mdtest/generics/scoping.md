@@ -96,18 +96,18 @@ class C[T]:
     def f(self, x: T) -> str:
         return "a"
 
-reveal_type(getattr_static(C[int], "f"))  # revealed: Literal[<f specialized with {T = int}>]
-reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f` specialized with {T = int}>
-reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: Literal[<f specialized with {T = int}>]
-# revealed: <bound method `f` of `C[int]` specialized with {T = int}>
+reveal_type(getattr_static(C[int], "f"))  # revealed: Literal[f[int]]
+reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f[int]`>
+reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: Literal[f[int]]
+# revealed: <bound method `f` of `C[int]`>
 reveal_type(getattr_static(C[int], "f").__get__(C[int](), C[int]))
 
-reveal_type(C[int].f)  # revealed: Literal[<f specialized with {T = int}>]
-reveal_type(C[int]().f)  # revealed: <bound method `f` of `C[int]` specialized with {T = int}>
+reveal_type(C[int].f)  # revealed: Literal[f[int]]
+reveal_type(C[int]().f)  # revealed: <bound method `f` of `C[int]`>
 
 bound_method = C[int]().f
 reveal_type(bound_method.__self__)  # revealed: C[int]
-reveal_type(bound_method.__func__)  # revealed: Literal[<f specialized with {T = int}>]
+reveal_type(bound_method.__func__)  # revealed: Literal[f[int]]
 
 reveal_type(C[int]().f(1))  # revealed: str
 reveal_type(bound_method(1))  # revealed: str
@@ -118,7 +118,7 @@ reveal_type(C[int].f(C[int](), 1))  # revealed: str
 class D[U](C[U]):
     pass
 
-reveal_type(D[int]().f)  # revealed: <bound method `f` of `D[int]` specialized with {T = int}>
+reveal_type(D[int]().f)  # revealed: <bound method `f` of `D[int]`>
 ```
 
 ## Methods can mention other typevars

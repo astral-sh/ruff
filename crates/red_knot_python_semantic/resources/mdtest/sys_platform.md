@@ -1,22 +1,9 @@
 # `sys.platform`
 
-## Default value
-
-When no target platform is specified, we fall back to the type of `sys.platform` declared in
-typeshed:
-
-```toml
-[environment]
-# No python-platform entry
-```
-
-```py
-import sys
-
-reveal_type(sys.platform)  # revealed: LiteralString
-```
-
 ## Explicit selection of `all` platforms
+
+When `python-platform="all"` is specified, we fall back to the type of `sys.platform` declared in
+typeshed:
 
 ```toml
 [environment]

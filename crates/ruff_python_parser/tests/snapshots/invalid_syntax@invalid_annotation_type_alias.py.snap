@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/invalid_annotation_ty
 ```
 Module(
     ModModule {
-        range: 0..308,
+        range: 0..406,
         body: [
             TypeAlias(
                 StmtTypeAlias {
@@ -280,6 +280,83 @@ Module(
                     ),
                 },
             ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 308..334,
+                    name: Name(
+                        ExprName {
+                            range: 313..314,
+                            id: Name("Y"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 314..328,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 315..327,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 315..316,
+                                        },
+                                        bound: Some(
+                                            Await(
+                                                ExprAwait {
+                                                    range: 319..326,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 325..326,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    value: Name(
+                        ExprName {
+                            range: 331..334,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 357..375,
+                    name: Name(
+                        ExprName {
+                            range: 362..363,
+                            id: Name("Y"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Await(
+                        ExprAwait {
+                            range: 367..374,
+                            value: NumberLiteral(
+                                ExprNumberLiteral {
+                                    range: 373..374,
+                                    value: Int(
+                                        1,
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -329,6 +406,7 @@ Module(
 5 | type Y = (yield 1)              # yield in value
   |           ^^^^^^^ Syntax Error: yield expression cannot be used within a type alias
 6 | type Y = (x := 1)               # named expr in value
+7 | type Y[T: (await 1)] = int      # await in bound
   |
 
 
@@ -337,4 +415,23 @@ Module(
 5 | type Y = (yield 1)              # yield in value
 6 | type Y = (x := 1)               # named expr in value
   |           ^^^^^^ Syntax Error: named expression cannot be used within a type alias
+7 | type Y[T: (await 1)] = int      # await in bound
+8 | type Y = (await 1)              # await in value
+  |
+
+
+  |
+5 | type Y = (yield 1)              # yield in value
+6 | type Y = (x := 1)               # named expr in value
+7 | type Y[T: (await 1)] = int      # await in bound
+  |            ^^^^^^^ Syntax Error: await expression cannot be used within a TypeVar bound
+8 | type Y = (await 1)              # await in value
+  |
+
+
+  |
+6 | type Y = (x := 1)               # named expr in value
+7 | type Y[T: (await 1)] = int      # await in bound
+8 | type Y = (await 1)              # await in value
+  |           ^^^^^^^ Syntax Error: await expression cannot be used within a type alias
   |

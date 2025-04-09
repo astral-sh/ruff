@@ -6,7 +6,7 @@ use config::SystemKind;
 use parser as test_parser;
 use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{
-    Program, ProgramSettings, PythonPath, SearchPathSettings, SysPrefixPathOrigin,
+    Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings, SysPrefixPathOrigin,
 };
 use ruff_db::diagnostic::{create_parse_diagnostic, Diagnostic, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File};
@@ -265,7 +265,9 @@ fn run_test(
 
     let settings = ProgramSettings {
         python_version,
-        python_platform: configuration.python_platform().unwrap_or_default(),
+        python_platform: configuration
+            .python_platform()
+            .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
         search_paths: SearchPathSettings {
             src_roots: vec![src_path],
             extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),

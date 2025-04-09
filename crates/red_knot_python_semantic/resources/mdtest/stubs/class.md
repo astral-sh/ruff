@@ -11,7 +11,7 @@ class Foo[T]: ...
 class Bar(Foo[Bar]): ...
 
 reveal_type(Bar)  # revealed: Literal[Bar]
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Foo[Bar], Literal[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Foo[Bar]], Literal[object]]
 ```
 
 ## Access to attributes declared in stubs

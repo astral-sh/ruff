@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/valid_annotation_class
 ```
 Module(
     ModModule {
-        range: 0..94,
+        range: 0..137,
         body: [
             ClassDef(
                 StmtClassDef {
@@ -162,6 +162,73 @@ Module(
                                             value: EllipsisLiteral(
                                                 ExprEllipsisLiteral {
                                                     range: 90..93,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 94..136,
+                    is_async: true,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 104..105,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 105..107,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        ClassDef(
+                            StmtClassDef {
+                                range: 113..136,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("G"),
+                                    range: 119..120,
+                                },
+                                type_params: None,
+                                arguments: Some(
+                                    Arguments {
+                                        range: 120..131,
+                                        args: [
+                                            Await(
+                                                ExprAwait {
+                                                    range: 122..129,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 128..129,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        keywords: [],
+                                    },
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 133..136,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 133..136,
                                                 },
                                             ),
                                         },

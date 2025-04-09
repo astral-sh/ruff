@@ -101,7 +101,7 @@ class Constrained[T: (int, str)]: ...
 reveal_type(Constrained[int]())  # revealed: Constrained[int]
 
 # TODO: error: [invalid-argument-type]
-# TODO: revealed: Unknown
+# TODO: revealed: Constrained[Unknown]
 reveal_type(Constrained[IntSubclass]())  # revealed: Constrained[IntSubclass]
 
 reveal_type(Constrained[str]())  # revealed: Constrained[str]
@@ -164,7 +164,7 @@ The types inferred from a type context and from a constructor parameter must be 
 other:
 
 ```py
-# TODO: error
+# TODO: error: [invalid-argument-type]
 wrong_innards: E[int] = E("five")
 ```
 
@@ -181,6 +181,29 @@ class Sub[U](Base[U]): ...
 
 reveal_type(Base[int].x)  # revealed: int | None
 reveal_type(Sub[int].x)  # revealed: int | None
+```
+
+## Generic methods
+
+Generic classes can contain methods that are themselves generic. The generic methods can refer to
+the typevars of the enclosing generic class, and introduce new (distinct) typevars that are only in
+scope for the method.
+
+```py
+class C[T]:
+    def method[U](self, u: U) -> U:
+        return u
+    # error: [unresolved-reference]
+    def cannot_use_outside_of_method(self, u: U): ...
+
+    # TODO: error
+    def cannot_shadow_class_typevar[T](self, t: T): ...
+
+c: C[int] = C[int]()
+# TODO: no error
+# TODO: revealed: str or Literal["string"]
+# error: [invalid-argument-type]
+reveal_type(c.method("string"))  # revealed: U
 ```
 
 ## Cyclic class definition
