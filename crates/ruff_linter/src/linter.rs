@@ -1067,11 +1067,7 @@ mod tests {
         let messages = test_contents_syntax_errors(
             &SourceKind::IpyNotebook(Notebook::from_path(path)?),
             path,
-            &settings::LinterSettings {
-                rules: settings::rule_table::RuleTable::empty(),
-                preview: settings::types::PreviewMode::Enabled,
-                ..Default::default()
-            },
+            &settings::LinterSettings::for_rule(Rule::YieldOutsideFunction),
         );
         assert_messages!(messages);
 
