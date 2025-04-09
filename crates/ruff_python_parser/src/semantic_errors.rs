@@ -660,7 +660,7 @@ impl SemanticSyntaxChecker {
         if ctx.in_notebook() && ctx.in_module_scope() {
             return;
         }
-        if ctx.in_async_context() {
+        if ctx.in_async_context() && !ctx.in_sync_comprehension() {
             return;
         }
         for generator in generators.iter().filter(|gen| gen.is_async) {
@@ -1317,8 +1317,16 @@ pub trait SemanticSyntaxContext {
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
 
-    /// Returns `true` if the visitor is currently in an async context.
+    /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
     fn in_async_context(&self) -> bool;
+
+    /// Returns `true` if the visitor is currently inside of a synchronous comprehension.
+    ///
+    /// This method is necessary because `in_async_context` only checks for the nearest, enclosing
+    /// function to determine the (a)sync context. Instead, this method will search all enclosing
+    /// scopes until it finds a sync comprehension. As a result, the two methods will typically be
+    /// used together.
+    fn in_sync_comprehension(&self) -> bool;
 
     /// Returns `true` if the visitor is at the top-level module scope.
     fn in_module_scope(&self) -> bool;

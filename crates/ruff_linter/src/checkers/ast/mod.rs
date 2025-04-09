@@ -597,6 +597,22 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.in_async_context()
     }
 
+    fn in_sync_comprehension(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            if let ScopeKind::Generator {
+                kind:
+                    GeneratorKind::ListComprehension
+                    | GeneratorKind::DictComprehension
+                    | GeneratorKind::SetComprehension,
+                is_async: false,
+            } = scope.kind
+            {
+                return true;
+            }
+        }
+        false
+    }
+
     fn in_module_scope(&self) -> bool {
         self.semantic.current_scope().kind.is_module()
     }
@@ -2010,7 +2026,10 @@ impl<'a> Checker<'a> {
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
-        self.semantic.push_scope(ScopeKind::Generator(kind));
+        self.semantic.push_scope(ScopeKind::Generator {
+            kind,
+            is_async: generators.iter().any(|gen| gen.is_async),
+        });
 
         self.visit_expr(&generator.target);
         self.semantic.flags = flags;
