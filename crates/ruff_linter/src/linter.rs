@@ -1070,7 +1070,9 @@ mod tests {
             &path,
             &settings::LinterSettings::for_rule(Rule::YieldOutsideFunction),
         );
-        assert_messages!(snapshot, messages);
+        insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+            assert_messages!(snapshot, messages);
+        });
 
         Ok(())
     }
