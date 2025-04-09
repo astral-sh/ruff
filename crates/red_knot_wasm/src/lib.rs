@@ -389,6 +389,14 @@ pub struct Range {
     pub end: Position,
 }
 
+#[wasm_bindgen]
+impl Range {
+    #[wasm_bindgen(constructor)]
+    pub fn new(start: Position, end: Position) -> Self {
+        Self { start, end }
+    }
+}
+
 impl Range {
     fn from_file_range(db: &dyn Db, file_range: FileRange) -> Self {
         let index = line_index(db.upcast(), file_range.file());

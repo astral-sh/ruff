@@ -18,10 +18,10 @@ import {
 import { useCallback, useEffect, useRef } from "react";
 import { Theme } from "shared";
 import {
+  Range as KnotRange,
   Severity,
   type Workspace,
   Position as KnotPosition,
-  type Range as KnotRange,
 } from "red_knot_wasm";
 
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
@@ -172,7 +172,6 @@ class PlaygroundServer
   }
 
   provideInlayHints(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _model: editor.ITextModel,
     range: Range,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -190,8 +189,11 @@ class PlaygroundServer
     if (selectedHandle == null) {
       return;
     }
-      
-    const inlayHints = workspace.inlayHints(selectedHandle, range);
+
+    const inlayHints = workspace.inlayHints(
+      selectedHandle,
+      iRangeToKnotRange(range),
+    );
 
     if (inlayHints.length === 0) {
       return undefined;
@@ -453,4 +455,11 @@ function knotRangeToIRange(range: KnotRange): IRange {
     endLineNumber: range.end.line,
     endColumn: range.end.column,
   };
+}
+
+function iRangeToKnotRange(range: IRange): KnotRange {
+  return new KnotRange(
+    new KnotPosition(range.startLineNumber, range.startColumn),
+    new KnotPosition(range.endLineNumber, range.endColumn),
+  );
 }
