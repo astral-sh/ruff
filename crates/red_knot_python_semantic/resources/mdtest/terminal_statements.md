@@ -654,7 +654,7 @@ def f(cond: bool) -> str:
         reveal_type(x)  # revealed: Literal["before"]
         return "a"
         x = "after-return"
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: Unknown
     else:
         x = "else"
     return reveal_type(x)  # revealed: Literal["else"]

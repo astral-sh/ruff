@@ -244,6 +244,8 @@ def outer():
     x = 1
 
     def inner():
+        # TODO
+        # error: [unresolved-reference]
         reveal_type(x)  # revealed: Unknown
     while True:
         pass
@@ -443,12 +445,8 @@ def _():
     class C: ...
     return
 
-    # TODO
-    # error: [invalid-type-form] "Variable of type `Never` is not allowed in a type expression"
     c: C = C()
 
-    # TODO
-    # error: [invalid-base] "Invalid class base with type `Never` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
     class Sub(C): ...
 ```
 
