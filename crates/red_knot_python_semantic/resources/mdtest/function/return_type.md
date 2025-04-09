@@ -310,7 +310,7 @@ def f(cond: bool) -> str:
     return "hello" if cond else NotImplemented
 
 def f(cond: bool) -> int:
-    # error: [invalid-return-type] "Object of type `Literal["hello"]` is not assignable to return type `int`"
+    # error: [invalid-return-type] "Return type does not match returned value: Expected `int`, found `Literal["hello"]`"
     return "hello" if cond else NotImplemented
 ```
 

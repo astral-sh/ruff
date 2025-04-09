@@ -2,9 +2,7 @@ use std::fmt;
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::{
-    diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, OldSecondaryDiagnosticMessage, Severity, Span,
-    },
+    diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span},
     files::File,
 };
 use ruff_text_size::Ranged;
@@ -84,27 +82,11 @@ impl<'db> InferContext<'db> {
     ) where
         T: Ranged,
     {
-        self.report_lint_with_secondary_messages(lint, ranged, message, &[]);
-    }
-
-    /// Reports a lint located at `ranged`.
-    pub(super) fn report_lint_with_secondary_messages<T>(
-        &self,
-        lint: &'static LintMetadata,
-        ranged: T,
-        message: fmt::Arguments,
-        secondary_messages: &[OldSecondaryDiagnosticMessage],
-    ) where
-        T: Ranged,
-    {
         let Some(builder) = self.lint(lint) else {
             return;
         };
         let mut reporter = builder.build("");
         let diag = reporter.diagnostic();
-        for secondary_msg in secondary_messages {
-            diag.sub(secondary_msg.to_sub_diagnostic());
-        }
         let span = Span::from(self.file).with_range(ranged.range());
         diag.annotate(Annotation::primary(span).message(message));
     }

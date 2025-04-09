@@ -8,7 +8,7 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{KnownInstanceType, Type};
-use ruff_db::diagnostic::{Diagnostic, OldSecondaryDiagnosticMessage, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
@@ -1085,22 +1085,26 @@ pub(super) fn report_invalid_return_type(
     expected_ty: Type,
     actual_ty: Type,
 ) {
+    let Some(builder) = context.lint(&INVALID_RETURN_TYPE) else {
+        return;
+    };
+
+    let object_span = Span::from(context.file()).with_range(object_range.range());
     let return_type_span = Span::from(context.file()).with_range(return_type_range.range());
-    context.report_lint_with_secondary_messages(
-        &INVALID_RETURN_TYPE,
-        object_range,
-        format_args!(
-            "Object of type `{}` is not assignable to return type `{}`",
-            actual_ty.display(context.db()),
-            expected_ty.display(context.db())
-        ),
-        &[OldSecondaryDiagnosticMessage::new(
-            return_type_span,
-            format!(
-                "Return type is declared here as `{}`",
-                expected_ty.display(context.db())
-            ),
-        )],
+
+    let mut reporter = builder.build("Return type does not match returned value");
+
+    let diag = reporter.diagnostic();
+    diag.annotate(Annotation::primary(object_span).message(format_args!(
+        "Expected `{expected_ty}`, found `{actual_ty}`",
+        expected_ty = expected_ty.display(context.db()),
+        actual_ty = actual_ty.display(context.db()),
+    )));
+    diag.annotate(
+        Annotation::secondary(return_type_span).message(format_args!(
+            "Expected `{expected_ty}` because of return type",
+            expected_ty = expected_ty.display(context.db()),
+        )),
     );
 }
 
