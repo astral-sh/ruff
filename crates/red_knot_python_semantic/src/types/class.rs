@@ -408,6 +408,19 @@ impl<'db> ClassLiteralType<'db> {
         }
     }
 
+    /// Returns the unknown specialization of this class. For non-generic classes, the class is
+    /// returned unchanged. For a non-specialized generic class, we return a generic alias that
+    /// maps each of the class's typevars to `Unknown`.
+    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        match self {
+            Self::NonGeneric(non_generic) => ClassType::NonGeneric(non_generic),
+            Self::Generic(generic) => {
+                let specialization = generic.generic_context(db).unknown_specialization(db);
+                ClassType::Generic(GenericAlias::new(db, generic, specialization))
+            }
+        }
+    }
+
     /// Return an iterator over the inferred types of this class's *explicit* bases.
     ///
     /// Note that any class (except for `object`) that has no explicit

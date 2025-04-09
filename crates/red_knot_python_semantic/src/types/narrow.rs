@@ -8,8 +8,8 @@ use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId, SymbolTable};
 use crate::semantic_index::symbol_table;
 use crate::types::infer::infer_same_file_expression_type;
 use crate::types::{
-    infer_expression_types, IntersectionBuilder, KnownClass, SubclassOfType, Truthiness, Type,
-    UnionBuilder,
+    infer_expression_types, ClassLiteralType, IntersectionBuilder, KnownClass, SubclassOfType,
+    Truthiness, Type, UnionBuilder,
 };
 use crate::Db;
 use itertools::Itertools;
@@ -470,8 +470,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             range: _,
                         },
                 }) if keywords.is_empty() => {
-                    let Type::ClassLiteral(rhs_class) = rhs_ty else {
-                        continue;
+                    let rhs_class = match rhs_ty {
+                        Type::ClassLiteral(class) => class,
+                        Type::GenericAlias(alias) => {
+                            ClassLiteralType::Generic(alias.origin(self.db))
+                        }
+                        _ => {
+                            continue;
+                        }
                     };
 
                     let [ast::Expr::Name(ast::ExprName { id, .. })] = &**args else {
@@ -498,7 +504,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         let symbol = self.expect_expr_name_symbol(id);
                         constraints.insert(
                             symbol,
-                            Type::instance(rhs_class.default_specialization(self.db)),
+                            Type::instance(rhs_class.unknown_specialization(self.db)),
                         );
                     }
                 }

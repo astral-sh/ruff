@@ -85,6 +85,11 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types)
     }
 
+    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        let types = vec![Type::unknown(); self.variables(db).len()];
+        self.specialize(db, types.into())
+    }
+
     pub(crate) fn specialize(
         self,
         db: &'db dyn Db,
