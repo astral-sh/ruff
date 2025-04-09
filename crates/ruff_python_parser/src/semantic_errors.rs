@@ -628,6 +628,7 @@ impl SemanticSyntaxChecker {
         // yield from 1
         // await 1
         // yield
+        // [(yield x) for x in range(3)]
 
         // test_ok yield_inside_function
         // def f():
@@ -635,6 +636,7 @@ impl SemanticSyntaxChecker {
         //     yield from 1
         //     await 1
         //     yield
+        //     [(yield x) for x in range(3)]
         Self::add_error(
             ctx,
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind),

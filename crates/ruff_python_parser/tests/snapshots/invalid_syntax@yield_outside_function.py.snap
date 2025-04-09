@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/yield_outside_functio
 ```
 Module(
     ModModule {
-        range: 0..35,
+        range: 0..65,
         body: [
             Expr(
                 StmtExpr {
@@ -76,6 +76,70 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    range: 35..64,
+                    value: ListComp(
+                        ExprListComp {
+                            range: 35..64,
+                            elt: Yield(
+                                ExprYield {
+                                    range: 37..44,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 43..44,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 46..63,
+                                    target: Name(
+                                        ExprName {
+                                            range: 50..51,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                    iter: Call(
+                                        ExprCall {
+                                            range: 55..63,
+                                            func: Name(
+                                                ExprName {
+                                                    range: 55..60,
+                                                    id: Name("range"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            arguments: Arguments {
+                                                range: 60..63,
+                                                args: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 61..62,
+                                                            value: Int(
+                                                                3,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                keywords: [],
+                                            },
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -105,6 +169,7 @@ Module(
 3 | await 1
   | ^^^^^^^ Syntax Error: `await` statement outside of a function
 4 | yield
+5 | [(yield x) for x in range(3)]
   |
 
 
@@ -113,4 +178,13 @@ Module(
 3 | await 1
 4 | yield
   | ^^^^^ Syntax Error: `yield` statement outside of a function
+5 | [(yield x) for x in range(3)]
+  |
+
+
+  |
+3 | await 1
+4 | yield
+5 | [(yield x) for x in range(3)]
+  |   ^^^^^^^ Syntax Error: `yield` statement outside of a function
   |
