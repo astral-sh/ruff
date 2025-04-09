@@ -6223,9 +6223,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         annotation: &ast::Expr,
     ) -> TypeAndQualifiers<'db> {
-        // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
+        // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
         let annotation_ty = match annotation {
-            // String annotations: https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
+            // String annotations: https://typing.python.org/en/latest/spec/annotations.html#string-annotations
             ast::Expr::StringLiteral(string) => self.infer_string_annotation_expression(string),
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
@@ -6420,7 +6420,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Infer the type of a type expression without storing the result.
     fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
-        // https://typing.readthedocs.io/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
+        // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => self
@@ -6446,7 +6446,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             ast::Expr::NoneLiteral(_literal) => Type::none(self.db()),
 
-            // https://typing.readthedocs.io/en/latest/spec/annotations.html#string-annotations
+            // https://typing.python.org/en/latest/spec/annotations.html#string-annotations
             ast::Expr::StringLiteral(string) => self.infer_string_type_expression(string),
 
             ast::Expr::Subscript(subscript) => {

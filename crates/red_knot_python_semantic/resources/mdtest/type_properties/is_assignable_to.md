@@ -504,4 +504,4 @@ c: Callable[[Any], str] = f
 c: Callable[[Any], str] = g
 ```
 
-[typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+[typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
