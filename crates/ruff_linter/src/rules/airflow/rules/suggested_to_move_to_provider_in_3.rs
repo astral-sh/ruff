@@ -9,8 +9,8 @@ use ruff_text_size::TextRange;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for uses of Airflow functions and values that have been moved to its providers,
-/// but still have compatibility layer. (e.g., apache-airflow-providers-standard)
+/// Checks for uses of Airflow functions and values that have been moved to its providers
+/// but still have a compatibility layer (e.g., `apache-airflow-providers-standard`).
 ///
 /// ## Why is this bad?
 /// Airflow 3.0 moved various deprecated functions, members, and other
