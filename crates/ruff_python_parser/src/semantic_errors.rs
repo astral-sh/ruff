@@ -1327,8 +1327,8 @@ pub trait SemanticSyntaxContext {
 
 enum Scope {
     Module,
-    Function(bool),
-    Comprehension(bool),
+    Function { is_async: bool },
+    Comprehension { is_async: bool },
 }
 
 #[derive(Default)]
@@ -1395,7 +1395,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
 
     fn in_async_context(&self) -> bool {
         for scope in &self.scopes {
-            if let Scope::Function(is_async) = scope {
+            if let Scope::Function { is_async } = scope {
                 return *is_async;
             }
         }
@@ -1404,7 +1404,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
 
     fn in_sync_comprehension(&self) -> bool {
         for scope in &self.scopes {
-            if let Scope::Comprehension(false) = scope {
+            if let Scope::Comprehension { is_async: false } = scope {
                 return true;
             }
         }
@@ -1428,7 +1428,9 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
-                self.scopes.push(Scope::Function(*is_async));
+                self.scopes.push(Scope::Function {
+                    is_async: *is_async,
+                });
                 ruff_python_ast::visitor::walk_stmt(self, stmt);
                 self.scopes.pop().unwrap();
                 return;
@@ -1442,16 +1444,16 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
         match expr {
             Expr::Lambda(_) => {
-                self.scopes.push(Scope::Function(false));
+                self.scopes.push(Scope::Function { is_async: false });
                 ruff_python_ast::visitor::walk_expr(self, expr);
                 self.scopes.pop().unwrap();
             }
             Expr::ListComp(ast::ExprListComp { generators, .. })
             | Expr::SetComp(ast::ExprSetComp { generators, .. })
             | Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
-                self.scopes.push(Scope::Comprehension(
-                    generators.iter().any(|gen| gen.is_async),
-                ));
+                self.scopes.push(Scope::Comprehension {
+                    is_async: generators.iter().any(|gen| gen.is_async),
+                });
                 ruff_python_ast::visitor::walk_expr(self, expr);
                 self.scopes.pop().unwrap();
             }
