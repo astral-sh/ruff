@@ -981,7 +981,6 @@ impl<'db> Binding<'db> {
         signature: &Signature<'db>,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) {
-        eprintln!("==> check types {:?}", signature);
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
         let parameters = signature.parameters();

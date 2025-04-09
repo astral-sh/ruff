@@ -277,8 +277,9 @@ impl<'db> ClassType<'db> {
         policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
+        eprintln!("==> class type class member {}", name);
         class_literal
-            .class_member(db, specialization, name, policy)
+            .class_member_inner(db, None, specialization, name, policy)
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
@@ -692,6 +693,16 @@ impl<'db> ClassLiteralType<'db> {
     pub(super) fn class_member(
         self,
         db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
+        self.class_member_inner(db, Some(self), None, name, policy)
+    }
+
+    fn class_member_inner(
+        self,
+        db: &'db dyn Db,
+        self_type: Option<ClassLiteralType<'db>>,
         specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
@@ -712,7 +723,7 @@ impl<'db> ClassLiteralType<'db> {
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Unbound(TypeQualifiers::empty()));
 
-        for superclass in self.iter_mro(db, specialization) {
+        for (idx, superclass) in self.iter_mro(db, specialization).enumerate() {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
@@ -739,7 +750,24 @@ impl<'db> ClassLiteralType<'db> {
                     }
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
+                        let member = match self_type {
+                            Some(self_type)
+                                if idx == 0 && policy.do_not_specialize_self_members() =>
+                            {
+                                self_type.own_class_member(db, name)
+                            }
+                            _ => class.own_class_member(db, name),
+                        };
+                        let x = member;
+                        eprintln!(
+                            "==> own class member {} {}",
+                            name,
+                            x.symbol
+                                .ignore_possibly_unbound()
+                                .unwrap_or(Type::unknown())
+                                .display(db)
+                        );
+                        lookup_error.or_fall_back_to(db, x)
                     });
                 }
             }
@@ -786,7 +814,26 @@ impl<'db> ClassLiteralType<'db> {
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         let body_scope = self.body_scope(db);
-        class_symbol(db, body_scope, name)
+        class_symbol(db, body_scope, name).map_type(|ty| {
+            // The `__new__` and `__init__` members of a non-specialized generic class are handled
+            // specially: they inherit the generic context of their class. That lets us treat them
+            // as generic functions when constructing the class, and infer the specialization of
+            // the class from the arguments that are passed in.
+            match (self, ty, name) {
+                (
+                    ClassLiteralType::Generic(origin),
+                    Type::FunctionLiteral(function),
+                    "__new__" | "__init__",
+                ) => {
+                    let f = Type::FunctionLiteral(
+                        function.with_generic_context(db, origin.generic_context(db)),
+                    );
+                    eprintln!("==> inherit generic {} {}", ty.display(db), f.display(db));
+                    f
+                }
+                _ => ty,
+            }
+        })
     }
 
     /// Returns the `name` attribute of an instance of this class.
@@ -822,6 +869,7 @@ impl<'db> ClassLiteralType<'db> {
                         qualifiers,
                     } = class.own_instance_member(db, name)
                     {
+                        eprintln!("==> own instance member {} {}", name, ty.display(db));
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
 

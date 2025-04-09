@@ -182,6 +182,11 @@ bitflags! {
         ///
         /// This is similar to no object fallback above
         const META_CLASS_NO_TYPE_FALLBACK = 1 << 2;
+
+        /// When looking up an attribute of an unspecialized generic class, do _not_ apply the
+        /// default specialization to the attribute's type. That means the result might contain
+        /// unspecialized typevars, which the caller must be able to handle correctly.
+        const DO_NOT_SPECIALIZE_SELF_MEMBERS = 1 << 3;
     }
 }
 
@@ -203,6 +208,12 @@ impl MemberLookupPolicy {
     /// Exclude attributes defined on `type` when looking up meta-class-attributes.
     pub(crate) const fn meta_class_no_type_fallback(self) -> bool {
         self.contains(Self::META_CLASS_NO_TYPE_FALLBACK)
+    }
+
+    /// Do _not_ apply the default specialization to the type of attributes of an unspecialized
+    /// generic class.
+    pub(crate) const fn do_not_specialize_self_members(self) -> bool {
+        self.contains(Self::DO_NOT_SPECIALIZE_SELF_MEMBERS)
     }
 }
 
@@ -2020,7 +2031,7 @@ impl<'db> Type<'db> {
                         "__get__" | "__set__" | "__delete__",
                     ) => Some(Symbol::Unbound.into()),
 
-                    _ => Some(class.class_member(db, None, name, policy)),
+                    _ => Some(class.class_member(db, name, policy)),
                 }
             }
 
@@ -3548,7 +3559,6 @@ impl<'db> Type<'db> {
             Symbol::Type(dunder_callable, boundness) => {
                 let mut signatures = dunder_callable.signatures(db);
                 if let Some(generic_context) = generic_context {
-                    eprintln!("==> add generic context to signature {:?}", signatures);
                     signatures.add_generic_context(generic_context);
                 }
                 let bindings = Bindings::match_parameters(signatures, argument_types)
@@ -3769,7 +3779,8 @@ impl<'db> Type<'db> {
                 argument_types,
                 generic_context,
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
+                    | MemberLookupPolicy::DO_NOT_SPECIALIZE_SELF_MEMBERS,
             );
             match result {
                 Err(CallDunderError::MethodNotAvailable) => None,
@@ -3797,7 +3808,8 @@ impl<'db> Type<'db> {
                 "__init__",
                 &mut argument_types,
                 generic_context,
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::DO_NOT_SPECIALIZE_SELF_MEMBERS,
             ))
         } else {
             None
@@ -5475,6 +5487,18 @@ impl<'db> FunctionType<'db> {
 
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
         self.known(db) == Some(known_function)
+    }
+
+    fn with_generic_context(self, db: &'db dyn Db, generic_context: GenericContext<'db>) -> Self {
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            Some(generic_context),
+            self.specialization(db),
+        )
     }
 
     fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
