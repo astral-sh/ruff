@@ -1011,6 +1011,43 @@ pub enum SemanticSyntaxErrorKind {
     ///     global counter
     ///     counter += 1
     /// ```
+    ///
+    /// ## Known Issues
+    ///
+    /// Note that the order in which the parts of a `try` statement are visited was changed in 3.13,
+    /// as tracked in CPython issue [#111123]. For example, this code was valid on Python 3.12:
+    ///
+    /// ```python
+    /// a = 10
+    /// def g():
+    ///     try:
+    ///         1 / 0
+    ///     except:
+    ///         a = 1
+    ///     else:
+    ///         global a
+    /// ```
+    ///
+    /// While this more intuitive behavior aligned with the textual order was a syntax error:
+    ///
+    /// ```python
+    /// a = 10
+    /// def f():
+    ///     try:
+    ///         pass
+    ///     except:
+    ///         global a
+    ///     else:
+    ///         a = 1  # SyntaxError: name 'a' is assigned to before global declaration
+    /// ```
+    ///
+    /// This was reversed in version 3.13 to make the second case valid and the first case a syntax
+    /// error. We intentionally enforce the 3.13 ordering, regardless of the Python version, which
+    /// will lead to both false positives and false negatives on 3.12 code that takes advantage of
+    /// the old behavior. However, as mentioned in the CPython issue, we expect code relying on this
+    /// to be very rare and not worth the additional complexity to detect.
+    ///
+    /// [#111123]: https://github.com/python/cpython/issues/111123
     LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
