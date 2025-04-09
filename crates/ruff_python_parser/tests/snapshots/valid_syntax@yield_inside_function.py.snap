@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/yield_inside_function.
 ```
 Module(
     ModModule {
-        range: 0..60,
+        range: 0..136,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -97,6 +97,97 @@ Module(
                             },
                         ),
                     ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 61..76,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 61..76,
+                            parameters: None,
+                            body: Yield(
+                                ExprYield {
+                                    range: 70..75,
+                                    value: None,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 77..94,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 77..94,
+                            parameters: None,
+                            body: Yield(
+                                ExprYield {
+                                    range: 86..93,
+                                    value: Some(
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 92..93,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 95..117,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 95..117,
+                            parameters: None,
+                            body: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 104..116,
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 115..116,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 118..135,
+                    value: Lambda(
+                        ExprLambda {
+                            range: 118..135,
+                            parameters: None,
+                            body: Await(
+                                ExprAwait {
+                                    range: 127..134,
+                                    value: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 133..134,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
                 },
             ),
         ],
