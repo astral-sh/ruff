@@ -67,7 +67,7 @@ impl<'db> GenericContext<'db> {
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 // TODO: This should be a new type variant where only these exact types are
-                // assignable, and not subclasses of them.
+                // assignable, and not subclasses of them, nor a union of them.
                 parameter = parameter
                     .with_annotated_type(UnionType::from_elements(db, constraints.iter(db)));
             }
