@@ -53,7 +53,7 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
                 version: _,
             } => {
                 format!("`{deprecated}` is deprecated and moved into `{provider}` provider in Airflow 3.0; \
-                         It still works in Airflow 3.0 but is expected to be removed in future version."
+                         It still works in Airflow 3.0 but is expected to be removed in a future version."
                 )
             }
         }
