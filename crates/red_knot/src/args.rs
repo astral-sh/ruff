@@ -75,7 +75,8 @@ pub(crate) struct CheckCommand {
     ///
     /// This is used to specialize the type of `sys.platform` and will affect the visibility
     /// of platform-specific functions and attributes. If the value is set to `all`, no
-    /// assumptions are made about the target platform.
+    /// assumptions are made about the target platform. If unspecified, the current system's
+    /// platform will be used.
     #[arg(long, value_name = "PLATFORM", alias = "platform")]
     pub(crate) python_platform: Option<String>,
 

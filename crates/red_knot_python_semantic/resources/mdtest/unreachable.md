@@ -195,24 +195,6 @@ if sys.platform == "win32":
     sys.getwindowsversion()
 ```
 
-##### Checking without a specified platform
-
-If `python-platform` is not specified, we currently default to `all`:
-
-```toml
-[environment]
-# python-platform not specified
-```
-
-```py
-import sys
-
-if sys.platform == "win32":
-    # TODO: we should not emit an error here
-    # error: [possibly-unbound-attribute]
-    sys.getwindowsversion()
-```
-
 ## No (incorrect) diagnostics in unreachable code
 
 ```toml

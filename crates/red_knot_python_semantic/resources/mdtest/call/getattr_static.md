@@ -56,7 +56,7 @@ We can access attributes on objects of all kinds:
 ```py
 import sys
 
-reveal_type(inspect.getattr_static(sys, "platform"))  # revealed: LiteralString
+reveal_type(inspect.getattr_static(sys, "dont_write_bytecode"))  # revealed: bool
 reveal_type(inspect.getattr_static(inspect, "getattr_static"))  # revealed: Literal[getattr_static]
 
 reveal_type(inspect.getattr_static(1, "real"))  # revealed: property
