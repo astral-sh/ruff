@@ -6,15 +6,10 @@ use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::TextRange;
 
 pub use self::render::DisplayDiagnostic;
-pub use crate::diagnostic::old::OldSecondaryDiagnosticMessage;
 use crate::files::File;
 use crate::Db;
 
 use self::render::FileResolver;
-
-// This module should not be exported. We are planning to migrate off
-// the APIs in this module.
-mod old;
 mod render;
 
 /// A collection of information that can be rendered into a diagnostic.
