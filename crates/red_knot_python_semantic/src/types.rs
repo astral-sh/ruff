@@ -3710,7 +3710,7 @@ impl<'db> Type<'db> {
     fn try_call_constructor(
         self,
         db: &'db dyn Db,
-        argument_types: CallArgumentTypes<'_, 'db>,
+        mut argument_types: CallArgumentTypes<'_, 'db>,
     ) -> Result<Type<'db>, ConstructorCallError<'db>> {
         debug_assert!(matches!(self, Type::ClassLiteral(_) | Type::SubclassOf(_)));
 
@@ -3749,11 +3749,9 @@ impl<'db> Type<'db> {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
                 // `__new__` is a static method, so we must inject the `cls` argument.
-                let mut argument_types = argument_types.prepend_synthetic(self);
-
-                Some(
-                    match Bindings::match_parameters(signatures, &mut argument_types)
-                        .check_types(db, &mut argument_types)
+                Some(argument_types.with_self(Some(self), |argument_types| {
+                    match Bindings::match_parameters(signatures, argument_types)
+                        .check_types(db, argument_types)
                     {
                         Ok(bindings) => {
                             if boundness == Boundness::PossiblyUnbound {
@@ -3763,8 +3761,8 @@ impl<'db> Type<'db> {
                             }
                         }
                         Err(err) => Err(err.into()),
-                    },
-                )
+                    }
+                }))
             }
             // No explicit `__new__` method found
             Symbol::Unbound => None,
