@@ -196,14 +196,10 @@ reveal_type(c.attr)  # revealed: Unknown
 
 ## Behind the scenes
 
-> TODO: This test is currently disabled pending
-> [an upstream Salsa fix](https://github.com/salsa-rs/salsa/pull/741). Once that has been merged,
-> re-enable this test by changing the language codes below back to `py`.
-
 In this section, we trace through some of the steps that make properties work. We start with a
 simple class `C` and a property `attr`:
 
-```ignore
+```py
 class C:
     def __init__(self):
         self._attr: int = 0
@@ -220,7 +216,7 @@ class C:
 Next, we create an instance of `C`. As we have seen above, accessing `attr` on the instance will
 return an `int`:
 
-```ignore
+```py
 c = C()
 
 reveal_type(c.attr)  # revealed: int
@@ -230,7 +226,7 @@ Behind the scenes, when we write `c.attr`, the first thing that happens is that 
 up the symbol `attr` on the meta-type of `c`, i.e. the class `C`. We can emulate this static lookup
 using `inspect.getattr_static`, to see that `attr` is actually an instance of the `property` class:
 
-```ignore
+```py
 from inspect import getattr_static
 
 attr_property = getattr_static(C, "attr")
@@ -241,7 +237,7 @@ The `property` class has a `__get__` method, which makes it a descriptor. It als
 method, which means that it is a *data* descriptor (if there is no setter, `__set__` is still
 available but yields an `AttributeError` at runtime).
 
-```ignore
+```py
 reveal_type(type(attr_property).__get__)  # revealed: <wrapper-descriptor `__get__` of `property` objects>
 reveal_type(type(attr_property).__set__)  # revealed: <wrapper-descriptor `__set__` of `property` objects>
 ```
@@ -250,14 +246,14 @@ When we access `c.attr`, the `__get__` method of the `property` class is called,
 property object itself as the first argument, and the class instance `c` as the second argument. The
 third argument is the "owner" which can be set to `None` or to `C` in this case:
 
-```ignore
+```py
 reveal_type(type(attr_property).__get__(attr_property, c, C))  # revealed: int
 reveal_type(type(attr_property).__get__(attr_property, c, None))  # revealed: int
 ```
 
 Alternatively, the above can also be written as a method call:
 
-```ignore
+```py
 reveal_type(attr_property.__get__(c, C))  # revealed: int
 ```
 
@@ -265,7 +261,7 @@ When we access `attr` on the class itself, the descriptor protocol is also invok
 argument is set to `None`. When `instance` is `None`, the call to `property.__get__` returns the
 property instance itself. So the following expressions are all equivalent
 
-```ignore
+```py
 reveal_type(attr_property)  # revealed: property
 reveal_type(C.attr)  # revealed: property
 reveal_type(attr_property.__get__(None, C))  # revealed: property
@@ -275,7 +271,7 @@ reveal_type(type(attr_property).__get__(attr_property, None, C))  # revealed: pr
 When we set the property using `c.attr = "a"`, the `__set__` method of the property class is called.
 This attribute access desugars to
 
-```ignore
+```py
 type(attr_property).__set__(attr_property, c, "a")
 
 # error: [call-non-callable] "Call of wrapper descriptor `property.__set__` failed: calling the setter failed"
@@ -284,7 +280,7 @@ type(attr_property).__set__(attr_property, c, 1)
 
 which is also equivalent to the following expressions:
 
-```ignore
+```py
 attr_property.__set__(c, "a")
 # error: [call-non-callable]
 attr_property.__set__(c, 1)
@@ -297,7 +293,7 @@ C.attr.__set__(c, 1)
 Properties also have `fget` and `fset` attributes that can be used to retrieve the original getter
 and setter functions, respectively.
 
-```ignore
+```py
 reveal_type(attr_property.fget)  # revealed: Literal[attr]
 reveal_type(attr_property.fget(c))  # revealed: int
 
