@@ -1337,12 +1337,19 @@ pub trait SemanticSyntaxContext {
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 }
 
+enum Scope {
+    Module,
+    Function(bool),
+    Comprehension(bool),
+}
+
 #[derive(Default)]
 pub struct SemanticSyntaxCheckerVisitor<'a> {
     checker: SemanticSyntaxChecker,
     diagnostics: RefCell<Vec<SemanticSyntaxError>>,
     python_version: PythonVersion,
     source: &'a str,
+    scopes: Vec<Scope>,
 }
 
 impl<'a> SemanticSyntaxCheckerVisitor<'a> {
@@ -1352,6 +1359,7 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
             diagnostics: RefCell::default(),
             python_version: PythonVersion::default(),
             source,
+            scopes: vec![Scope::Module],
         }
     }
 
@@ -1398,15 +1406,27 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_async_context(&self) -> bool {
+        for scope in &self.scopes {
+            if let Scope::Function(is_async) = scope {
+                return *is_async;
+            }
+        }
         false
     }
 
     fn in_sync_comprehension(&self) -> bool {
+        for scope in &self.scopes {
+            if let Scope::Comprehension(false) = scope {
+                return true;
+            }
+        }
         false
     }
 
     fn in_module_scope(&self) -> bool {
-        false
+        self.scopes
+            .last()
+            .is_some_and(|scope| matches!(scope, Scope::Module))
     }
 
     fn in_notebook(&self) -> bool {
@@ -1415,13 +1435,40 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
 }
 
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
+    #[allow(clippy::single_match)]
     fn visit_stmt(&mut self, stmt: &Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context));
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
+                self.scopes.push(Scope::Function(*is_async));
+                ruff_python_ast::visitor::walk_stmt(self, stmt);
+                self.scopes.pop().unwrap();
+                return;
+            }
+            _ => {}
+        }
         ruff_python_ast::visitor::walk_stmt(self, stmt);
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
         self.with_semantic_checker(|semantic, context| semantic.enter_expr(expr, context));
+        match expr {
+            Expr::Lambda(_) => {
+                self.scopes.push(Scope::Function(false));
+                ruff_python_ast::visitor::walk_expr(self, expr);
+                self.scopes.pop().unwrap();
+            }
+            Expr::ListComp(ast::ExprListComp { generators, .. })
+            | Expr::SetComp(ast::ExprSetComp { generators, .. })
+            | Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
+                self.scopes.push(Scope::Comprehension(
+                    generators.iter().any(|gen| gen.is_async),
+                ));
+                ruff_python_ast::visitor::walk_expr(self, expr);
+                self.scopes.pop().unwrap();
+            }
+            _ => {}
+        }
         ruff_python_ast::visitor::walk_expr(self, expr);
     }
 }
