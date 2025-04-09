@@ -1152,6 +1152,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
             }
+            if checker.enabled(Rule::Airflow3SuggestedUpdate) {
+                airflow::rules::airflow_3_removal_expr(checker, expr);
+            }
             if checker.enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);
             }
