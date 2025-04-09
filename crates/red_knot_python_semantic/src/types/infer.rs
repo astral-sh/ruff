@@ -590,6 +590,17 @@ impl<'db> TypeInferenceBuilder<'db> {
         matches!(self.region, InferenceRegion::Deferred(_)) || self.deferred_state.is_deferred()
     }
 
+    /// Return the ID of the given expression, or the ID of the outermost enclosing string literal,
+    /// if the expression originates from a stringified annotation.
+    fn enclosing_expression_id(&self, expr: &impl HasScopedExpressionId) -> ScopedExpressionId {
+        match self.deferred_state {
+            DeferredExpressionState::InStringAnnotation(enclosing_string_expression) => {
+                enclosing_string_expression
+            }
+            _ => expr.scoped_expression_id(self.db(), self.scope()),
+        }
+    }
+
     fn in_stub(&self) -> bool {
         self.context.in_stub()
     }
@@ -4287,8 +4298,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         let use_def = self.index.use_def_map(file_scope_id);
 
         // If we're inferring types of deferred expressions, always treat them as public symbols
-        let (local_scope_symbol, report_unresolved_usage) = if self.is_deferred() {
-            let symbol = if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
+        let local_scope_symbol = if self.is_deferred() {
+            if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
                 symbol_from_bindings(db, use_def.public_bindings(symbol_id))
             } else {
                 assert!(
@@ -4296,16 +4307,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "Expected the symbol table to create a symbol for every Name node"
                 );
                 Symbol::Unbound
-            };
-
-            (symbol, true)
+            }
         } else {
             let use_id = name_node.scoped_use_id(db, scope);
-            let symbol = symbol_from_bindings(db, use_def.bindings_at_use(use_id));
-            let report_unresolved_usage =
-                self.index
-                    .is_symbol_use_reachable(db, file_scope_id, use_id);
-            (symbol, report_unresolved_usage)
+            symbol_from_bindings(db, use_def.bindings_at_use(use_id))
         };
 
         let symbol = SymbolAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
@@ -4452,16 +4457,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                 })
         });
 
+        let report_unresolved_usage = || {
+            self.index.is_expression_reachable(
+                db,
+                file_scope_id,
+                self.enclosing_expression_id(name_node),
+            )
+        };
+
         symbol
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(qualifiers) => {
-                    if report_unresolved_usage {
+                    if report_unresolved_usage() {
                         report_unresolved_reference(&self.context, name_node);
                     }
                     TypeAndQualifiers::new(Type::unknown(), qualifiers)
                 }
                 LookupError::PossiblyUnbound(type_when_bound) => {
-                    if report_unresolved_usage {
+                    if report_unresolved_usage() {
                         report_possibly_unresolved_reference(&self.context, name_node);
                     }
                     type_when_bound
@@ -4511,26 +4524,36 @@ impl<'db> TypeInferenceBuilder<'db> {
                         _ => false,
                     };
 
-                    if bound_on_instance {
-                        self.context.report_lint(
-                            &UNRESOLVED_ATTRIBUTE,
-                            attribute,
-                            format_args!(
-                                "Attribute `{}` can only be accessed on instances, not on the class object `{}` itself.",
-                                attr.id,
-                                value_type.display(db)
-                            ),
+                    let report_unresolved_attribute = self
+                        .index
+                        .is_expression_reachable(
+                            db,
+                            self.scope().file_scope_id(db),
+                            self.enclosing_expression_id(attribute),
                         );
-                    } else {
-                        self.context.report_lint(
-                            &UNRESOLVED_ATTRIBUTE,
-                            attribute,
-                            format_args!(
-                                "Type `{}` has no attribute `{}`",
-                                value_type.display(db),
-                                attr.id
-                            ),
-                        );
+
+                    if report_unresolved_attribute {
+                        if bound_on_instance {
+                            self.context.report_lint(
+                                &UNRESOLVED_ATTRIBUTE,
+                                attribute,
+                                format_args!(
+                                    "Attribute `{}` can only be accessed on instances, not on the class object `{}` itself.",
+                                    attr.id,
+                                    value_type.display(db)
+                                ),
+                            );
+                        } else {
+                            self.context.report_lint(
+                                &UNRESOLVED_ATTRIBUTE,
+                                attribute,
+                                format_args!(
+                                    "Type `{}` has no attribute `{}`",
+                                    value_type.display(db),
+                                    attr.id
+                                ),
+                            );
+                        }
                     }
 
                     Type::unknown().into()
@@ -6368,7 +6391,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // String annotations are always evaluated in the deferred context.
                 self.infer_annotation_expression(
                     parsed.expr(),
-                    DeferredExpressionState::InStringAnnotation,
+                    DeferredExpressionState::InStringAnnotation(
+                        self.enclosing_expression_id(string),
+                    ),
                 )
             }
             None => TypeAndQualifiers::unknown(),
@@ -6732,7 +6757,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // String annotations are always evaluated in the deferred context.
                 self.infer_type_expression_with_state(
                     parsed.expr(),
-                    DeferredExpressionState::InStringAnnotation,
+                    DeferredExpressionState::InStringAnnotation(
+                        self.enclosing_expression_id(string),
+                    ),
                 )
             }
             None => Type::unknown(),
@@ -7449,19 +7476,19 @@ enum DeferredExpressionState {
     ///
     /// The annotation of `a` is completely inside a string while for `b`, it's only partially
     /// stringified.
-    InStringAnnotation,
+    InStringAnnotation(ScopedExpressionId),
 }
 
 impl DeferredExpressionState {
     const fn is_deferred(self) -> bool {
         matches!(
             self,
-            DeferredExpressionState::Deferred | DeferredExpressionState::InStringAnnotation
+            DeferredExpressionState::Deferred | DeferredExpressionState::InStringAnnotation(_)
         )
     }
 
     const fn in_string_annotation(self) -> bool {
-        matches!(self, DeferredExpressionState::InStringAnnotation)
+        matches!(self, DeferredExpressionState::InStringAnnotation(_))
     }
 }
 
