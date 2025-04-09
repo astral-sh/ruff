@@ -6,7 +6,7 @@
 //! followed by matching calls to [`SemanticSyntaxChecker::exit_stmt`] and
 //! [`SemanticSyntaxChecker::exit_expr`].
 
-use std::fmt::Display;
+use std::{cell::RefCell, fmt::Display};
 
 use ruff_python_ast::{
     self as ast,
@@ -1338,35 +1338,90 @@ pub trait SemanticSyntaxContext {
 }
 
 #[derive(Default)]
-pub struct SemanticSyntaxCheckerVisitor<Ctx> {
+pub struct SemanticSyntaxCheckerVisitor<'a> {
     checker: SemanticSyntaxChecker,
-    context: Ctx,
+    diagnostics: RefCell<Vec<SemanticSyntaxError>>,
+    python_version: PythonVersion,
+    source: &'a str,
 }
 
-impl<Ctx> SemanticSyntaxCheckerVisitor<Ctx> {
-    pub fn new(context: Ctx) -> Self {
+impl<'a> SemanticSyntaxCheckerVisitor<'a> {
+    pub fn new(source: &'a str) -> Self {
         Self {
             checker: SemanticSyntaxChecker::new(),
-            context,
+            diagnostics: RefCell::default(),
+            python_version: PythonVersion::default(),
+            source,
         }
     }
 
-    pub fn into_context(self) -> Ctx {
-        self.context
+    #[must_use]
+    pub fn with_python_version(mut self, python_version: PythonVersion) -> Self {
+        self.python_version = python_version;
+        self
+    }
+
+    pub fn into_diagnostics(self) -> Vec<SemanticSyntaxError> {
+        self.diagnostics.into_inner()
+    }
+
+    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
+        let mut checker = std::mem::take(&mut self.checker);
+        f(&mut checker, self);
+        self.checker = checker;
     }
 }
 
-impl<Ctx> Visitor<'_> for SemanticSyntaxCheckerVisitor<Ctx>
-where
-    Ctx: SemanticSyntaxContext,
-{
-    fn visit_stmt(&mut self, stmt: &'_ Stmt) {
-        self.checker.enter_stmt(stmt, &self.context);
+impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
+    fn seen_docstring_boundary(&self) -> bool {
+        false
+    }
+
+    fn future_annotations_or_stub(&self) -> bool {
+        false
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        self.python_version
+    }
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        self.diagnostics.borrow_mut().push(error);
+    }
+
+    fn source(&self) -> &str {
+        self.source
+    }
+
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
+    }
+
+    fn in_async_context(&self) -> bool {
+        false
+    }
+
+    fn in_sync_comprehension(&self) -> bool {
+        false
+    }
+
+    fn in_module_scope(&self) -> bool {
+        false
+    }
+
+    fn in_notebook(&self) -> bool {
+        false
+    }
+}
+
+impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &Stmt) {
+        self.with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context));
         ruff_python_ast::visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &'_ Expr) {
-        self.checker.enter_expr(expr, &self.context);
+    fn visit_expr(&mut self, expr: &Expr) {
+        self.with_semantic_checker(|semantic, context| semantic.enter_expr(expr, context));
         ruff_python_ast::visitor::walk_expr(self, expr);
     }
 }
