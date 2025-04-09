@@ -35,12 +35,16 @@ use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
 use crate::types::call::{Bindings, CallArgumentTypes};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
+use crate::types::generics::Specialization;
 use crate::types::infer::infer_unpack_types;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{Class, ClassLiteralType, InstanceType, KnownClass, KnownInstanceType};
+pub(crate) use class::{
+    Class, ClassLiteralType, ClassType, GenericAlias, GenericClass, InstanceType, KnownClass,
+    KnownInstanceType, NonGenericClass,
+};
 
 mod builder;
 mod call;
@@ -49,6 +53,7 @@ mod class_base;
 mod context;
 mod diagnostic;
 mod display;
+mod generics;
 mod infer;
 mod mro;
 mod narrow;
@@ -276,6 +281,18 @@ pub struct PropertyInstanceType<'db> {
     setter: Option<Type<'db>>,
 }
 
+impl<'db> PropertyInstanceType<'db> {
+    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let getter = self
+            .getter(db)
+            .map(|ty| ty.apply_specialization(db, specialization));
+        let setter = self
+            .setter(db)
+            .map(|ty| ty.apply_specialization(db, specialization));
+        Self::new(db, getter, setter)
+    }
+}
+
 /// Representation of a type: a set of possible values at runtime.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
@@ -319,7 +336,9 @@ pub enum Type<'db> {
     ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object
     ClassLiteral(ClassLiteralType<'db>),
-    // The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
+    /// A specialization of a generic class
+    GenericAlias(GenericAlias<'db>),
+    /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
     SubclassOf(SubclassOfType<'db>),
     /// The set of Python objects with the given class in their __class__'s method resolution order
     Instance(InstanceType<'db>),
@@ -382,20 +401,17 @@ impl<'db> Type<'db> {
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
         self.into_instance()
-            .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
+            .is_some_and(|instance| instance.class.is_known(db, KnownClass::NoneType))
     }
 
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
-        self.into_instance().is_some_and(|instance| {
-            instance
-                .class()
-                .is_known(db, KnownClass::NotImplementedType)
-        })
+        self.into_instance()
+            .is_some_and(|instance| instance.class.is_known(db, KnownClass::NotImplementedType))
     }
 
     pub fn is_object(&self, db: &'db dyn Db) -> bool {
         self.into_instance()
-            .is_some_and(|instance| instance.class().is_object(db))
+            .is_some_and(|instance| instance.class.is_object(db))
     }
 
     pub const fn is_todo(&self) -> bool {
@@ -425,6 +441,12 @@ impl<'db> Type<'db> {
             | Self::BoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::MethodWrapper(_) => false,
+
+            Self::GenericAlias(generic) => generic
+                .specialization(db)
+                .types(db)
+                .iter()
+                .any(|ty| ty.contains_todo(db)),
 
             Self::Callable(callable) => {
                 let signature = callable.signature(db);
@@ -467,10 +489,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub const fn class_literal(class: Class<'db>) -> Self {
-        Self::ClassLiteral(ClassLiteralType { class })
-    }
-
     pub const fn into_class_literal(self) -> Option<ClassLiteralType<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
@@ -490,6 +508,29 @@ impl<'db> Type<'db> {
 
     pub const fn is_class_literal(&self) -> bool {
         matches!(self, Type::ClassLiteral(..))
+    }
+
+    pub const fn into_class_type(self) -> Option<ClassType<'db>> {
+        match self {
+            Type::ClassLiteral(ClassLiteralType::NonGeneric(non_generic)) => {
+                Some(ClassType::NonGeneric(non_generic))
+            }
+            Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
+            _ => None,
+        }
+    }
+
+    #[track_caller]
+    pub fn expect_class_type(self) -> ClassType<'db> {
+        self.into_class_type()
+            .expect("Expected a Type::GenericAlias or non-generic Type::ClassLiteral variant")
+    }
+
+    pub const fn is_class_type(&self) -> bool {
+        matches!(
+            self,
+            Type::ClassLiteral(ClassLiteralType::NonGeneric(_)) | Type::GenericAlias(_)
+        )
     }
 
     pub const fn is_instance(&self) -> bool {
@@ -631,7 +672,7 @@ impl<'db> Type<'db> {
         matches!(self, Type::LiteralString)
     }
 
-    pub const fn instance(class: Class<'db>) -> Self {
+    pub const fn instance(class: ClassType<'db>) -> Self {
         Self::Instance(InstanceType { class })
     }
 
@@ -693,6 +734,10 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::IntLiteral(_)
             | Type::SubclassOf(_) => self,
+            Type::GenericAlias(generic) => {
+                let specialization = generic.specialization(db).normalized(db);
+                Type::GenericAlias(GenericAlias::new(db, generic.origin(db), specialization))
+            }
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     Type::TypeVar(TypeVarInstance::new(
@@ -932,13 +977,16 @@ impl<'db> Type<'db> {
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
-            (
-                Type::ClassLiteral(ClassLiteralType { class }),
-                Type::SubclassOf(target_subclass_ty),
-            ) => target_subclass_ty
+            (Type::ClassLiteral(class), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class()
-                .is_some_and(|target_class| class.is_subclass_of(db, target_class)),
+                .is_some_and(|target_class| class.is_subclass_of(db, None, target_class)),
+            (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
+                .subclass_of()
+                .into_class()
+                .is_some_and(|target_class| {
+                    ClassType::from(alias).is_subclass_of(db, target_class)
+                }),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
             (Type::SubclassOf(self_subclass_ty), Type::SubclassOf(target_subclass_ty)) => {
@@ -948,9 +996,12 @@ impl<'db> Type<'db> {
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
-            (Type::ClassLiteral(ClassLiteralType { class }), _) => {
+            (Type::ClassLiteral(class), _) => {
                 class.metaclass_instance_type(db).is_subtype_of(db, target)
             }
+            (Type::GenericAlias(alias), _) => ClassType::from(alias)
+                .metaclass_instance_type(db)
+                .is_subtype_of(db, target),
 
             // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
             // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
@@ -1141,11 +1192,10 @@ impl<'db> Type<'db> {
             // Every class literal type is also assignable to `type[Any]`, because the class
             // literal type for a class `C` is a subtype of `type[C]`, and `type[C]` is assignable
             // to `type[Any]`.
-            (Type::ClassLiteral(_) | Type::SubclassOf(_), Type::SubclassOf(target_subclass_of))
-                if target_subclass_of.is_dynamic() =>
-            {
-                true
-            }
+            (
+                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_),
+                Type::SubclassOf(target_subclass_of),
+            ) if target_subclass_of.is_dynamic() => true,
 
             // `type[Any]` is assignable to any type that `type[object]` is assignable to, because
             // `type[Any]` can materialize to `type[object]`.
@@ -1386,6 +1436,7 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
+                | Type::GenericAlias(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::BooleanLiteral(..)
                 | Type::IntLiteral(..)
@@ -1398,6 +1449,7 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
+                | Type::GenericAlias(..)
                 | Type::KnownInstance(..)),
             ) => left != right,
 
@@ -1406,6 +1458,7 @@ impl<'db> Type<'db> {
             (
                 Type::Tuple(..),
                 Type::ClassLiteral(..)
+                | Type::GenericAlias(..)
                 | Type::ModuleLiteral(..)
                 | Type::BooleanLiteral(..)
                 | Type::BytesLiteral(..)
@@ -1420,6 +1473,7 @@ impl<'db> Type<'db> {
             )
             | (
                 Type::ClassLiteral(..)
+                | Type::GenericAlias(..)
                 | Type::ModuleLiteral(..)
                 | Type::BooleanLiteral(..)
                 | Type::BytesLiteral(..)
@@ -1434,17 +1488,23 @@ impl<'db> Type<'db> {
                 Type::Tuple(..),
             ) => true,
 
-            (
-                Type::SubclassOf(subclass_of_ty),
-                Type::ClassLiteral(ClassLiteralType { class: class_b }),
-            )
-            | (
-                Type::ClassLiteral(ClassLiteralType { class: class_b }),
-                Type::SubclassOf(subclass_of_ty),
-            ) => match subclass_of_ty.subclass_of() {
-                ClassBase::Dynamic(_) => false,
-                ClassBase::Class(class_a) => !class_b.is_subclass_of(db, class_a),
-            },
+            (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
+            | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
+                match subclass_of_ty.subclass_of() {
+                    ClassBase::Dynamic(_) => false,
+                    ClassBase::Class(class_a) => !class_b.is_subclass_of(db, None, class_a),
+                }
+            }
+
+            (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
+            | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
+                match subclass_of_ty.subclass_of() {
+                    ClassBase::Dynamic(_) => false,
+                    ClassBase::Class(class_a) => {
+                        !ClassType::from(alias_b).is_subclass_of(db, class_a)
+                    }
+                }
+            }
 
             (
                 Type::SubclassOf(_),
@@ -1561,12 +1621,14 @@ impl<'db> Type<'db> {
             // A class-literal type `X` is always disjoint from an instance type `Y`,
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
             // where `Z` is `X`'s metaclass.
-            (Type::ClassLiteral(ClassLiteralType { class }), instance @ Type::Instance(_))
-            | (instance @ Type::Instance(_), Type::ClassLiteral(ClassLiteralType { class })) => {
-                !class
-                    .metaclass_instance_type(db)
-                    .is_subtype_of(db, instance)
-            }
+            (Type::ClassLiteral(class), instance @ Type::Instance(_))
+            | (instance @ Type::Instance(_), Type::ClassLiteral(class)) => !class
+                .metaclass_instance_type(db)
+                .is_subtype_of(db, instance),
+            (Type::GenericAlias(alias), instance @ Type::Instance(_))
+            | (instance @ Type::Instance(_), Type::GenericAlias(alias)) => !ClassType::from(alias)
+                .metaclass_instance_type(db)
+                .is_subtype_of(db, instance),
 
             (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
             | (Type::Instance(InstanceType { class }), Type::FunctionLiteral(..)) => {
@@ -1692,7 +1754,7 @@ impl<'db> Type<'db> {
             },
 
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.is_fully_static(),
-            Type::ClassLiteral(_) | Type::Instance(_) => {
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::Instance(_) => {
                 // TODO: Ideally, we would iterate over the MRO of the class, check if all
                 // bases are fully static, and only return `true` if that is the case.
                 //
@@ -1763,6 +1825,7 @@ impl<'db> Type<'db> {
             | Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
+            | Type::GenericAlias(..)
             | Type::ModuleLiteral(..)
             | Type::KnownInstance(..) => true,
             Type::Callable(_) => {
@@ -1828,6 +1891,7 @@ impl<'db> Type<'db> {
             | Type::MethodWrapper(_)
             | Type::ModuleLiteral(..)
             | Type::ClassLiteral(..)
+            | Type::GenericAlias(..)
             | Type::IntLiteral(..)
             | Type::BooleanLiteral(..)
             | Type::StringLiteral(..)
@@ -1912,7 +1976,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Some(Symbol::bound(self).into()),
 
-            Type::ClassLiteral(class_literal @ ClassLiteralType { class }) => {
+            Type::ClassLiteral(class) => {
                 match (class.known(db), name) {
                     (Some(KnownClass::FunctionType), "__get__") => Some(
                         Symbol::bound(Type::WrapperDescriptor(
@@ -1956,8 +2020,12 @@ impl<'db> Type<'db> {
                         "__get__" | "__set__" | "__delete__",
                     ) => Some(Symbol::Unbound.into()),
 
-                    _ => Some(class_literal.class_member(db, name, policy)),
+                    _ => Some(class.class_member(db, None, name, policy)),
                 }
+            }
+
+            Type::GenericAlias(alias) => {
+                Some(ClassType::from(*alias).class_member(db, name, policy))
             }
 
             Type::SubclassOf(subclass_of)
@@ -2126,7 +2194,9 @@ impl<'db> Type<'db> {
             // a `__dict__` that is filled with class level attributes. Modeling this is currently not
             // required, as `instance_member` is only called for instance-like types through `member`,
             // but we might want to add this in the future.
-            Type::ClassLiteral(_) | Type::SubclassOf(_) => Symbol::Unbound.into(),
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                Symbol::Unbound.into()
+            }
         }
     }
 
@@ -2439,7 +2509,7 @@ impl<'db> Type<'db> {
             )
             .into(),
 
-            Type::ClassLiteral(ClassLiteralType { class })
+            Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
             {
                 Symbol::bound(Type::WrapperDescriptor(
@@ -2447,7 +2517,7 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
-            Type::ClassLiteral(ClassLiteralType { class })
+            Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::Property) =>
             {
                 Symbol::bound(Type::WrapperDescriptor(
@@ -2455,7 +2525,7 @@ impl<'db> Type<'db> {
                 ))
                 .into()
             }
-            Type::ClassLiteral(ClassLiteralType { class })
+            Type::ClassLiteral(class)
                 if name == "__set__" && class.is_known(db, KnownClass::Property) =>
             {
                 Symbol::bound(Type::WrapperDescriptor(
@@ -2599,8 +2669,8 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::ClassLiteral(..) | Type::SubclassOf(..) => {
-                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
+            Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str,policy).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
 
@@ -2785,14 +2855,17 @@ impl<'db> Type<'db> {
 
             Type::AlwaysFalsy => Truthiness::AlwaysFalse,
 
-            Type::ClassLiteral(ClassLiteralType { class }) => class
+            Type::ClassLiteral(class) => class
+                .metaclass_instance_type(db)
+                .try_bool_impl(db, allow_short_circuit)?,
+            Type::GenericAlias(alias) => ClassType::from(*alias)
                 .metaclass_instance_type(db)
                 .try_bool_impl(db, allow_short_circuit)?,
 
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => Truthiness::Ambiguous,
                 ClassBase::Class(class) => {
-                    Type::class_literal(class).try_bool_impl(db, allow_short_circuit)?
+                    Type::from(class).try_bool_impl(db, allow_short_circuit)?
                 }
             },
 
@@ -3141,7 +3214,7 @@ impl<'db> Type<'db> {
                 )),
             },
 
-            Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
+            Type::ClassLiteral(class) => match class.known(db) {
                 // TODO: Ideally we'd use `try_call_constructor` for all constructor calls.
                 // Currently we don't for a few special known types, either because their
                 // constructors are defined with overloads, or because we want to special case
@@ -3345,13 +3418,23 @@ impl<'db> Type<'db> {
                 }
             },
 
+            Type::GenericAlias(_) => {
+                // TODO annotated return type on `__new__` or metaclass `__call__`
+                // TODO check call vs signatures of `__new__` and/or `__init__`
+                let signature = CallableSignature::single(
+                    self,
+                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                );
+                Signatures::single(signature)
+            }
+
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
                 ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).signatures(db),
                 // Most type[] constructor calls are handled by `try_call_constructor` and not via
                 // getting the signature here. This signature can still be used in some cases (e.g.
                 // evaluating callable subtyping). TODO improve this definition (intersection of
                 // `__new__` and `__init__` signatures? and respect metaclass `__call__`).
-                ClassBase::Class(class) => Type::class_literal(class).signatures(db),
+                ClassBase::Class(class) => Type::from(class).signatures(db),
             },
 
             Type::Instance(_) => {
@@ -3729,7 +3812,8 @@ impl<'db> Type<'db> {
     pub fn to_instance(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Dynamic(_) | Type::Never => Some(*self),
-            Type::ClassLiteral(ClassLiteralType { class }) => Some(Type::instance(*class)),
+            Type::ClassLiteral(class) => Some(Type::instance(class.default_specialization(db))),
+            Type::GenericAlias(alias) => Some(Type::instance(ClassType::from(*alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance()),
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -3774,7 +3858,7 @@ impl<'db> Type<'db> {
         match self {
             // Special cases for `float` and `complex`
             // https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
-            Type::ClassLiteral(ClassLiteralType { class }) => {
+            Type::ClassLiteral(class) => {
                 let ty = match class.known(db) {
                     Some(KnownClass::Any) => Type::any(),
                     Some(KnownClass::Complex) => UnionType::from_elements(
@@ -3792,10 +3876,11 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
-                    _ => Type::instance(*class),
+                    _ => Type::instance(class.default_specialization(db)),
                 };
                 Ok(ty)
             }
+            Type::GenericAlias(alias) => Ok(Type::instance(ClassType::from(*alias))),
 
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)
@@ -4033,7 +4118,8 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::ClassLiteral(ClassLiteralType { class }) => class.metaclass(db),
+            Type::ClassLiteral(class) => class.metaclass(db),
+            Type::GenericAlias(alias) => ClassType::from(*alias).metaclass(db),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 ClassBase::Dynamic(_) => *self,
                 ClassBase::Class(class) => SubclassOfType::from(
@@ -4052,6 +4138,121 @@ impl<'db> Type<'db> {
                     .expect("Type::Todo should be a valid ClassBase"),
             ),
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
+        }
+    }
+
+    /// Applies a specialization to this type, replacing any typevars with the types that they are
+    /// specialized to.
+    ///
+    /// Note that this does not specialize generic classes, functions, or type aliases! That is a
+    /// different operation that is performed explicitly (via a subscript operation), or implicitly
+    /// via a call to the generic object.
+    #[must_use]
+    #[salsa::tracked]
+    pub fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        match self {
+            Type::TypeVar(typevar) => specialization.get(db, typevar).unwrap_or(self),
+
+            Type::FunctionLiteral(function) => {
+                Type::FunctionLiteral(function.apply_specialization(db, specialization))
+            }
+
+            // Note that we don't need to apply the specialization to `self_instance`, since it
+            // must either be a non-generic class literal (which cannot have any typevars to
+            // specialize) or a generic alias (which has already been fully specialized). For a
+            // generic alias, the specialization being applied here must be for some _other_
+            // generic context nested within the generic alias's class literal, which the generic
+            // alias's context cannot refer to. (The _method_ does need to be specialized, since it
+            // might be a nested generic method, whose generic context is what is now being
+            // specialized.)
+            Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
+                db,
+                method.function(db).apply_specialization(db, specialization),
+                method.self_instance(db),
+            )),
+
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
+                Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
+                    function.apply_specialization(db, specialization),
+                ))
+            }
+
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
+                Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(
+                    property.apply_specialization(db, specialization),
+                ))
+            }
+
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
+                Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(
+                    property.apply_specialization(db, specialization),
+                ))
+            }
+
+            Type::Callable(callable) => {
+                Type::Callable(callable.apply_specialization(db, specialization))
+            }
+
+            Type::GenericAlias(generic) => {
+                let specialization = generic
+                    .specialization(db)
+                    .apply_specialization(db, specialization);
+                Type::GenericAlias(GenericAlias::new(db, generic.origin(db), specialization))
+            }
+
+            Type::PropertyInstance(property) => {
+                Type::PropertyInstance(property.apply_specialization(db, specialization))
+            }
+
+            Type::Union(union) => union.map(db, |element| {
+                element.apply_specialization(db, specialization)
+            }),
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db);
+                for positive in intersection.positive(db) {
+                    builder =
+                        builder.add_positive(positive.apply_specialization(db, specialization));
+                }
+                for negative in intersection.negative(db) {
+                    builder =
+                        builder.add_negative(negative.apply_specialization(db, specialization));
+                }
+                builder.build()
+            }
+            Type::Tuple(tuple) => TupleType::from_elements(
+                db,
+                tuple
+                    .iter(db)
+                    .map(|ty| ty.apply_specialization(db, specialization)),
+            ),
+
+            Type::Dynamic(_)
+            | Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::WrapperDescriptor(_)
+            | Type::ModuleLiteral(_)
+            // A non-generic class never needs to be specialized. A generic class is specialized
+            // explicitly (via a subscript expression) or implicitly (via a call), and not because
+            // some other generic context's specialization is applied to it.
+            | Type::ClassLiteral(_)
+            // SubclassOf contains a ClassType, which has already been specialized if needed, like
+            // above with BoundMethod's self_instance.
+            | Type::SubclassOf(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_)
+            // Instance contains a ClassType, which has already been specialized if needed, like
+            // above with BoundMethod's self_instance.
+            | Type::Instance(_)
+            | Type::KnownInstance(_) => self,
         }
     }
 
@@ -4111,11 +4312,10 @@ impl<'db> Type<'db> {
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
             Self::ClassLiteral(class_literal) => {
-                Some(TypeDefinition::Class(class_literal.class().definition(db)))
+                Some(TypeDefinition::Class(class_literal.definition(db)))
             }
-            Self::Instance(instance) => {
-                Some(TypeDefinition::Class(instance.class().definition(db)))
-            }
+            Self::GenericAlias(alias) => Some(TypeDefinition::Class(alias.definition(db))),
+            Self::Instance(instance) => Some(TypeDefinition::Class(instance.class.definition(db))),
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
                     Some(TypeDefinition::TypeVar(var.definition(db)))
@@ -5133,6 +5333,11 @@ pub struct FunctionType<'db> {
 
     /// A set of special decorators that were applied to this function
     decorators: FunctionDecorators,
+
+    /// A specialization that should be applied to the function's parameter and return types,
+    /// either because the function is itself generic, or because it appears in the body of a
+    /// generic class.
+    specialization: Option<Specialization<'db>>,
 }
 
 #[salsa::tracked]
@@ -5183,13 +5388,17 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
-        let internal_signature = self.internal_signature(db);
+        let mut internal_signature = self.internal_signature(db);
 
         if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-            Signature::todo("return type of overloaded function")
-        } else {
-            internal_signature
+            return Signature::todo("return type of overloaded function");
         }
+
+        if let Some(specialization) = self.specialization(db) {
+            internal_signature.apply_specialization(db, specialization);
+        }
+
+        internal_signature
     }
 
     /// Typed internally-visible signature for this function.
@@ -5211,6 +5420,21 @@ impl<'db> FunctionType<'db> {
 
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
         self.known(db) == Some(known_function)
+    }
+
+    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let specialization = match self.specialization(db) {
+            Some(existing) => existing.apply_specialization(db, specialization),
+            None => specialization,
+        };
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            Some(specialization),
+        )
     }
 }
 
@@ -5380,6 +5604,12 @@ impl<'db> CallableType<'db> {
             .return_ty
             .map(|return_ty| return_ty.normalized(db));
         CallableType::new(db, Signature::new(parameters, return_ty))
+    }
+
+    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let mut signature = self.signature(db).clone();
+        signature.apply_specialization(db, specialization);
+        Self::new(db, signature)
     }
 
     /// Returns `true` if this is a fully static callable type.
@@ -6006,8 +6236,8 @@ impl<'db> TypeAliasType<'db> {
 /// Either the explicit `metaclass=` keyword of the class, or the inferred metaclass of one of its base classes.
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(super) struct MetaclassCandidate<'db> {
-    metaclass: Class<'db>,
-    explicit_metaclass_of: Class<'db>,
+    metaclass: ClassType<'db>,
+    explicit_metaclass_of: ClassLiteralType<'db>,
 }
 
 #[salsa::interned(debug)]
@@ -6578,6 +6808,10 @@ impl<'db> TupleType<'db> {
 
     pub fn len(&self, db: &'db dyn Db) -> usize {
         self.elements(db).len()
+    }
+
+    pub fn iter(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> + 'db + '_ {
+        self.elements(db).iter().copied()
     }
 }
 

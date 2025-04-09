@@ -159,10 +159,10 @@ impl KnownConstraintFunction {
             Type::ClassLiteral(class_literal) => {
                 // At runtime (on Python 3.11+), this will return `True` for classes that actually
                 // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
-                if class_literal.class().is_known(db, KnownClass::Any) {
+                if class_literal.is_known(db, KnownClass::Any) {
                     None
                 } else {
-                    Some(constraint_fn(class_literal.class()))
+                    Some(constraint_fn(class_literal.default_specialization(db)))
                 }
             }
             Type::SubclassOf(subclass_of_ty) => {
@@ -473,8 +473,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             range: _,
                         },
                 }) if keywords.is_empty() => {
-                    let Type::ClassLiteral(ClassLiteralType { class: rhs_class }) = rhs_ty else {
-                        continue;
+                    let rhs_class = match rhs_ty {
+                        Type::ClassLiteral(class) => class,
+                        Type::GenericAlias(alias) => {
+                            ClassLiteralType::Generic(alias.origin(self.db))
+                        }
+                        _ => {
+                            continue;
+                        }
                     };
 
                     let [ast::Expr::Name(ast::ExprName { id, .. })] = &**args else {
@@ -496,10 +502,13 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                     if callable_type
                         .into_class_literal()
-                        .is_some_and(|c| c.class().is_known(self.db, KnownClass::Type))
+                        .is_some_and(|c| c.is_known(self.db, KnownClass::Type))
                     {
                         let symbol = self.expect_expr_name_symbol(id);
-                        constraints.insert(symbol, Type::instance(rhs_class));
+                        constraints.insert(
+                            symbol,
+                            Type::instance(rhs_class.unknown_specialization(self.db)),
+                        );
                     }
                 }
                 _ => {}
@@ -550,7 +559,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             Type::ClassLiteral(class_type)
                 if expr_call.arguments.args.len() == 1
                     && expr_call.arguments.keywords.is_empty()
-                    && class_type.class().is_known(self.db, KnownClass::Bool) =>
+                    && class_type.is_known(self.db, KnownClass::Bool) =>
             {
                 self.evaluate_expression_node_predicate(
                     &expr_call.arguments.args[0],
