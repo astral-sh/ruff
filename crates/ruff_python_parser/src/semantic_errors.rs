@@ -1015,7 +1015,7 @@ pub enum SemanticSyntaxErrorKind {
     /// ## Known Issues
     ///
     /// Note that the order in which the parts of a `try` statement are visited was changed in 3.13,
-    /// as tracked in CPython issue [#111123]. For example, this code was valid on Python 3.12:
+    /// as tracked in Python issue [#111123]. For example, this code was valid on Python 3.12:
     ///
     /// ```python
     /// a = 10
@@ -1044,7 +1044,7 @@ pub enum SemanticSyntaxErrorKind {
     /// This was reversed in version 3.13 to make the second case valid and the first case a syntax
     /// error. We intentionally enforce the 3.13 ordering, regardless of the Python version, which
     /// will lead to both false positives and false negatives on 3.12 code that takes advantage of
-    /// the old behavior. However, as mentioned in the CPython issue, we expect code relying on this
+    /// the old behavior. However, as mentioned in the Python issue, we expect code relying on this
     /// to be very rare and not worth the additional complexity to detect.
     ///
     /// [#111123]: https://github.com/python/cpython/issues/111123
