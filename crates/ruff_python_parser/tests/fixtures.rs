@@ -513,4 +513,16 @@ impl SemanticSyntaxContext for TestContext<'_> {
     fn in_async_context(&self) -> bool {
         false
     }
+
+    fn in_sync_comprehension(&self) -> bool {
+        false
+    }
+
+    fn in_module_scope(&self) -> bool {
+        false
+    }
+
+    fn in_notebook(&self) -> bool {
+        false
+    }
 }
