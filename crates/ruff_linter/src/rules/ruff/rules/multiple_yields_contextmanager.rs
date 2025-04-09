@@ -2,6 +2,7 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::identifier::Identifier;
+use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::{self as ast, visitor::source_order};
 
 use crate::checkers::ast::Checker;
@@ -11,11 +12,7 @@ use crate::rules::ruff::rules::helpers::function_def_visit_preorder_except_body;
 /// Checks that a function decorated with `contextlib.contextmanager` yields only once.
 ///
 /// ### Why is this bad?
-/// When using `contextlib.contextmanager` all code preceding the   `yield` is setup code and all
-/// code after the `yield` is cleanup code that runs when exiting the context.
-///
-/// A second `yield` in the cleanup phase breaks the context manager protocol and results in a
-/// runtime error.
+/// A context manager must yield exactly once. Multiple yields cause a runtime error.
 ///
 /// ## Example
 /// ```python
@@ -23,19 +20,9 @@ use crate::rules::ruff::rules::helpers::function_def_visit_preorder_except_body;
 /// def broken_context_manager():
 ///     print("Setting up")
 ///     yield "first value"  # This yield is expected
-///     print("Some cleanup")
+///     print("Cleanup")
 ///     yield "second value"  # This violates the protocol
 /// ```
-///
-/// Use instead:
-/// ```python
-/// @contextlib.contextmanager
-/// def correct_context_manager():
-///     print("Setting up")
-///     yield "value"  # Single yield
-///     print("Cleanup code runs when exiting the context")
-/// ```
-///
 /// ## References
 /// - [Python documentation: contextlib.contextmanager](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 /// - [Python documentation: contextlib.asynccontextmanager](https://docs.python.org/3/library/contextlib.html#contextlib.asynccontextmanager)
@@ -60,8 +47,10 @@ pub(crate) fn multiple_yields_in_contextmanager(
     if !is_contextmanager_decorated(function_def, checker) {
         return;
     }
-    let yield_count = count_yields_in_fn(function_def);
-    if yield_count > 1 {
+    let mut path_tracker = YieldPathTracker::default();
+    source_order::walk_body(&mut path_tracker, &function_def.body);
+
+    if path_tracker.has_multiple_yields {
         checker.report_diagnostic(Diagnostic::new(
             MultipleYieldsInContextManager,
             function_def.identifier(),
@@ -86,16 +75,81 @@ fn is_contextmanager_decorated(function_def: &ast::StmtFunctionDef, checker: &Ch
     false
 }
 
-#[derive(Default)]
-struct YieldCounter {
-    count: usize,
+struct YieldPathTracker {
+    has_multiple_yields: bool,
+    path_yields: Vec<usize>,
+    branch_stack: Vec<Vec<usize>>,
 }
 
-impl<'a> source_order::SourceOrderVisitor<'a> for YieldCounter {
+impl Default for YieldPathTracker {
+    fn default() -> Self {
+        Self {
+            has_multiple_yields: false,
+            path_yields: vec![0],
+            branch_stack: vec![],
+        }
+    }
+}
+
+impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> source_order::TraversalSignal {
+        if self.has_multiple_yields {
+            return source_order::TraversalSignal::Skip;
+        }
+        match node {
+            AnyNodeRef::StmtTry(_) | AnyNodeRef::StmtIf(_) | AnyNodeRef::StmtMatch(_) => {
+                self.branch_stack.push(vec![]);
+            }
+            AnyNodeRef::ElifElseClause(_)
+            | AnyNodeRef::MatchCase(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_) => {
+                // Save the yield count of previous branch
+                let current = self.path_yields.pop().unwrap();
+                if let Some(branch) = self.branch_stack.last_mut() {
+                    branch.push(current);
+                }
+                // Start fresh path count for this branch
+                self.path_yields.push(0);
+            }
+            AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
+                // Yields in loops are at high risk of being executed multiple times
+                self.has_multiple_yields = true;
+            }
+            _ => {}
+        }
+        source_order::TraversalSignal::Traverse
+    }
+
+    fn leave_node(&mut self, node: AnyNodeRef<'a>) {
+        match node {
+            AnyNodeRef::StmtTry(_) | AnyNodeRef::StmtIf(_) => {
+                let current = self.path_yields.pop().unwrap();
+                let mut branch = self.branch_stack.pop().unwrap_or_default();
+                branch.push(current);
+                let max_yield = branch.iter().max().copied().unwrap_or(0);
+
+                if max_yield > 1 {
+                    self.has_multiple_yields = true;
+                }
+
+                self.path_yields.push(max_yield);
+            }
+            AnyNodeRef::ElifElseClause(_) | AnyNodeRef::MatchCase(_) => {
+                // Handled on enter/leave of outer structure
+            }
+            _ => {}
+        }
+    }
+
     fn visit_expr(&mut self, expr: &'a ast::Expr) {
         match expr {
             ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
-                self.count += 1;
+                if let Some(count) = self.path_yields.last_mut() {
+                    *count += 1;
+                    if *count > 1 {
+                        self.has_multiple_yields = true;
+                    }
+                }
             }
             _ => source_order::walk_expr(self, expr),
         }
@@ -103,16 +157,10 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldCounter {
 
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
         match stmt {
-            ast::Stmt::FunctionDef(nested_fn) => {
-                function_def_visit_preorder_except_body(nested_fn, self);
+            ast::Stmt::FunctionDef(nested) => {
+                function_def_visit_preorder_except_body(nested, self);
             }
             _ => source_order::walk_stmt(self, stmt),
         }
     }
-}
-
-fn count_yields_in_fn(fn_def: &ast::StmtFunctionDef) -> usize {
-    let mut counter = YieldCounter::default();
-    source_order::walk_body(&mut counter, &fn_def.body);
-    counter.count
 }
