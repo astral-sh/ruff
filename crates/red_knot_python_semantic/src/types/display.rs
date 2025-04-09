@@ -44,6 +44,7 @@ impl Display for DisplayType<'_> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
             | Type::FunctionLiteral(_) => {
                 write!(f, "Literal[{representation}]")
             }
