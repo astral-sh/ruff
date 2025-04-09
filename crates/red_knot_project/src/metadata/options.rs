@@ -242,7 +242,7 @@ pub struct EnvironmentOptions {
     /// If specified, Red Knot will tailor its use of type stub files,
     /// which conditionalize type definitions based on the platform.
     ///
-    /// If no platform is specified, knot will use current platform:
+    /// If no platform is specified, knot will use the current platform:
     /// - `win32` for Windows
     /// - `darwin` for macOS
     /// - `android` for Android
