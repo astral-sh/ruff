@@ -3949,17 +3949,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => None,
         }?;
 
-        if first_param.annotation().is_none() {
-            return Some(Type::unknown());
-        }
-
         let definition = self.index.expect_single_definition(first_param);
 
-        Some(
-            infer_definition_types(self.db(), definition)
-                .declaration_type(definition)
-                .inner_type(),
-        )
+        Some(infer_definition_types(self.db(), definition).binding_type(definition))
     }
 
     /// Returns the type of the nearest enclosing class for the given scope.
