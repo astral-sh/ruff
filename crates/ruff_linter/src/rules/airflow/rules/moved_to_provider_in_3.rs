@@ -90,7 +90,7 @@ pub(crate) fn moved_to_provider_in_3(checker: &Checker, expr: &Expr) {
         Expr::Attribute(ExprAttribute { attr, .. }) => {
             check_names_moved_to_provider(checker, expr, attr.range());
         }
-        ranged @ Expr::Name(_) => check_names_moved_to_provider(checker, expr, ranged.range()),
+        Expr::Name(_) => check_names_moved_to_provider(checker, expr, expr.range()),
         _ => {}
     }
 }
