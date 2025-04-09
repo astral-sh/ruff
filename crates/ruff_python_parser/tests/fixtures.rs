@@ -607,6 +607,9 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
             })
             | ast::Expr::SetComp(ast::ExprSetComp {
                 elt, generators, ..
+            })
+            | ast::Expr::Generator(ast::ExprGenerator {
+                elt, generators, ..
             }) => {
                 for comprehension in generators {
                     self.visit_comprehension(comprehension);
