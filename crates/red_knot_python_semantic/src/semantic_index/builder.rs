@@ -1185,6 +1185,20 @@ where
 
                         let referenced_module = module.file();
 
+                        // In order to understand the visibility of definitions created by a `*` import,
+                        // we need to know the visibility of the global-scope definitions in the
+                        // `referenced_module` the symbols imported from. Much like predicates for `if`
+                        // statements can only have their visibility constraints resolved at type-inference
+                        // time, the visibility of these global-scope definitions in the external module
+                        // cannot be resolved at this point. As such, we essentially model each definition
+                        // stemming from a `from exporter *` import as something like:
+                        //
+                        // ```py
+                        // if <external_definition_is_visible>:
+                        //     from exporter import name
+                        // ```
+                        //
+                        // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
                         for export in exported_names(self.db, referenced_module) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
@@ -1194,13 +1208,10 @@ where
                                 symbol_id,
                                 referenced_module,
                             );
-                            let predicate = Predicate {
-                                node: PredicateNode::StarImportPlaceholder(star_import),
-                                is_positive: true,
-                            };
                             let pre_definition = self.flow_snapshot();
                             self.push_additional_definition(symbol_id, node_ref);
-                            let constraint_id = self.record_visibility_constraint(predicate);
+                            let constraint_id =
+                                self.record_visibility_constraint(star_import.into());
                             let post_definition = self.flow_snapshot();
                             self.flow_restore(pre_definition.clone());
                             self.record_negated_visibility_constraint(constraint_id);

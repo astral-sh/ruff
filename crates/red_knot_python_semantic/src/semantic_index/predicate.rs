@@ -93,22 +93,22 @@ impl<'db> PatternPredicate<'db> {
 /// until type-inference time. This is essentially the same as a standard visibility constraint,
 /// so we reuse the [`Predicate`] infrastructure to model it.
 ///
-/// To illustrate, say we have a module `a.py` like so:
+/// To illustrate, say we have a module `exporter.py` like so:
 ///
 /// ```py
 /// if <condition>:
 ///     class A: ...
 /// ```
 ///
-/// and we have a module `b.py` like so:
+/// and we have a module `importer.py` like so:
 ///
 /// ```py
 /// A = 1
 ///
-/// from a import *
+/// from importer import *
 /// ```
 ///
-/// Since we cannot know whether or not <test> is true at semantic-index time,
+/// Since we cannot know whether or not <condition> is true at semantic-index time,
 /// we record a definition for `A` in `b.py` as a result of the `from a import *`
 /// statement, but place a predicate on it to record the fact that we don't yet
 /// know whether this definition will be visible from all control-flow paths or not.
@@ -132,6 +132,15 @@ impl<'db> PatternPredicate<'db> {
 pub(crate) struct StarImportPlaceholderPredicate<'db> {
     pub(crate) importing_file: File,
 
+    /// Each symbol imported by a `*` import has a separate predicate associated with it:
+    /// this field identifies which symbol that is.
+    ///
+    /// Note that a [`ScopedSymbolId`] is only meaningful if you also know the scope
+    /// it is relative to. For this specific struct, however, there's no need to store a
+    /// separate field to hold the ID of the scope. `StarImportPredicate`s are only created
+    /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
+    /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
+    /// to the global scope.
     pub(crate) symbol_id: ScopedSymbolId,
 
     pub(crate) referenced_file: File,
@@ -139,8 +148,17 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
 
 impl<'db> StarImportPlaceholderPredicate<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        // `StarImportPredicate`s are only created for valid `*`-import definitions,
-        // and valid `*`-import definitions can only ever exist in the global scope.
+        // See doc-comment above [`StarImportPlaceholderPredicate::symbol_id`]:
+        // valid `*`-import definitions can only take place in the global scope.
         global_scope(db, self.importing_file(db))
+    }
+}
+
+impl<'db> From<StarImportPlaceholderPredicate<'db>> for Predicate<'db> {
+    fn from(predicate: StarImportPlaceholderPredicate<'db>) -> Self {
+        Predicate {
+            node: PredicateNode::StarImportPlaceholder(predicate),
+            is_positive: true,
+        }
     }
 }
