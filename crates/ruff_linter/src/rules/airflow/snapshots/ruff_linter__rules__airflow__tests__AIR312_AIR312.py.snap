@@ -12,7 +12,7 @@ AIR312.py:32:1: AIR312 `airflow.hooks.filesystem.FSHook` is deprecated and moved
    |
    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.hooks.filesystem.FSHook` instead.
 
-AIR312.py:33:1: AIR312 `airflow.hooks.package_index.PackageIndexHook` is deprecated and moved into `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in future version.
+AIR312.py:33:1: AIR312 `airflow.hooks.package_index.PackageIndexHook` is deprecated and moved into the `standard` provider in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in future version.
    |
 32 | FSHook()
 33 | PackageIndexHook()
