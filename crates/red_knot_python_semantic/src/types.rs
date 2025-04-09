@@ -6215,7 +6215,7 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        imported_symbol(db, &self.module(db), name).symbol
+        imported_symbol(db, self.module(db).file(), name).symbol
     }
 }
 

@@ -25,6 +25,7 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
+    StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
@@ -1182,10 +1183,40 @@ where
                             continue;
                         };
 
-                        for export in exported_names(self.db, module.file()) {
+                        let referenced_module = module.file();
+
+                        // In order to understand the visibility of definitions created by a `*` import,
+                        // we need to know the visibility of the global-scope definitions in the
+                        // `referenced_module` the symbols imported from. Much like predicates for `if`
+                        // statements can only have their visibility constraints resolved at type-inference
+                        // time, the visibility of these global-scope definitions in the external module
+                        // cannot be resolved at this point. As such, we essentially model each definition
+                        // stemming from a `from exporter *` import as something like:
+                        //
+                        // ```py
+                        // if <external_definition_is_visible>:
+                        //     from exporter import name
+                        // ```
+                        //
+                        // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
+                        for export in exported_names(self.db, referenced_module) {
                             let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
+                            let star_import = StarImportPlaceholderPredicate::new(
+                                self.db,
+                                self.file,
+                                symbol_id,
+                                referenced_module,
+                            );
+                            let pre_definition = self.flow_snapshot();
                             self.push_additional_definition(symbol_id, node_ref);
+                            let constraint_id =
+                                self.record_visibility_constraint(star_import.into());
+                            let post_definition = self.flow_snapshot();
+                            self.flow_restore(pre_definition.clone());
+                            self.record_negated_visibility_constraint(constraint_id);
+                            self.flow_merge(post_definition);
+                            self.simplify_visibility_constraints(pre_definition);
                         }
 
                         continue;
