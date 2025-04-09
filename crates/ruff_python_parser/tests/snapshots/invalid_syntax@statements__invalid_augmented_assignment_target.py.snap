@@ -196,17 +196,17 @@ Module(
                     target: If(
                         ExprIf {
                             range: 166..179,
-                            body: Name(
-                                ExprName {
-                                    range: 166..167,
-                                    id: Name("a"),
-                                    ctx: Load,
-                                },
-                            ),
                             test: Name(
                                 ExprName {
                                     range: 171..172,
                                     id: Name("b"),
+                                    ctx: Load,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 166..167,
+                                    id: Name("a"),
                                     ctx: Load,
                                 },
                             ),

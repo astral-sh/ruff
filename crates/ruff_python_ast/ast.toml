@@ -52,7 +52,7 @@
 #    * `Expr*` - A vector of Expr.
 #    * `&Expr*` - A boxed slice of Expr.
 #    These properties cannot be nested, for example we cannot create a vector of option types.
-# * skip_source_order - (Optional) if this field should be skipped during source order visit.
+# * source_order - (Optional) Defines in what order the fields appear in source
 #
 # variant:
 #   The name of the enum variant for this syntax node.  Defaults to the node
@@ -81,7 +81,7 @@ and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunct
 
 This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
 fields = [
-  { name = "is_async", type = "bool", skip_source_order = true },
+  { name = "is_async", type = "bool" },
   { name = "decorator_list", type = "Decorator*" },
   { name = "name", type = "Identifier" },
   { name = "type_params", type = "Box<crate::TypeParams>?" },
@@ -138,7 +138,7 @@ fields = [
   { name = "target", type = "Expr" },
   { name = "annotation", type = "Expr" },
   { name = "value", type = "Expr?" },
-  { name = "simple", type = "bool", skip_source_order = true },
+  { name = "simple", type = "bool" },
 ]
 
 [Stmt.nodes.StmtFor]
@@ -147,7 +147,7 @@ and [AsyncFor](https://docs.python.org/3/library/ast.html#ast.AsyncFor).
 
 This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
 fields = [
-  { name = "is_async", type = "bool", skip_source_order = true },
+  { name = "is_async", type = "bool" },
   { name = "target", type = "Expr" },
   { name = "iter", type = "Expr" },
   { name = "body", type = "Stmt*" },
@@ -179,7 +179,7 @@ and [AsyncWith](https://docs.python.org/3/library/ast.html#ast.AsyncWith).
 
 This type differs from the original Python AST, as it collapses the synchronous and asynchronous variants into a single type."""
 fields = [
-  { name = "is_async", type = "bool", skip_source_order = true },
+  { name = "is_async", type = "bool" },
   { name = "items", type = "WithItem*" },
   { name = "body", type = "Stmt*" },
 ]
@@ -203,25 +203,23 @@ fields = [
   { name = "handlers", type = "ExceptHandler*" },
   { name = "orelse", type = "Stmt*" },
   { name = "finalbody", type = "Stmt*" },
-  { name = "is_star", type = "bool", skip_source_order = true },
+  { name = "is_star", type = "bool" },
 ]
 
 [Stmt.nodes.StmtAssert]
 doc = "See also [Assert](https://docs.python.org/3/library/ast.html#ast.Assert)"
 fields = [{ name = "test", type = "Expr" }, { name = "msg", type = "Expr?" }]
-source_order = ["test", "msg"]
 
 [Stmt.nodes.StmtImport]
 doc = "See also [Import](https://docs.python.org/3/library/ast.html#ast.Import)"
 fields = [{ name = "names", type = "Alias*" }]
-source_order = ["names"]
 
 [Stmt.nodes.StmtImportFrom]
 doc = "See also [ImportFrom](https://docs.python.org/3/library/ast.html#ast.ImportFrom)"
 fields = [
   { name = "module", type = "Identifier?" },
   { name = "names", type = "Alias*" },
-  { name = "level", type = "u32", skip_source_order = true },
+  { name = "level", type = "u32" },
 ]
 
 [Stmt.nodes.StmtGlobal]
@@ -305,8 +303,8 @@ The final syntax is the combined version of the above two. For example, `%matplo
 [Escape kind]: crate::IpyEscapeKind
 """
 fields = [
-  { name = "kind", type = "IpyEscapeKind", skip_source_order = true },
-  { name = "value", type = "Box<str>", skip_source_order = true },
+  { name = "kind", type = "IpyEscapeKind" },
+  { name = "value", type = "Box<str>" },
 ]
 
 [Expr]
@@ -348,14 +346,16 @@ fields = [
 [Expr.nodes.ExprIf]
 doc = "See also [IfExp](https://docs.python.org/3/library/ast.html#ast.IfExp)"
 fields = [
-  { name = "body", type = "Expr" },
   { name = "test", type = "Expr" },
+  { name = "body", type = "Expr" },
   { name = "orelse", type = "Expr" },
 ]
+source_order = ["body", "test", "orelse"]
 
 [Expr.nodes.ExprDict]
 doc = "See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)"
 fields = [{ name = "items", type = "DictItem*" }]
+custom_source_order = true
 
 [Expr.nodes.ExprSet]
 doc = "See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)"
@@ -388,7 +388,7 @@ doc = "See also [GeneratorExp](https://docs.python.org/3/library/ast.html#ast.Ge
 fields = [
   { name = "elt", type = "Expr" },
   { name = "generators", type = "Comprehension*" },
-  { name = "parenthesized", type = "bool", skip_source_order = true },
+  { name = "parenthesized", type = "bool" },
 ]
 
 [Expr.nodes.ExprAwait]
@@ -430,6 +430,7 @@ it keeps them separate and provide various methods to access the parts.
 
 See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)"""
 fields = [{ name = "value", type = "FStringValue" }]
+custom_source_order = true
 
 [Expr.nodes.ExprStringLiteral]
 doc = """An AST node that represents either a single-part string literal
@@ -446,10 +447,10 @@ fields = [{ name = "value", type = "BytesLiteralValue" }]
 custom_source_order = true
 
 [Expr.nodes.ExprNumberLiteral]
-fields = [{ name = "value", type = "Number", skip_source_order = true }]
+fields = [{ name = "value", type = "Number" }]
 
 [Expr.nodes.ExprBooleanLiteral]
-fields = [{ name = "value", type = "bool", skip_source_order = true }]
+fields = [{ name = "value", type = "bool" }]
 derives = ["Default"]
 
 [Expr.nodes.ExprNoneLiteral]
@@ -465,7 +466,7 @@ doc = "See also [Attribute](https://docs.python.org/3/library/ast.html#ast.Attri
 fields = [
   { name = "value", type = "Expr" },
   { name = "attr", type = "Identifier" },
-  { name = "ctx", type = "ExprContext", skip_source_order = true },
+  { name = "ctx", type = "ExprContext" },
 ]
 
 [Expr.nodes.ExprSubscript]
@@ -473,36 +474,36 @@ doc = "See also [Subscript](https://docs.python.org/3/library/ast.html#ast.Subsc
 fields = [
   { name = "value", type = "Expr" },
   { name = "slice", type = "Expr" },
-  { name = "ctx", type = "ExprContext", skip_source_order = true },
+  { name = "ctx", type = "ExprContext" },
 ]
 
 [Expr.nodes.ExprStarred]
 doc = "See also [Starred](https://docs.python.org/3/library/ast.html#ast.Starred)"
 fields = [
   { name = "value", type = "Expr" },
-  { name = "ctx", type = "ExprContext", skip_source_order = true },
+  { name = "ctx", type = "ExprContext" },
 ]
 
 [Expr.nodes.ExprName]
 doc = "See also [Name](https://docs.python.org/3/library/ast.html#ast.Name)"
 fields = [
-  { name = "id", type = "Name", skip_source_order = true },
-  { name = "ctx", type = "ExprContext", skip_source_order = true },
+  { name = "id", type = "Name" },
+  { name = "ctx", type = "ExprContext" },
 ]
 
 [Expr.nodes.ExprList]
 doc = "See also [List](https://docs.python.org/3/library/ast.html#ast.List)"
 fields = [
   { name = "elts", type = "Expr*" },
-  { name = "ctx", type = "ExprContext", skip_source_order = true },
+  { name = "ctx", type = "ExprContext" },
 ]
 
 [Expr.nodes.ExprTuple]
 doc = "See also [Tuple](https://docs.python.org/3/library/ast.html#ast.Tuple)"
 fields = [
   { name = "elts", type = "Expr*" },
-  { name = "ctx", type = "ExprContext", skip_source_order = true },
-  { name = "parenthesized", type = "bool", skip_source_order = true },
+  { name = "ctx", type = "ExprContext" },
+  { name = "parenthesized", type = "bool" },
 ]
 
 [Expr.nodes.ExprSlice]
@@ -527,8 +528,8 @@ For more information related to terminology and syntax of escape commands,
 see [`StmtIpyEscapeCommand`]."""
 
 fields = [
-  { name = "kind", type = "IpyEscapeKind", skip_source_order = true },
-  { name = "value", type = "Box<str>", skip_source_order = true },
+  { name = "kind", type = "IpyEscapeKind" },
+  { name = "value", type = "Box<str>" },
 ]
 
 [ExceptHandler]

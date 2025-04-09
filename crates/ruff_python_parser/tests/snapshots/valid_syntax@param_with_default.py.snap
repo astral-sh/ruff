@@ -119,18 +119,18 @@ Module(
                                     If(
                                         ExprIf {
                                             range: 38..54,
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 43..47,
+                                                    value: true,
+                                                },
+                                            ),
                                             body: NumberLiteral(
                                                 ExprNumberLiteral {
                                                     range: 38..39,
                                                     value: Int(
                                                         1,
                                                     ),
-                                                },
-                                            ),
-                                            test: BooleanLiteral(
-                                                ExprBooleanLiteral {
-                                                    range: 43..47,
-                                                    value: true,
                                                 },
                                             ),
                                             orelse: NumberLiteral(

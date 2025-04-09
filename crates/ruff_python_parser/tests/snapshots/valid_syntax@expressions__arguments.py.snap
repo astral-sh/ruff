@@ -804,18 +804,18 @@ Module(
                                         value: If(
                                             ExprIf {
                                                 range: 385..401,
+                                                test: BooleanLiteral(
+                                                    ExprBooleanLiteral {
+                                                        range: 390..394,
+                                                        value: true,
+                                                    },
+                                                ),
                                                 body: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         range: 385..386,
                                                         value: Int(
                                                             1,
                                                         ),
-                                                    },
-                                                ),
-                                                test: BooleanLiteral(
-                                                    ExprBooleanLiteral {
-                                                        range: 390..394,
-                                                        value: true,
                                                     },
                                                 ),
                                                 orelse: NumberLiteral(
@@ -1410,17 +1410,17 @@ Module(
                                             value: If(
                                                 ExprIf {
                                                     range: 664..680,
+                                                    test: BooleanLiteral(
+                                                        ExprBooleanLiteral {
+                                                            range: 669..673,
+                                                            value: true,
+                                                        },
+                                                    ),
                                                     body: Name(
                                                         ExprName {
                                                             range: 664..665,
                                                             id: Name("x"),
                                                             ctx: Load,
-                                                        },
-                                                    ),
-                                                    test: BooleanLiteral(
-                                                        ExprBooleanLiteral {
-                                                            range: 669..673,
-                                                            value: true,
                                                         },
                                                     ),
                                                     orelse: Name(
@@ -1587,17 +1587,17 @@ Module(
                                         value: If(
                                             ExprIf {
                                                 range: 749..765,
+                                                test: BooleanLiteral(
+                                                    ExprBooleanLiteral {
+                                                        range: 754..758,
+                                                        value: true,
+                                                    },
+                                                ),
                                                 body: Name(
                                                     ExprName {
                                                         range: 749..750,
                                                         id: Name("x"),
                                                         ctx: Load,
-                                                    },
-                                                ),
-                                                test: BooleanLiteral(
-                                                    ExprBooleanLiteral {
-                                                        range: 754..758,
-                                                        value: true,
                                                     },
                                                 ),
                                                 orelse: Name(

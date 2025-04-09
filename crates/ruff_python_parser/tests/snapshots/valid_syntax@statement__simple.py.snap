@@ -123,17 +123,17 @@ Module(
                     value: If(
                         ExprIf {
                             range: 120..133,
-                            body: Name(
-                                ExprName {
-                                    range: 120..121,
-                                    id: Name("a"),
-                                    ctx: Load,
-                                },
-                            ),
                             test: Name(
                                 ExprName {
                                     range: 125..126,
                                     id: Name("b"),
+                                    ctx: Load,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 120..121,
+                                    id: Name("a"),
                                     ctx: Load,
                                 },
                             ),

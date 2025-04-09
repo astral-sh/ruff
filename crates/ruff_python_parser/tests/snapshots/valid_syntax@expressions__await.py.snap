@@ -331,6 +331,12 @@ Module(
                     value: If(
                         ExprIf {
                             range: 121..146,
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 132..136,
+                                    value: true,
+                                },
+                            ),
                             body: Await(
                                 ExprAwait {
                                     range: 121..128,
@@ -341,12 +347,6 @@ Module(
                                             ctx: Load,
                                         },
                                     ),
-                                },
-                            ),
-                            test: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    range: 132..136,
-                                    value: true,
                                 },
                             ),
                             orelse: NoneLiteral(

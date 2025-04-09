@@ -15,17 +15,17 @@ Module(
                     value: If(
                         ExprIf {
                             range: 0..16,
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 5..9,
+                                    value: true,
+                                },
+                            ),
                             body: Name(
                                 ExprName {
                                     range: 0..1,
                                     id: Name("a"),
                                     ctx: Load,
-                                },
-                            ),
-                            test: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    range: 5..9,
-                                    value: true,
                                 },
                             ),
                             orelse: Name(
@@ -45,6 +45,13 @@ Module(
                     value: If(
                         ExprIf {
                             range: 17..35,
+                            test: Name(
+                                ExprName {
+                                    range: 24..25,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
                             body: Call(
                                 ExprCall {
                                     range: 17..20,
@@ -62,13 +69,6 @@ Module(
                                     },
                                 },
                             ),
-                            test: Name(
-                                ExprName {
-                                    range: 24..25,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             orelse: NoneLiteral(
                                 ExprNoneLiteral {
                                     range: 31..35,
@@ -84,13 +84,6 @@ Module(
                     value: If(
                         ExprIf {
                             range: 36..61,
-                            body: Name(
-                                ExprName {
-                                    range: 36..37,
-                                    id: Name("a"),
-                                    ctx: Load,
-                                },
-                            ),
                             test: Name(
                                 ExprName {
                                     range: 41..42,
@@ -98,20 +91,27 @@ Module(
                                     ctx: Load,
                                 },
                             ),
+                            body: Name(
+                                ExprName {
+                                    range: 36..37,
+                                    id: Name("a"),
+                                    ctx: Load,
+                                },
+                            ),
                             orelse: If(
                                 ExprIf {
                                     range: 48..61,
-                                    body: Name(
-                                        ExprName {
-                                            range: 48..49,
-                                            id: Name("c"),
-                                            ctx: Load,
-                                        },
-                                    ),
                                     test: Name(
                                         ExprName {
                                             range: 53..54,
                                             id: Name("d"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    body: Name(
+                                        ExprName {
+                                            range: 48..49,
+                                            id: Name("c"),
                                             ctx: Load,
                                         },
                                     ),
@@ -134,27 +134,6 @@ Module(
                     value: If(
                         ExprIf {
                             range: 62..84,
-                            body: BinOp(
-                                ExprBinOp {
-                                    range: 62..67,
-                                    left: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            range: 62..63,
-                                            value: Int(
-                                                1,
-                                            ),
-                                        },
-                                    ),
-                                    op: Add,
-                                    right: Name(
-                                        ExprName {
-                                            range: 66..67,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                },
-                            ),
                             test: Compare(
                                 ExprCompare {
                                     range: 71..76,
@@ -181,6 +160,27 @@ Module(
                                     ],
                                 },
                             ),
+                            body: BinOp(
+                                ExprBinOp {
+                                    range: 62..67,
+                                    left: NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 62..63,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                    op: Add,
+                                    right: Name(
+                                        ExprName {
+                                            range: 66..67,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
                             orelse: UnaryOp(
                                 ExprUnaryOp {
                                     range: 82..84,
@@ -205,6 +205,13 @@ Module(
                     value: If(
                         ExprIf {
                             range: 85..108,
+                            test: Name(
+                                ExprName {
+                                    range: 96..97,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
                             body: BoolOp(
                                 ExprBoolOp {
                                     range: 85..92,
@@ -227,13 +234,6 @@ Module(
                                     ],
                                 },
                             ),
-                            test: Name(
-                                ExprName {
-                                    range: 96..97,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             orelse: BooleanLiteral(
                                 ExprBooleanLiteral {
                                     range: 103..108,
@@ -250,6 +250,13 @@ Module(
                     value: If(
                         ExprIf {
                             range: 109..127,
+                            test: Name(
+                                ExprName {
+                                    range: 119..120,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
                             body: Compare(
                                 ExprCompare {
                                     range: 109..115,
@@ -274,13 +281,6 @@ Module(
                                     ],
                                 },
                             ),
-                            test: Name(
-                                ExprName {
-                                    range: 119..120,
-                                    id: Name("y"),
-                                    ctx: Load,
-                                },
-                            ),
                             orelse: Name(
                                 ExprName {
                                     range: 126..127,
@@ -298,12 +298,6 @@ Module(
                     value: If(
                         ExprIf {
                             range: 128..154,
-                            body: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    range: 128..132,
-                                    value: true,
-                                },
-                            ),
                             test: BoolOp(
                                 ExprBoolOp {
                                     range: 136..143,
@@ -324,6 +318,12 @@ Module(
                                             },
                                         ),
                                     ],
+                                },
+                            ),
+                            body: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 128..132,
+                                    value: true,
                                 },
                             ),
                             orelse: BooleanLiteral(
@@ -354,19 +354,19 @@ Module(
                                 If(
                                     ExprIf {
                                         range: 158..171,
+                                        test: Name(
+                                            ExprName {
+                                                range: 163..164,
+                                                id: Name("a"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                         body: NumberLiteral(
                                             ExprNumberLiteral {
                                                 range: 158..159,
                                                 value: Int(
                                                     1,
                                                 ),
-                                            },
-                                        ),
-                                        test: Name(
-                                            ExprName {
-                                                range: 163..164,
-                                                id: Name("a"),
-                                                ctx: Load,
                                             },
                                         ),
                                         orelse: Name(
@@ -391,17 +391,17 @@ Module(
                     value: If(
                         ExprIf {
                             range: 214..240,
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    range: 219..223,
+                                    value: true,
+                                },
+                            ),
                             body: Name(
                                 ExprName {
                                     range: 214..215,
                                     id: Name("x"),
                                     ctx: Load,
-                                },
-                            ),
-                            test: BooleanLiteral(
-                                ExprBooleanLiteral {
-                                    range: 219..223,
-                                    value: true,
                                 },
                             ),
                             orelse: Lambda(
@@ -449,13 +449,6 @@ Module(
                     value: If(
                         ExprIf {
                             range: 302..323,
-                            body: Name(
-                                ExprName {
-                                    range: 302..303,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             test: Yield(
                                 ExprYield {
                                     range: 308..315,
@@ -468,6 +461,13 @@ Module(
                                             },
                                         ),
                                     ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 302..303,
+                                    id: Name("x"),
+                                    ctx: Load,
                                 },
                             ),
                             orelse: Name(
@@ -487,13 +487,6 @@ Module(
                     value: If(
                         ExprIf {
                             range: 324..350,
-                            body: Name(
-                                ExprName {
-                                    range: 324..325,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             test: YieldFrom(
                                 ExprYieldFrom {
                                     range: 330..342,
@@ -504,6 +497,13 @@ Module(
                                             ctx: Load,
                                         },
                                     ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 324..325,
+                                    id: Name("x"),
+                                    ctx: Load,
                                 },
                             ),
                             orelse: Name(
@@ -523,13 +523,6 @@ Module(
                     value: If(
                         ExprIf {
                             range: 351..376,
-                            body: Name(
-                                ExprName {
-                                    range: 351..352,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             test: Lambda(
                                 ExprLambda {
                                     range: 357..368,
@@ -565,6 +558,13 @@ Module(
                                     ),
                                 },
                             ),
+                            body: Name(
+                                ExprName {
+                                    range: 351..352,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
                             orelse: Name(
                                 ExprName {
                                     range: 375..376,
@@ -582,17 +582,17 @@ Module(
                     value: If(
                         ExprIf {
                             range: 409..422,
-                            body: Name(
-                                ExprName {
-                                    range: 409..410,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
                             test: Name(
                                 ExprName {
                                     range: 414..415,
                                     id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 409..410,
+                                    id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
