@@ -209,11 +209,10 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
                             parenthesized: true,
                         })
                     } else {
-                        group
-                            .first()
-                            .expect("should have at least one new_expr")
-                            .to_owned()
-                            .clone()
+                        let Some(group) = group.first() else {
+                            return;
+                        };
+                        group.to_owned().clone()
                     }),
                 });
                 new_exprs.push(new_literal_expr);
@@ -221,7 +220,6 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         }
     }
 
-    // Now concatenate the exprs based on the union type
     let applicability = if checker.comment_ranges().intersects(union.range()) {
         Applicability::Unsafe
     } else {
@@ -307,10 +305,10 @@ fn generate_typing_union_fix(
                 parenthesized: true,
             })
         } else {
-            new_exprs
-                .first()
-                .expect("should have at least one new_expr")
-                .clone()
+            let Some(new_exprs) = new_exprs.first() else {
+                return Ok(None);
+            };
+            new_exprs.clone()
         }),
         ctx: ExprContext::Load,
     });
