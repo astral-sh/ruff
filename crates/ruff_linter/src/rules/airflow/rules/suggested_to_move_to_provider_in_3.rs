@@ -15,8 +15,8 @@ use crate::checkers::ast::Checker;
 /// ## Why is this bad?
 /// Airflow 3.0 moved various deprecated functions, members, and other
 /// values to its providers. Even though these symbols still work fine on Airflow 3.0,
-/// they are expected to be removed from future version. The user is suggested to install
-/// the corresponding provider and replace the original usage with the one in the provider
+/// they are expected to be removed in a future version. The user is suggested to install
+/// the corresponding provider and replace the original usage with the one in the provider.
 ///
 /// ## Example
 /// ```python
