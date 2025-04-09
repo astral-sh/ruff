@@ -8,7 +8,11 @@ Currently, red-knot doesn't support `typing.NewType` in type annotations.
 from typing_extensions import NewType
 from types import GenericAlias
 
+X = GenericAlias(type, ())
 A = NewType("A", int)
+# TODO: typeshed for `typing.GenericAlias` uses `type` for the first argument. `NewType` should be special-cased
+# to be compatible with `type`
+# error: [invalid-argument-type] "Object of type `NewType` cannot be assigned to parameter 2 (`origin`) of function `__new__`; expected type `type`"
 B = GenericAlias(A, ())
 
 def _(

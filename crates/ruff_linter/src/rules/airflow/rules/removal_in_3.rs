@@ -686,36 +686,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "operators", "subdag", ..] => {
             Replacement::Message("The whole `airflow.subdag` module has been removed.")
         }
-        ["airflow", "operators", "branch_operator", "BaseBranchOperator"] => {
-            Replacement::Name("airflow.operators.branch.BaseBranchOperator")
-        }
-        ["airflow", "operators", "dummy" | "dummy_operator", "EmptyOperator" | "DummyOperator"] => {
-            Replacement::Name("airflow.operators.empty.EmptyOperator")
-        }
-        ["airflow", "operators", "email_operator", "EmailOperator"] => {
-            Replacement::Name("airflow.operators.email.EmailOperator")
-        }
-        ["airflow", "operators", "dagrun_operator", "TriggerDagRunLink"] => {
-            Replacement::Name("airflow.operators.trigger_dagrun.TriggerDagRunLink")
-        }
-        ["airflow", "operators", "dagrun_operator", "TriggerDagRunOperator"] => {
-            Replacement::Name("airflow.operators.trigger_dagrun.TriggerDagRunOperator")
-        }
-        ["airflow", "operators", "python_operator", "BranchPythonOperator"] => {
-            Replacement::Name("airflow.operators.python.BranchPythonOperator")
-        }
-        ["airflow", "operators", "python_operator", "PythonOperator"] => {
-            Replacement::Name("airflow.operators.python.PythonOperator")
-        }
-        ["airflow", "operators", "python_operator", "PythonVirtualenvOperator"] => {
-            Replacement::Name("airflow.operators.python.PythonVirtualenvOperator")
-        }
-        ["airflow", "operators", "python_operator", "ShortCircuitOperator"] => {
-            Replacement::Name("airflow.operators.python.ShortCircuitOperator")
-        }
-        ["airflow", "operators", "latest_only_operator", "LatestOnlyOperator"] => {
-            Replacement::Name("airflow.operators.latest_only.LatestOnlyOperator")
-        }
 
         // airflow.secrets
         ["airflow", "secrets", "local_filesystem", "load_connections"] => {
@@ -730,21 +700,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         // airflow.sensors
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
             Replacement::Name("airflow.sdk.bases.sensor.BaseSensorOperator")
-        }
-        ["airflow", "sensors", "date_time_sensor", "DateTimeSensor"] => {
-            Replacement::Name("airflow.sensors.date_time.DateTimeSensor")
-        }
-        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskMarker"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalTaskMarker")
-        }
-        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskSensorLink"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalDagLink")
-        }
-        ["airflow", "sensors", "external_task" | "external_task_sensor", "ExternalTaskSensor"] => {
-            Replacement::Name("airflow.sensors.external_task.ExternalTaskSensor")
-        }
-        ["airflow", "sensors", "time_delta_sensor", "TimeDeltaSensor"] => {
-            Replacement::Name("airflow.sensors.time_delta.TimeDeltaSensor")
         }
 
         // airflow.timetables

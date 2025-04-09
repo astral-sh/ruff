@@ -1,6 +1,6 @@
 use crate::symbol::SymbolAndQualifiers;
 
-use super::{ClassBase, ClassLiteralType, Db, KnownClass, Type};
+use super::{ClassBase, ClassLiteralType, Db, KnownClass, MemberLookupPolicy, Type};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
@@ -66,12 +66,13 @@ impl<'db> SubclassOfType<'db> {
         !self.is_dynamic()
     }
 
-    pub(crate) fn find_name_in_mro(
+    pub(crate) fn find_name_in_mro_with_policy(
         self,
         db: &'db dyn Db,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> Option<SymbolAndQualifiers<'db>> {
-        Type::from(self.subclass_of).find_name_in_mro(db, name)
+        Type::from(self.subclass_of).find_name_in_mro_with_policy(db, name, policy)
     }
 
     /// Return `true` if `self` is a subtype of `other`.

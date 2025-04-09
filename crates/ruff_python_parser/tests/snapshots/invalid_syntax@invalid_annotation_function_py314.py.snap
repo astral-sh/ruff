@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/invalid_annotation_fu
 ```
 Module(
     ModModule {
-        range: 0..236,
+        range: 0..316,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -371,6 +371,136 @@ Module(
                     ],
                 },
             ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 236..315,
+                    is_async: true,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("outer"),
+                        range: 246..251,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 251..253,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 259..284,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("f"),
+                                    range: 263..264,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 264..266,
+                                    posonlyargs: [],
+                                    args: [],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: Some(
+                                    Await(
+                                        ExprAwait {
+                                            range: 271..278,
+                                            value: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 277..278,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 281..284,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 281..284,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        FunctionDef(
+                            StmtFunctionDef {
+                                range: 289..315,
+                                is_async: false,
+                                decorator_list: [],
+                                name: Identifier {
+                                    id: Name("g"),
+                                    range: 293..294,
+                                },
+                                type_params: None,
+                                parameters: Parameters {
+                                    range: 294..310,
+                                    posonlyargs: [],
+                                    args: [
+                                        ParameterWithDefault {
+                                            range: 295..309,
+                                            parameter: Parameter {
+                                                range: 295..309,
+                                                name: Identifier {
+                                                    id: Name("arg"),
+                                                    range: 295..298,
+                                                },
+                                                annotation: Some(
+                                                    Await(
+                                                        ExprAwait {
+                                                            range: 301..308,
+                                                            value: NumberLiteral(
+                                                                ExprNumberLiteral {
+                                                                    range: 307..308,
+                                                                    value: Int(
+                                                                        1,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ),
+                                                ),
+                                            },
+                                            default: None,
+                                        },
+                                    ],
+                                    vararg: None,
+                                    kwonlyargs: [],
+                                    kwarg: None,
+                                },
+                                returns: None,
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 312..315,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 312..315,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -422,12 +552,32 @@ Module(
 7 |     def m(x: (yield from 1)): ...
   |               ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
 8 |     def o() -> (yield from 1): ...
+9 | async def outer():
   |
 
 
-  |
-6 |     def k() -> (yield 1): ...
-7 |     def m(x: (yield from 1)): ...
-8 |     def o() -> (yield from 1): ...
-  |                 ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
-  |
+   |
+ 6 |     def k() -> (yield 1): ...
+ 7 |     def m(x: (yield from 1)): ...
+ 8 |     def o() -> (yield from 1): ...
+   |                 ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a type annotation
+ 9 | async def outer():
+10 |     def f() -> (await 1): ...
+   |
+
+
+   |
+ 8 |     def o() -> (yield from 1): ...
+ 9 | async def outer():
+10 |     def f() -> (await 1): ...
+   |                 ^^^^^^^ Syntax Error: await expression cannot be used within a type annotation
+11 |     def g(arg: (await 1)): ...
+   |
+
+
+   |
+ 9 | async def outer():
+10 |     def f() -> (await 1): ...
+11 |     def g(arg: (await 1)): ...
+   |                 ^^^^^^^ Syntax Error: await expression cannot be used within a type annotation
+   |

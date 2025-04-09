@@ -21,6 +21,15 @@ pub enum PythonPlatform {
     Identifier(String),
 }
 
+impl From<String> for PythonPlatform {
+    fn from(platform: String) -> Self {
+        match platform.as_str() {
+            "all" => PythonPlatform::All,
+            _ => PythonPlatform::Identifier(platform.to_string()),
+        }
+    }
+}
+
 impl Display for PythonPlatform {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {

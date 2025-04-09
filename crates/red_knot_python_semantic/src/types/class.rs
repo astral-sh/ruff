@@ -2,8 +2,8 @@ use std::sync::{LazyLock, Mutex};
 
 use super::{
     class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
-    KnownFunction, Mro, MroError, MroIterator, SubclassOfType, Truthiness, Type, TypeAliasType,
-    TypeQualifiers, TypeVarInstance,
+    KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator, SubclassOfType, Truthiness,
+    Type, TypeAliasType, TypeQualifiers, TypeVarInstance,
 };
 use crate::semantic_index::definition::Definition;
 use crate::{
@@ -323,7 +323,12 @@ impl<'db> Class<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     ///
     /// TODO: Should this be made private...?
-    pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(super) fn class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
         if name == "__mro__" {
             let tuple_elements = self.iter_mro(db).map(Type::from);
             return Symbol::bound(TupleType::from_elements(db, tuple_elements)).into();
@@ -354,6 +359,18 @@ impl<'db> Class<'db> {
                     dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
                 }
                 ClassBase::Class(class) => {
+                    if class.is_known(db, KnownClass::Object)
+                        // Only exclude `object` members if this is not an `object` class itself
+                        && (policy.mro_no_object_fallback() && !self.is_known(db, KnownClass::Object))
+                    {
+                        continue;
+                    }
+
+                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
+                    {
+                        continue;
+                    }
+
                     lookup_result = lookup_result.or_else(|lookup_error| {
                         lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
                     });
@@ -776,8 +793,13 @@ impl<'db> ClassLiteralType<'db> {
         self.class.body_scope(db)
     }
 
-    pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        self.class.class_member(db, name)
+    pub(super) fn class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
+        self.class.class_member(db, name, policy)
     }
 }
 

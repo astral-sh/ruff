@@ -45,20 +45,6 @@ from airflow.lineage.hook import DatasetLineageInfo
 from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
 from airflow.metrics.validators import AllowListValidator, BlockListValidator
 from airflow.models.baseoperator import chain, chain_linear, cross_downstream
-from airflow.models.baseoperatorlink import BaseOperatorLink
-from airflow.notifications.basenotifier import BaseNotifier
-from airflow.operators import dummy_operator
-from airflow.operators.branch_operator import BaseBranchOperator
-from airflow.operators.dagrun_operator import TriggerDagRunLink, TriggerDagRunOperator
-from airflow.operators.dummy import DummyOperator, EmptyOperator
-from airflow.operators.email_operator import EmailOperator
-from airflow.operators.latest_only_operator import LatestOnlyOperator
-from airflow.operators.python_operator import (
-    BranchPythonOperator,
-    PythonOperator,
-    PythonVirtualenvOperator,
-    ShortCircuitOperator,
-)
 from airflow.operators.subdag import SubDagOperator
 from airflow.providers.amazon.aws.auth_manager.avp.entities import AvpEntities
 from airflow.providers.amazon.aws.datasets import s3
@@ -75,22 +61,6 @@ from airflow.providers.trino.datasets import trino
 from airflow.secrets.local_filesystem import LocalFilesystemBackend, load_connections
 from airflow.security.permissions import RESOURCE_DATASET
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
-from airflow.sensors.date_time_sensor import DateTimeSensor
-from airflow.sensors.external_task import (
-    ExternalTaskMarker,
-    ExternalTaskSensor,
-    ExternalTaskSensorLink,
-)
-from airflow.sensors.external_task_sensor import (
-    ExternalTaskMarker as ExternalTaskMarkerFromExternalTaskSensor,
-)
-from airflow.sensors.external_task_sensor import (
-    ExternalTaskSensor as ExternalTaskSensorFromExternalTaskSensor,
-)
-from airflow.sensors.external_task_sensor import (
-    ExternalTaskSensorLink as ExternalTaskSensorLinkFromExternalTaskSensor,
-)
-from airflow.sensors.time_delta_sensor import TimeDeltaSensor
 from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.timetables.simple import DatasetTriggeredTimetable
 from airflow.triggers.external_task import TaskStateTrigger
@@ -167,19 +137,6 @@ BlockListValidator()
 # airflow.models.baseoperator
 chain, chain_linear, cross_downstream
 
-# airflow.models.baseoperatorlink
-BaseOperatorLink()
-
-# ariflow.notifications.basenotifier
-BaseNotifier()
-
-# airflow.operators.dummy
-EmptyOperator()
-DummyOperator()
-
-# airflow.operators.dummy_operator
-dummy_operator.EmptyOperator()
-dummy_operator.DummyOperator()
 
 # airflow.operators.branch_operator
 BaseBranchOperator()
@@ -248,21 +205,6 @@ RESOURCE_DATASET
 # airflow.sensors.base_sensor_operator
 BaseSensorOperator()
 
-# airflow.sensors.date_time_sensor
-DateTimeSensor()
-
-# airflow.sensors.external_task
-ExternalTaskSensorLink()
-ExternalTaskMarker()
-ExternalTaskSensor()
-
-# airflow.sensors.external_task_sensor
-ExternalTaskMarkerFromExternalTaskSensor()
-ExternalTaskSensorFromExternalTaskSensor()
-ExternalTaskSensorLinkFromExternalTaskSensor()
-
-# airflow.sensors.time_delta_sensor
-TimeDeltaSensor()
 
 # airflow.timetables
 DatasetOrTimeSchedule()
