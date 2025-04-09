@@ -321,7 +321,7 @@ AIR301_names.py:118:1: AIR301 `airflow.datasets.manager.DatasetManager` is remov
 119 | dataset_manager
 120 | resolve_dataset_manager
     |
-    = help: Use `airflow.assets.AssetManager` instead
+    = help: Use `airflow.assets.manager.AssetManager` instead
 
 AIR301_names.py:119:1: AIR301 `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
     |
@@ -876,7 +876,7 @@ AIR301_names.py:264:1: AIR301 `airflow.www.auth.has_access_dataset` is removed i
 265 |
 266 | # airflow.www.utils
     |
-    = help: Use `airflow.www.auth.has_access_dataset.has_access_asset` instead
+    = help: Use `airflow.www.auth.has_access_dataset` instead
 
 AIR301_names.py:267:1: AIR301 `airflow.www.utils.get_sensitive_variables_fields` is removed in Airflow 3.0
     |

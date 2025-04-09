@@ -82,16 +82,49 @@ class C[T]:
     def m2(self, x: T) -> T:
         return x
 
-c: C[int] = C()
-# TODO: no error
-# error: [invalid-argument-type]
+c: C[int] = C[int]()
 c.m1(1)
-# TODO: no error
-# error: [invalid-argument-type]
 c.m2(1)
-# TODO: expected type `int`
-# error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `T`"
+# error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `int`"
 c.m2("string")
+```
+
+## Functions on generic classes are descriptors
+
+This repeats the tests in the [Functions as descriptors](./call/methods.md) test suite, but on a
+generic class. This ensures that we are carrying any specializations through the entirety of the
+descriptor protocol, which is how `self` parameters are bound to instance methods.
+
+```py
+from inspect import getattr_static
+
+class C[T]:
+    def f(self, x: T) -> str:
+        return "a"
+
+reveal_type(getattr_static(C[int], "f"))  # revealed: Literal[f[int]]
+reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f[int]`>
+reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: Literal[f[int]]
+# revealed: <bound method `f` of `C[int]`>
+reveal_type(getattr_static(C[int], "f").__get__(C[int](), C[int]))
+
+reveal_type(C[int].f)  # revealed: Literal[f[int]]
+reveal_type(C[int]().f)  # revealed: <bound method `f` of `C[int]`>
+
+bound_method = C[int]().f
+reveal_type(bound_method.__self__)  # revealed: C[int]
+reveal_type(bound_method.__func__)  # revealed: Literal[f[int]]
+
+reveal_type(C[int]().f(1))  # revealed: str
+reveal_type(bound_method(1))  # revealed: str
+
+C[int].f(1)  # error: [missing-argument]
+reveal_type(C[int].f(C[int](), 1))  # revealed: str
+
+class D[U](C[U]):
+    pass
+
+reveal_type(D[int]().f)  # revealed: <bound method `f` of `D[int]`>
 ```
 
 ## Methods can mention other typevars
@@ -126,7 +159,6 @@ class C[T]:
 c: C[int] = C()
 # TODO: no errors
 # TODO: revealed: str
-# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 reveal_type(c.m(1, "string"))  # revealed: S
 ```
@@ -267,4 +299,4 @@ class C[T]:
     ok2: Inner[T]
 ```
 
-[scoping]: https://typing.readthedocs.io/en/latest/spec/generics.html#scoping-rules-for-type-variables
+[scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables

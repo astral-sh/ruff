@@ -168,7 +168,7 @@ impl SearchPaths {
     ///
     /// This method also implements the typing spec's [module resolution order].
     ///
-    /// [module resolution order]: https://typing.readthedocs.io/en/latest/spec/distributing.html#import-resolution-ordering
+    /// [module resolution order]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
     pub(crate) fn from_settings(
         db: &dyn Db,
         settings: &SearchPathSettings,

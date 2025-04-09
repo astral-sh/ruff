@@ -4,7 +4,7 @@ This document describes the conventions for importing symbols.
 
 Reference:
 
-- <https://typing.readthedocs.io/en/latest/spec/distributing.html#import-conventions>
+- <https://typing.python.org/en/latest/spec/distributing.html#import-conventions>
 
 ## Builtins scope
 

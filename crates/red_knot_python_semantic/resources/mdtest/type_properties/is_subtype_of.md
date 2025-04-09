@@ -1148,5 +1148,5 @@ static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 
-[special case for float and complex]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
-[typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+[special case for float and complex]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+[typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence

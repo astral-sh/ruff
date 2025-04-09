@@ -6,6 +6,7 @@ use super::{
     Type, TypeAliasType, TypeQualifiers, TypeVarInstance,
 };
 use crate::semantic_index::definition::Definition;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
@@ -24,41 +25,400 @@ use crate::{
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
-use ruff_db::files::{File, FileRange};
+use ruff_db::files::File;
 use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
 
-/// Representation of a runtime class object.
-///
-/// Does not in itself represent a type,
-/// but is used as the inner data for several structs that *do* represent types.
-#[salsa::interned(debug)]
+fn explicit_bases_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &[Type<'db>],
+    _count: u32,
+    _self: ClassLiteralType<'db>,
+) -> salsa::CycleRecoveryAction<Box<[Type<'db>]>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn explicit_bases_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: ClassLiteralType<'db>,
+) -> Box<[Type<'db>]> {
+    Box::default()
+}
+
+fn try_mro_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Result<Mro<'db>, MroError<'db>>,
+    _count: u32,
+    _self: ClassLiteralType<'db>,
+    _specialization: Option<Specialization<'db>>,
+) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn try_mro_cycle_initial<'db>(
+    db: &'db dyn Db,
+    self_: ClassLiteralType<'db>,
+    specialization: Option<Specialization<'db>>,
+) -> Result<Mro<'db>, MroError<'db>> {
+    Ok(Mro::from_error(
+        db,
+        self_.apply_optional_specialization(db, specialization),
+    ))
+}
+
+#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
+fn inheritance_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<InheritanceCycle>,
+    _count: u32,
+    _self: ClassLiteralType<'db>,
+) -> salsa::CycleRecoveryAction<Option<InheritanceCycle>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn inheritance_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: ClassLiteralType<'db>,
+) -> Option<InheritanceCycle> {
+    None
+}
+
+/// Representation of a class definition statement in the AST. This does not in itself represent a
+/// type, but is used as the inner data for several structs that *do* represent types.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update)]
 pub struct Class<'db> {
     /// Name of the class at definition
-    #[return_ref]
     pub(crate) name: ast::name::Name,
 
-    body_scope: ScopeId<'db>,
+    pub(crate) body_scope: ScopeId<'db>,
 
     pub(crate) known: Option<KnownClass>,
 }
 
-#[salsa::tracked]
 impl<'db> Class<'db> {
+    fn file(&self, db: &dyn Db) -> File {
+        self.body_scope.file(db)
+    }
+
+    /// Return the original [`ast::StmtClassDef`] node associated with this class
+    ///
+    /// ## Note
+    /// Only call this function from queries in the same file or your
+    /// query depends on the AST of another file (bad!).
+    fn node(&self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
+        self.body_scope.node(db).expect_class()
+    }
+
+    fn definition(&self, db: &'db dyn Db) -> Definition<'db> {
+        let index = semantic_index(db, self.body_scope.file(db));
+        index.expect_single_definition(self.body_scope.node(db).expect_class())
+    }
+}
+
+/// A [`Class`] that is not generic.
+#[salsa::interned(debug)]
+pub struct NonGenericClass<'db> {
+    #[return_ref]
+    pub(crate) class: Class<'db>,
+}
+
+impl<'db> From<NonGenericClass<'db>> for Type<'db> {
+    fn from(class: NonGenericClass<'db>) -> Type<'db> {
+        Type::ClassLiteral(ClassLiteralType::NonGeneric(class))
+    }
+}
+
+/// A [`Class`] that is generic.
+#[salsa::interned(debug)]
+pub struct GenericClass<'db> {
+    #[return_ref]
+    pub(crate) class: Class<'db>,
+    pub(crate) generic_context: GenericContext<'db>,
+}
+
+impl<'db> From<GenericClass<'db>> for Type<'db> {
+    fn from(class: GenericClass<'db>) -> Type<'db> {
+        Type::ClassLiteral(ClassLiteralType::Generic(class))
+    }
+}
+
+/// A specialization of a generic class with a particular assignment of types to typevars.
+#[salsa::interned(debug)]
+pub struct GenericAlias<'db> {
+    pub(crate) origin: GenericClass<'db>,
+    pub(crate) specialization: Specialization<'db>,
+}
+
+impl<'db> GenericAlias<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let scope = self.body_scope(db);
-        let index = semantic_index(db, scope.file(db));
-        index.expect_single_definition(scope.node(db).expect_class())
+        self.origin(db).class(db).definition(db)
+    }
+}
+
+impl<'db> From<GenericAlias<'db>> for Type<'db> {
+    fn from(alias: GenericAlias<'db>) -> Type<'db> {
+        Type::GenericAlias(alias)
+    }
+}
+
+/// Represents a class type, which might be a non-generic class, or a specialization of a generic
+/// class.
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Supertype, salsa::Update,
+)]
+pub enum ClassType<'db> {
+    NonGeneric(NonGenericClass<'db>),
+    Generic(GenericAlias<'db>),
+}
+
+#[salsa::tracked]
+impl<'db> ClassType<'db> {
+    fn class(self, db: &'db dyn Db) -> &'db Class<'db> {
+        match self {
+            Self::NonGeneric(non_generic) => non_generic.class(db),
+            Self::Generic(generic) => generic.origin(db).class(db),
+        }
+    }
+
+    /// Returns the class literal and specialization for this class. For a non-generic class, this
+    /// is the class itself. For a generic alias, this is the alias's origin.
+    pub(crate) fn class_literal(
+        self,
+        db: &'db dyn Db,
+    ) -> (ClassLiteralType<'db>, Option<Specialization<'db>>) {
+        match self {
+            Self::NonGeneric(non_generic) => (ClassLiteralType::NonGeneric(non_generic), None),
+            Self::Generic(generic) => (
+                ClassLiteralType::Generic(generic.origin(db)),
+                Some(generic.specialization(db)),
+            ),
+        }
+    }
+
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
+        &self.class(db).name
+    }
+
+    pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
+        self.class(db).known
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        self.class(db).definition(db)
+    }
+
+    fn specialize_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        match self {
+            Self::NonGeneric(_) => ty,
+            Self::Generic(generic) => ty.apply_specialization(db, generic.specialization(db)),
+        }
     }
 
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        self.known(db) == Some(known_class)
+        self.class(db).known == Some(known_class)
     }
 
     /// Return `true` if this class represents the builtin class `object`
     pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Object)
+    }
+
+    /// Iterate over the [method resolution order] ("MRO") of the class.
+    ///
+    /// If the MRO could not be accurately resolved, this method falls back to iterating
+    /// over an MRO that has the class directly inheriting from `Unknown`. Use
+    /// [`ClassLiteralType::try_mro`] if you need to distinguish between the success and failure
+    /// cases rather than simply iterating over the inferred resolution order for the class.
+    ///
+    /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+    pub(super) fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+        let (class_literal, specialization) = self.class_literal(db);
+        class_literal.iter_mro(db, specialization)
+    }
+
+    /// Is this class final?
+    pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
+        let (class_literal, _) = self.class_literal(db);
+        class_literal.is_final(db)
+    }
+
+    /// Return `true` if `other` is present in this class's MRO.
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        // `is_subclass_of` is checking the subtype relation, in which gradual types do not
+        // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
+        self.iter_mro(db).contains(&ClassBase::Class(other))
+    }
+
+    /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
+    pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        let (class_literal, _) = self.class_literal(db);
+        self.specialize_type(db, class_literal.metaclass(db))
+    }
+
+    /// Return a type representing "the set of all instances of the metaclass of this class".
+    pub(super) fn metaclass_instance_type(self, db: &'db dyn Db) -> Type<'db> {
+        self
+            .metaclass(db)
+            .to_instance(db)
+            .expect("`Type::to_instance()` should always return `Some()` when called on the type of a metaclass")
+    }
+
+    /// Returns the class member of this class named `name`.
+    ///
+    /// The member resolves to a member on the class itself or any of its proper superclasses.
+    ///
+    /// TODO: Should this be made private...?
+    pub(super) fn class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
+        let (class_literal, specialization) = self.class_literal(db);
+        class_literal
+            .class_member(db, specialization, name, policy)
+            .map_type(|ty| self.specialize_type(db, ty))
+    }
+
+    /// Returns the inferred type of the class member named `name`. Only bound members
+    /// or those marked as ClassVars are considered.
+    ///
+    /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
+    /// directly. Use [`ClassType::class_member`] if you require a method that will
+    /// traverse through the MRO until it finds the member.
+    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let (class_literal, _) = self.class_literal(db);
+        class_literal
+            .own_class_member(db, name)
+            .map_type(|ty| self.specialize_type(db, ty))
+    }
+
+    /// Returns the `name` attribute of an instance of this class.
+    ///
+    /// The attribute could be defined in the class body, but it could also be an implicitly
+    /// defined attribute that is only present in a method (typically `__init__`).
+    ///
+    /// The attribute might also be defined in a superclass of this class.
+    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let (class_literal, specialization) = self.class_literal(db);
+        class_literal
+            .instance_member(db, specialization, name)
+            .map_type(|ty| self.specialize_type(db, ty))
+    }
+
+    /// A helper function for `instance_member` that looks up the `name` attribute only on
+    /// this class, not on its superclasses.
+    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        let (class_literal, _) = self.class_literal(db);
+        class_literal
+            .own_instance_member(db, name)
+            .map_type(|ty| self.specialize_type(db, ty))
+    }
+}
+
+impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
+    fn from(generic: GenericAlias<'db>) -> ClassType<'db> {
+        ClassType::Generic(generic)
+    }
+}
+
+impl<'db> From<ClassType<'db>> for Type<'db> {
+    fn from(class: ClassType<'db>) -> Type<'db> {
+        match class {
+            ClassType::NonGeneric(non_generic) => non_generic.into(),
+            ClassType::Generic(generic) => generic.into(),
+        }
+    }
+}
+
+/// Represents a single class object at runtime, which might be a non-generic class, or a generic
+/// class that has not been specialized.
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Supertype, salsa::Update,
+)]
+pub enum ClassLiteralType<'db> {
+    NonGeneric(NonGenericClass<'db>),
+    Generic(GenericClass<'db>),
+}
+
+#[salsa::tracked]
+impl<'db> ClassLiteralType<'db> {
+    fn class(self, db: &'db dyn Db) -> &'db Class<'db> {
+        match self {
+            Self::NonGeneric(non_generic) => non_generic.class(db),
+            Self::Generic(generic) => generic.class(db),
+        }
+    }
+
+    pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
+        &self.class(db).name
+    }
+
+    pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
+        self.class(db).known
+    }
+
+    /// Return `true` if this class represents `known_class`
+    pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
+        self.class(db).known == Some(known_class)
+    }
+
+    /// Return `true` if this class represents the builtin class `object`
+    pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
+        self.is_known(db, KnownClass::Object)
+    }
+
+    pub(crate) fn body_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        self.class(db).body_scope
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        self.class(db).definition(db)
+    }
+
+    pub(crate) fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> ClassType<'db> {
+        match (self, specialization) {
+            (Self::NonGeneric(non_generic), _) => ClassType::NonGeneric(non_generic),
+            (Self::Generic(generic), None) => {
+                let specialization = generic.generic_context(db).default_specialization(db);
+                ClassType::Generic(GenericAlias::new(db, generic, specialization))
+            }
+            (Self::Generic(generic), Some(specialization)) => {
+                ClassType::Generic(GenericAlias::new(db, generic, specialization))
+            }
+        }
+    }
+
+    /// Returns the default specialization of this class. For non-generic classes, the class is
+    /// returned unchanged. For a non-specialized generic class, we return a generic alias that
+    /// applies the default specialization to the class's typevars.
+    pub(crate) fn default_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        match self {
+            Self::NonGeneric(non_generic) => ClassType::NonGeneric(non_generic),
+            Self::Generic(generic) => {
+                let specialization = generic.generic_context(db).default_specialization(db);
+                ClassType::Generic(GenericAlias::new(db, generic, specialization))
+            }
+        }
+    }
+
+    /// Returns the unknown specialization of this class. For non-generic classes, the class is
+    /// returned unchanged. For a non-specialized generic class, we return a generic alias that
+    /// maps each of the class's typevars to `Unknown`.
+    pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        match self {
+            Self::NonGeneric(non_generic) => ClassType::NonGeneric(non_generic),
+            Self::Generic(generic) => {
+                let specialization = generic.generic_context(db).unknown_specialization(db);
+                ClassType::Generic(GenericAlias::new(db, generic, specialization))
+            }
+        }
     }
 
     /// Return an iterator over the inferred types of this class's *explicit* bases.
@@ -79,21 +439,21 @@ impl<'db> Class<'db> {
     }
 
     /// Iterate over this class's explicit bases, filtering out any bases that are not class objects.
-    fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = Class<'db>> {
+    fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassType<'db>> {
         self.explicit_bases(db)
             .iter()
             .copied()
-            .filter_map(Type::into_class_literal)
-            .map(|ClassLiteralType { class }| class)
+            .filter_map(Type::into_class_type)
     }
 
     #[salsa::tracked(return_ref, cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial)]
     fn explicit_bases_query(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
-        tracing::trace!("Class::explicit_bases_query: {}", self.name(db));
+        let class = self.class(db);
+        tracing::trace!("ClassLiteralType::explicit_bases_query: {}", class.name);
 
-        let class_stmt = self.node(db);
+        let class_stmt = class.node(db);
         let class_definition =
-            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+            semantic_index(db, class.file(db)).expect_single_definition(class_stmt);
 
         class_stmt
             .bases()
@@ -102,40 +462,19 @@ impl<'db> Class<'db> {
             .collect()
     }
 
-    fn file(self, db: &dyn Db) -> File {
-        self.body_scope(db).file(db)
-    }
-
-    /// Return the original [`ast::StmtClassDef`] node associated with this class
-    ///
-    /// ## Note
-    /// Only call this function from queries in the same file or your
-    /// query depends on the AST of another file (bad!).
-    fn node(self, db: &'db dyn Db) -> &'db ast::StmtClassDef {
-        self.body_scope(db).node(db).expect_class()
-    }
-
-    /// Returns the file range of the class's name.
-    pub fn focus_range(self, db: &dyn Db) -> FileRange {
-        FileRange::new(self.file(db), self.node(db).name.range)
-    }
-
-    pub fn full_range(self, db: &dyn Db) -> FileRange {
-        FileRange::new(self.file(db), self.node(db).range)
-    }
-
     /// Return the types of the decorators on this class
     #[salsa::tracked(return_ref)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
-        tracing::trace!("Class::decorators: {}", self.name(db));
+        let class = self.class(db);
+        tracing::trace!("ClassLiteralType::decorators: {}", class.name);
 
-        let class_stmt = self.node(db);
+        let class_stmt = class.node(db);
         if class_stmt.decorator_list.is_empty() {
             return Box::new([]);
         }
 
         let class_definition =
-            semantic_index(db, self.file(db)).expect_single_definition(class_stmt);
+            semantic_index(db, class.file(db)).expect_single_definition(class_stmt);
 
         class_stmt
             .decorator_list
@@ -164,28 +503,43 @@ impl<'db> Class<'db> {
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     #[salsa::tracked(return_ref, cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial)]
-    pub(super) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, MroError<'db>> {
-        tracing::trace!("Class::try_mro: {}", self.name(db));
-        Mro::of_class(db, self)
+    pub(super) fn try_mro(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Result<Mro<'db>, MroError<'db>> {
+        let class = self.class(db);
+        tracing::trace!("ClassLiteralType::try_mro: {}", class.name);
+        Mro::of_class(db, self, specialization)
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
     ///
     /// If the MRO could not be accurately resolved, this method falls back to iterating
     /// over an MRO that has the class directly inheriting from `Unknown`. Use
-    /// [`Class::try_mro`] if you need to distinguish between the success and failure
+    /// [`ClassLiteralType::try_mro`] if you need to distinguish between the success and failure
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    pub(super) fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
-        MroIterator::new(db, self)
+    pub(super) fn iter_mro(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> impl Iterator<Item = ClassBase<'db>> {
+        MroIterator::new(db, self, specialization)
     }
 
     /// Return `true` if `other` is present in this class's MRO.
-    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Class) -> bool {
+    pub(super) fn is_subclass_of(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        other: ClassType<'db>,
+    ) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
-        self.iter_mro(db).contains(&ClassBase::Class(other))
+        self.iter_mro(db, specialization)
+            .contains(&ClassBase::Class(other))
     }
 
     /// Return the explicit `metaclass` of this class, if one is defined.
@@ -194,14 +548,15 @@ impl<'db> Class<'db> {
     /// Only call this function from queries in the same file or your
     /// query depends on the AST of another file (bad!).
     fn explicit_metaclass(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let class_stmt = self.node(db);
+        let class = self.class(db);
+        let class_stmt = class.node(db);
         let metaclass_node = &class_stmt
             .arguments
             .as_ref()?
             .find_keyword("metaclass")?
             .value;
 
-        let class_definition = self.definition(db);
+        let class_definition = class.definition(db);
 
         Some(definition_expression_type(
             db,
@@ -227,7 +582,8 @@ impl<'db> Class<'db> {
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     #[salsa::tracked]
     pub(super) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
-        tracing::trace!("Class::try_metaclass: {}", self.name(db));
+        let class = self.class(db);
+        tracing::trace!("ClassLiteralType::try_metaclass: {}", class.name);
 
         // Identify the class's own metaclass (or take the first base class's metaclass).
         let mut base_classes = self.fully_static_explicit_bases(db).peekable();
@@ -243,18 +599,19 @@ impl<'db> Class<'db> {
         let (metaclass, class_metaclass_was_from) = if let Some(metaclass) = explicit_metaclass {
             (metaclass, self)
         } else if let Some(base_class) = base_classes.next() {
-            (base_class.metaclass(db), base_class)
+            let (base_class_literal, _) = base_class.class_literal(db);
+            (base_class.metaclass(db), base_class_literal)
         } else {
             (KnownClass::Type.to_class_literal(db), self)
         };
 
-        let mut candidate = if let Type::ClassLiteral(metaclass_ty) = metaclass {
+        let mut candidate = if let Some(metaclass_ty) = metaclass.into_class_type() {
             MetaclassCandidate {
-                metaclass: metaclass_ty.class,
+                metaclass: metaclass_ty,
                 explicit_metaclass_of: class_metaclass_was_from,
             }
         } else {
-            let name = Type::string_literal(db, self.name(db));
+            let name = Type::string_literal(db, &class.name);
             let bases = TupleType::from_elements(db, self.explicit_bases(db));
             // TODO: Should be `dict[str, Any]`
             let namespace = KnownClass::Dict.to_instance(db);
@@ -290,32 +647,34 @@ impl<'db> Class<'db> {
         // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
         for base_class in base_classes {
             let metaclass = base_class.metaclass(db);
-            let Type::ClassLiteral(metaclass) = metaclass else {
+            let Some(metaclass) = metaclass.into_class_type() else {
                 continue;
             };
-            if metaclass.class.is_subclass_of(db, candidate.metaclass) {
+            if metaclass.is_subclass_of(db, candidate.metaclass) {
+                let (base_class_literal, _) = base_class.class_literal(db);
                 candidate = MetaclassCandidate {
-                    metaclass: metaclass.class,
-                    explicit_metaclass_of: base_class,
+                    metaclass,
+                    explicit_metaclass_of: base_class_literal,
                 };
                 continue;
             }
-            if candidate.metaclass.is_subclass_of(db, metaclass.class) {
+            if candidate.metaclass.is_subclass_of(db, metaclass) {
                 continue;
             }
+            let (base_class_literal, _) = base_class.class_literal(db);
             return Err(MetaclassError {
                 kind: MetaclassErrorKind::Conflict {
                     candidate1: candidate,
                     candidate2: MetaclassCandidate {
-                        metaclass: metaclass.class,
-                        explicit_metaclass_of: base_class,
+                        metaclass,
+                        explicit_metaclass_of: base_class_literal,
                     },
                     candidate1_is_base_class: explicit_metaclass.is_none(),
                 },
             });
         }
 
-        Ok(Type::class_literal(candidate.metaclass))
+        Ok(candidate.metaclass.into())
     }
 
     /// Returns the class member of this class named `name`.
@@ -326,11 +685,12 @@ impl<'db> Class<'db> {
     pub(super) fn class_member(
         self,
         db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
         if name == "__mro__" {
-            let tuple_elements = self.iter_mro(db).map(Type::from);
+            let tuple_elements = self.iter_mro(db, specialization).map(Type::from);
             return Symbol::bound(TupleType::from_elements(db, tuple_elements)).into();
         }
 
@@ -345,7 +705,7 @@ impl<'db> Class<'db> {
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Unbound(TypeQualifiers::empty()));
 
-        for superclass in self.iter_mro(db) {
+        for superclass in self.iter_mro(db, specialization) {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
@@ -415,7 +775,7 @@ impl<'db> Class<'db> {
     /// or those marked as ClassVars are considered.
     ///
     /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
-    /// directly. Use [`Class::class_member`] if you require a method that will
+    /// directly. Use [`ClassLiteralType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         let body_scope = self.body_scope(db);
@@ -428,11 +788,16 @@ impl<'db> Class<'db> {
     /// defined attribute that is only present in a method (typically `__init__`).
     ///
     /// The attribute might also be defined in a superclass of this class.
-    pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(super) fn instance_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> SymbolAndQualifiers<'db> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
 
-        for superclass in self.iter_mro(db) {
+        for superclass in self.iter_mro(db, specialization) {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up instance members, in order to
@@ -680,21 +1045,22 @@ impl<'db> Class<'db> {
         /// Also, populates `visited_classes` with all base classes of `self`.
         fn is_cyclically_defined_recursive<'db>(
             db: &'db dyn Db,
-            class: Class<'db>,
-            classes_on_stack: &mut IndexSet<Class<'db>>,
-            visited_classes: &mut IndexSet<Class<'db>>,
+            class: ClassLiteralType<'db>,
+            classes_on_stack: &mut IndexSet<ClassLiteralType<'db>>,
+            visited_classes: &mut IndexSet<ClassLiteralType<'db>>,
         ) -> bool {
             let mut result = false;
             for explicit_base_class in class.fully_static_explicit_bases(db) {
-                if !classes_on_stack.insert(explicit_base_class) {
+                let (explicit_base_class_literal, _) = explicit_base_class.class_literal(db);
+                if !classes_on_stack.insert(explicit_base_class_literal) {
                     return true;
                 }
 
-                if visited_classes.insert(explicit_base_class) {
+                if visited_classes.insert(explicit_base_class_literal) {
                     // If we find a cycle, keep searching to check if we can reach the starting class.
                     result |= is_cyclically_defined_recursive(
                         db,
-                        explicit_base_class,
+                        explicit_base_class_literal,
                         classes_on_stack,
                         visited_classes,
                     );
@@ -718,48 +1084,13 @@ impl<'db> Class<'db> {
     }
 }
 
-fn explicit_bases_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &[Type<'db>],
-    _count: u32,
-    _self: Class<'db>,
-) -> salsa::CycleRecoveryAction<Box<[Type<'db>]>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn explicit_bases_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Box<[Type<'db>]> {
-    Box::default()
-}
-
-fn try_mro_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Result<Mro<'db>, MroError<'db>>,
-    _count: u32,
-    _self: Class<'db>,
-) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    self_: Class<'db>,
-) -> Result<Mro<'db>, MroError<'db>> {
-    Ok(Mro::from_error(db, self_))
-}
-
-#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-fn inheritance_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<InheritanceCycle>,
-    _count: u32,
-    _self: Class<'db>,
-) -> salsa::CycleRecoveryAction<Option<InheritanceCycle>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn inheritance_cycle_initial<'db>(_db: &'db dyn Db, _self: Class<'db>) -> Option<InheritanceCycle> {
-    None
+impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
+    fn from(class: ClassLiteralType<'db>) -> Type<'db> {
+        match class {
+            ClassLiteralType::NonGeneric(non_generic) => non_generic.into(),
+            ClassLiteralType::Generic(generic) => generic.into(),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -778,48 +1109,13 @@ impl InheritanceCycle {
     }
 }
 
-/// A singleton type representing a single class object at runtime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
-pub struct ClassLiteralType<'db> {
-    pub(super) class: Class<'db>,
-}
-
-impl<'db> ClassLiteralType<'db> {
-    pub(super) fn class(self) -> Class<'db> {
-        self.class
-    }
-
-    pub(crate) fn body_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.class.body_scope(db)
-    }
-
-    pub(super) fn class_member(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        policy: MemberLookupPolicy,
-    ) -> SymbolAndQualifiers<'db> {
-        self.class.class_member(db, name, policy)
-    }
-}
-
-impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
-    fn from(value: ClassLiteralType<'db>) -> Self {
-        Self::ClassLiteral(value)
-    }
-}
-
 /// A type representing the set of runtime objects which are instances of a certain class.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
 pub struct InstanceType<'db> {
-    pub(super) class: Class<'db>,
+    pub class: ClassType<'db>,
 }
 
 impl<'db> InstanceType<'db> {
-    pub(super) fn class(self) -> Class<'db> {
-        self.class
-    }
-
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
         // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)
@@ -839,7 +1135,7 @@ impl<'db> From<InstanceType<'db>> for Type<'db> {
 /// Note: good candidates are any classes in `[crate::module_resolver::module::KnownModule]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
-pub enum KnownClass {
+pub(crate) enum KnownClass {
     // To figure out where an stdlib symbol is defined, you can go into `crates/red_knot_vendored`
     // and grep for the symbol name in any `.pyi` file.
 
@@ -874,6 +1170,7 @@ pub enum KnownClass {
     MethodType,
     MethodWrapperType,
     WrapperDescriptorType,
+    UnionType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
@@ -937,6 +1234,7 @@ impl<'db> KnownClass {
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
             | Self::WrapperDescriptorType
+            | Self::UnionType
             | Self::MethodWrapperType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
@@ -1009,6 +1307,7 @@ impl<'db> KnownClass {
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
             Self::MethodType => "MethodType",
+            Self::UnionType => "UnionType",
             Self::MethodWrapperType => "MethodWrapperType",
             Self::WrapperDescriptorType => "WrapperDescriptorType",
             Self::NoneType => "NoneType",
@@ -1081,8 +1380,8 @@ impl<'db> KnownClass {
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
-            .into_class_literal()
-            .map(|ClassLiteralType { class }| Type::instance(class))
+            .into_class_type()
+            .map(Type::instance)
             .unwrap_or_else(Type::unknown)
     }
 
@@ -1096,9 +1395,9 @@ impl<'db> KnownClass {
     ) -> Result<ClassLiteralType<'db>, KnownClassLookupError<'db>> {
         let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).symbol;
         match symbol {
-            Symbol::Type(Type::ClassLiteral(class_type), Boundness::Bound) => Ok(class_type),
-            Symbol::Type(Type::ClassLiteral(class_type), Boundness::PossiblyUnbound) => {
-                Err(KnownClassLookupError::ClassPossiblyUnbound { class_type })
+            Symbol::Type(Type::ClassLiteral(class_literal), Boundness::Bound) => Ok(class_literal),
+            Symbol::Type(Type::ClassLiteral(class_literal), Boundness::PossiblyUnbound) => {
+                Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal })
             }
             Symbol::Type(found_type, _) => {
                 Err(KnownClassLookupError::SymbolNotAClass { found_type })
@@ -1133,8 +1432,8 @@ impl<'db> KnownClass {
                 }
 
                 match lookup_error {
-                    KnownClassLookupError::ClassPossiblyUnbound { class_type, .. } => {
-                        Type::class_literal(class_type.class)
+                    KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. } => {
+                        class_literal.into()
                     }
                     KnownClassLookupError::ClassNotFound { .. }
                     | KnownClassLookupError::SymbolNotAClass { .. } => Type::unknown(),
@@ -1148,16 +1447,16 @@ impl<'db> KnownClass {
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
-            .into_class_literal()
-            .map(|ClassLiteralType { class }| SubclassOfType::from(db, class))
+            .into_class_type()
+            .map(|class| SubclassOfType::from(db, class))
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }
 
     /// Return `true` if this symbol can be resolved to a class definition `class` in typeshed,
     /// *and* `class` is a subclass of `other`.
-    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: Class<'db>) -> bool {
+    pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         self.try_to_class_literal(db)
-            .is_ok_and(|ClassLiteralType { class }| class.is_subclass_of(db, other))
+            .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
     /// Return the module in which we should look up the definition for this class
@@ -1191,6 +1490,7 @@ impl<'db> KnownClass {
             | Self::FunctionType
             | Self::MethodType
             | Self::MethodWrapperType
+            | Self::UnionType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
             Self::Any
@@ -1243,6 +1543,7 @@ impl<'db> KnownClass {
             | Self::VersionInfo
             | Self::EllipsisType
             | Self::TypeAliasType
+            | Self::UnionType
             | Self::NotImplementedType => true,
 
             Self::Any
@@ -1347,6 +1648,7 @@ impl<'db> KnownClass {
             | Self::Sized
             | Self::Enum
             | Self::Super
+            | Self::UnionType
             | Self::NewType => false,
         }
     }
@@ -1385,6 +1687,7 @@ impl<'db> KnownClass {
             "ModuleType" => Self::ModuleType,
             "FunctionType" => Self::FunctionType,
             "MethodType" => Self::MethodType,
+            "UnionType" => Self::UnionType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
             "NewType" => Self::NewType,
@@ -1462,6 +1765,7 @@ impl<'db> KnownClass {
             | Self::Enum
             | Self::Super
             | Self::NotImplementedType
+            | Self::UnionType
             | Self::WrapperDescriptorType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
@@ -1489,7 +1793,9 @@ pub(crate) enum KnownClassLookupError<'db> {
     SymbolNotAClass { found_type: Type<'db> },
     /// There is a symbol by that name in the expected typeshed module,
     /// and it's a class definition, but it's possibly unbound.
-    ClassPossiblyUnbound { class_type: ClassLiteralType<'db> },
+    ClassPossiblyUnbound {
+        class_literal: ClassLiteralType<'db>,
+    },
 }
 
 impl<'db> KnownClassLookupError<'db> {
@@ -1769,7 +2075,7 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return `true` if this symbol is an instance of `class`.
-    pub(super) fn is_instance_of(self, db: &'db dyn Db, class: Class<'db>) -> bool {
+    pub(super) fn is_instance_of(self, db: &'db dyn Db, class: ClassType<'db>) -> bool {
         self.class().is_subclass_of(db, class)
     }
 
@@ -1961,6 +2267,7 @@ mod tests {
 
         for class in KnownClass::iter() {
             let version_added = match class {
+                KnownClass::UnionType => PythonVersion::PY310,
                 KnownClass::BaseExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
                 _ => PythonVersion::PY37,

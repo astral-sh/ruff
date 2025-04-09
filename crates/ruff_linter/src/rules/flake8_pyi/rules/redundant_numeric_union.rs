@@ -54,7 +54,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// - [Python documentation: The numeric tower](https://docs.python.org/3/library/numbers.html#the-numeric-tower)
 /// - [PEP 484: The numeric tower](https://peps.python.org/pep-0484/#the-numeric-tower)
 ///
-/// [typing specification]: https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+/// [typing specification]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 #[derive(ViolationMetadata)]
 pub(crate) struct RedundantNumericUnion {
     redundancy: Redundancy,

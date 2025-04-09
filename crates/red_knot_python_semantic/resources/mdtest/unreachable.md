@@ -195,24 +195,6 @@ if sys.platform == "win32":
     sys.getwindowsversion()
 ```
 
-##### Checking without a specified platform
-
-If `python-platform` is not specified, we currently default to `all`:
-
-```toml
-[environment]
-# python-platform not specified
-```
-
-```py
-import sys
-
-if sys.platform == "win32":
-    # TODO: we should not emit an error here
-    # error: [possibly-unbound-attribute]
-    sys.getwindowsversion()
-```
-
 ## No (incorrect) diagnostics in unreachable code
 
 ```toml
@@ -430,6 +412,44 @@ if sys.version_info >= (3, 11):
     # TODO
     # error: [unresolved-import]
     import wsgiref.types
+```
+
+### Nested scopes
+
+When we have nested scopes inside the unreachable section, we should not emit diagnostics either:
+
+```py
+if False:
+    x = 1
+
+    def f():
+        # TODO
+        # error: [unresolved-reference]
+        print(x)
+
+    class C:
+        def __init__(self):
+            # TODO
+            # error: [unresolved-reference]
+            print(x)
+```
+
+### Use of unreachable symbols in type annotations, or as class bases
+
+We should not show any diagnostics in type annotations inside unreachable sections.
+
+```py
+def _():
+    class C: ...
+    return
+
+    # TODO
+    # error: [invalid-type-form] "Variable of type `Never` is not allowed in a type expression"
+    c: C = C()
+
+    # TODO
+    # error: [invalid-base] "Invalid class base with type `Never` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+    class Sub(C): ...
 ```
 
 ### Emit diagnostics for definitely wrong code
