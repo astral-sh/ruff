@@ -2516,6 +2516,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     )),
                                     value_ty,
                                 ]),
+                                None,
                                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                                     | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                             );
@@ -4038,14 +4039,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         // For class literals we model the entire class instantiation logic, so it is handled
         // in a separate function.
         let class = match callable_type {
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                ClassBase::Dynamic(_) => None,
-                ClassBase::Class(class) => {
-                    let (class_literal, _) = class.class_literal(self.db());
-                    Some(class_literal)
-                }
-            },
-            Type::ClassLiteral(class) => Some(class),
+            Type::ClassLiteral(_) | Type::GenericAlias(_) => Some(callable_type),
+            Type::SubclassOf(subclass) if matches!(subclass.subclass_of(), ClassBase::Class(_)) => {
+                Some(callable_type)
+            }
             _ => None,
         };
 
@@ -4054,16 +4051,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             // below. TODO: it should be possible to move these special cases into the
             // `try_call_constructor` path instead, or even remove some entirely once we support
             // overloads fully.
-            class.known(self.db()).is_none_or(|class| {
-                !matches!(
-                    class,
-                    KnownClass::Bool
-                        | KnownClass::Str
-                        | KnownClass::Type
-                        | KnownClass::Object
-                        | KnownClass::Property
-                )
-            })
+            match class {
+                Type::ClassLiteral(class) => class.known(self.db()).is_none_or(|class| {
+                    !matches!(
+                        class,
+                        KnownClass::Bool
+                            | KnownClass::Str
+                            | KnownClass::Type
+                            | KnownClass::Object
+                            | KnownClass::Property
+                    )
+                }),
+                _ => true,
+            }
         }) {
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
             let call_argument_types =

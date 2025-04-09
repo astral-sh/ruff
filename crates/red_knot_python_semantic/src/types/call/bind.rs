@@ -16,7 +16,7 @@ use crate::types::diagnostic::{
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
-use crate::types::generics::SpecializationBuilder;
+use crate::types::generics::{Specialization, SpecializationBuilder};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, FunctionDecorators, KnownClass, KnownFunction, KnownInstanceType,
@@ -146,6 +146,13 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn is_single(&self) -> bool {
         self.elements.len() == 1
+    }
+
+    pub(crate) fn single_element(&self) -> Option<&CallableBinding<'db>> {
+        match self.elements.as_slice() {
+            [element] => Some(element),
+            _ => None,
+        }
     }
 
     pub(crate) fn callable_type(&self) -> Type<'db> {
@@ -823,6 +830,9 @@ pub(crate) struct Binding<'db> {
     /// Return type of the call.
     return_ty: Type<'db>,
 
+    /// The specialization that was inferred from the argument types, if the callable is generic.
+    specialization: Option<Specialization<'db>>,
+
     /// The formal parameter that each argument is matched with, in argument source order, or
     /// `None` if the argument was not matched to any parameter.
     argument_parameters: Box<[Option<usize>]>,
@@ -958,6 +968,7 @@ impl<'db> Binding<'db> {
 
         Self {
             return_ty: signature.return_ty.unwrap_or(Type::unknown()),
+            specialization: None,
             argument_parameters: argument_parameters.into_boxed_slice(),
             parameter_tys: vec![None; parameters.len()].into_boxed_slice(),
             errors,
@@ -970,10 +981,11 @@ impl<'db> Binding<'db> {
         signature: &Signature<'db>,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) {
+        eprintln!("==> check types {:?}", signature);
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
         let parameters = signature.parameters();
-        let specialization = signature.generic_context.map(|generic_context| {
+        self.specialization = signature.generic_context.map(|generic_context| {
             let mut builder = SpecializationBuilder::new(db, generic_context);
             for (argument_index, (_, argument_type)) in argument_types.iter().enumerate() {
                 let Some(parameter_index) = self.argument_parameters[argument_index] else {
@@ -1013,7 +1025,7 @@ impl<'db> Binding<'db> {
             };
             let parameter = &parameters[parameter_index];
             if let Some(mut expected_ty) = parameter.annotated_type() {
-                if let Some(specialization) = specialization {
+                if let Some(specialization) = self.specialization {
                     expected_ty = expected_ty.apply_specialization(db, specialization);
                 }
                 if !argument_type.is_assignable_to(db, expected_ty) {
@@ -1038,7 +1050,7 @@ impl<'db> Binding<'db> {
             }
         }
 
-        if let Some(specialization) = specialization {
+        if let Some(specialization) = self.specialization {
             self.return_ty = self.return_ty.apply_specialization(db, specialization);
         }
     }
@@ -1049,6 +1061,10 @@ impl<'db> Binding<'db> {
 
     pub(crate) fn return_type(&self) -> Type<'db> {
         self.return_ty
+    }
+
+    pub(crate) fn specialization(&self) -> Option<Specialization<'db>> {
+        self.specialization
     }
 
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {

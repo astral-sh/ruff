@@ -32,7 +32,7 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
-use crate::types::call::{Bindings, CallArgumentTypes};
+use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 use crate::types::generics::{GenericContext, Specialization};
@@ -3518,6 +3518,7 @@ impl<'db> Type<'db> {
             db,
             name,
             &mut argument_types,
+            None,
             MemberLookupPolicy::NO_INSTANCE_FALLBACK,
         )
     }
@@ -3526,11 +3527,18 @@ impl<'db> Type<'db> {
     /// particular, this allows to specify `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK` to avoid
     /// looking up dunder methods on `object`, which is needed for functions like `__init__`,
     /// `__new__`, or `__setattr__`.
+    ///
+    /// You can also provide a generic context that will be added to the method's signature before
+    /// calling it. This is used for the `__new__` and `__init__` methods of an unspecialized
+    /// generic class, to allow us to infer the _class's_ specialization from the arguments to its
+    /// constructor. This parameter is _not_ used for functions and methods that are themselves
+    /// generic; they will already have a generic context attached to them.
     fn try_call_dunder_with_policy(
         self,
         db: &'db dyn Db,
         name: &str,
         argument_types: &mut CallArgumentTypes<'_, 'db>,
+        generic_context: Option<GenericContext<'db>>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match self
@@ -3538,7 +3546,11 @@ impl<'db> Type<'db> {
             .symbol
         {
             Symbol::Type(dunder_callable, boundness) => {
-                let signatures = dunder_callable.signatures(db);
+                let mut signatures = dunder_callable.signatures(db);
+                if let Some(generic_context) = generic_context {
+                    eprintln!("==> add generic context to signature {:?}", signatures);
+                    signatures.add_generic_context(generic_context);
+                }
                 let bindings = Bindings::match_parameters(signatures, argument_types)
                     .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
@@ -3713,7 +3725,18 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mut argument_types: CallArgumentTypes<'_, 'db>,
     ) -> Result<Type<'db>, ConstructorCallError<'db>> {
-        debug_assert!(matches!(self, Type::ClassLiteral(_) | Type::SubclassOf(_)));
+        debug_assert!(matches!(
+            self,
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+        ));
+
+        // If we are trying to construct a non-specialized generic class, we should use the
+        // constructor parameters to try to infer the class specialization.
+        let generic_origin = match self {
+            Type::ClassLiteral(ClassLiteralType::Generic(generic)) => Some(generic),
+            _ => None,
+        };
+        let generic_context = generic_origin.map(|origin| origin.generic_context(db));
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
@@ -3744,6 +3767,7 @@ impl<'db> Type<'db> {
                 db,
                 "__new__",
                 argument_types,
+                generic_context,
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
                     | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             );
@@ -3756,7 +3780,7 @@ impl<'db> Type<'db> {
         // TODO: we should use the actual return type of `__new__` to determine the instance type
         let instance_ty = self
             .to_instance(db)
-            .expect("Class literal type and subclass-of types should always be convertible to instance type");
+            .expect("Class literal, generic alias, and subclass-of types should always be convertible to instance type");
 
         let init_call_outcome = if new_call_outcome.is_none()
             || !instance_ty
@@ -3768,14 +3792,51 @@ impl<'db> Type<'db> {
                 .symbol
                 .is_unbound()
         {
-            Some(instance_ty.try_call_dunder(db, "__init__", argument_types))
+            Some(instance_ty.try_call_dunder_with_policy(
+                db,
+                "__init__",
+                &mut argument_types,
+                generic_context,
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            ))
         } else {
             None
         };
 
         match (new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
-            (None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
+            (new_call_outcome @ (None | Some(Ok(_))), init_call_outcome @ (None | Some(Ok(_)))) => {
+                let new_specialization = new_call_outcome
+                    .and_then(Result::ok)
+                    .as_ref()
+                    .and_then(Bindings::single_element)
+                    .and_then(CallableBinding::matching_overload)
+                    .and_then(|(_, binding)| binding.specialization());
+                if let Some(new_specialization) = &new_specialization {
+                    eprintln!("==> new {}", new_specialization.display(db));
+                }
+                let init_specialization = init_call_outcome
+                    .and_then(Result::ok)
+                    .as_ref()
+                    .and_then(Bindings::single_element)
+                    .and_then(CallableBinding::matching_overload)
+                    .and_then(|(_, binding)| binding.specialization());
+                if let Some(init_specialization) = &init_specialization {
+                    eprintln!("==> init {}", init_specialization.display(db));
+                }
+                let specialized = generic_origin
+                    .zip(new_specialization.or(init_specialization))
+                    .map(|(origin, specialization)| {
+                        Type::instance(ClassType::Generic(GenericAlias::new(
+                            db,
+                            origin,
+                            specialization,
+                        )))
+                    })
+                    .unwrap_or(instance_ty);
+                Ok(specialized)
+            }
+
             (None | Some(Ok(_)), Some(Err(error))) => {
                 // no custom `__new__` or it was called and succeeded, but `__init__` failed.
                 Err(ConstructorCallError::Init(instance_ty, error))

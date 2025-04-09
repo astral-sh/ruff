@@ -189,6 +189,11 @@ impl<'db> SpecializationBuilder<'db> {
     }
 
     pub(crate) fn infer(&mut self, formal: Type<'db>, actual: Type<'db>) {
+        eprintln!(
+            "==> infer {} {}",
+            formal.display(self.db),
+            actual.display(self.db)
+        );
         // If the actual type is already assignable to the formal type, then return without adding
         // any new type mappings. (Note that if the formal type contains any typevars, this check
         // will fail, since no non-typevar types are assignable to a typevar.)

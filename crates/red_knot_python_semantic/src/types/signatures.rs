@@ -80,6 +80,12 @@ impl<'db> Signatures<'db> {
         }
     }
 
+    pub(crate) fn add_generic_context(&mut self, generic_context: GenericContext<'db>) {
+        for signature in &mut self.elements {
+            signature.add_generic_context(generic_context);
+        }
+    }
+
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
         for signature in &mut self.elements {
             signature.dunder_call_is_possibly_unbound = true;
@@ -195,6 +201,12 @@ impl<'db> CallableSignature<'db> {
             self.callable_type = after;
         }
     }
+
+    fn add_generic_context(&mut self, generic_context: GenericContext<'db>) {
+        for overload in &mut self.overloads {
+            overload.add_generic_context(generic_context);
+        }
+    }
 }
 
 impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
@@ -281,6 +293,10 @@ impl<'db> Signature<'db> {
             ),
             return_ty,
         }
+    }
+
+    fn add_generic_context(&mut self, generic_context: GenericContext<'db>) {
+        self.generic_context = Some(generic_context);
     }
 
     pub(crate) fn apply_specialization(
