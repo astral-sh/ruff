@@ -1,7 +1,7 @@
 //! [`SemanticSyntaxChecker`] for AST-based syntax errors.
 //!
 //! This checker is not responsible for traversing the AST itself. Instead, its
-//! [`SemanticSyntaxChecker::enter_stmt`] and [`SemanticSyntaxChecker::enter_expr`] methods should
+//! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 use std::{cell::RefCell, fmt::Display};
 
@@ -473,11 +473,11 @@ impl SemanticSyntaxChecker {
     /// Check `stmt` for semantic syntax errors and update the checker's internal state.
     ///
     /// Note that this method should only be called when traversing `stmt` *and* its children. For
-    /// example, if traversal of function bodies needs to be deferred, avoid calling `enter_stmt` on
-    /// the function itself until the deferred body is visited too. Failing to defer `enter_stmt` in
+    /// example, if traversal of function bodies needs to be deferred, avoid calling `visit_stmt` on
+    /// the function itself until the deferred body is visited too. Failing to defer `visit_stmt` in
     /// this case will break any internal state that depends on function scopes, such as `async`
     /// context detection.
-    pub fn enter_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
+    pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         // check for errors
         self.check_stmt(stmt, ctx);
 
@@ -501,7 +501,7 @@ impl SemanticSyntaxChecker {
     }
 
     /// Check `expr` for semantic syntax errors and update the checker's internal state.
-    pub fn enter_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
+    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt, generators, ..
@@ -662,11 +662,9 @@ impl SemanticSyntaxChecker {
 
             // test_ok nested_async_comprehension_py310
             // # parse_options: {"target-version": "3.10"}
-            // # this case fails if exit_expr doesn't run
             // async def f():
             //     [_ for n in range(3)]
             //     [_ async for n in range(3)]
-            // # and this fails without exit_stmt
             // async def f():
             //     def g(): ...
             //     [_ async for n in range(3)]
@@ -1427,7 +1425,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
     #[allow(clippy::single_match)]
     fn visit_stmt(&mut self, stmt: &Stmt) {
-        self.with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context));
+        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         match stmt {
             Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
                 self.scopes.push(Scope::Function(*is_async));
@@ -1441,7 +1439,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.enter_expr(expr, context));
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
         match expr {
             Expr::Lambda(_) => {
                 self.scopes.push(Scope::Function(false));
