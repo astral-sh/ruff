@@ -1060,4 +1060,21 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_await_scope_notebook() -> Result<()> {
+        let path = Path::new("resources/test/fixtures/syntax_errors/await_scope.ipynb");
+        let messages = test_contents_syntax_errors(
+            &SourceKind::IpyNotebook(Notebook::from_path(path)?),
+            path,
+            &settings::LinterSettings {
+                rules: settings::rule_table::RuleTable::empty(),
+                preview: settings::types::PreviewMode::Enabled,
+                ..Default::default()
+            },
+        );
+        assert_messages!(messages);
+
+        Ok(())
+    }
 }
