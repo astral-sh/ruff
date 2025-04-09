@@ -815,3 +815,22 @@ Module(
    |             ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
 14 | [x for x in lambda y: y]
    |
+
+
+   |
+16 | # Invalid if
+17 | [x for x in data if *y]
+18 | [x for x in data if yield y]
+   |                     ^^^^^^^ Syntax Error: `yield` statement outside of a function
+19 | [x for x in data if yield from y]
+20 | [x for x in data if lambda y: y]
+   |
+
+
+   |
+17 | [x for x in data if *y]
+18 | [x for x in data if yield y]
+19 | [x for x in data if yield from y]
+   |                     ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
+20 | [x for x in data if lambda y: y]
+   |

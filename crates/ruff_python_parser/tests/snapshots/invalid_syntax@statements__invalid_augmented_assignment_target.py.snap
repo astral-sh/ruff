@@ -1555,3 +1555,35 @@ Module(
 34 | (x, foo(), y) += (42, 42, 42)
    | ^^^^^^^^^^^^^ Syntax Error: Invalid augmented assignment target
    |
+
+
+## Semantic Syntax Errors
+
+   |
+14 | {x: x * 2 for x in xs} += 42
+15 | (x for x in xs) += 42
+16 | await x += 42
+   | ^^^^^^^ Syntax Error: `await` statement outside of a function
+17 | (yield x) += 42
+18 | (yield from xs) += 42
+   |
+
+
+   |
+15 | (x for x in xs) += 42
+16 | await x += 42
+17 | (yield x) += 42
+   |  ^^^^^^^ Syntax Error: `yield` statement outside of a function
+18 | (yield from xs) += 42
+19 | a < b < c += 42
+   |
+
+
+   |
+16 | await x += 42
+17 | (yield x) += 42
+18 | (yield from xs) += 42
+   |  ^^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
+19 | a < b < c += 42
+20 | foo() += 42
+   |

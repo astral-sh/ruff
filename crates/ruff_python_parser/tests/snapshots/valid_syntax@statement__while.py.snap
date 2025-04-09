@@ -1,14 +1,13 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/while.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..314,
+        range: 0..327,
         body: [
             While(
                 StmtWhile {
@@ -374,52 +373,75 @@ Module(
                     orelse: [],
                 },
             ),
-            While(
-                StmtWhile {
-                    range: 221..239,
-                    test: Await(
-                        ExprAwait {
-                            range: 227..234,
-                            value: Name(
-                                ExprName {
-                                    range: 233..234,
-                                    id: Name("x"),
-                                    ctx: Load,
-                                },
-                            ),
-                        },
-                    ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 221..252,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("_"),
+                        range: 225..226,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 226..228,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
                     body: [
-                        Expr(
-                            StmtExpr {
-                                range: 236..239,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 236..239,
+                        While(
+                            StmtWhile {
+                                range: 234..252,
+                                test: Await(
+                                    ExprAwait {
+                                        range: 240..247,
+                                        value: Name(
+                                            ExprName {
+                                                range: 246..247,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                     },
                                 ),
+                                body: [
+                                    Expr(
+                                        StmtExpr {
+                                            range: 249..252,
+                                            value: EllipsisLiteral(
+                                                ExprEllipsisLiteral {
+                                                    range: 249..252,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ],
+                                orelse: [],
                             },
                         ),
                     ],
-                    orelse: [],
                 },
             ),
             If(
                 StmtIf {
-                    range: 241..313,
+                    range: 254..326,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            range: 244..248,
+                            range: 257..261,
                             value: true,
                         },
                     ),
                     body: [
                         While(
                             StmtWhile {
-                                range: 254..298,
+                                range: 267..311,
                                 test: Name(
                                     ExprName {
-                                        range: 260..261,
+                                        range: 273..274,
                                         id: Name("x"),
                                         ctx: Load,
                                     },
@@ -427,14 +449,14 @@ Module(
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            range: 271..275,
+                                            range: 284..288,
                                         },
                                     ),
                                 ],
                                 orelse: [
                                     Pass(
                                         StmtPass {
-                                            range: 294..298,
+                                            range: 307..311,
                                         },
                                     ),
                                 ],
@@ -443,12 +465,12 @@ Module(
                     ],
                     elif_else_clauses: [
                         ElifElseClause {
-                            range: 299..313,
+                            range: 312..326,
                             test: None,
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 309..313,
+                                        range: 322..326,
                                     },
                                 ),
                             ],

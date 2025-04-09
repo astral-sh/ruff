@@ -391,3 +391,40 @@ Module(
 14 | await +x
 15 | await -x
    |
+
+
+   |
+12 | await yield x
+13 | await lambda x: x
+14 | await +x
+   | ^^^^^^^^ Syntax Error: `await` statement outside of a function
+15 | await -x
+16 | await ~x
+   |
+
+
+   |
+13 | await lambda x: x
+14 | await +x
+15 | await -x
+   | ^^^^^^^^ Syntax Error: `await` statement outside of a function
+16 | await ~x
+17 | await not x
+   |
+
+
+   |
+14 | await +x
+15 | await -x
+16 | await ~x
+   | ^^^^^^^^ Syntax Error: `await` statement outside of a function
+17 | await not x
+   |
+
+
+   |
+15 | await -x
+16 | await ~x
+17 | await not x
+   | ^^^^^^^^^^^ Syntax Error: `await` statement outside of a function
+   |

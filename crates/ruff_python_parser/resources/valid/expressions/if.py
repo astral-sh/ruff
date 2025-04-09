@@ -11,8 +11,9 @@ True if a and b else False
 x if True else lambda y: y
 
 # These test expression are only allowed when parenthesized
-x if (yield x) else y
-x if (yield from x) else y
+def _():
+    x if (yield x) else y
+    x if (yield from x) else y
 x if (lambda x: x) else y
 
 # Split across multiple lines

@@ -4,5 +4,6 @@
 (name := (*x, y))
 (name := x if True else y)
 (name := lambda x: x)
-(name := (yield x))
-(name := (yield from x))
+def _():
+    (name := (yield x))
+    (name := (yield from x))

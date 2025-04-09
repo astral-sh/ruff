@@ -122,3 +122,13 @@ Module(
 3 | x == yield y
   |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
   |
+
+
+## Semantic Syntax Errors
+
+  |
+1 | x not in lambda y: y
+2 |
+3 | x == yield y
+  |      ^^^^^^^ Syntax Error: `yield` statement outside of a function
+  |
