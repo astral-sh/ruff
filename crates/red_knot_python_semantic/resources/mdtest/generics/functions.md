@@ -154,21 +154,28 @@ reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+When one of the parameters is a union, we attempt to find the smallest specialization that satisfies
+all of the constraints.
+
 ```py
-def param_with_union[T](x: T | int, y: T) -> T:
+# TODO: make this return list[T], so that we can write a correct body
+# error: [invalid-return-type]
+def union_param[T](x: T | None) -> T: ...
+
+reveal_type(union_param("a"))  # revealed: Literal["a"]
+reveal_type(union_param(1))  # revealed: Literal[1]
+reveal_type(union_param(None))  # revealed: Unknown
+```
+
+```py
+def union_and_nonunion_params[T](x: T | int, y: T) -> T:
     return y
 
-# TODO: revealed: str
-reveal_type(param_with_union(1, "a"))  # revealed: Literal["a"]
-
-# TODO: revealed: str
-reveal_type(param_with_union("a", "a"))  # revealed: Literal["a"]
-
-# TODO: revealed: int
-reveal_type(param_with_union(1, 1))  # revealed: Literal[1]
-
-# TODO: revealed: str | int
-reveal_type(param_with_union("a", 1))  # revealed: Literal["a", 1]
+reveal_type(union_and_nonunion_params(1, "a"))  # revealed: Literal["a"]
+reveal_type(union_and_nonunion_params("a", "a"))  # revealed: Literal["a"]
+reveal_type(union_and_nonunion_params(1, 1))  # revealed: Literal[1]
+reveal_type(union_and_nonunion_params(3, 1))  # revealed: Literal[1]
+reveal_type(union_and_nonunion_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
 ```py
