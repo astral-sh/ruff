@@ -546,6 +546,42 @@ impl<'db> SemanticIndexBuilder<'db> {
             .simplify_visibility_constraints(snapshot);
     }
 
+    /// Record a constraint that affects the reachability of the current position in the semantic
+    /// index analysis. For example, if we encounter a `if test:` branch, we immediately record
+    /// a `test` constraint, because if `test` later (during type checking) evaluates to `False`,
+    /// we know that all statements that follow in this path of control flow will be unreachable.
+    fn record_reachability_constraint(
+        &mut self,
+        predicate: Predicate<'db>,
+    ) -> ScopedVisibilityConstraintId {
+        let predicate_id = self.add_predicate(predicate);
+        self.record_reachability_constraint_id(predicate_id)
+    }
+
+    /// Similar to [`Self::record_reachability_constraint`], but takes a [`ScopedPredicateId`].
+    fn record_reachability_constraint_id(
+        &mut self,
+        predicate_id: ScopedPredicateId,
+    ) -> ScopedVisibilityConstraintId {
+        let visibility_constraint = self
+            .current_visibility_constraints_mut()
+            .add_atom(predicate_id);
+        self.current_use_def_map_mut()
+            .record_reachability_constraint(visibility_constraint)
+    }
+
+    /// Record the negation of a given reachability/visibility constraint.
+    fn record_negated_reachability_constraint(
+        &mut self,
+        reachability_constraint: ScopedVisibilityConstraintId,
+    ) {
+        let negated_constraint = self
+            .current_visibility_constraints_mut()
+            .add_not_constraint(reachability_constraint);
+        self.current_use_def_map_mut()
+            .record_reachability_constraint(negated_constraint);
+    }
+
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
         self.current_assignments.push(assignment);
     }
@@ -1252,6 +1288,8 @@ where
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
+                let mut reachability_constraint =
+                    self.record_reachability_constraint(last_predicate);
                 self.visit_body(&node.body);
 
                 let visibility_constraint_id = self.record_visibility_constraint(last_predicate);
@@ -1281,11 +1319,14 @@ where
                     // taken
                     self.flow_restore(no_branch_taken.clone());
                     self.record_negated_narrowing_constraint(last_predicate);
+                    self.record_negated_reachability_constraint(reachability_constraint);
 
                     let elif_predicate = if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
+                        reachability_constraint =
+                            self.record_reachability_constraint(last_predicate);
                         let predicate = self.record_expression_narrowing_constraint(elif_test);
                         Some(predicate)
                     } else {
@@ -1320,6 +1361,7 @@ where
 
                 let pre_loop = self.flow_snapshot();
                 let predicate = self.record_expression_narrowing_constraint(test);
+                self.record_reachability_constraint(predicate);
 
                 // We need multiple copies of the visibility constraint for the while condition,
                 // since we need to model situations where the first evaluation of the condition
@@ -1467,6 +1509,7 @@ where
                         &case.pattern,
                         case.guard.as_deref(),
                     );
+                    self.record_reachability_constraint(predicate);
                     if let Some(expr) = &case.guard {
                         self.visit_expr(expr);
                     }
@@ -1770,12 +1813,14 @@ where
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
                 let predicate = self.record_expression_narrowing_constraint(test);
+                let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.visit_expr(body);
                 let visibility_constraint = self.record_visibility_constraint(predicate);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if.clone());
 
                 self.record_negated_narrowing_constraint(predicate);
+                self.record_negated_reachability_constraint(reachability_constraint);
                 self.visit_expr(orelse);
                 self.record_negated_visibility_constraint(visibility_constraint);
                 self.flow_merge(post_body);
@@ -1848,7 +1893,7 @@ where
                         self.record_visibility_constraint_id(*vid);
                     }
 
-                    // For the last value, we don't need to model control flow. There is short-circuiting
+                    // For the last value, we don't need to model control flow. There is no short-circuiting
                     // anymore.
                     if index < values.len() - 1 {
                         let predicate = self.build_predicate(value);
@@ -1877,6 +1922,7 @@ where
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
                         self.record_narrowing_constraint_id(predicate_id);
+                        self.record_reachability_constraint_id(predicate_id);
                         visibility_constraints.push(visibility_constraint);
                     }
                 }

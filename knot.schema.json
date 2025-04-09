@@ -89,7 +89,7 @@
           ]
         },
         "python-platform": {
-          "description": "Specifies the target platform that will be used to analyze the source code. If specified, Red Knot will tailor its use of type stub files, which conditionalize type definitions based on the platform.\n\nIf no platform is specified, knot will use `all` or the current platform in the LSP use case.",
+          "description": "Specifies the target platform that will be used to analyze the source code. If specified, Red Knot will tailor its use of type stub files, which conditionalize type definitions based on the platform.\n\nIf no platform is specified, knot will use the current platform: - `win32` for Windows - `darwin` for macOS - `android` for Android - `ios` for iOS - `linux` for everything else",
           "anyOf": [
             {
               "$ref": "#/definitions/PythonPlatform"
@@ -652,7 +652,7 @@
         },
         "type-assertion-failure": {
           "title": "detects failed type assertions",
-          "description": "## What it does\nChecks for `assert_type()` calls where the actual type\nis not the same as the asserted type.\n\n## Why is this bad?\n`assert_type()` allows confirming the inferred type of a certain value.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    assert_type(x, str)  # error: Actual type does not match asserted type\n```",
+          "description": "## What it does\nChecks for `assert_type()` and `assert_never()` calls where the actual type\nis not the same as the asserted type.\n\n## Why is this bad?\n`assert_type()` allows confirming the inferred type of a certain value.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    assert_type(x, str)  # error: Actual type does not match asserted type\n```",
           "default": "error",
           "oneOf": [
             {

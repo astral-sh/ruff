@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/invalid_annotation_cl
 ```
 Module(
     ModModule {
-        range: 0..193,
+        range: 0..247,
         body: [
             ClassDef(
                 StmtClassDef {
@@ -319,6 +319,122 @@ Module(
                     ],
                 },
             ),
+            ClassDef(
+                StmtClassDef {
+                    range: 193..219,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("M"),
+                        range: 199..200,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 200..203,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 201..202,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 201..202,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: Some(
+                        Arguments {
+                            range: 203..214,
+                            args: [
+                                Await(
+                                    ExprAwait {
+                                        range: 205..212,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 211..212,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                            keywords: [],
+                        },
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 216..219,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 216..219,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            ClassDef(
+                StmtClassDef {
+                    range: 220..246,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("N"),
+                        range: 226..227,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 227..241,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 228..240,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 228..229,
+                                        },
+                                        bound: Some(
+                                            Await(
+                                                ExprAwait {
+                                                    range: 232..239,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 238..239,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    arguments: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 243..246,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 243..246,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -358,6 +474,7 @@ Module(
 4 | class K[T: (yield 1)]: ...      # yield in TypeVar
   |             ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar bound
 5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
+6 | class M[T]((await 1)): ...
   |
 
 
@@ -366,4 +483,23 @@ Module(
 4 | class K[T: (yield 1)]: ...      # yield in TypeVar
 5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
   |             ^^^^^^ Syntax Error: named expression cannot be used within a TypeVar bound
+6 | class M[T]((await 1)): ...
+7 | class N[T: (await 1)]: ...
+  |
+
+
+  |
+4 | class K[T: (yield 1)]: ...      # yield in TypeVar
+5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
+6 | class M[T]((await 1)): ...
+  |             ^^^^^^^ Syntax Error: await expression cannot be used within a generic definition
+7 | class N[T: (await 1)]: ...
+  |
+
+
+  |
+5 | class L[T: (x := 1)]: ...       # named expr in TypeVar
+6 | class M[T]((await 1)): ...
+7 | class N[T: (await 1)]: ...
+  |             ^^^^^^^ Syntax Error: await expression cannot be used within a TypeVar bound
   |

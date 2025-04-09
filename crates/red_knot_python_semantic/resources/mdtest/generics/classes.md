@@ -164,7 +164,7 @@ The types inferred from a type context and from a constructor parameter must be 
 other:
 
 ```py
-# TODO: error
+# TODO: error: [invalid-argument-type]
 wrong_innards: E[int] = E("five")
 ```
 

@@ -2,8 +2,8 @@ use std::sync::{LazyLock, Mutex};
 
 use super::{
     class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
-    KnownFunction, Mro, MroError, MroIterator, SubclassOfType, Truthiness, Type, TypeAliasType,
-    TypeQualifiers, TypeVarInstance,
+    KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator, SubclassOfType, Truthiness,
+    Type, TypeAliasType, TypeQualifiers, TypeVarInstance,
 };
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization};
@@ -270,10 +270,15 @@ impl<'db> ClassType<'db> {
     /// The member resolves to a member on the class itself or any of its proper superclasses.
     ///
     /// TODO: Should this be made private...?
-    pub(super) fn class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(super) fn class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
-            .class_member(db, specialization, name)
+            .class_member(db, specialization, name, policy)
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
@@ -669,6 +674,7 @@ impl<'db> ClassLiteralType<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
         if name == "__mro__" {
             let tuple_elements = self.iter_mro(db, specialization).map(Type::from);
@@ -700,6 +706,18 @@ impl<'db> ClassLiteralType<'db> {
                     dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
                 }
                 ClassBase::Class(class) => {
+                    if class.is_known(db, KnownClass::Object)
+                        // Only exclude `object` members if this is not an `object` class itself
+                        && (policy.mro_no_object_fallback() && !self.is_known(db, KnownClass::Object))
+                    {
+                        continue;
+                    }
+
+                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
+                    {
+                        continue;
+                    }
+
                     lookup_result = lookup_result.or_else(|lookup_error| {
                         lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
                     });

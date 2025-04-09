@@ -7,15 +7,15 @@ input_file: crates/ruff_python_parser/resources/inline/err/invalid_annotation_fu
 ```
 Module(
     ModModule {
-        range: 0..683,
+        range: 0..987,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    range: 0..27,
+                    range: 0..28,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: Name("f"),
+                        id: Name("d"),
                         range: 4..5,
                     },
                     type_params: Some(
@@ -45,21 +45,14 @@ Module(
                         kwarg: None,
                     },
                     returns: Some(
-                        Named(
-                            ExprNamed {
-                                range: 15..21,
-                                target: Name(
-                                    ExprName {
-                                        range: 15..16,
-                                        id: Name("y"),
-                                        ctx: Store,
-                                    },
-                                ),
+                        Await(
+                            ExprAwait {
+                                range: 15..22,
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 20..21,
+                                        range: 21..22,
                                         value: Int(
-                                            3,
+                                            1,
                                         ),
                                     },
                                 ),
@@ -69,10 +62,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 24..27,
+                                range: 25..28,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 24..27,
+                                        range: 25..28,
                                     },
                                 ),
                             },
@@ -82,23 +75,23 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 28..56,
+                    range: 29..58,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: Name("g"),
-                        range: 32..33,
+                        id: Name("e"),
+                        range: 33..34,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 33..36,
+                            range: 34..37,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 34..35,
+                                        range: 35..36,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 34..35,
+                                            range: 35..36,
                                         },
                                         bound: None,
                                         default: None,
@@ -108,31 +101,24 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 36..51,
+                        range: 37..53,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
-                                range: 37..50,
+                                range: 38..52,
                                 parameter: Parameter {
-                                    range: 37..50,
+                                    range: 38..52,
                                     name: Identifier {
                                         id: Name("arg"),
-                                        range: 37..40,
+                                        range: 38..41,
                                     },
                                     annotation: Some(
-                                        Named(
-                                            ExprNamed {
-                                                range: 43..49,
-                                                target: Name(
-                                                    ExprName {
-                                                        range: 43..44,
-                                                        id: Name("x"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
+                                        Await(
+                                            ExprAwait {
+                                                range: 44..51,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 48..49,
+                                                        range: 50..51,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -153,10 +139,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 53..56,
+                                range: 55..58,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 53..56,
+                                        range: 55..58,
                                     },
                                 ),
                             },
@@ -166,23 +152,23 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 57..84,
+                    range: 59..86,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
-                        id: Name("h"),
-                        range: 61..62,
+                        id: Name("f"),
+                        range: 63..64,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 62..65,
+                            range: 64..67,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 63..64,
+                                        range: 65..66,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 63..64,
+                                            range: 65..66,
                                         },
                                         bound: None,
                                         default: None,
@@ -192,25 +178,180 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 65..79,
+                        range: 67..69,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: Some(
+                        Named(
+                            ExprNamed {
+                                range: 74..80,
+                                target: Name(
+                                    ExprName {
+                                        range: 74..75,
+                                        id: Name("y"),
+                                        ctx: Store,
+                                    },
+                                ),
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 79..80,
+                                        value: Int(
+                                            3,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ),
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 83..86,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 83..86,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 87..115,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("g"),
+                        range: 91..92,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 92..95,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 93..94,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 93..94,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 95..110,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
-                                range: 66..78,
+                                range: 96..109,
                                 parameter: Parameter {
-                                    range: 66..78,
+                                    range: 96..109,
+                                    name: Identifier {
+                                        id: Name("arg"),
+                                        range: 96..99,
+                                    },
+                                    annotation: Some(
+                                        Named(
+                                            ExprNamed {
+                                                range: 102..108,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 102..103,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 107..108,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ),
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 112..115,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 112..115,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 116..143,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("h"),
+                        range: 120..121,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 121..124,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 122..123,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 122..123,
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 124..138,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 125..137,
+                                parameter: Parameter {
+                                    range: 125..137,
                                     name: Identifier {
                                         id: Name("x"),
-                                        range: 66..67,
+                                        range: 125..126,
                                     },
                                     annotation: Some(
                                         Yield(
                                             ExprYield {
-                                                range: 70..77,
+                                                range: 129..136,
                                                 value: Some(
                                                     NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 76..77,
+                                                            range: 135..136,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -232,10 +373,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 81..84,
+                                range: 140..143,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 81..84,
+                                        range: 140..143,
                                     },
                                 ),
                             },
@@ -245,23 +386,23 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 85..113,
+                    range: 144..172,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("j"),
-                        range: 89..90,
+                        range: 148..149,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 90..93,
+                            range: 149..152,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 91..92,
+                                        range: 150..151,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 91..92,
+                                            range: 150..151,
                                         },
                                         bound: None,
                                         default: None,
@@ -271,7 +412,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 93..95,
+                        range: 152..154,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -281,11 +422,11 @@ Module(
                     returns: Some(
                         Yield(
                             ExprYield {
-                                range: 100..107,
+                                range: 159..166,
                                 value: Some(
                                     NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 106..107,
+                                            range: 165..166,
                                             value: Int(
                                                 1,
                                             ),
@@ -298,10 +439,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 110..113,
+                                range: 169..172,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 110..113,
+                                        range: 169..172,
                                     },
                                 ),
                             },
@@ -311,23 +452,23 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 114..146,
+                    range: 173..205,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("l"),
-                        range: 118..119,
+                        range: 177..178,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 119..122,
+                            range: 178..181,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 120..121,
+                                        range: 179..180,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 120..121,
+                                            range: 179..180,
                                         },
                                         bound: None,
                                         default: None,
@@ -337,24 +478,24 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 122..141,
+                        range: 181..200,
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
-                                range: 123..140,
+                                range: 182..199,
                                 parameter: Parameter {
-                                    range: 123..140,
+                                    range: 182..199,
                                     name: Identifier {
                                         id: Name("x"),
-                                        range: 123..124,
+                                        range: 182..183,
                                     },
                                     annotation: Some(
                                         YieldFrom(
                                             ExprYieldFrom {
-                                                range: 127..139,
+                                                range: 186..198,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 138..139,
+                                                        range: 197..198,
                                                         value: Int(
                                                             1,
                                                         ),
@@ -375,10 +516,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 143..146,
+                                range: 202..205,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 143..146,
+                                        range: 202..205,
                                     },
                                 ),
                             },
@@ -388,23 +529,23 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 147..180,
+                    range: 206..239,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("n"),
-                        range: 151..152,
+                        range: 210..211,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 152..155,
+                            range: 211..214,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 153..154,
+                                        range: 212..213,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 153..154,
+                                            range: 212..213,
                                         },
                                         bound: None,
                                         default: None,
@@ -414,7 +555,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 155..157,
+                        range: 214..216,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -424,10 +565,10 @@ Module(
                     returns: Some(
                         YieldFrom(
                             ExprYieldFrom {
-                                range: 162..174,
+                                range: 221..233,
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 173..174,
+                                        range: 232..233,
                                         value: Int(
                                             1,
                                         ),
@@ -439,10 +580,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 177..180,
+                                range: 236..239,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 177..180,
+                                        range: 236..239,
                                     },
                                 ),
                             },
@@ -452,32 +593,32 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 181..207,
+                    range: 240..266,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("p"),
-                        range: 185..186,
+                        range: 244..245,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 186..200,
+                            range: 245..259,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 187..199,
+                                        range: 246..258,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 187..188,
+                                            range: 246..247,
                                         },
                                         bound: Some(
                                             Yield(
                                                 ExprYield {
-                                                    range: 191..198,
+                                                    range: 250..257,
                                                     value: Some(
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 197..198,
+                                                                range: 256..257,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -494,7 +635,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 200..202,
+                        range: 259..261,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -505,10 +646,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 204..207,
+                                range: 263..266,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 204..207,
+                                        range: 263..266,
                                     },
                                 ),
                             },
@@ -518,33 +659,33 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 238..265,
+                    range: 297..324,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("q"),
-                        range: 242..243,
+                        range: 301..302,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 243..258,
+                            range: 302..317,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 244..257,
+                                        range: 303..316,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 244..245,
+                                            range: 303..304,
                                         },
                                         bound: None,
                                         default: Some(
                                             Yield(
                                                 ExprYield {
-                                                    range: 249..256,
+                                                    range: 308..315,
                                                     value: Some(
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 255..256,
+                                                                range: 314..315,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -560,7 +701,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 258..260,
+                        range: 317..319,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -571,10 +712,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 262..265,
+                                range: 321..324,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 262..265,
+                                        range: 321..324,
                                     },
                                 ),
                             },
@@ -584,32 +725,32 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 297..326,
+                    range: 356..385,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("r"),
-                        range: 301..302,
+                        range: 360..361,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 302..319,
+                            range: 361..378,
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 303..318,
+                                        range: 362..377,
                                         name: Identifier {
                                             id: Name("Ts"),
-                                            range: 304..306,
+                                            range: 363..365,
                                         },
                                         default: Some(
                                             Yield(
                                                 ExprYield {
-                                                    range: 310..317,
+                                                    range: 369..376,
                                                     value: Some(
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 316..317,
+                                                                range: 375..376,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -625,7 +766,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 319..321,
+                        range: 378..380,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -636,10 +777,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 323..326,
+                                range: 382..385,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 323..326,
+                                        range: 382..385,
                                     },
                                 ),
                             },
@@ -649,32 +790,32 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 361..391,
+                    range: 420..450,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("s"),
-                        range: 365..366,
+                        range: 424..425,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 366..384,
+                            range: 425..443,
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 367..383,
+                                        range: 426..442,
                                         name: Identifier {
                                             id: Name("Ts"),
-                                            range: 369..371,
+                                            range: 428..430,
                                         },
                                         default: Some(
                                             Yield(
                                                 ExprYield {
-                                                    range: 375..382,
+                                                    range: 434..441,
                                                     value: Some(
                                                         NumberLiteral(
                                                             ExprNumberLiteral {
-                                                                range: 381..382,
+                                                                range: 440..441,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -690,7 +831,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 384..386,
+                        range: 443..445,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -701,10 +842,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 388..391,
+                                range: 447..450,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 388..391,
+                                        range: 447..450,
                                     },
                                 ),
                             },
@@ -714,38 +855,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 422..447,
+                    range: 481..506,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("t"),
-                        range: 426..427,
+                        range: 485..486,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 427..440,
+                            range: 486..499,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 428..439,
+                                        range: 487..498,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 428..429,
+                                            range: 487..488,
                                         },
                                         bound: Some(
                                             Named(
                                                 ExprNamed {
-                                                    range: 432..438,
+                                                    range: 491..497,
                                                     target: Name(
                                                         ExprName {
-                                                            range: 432..433,
+                                                            range: 491..492,
                                                             id: Name("x"),
                                                             ctx: Store,
                                                         },
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 437..438,
+                                                            range: 496..497,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -761,7 +902,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 440..442,
+                        range: 499..501,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -772,10 +913,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 444..447,
+                                range: 503..506,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 444..447,
+                                        range: 503..506,
                                     },
                                 ),
                             },
@@ -785,39 +926,39 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 484..510,
+                    range: 543..569,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("u"),
-                        range: 488..489,
+                        range: 547..548,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 489..503,
+                            range: 548..562,
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 490..502,
+                                        range: 549..561,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 490..491,
+                                            range: 549..550,
                                         },
                                         bound: None,
                                         default: Some(
                                             Named(
                                                 ExprNamed {
-                                                    range: 495..501,
+                                                    range: 554..560,
                                                     target: Name(
                                                         ExprName {
-                                                            range: 495..496,
+                                                            range: 554..555,
                                                             id: Name("x"),
                                                             ctx: Store,
                                                         },
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 500..501,
+                                                            range: 559..560,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -832,7 +973,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 503..505,
+                        range: 562..564,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -843,10 +984,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 507..510,
+                                range: 566..569,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 507..510,
+                                        range: 566..569,
                                     },
                                 ),
                             },
@@ -856,38 +997,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 548..576,
+                    range: 607..635,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("v"),
-                        range: 552..553,
+                        range: 611..612,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 553..569,
+                            range: 612..628,
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 554..568,
+                                        range: 613..627,
                                         name: Identifier {
                                             id: Name("Ts"),
-                                            range: 555..557,
+                                            range: 614..616,
                                         },
                                         default: Some(
                                             Named(
                                                 ExprNamed {
-                                                    range: 561..567,
+                                                    range: 620..626,
                                                     target: Name(
                                                         ExprName {
-                                                            range: 561..562,
+                                                            range: 620..621,
                                                             id: Name("x"),
                                                             ctx: Store,
                                                         },
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 566..567,
+                                                            range: 625..626,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -902,7 +1043,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 569..571,
+                        range: 628..630,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -913,10 +1054,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 573..576,
+                                range: 632..635,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 573..576,
+                                        range: 632..635,
                                     },
                                 ),
                             },
@@ -926,38 +1067,38 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    range: 617..646,
+                    range: 676..705,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("w"),
-                        range: 621..622,
+                        range: 680..681,
                     },
                     type_params: Some(
                         TypeParams {
-                            range: 622..639,
+                            range: 681..698,
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 623..638,
+                                        range: 682..697,
                                         name: Identifier {
                                             id: Name("Ts"),
-                                            range: 625..627,
+                                            range: 684..686,
                                         },
                                         default: Some(
                                             Named(
                                                 ExprNamed {
-                                                    range: 631..637,
+                                                    range: 690..696,
                                                     target: Name(
                                                         ExprName {
-                                                            range: 631..632,
+                                                            range: 690..691,
                                                             id: Name("x"),
                                                             ctx: Store,
                                                         },
                                                     ),
                                                     value: NumberLiteral(
                                                         ExprNumberLiteral {
-                                                            range: 636..637,
+                                                            range: 695..696,
                                                             value: Int(
                                                                 1,
                                                             ),
@@ -972,7 +1113,7 @@ Module(
                         },
                     ),
                     parameters: Parameters {
-                        range: 639..641,
+                        range: 698..700,
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -983,10 +1124,264 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 643..646,
+                                range: 702..705,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 643..646,
+                                        range: 702..705,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 742..768,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("t"),
+                        range: 746..747,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 747..761,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 748..760,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 748..749,
+                                        },
+                                        bound: Some(
+                                            Await(
+                                                ExprAwait {
+                                                    range: 752..759,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 758..759,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 761..763,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 765..768,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 765..768,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 800..827,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("u"),
+                        range: 804..805,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 805..820,
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        range: 806..819,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 806..807,
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Await(
+                                                ExprAwait {
+                                                    range: 811..818,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 817..818,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 820..822,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 824..827,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 824..827,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 860..889,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("v"),
+                        range: 864..865,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 865..882,
+                            type_params: [
+                                TypeVarTuple(
+                                    TypeParamTypeVarTuple {
+                                        range: 866..881,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 867..869,
+                                        },
+                                        default: Some(
+                                            Await(
+                                                ExprAwait {
+                                                    range: 873..880,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 879..880,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 882..884,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 886..889,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 886..889,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 925..955,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("w"),
+                        range: 929..930,
+                    },
+                    type_params: Some(
+                        TypeParams {
+                            range: 930..948,
+                            type_params: [
+                                ParamSpec(
+                                    TypeParamParamSpec {
+                                        range: 931..947,
+                                        name: Identifier {
+                                            id: Name("Ts"),
+                                            range: 933..935,
+                                        },
+                                        default: Some(
+                                            Await(
+                                                ExprAwait {
+                                                    range: 939..946,
+                                                    value: NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 945..946,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 948..950,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 952..955,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 952..955,
                                     },
                                 ),
                             },
@@ -1001,134 +1396,194 @@ Module(
 ## Semantic Syntax Errors
 
   |
-1 | def f[T]() -> (y := 3): ...
+1 | def d[T]() -> (await 1): ...
+  |                ^^^^^^^ Syntax Error: await expression cannot be used within a generic definition
+2 | def e[T](arg: (await 1)): ...
+3 | def f[T]() -> (y := 3): ...
+  |
+
+
+  |
+1 | def d[T]() -> (await 1): ...
+2 | def e[T](arg: (await 1)): ...
+  |                ^^^^^^^ Syntax Error: await expression cannot be used within a generic definition
+3 | def f[T]() -> (y := 3): ...
+4 | def g[T](arg: (x := 1)): ...
+  |
+
+
+  |
+1 | def d[T]() -> (await 1): ...
+2 | def e[T](arg: (await 1)): ...
+3 | def f[T]() -> (y := 3): ...
   |                ^^^^^^ Syntax Error: named expression cannot be used within a generic definition
-2 | def g[T](arg: (x := 1)): ...
-3 | def h[T](x: (yield 1)): ...
+4 | def g[T](arg: (x := 1)): ...
+5 | def h[T](x: (yield 1)): ...
   |
 
 
   |
-1 | def f[T]() -> (y := 3): ...
-2 | def g[T](arg: (x := 1)): ...
+2 | def e[T](arg: (await 1)): ...
+3 | def f[T]() -> (y := 3): ...
+4 | def g[T](arg: (x := 1)): ...
   |                ^^^^^^ Syntax Error: named expression cannot be used within a generic definition
-3 | def h[T](x: (yield 1)): ...
-4 | def j[T]() -> (yield 1): ...
+5 | def h[T](x: (yield 1)): ...
+6 | def j[T]() -> (yield 1): ...
   |
 
 
   |
-1 | def f[T]() -> (y := 3): ...
-2 | def g[T](arg: (x := 1)): ...
-3 | def h[T](x: (yield 1)): ...
+3 | def f[T]() -> (y := 3): ...
+4 | def g[T](arg: (x := 1)): ...
+5 | def h[T](x: (yield 1)): ...
   |              ^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
-4 | def j[T]() -> (yield 1): ...
-5 | def l[T](x: (yield from 1)): ...
+6 | def j[T]() -> (yield 1): ...
+7 | def l[T](x: (yield from 1)): ...
   |
 
 
   |
-2 | def g[T](arg: (x := 1)): ...
-3 | def h[T](x: (yield 1)): ...
-4 | def j[T]() -> (yield 1): ...
+4 | def g[T](arg: (x := 1)): ...
+5 | def h[T](x: (yield 1)): ...
+6 | def j[T]() -> (yield 1): ...
   |                ^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
-5 | def l[T](x: (yield from 1)): ...
-6 | def n[T]() -> (yield from 1): ...
+7 | def l[T](x: (yield from 1)): ...
+8 | def n[T]() -> (yield from 1): ...
   |
 
 
   |
-3 | def h[T](x: (yield 1)): ...
-4 | def j[T]() -> (yield 1): ...
-5 | def l[T](x: (yield from 1)): ...
+5 | def h[T](x: (yield 1)): ...
+6 | def j[T]() -> (yield 1): ...
+7 | def l[T](x: (yield from 1)): ...
   |              ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
-6 | def n[T]() -> (yield from 1): ...
-7 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
-  |
-
-
-  |
-4 | def j[T]() -> (yield 1): ...
-5 | def l[T](x: (yield from 1)): ...
-6 | def n[T]() -> (yield from 1): ...
-  |                ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
-7 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
-8 | def q[T = (yield 1)](): ...     # yield in TypeVar default
-  |
-
-
-  |
-5 | def l[T](x: (yield from 1)): ...
-6 | def n[T]() -> (yield from 1): ...
-7 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
-  |           ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar bound
-8 | def q[T = (yield 1)](): ...     # yield in TypeVar default
-9 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
+8 | def n[T]() -> (yield from 1): ...
+9 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
   |
 
 
    |
- 6 | def n[T]() -> (yield from 1): ...
- 7 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
- 8 | def q[T = (yield 1)](): ...     # yield in TypeVar default
+ 6 | def j[T]() -> (yield 1): ...
+ 7 | def l[T](x: (yield from 1)): ...
+ 8 | def n[T]() -> (yield from 1): ...
+   |                ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a generic definition
+ 9 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
+10 | def q[T = (yield 1)](): ...     # yield in TypeVar default
+   |
+
+
+   |
+ 7 | def l[T](x: (yield from 1)): ...
+ 8 | def n[T]() -> (yield from 1): ...
+ 9 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
+   |           ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar bound
+10 | def q[T = (yield 1)](): ...     # yield in TypeVar default
+11 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
+   |
+
+
+   |
+ 8 | def n[T]() -> (yield from 1): ...
+ 9 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
+10 | def q[T = (yield 1)](): ...     # yield in TypeVar default
    |            ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar default
- 9 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
-10 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
+11 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
+12 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
    |
 
 
    |
- 7 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
- 8 | def q[T = (yield 1)](): ...     # yield in TypeVar default
- 9 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
+ 9 | def p[T: (yield 1)](): ...      # yield in TypeVar bound
+10 | def q[T = (yield 1)](): ...     # yield in TypeVar default
+11 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
    |              ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVarTuple default
-10 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
-11 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
+12 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
+13 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
    |
 
 
    |
- 8 | def q[T = (yield 1)](): ...     # yield in TypeVar default
- 9 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
-10 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
+10 | def q[T = (yield 1)](): ...     # yield in TypeVar default
+11 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
+12 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
    |               ^^^^^^^ Syntax Error: yield expression cannot be used within a ParamSpec default
-11 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
-12 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
+13 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
+14 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
    |
 
 
    |
- 9 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
-10 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
-11 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
+11 | def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
+12 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
+13 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
    |           ^^^^^^ Syntax Error: named expression cannot be used within a TypeVar bound
-12 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
-13 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
+14 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
+15 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
    |
 
 
    |
-10 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
-11 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
-12 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
+12 | def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
+13 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
+14 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
    |            ^^^^^^ Syntax Error: named expression cannot be used within a TypeVar default
-13 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
-14 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+15 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
+16 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
    |
 
 
    |
-11 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
-12 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
-13 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
+13 | def t[T: (x := 1)](): ...       # named expr in TypeVar bound
+14 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
+15 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
    |              ^^^^^^ Syntax Error: named expression cannot be used within a TypeVarTuple default
-14 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+16 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+17 | def t[T: (await 1)](): ...       # await in TypeVar bound
    |
 
 
    |
-12 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
-13 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
-14 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+14 | def u[T = (x := 1)](): ...      # named expr in TypeVar default
+15 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
+16 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
    |               ^^^^^^ Syntax Error: named expression cannot be used within a ParamSpec default
+17 | def t[T: (await 1)](): ...       # await in TypeVar bound
+18 | def u[T = (await 1)](): ...      # await in TypeVar default
+   |
+
+
+   |
+15 | def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
+16 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+17 | def t[T: (await 1)](): ...       # await in TypeVar bound
+   |           ^^^^^^^ Syntax Error: await expression cannot be used within a TypeVar bound
+18 | def u[T = (await 1)](): ...      # await in TypeVar default
+19 | def v[*Ts = (await 1)](): ...    # await in TypeVarTuple default
+   |
+
+
+   |
+16 | def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+17 | def t[T: (await 1)](): ...       # await in TypeVar bound
+18 | def u[T = (await 1)](): ...      # await in TypeVar default
+   |            ^^^^^^^ Syntax Error: await expression cannot be used within a TypeVar default
+19 | def v[*Ts = (await 1)](): ...    # await in TypeVarTuple default
+20 | def w[**Ts = (await 1)](): ...   # await in ParamSpec default
+   |
+
+
+   |
+17 | def t[T: (await 1)](): ...       # await in TypeVar bound
+18 | def u[T = (await 1)](): ...      # await in TypeVar default
+19 | def v[*Ts = (await 1)](): ...    # await in TypeVarTuple default
+   |              ^^^^^^^ Syntax Error: await expression cannot be used within a TypeVarTuple default
+20 | def w[**Ts = (await 1)](): ...   # await in ParamSpec default
+   |
+
+
+   |
+18 | def u[T = (await 1)](): ...      # await in TypeVar default
+19 | def v[*Ts = (await 1)](): ...    # await in TypeVarTuple default
+20 | def w[**Ts = (await 1)](): ...   # await in ParamSpec default
+   |               ^^^^^^^ Syntax Error: await expression cannot be used within a ParamSpec default
    |
