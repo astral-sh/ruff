@@ -122,4 +122,4 @@ class Wrapper:
 reveal_type(Wrapper.value)  # revealed: Unknown | None
 ```
 
-[gradual guarantee]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-gradual-guarantee
+[gradual guarantee]: https://typing.python.org/en/latest/spec/concepts.html#the-gradual-guarantee

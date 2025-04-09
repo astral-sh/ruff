@@ -766,7 +766,7 @@ impl<'db> Type<'db> {
     ///
     /// This method returns `false` if either `self` or `other` is not fully static.
     ///
-    /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    /// [subtype of]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         // Two equivalent types are always subtypes of each other.
         //
@@ -1056,7 +1056,7 @@ impl<'db> Type<'db> {
 
     /// Return true if this type is [assignable to] type `target`.
     ///
-    /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.is_gradual_equivalent_to(db, target) {
             return true;
@@ -1274,7 +1274,7 @@ impl<'db> Type<'db> {
     ///
     /// This method returns `false` if either `self` or `other` is not fully static.
     ///
-    /// [equivalent to]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
+    /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         // TODO equivalent but not identical types: TypedDicts, Protocols, type aliases, etc.
 
@@ -1318,7 +1318,7 @@ impl<'db> Type<'db> {
     ///
     /// This powers the `assert_type()` directive.
     ///
-    /// [Summary of type relations]: https://typing.readthedocs.io/en/latest/spec/concepts.html#summary-of-type-relations
+    /// [Summary of type relations]: https://typing.python.org/en/latest/spec/concepts.html#summary-of-type-relations
     pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         if self == other {
             return true;
@@ -3857,7 +3857,7 @@ impl<'db> Type<'db> {
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
-            // https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+            // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
             Type::ClassLiteral(class) => {
                 let ty = match class.known(db) {
                     Some(KnownClass::Any) => Type::any(),
@@ -5462,7 +5462,7 @@ pub enum KnownFunction {
     /// `typing(_extensions).final`
     Final,
 
-    /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
+    /// [`typing(_extensions).no_type_check`](https://typing.python.org/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
 
     /// `typing(_extensions).assert_type`

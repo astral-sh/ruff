@@ -2,7 +2,7 @@
 
 References:
 
-- <https://typing.readthedocs.io/en/latest/spec/callables.html#callable>
+- <https://typing.python.org/en/latest/spec/callables.html#callable>
 
 Note that `typing.Callable` is deprecated at runtime, in favour of `collections.abc.Callable` (see:
 <https://docs.python.org/3/library/typing.html#deprecated-aliases>). However, removal of
@@ -299,4 +299,4 @@ def _(c: Callable[[int], int]):
     reveal_type(c.__call__)  # revealed: Unknown
 ```
 
-[gradual form]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-gradual-form
+[gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

@@ -480,7 +480,7 @@ impl Violation for MissingReturnTypeClassMethod {
 /// ```
 ///
 /// ## References
-/// - [Typing spec: `Any`](https://typing.readthedocs.io/en/latest/spec/special-types.html#any)
+/// - [Typing spec: `Any`](https://typing.python.org/en/latest/spec/special-types.html#any)
 /// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy documentation: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[derive(ViolationMetadata)]

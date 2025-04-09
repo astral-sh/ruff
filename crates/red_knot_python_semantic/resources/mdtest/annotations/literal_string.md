@@ -147,4 +147,4 @@ def f():
     reveal_type(x)  # revealed: LiteralString
 ```
 
-[1]: https://typing.readthedocs.io/en/latest/spec/literal.html#literalstring
+[1]: https://typing.python.org/en/latest/spec/literal.html#literalstring

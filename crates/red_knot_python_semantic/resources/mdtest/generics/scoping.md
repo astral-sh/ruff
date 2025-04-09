@@ -299,4 +299,4 @@ class C[T]:
     ok2: Inner[T]
 ```
 
-[scoping]: https://typing.readthedocs.io/en/latest/spec/generics.html#scoping-rules-for-type-variables
+[scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables
