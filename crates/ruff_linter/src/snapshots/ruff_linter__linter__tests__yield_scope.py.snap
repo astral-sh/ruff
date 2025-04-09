@@ -1,0 +1,58 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+resources/test/fixtures/syntax_errors/yield_scope.py:3:9: F704 `yield` statement outside of a function
+  |
+1 | def outer():
+2 |     class C:
+3 |         yield 1  # error
+  |         ^^^^^^^ F704
+4 |
+5 |     [(yield 1) for x in range(3)]  # error
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:5:7: F704 `yield` statement outside of a function
+  |
+3 |         yield 1  # error
+4 |
+5 |     [(yield 1) for x in range(3)]  # error
+  |       ^^^^^^^ F704
+6 |     ((yield 1) for x in range(3))  # error
+7 |     {(yield 1) for x in range(3)}  # error
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:6:7: F704 `yield` statement outside of a function
+  |
+5 |     [(yield 1) for x in range(3)]  # error
+6 |     ((yield 1) for x in range(3))  # error
+  |       ^^^^^^^ F704
+7 |     {(yield 1) for x in range(3)}  # error
+8 |     {(yield 1): 0 for x in range(3)}  # error
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:7:7: F704 `yield` statement outside of a function
+  |
+5 |     [(yield 1) for x in range(3)]  # error
+6 |     ((yield 1) for x in range(3))  # error
+7 |     {(yield 1) for x in range(3)}  # error
+  |       ^^^^^^^ F704
+8 |     {(yield 1): 0 for x in range(3)}  # error
+9 |     {0: (yield 1) for x in range(3)}  # error
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:8:7: F704 `yield` statement outside of a function
+  |
+6 |     ((yield 1) for x in range(3))  # error
+7 |     {(yield 1) for x in range(3)}  # error
+8 |     {(yield 1): 0 for x in range(3)}  # error
+  |       ^^^^^^^ F704
+9 |     {0: (yield 1) for x in range(3)}  # error
+  |
+
+resources/test/fixtures/syntax_errors/yield_scope.py:9:10: F704 `yield` statement outside of a function
+  |
+7 |     {(yield 1) for x in range(3)}  # error
+8 |     {(yield 1): 0 for x in range(3)}  # error
+9 |     {0: (yield 1) for x in range(3)}  # error
+  |          ^^^^^^^ F704
+  |
