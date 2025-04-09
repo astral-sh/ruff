@@ -4,7 +4,7 @@ use crate::db::Db;
 
 use super::{
     class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType,
-    TodoType, Type,
+    SuperOwnerKind, TodoType, Type,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -131,6 +131,33 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::AlwaysFalsy, _) => Ordering::Less,
         (_, Type::AlwaysFalsy) => Ordering::Greater,
 
+        (Type::BoundSuper(left), Type::BoundSuper(right)) => {
+            (match (left.pivot_class(db), right.pivot_class(db)) {
+                (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(right),
+                (ClassBase::Class(_), _) => Ordering::Less,
+                (_, ClassBase::Class(_)) => Ordering::Greater,
+                (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
+                    dynamic_elements_ordering(*left, *right)
+                }
+            })
+            .then_with(|| match (left.owner(db), right.owner(db)) {
+                (
+                    SuperOwnerKind::Class(ClassLiteralType { class: left }),
+                    SuperOwnerKind::Class(ClassLiteralType { class: right }),
+                ) => left.cmp(right),
+                (SuperOwnerKind::Class(_), _) => Ordering::Less,
+                (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
+                (
+                    SuperOwnerKind::Instance(InstanceType { class: left }),
+                    SuperOwnerKind::Instance(InstanceType { class: right }),
+                ) => left.cmp(right),
+                (SuperOwnerKind::Instance(_), _) => Ordering::Less,
+                (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
+                (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
+                    dynamic_elements_ordering(*left, *right)
+                }
+            })
+        }
         (Type::BoundSuper(_), _) => Ordering::Less,
         (_, Type::BoundSuper(_)) => Ordering::Greater,
 
