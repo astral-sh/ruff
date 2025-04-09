@@ -2,10 +2,7 @@
 //!
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::enter_stmt`] and [`SemanticSyntaxChecker::enter_expr`] methods should
-//! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively, and
-//! followed by matching calls to [`SemanticSyntaxChecker::exit_stmt`] and
-//! [`SemanticSyntaxChecker::exit_expr`].
-
+//! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 use std::{cell::RefCell, fmt::Display};
 
 use ruff_python_ast::{
@@ -475,9 +472,6 @@ impl SemanticSyntaxChecker {
 
     /// Check `stmt` for semantic syntax errors and update the checker's internal state.
     ///
-    /// This should be followed by a call to [`SemanticSyntaxChecker::exit_stmt`] to reset any state
-    /// specific to scopes introduced by `stmt`, such as whether the body of a function is async.
-    ///
     /// Note that this method should only be called when traversing `stmt` *and* its children. For
     /// example, if traversal of function bodies needs to be deferred, avoid calling `enter_stmt` on
     /// the function itself until the deferred body is visited too. Failing to defer `enter_stmt` in
@@ -507,10 +501,6 @@ impl SemanticSyntaxChecker {
     }
 
     /// Check `expr` for semantic syntax errors and update the checker's internal state.
-    ///
-    /// This should be followed by a call to [`SemanticSyntaxChecker::exit_expr`] to reset any state
-    /// specific to scopes introduced by `expr`, such as whether the body of a comprehension is
-    /// async.
     pub fn enter_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
