@@ -175,30 +175,70 @@ reveal_type(super(B, B).a1)  # revealed: Literal[a1]
 reveal_type(super(B, B).a2)  # revealed: <bound method `a2` of `Literal[B]`>
 ```
 
+## Union of supers
+
+```py
+class A:
+    x = 1
+    y: int = 1
+
+    a: str = "a only"
+
+class B(A): ...
+
+class C:
+    x = 2
+    y: int | str = "test"
+
+class D(C): ...
+
+def f(flag: bool):
+    s = super(B, B()) if flag else super(D, D())
+
+    reveal_type(s)  # revealed: <super: Literal[B], B> | <super: Literal[D], D>
+
+    reveal_type(s.x)  # revealed: Unknown | Literal[1, 2]
+    reveal_type(s.y)  # revealed: int | str
+
+    # error: [possibly-unbound-attribute] "Attribute `a` on type `<super: Literal[B], B> | <super: Literal[D], D>` is possibly unbound"
+    reveal_type(s.a)  # revealed: str
+```
+
 ## Invalid Usages
 
 ### Unresolvable `super()` Calls
 
-If an appropriate class and argument cannot be found, a runtime error will occur. TODO: Proper
-diagnostics should be provided in these cases.
+If an appropriate class and argument cannot be found, a runtime error will occur.
 
 ```py
 from __future__ import annotations
 
+# error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
 reveal_type(super())  # revealed: Unknown
 
 def f():
-    reveal_type(super())  # revealed: Unknown
+    # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+    super()
 
 # No first argument in its scope
-# TODO: This should work the same even without explicitly annotating `self`.
 class A:
-    def f(self: A):
-        def g():
-            reveal_type(super())  # revealed: Unknown
-        lambda: reveal_type(super())  # revealed: Unknown
+    # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+    s = super()
 
-        (reveal_type(super()) for _ in range(10))  # revealed: Unknown
+    def f(self):
+        def g():
+            # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+            super()
+        # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+        lambda: super()
+
+        # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+        (super() for _ in range(10))
+
+    @staticmethod
+    def h():
+        # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+        super()
 ```
 
 ### Failing Condition Checks
@@ -228,6 +268,8 @@ reveal_type(super(B, object))  # revealed: Unknown
 
 ### Instance Member Access via `super`
 
+Accessing instance members through `super()` is not allowed.
+
 ```py
 from __future__ import annotations
 
@@ -238,7 +280,7 @@ class A:
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
-        # TODO: it should occur `unresolved-attribute` error
+        # TODO: Once `Self` is supported, this should raise `unresolved-attribute` error
         super().a
 ```
 

@@ -1726,21 +1726,6 @@ reveal_type(Foo.BAR.value)  # revealed: @Todo(Attribute access on enum classes)
 reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes)
 ```
 
-## `super()`
-
-```py
-from __future__ import annotations
-
-class Foo:
-    def bar(self) -> int:
-        return 42
-
-# TODO: This should work the same even without explicitly annotating `self`.
-class Bar(Foo):
-    def bar(self: Bar) -> int:
-        return super().bar()
-```
-
 ## References
 
 Some of the tests in the *Class and instance variables* section draw inspiration from

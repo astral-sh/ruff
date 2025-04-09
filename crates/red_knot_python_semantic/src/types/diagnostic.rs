@@ -53,6 +53,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
+    registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
@@ -471,7 +472,7 @@ declare_lint! {
     /// ## References
     /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
     pub(crate) static INVALID_SUPER_ARGUMENT = {
-        summary: "detects invalid arguments for super()",
+        summary: "detects invalid arguments for `super()`",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -753,6 +754,46 @@ declare_lint! {
     /// ```
     pub(crate) static TOO_MANY_POSITIONAL_ARGUMENTS = {
         summary: "detects calls passing too many positional arguments",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.
+    ///
+    /// ## Why is this bad?
+    /// When `super()` is used without arguments, Python tries to find two things:
+    /// the nearest enclosing class and the first argument of the immediately enclosing function (typically self or cls).
+    /// If either of these is missing, the call will fail at runtime with a `RuntimeError`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// super()  # error: no enclosing class or function found
+    ///
+    /// def func():
+    ///     super()  # error: no enclosing class or first argument exists
+    ///
+    /// class A:
+    ///     f = super()  # error: no enclosing function to provide the first argument
+    ///
+    ///     def method(self):
+    ///         def nested():
+    ///             super()  # error: first argument does not exist in this nested function
+    ///
+    ///         lambda: super()  # error: first argument does not exist in this lambda
+    ///
+    ///         (super() for _ in range(10))  # error: argument is not available in generator expression
+    ///
+    ///         super()  # okay! both enclosing class and first argument are available
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+
+    pub(crate) static UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS = {
+        summary: "detects invalid `super()` calls where implicit arguments are unavailable.",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1150,23 +1191,6 @@ pub(super) fn report_implicit_return_type(
         format_args!(
             "Function can implicitly return `None`, which is not assignable to return type `{}`",
             expected_ty.display(context.db())
-        ),
-    );
-}
-
-pub(super) fn report_invalid_super_argument(
-    context: &InferContext,
-    node: AnyNodeRef,
-    pivot_ty: Type,
-    owner_ty: Type,
-) {
-    context.report_lint(
-        &INVALID_SUPER_ARGUMENT,
-        node,
-        format_args!(
-            "Second argument `{}` is not an instance or subclass of `{}` in `super()` call",
-            owner_ty.display(context.db()),
-            pivot_ty.display(context.db())
         ),
     );
 }

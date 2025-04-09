@@ -7,7 +7,10 @@ use std::str::FromStr;
 use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
-use diagnostic::{INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE};
+use diagnostic::{
+    INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE,
+    UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
+};
 use itertools::EitherOrBoth;
 use ruff_db::files::{File, FileRange};
 use ruff_python_ast::name::Name;
@@ -387,7 +390,6 @@ impl<'db> Type<'db> {
             | Self::LiteralString
             | Self::SliceLiteral(_)
             | Self::Dynamic(DynamicType::Unknown | DynamicType::Any)
-            | Self::BoundSuper(_)
             | Self::BoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::MethodWrapper(_) => false,
@@ -415,6 +417,16 @@ impl<'db> Type<'db> {
                     .iter()
                     .any(|constraint| constraint.contains_todo(db)),
             },
+
+            Self::BoundSuper(bound_super) => {
+                matches!(
+                    bound_super.pivot_class(db),
+                    ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoProtocol)
+                ) || matches!(
+                    bound_super.owner(db),
+                    SuperOwnerKind::Dynamic(DynamicType::Todo(_) | DynamicType::TodoProtocol)
+                )
+            }
 
             Self::Tuple(tuple) => tuple.elements(db).iter().any(|ty| ty.contains_todo(db)),
 
@@ -889,9 +901,13 @@ impl<'db> Type<'db> {
             // as that type is equivalent to `type[Any, ...]` (and therefore not a fully static type).
             (Type::Tuple(_), _) => KnownClass::Tuple.to_instance(db).is_subtype_of(db, target),
 
-            (Type::BoundSuper(_), _) | (_, Type::BoundSuper(_)) => {
-                KnownClass::Super.to_instance(db).is_subtype_of(db, target)
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => self.is_equivalent_to(db, target),
+            (Type::BoundSuper(_), Type::Instance(InstanceType { class })) => {
+                // `BoundSuper` is a special kind of `super` instance.
+                // Therefore, `BoundSuper` is always subtype of `super` instances.
+                class.is_known(db, KnownClass::Super)
             }
+            (Type::BoundSuper(_), _) => KnownClass::Super.to_instance(db).is_subtype_of(db, target),
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
@@ -1618,6 +1634,12 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .is_disjoint_from(db, other),
 
+            (Type::BoundSuper(_), Type::Instance(InstanceType { class }))
+            | (Type::Instance(InstanceType { class }), Type::BoundSuper(_)) => {
+                // `BoundSuper` is a special kind of `super` instance.
+                // Therefore, `super` instances and `BoundSuper` are always not disjoint.
+                !class.is_known(db, KnownClass::Super)
+            }
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => KnownClass::Super
                 .to_instance(db)
                 .is_disjoint_from(db, other),
@@ -1655,7 +1677,10 @@ impl<'db> Type<'db> {
             },
 
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.is_fully_static(),
-            Type::BoundSuper(_) => true,
+            Type::BoundSuper(bound_super) => {
+                !matches!(bound_super.pivot_class(db), ClassBase::Dynamic(_))
+                    && !matches!(bound_super.owner(db), SuperOwnerKind::Dynamic(_))
+            }
             Type::ClassLiteral(_) | Type::Instance(_) => {
                 // TODO: Ideally, we would iterate over the MRO of the class, check if all
                 // bases are fully static, and only return `true` if that is the case.
@@ -1789,7 +1814,6 @@ impl<'db> Type<'db> {
         match self {
             Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
-            | Type::BoundSuper(..)
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
             | Type::ModuleLiteral(..)
@@ -1828,6 +1852,11 @@ impl<'db> Type<'db> {
 
             Type::Instance(InstanceType { class }) => {
                 class.known(db).is_some_and(KnownClass::is_single_valued)
+            }
+
+            Type::BoundSuper(_) => {
+                // At runtime two super instances never compare equal, even if their arguments are identical.
+                false
             }
 
             Type::Dynamic(_)
@@ -6297,26 +6326,38 @@ impl<'db> TupleType<'db> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct BoundSuperError<'db> {
-    pivot_class: Type<'db>,
-    owner: Type<'db>,
+pub(crate) enum BoundSuperError<'db> {
+    InvalidArgument {
+        pivot_class: Type<'db>,
+        owner: Type<'db>,
+    },
+    UnavailableImplicitArguments,
 }
 
-impl<'db> BoundSuperError<'db> {
-    fn new(pivot_class: Type<'db>, owner: Type<'db>) -> Self {
-        BoundSuperError { pivot_class, owner }
-    }
-
+impl BoundSuperError<'_> {
     pub(super) fn report_diagnostic(&self, context: &InferContext, node: AnyNodeRef) {
-        context.report_lint(
-            &INVALID_SUPER_ARGUMENT,
-            node,
-            format_args!(
-                "Second argument `{owner}` is not an instance or subclass of `{pivot_class}` in `super({pivot_class}, {owner})` call",
-                pivot_class = self.pivot_class.display(context.db()),
-                owner = self.owner.display(context.db()),
-            ),
-        );
+        match self {
+            BoundSuperError::InvalidArgument { pivot_class, owner } => {
+                context.report_lint(
+                    &INVALID_SUPER_ARGUMENT,
+                    node,
+                    format_args!(
+                        "Second argument `{owner}` is not an instance or subclass of `{pivot_class}` in `super({pivot_class}, {owner})` call",
+                        pivot_class = pivot_class.display(context.db()),
+                        owner = owner.display(context.db()),
+                    ),
+                );
+            }
+            BoundSuperError::UnavailableImplicitArguments => {
+                context.report_lint(
+                    &UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
+                    node,
+                    format_args!(
+                        "Implicit arguments for `super()` are not available in this context",
+                    ),
+                );
+            }
+        }
     }
 }
 
@@ -6406,8 +6447,12 @@ impl<'db> BoundSuperType<'db> {
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,
     ) -> Result<Type<'db>, BoundSuperError<'db>> {
-        let pivot_class = ClassBase::try_from_type(db, pivot_class_type)
-            .ok_or_else(|| BoundSuperError::new(pivot_class_type, owner_type))?;
+        let pivot_class = ClassBase::try_from_type(db, pivot_class_type).ok_or({
+            BoundSuperError::InvalidArgument {
+                pivot_class: pivot_class_type,
+                owner: owner_type,
+            }
+        })?;
 
         let owner = SuperOwnerKind::try_from_type(db, owner_type)
             .and_then(|owner| {
@@ -6425,7 +6470,10 @@ impl<'db> BoundSuperType<'db> {
                     None
                 }
             })
-            .ok_or_else(|| BoundSuperError::new(pivot_class_type, owner_type))?;
+            .ok_or(BoundSuperError::InvalidArgument {
+                pivot_class: pivot_class_type,
+                owner: owner_type,
+            })?;
 
         Ok(Type::BoundSuper(BoundSuperType::new(
             db,

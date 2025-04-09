@@ -100,7 +100,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{BoundSuperType, CallDunderError};
+use super::{BoundSuperError, BoundSuperType, CallDunderError};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -4153,14 +4153,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     let Some(enclosing_class) = self.enclosing_class_symbol(scope)
                                     else {
                                         overload.set_return_type(Type::unknown());
-                                        // TODO: add proper diagnostic
+                                        BoundSuperError::UnavailableImplicitArguments
+                                            .report_diagnostic(
+                                                &self.context,
+                                                call_expression.into(),
+                                            );
                                         continue;
                                     };
 
                                     let Some(first_param) = self.first_param_type_in_scope(scope)
                                     else {
                                         overload.set_return_type(Type::unknown());
-                                        // TODO: add proper diagnostic
+                                        BoundSuperError::UnavailableImplicitArguments
+                                            .report_diagnostic(
+                                                &self.context,
+                                                call_expression.into(),
+                                            );
                                         continue;
                                     };
 
