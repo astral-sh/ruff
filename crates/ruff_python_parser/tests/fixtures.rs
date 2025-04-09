@@ -602,13 +602,35 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 ast::visitor::walk_expr(self, expr);
                 self.scopes.pop().unwrap();
             }
-            ast::Expr::ListComp(ast::ExprListComp { generators, .. })
-            | ast::Expr::SetComp(ast::ExprSetComp { generators, .. })
-            | ast::Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
+            ast::Expr::ListComp(ast::ExprListComp {
+                elt, generators, ..
+            })
+            | ast::Expr::SetComp(ast::ExprSetComp {
+                elt, generators, ..
+            }) => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
                 self.scopes.push(Scope::Comprehension {
                     is_async: generators.iter().any(|gen| gen.is_async),
                 });
-                ast::visitor::walk_expr(self, expr);
+                self.visit_expr(elt);
+                self.scopes.pop().unwrap();
+            }
+            ast::Expr::DictComp(ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                ..
+            }) => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
+                self.scopes.push(Scope::Comprehension {
+                    is_async: generators.iter().any(|gen| gen.is_async),
+                });
+                self.visit_expr(key);
+                self.visit_expr(value);
                 self.scopes.pop().unwrap();
             }
             _ => {

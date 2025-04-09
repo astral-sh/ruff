@@ -7,9 +7,6 @@ x = [y for y in (1, 2, 3)]
 [1 for i in x in a]
 [a for a, b in G]
 def outer():
-    [
-        await x for a, b in C
-    ]
     [i for i in await x if entity is not None]
 [x for x in (l if True else L) if T]
 def outer():
