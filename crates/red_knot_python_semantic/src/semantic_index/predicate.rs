@@ -140,7 +140,7 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
     /// separate field to hold the ID of the scope. `StarImportPredicate`s are only created
     /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
     /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
-    /// to the global scope.
+    /// to the global scope of the importing file.
     pub(crate) symbol_id: ScopedSymbolId,
 
     pub(crate) referenced_file: File,
