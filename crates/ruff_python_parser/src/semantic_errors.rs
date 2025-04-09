@@ -103,12 +103,23 @@ impl SemanticSyntaxChecker {
                     Self::add_error(ctx, SemanticSyntaxErrorKind::ReturnOutsideFunction, *range);
                 }
             }
-            Stmt::For(ast::StmtFor { target, iter, .. }) => {
+            Stmt::For(ast::StmtFor {
+                target,
+                iter,
+                is_async,
+                ..
+            }) => {
                 // test_err single_star_for
                 // for _ in *x: ...
                 // for *x in xs: ...
                 Self::invalid_star_expression(target, ctx);
                 Self::invalid_star_expression(iter, ctx);
+                if *is_async {
+                    Self::await_outside_async_function(ctx, stmt);
+                }
+            }
+            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
+                Self::await_outside_async_function(ctx, stmt);
             }
             _ => {}
         }
@@ -514,11 +525,16 @@ impl SemanticSyntaxChecker {
             }) => {
                 Self::check_generator_expr(elt, generators, ctx);
                 Self::async_comprehension_outside_async_function(ctx, generators);
+                for generator in generators.iter().filter(|g| g.is_async) {
+                    Self::await_outside_async_function(ctx, generator);
+                }
             }
             Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
             }) => {
                 Self::check_generator_expr(elt, generators, ctx);
+                // Note that `await_outside_async_function` is not called here because generators
+                // are evaluated lazily. See the note in the function for more details.
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -603,9 +619,50 @@ impl SemanticSyntaxChecker {
             }
             Expr::Await(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
+                Self::await_outside_async_function(ctx, expr);
             }
             _ => {}
         }
+    }
+
+    /// PLE1142
+    fn await_outside_async_function<Ctx: SemanticSyntaxContext, Node: Ranged>(
+        ctx: &Ctx,
+        node: Node,
+    ) {
+        if ctx.in_async_context() {
+            return;
+        }
+        // `await` is allowed at the top level of a Jupyter notebook.
+        // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
+        if ctx.in_module_scope() && ctx.in_notebook() {
+            return;
+        }
+        // Generators are evaluated lazily, so you can use `await` in them. For example:
+        //
+        // ```python
+        // # This is valid
+        // def f():
+        //     (await x for x in y)
+        //     (x async for x in y)
+        //
+        // # This is invalid
+        // def f():
+        //     (x for x in await y)
+        //     [await x for x in y]
+        // ```
+        //
+        // This check is required in addition to avoiding calling this function in `visit_expr`
+        // because the generator scope applies to nested parts of the `Expr::Generator` that are
+        // visited separately.
+        if ctx.in_generator_scope() {
+            return;
+        }
+        Self::add_error(
+            ctx,
+            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction,
+            node.range(),
+        );
     }
 
     /// F704
@@ -802,6 +859,9 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
                 f.write_str("`return` statement outside of a function")
+            }
+            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction => {
+                f.write_str("`await` statement outside of an asynchronous function")
             }
         }
     }
@@ -1101,6 +1161,19 @@ pub enum SemanticSyntaxErrorKind {
 
     /// Represents the use of `return` outside of a function scope.
     ReturnOutsideFunction,
+
+    /// Represents the use of `await`, `async for`, or `async with` outside of an asynchronous
+    /// function.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f():
+    ///     await 1                # error
+    ///     async for x in y: ...  # error
+    ///     async with x: ...      # error
+    /// ```
+    AwaitOutsideAsyncFunction,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1526,6 +1599,12 @@ pub trait SemanticSyntaxContext {
 
     /// Returns `true` if the visitor is in a function scope.
     fn in_function_scope(&self) -> bool;
+
+    /// Returns `true` if the visitor is in a generator scope.
+    ///
+    /// Note that this refers to an `Expr::Generator` precisely, not to comprehensions more
+    /// generally.
+    fn in_generator_scope(&self) -> bool;
 
     /// Returns `true` if the source file is a Jupyter notebook.
     fn in_notebook(&self) -> bool;

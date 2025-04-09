@@ -69,7 +69,7 @@ use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
 };
-use crate::rules::pylint::rules::LoadBeforeGlobalDeclaration;
+use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa, Locator};
@@ -604,6 +604,11 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(Diagnostic::new(ReturnOutsideFunction, error.range));
                 }
             }
+            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction => {
+                if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
+                    self.report_diagnostic(Diagnostic::new(AwaitOutsideAsync, error.range));
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
@@ -679,6 +684,16 @@ impl SemanticSyntaxContext for Checker<'_> {
 
     fn in_notebook(&self) -> bool {
         self.source_type.is_ipynb()
+    }
+
+    fn in_generator_scope(&self) -> bool {
+        matches!(
+            &self.semantic.current_scope().kind,
+            ScopeKind::Generator {
+                kind: GeneratorKind::Generator,
+                ..
+            }
+        )
     }
 }
 

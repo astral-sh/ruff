@@ -1215,11 +1215,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 pylint::rules::yield_from_in_async_function(checker, yield_from);
             }
         }
-        Expr::Await(_) => {
-            if checker.enabled(Rule::AwaitOutsideAsync) {
-                pylint::rules::await_outside_async(checker, expr);
-            }
-        }
         Expr::FString(f_string_expr @ ast::ExprFString { value, .. }) => {
             if checker.enabled(Rule::FStringMissingPlaceholders) {
                 pyflakes::rules::f_string_missing_placeholders(checker, f_string_expr);
