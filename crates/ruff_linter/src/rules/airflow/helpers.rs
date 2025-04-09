@@ -10,8 +10,12 @@ pub(crate) enum Replacement {
     Name(&'static str),
     Message(&'static str),
     AutoImport {
-        path: &'static str,
+        module: &'static str,
         name: &'static str,
+    },
+    SourceModuleMoved {
+        module: &'static str,
+        name: String,
     },
 }
 
@@ -70,10 +74,10 @@ pub(crate) fn is_guarded_by_try_except(
 /// contain any [`ast::StmtImportFrom`] nodes that indicate the numpy
 /// member is being imported from the non-deprecated location?
 fn try_block_contains_undeprecated_import(try_node: &StmtTry, replacement: &Replacement) -> bool {
-    let Replacement::AutoImport { path, name } = replacement else {
+    let Replacement::AutoImport { module, name } = replacement else {
         return false;
     };
-    let mut import_searcher = ImportSearcher::new(path, name);
+    let mut import_searcher = ImportSearcher::new(module, name);
     import_searcher.visit_body(&try_node.body);
     import_searcher.found_import
 }

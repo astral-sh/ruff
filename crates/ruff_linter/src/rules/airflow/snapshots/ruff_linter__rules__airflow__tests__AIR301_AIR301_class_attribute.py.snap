@@ -244,7 +244,7 @@ AIR301_class_attribute.py:42:6: AIR301 `airflow.datasets.manager.DatasetManager`
 43 | dm.register_dataset_change()
 44 | dm.create_datasets()
    |
-   = help: Use `airflow.assets.AssetManager` instead
+   = help: Use `airflow.assets.manager.AssetManager` instead
 
 AIR301_class_attribute.py:43:4: AIR301 [*] `register_dataset_change` is removed in Airflow 3.0
    |
