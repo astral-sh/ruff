@@ -104,8 +104,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         // ProviderName: for cases that only one name has been moved
         // apache-airflow-providers-amazon
         ["airflow", "hooks", "S3_hook", rest @ (
-            "S3Hook" |
-            "provide_bucket_name"
+            "S3Hook"
+            | "provide_bucket_name"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.amazon.aws.hooks.s3",
@@ -170,8 +170,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
         // apache-airflow-providers-common-sql
         ["airflow", "hooks", "dbapi", rest @ (
-            "ConnectorProtocol" |
-            "DbApiHook"
+            "ConnectorProtocol"
+            | "DbApiHook"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.common.sql.hooks.sql",
@@ -274,8 +274,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
         // apache-airflow-providers-apache-druid
         ["airflow", "hooks", "druid_hook", rest @ (
-            "DruidDbApiHook" |
-            "DruidHook"
+            "DruidDbApiHook"
+            | "DruidHook"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.apache.druid.hooks.druid",
@@ -295,10 +295,10 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
         // apache-airflow-providers-fab
         ["airflow", "api", "auth", "backend", "basic_auth", rest @ (
-            "CLIENT_AUTH" |
-            "init_app" |
-            "auth_current_user" |
-            "requires_authentication"
+            "CLIENT_AUTH"
+            | "init_app"
+            | "auth_current_user"
+            | "requires_authentication"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.fab.auth_manager.api.auth.backend.basic_auth",
@@ -306,11 +306,11 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "api", "auth", "backend", "kerberos_auth", rest @ (
-            "log" |
-            "CLIENT_AUTH" |
-            "find_user" |
-            "init_app" |
-            "requires_authentication"
+            "log"
+            | "CLIENT_AUTH"
+            | "find_user"
+            | "init_app"
+            | "requires_authentication"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
@@ -318,11 +318,11 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "auth", "managers", "fab", "api", "auth", "backend", "kerberos_auth", rest @ (
-            "log" |
-            "CLIENT_AUTH" |
-            "find_user" |
-            "init_app" |
-            "requires_authentication"
+            "log"
+            | "CLIENT_AUTH"
+            | "find_user"
+            | "init_app"
+            | "requires_authentication"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth",
@@ -335,8 +335,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "auth", "managers", "fab", "security_manager", "override", rest @ (
-            "MAX_NUM_DATABASE_USER_SESSIONS" |
-            "FabAirflowSecurityManagerOverride"
+            "MAX_NUM_DATABASE_USER_SESSIONS"
+            | "FabAirflowSecurityManagerOverride"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.fab.auth_manager.security_manager.override",
@@ -363,8 +363,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
         // apache-airflow-providers-apache-hive
         ["airflow", "macros", "hive", rest @ (
-            "closest_ds_partition" |
-            "max_partition"
+            "closest_ds_partition"
+            | "max_partition"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.apache.hive.macros.hive",
@@ -372,10 +372,10 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "5.1.0"
         },
         ["airflow", "hooks", "hive_hooks", rest @ (
-            "HiveCliHook" |
-            "HiveMetastoreHook" |
-            "HiveServer2Hook" |
-            "HIVE_QUEUE_PRIORITIES"
+            "HiveCliHook"
+            | "HiveMetastoreHook"
+            | "HiveServer2Hook"
+            | "HIVE_QUEUE_PRIORITIES"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.apache.hive.hooks.hive",
@@ -452,8 +452,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
         // apache-airflow-providers-jdbc
         ["airflow", "hooks", "jdbc_hook", rest @ (
-            "JdbcHook" |
-            "jaydebeapi"
+            "JdbcHook"
+            | "jaydebeapi"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.jdbc.hooks.jdbc",
@@ -468,17 +468,17 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
         // apache-airflow-providers-cncf-kubernetes
         ["airflow", "executors", "kubernetes_executor_types", rest @ (
-            "ALL_NAMESPACES" |
-            "POD_EXECUTOR_DONE_KEY"
+            "ALL_NAMESPACES"
+            | "POD_EXECUTOR_DONE_KEY"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types",
             provider: "cncf-kubernetes",
             version: "7.4.0"
         },
-        ["airflow", "kubernetes", "k8s_model", rest@ (
-            "K8SModel" |
-            "append_to_pod"
+        ["airflow", "kubernetes", "k8s_model", rest @ (
+            "K8SModel"
+            | "append_to_pod"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.cncf.kubernetes.k8s_model",
@@ -486,22 +486,22 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "7.4.0"
         },
         ["airflow", "kubernetes", "kube_client", rest @ (
-            "_disable_verify_ssl" |
-            "_enable_tcp_keepalive" |
-            "get_kube_client"
+            "_disable_verify_ssl"
+            | "_enable_tcp_keepalive"
+            | "get_kube_client"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client",
             provider: "cncf-kubernetes",
             version: "7.4.0"
         },
-        ["airflow", "kubernetes", "kubernetes_helper_functions", rest@ (
-            "add_pod_suffix" |
-            "annotations_for_logging_task_metadata" |
-            "annotations_to_key" |
-            "create_pod_id" |
-            "get_logs_task_metadata" |
-            "rand_str"
+        ["airflow", "kubernetes", "kubernetes_helper_functions", rest @ (
+            "add_pod_suffix"
+            | "annotations_for_logging_task_metadata"
+            | "annotations_to_key"
+            | "create_pod_id"
+            | "get_logs_task_metadata"
+            | "rand_str"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions",
@@ -548,10 +548,10 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             },
             _ => return,
         },
-        ["airflow", "kubernetes", "pod_generator_deprecated", rest@ (
-            "make_safe_label_value" |
-            "PodDefaults" |
-            "PodGenerator"
+        ["airflow", "kubernetes", "pod_generator_deprecated", rest @ (
+            "make_safe_label_value"
+            | "PodDefaults"
+            | "PodGenerator"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.cncf.kubernetes.pod_generator_deprecated",
@@ -559,8 +559,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "7.4.0"
         },
         ["airflow", "kubernetes", "pod_launcher", rest @(
-            "PodLauncher" |
-            "PodStatus"
+            "PodLauncher"
+            | "PodStatus"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.cncf.kubernetes.pod_launcher_deprecated",
@@ -677,8 +677,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "operators", "postgres_operator", rest @ (
-            "Mapping" |
-            "PostgresOperator"
+            "Mapping"
+            | "PostgresOperator"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.postgres.operators.postgres",
@@ -707,8 +707,8 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "operators", "slack_operator", rest @ (
-            "SlackAPIOperator" |
-            "SlackAPIPostOperator"
+            "SlackAPIOperator"
+            | "SlackAPIPostOperator"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.slack.operators.slack",
@@ -749,9 +749,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "standard",
             version: "0.0.1"
         },
-        ["airflow", "operators", "dagrun_operator", rest@ (
-            "TriggerDagRunLink" |
-            "TriggerDagRunOperator"
+        ["airflow", "operators", "dagrun_operator", rest @ (
+            "TriggerDagRunLink"
+            | "TriggerDagRunOperator"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.operators.trigger_dagrun",
@@ -769,10 +769,10 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "0.0.3"
         },
         ["airflow", "operators", "python_operator", rest @ (
-            "BranchPythonOperator" |
-            "PythonOperator" |
-            "PythonVirtualenvOperator" |
-            "ShortCircuitOperator"
+            "BranchPythonOperator"
+            | "PythonOperator"
+            | "PythonVirtualenvOperator"
+            | "ShortCircuitOperator"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.operators.python",
@@ -780,9 +780,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "0.0.1"
         },
         ["airflow", "sensors", "external_task_sensor", rest @ (
-            "ExternalTaskMarker" |
-            "ExternalTaskSensor" |
-            "ExternalTaskSensorLink"
+            "ExternalTaskMarker"
+            | "ExternalTaskSensor"
+            | "ExternalTaskSensorLink"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.standard.sensors.external_task",
