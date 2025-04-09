@@ -3940,8 +3940,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         ))
     }
 
-    /// Returns the type of the first parameter if the scope is function-like (function or lambda).
-    /// Returns `None` if the scope is not function-like, or if there are no parameters.
+    /// Returns the type of the first parameter if the given scope is function-like (i.e. function or lambda).
+    /// Returns `None` if the scope is not function-like, or has no parameters.
     fn first_param_type_in_scope(&self, scope: ScopeId) -> Option<Type<'db>> {
         let first_param = match scope.node(self.db()) {
             NodeWithScopeKind::Function(f) => f.parameters.iter().next(),
@@ -3959,7 +3959,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// This function walks up the ancestor scopes starting from the given scope,
     /// and finds the closest class definition.
     ///
-    /// Returns `None` if no enclosing class is found.
+    /// Returns `None` if no enclosing class is found.a
     fn enclosing_class_symbol(&self, scope: ScopeId) -> Option<Type<'db>> {
         self.index
             .ancestor_scopes(scope.file_scope_id(self.db()))
