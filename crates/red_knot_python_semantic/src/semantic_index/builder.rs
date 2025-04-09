@@ -1618,8 +1618,10 @@ where
                     post_case_snapshots.push(self.flow_snapshot());
 
                     if i != cases.len() - 1 || !has_catchall {
-                        // We need to restore the state after each case, but not after the last one.
-                        // The last one will just become the state that we merge the other snapshots into
+                        // We need to restore the state after each case, but not after the last
+                        // one. The last one will just become the state that we merge the other
+                        // snapshots into. (If there's no catch-all, we'll add an implied one
+                        // below, so this can't be the last case.)
                         self.flow_restore(no_case_matched.clone());
                         self.record_negated_narrowing_constraint(match_predicate);
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
