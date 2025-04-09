@@ -6487,7 +6487,6 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
-        // Pivot Class Dynamic 할 때는 , 따로
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
             return Either::Left(mro_iter);
         };
