@@ -227,23 +227,23 @@ print((
     D,
     E,
     F,
-    G,  # TODO: could emit diagnostic about being possibly unbound
-    H,
+    G,  # error: [possibly-unresolved-reference]
+    H,  # error: [possibly-unresolved-reference]
     I,
     J,
     K,
     L,
-    M,  # TODO: could emit diagnostic about being possibly unbound
-    N,  # TODO: could emit diagnostic about being possibly unbound
-    O,  # TODO: could emit diagnostic about being possibly unbound
-    P,  # TODO: could emit diagnostic about being possibly unbound
-    Q,  # TODO: could emit diagnostic about being possibly unbound
-    R,  # TODO: could emit diagnostic about being possibly unbound
-    S,  # TODO: could emit diagnostic about being possibly unbound
-    T,  # TODO: could emit diagnostic about being possibly unbound
-    U,  # TODO: could emit diagnostic about being possibly unbound
-    V,  # TODO: could emit diagnostic about being possibly unbound
-    W,  # TODO: could emit diagnostic about being possibly unbound
+    M,  # error: [possibly-unresolved-reference]
+    N,  # error: [possibly-unresolved-reference]
+    O,  # error: [possibly-unresolved-reference]
+    P,  # error: [possibly-unresolved-reference]
+    Q,  # error: [possibly-unresolved-reference]
+    R,  # error: [possibly-unresolved-reference]
+    S,  # error: [possibly-unresolved-reference]
+    T,  # error: [possibly-unresolved-reference]
+    U,  # TODO: could emit [possibly-unresolved-reference here] (https://github.com/astral-sh/ruff/issues/16996)
+    V,  # error: [possibly-unresolved-reference]
+    W,  # error: [possibly-unresolved-reference]
     typing,
     OrderedDict,
     Foo,
@@ -479,15 +479,21 @@ reveal_type(s)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(t)  # revealed: Unknown
 
-# TODO: these should all reveal `Unknown | int`.
+# TODO: these should all reveal `Unknown | int` and should not emit errors.
 # (We don't generally model elsewhere in red-knot that bindings from walruses
 # "leak" from comprehension scopes into outer scopes, but we should.)
 # See https://github.com/astral-sh/ruff/issues/16954
+# error: [unresolved-reference]
 reveal_type(g)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(i)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(k)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(m)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(o)  # revealed: Unknown
+# error: [unresolved-reference]
 reveal_type(q)  # revealed: Unknown
 ```
 
@@ -668,15 +674,15 @@ from exporter import *
 
 reveal_type(X)  # revealed: bool
 
-# TODO: should emit error: [unresolved-reference]
+# error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
 
-# TODO: The `*` import should not be considered a redefinition
-# of the global variable in this module, as the symbol in
+# The `*` import is not considered a redefinition
+# of the global variable `Z` in this module, as the symbol in
 # the `a` module is in a branch that is statically known
 # to be dead code given the `python-version` configuration.
-# Thus this should reveal `Literal[True]`.
-reveal_type(Z)  # revealed: Unknown
+# Thus this still reveals `Literal[True]`.
+reveal_type(Z)  # revealed: Literal[True]
 ```
 
 ### Multiple `*` imports with always-false visibility constraints
@@ -707,8 +713,7 @@ from exporter import *
 from exporter import *
 from exporter import *
 
-# TODO: should still be `Literal[True]
-reveal_type(Z)  # revealed: Unknown
+reveal_type(Z)  # revealed: Literal[True]
 ```
 
 ### Ambiguous visibility constraints
@@ -735,7 +740,7 @@ else:
 ```py
 from exporter import *
 
-# TODO: should have a `[possibly-unresolved-reference]` diagnostic
+# error: [possibly-unresolved-reference]
 reveal_type(A)  # revealed: Unknown | Literal[1]
 
 reveal_type(B)  # revealed: Unknown | Literal[2, 3]
@@ -798,16 +803,14 @@ if sys.version_info >= (3, 12):
 else:
     from exporter import *
 
-    # TODO: should have an `[unresolved-reference]` diagnostic
+    # error: [unresolved-reference]
     reveal_type(A)  # revealed: Unknown
-
-    # TODO: should have a `[possibly-unresolved-reference]` diagnostic
+    # error: [possibly-unresolved-reference]
     reveal_type(B)  # revealed: bool
 
-# TODO: should have an `[unresolved-reference]` diagnostic
+# error: [unresolved-reference]
 reveal_type(A)  # revealed: Unknown
-
-# TODO: should have a `[possibly-unresolved-reference]` diagnostic
+# error: [possibly-unresolved-reference]
 reveal_type(B)  # revealed: bool
 ```
 
@@ -1065,7 +1068,7 @@ from exporter import *
 reveal_type(X)  # revealed: bool
 reveal_type(Y)  # revealed: bool
 
-# TODO: should error with [unresolved-reference]
+# error: [unresolved-reference]
 reveal_type(Z)  # revealed: Unknown
 ```
 
@@ -1100,7 +1103,7 @@ from exporter import *
 reveal_type(X)  # revealed: bool
 reveal_type(Y)  # revealed: bool
 
-# TODO should have an [unresolved-reference] diagnostic
+# error: [unresolved-reference]
 reveal_type(Z)  # revealed: Unknown
 ```
 
