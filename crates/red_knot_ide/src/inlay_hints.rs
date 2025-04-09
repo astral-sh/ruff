@@ -3,8 +3,8 @@ use red_knot_python_semantic::types::Type;
 use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
+use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 use std::fmt::Formatter;
@@ -51,8 +51,8 @@ impl fmt::Display for DisplayInlayHint<'_, '_> {
     }
 }
 
-pub fn inlay_hints(db: &dyn Db, file: File) -> Vec<InlayHint<'_>> {
-    let mut visitor = InlayHintVisitor::new(db, file);
+pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'_>> {
+    let mut visitor = InlayHintVisitor::new(db, file, range);
 
     let ast = parsed_module(db.upcast(), file);
 
@@ -64,13 +64,15 @@ pub fn inlay_hints(db: &dyn Db, file: File) -> Vec<InlayHint<'_>> {
 struct InlayHintVisitor<'db> {
     model: SemanticModel<'db>,
     hints: Vec<InlayHint<'db>>,
+    range: TextRange,
 }
 
 impl<'db> InlayHintVisitor<'db> {
-    fn new(db: &'db dyn Db, file: File) -> Self {
+    fn new(db: &'db dyn Db, file: File, range: TextRange) -> Self {
         Self {
             model: SemanticModel::new(db.upcast(), file),
             hints: Vec::new(),
+            range,
         }
     }
 
@@ -80,27 +82,43 @@ impl<'db> InlayHintVisitor<'db> {
             content: InlayHintContent::AssignStatement(ty),
         });
     }
+
+    fn handle_assign_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Tuple(tuple) => {
+                for element in &tuple.elts {
+                    self.handle_assign_expr(element);
+                }
+            }
+            _ => {
+                let ty = expr.inferred_type(&self.model);
+                self.add_hint(expr.range(), ty);
+            }
+        }
+    }
 }
 
 impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
+    fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
+        if self.range.intersect(node.range()).is_some() {
+            TraversalSignal::Traverse
+        } else {
+            TraversalSignal::Skip
+        }
+    }
+
     fn visit_stmt(&mut self, stmt: &Stmt) {
+        let node = AnyNodeRef::from(stmt);
+
+        if !self.enter_node(node).is_traverse() {
+            return;
+        }
+
         match stmt {
             Stmt::Assign(assign) => {
                 for target in &assign.targets {
-                    match target {
-                        Expr::Tuple(tuple) => {
-                            for element in &tuple.elts {
-                                let element_ty = element.inferred_type(&self.model);
-                                self.add_hint(element.range(), element_ty);
-                            }
-                        }
-                        _ => {
-                            let ty = assign.value.inferred_type(&self.model);
-                            self.add_hint(target.range(), ty);
-                        }
-                    }
+                    self.handle_assign_expr(target);
                 }
-                return;
             }
             // TODO
             Stmt::FunctionDef(_) => {}
@@ -117,72 +135,129 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
 mod tests {
     use super::*;
 
-    use red_knot_python_semantic::types::StringLiteralType;
-    use ruff_db::files::{system_path_to_file, File};
-    use ruff_db::system::DbWithWritableSystem as _;
+    use insta::assert_snapshot;
+    use ruff_db::{
+        files::{system_path_to_file, File},
+        source::source_text,
+    };
     use ruff_text_size::TextSize;
 
     use crate::db::tests::TestDb;
 
-    struct TestCase {
-        db: TestDb,
-        file: File,
+    use red_knot_python_semantic::{
+        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+    };
+    use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
+
+    pub(super) fn inlay_hint_test(source: &str, range: TextRange) -> InlayHintTest {
+        let mut db = TestDb::new();
+
+        db.write_file("main.py", source)
+            .expect("write to memory file system to be successful");
+
+        let file = system_path_to_file(&db, "main.py").expect("newly written file to existing");
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersion::latest(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings {
+                    extra_paths: vec![],
+                    src_roots: vec![SystemPathBuf::from("/")],
+                    custom_typeshed: None,
+                    python_path: PythonPath::KnownSitePackages(vec![]),
+                },
+            },
+        )
+        .expect("Default settings to be valid");
+
+        InlayHintTest { db, file, range }
     }
 
-    fn test_case(content: impl AsRef<str>) -> TestCase {
-        let mut db = TestDb::new();
-        db.write_file("test.py", content).unwrap();
+    pub(super) struct InlayHintTest {
+        pub(super) db: TestDb,
+        pub(super) file: File,
+        pub(super) range: TextRange,
+    }
 
-        let file = system_path_to_file(&db, "test.py").unwrap();
+    impl InlayHintTest {
+        fn inlay_hints(&self) -> String {
+            let hints = inlay_hints(&self.db, self.file, self.range);
 
-        TestCase { db, file }
+            let mut buf = source_text(&self.db, self.file).as_str().to_string();
+            let mut offset = 0;
+
+            for hint in hints {
+                let end_position = (hint.range.end().to_u32() as usize) + offset;
+                let hint_str = format!("[{}]", hint.display(&self.db));
+                buf.insert_str(end_position, &hint_str);
+                offset += hint_str.len();
+            }
+
+            buf
+        }
     }
 
     #[test]
     fn test_assign_statement() {
-        let test_case = test_case("x = 1");
-        let hints = inlay_hints(&test_case.db, test_case.file);
-        assert_eq!(hints.len(), 1);
-        assert_eq!(
-            hints[0].content,
-            InlayHintContent::AssignStatement(Type::IntLiteral(1))
+        let test = inlay_hint_test(
+            "x = 1",
+            TextRange::new(TextSize::from(0), TextSize::from(4)),
         );
-        assert_eq!(
-            hints[0].range,
-            TextRange::new(TextSize::from(0), TextSize::from(1))
-        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        x[: Literal[1]] = 1
+        ");
     }
 
     #[test]
     fn test_tuple_assignment() {
-        let test_case = test_case("x, y = (1, 'abc')");
-        let hints = inlay_hints(&test_case.db, test_case.file);
-        assert_eq!(hints.len(), 2);
-        assert_eq!(
-            hints[0].content,
-            InlayHintContent::AssignStatement(Type::IntLiteral(1))
+        let test = inlay_hint_test(
+            "x, y = (1, 'abc')",
+            TextRange::new(TextSize::from(0), TextSize::from(13)),
         );
-        assert_eq!(
-            hints[1].content,
-            InlayHintContent::AssignStatement(Type::StringLiteral(StringLiteralType::new(
-                &test_case.db,
-                "abc"
-            )))
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        x[: Literal[1]], y[: Literal["abc"]] = (1, 'abc')
+        "#);
+    }
+
+    #[test]
+    fn test_nested_tuple_assignment() {
+        let test = inlay_hint_test(
+            "x, (y, z) = (1, ('abc', 2))",
+            TextRange::new(TextSize::from(0), TextSize::from(20)),
         );
-        assert_eq!(
-            hints[0].range,
-            TextRange::new(TextSize::from(0), TextSize::from(1))
-        );
-        assert_eq!(
-            hints[1].range,
-            TextRange::new(TextSize::from(3), TextSize::from(4))
-        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        x[: Literal[1]], (y[: Literal["abc"]], z[: Literal[2]]) = (1, ('abc', 2))
+        "#);
     }
 
     #[test]
     fn test_assign_statement_with_type_annotation() {
-        let test_case = test_case("x: int = 1");
-        let hints = inlay_hints(&test_case.db, test_case.file);
-        assert_eq!(hints.len(), 0);
+        let test = inlay_hint_test(
+            "x: int = 1",
+            TextRange::new(TextSize::from(0), TextSize::from(13)),
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        x: int = 1
+        ");
+    }
+
+    #[test]
+    fn test_assign_statement_out_of_range() {
+        let test = inlay_hint_test(
+            "x = 1\ny = 2",
+            TextRange::new(TextSize::from(0), TextSize::from(4)),
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        x[: Literal[1]] = 1
+        y = 2
+        ");
     }
 }

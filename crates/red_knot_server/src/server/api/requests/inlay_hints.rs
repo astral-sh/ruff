@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::document::TextSizeExt;
+use crate::document::{PositionExt, TextSizeExt};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::client::Notifier;
 use crate::DocumentSnapshot;
@@ -9,6 +9,7 @@ use lsp_types::{InlayHintParams, Url};
 use red_knot_ide::inlay_hints;
 use red_knot_project::ProjectDatabase;
 use ruff_db::source::{line_index, source_text};
+use ruff_text_size::TextRange;
 
 pub(crate) struct InlayHintRequestHandler;
 
@@ -32,10 +33,21 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             return Ok(None);
         };
 
-        let inlay_hints = inlay_hints(&db, file);
-
         let index = line_index(&db, file);
         let source = source_text(&db, file);
+
+        let range = TextRange::new(
+            params
+                .range
+                .start
+                .to_text_size(&source, &index, snapshot.encoding()),
+            params
+                .range
+                .end
+                .to_text_size(&source, &index, snapshot.encoding()),
+        );
+
+        let inlay_hints = inlay_hints(&db, file, range);
 
         let inlay_hints = inlay_hints
             .into_iter()

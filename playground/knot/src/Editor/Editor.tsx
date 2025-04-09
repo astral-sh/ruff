@@ -174,8 +174,7 @@ class PlaygroundServer
   provideInlayHints(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _model: editor.ITextModel,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    _range: Range,
+    range: Range,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _token: CancellationToken,
   ): languages.ProviderResult<languages.InlayHintList> {
@@ -191,8 +190,8 @@ class PlaygroundServer
     if (selectedHandle == null) {
       return;
     }
-
-    const inlayHints = workspace.inlayHints(selectedHandle);
+      
+    const inlayHints = workspace.inlayHints(selectedHandle, range);
 
     if (inlayHints.length === 0) {
       return undefined;

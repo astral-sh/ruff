@@ -285,11 +285,11 @@ impl Workspace {
     }
 
     #[wasm_bindgen(js_name = "inlayHints")]
-    pub fn inlay_hints(&self, file_id: &FileHandle) -> Result<Vec<InlayHint>, Error> {
-        let result = inlay_hints(&self.db, file_id.file);
-
+    pub fn inlay_hints(&self, file_id: &FileHandle, range: Range) -> Result<Vec<InlayHint>, Error> {
         let index = line_index(&self.db, file_id.file);
         let source = source_text(&self.db, file_id.file);
+
+        let result = inlay_hints(&self.db, file_id.file, range.to_text_range(&index, &source));
 
         Ok(result
             .into_iter()
@@ -405,6 +405,21 @@ impl Range {
         let start = line_index.source_location(text_range.start(), source);
         let end = line_index.source_location(text_range.end(), source);
         Self::from((start, end))
+    }
+
+    fn to_text_range(self, line_index: &LineIndex, source: &str) -> ruff_text_size::TextRange {
+        let start = line_index.offset(
+            OneIndexed::new(self.start.line).unwrap(),
+            OneIndexed::new(self.start.column).unwrap(),
+            source,
+        );
+        let end = line_index.offset(
+            OneIndexed::new(self.end.line).unwrap(),
+            OneIndexed::new(self.end.column).unwrap(),
+            source,
+        );
+
+        ruff_text_size::TextRange::new(start, end)
     }
 }
 
