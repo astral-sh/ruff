@@ -269,7 +269,7 @@ use crate::semantic_index::narrowing_constraints::{
     NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
 use crate::semantic_index::predicate::{
-    Predicate, Predicates, PredicatesBuilder, ScopedPredicateId,
+    Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
 use crate::semantic_index::visibility_constraints::{
@@ -603,7 +603,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     ///    x  # we store a reachability constraint of [test] for this use of `x`
     ///
     ///    y = 2
-    ///    
+    ///
     ///    # we record a visibility constraint of [test] here, which retroactively affects
     ///    # the `y = 1` and the `y = 2` binding.
     /// else:
@@ -699,6 +699,31 @@ impl<'db> UseDefMapBuilder<'db> {
         self.scope_start_visibility = self
             .visibility_constraints
             .add_and_constraint(self.scope_start_visibility, constraint);
+    }
+
+    pub(super) fn record_star_import_visibility_constraint(
+        &mut self,
+        star_import: StarImportPlaceholderPredicate<'db>,
+        symbol: ScopedSymbolId,
+    ) -> ScopedVisibilityConstraintId {
+        let predicate_id = self.add_predicate(star_import.into());
+        let visibility_id = self.visibility_constraints.add_atom(predicate_id);
+        self.symbol_states[symbol]
+            .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
+        visibility_id
+    }
+
+    pub(super) fn negate_star_import_visibility_constraint(
+        &mut self,
+        symbol_id: ScopedSymbolId,
+        constraint: ScopedVisibilityConstraintId,
+    ) {
+        let negated_constraint = self.visibility_constraints.add_not_constraint(constraint);
+        self.symbol_states[symbol_id]
+            .record_visibility_constraint(&mut self.visibility_constraints, negated_constraint);
+        self.scope_start_visibility = self
+            .visibility_constraints
+            .add_and_constraint(self.scope_start_visibility, negated_constraint);
     }
 
     /// This method resets the visibility constraints for all symbols to a previous state
