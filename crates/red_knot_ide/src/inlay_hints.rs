@@ -5,13 +5,13 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct InlayHint<'db> {
-    pub range: TextRange,
+    pub position: TextSize,
     pub content: InlayHintContent<'db>,
 }
 
@@ -23,8 +23,8 @@ impl<'db> InlayHint<'db> {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum InlayHintContent<'db> {
-    AssignStatement(Type<'db>),
-    FunctionReturnType(Type<'db>),
+    Type(Type<'db>),
+    ReturnType(Type<'db>),
 }
 
 impl<'db> InlayHintContent<'db> {
@@ -41,10 +41,10 @@ pub struct DisplayInlayHint<'a, 'db> {
 impl fmt::Display for DisplayInlayHint<'_, '_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.hint {
-            InlayHintContent::AssignStatement(ty) => {
+            InlayHintContent::Type(ty) => {
                 write!(f, ": {}", ty.display(self.db.upcast()))
             }
-            InlayHintContent::FunctionReturnType(ty) => {
+            InlayHintContent::ReturnType(ty) => {
                 write!(f, " -> {}", ty.display(self.db.upcast()))
             }
         }
@@ -76,10 +76,10 @@ impl<'db> InlayHintVisitor<'db> {
         }
     }
 
-    fn add_hint(&mut self, range: TextRange, ty: Type<'db>) {
+    fn add_type_hint(&mut self, position: TextSize, ty: Type<'db>) {
         self.hints.push(InlayHint {
-            range,
-            content: InlayHintContent::AssignStatement(ty),
+            position,
+            content: InlayHintContent::Type(ty),
         });
     }
 
@@ -92,7 +92,7 @@ impl<'db> InlayHintVisitor<'db> {
             }
             _ => {
                 let ty = expr.inferred_type(&self.model);
-                self.add_hint(expr.range(), ty);
+                self.add_type_hint(expr.range().end(), ty);
             }
         }
     }
@@ -150,8 +150,25 @@ mod tests {
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
 
-    pub(super) fn inlay_hint_test(source: &str, range: TextRange) -> InlayHintTest {
+    const START: &str = "<START>";
+    const END: &str = "<END>";
+
+    pub(super) fn inlay_hint_test(source: &str) -> InlayHintTest {
         let mut db = TestDb::new();
+
+        let start = source.find(START).unwrap_or(0);
+        let end = source
+            .find(END)
+            .map(|x| x - START.len())
+            .unwrap_or(source.len());
+
+        let range = TextRange::new(
+            TextSize::try_from(start).unwrap(),
+            TextSize::try_from(end).unwrap(),
+        );
+
+        let source = source.replace(START, "");
+        let source = source.replace(END, "");
 
         db.write_file("main.py", source)
             .expect("write to memory file system to be successful");
@@ -187,10 +204,11 @@ mod tests {
             let hints = inlay_hints(&self.db, self.file, self.range);
 
             let mut buf = source_text(&self.db, self.file).as_str().to_string();
+
             let mut offset = 0;
 
             for hint in hints {
-                let end_position = (hint.range.end().to_u32() as usize) + offset;
+                let end_position = (hint.position.to_u32() as usize) + offset;
                 let hint_str = format!("[{}]", hint.display(&self.db));
                 buf.insert_str(end_position, &hint_str);
                 offset += hint_str.len();
@@ -202,10 +220,7 @@ mod tests {
 
     #[test]
     fn test_assign_statement() {
-        let test = inlay_hint_test(
-            "x = 1",
-            TextRange::new(TextSize::from(0), TextSize::from(4)),
-        );
+        let test = inlay_hint_test(&format!("{START}x = 1{END}"));
 
         assert_snapshot!(test.inlay_hints(), @r"
         x[: Literal[1]] = 1
@@ -214,10 +229,7 @@ mod tests {
 
     #[test]
     fn test_tuple_assignment() {
-        let test = inlay_hint_test(
-            "x, y = (1, 'abc')",
-            TextRange::new(TextSize::from(0), TextSize::from(13)),
-        );
+        let test = inlay_hint_test(&format!("{START}x, y = (1, 'abc'){END}"));
 
         assert_snapshot!(test.inlay_hints(), @r#"
         x[: Literal[1]], y[: Literal["abc"]] = (1, 'abc')
@@ -226,10 +238,7 @@ mod tests {
 
     #[test]
     fn test_nested_tuple_assignment() {
-        let test = inlay_hint_test(
-            "x, (y, z) = (1, ('abc', 2))",
-            TextRange::new(TextSize::from(0), TextSize::from(20)),
-        );
+        let test = inlay_hint_test(&format!("{START}x, (y, z) = (1, ('abc', 2)){END}"));
 
         assert_snapshot!(test.inlay_hints(), @r#"
         x[: Literal[1]], (y[: Literal["abc"]], z[: Literal[2]]) = (1, ('abc', 2))
@@ -238,10 +247,7 @@ mod tests {
 
     #[test]
     fn test_assign_statement_with_type_annotation() {
-        let test = inlay_hint_test(
-            "x: int = 1",
-            TextRange::new(TextSize::from(0), TextSize::from(13)),
-        );
+        let test = inlay_hint_test(&format!("{START}x: int = 1{END}"));
 
         assert_snapshot!(test.inlay_hints(), @r"
         x: int = 1
@@ -250,10 +256,7 @@ mod tests {
 
     #[test]
     fn test_assign_statement_out_of_range() {
-        let test = inlay_hint_test(
-            "x = 1\ny = 2",
-            TextRange::new(TextSize::from(0), TextSize::from(4)),
-        );
+        let test = inlay_hint_test(&format!("{START}x = 1{END}\ny = 2"));
 
         assert_snapshot!(test.inlay_hints(), @r"
         x[: Literal[1]] = 1

@@ -216,17 +216,7 @@ impl Workspace {
         let source = source_text(&self.db, file_id.file);
         let index = line_index(&self.db, file_id.file);
 
-        let offset = index.offset(
-            OneIndexed::new(position.line).ok_or_else(|| {
-                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
-            })?,
-            OneIndexed::new(position.column).ok_or_else(|| {
-                Error::new(
-                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
-                )
-            })?,
-            &source,
-        );
+        let offset = position.to_text_size(&source, &index)?;
 
         let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
             return Ok(Vec::new());
@@ -258,17 +248,7 @@ impl Workspace {
         let source = source_text(&self.db, file_id.file);
         let index = line_index(&self.db, file_id.file);
 
-        let offset = index.offset(
-            OneIndexed::new(position.line).ok_or_else(|| {
-                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
-            })?,
-            OneIndexed::new(position.column).ok_or_else(|| {
-                Error::new(
-                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
-                )
-            })?,
-            &source,
-        );
+        let offset = position.to_text_size(&source, &index)?;
 
         let Some(range_info) = hover(&self.db, file_id.file, offset) else {
             return Ok(None);
@@ -289,16 +269,23 @@ impl Workspace {
         let index = line_index(&self.db, file_id.file);
         let source = source_text(&self.db, file_id.file);
 
-        let result = inlay_hints(&self.db, file_id.file, range.to_text_range(&index, &source));
+        let result = inlay_hints(
+            &self.db,
+            file_id.file,
+            range.to_text_range(&index, &source)?,
+        );
 
         Ok(result
             .into_iter()
             .map(|hint| {
-                let source_range = Range::from_text_range(hint.range, &index, &source);
+                let source_location = index.source_location(hint.position, &source);
 
                 InlayHint {
                     markdown: hint.display(&self.db).to_string(),
-                    position: Position::new(source_range.end.line, source_range.end.column),
+                    position: Position::new(
+                        source_location.row.get(),
+                        source_location.column.get(),
+                    ),
                 }
             })
             .collect())
@@ -415,19 +402,15 @@ impl Range {
         Self::from((start, end))
     }
 
-    fn to_text_range(self, line_index: &LineIndex, source: &str) -> ruff_text_size::TextRange {
-        let start = line_index.offset(
-            OneIndexed::new(self.start.line).unwrap(),
-            OneIndexed::new(self.start.column).unwrap(),
-            source,
-        );
-        let end = line_index.offset(
-            OneIndexed::new(self.end.line).unwrap(),
-            OneIndexed::new(self.end.column).unwrap(),
-            source,
-        );
+    fn to_text_range(
+        self,
+        line_index: &LineIndex,
+        source: &str,
+    ) -> Result<ruff_text_size::TextRange, Error> {
+        let start = self.start.to_text_size(source, line_index)?;
+        let end = self.end.to_text_size(source, line_index)?;
 
-        ruff_text_size::TextRange::new(start, end)
+        Ok(ruff_text_size::TextRange::new(start, end))
     }
 }
 
@@ -455,6 +438,28 @@ impl Position {
     #[wasm_bindgen(constructor)]
     pub fn new(line: usize, column: usize) -> Self {
         Self { line, column }
+    }
+}
+
+impl Position {
+    pub fn to_text_size(
+        self,
+        text: &str,
+        index: &LineIndex,
+    ) -> Result<ruff_text_size::TextSize, Error> {
+        let text_size = index.offset(
+            OneIndexed::new(self.line).ok_or_else(|| {
+                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
+            })?,
+            OneIndexed::new(self.column).ok_or_else(|| {
+                Error::new(
+                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                )
+            })?,
+            text,
+        );
+
+        Ok(text_size)
     }
 }
 
