@@ -1048,14 +1048,42 @@ impl<'db> ClassLiteralType<'db> {
                             }
                         }
                     }
-                    DefinitionKind::Comprehension(_) => {
-                        // TODO:
+                    DefinitionKind::Comprehension(comprehension) => {
+                        match comprehension.target_kind() {
+                            TargetKind::Sequence(_, unpack) => {
+                                // We found an unpacking assignment like:
+                                //
+                                //     [... for .., self.name, .. in <iterable>]
+
+                                let unpacked = infer_unpack_types(db, unpack);
+                                let target_ast_id = comprehension
+                                    .target()
+                                    .scoped_expression_id(db, unpack.target_scope(db));
+                                let inferred_ty = unpacked.expression_type(target_ast_id);
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                            TargetKind::NameOrAttribute => {
+                                // We found an attribute assignment like:
+                                //
+                                //     [... for self.name in <iterable>]
+
+                                let iterable_ty = infer_expression_type(
+                                    db,
+                                    index.expression(comprehension.iterable()),
+                                );
+                                // TODO: Potential diagnostics resulting from the iterable are currently not reported.
+                                let inferred_ty = iterable_ty.iterate(db);
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                        }
                     }
                     DefinitionKind::AugmentedAssignment(_) => {
                         // TODO:
                     }
                     DefinitionKind::NamedExpression(_) => {
-                        // TODO:
+                        // A named expression whose target is an attribute is syntactically prohibited
                     }
                     _ => {}
                 }

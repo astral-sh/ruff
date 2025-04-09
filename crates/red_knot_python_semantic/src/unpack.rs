@@ -30,7 +30,9 @@ use crate::Db;
 pub(crate) struct Unpack<'db> {
     pub(crate) file: File,
 
-    pub(crate) file_scope: FileScopeId,
+    pub(crate) value_file_scope: FileScopeId,
+
+    pub(crate) target_file_scope: FileScopeId,
 
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
     /// expression is `(a, b)`.
@@ -47,9 +49,15 @@ pub(crate) struct Unpack<'db> {
 }
 
 impl<'db> Unpack<'db> {
-    /// Returns the scope where the unpacking is happening.
-    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+    /// Returns the scope where the unpacked value is appeared.
+    /// In comprehension, the scope of the value and the target may be different.
+    pub(crate) fn value_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        self.value_file_scope(db).to_scope_id(db, self.file(db))
+    }
+
+    /// Returns the scope where the unpack target is appeared.
+    pub(crate) fn target_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        self.target_file_scope(db).to_scope_id(db, self.file(db))
     }
 
     /// Returns the range of the unpack target expression.

@@ -304,7 +304,7 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     let _span =
         tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), ?file).entered();
 
-    let mut unpacker = Unpacker::new(db, unpack.scope(db));
+    let mut unpacker = Unpacker::new(db, unpack.target_scope(db), unpack.value_scope(db));
     unpacker.unpack(unpack.target(db), unpack.value(db));
     unpacker.finish()
 }
@@ -3914,7 +3914,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     fn infer_comprehension_definition(
         &mut self,
         iterable: &ast::Expr,
-        target: &ast::ExprName,
+        target: &ast::Expr,
         is_first: bool,
         is_async: bool,
         definition: Definition<'db>,
