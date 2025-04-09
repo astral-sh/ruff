@@ -2,11 +2,6 @@
 
 ## Basic usage
 
-```toml
-[environment]
-python-platform = "all"
-```
-
 `inspect.getattr_static` is a function that returns attributes of an object without invoking the
 descriptor protocol (for caveats, see the [official documentation]).
 
@@ -61,7 +56,7 @@ We can access attributes on objects of all kinds:
 ```py
 import sys
 
-reveal_type(inspect.getattr_static(sys, "platform"))  # revealed: LiteralString
+reveal_type(inspect.getattr_static(sys, "dont_write_bytecode"))  # revealed: bool
 reveal_type(inspect.getattr_static(inspect, "getattr_static"))  # revealed: Literal[getattr_static]
 
 reveal_type(inspect.getattr_static(1, "real"))  # revealed: property
