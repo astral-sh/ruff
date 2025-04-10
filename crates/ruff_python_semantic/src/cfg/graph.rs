@@ -1,5 +1,5 @@
 use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::{ExceptHandlerExceptHandler, Expr, MatchCase, Stmt};
+use ruff_python_ast::{ExceptHandler, ExceptHandlerExceptHandler, Expr, MatchCase, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 /// Returns the control flow graph associated to an array of statements
@@ -460,15 +460,257 @@ impl<'stmt> CFGBuilder<'stmt> {
                 }
 
                 // Exception handling statements
-                Stmt::Try(_) => {}
+                Stmt::Try(stmt_try) => {
+                    let try_kind = match (
+                        !stmt_try.handlers.is_empty(),
+                        !stmt_try.orelse.is_empty(),
+                        !stmt_try.finalbody.is_empty(),
+                    ) {
+                        (true, false, false) => TryKind::TryExcept,
+                        (false, false, true) => TryKind::TryFinally,
+                        (true, true, false) => TryKind::TryExceptElse,
+                        (true, false, true) => TryKind::TryExceptFinally,
+                        (true, true, true) => TryKind::TryExceptElseFinally,
+                        _ => {
+                            unreachable!("Invalid try statement.")
+                        }
+                    };
+                    self.push_try_context(try_kind);
+
+                    let try_block = self.new_block_if_nonempty();
+                    if self.current != try_block {
+                        self.set_current_block_stmts(&stmts[start..end]);
+                        self.set_current_block_edges(Edges::always(try_block));
+                        self.move_to(try_block);
+                    }
+                    let next_block = self.next_or_default_block(&stmts[end + 1..], self.exit);
+
+                    match try_kind {
+                        TryKind::TryFinally => {
+                            let finally_block = self.new_block();
+                            let recovery_block = self.new_recovery();
+
+                            // Process try clause
+                            self.update_exit(finally_block);
+                            self.process_stmts(&stmt_try.body);
+
+                            // Process finally clause
+                            self.move_to(finally_block);
+                            self.set_try_state(TryState::Finally);
+                            self.update_exit(recovery_block);
+                            self.process_stmts(&stmt_try.finalbody);
+
+                            // Process recovery
+                            self.move_to(recovery_block);
+                            self.set_try_state(TryState::Recovery);
+                            self.update_exit(next_block);
+                            let edges = self.resolve_deferred_jumps();
+                            self.set_current_block_edges(edges);
+                        }
+                        TryKind::TryExcept => {
+                            let dispatch_block = self.new_exception_dispatch();
+                            self.update_exit(dispatch_block);
+                            self.process_stmts(&stmt_try.body);
+
+                            self.move_to(dispatch_block);
+                            self.set_try_state(TryState::Dispatch);
+                            self.update_exit(cache_exit);
+
+                            // Create a vec of conditions and their target blocks
+                            let mut conditions = Vec::with_capacity(stmt_try.handlers.len());
+                            let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len());
+
+                            for ExceptHandler::ExceptHandler(handler) in stmt_try.handlers.iter() {
+                                except_blocks.push(self.new_block());
+                                conditions.push(Condition::ExceptHandler(handler));
+                            }
+
+                            let edges = Edges {
+                                conditions,
+                                targets: except_blocks.clone(),
+                            };
+
+                            self.set_current_block_edges(edges);
+
+                            // Process each case's body
+                            self.set_try_state(TryState::Except);
+                            for (ExceptHandler::ExceptHandler(handler), block) in
+                                stmt_try.handlers.iter().zip(except_blocks)
+                            {
+                                self.move_to(block);
+                                self.update_exit(next_block);
+                                self.process_stmts(&handler.body);
+                            }
+                            self.try_contexts.pop();
+                        }
+                        TryKind::TryExceptElse => {
+                            let dispatch_block = self.new_exception_dispatch();
+                            self.update_exit(dispatch_block);
+                            self.process_stmts(&stmt_try.body);
+
+                            self.move_to(dispatch_block);
+                            self.set_try_state(TryState::Dispatch);
+                            self.update_exit(cache_exit);
+
+                            // Create a vec of conditions and their target blocks
+                            let mut conditions = Vec::with_capacity(stmt_try.handlers.len() + 1);
+                            let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len());
+
+                            for ExceptHandler::ExceptHandler(handler) in stmt_try.handlers.iter() {
+                                except_blocks.push(self.new_block());
+                                conditions.push(Condition::ExceptHandler(handler));
+                            }
+
+                            let else_block = self.new_block();
+                            conditions.push(Condition::Else);
+
+                            let edges = Edges {
+                                conditions,
+                                targets: [except_blocks.as_slice(), &[else_block]].concat(),
+                            };
+
+                            self.set_current_block_edges(edges);
+
+                            // Process each case's body
+                            self.set_try_state(TryState::Except);
+                            for (ExceptHandler::ExceptHandler(handler), block) in
+                                stmt_try.handlers.iter().zip(except_blocks)
+                            {
+                                self.move_to(block);
+                                self.update_exit(next_block);
+                                self.process_stmts(&handler.body);
+                            }
+
+                            // Process else body
+                            self.set_try_state(TryState::Else);
+                            self.move_to(else_block);
+                            self.process_stmts(&stmt_try.orelse);
+                            self.try_contexts.pop();
+                        }
+                        TryKind::TryExceptFinally => {
+                            let dispatch_block = self.new_exception_dispatch();
+                            let finally_block = self.new_block();
+                            let recovery_block = self.new_recovery();
+
+                            self.update_exit(dispatch_block);
+                            self.process_stmts(&stmt_try.body);
+
+                            self.move_to(dispatch_block);
+                            self.set_try_state(TryState::Dispatch);
+                            // Create a vec of conditions and their target blocks
+                            let mut conditions = Vec::with_capacity(stmt_try.handlers.len() + 1);
+                            let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len());
+
+                            for ExceptHandler::ExceptHandler(handler) in stmt_try.handlers.iter() {
+                                except_blocks.push(self.new_block());
+                                conditions.push(Condition::ExceptHandler(handler));
+                            }
+
+                            conditions.push(Condition::Else);
+
+                            let edges = Edges {
+                                conditions,
+                                targets: [except_blocks.as_slice(), &[finally_block]].concat(),
+                            };
+
+                            self.set_current_block_edges(edges);
+
+                            // Process each case's body
+                            self.set_try_state(TryState::Except);
+                            for (ExceptHandler::ExceptHandler(handler), block) in
+                                stmt_try.handlers.iter().zip(except_blocks)
+                            {
+                                self.move_to(block);
+                                self.update_exit(finally_block);
+                                self.process_stmts(&handler.body);
+                            }
+
+                            // Process finally clause
+                            self.move_to(finally_block);
+                            self.set_try_state(TryState::Finally);
+                            self.update_exit(recovery_block);
+                            self.process_stmts(&stmt_try.finalbody);
+
+                            // Process recovery
+                            self.move_to(recovery_block);
+                            self.set_try_state(TryState::Recovery);
+                            self.update_exit(next_block);
+                            let edges = self.resolve_deferred_jumps();
+                            self.set_current_block_edges(edges);
+                        }
+                        TryKind::TryExceptElseFinally => {
+                            let dispatch_block = self.new_exception_dispatch();
+                            let finally_block = self.new_block();
+                            let recovery_block = self.new_recovery();
+
+                            self.update_exit(dispatch_block);
+                            self.process_stmts(&stmt_try.body);
+
+                            self.move_to(dispatch_block);
+                            self.set_try_state(TryState::Dispatch);
+
+                            // Create a vec of conditions and their target blocks
+                            let mut conditions = Vec::with_capacity(stmt_try.handlers.len() + 1);
+                            let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len());
+
+                            for ExceptHandler::ExceptHandler(handler) in stmt_try.handlers.iter() {
+                                except_blocks.push(self.new_block());
+                                conditions.push(Condition::ExceptHandler(handler));
+                            }
+
+                            let else_block = self.new_block();
+                            conditions.push(Condition::Else);
+
+                            let edges = Edges {
+                                conditions,
+                                targets: [except_blocks.as_slice(), &[else_block]].concat(),
+                            };
+
+                            self.set_current_block_edges(edges);
+
+                            // Process each case's body
+                            self.set_try_state(TryState::Except);
+                            for (ExceptHandler::ExceptHandler(handler), block) in
+                                stmt_try.handlers.iter().zip(except_blocks)
+                            {
+                                self.move_to(block);
+                                self.update_exit(finally_block);
+                                self.process_stmts(&handler.body);
+                            }
+
+                            // Process else body
+                            self.move_to(else_block);
+                            self.set_try_state(TryState::Else);
+                            self.process_stmts(&stmt_try.orelse);
+
+                            // Process finally clause
+                            self.move_to(finally_block);
+                            self.set_try_state(TryState::Finally);
+                            self.update_exit(recovery_block);
+                            self.process_stmts(&stmt_try.finalbody);
+
+                            // Process recovery
+                            self.move_to(recovery_block);
+                            self.set_try_state(TryState::Recovery);
+                            self.update_exit(next_block);
+                            let edges = self.resolve_deferred_jumps();
+                            self.set_current_block_edges(edges);
+                        }
+                    }
+
+                    self.move_to(next_block);
+                    start = end + 1;
+                }
                 Stmt::With(_) => {}
 
                 // Jumps
                 Stmt::Return(_) => {
-                    let edges = Edges::always(self.cfg.terminal());
-                    self.set_current_block_stmts(&stmts[start..=end]);
-                    self.set_current_block_edges(edges);
-                    start = end + 1;
+                    self.defer_jump(stmt).unwrap_or_else(|| {
+                        let edges = Edges::always(self.cfg.terminal());
+                        self.set_current_block_stmts(&stmts[start..=end]);
+                        self.set_current_block_edges(edges);
+                        start = end + 1;
+                    });
 
                     if stmts.get(start).is_some() {
                         let next_block = self.new_block();
@@ -476,26 +718,32 @@ impl<'stmt> CFGBuilder<'stmt> {
                     }
                 }
                 Stmt::Break(_) => {
-                    let edges = Edges::always(
-                        self.loop_exit()
-                            .expect("`break` should only occur inside loop context"),
-                    );
-                    self.set_current_block_stmts(&stmts[start..=end]);
-                    self.set_current_block_edges(edges);
-                    start = end + 1;
+                    self.defer_jump(stmt).unwrap_or_else(|| {
+                        let edges = Edges::always(
+                            self.loop_exit()
+                                .expect("`break` should only occur inside loop context"),
+                        );
+                        self.set_current_block_stmts(&stmts[start..=end]);
+                        self.set_current_block_edges(edges);
+                        start = end + 1;
+                    });
+
                     if stmts.get(start).is_some() {
                         let next_block = self.new_block();
                         self.move_to(next_block);
                     }
                 }
                 Stmt::Continue(_) => {
-                    let edges = Edges::always(
-                        self.loop_guard()
-                            .expect("`continue` should only occur inside loop context"),
-                    );
-                    self.set_current_block_stmts(&stmts[start..=end]);
-                    self.set_current_block_edges(edges);
-                    start = end + 1;
+                    self.defer_jump(stmt).unwrap_or_else(|| {
+                        let edges = Edges::always(
+                            self.loop_guard()
+                                .expect("`continue` should only occur inside loop context"),
+                        );
+                        self.set_current_block_stmts(&stmts[start..=end]);
+                        self.set_current_block_edges(edges);
+                        start = end + 1;
+                    });
+
                     if stmts.get(start).is_some() {
                         let next_block = self.new_block();
                         self.move_to(next_block);
@@ -577,6 +825,17 @@ impl<'stmt> CFGBuilder<'stmt> {
         }
     }
 
+    fn new_block_if_nonempty(&mut self) -> BlockId {
+        let Some(currblock) = self.cfg.blocks.get_mut(self.current) else {
+            return self.new_block();
+        };
+        if currblock.stmts.is_empty() {
+            self.current
+        } else {
+            self.new_block()
+        }
+    }
+
     /// Creates a new block to handle entering and exiting a loop body.
     fn new_loop_guard(&mut self) -> BlockId {
         let Some(currblock) = self.cfg.blocks.get_mut(self.current) else {
@@ -636,6 +895,83 @@ impl<'stmt> CFGBuilder<'stmt> {
 
     fn push_try_context(&mut self, kind: TryKind) {
         self.try_contexts.push(TryContext::new(kind));
+    }
+
+    fn set_try_state(&mut self, state: TryState) {
+        let ctxt = self
+            .try_contexts
+            .last_mut()
+            .expect("try contexts should be nonempty to set try state");
+        ctxt.state = state;
+    }
+
+    fn resolve_deferred_jumps(&mut self) -> Edges<'stmt> {
+        let try_context = self
+            .try_contexts
+            .pop()
+            .expect("resolve deferred jumps only in try context");
+        let deferred_jumps = try_context.deferred_jumps;
+        // We may be nested inside _another_ try context, then we
+        // don't resolve any jumps and keep deferring them.
+        if self.should_defer_jumps() {
+            self.extend_deferred_jumps(deferred_jumps);
+            Edges::always(self.exit)
+        } else {
+            let mut conditions = Vec::with_capacity(deferred_jumps.len() + 1);
+            let mut targets = Vec::with_capacity(deferred_jumps.len() + 1);
+            for jump in deferred_jumps {
+                conditions.push(Condition::Deferred(jump));
+                let target = match jump {
+                    Stmt::Return(_) | Stmt::Raise(_) => self.cfg.terminal,
+                    Stmt::Break(_) => self.loop_exit().expect("break to be inside loop context"),
+                    Stmt::Continue(_) => self
+                        .loop_guard()
+                        .expect("continue to be inside of loop context"),
+                    _ => {
+                        unreachable!(
+                            "deferred jump statements must be return,break,raise, or continue"
+                        )
+                    }
+                };
+                targets.push(target);
+            }
+            conditions.push(Condition::Always);
+            targets.push(self.exit);
+            Edges {
+                conditions,
+                targets,
+            }
+        }
+    }
+
+    fn should_defer_jumps(&self) -> bool {
+        self.try_contexts
+            .iter()
+            .any(|try_ctxt| match try_ctxt.state {
+                TryState::Try => true,
+                TryState::Except | TryState::Else if try_ctxt.has_finally() => true,
+                _ => false,
+            })
+    }
+
+    fn extend_deferred_jumps(&mut self, jumps: Vec<&'stmt Stmt>) {
+        let Some(try_ctxt) = self.try_contexts.last_mut() else {
+            return;
+        };
+        try_ctxt.deferred_jumps.extend(jumps);
+    }
+
+    fn defer_jump(&mut self, jump: &'stmt Stmt) -> Option<()> {
+        if self.should_defer_jumps() {
+            let ctxt = self
+                .try_contexts
+                .last_mut()
+                .expect("try contexts nonempty if we should defer jumps");
+            ctxt.deferred_jumps.push(jump);
+            Some(())
+        } else {
+            None
+        }
     }
 
     /// Populates the current basic block with the given set of statements.
