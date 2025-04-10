@@ -593,9 +593,24 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         match stmt {
-            ast::Stmt::ClassDef(_) => {
+            ast::Stmt::ClassDef(ast::StmtClassDef {
+                arguments,
+                body,
+                decorator_list,
+                type_params,
+                ..
+            }) => {
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
+                }
+                if let Some(arguments) = arguments {
+                    self.visit_arguments(arguments);
+                }
                 self.scopes.push(Scope::Class);
-                ast::visitor::walk_stmt(self, stmt);
+                self.visit_body(body);
                 self.scopes.pop().unwrap();
             }
             ast::Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
