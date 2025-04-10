@@ -7880,7 +7880,7 @@ mod tests {
                 .iter()
                 .filter_map(|event| {
                     if let salsa::EventKind::WillIterateCycle { database_key } = event.kind {
-                        Some(format!("{:?}", database_key))
+                        Some(format!("{database_key:?}"))
                     } else {
                         None
                     }
