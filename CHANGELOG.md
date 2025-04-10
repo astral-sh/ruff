@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.11.5
+
+### Preview features
+
+- [`airflow`] Add missing `AIR302` attribute check ([#17115](https://github.com/astral-sh/ruff/pull/17115))
+- [`airflow`] Expand module path check to individual symbols (`AIR302`) ([#17278](https://github.com/astral-sh/ruff/pull/17278))
+- [`airflow`] Extract `AIR312` from `AIR302` rules (`AIR302`, `AIR312`) ([#17152](https://github.com/astral-sh/ruff/pull/17152))
+- [`airflow`] Update oudated `AIR301`, `AIR302` rules ([#17123](https://github.com/astral-sh/ruff/pull/17123))
+- [syntax-errors] Async comprehension in sync comprehension ([#17177](https://github.com/astral-sh/ruff/pull/17177))
+- [syntax-errors] Check annotations in annotated assignments ([#17283](https://github.com/astral-sh/ruff/pull/17283))
+- [syntax-errors] Extend annotation checks to `await` ([#17282](https://github.com/astral-sh/ruff/pull/17282))
+
+### Rule changes
+
+- Fix RUF100 to detect unused file-level noqa directives with specific codes (#17042) ([#17061](https://github.com/astral-sh/ruff/pull/17061))
+- [`flake8-pytest-style`] Avoid false positive for legacy form of `pytest.raises` (`PT011`) ([#17231](https://github.com/astral-sh/ruff/pull/17231))
+
+### Documentation
+
+- [docs] fix formatting of "See Style Guide" link ([#17272](https://github.com/astral-sh/ruff/pull/17272))
+- [syntax-errors] Document behavior of `global` declarations in `try` nodes before 3.13 ([#17285](https://github.com/astral-sh/ruff/pull/17285))
+
+### Other changes
+
+- Run fuzzer with `--preview` ([#17210](https://github.com/astral-sh/ruff/pull/17210))
+- [`flake8-pie`] Avoid false positive for multiple assignment with `auto()` (`PIE796`) ([#17274](https://github.com/astral-sh/ruff/pull/17274))
+- [playground] Add Reset button ([#17236](https://github.com/astral-sh/ruff/pull/17236))
+- [playground] Provide fallback monospace-font ([#17242](https://github.com/astral-sh/ruff/pull/17242))
+- update cargo-dist ([#17325](https://github.com/astral-sh/ruff/pull/17325))
+
 ## 0.11.4
 
 ### Preview features
@@ -94,25 +124,25 @@ This is a follow-up to release 0.10.0. Because of a mistake in the release proce
 ### Breaking changes
 
 - **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
-
-    In previous versions of Ruff, you could specify your Python version with:
-
-    - The `target-version` option in a `ruff.toml` file or the `[tool.ruff]` section of a pyproject.toml file.
-    - The `project.requires-python` field in a `pyproject.toml` file with a `[tool.ruff]` section.
-
-    These options worked well in most cases, and are still recommended for fine control of the Python version. However, because of the way Ruff discovers config files, `pyproject.toml` files without a `[tool.ruff]` section would be ignored, including the `requires-python` setting. Ruff would then use the default Python version (3.9 as of this writing) instead, which is surprising when you've attempted to request another version.
-
-    In v0.10, config discovery has been updated to address this issue:
-
-    - If Ruff finds a `ruff.toml` file without a `target-version`, it will check
-        for a `pyproject.toml` file in the same directory and respect its
-        `requires-python` version, even if it does not contain a `[tool.ruff]`
-        section.
-    - If Ruff finds a user-level configuration, the `requires-python` field of the closest `pyproject.toml` in a parent directory will take precedence.
-    - If there is no config file (`ruff.toml`or `pyproject.toml` with a
-        `[tool.ruff]` section) in the directory of the file being checked, Ruff will
-        search for the closest `pyproject.toml` in the parent directories and use its
-        `requires-python` setting.
+  
+  In previous versions of Ruff, you could specify your Python version with:
+  
+  - The `target-version` option in a `ruff.toml` file or the `[tool.ruff]` section of a pyproject.toml file.
+  - The `project.requires-python` field in a `pyproject.toml` file with a `[tool.ruff]` section.
+  
+  These options worked well in most cases, and are still recommended for fine control of the Python version. However, because of the way Ruff discovers config files, `pyproject.toml` files without a `[tool.ruff]` section would be ignored, including the `requires-python` setting. Ruff would then use the default Python version (3.9 as of this writing) instead, which is surprising when you've attempted to request another version.
+  
+  In v0.10, config discovery has been updated to address this issue:
+  
+  - If Ruff finds a `ruff.toml` file without a `target-version`, it will check
+for a `pyproject.toml` file in the same directory and respect its
+`requires-python` version, even if it does not contain a `[tool.ruff]`
+section.
+  - If Ruff finds a user-level configuration, the `requires-python` field of the closest `pyproject.toml` in a parent directory will take precedence.
+  - If there is no config file (`ruff.toml`or `pyproject.toml` with a
+`[tool.ruff]` section) in the directory of the file being checked, Ruff will
+search for the closest `pyproject.toml` in the parent directories and use its
+`requires-python` setting.
 
 ### Stabilization
 
@@ -133,25 +163,21 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.10.0) for a migration g
 See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Changes to how the Python version is inferred when a `target-version` is not specified** ([#16319](https://github.com/astral-sh/ruff/pull/16319))
-
-    Because of a mistake in the release process, the `requires-python` inference changes are not included in this release and instead shipped as part of 0.11.0.
-    You can find a description of this change in the 0.11.0 section.
-
+  
+  Because of a mistake in the release process, the `requires-python` inference changes are not included in this release and instead shipped as part of 0.11.0.
+You can find a description of this change in the 0.11.0 section.
 - **Updated `TYPE_CHECKING` behavior** ([#16669](https://github.com/astral-sh/ruff/pull/16669))
-
-    Previously, Ruff only recognized typechecking blocks that tested the `typing.TYPE_CHECKING` symbol. Now, Ruff recognizes any local variable named `TYPE_CHECKING`. This release also removes support for the legacy `if 0:` and `if False:` typechecking checks. Use a local `TYPE_CHECKING` variable instead.
-
+  
+  Previously, Ruff only recognized typechecking blocks that tested the `typing.TYPE_CHECKING` symbol. Now, Ruff recognizes any local variable named `TYPE_CHECKING`. This release also removes support for the legacy `if 0:` and `if False:` typechecking checks. Use a local `TYPE_CHECKING` variable instead.
 - **More robust noqa parsing** ([#16483](https://github.com/astral-sh/ruff/pull/16483))
-
-    The syntax for both file-level and in-line suppression comments has been unified and made more robust to certain errors. In most cases, this will result in more suppression comments being read by Ruff, but there are a few instances where previously read comments will now log an error to the user instead. Please refer to the documentation on [*Error suppression*](https://docs.astral.sh/ruff/linter/#error-suppression) for the full specification.
-
+  
+  The syntax for both file-level and in-line suppression comments has been unified and made more robust to certain errors. In most cases, this will result in more suppression comments being read by Ruff, but there are a few instances where previously read comments will now log an error to the user instead. Please refer to the documentation on [*Error suppression*](https://docs.astral.sh/ruff/linter/#error-suppression) for the full specification.
 - **Avoid unnecessary parentheses around with statements with a single context manager and a trailing comment** ([#14005](https://github.com/astral-sh/ruff/pull/14005))
-
-    This change fixes a bug in the formatter where it introduced unnecessary parentheses around with statements with a single context manager and a trailing comment. This change may result in a change in formatting for some users.
-
+  
+  This change fixes a bug in the formatter where it introduced unnecessary parentheses around with statements with a single context manager and a trailing comment. This change may result in a change in formatting for some users.
 - **Bump alpine default tag to 3.21 for derived Docker images** ([#16456](https://github.com/astral-sh/ruff/pull/16456))
-
-    Alpine 3.21 was released in Dec 2024 and is used in the official Alpine-based Python images. Now the ruff:alpine image will use 3.21 instead of 3.20 and ruff:alpine3.20 will no longer be updated.
+  
+  Alpine 3.21 was released in Dec 2024 and is used in the official Alpine-based Python images. Now the ruff:alpine image will use 3.21 instead of 3.20 and ruff:alpine3.20 will no longer be updated.
 
 ### Deprecated Rules
 
@@ -625,7 +651,7 @@ This release doesn’t remove or remap any existing stable rules.
 The following rules have been stabilized and are no longer in preview:
 
 - [`stdlib-module-shadowing`](https://docs.astral.sh/ruff/rules/stdlib-module-shadowing/) (`A005`).
-    This rule has also been renamed: previously, it was called `builtin-module-shadowing`.
+This rule has also been renamed: previously, it was called `builtin-module-shadowing`.
 - [`builtin-lambda-argument-shadowing`](https://docs.astral.sh/ruff/rules/builtin-lambda-argument-shadowing/) (`A006`)
 - [`slice-to-remove-prefix-or-suffix`](https://docs.astral.sh/ruff/rules/slice-to-remove-prefix-or-suffix/) (`FURB188`)
 - [`boolean-chained-comparison`](https://docs.astral.sh/ruff/rules/boolean-chained-comparison/) (`PLR1716`)
@@ -680,7 +706,7 @@ This release introduces the new 2025 stable style ([#13371](https://github.com/a
 ### Server
 
 - Improve the observability by removing the need for the ["trace" value](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#traceValue) to turn on or off logging. The server logging is solely controlled using the [`logLevel` server setting](https://docs.astral.sh/ruff/editors/settings/#loglevel)
-    which defaults to `info`. This addresses the issue where users were notified about an error and told to consult the log, but it didn’t contain any messages. ([#15232](https://github.com/astral-sh/ruff/pull/15232))
+which defaults to `info`. This addresses the issue where users were notified about an error and told to consult the log, but it didn’t contain any messages. ([#15232](https://github.com/astral-sh/ruff/pull/15232))
 - Ignore diagnostics from other sources for code action requests ([#15373](https://github.com/astral-sh/ruff/pull/15373))
 
 ### CLI
@@ -911,27 +937,24 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.8.0) for a migration gu
 See also, the "Remapped rules" section which may result in disabled rules.
 
 - **Default to Python 3.9**
-
-    Ruff now defaults to Python 3.9 instead of 3.8 if no explicit Python version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version) or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires) ([#13896](https://github.com/astral-sh/ruff/pull/13896))
-
+  
+  Ruff now defaults to Python 3.9 instead of 3.8 if no explicit Python version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version) or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires) ([#13896](https://github.com/astral-sh/ruff/pull/13896))
 - **Changed location of `pydoclint` diagnostics**
-
-    [`pydoclint`](https://docs.astral.sh/ruff/rules/#pydoclint-doc) diagnostics now point to the first-line of the problematic docstring. Previously, this was not the case.
-
-    If you've opted into these preview rules but have them suppressed using
-    [`noqa`](https://docs.astral.sh/ruff/linter/#error-suppression) comments in
-    some places, this change may mean that you need to move the `noqa` suppression
-    comments. Most users should be unaffected by this change.
-
+  
+  [`pydoclint`](https://docs.astral.sh/ruff/rules/#pydoclint-doc) diagnostics now point to the first-line of the problematic docstring. Previously, this was not the case.
+  
+  If you've opted into these preview rules but have them suppressed using
+[`noqa`](https://docs.astral.sh/ruff/linter/#error-suppression) comments in
+some places, this change may mean that you need to move the `noqa` suppression
+comments. Most users should be unaffected by this change.
 - **Use XDG (i.e. `~/.local/bin`) instead of the Cargo home directory in the standalone installer**
-
-    Previously, Ruff's installer used `$CARGO_HOME` or `~/.cargo/bin` for its target install directory. Now, Ruff will be installed into `$XDG_BIN_HOME`, `$XDG_DATA_HOME/../bin`, or `~/.local/bin` (in that order).
-
-    This change is only relevant to users of the standalone Ruff installer (using the shell or PowerShell script). If you installed Ruff using uv or pip, you should be unaffected.
-
+  
+  Previously, Ruff's installer used `$CARGO_HOME` or `~/.cargo/bin` for its target install directory. Now, Ruff will be installed into `$XDG_BIN_HOME`, `$XDG_DATA_HOME/../bin`, or `~/.local/bin` (in that order).
+  
+  This change is only relevant to users of the standalone Ruff installer (using the shell or PowerShell script). If you installed Ruff using uv or pip, you should be unaffected.
 - **Changes to the line width calculation**
-
-    Ruff now uses a new version of the [unicode-width](https://github.com/unicode-rs/unicode-width) Rust crate to calculate the line width. In very rare cases, this may lead to lines containing Unicode characters being reformatted, or being considered too long when they were not before ([`E501`](https://docs.astral.sh/ruff/rules/line-too-long/)).
+  
+  Ruff now uses a new version of the [unicode-width](https://github.com/unicode-rs/unicode-width) Rust crate to calculate the line width. In very rare cases, this may lead to lines containing Unicode characters being reformatted, or being considered too long when they were not before ([`E501`](https://docs.astral.sh/ruff/rules/line-too-long/)).
 
 ### Removed Rules
 
@@ -1145,15 +1168,15 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.7.0) for a migration gu
 ### Breaking changes
 
 - The pytest rules `PT001` and `PT023` now default to omitting the decorator parentheses when there are no arguments
-    ([#12838](https://github.com/astral-sh/ruff/pull/12838), [#13292](https://github.com/astral-sh/ruff/pull/13292)).
-    This was a change that we attempted to make in Ruff v0.6.0, but only partially made due to an error on our part.
-    See the [blog post](https://astral.sh/blog/ruff-v0.7.0) for more details.
+([#12838](https://github.com/astral-sh/ruff/pull/12838), [#13292](https://github.com/astral-sh/ruff/pull/13292)).
+This was a change that we attempted to make in Ruff v0.6.0, but only partially made due to an error on our part.
+See the [blog post](https://astral.sh/blog/ruff-v0.7.0) for more details.
 - The `useless-try-except` rule (in our `tryceratops` category) has been recoded from `TRY302` to
-    `TRY203` ([#13502](https://github.com/astral-sh/ruff/pull/13502)). This ensures Ruff's code is consistent with
-    the same rule in the [`tryceratops`](https://github.com/guilatrova/tryceratops) linter.
+`TRY203` ([#13502](https://github.com/astral-sh/ruff/pull/13502)). This ensures Ruff's code is consistent with
+the same rule in the [`tryceratops`](https://github.com/guilatrova/tryceratops) linter.
 - The `lint.allow-unused-imports` setting has been removed ([#13677](https://github.com/astral-sh/ruff/pull/13677)). Use
-    [`lint.pyflakes.allow-unused-imports`](https://docs.astral.sh/ruff/settings/#lint_pyflakes_allowed-unused-imports)
-    instead.
+[`lint.pyflakes.allow-unused-imports`](https://docs.astral.sh/ruff/settings/#lint_pyflakes_allowed-unused-imports)
+instead.
 
 ### Formatter preview style
 
@@ -1172,7 +1195,7 @@ Check out the [blog post](https://astral.sh/blog/ruff-v0.7.0) for a migration gu
 - \[`flake8-todos`\] Only flag the word "TODO", not words starting with "todo" (`TD006`) ([#13640](https://github.com/astral-sh/ruff/pull/13640))
 - \[`pycodestyle`\] Fix whitespace-related false positives and false negatives inside type-parameter lists (`E231`, `E251`) ([#13704](https://github.com/astral-sh/ruff/pull/13704))
 - \[`flake8-simplify`\] Stabilize preview behavior for `SIM115` so that the rule can detect files
-    being opened from a wider range of standard-library functions ([#12959](https://github.com/astral-sh/ruff/pull/12959)).
+being opened from a wider range of standard-library functions ([#12959](https://github.com/astral-sh/ruff/pull/12959)).
 
 ### CLI
 
@@ -3688,9 +3711,9 @@ Read Ruff's new [versioning policy](https://docs.astral.sh/ruff/versioning/).
 - Unsafe fixes are no longer displayed or applied without opt-in ([#7769](https://github.com/astral-sh/ruff/pull/7769))
 - Drop formatting specific rules from the default set ([#7900](https://github.com/astral-sh/ruff/pull/7900))
 - The deprecated `format` setting has been removed ([#7984](https://github.com/astral-sh/ruff/pull/7984))
-    - The `format` setting cannot be used to configure the output format, use `output-format` instead
-    - The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
-    - The `--format` option has been removed from `ruff check`, use `--output-format` instead
+  - The `format` setting cannot be used to configure the output format, use `output-format` instead
+  - The `RUFF_FORMAT` environment variable is ignored, use `RUFF_OUTPUT_FORMAT` instead
+  - The `--format` option has been removed from `ruff check`, use `--output-format` instead
 
 ### Rule changes
 
