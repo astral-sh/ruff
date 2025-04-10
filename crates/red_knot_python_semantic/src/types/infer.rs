@@ -3188,7 +3188,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             msg,
         } = assert;
 
-        let test_ty = self.infer_expression(test);
+        let test_ty = self.infer_standalone_expression(test);
 
         if let Err(err) = test_ty.try_bool(self.db()) {
             err.report_diagnostic(&self.context, &**test);

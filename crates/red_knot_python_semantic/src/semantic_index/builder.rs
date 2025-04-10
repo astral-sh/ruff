@@ -534,7 +534,6 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     /// Records a visibility constraint by applying it to all live bindings and declarations.
-    #[must_use = "A visibility constraint must always be negated after it is added"]
     fn record_visibility_constraint(
         &mut self,
         predicate: Predicate<'db>,
@@ -1292,6 +1291,17 @@ where
                     );
                 }
             }
+
+            ast::Stmt::Assert(node) => {
+                self.visit_expr(&node.test);
+                let predicate = self.record_expression_narrowing_constraint(&node.test);
+                self.record_visibility_constraint(predicate);
+
+                if let Some(msg) = &node.msg {
+                    self.visit_expr(msg);
+                }
+            }
+
             ast::Stmt::Assign(node) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
