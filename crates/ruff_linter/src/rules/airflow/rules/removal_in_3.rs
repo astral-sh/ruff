@@ -611,22 +611,8 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "resolve_dataset_manager" => Replacement::Name("airflow.assets.resolve_asset_manager"),
             _ => return,
         },
-        ["airflow", "datasets", "metadata", "Metadata"] => {
-            Replacement::Name("airflow.sdk.Metadata")
-        }
         // airflow.datasets
-        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::AutoImport {
-            module: "airflow.sdk",
-            name: "Asset",
-        },
-        ["airflow", "datasets", rest] => match *rest {
-            "DatasetAliasEvent" => Replacement::None,
-            "DatasetAlias" => Replacement::Name("airflow.sdk.AssetAlias"),
-            "DatasetAll" => Replacement::Name("airflow.sdk.AssetAll"),
-            "DatasetAny" => Replacement::Name("airflow.sdk.AssetAny"),
-            "expand_alias_to_datasets" => Replacement::Name("airflow.sdk.expand_alias_to_assets"),
-            _ => return,
-        },
+        ["airflow", "datasets", "DatasetAliasEvent"] => Replacement::None,
 
         // airflow.hooks
         ["airflow", "hooks", "base_hook", "BaseHook"] => {
@@ -661,18 +647,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             _ => return,
         },
 
-        // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", rest] => match *rest {
-            "chain" | "chain_linear" | "cross_downstream" => Replacement::SourceModuleMoved {
-                module: "airflow.sdk",
-                name: (*rest).to_string(),
-            },
-            "BaseOperatorLink" => {
-                Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
-            }
-            _ => return,
-        },
-
         // airflow.notifications
         ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
             Replacement::Name("airflow.sdk.BaseNotifier")
@@ -699,15 +673,9 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.timetables
-        ["airflow", "timetables", rest @ ..] => match &rest {
-            ["datasets", "DatasetOrTimeSchedule"] => {
-                Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule")
-            }
-            ["simple", "DatasetTriggeredTimetable"] => {
-                Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
-            }
-            _ => return,
-        },
+        ["airflow", "timetables", "simple", "DatasetTriggeredTimetable"] => {
+            Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
+        }
 
         // airflow.triggers
         ["airflow", "triggers", "external_task", "TaskStateTrigger"] => Replacement::None,
