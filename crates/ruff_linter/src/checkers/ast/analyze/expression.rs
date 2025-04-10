@@ -455,7 +455,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 airflow::rules::moved_to_provider_in_3(checker, expr);
             }
             if checker.enabled(Rule::Airflow3SuggestedToMoveToProvider) {
-                airflow::rules::suggested_to_move_to_provider_in_3(checker, expr);
+                airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
             }
         }
         Expr::Call(
