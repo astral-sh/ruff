@@ -4507,23 +4507,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             .member(db, &attr.id)
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
-                    let bound_on_instance = match value_type {
-                        Type::ClassLiteral(class) => {
-                            !class.instance_member(db, None, attr).symbol.is_unbound()
-                        }
-                        Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
-                            match subclass_of.subclass_of() {
-                                ClassBase::Class(class) => {
-                                    !class.instance_member(db, attr).symbol.is_unbound()
-                                }
-                                ClassBase::Dynamic(_) => unreachable!(
-                                    "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
-                                ),
-                            }
-                        }
-                        _ => false,
-                    };
-
                     let report_unresolved_attribute = self
                         .index
                         .is_expression_reachable(
@@ -4533,6 +4516,23 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
 
                     if report_unresolved_attribute {
+                        let bound_on_instance = match value_type {
+                            Type::ClassLiteral(class) => {
+                                !class.instance_member(db, None, attr).symbol.is_unbound()
+                            }
+                            Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                                match subclass_of.subclass_of() {
+                                    ClassBase::Class(class) => {
+                                        !class.instance_member(db, attr).symbol.is_unbound()
+                                    }
+                                    ClassBase::Dynamic(_) => unreachable!(
+                                        "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
+                                    ),
+                                }
+                            }
+                            _ => false,
+                        };
+
                         if bound_on_instance {
                             self.context.report_lint(
                                 &UNRESOLVED_ATTRIBUTE,
@@ -7476,6 +7476,9 @@ enum DeferredExpressionState {
     ///
     /// The annotation of `a` is completely inside a string while for `b`, it's only partially
     /// stringified.
+    ///
+    /// This variant wraps a [`ScopedExpressionId`] that allows us to retrieve
+    /// the original [`ast::ExprStringLiteral`] node which created the string annotation
     InStringAnnotation(ScopedExpressionId),
 }
 

@@ -361,7 +361,8 @@ impl<'db> UseDefMap<'db> {
 
     /// Check whether or not a given expression is reachable from the start of the scope. This
     /// is a local analysis which does not capture the possibility that the entire scope might
-    /// be unreachable. Use `SemanticIndex::is_expression_reachable` for the global analysis.
+    /// be unreachable. Use [`super::SemanticIndex::is_expression_reachable`] for the global
+    /// analysis.
     #[track_caller]
     pub(super) fn is_expression_reachable(
         &self,
@@ -376,7 +377,7 @@ impl<'db> UseDefMap<'db> {
                 *self
                     .expression_reachability
                     .get(&expression_id)
-                    .expect("only called on expressions with recorded reachability"),
+                    .expect("`is_expression_reachable` should only be called on expressions with recorded reachability"),
             )
             .is_always_false()
     }
@@ -934,6 +935,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_definitions.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
+        self.expression_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_declaration.shrink_to_fit();
         self.eager_bindings.shrink_to_fit();
