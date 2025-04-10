@@ -182,11 +182,6 @@ bitflags! {
         ///
         /// This is similar to no object fallback above
         const META_CLASS_NO_TYPE_FALLBACK = 1 << 2;
-
-        /// When looking up an attribute of an unspecialized generic class, do _not_ apply the
-        /// default specialization to the attribute's type. That means the result might contain
-        /// unspecialized typevars, which the caller must be able to handle correctly.
-        const DO_NOT_SPECIALIZE_SELF_MEMBERS = 1 << 3;
     }
 }
 
@@ -208,12 +203,6 @@ impl MemberLookupPolicy {
     /// Exclude attributes defined on `type` when looking up meta-class-attributes.
     pub(crate) const fn meta_class_no_type_fallback(self) -> bool {
         self.contains(Self::META_CLASS_NO_TYPE_FALLBACK)
-    }
-
-    /// Do _not_ apply the default specialization to the type of attributes of an unspecialized
-    /// generic class.
-    pub(crate) const fn do_not_specialize_self_members(self) -> bool {
-        self.contains(Self::DO_NOT_SPECIALIZE_SELF_MEMBERS)
     }
 }
 
@@ -3530,7 +3519,6 @@ impl<'db> Type<'db> {
             db,
             name,
             &mut argument_types,
-            None,
             MemberLookupPolicy::NO_INSTANCE_FALLBACK,
         )
     }
@@ -3539,18 +3527,11 @@ impl<'db> Type<'db> {
     /// particular, this allows to specify `MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK` to avoid
     /// looking up dunder methods on `object`, which is needed for functions like `__init__`,
     /// `__new__`, or `__setattr__`.
-    ///
-    /// You can also provide a generic context that will be added to the method's signature before
-    /// calling it. This is used for the `__new__` and `__init__` methods of an unspecialized
-    /// generic class, to allow us to infer the _class's_ specialization from the arguments to its
-    /// constructor. This parameter is _not_ used for functions and methods that are themselves
-    /// generic; they will already have a generic context attached to them.
     fn try_call_dunder_with_policy(
         self,
         db: &'db dyn Db,
         name: &str,
         argument_types: &mut CallArgumentTypes<'_, 'db>,
-        generic_context: Option<GenericContext<'db>>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         match self
@@ -3558,10 +3539,7 @@ impl<'db> Type<'db> {
             .symbol
         {
             Symbol::Type(dunder_callable, boundness) => {
-                let mut signatures = dunder_callable.signatures(db);
-                if let Some(generic_context) = generic_context {
-                    signatures.add_generic_context(generic_context);
-                }
+                let signatures = dunder_callable.signatures(db);
                 let bindings = Bindings::match_parameters(signatures, argument_types)
                     .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
@@ -3747,7 +3725,6 @@ impl<'db> Type<'db> {
             Type::ClassLiteral(ClassLiteralType::Generic(generic)) => Some(generic),
             _ => None,
         };
-        let generic_context = generic_origin.map(|origin| origin.generic_context(db));
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
@@ -3778,10 +3755,8 @@ impl<'db> Type<'db> {
                 db,
                 "__new__",
                 argument_types,
-                generic_context,
                 MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
-                    | MemberLookupPolicy::DO_NOT_SPECIALIZE_SELF_MEMBERS,
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
             );
             match result {
                 Err(CallDunderError::MethodNotAvailable) => None,
@@ -3790,12 +3765,22 @@ impl<'db> Type<'db> {
         });
 
         // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let instance_ty = self
-            .to_instance(db)
-            .expect("Class literal, generic alias, and subclass-of types should always be convertible to instance type");
+        let init_ty = match self {
+            Type::ClassLiteral(generic @ ClassLiteralType::Generic(_)) => {
+                Type::Instance(InstanceType::UninitializedGenericClass(generic))
+            }
+            Type::ClassLiteral(ClassLiteralType::NonGeneric(non_generic)) => {
+                Type::Instance(InstanceType::Class(ClassType::NonGeneric(non_generic)))
+            }
+            Type::GenericAlias(generic) => {
+                Type::Instance(InstanceType::Class(ClassType::Generic(generic)))
+            }
+            Type::SubclassOf(subclass_of) => subclass_of.to_instance(),
+            _ => panic!("type should be constructible"),
+        };
 
         let init_call_outcome = if new_call_outcome.is_none()
-            || !instance_ty
+            || !init_ty
                 .member_lookup_with_policy(
                     db,
                     "__init__".into(),
@@ -3804,17 +3789,19 @@ impl<'db> Type<'db> {
                 .symbol
                 .is_unbound()
         {
-            Some(instance_ty.try_call_dunder_with_policy(
+            Some(init_ty.try_call_dunder_with_policy(
                 db,
                 "__init__",
                 &mut argument_types,
-                generic_context,
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                    | MemberLookupPolicy::DO_NOT_SPECIALIZE_SELF_MEMBERS,
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             ))
         } else {
             None
         };
+
+        let instance_ty = self
+            .to_instance(db)
+            .expect("Class literal, generic alias, and subclass-of types should always be convertible to instance type");
 
         match (new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
@@ -3825,18 +3812,12 @@ impl<'db> Type<'db> {
                     .and_then(Bindings::single_element)
                     .and_then(CallableBinding::matching_overload)
                     .and_then(|(_, binding)| binding.specialization());
-                if let Some(new_specialization) = &new_specialization {
-                    eprintln!("==> new {}", new_specialization.display(db));
-                }
                 let init_specialization = init_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
                     .and_then(CallableBinding::matching_overload)
                     .and_then(|(_, binding)| binding.specialization());
-                if let Some(init_specialization) = &init_specialization {
-                    eprintln!("==> init {}", init_specialization.display(db));
-                }
                 let specialized = generic_origin
                     .zip(new_specialization.or(init_specialization))
                     .map(|(origin, specialization)| {

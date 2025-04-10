@@ -156,8 +156,7 @@ parameter:
 class E[T]:
     def __init__(self, x: T) -> None: ...
 
-# TODO: revealed: E[int] or E[Literal[1]]
-reveal_type(E(1))  # revealed: E[int]
+reveal_type(E(1))  # revealed: E[Literal[1]]
 ```
 
 The types inferred from a type context and from a constructor parameter must be consistent with each
@@ -166,16 +165,6 @@ other:
 ```py
 # TODO: error: [invalid-argument-type]
 wrong_innards: E[int] = E("five")
-```
-
-## fwomp
-
-```py
-class E[T]:
-    def __init__(self, x: T) -> None: ...
-
-# TODO: revealed: E[int] or E[Literal[1]]
-reveal_type(E(1))  # revealed: E[int]
 ```
 
 ## Generic subclass

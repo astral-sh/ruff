@@ -277,7 +277,6 @@ impl<'db> ClassType<'db> {
         policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
-        eprintln!("==> class type class member {}", name);
         class_literal
             .class_member_inner(db, None, specialization, name, policy)
             .map_type(|ty| self.specialize_type(db, ty))
@@ -751,23 +750,10 @@ impl<'db> ClassLiteralType<'db> {
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
                         let member = match self_type {
-                            Some(self_type)
-                                if idx == 0 && policy.do_not_specialize_self_members() =>
-                            {
-                                self_type.own_class_member(db, name)
-                            }
+                            Some(self_type) if idx == 0 => self_type.own_class_member(db, name),
                             _ => class.own_class_member(db, name),
                         };
-                        let x = member;
-                        eprintln!(
-                            "==> own class member {} {}",
-                            name,
-                            x.symbol
-                                .ignore_possibly_unbound()
-                                .unwrap_or(Type::unknown())
-                                .display(db)
-                        );
-                        lookup_error.or_fall_back_to(db, x)
+                        lookup_error.or_fall_back_to(db, member)
                     });
                 }
             }
@@ -824,13 +810,9 @@ impl<'db> ClassLiteralType<'db> {
                     ClassLiteralType::Generic(origin),
                     Type::FunctionLiteral(function),
                     "__new__" | "__init__",
-                ) => {
-                    let f = Type::FunctionLiteral(
-                        function.with_generic_context(db, origin.generic_context(db)),
-                    );
-                    eprintln!("==> inherit generic {} {}", ty.display(db), f.display(db));
-                    f
-                }
+                ) => Type::FunctionLiteral(
+                    function.with_generic_context(db, origin.generic_context(db)),
+                ),
                 _ => ty,
             }
         })
@@ -869,7 +851,6 @@ impl<'db> ClassLiteralType<'db> {
                         qualifiers,
                     } = class.own_instance_member(db, name)
                     {
-                        eprintln!("==> own instance member {} {}", name, ty.display(db));
                         // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
                         union_qualifiers |= qualifiers;
 

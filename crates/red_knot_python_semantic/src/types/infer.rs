@@ -2516,7 +2516,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     )),
                                     value_ty,
                                 ]),
-                                None,
                                 MemberLookupPolicy::NO_INSTANCE_FALLBACK
                                     | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                             );
