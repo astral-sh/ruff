@@ -138,7 +138,7 @@ impl Diagnostic {
         // in Red Knot, so we do it this way for now to match the old
         // semantics. ---AG
         self.primary_annotation()
-            .and_then(|ann| ann.message.as_deref())
+            .and_then(|ann| ann.get_message())
             .unwrap_or_default()
     }
 
@@ -170,7 +170,7 @@ impl Diagnostic {
         let main = &self.inner.message;
         let annotation = self
             .primary_annotation()
-            .and_then(|ann| ann.message.as_deref())
+            .and_then(|ann| ann.get_message())
             .unwrap_or_default();
         match (main.is_empty(), annotation.is_empty()) {
             (false, true) => ConciseMessage::MainDiagnostic(main),
