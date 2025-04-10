@@ -263,7 +263,8 @@ use self::symbol_state::{
     LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator, ScopedDefinitionId,
     SymbolBindings, SymbolDeclarations, SymbolState,
 };
-use crate::semantic_index::ast_ids::{ScopedExpressionId, ScopedUseId};
+use crate::node_key::NodeKey;
+use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::narrowing_constraints::{
     NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
@@ -297,8 +298,8 @@ pub(crate) struct UseDefMap<'db> {
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
 
-    /// Tracks whether or not a given expression is reachable from the start of the scope.
-    expression_reachability: FxHashMap<ScopedExpressionId, ScopedVisibilityConstraintId>,
+    /// Tracks whether or not a given AST node is reachable from the start of the scope.
+    node_reachability: FxHashMap<NodeKey, ScopedVisibilityConstraintId>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`SymbolDeclarations`] to know whether this binding is permitted by the live declarations.
@@ -361,23 +362,19 @@ impl<'db> UseDefMap<'db> {
 
     /// Check whether or not a given expression is reachable from the start of the scope. This
     /// is a local analysis which does not capture the possibility that the entire scope might
-    /// be unreachable. Use [`super::SemanticIndex::is_expression_reachable`] for the global
+    /// be unreachable. Use [`super::SemanticIndex::is_node_reachable`] for the global
     /// analysis.
     #[track_caller]
-    pub(super) fn is_expression_reachable(
-        &self,
-        db: &dyn crate::Db,
-        expression_id: ScopedExpressionId,
-    ) -> bool {
+    pub(super) fn is_node_reachable(&self, db: &dyn crate::Db, node_key: NodeKey) -> bool {
         !self
             .visibility_constraints
             .evaluate(
                 db,
                 &self.predicates,
                 *self
-                    .expression_reachability
-                    .get(&expression_id)
-                    .expect("`is_expression_reachable` should only be called on expressions with recorded reachability"),
+                    .node_reachability
+                    .get(&node_key)
+                    .expect("`is_node_reachable` should only be called on AST nodes with recorded reachability"),
             )
             .is_always_false()
     }
@@ -636,8 +633,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// The use of `x` is recorded with a reachability constraint of `[test]`.
     pub(super) reachability: ScopedVisibilityConstraintId,
 
-    /// Tracks whether or not a given expression is reachable from the start of the scope.
-    expression_reachability: FxHashMap<ScopedExpressionId, ScopedVisibilityConstraintId>,
+    /// Tracks whether or not a given AST node is reachable from the start of the scope.
+    node_reachability: FxHashMap<NodeKey, ScopedVisibilityConstraintId>,
 
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, SymbolDeclarations>,
@@ -663,7 +660,7 @@ impl Default for UseDefMapBuilder<'_> {
             scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
             bindings_by_use: IndexVec::new(),
             reachability: ScopedVisibilityConstraintId::ALWAYS_TRUE,
-            expression_reachability: FxHashMap::default(),
+            node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
             bindings_by_declaration: FxHashMap::default(),
             symbol_states: IndexVec::new(),
@@ -822,7 +819,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         symbol: ScopedSymbolId,
         use_id: ScopedUseId,
-        expression_id: ScopedExpressionId,
+        node_key: NodeKey,
     ) {
         // We have a use of a symbol; clone the current bindings for that symbol, and record them
         // as the live bindings for this use.
@@ -833,12 +830,11 @@ impl<'db> UseDefMapBuilder<'db> {
 
         // Track reachability of all uses of symbols to silence `unresolved-reference`
         // diagnostics in unreachable code.
-        self.record_expression_reachability(expression_id);
+        self.record_node_reachability(node_key);
     }
 
-    pub(super) fn record_expression_reachability(&mut self, expression_id: ScopedExpressionId) {
-        self.expression_reachability
-            .insert(expression_id, self.reachability);
+    pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {
+        self.node_reachability.insert(node_key, self.reachability);
     }
 
     pub(super) fn snapshot_eager_bindings(
@@ -935,7 +931,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_definitions.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
-        self.expression_reachability.shrink_to_fit();
+        self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_declaration.shrink_to_fit();
         self.eager_bindings.shrink_to_fit();
@@ -946,7 +942,7 @@ impl<'db> UseDefMapBuilder<'db> {
             narrowing_constraints: self.narrowing_constraints.build(),
             visibility_constraints: self.visibility_constraints.build(),
             bindings_by_use: self.bindings_by_use,
-            expression_reachability: self.expression_reachability,
+            node_reachability: self.node_reachability,
             public_symbols: self.symbol_states,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,

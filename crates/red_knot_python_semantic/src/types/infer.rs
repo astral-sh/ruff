@@ -46,6 +46,7 @@ use salsa::plumbing::AsId;
 
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::resolve_module;
+use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
     AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
@@ -67,13 +68,13 @@ use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
     report_invalid_attribute_assignment, report_invalid_return_type,
-    report_possibly_unbound_attribute, report_unresolved_module, TypeCheckDiagnostics,
-    CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
-    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
-    INCONSISTENT_MRO, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    report_possibly_unbound_attribute, TypeCheckDiagnostics, CALL_NON_CALLABLE,
+    CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO,
+    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
+    UNSUPPORTED_OPERATOR,
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
@@ -590,14 +591,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         matches!(self.region, InferenceRegion::Deferred(_)) || self.deferred_state.is_deferred()
     }
 
-    /// Return the ID of the given expression, or the ID of the outermost enclosing string literal,
-    /// if the expression originates from a stringified annotation.
-    fn enclosing_expression_id(&self, expr: &impl HasScopedExpressionId) -> ScopedExpressionId {
+    /// Return the node key of the given AST node, or the key of the outermost enclosing string
+    /// literal, if the node originates from inside a stringified annotation.
+    fn enclosing_node_key(&self, node: AnyNodeRef<'_>) -> NodeKey {
         match self.deferred_state {
-            DeferredExpressionState::InStringAnnotation(enclosing_string_expression) => {
-                enclosing_string_expression
-            }
-            _ => expr.scoped_expression_id(self.db(), self.scope()),
+            DeferredExpressionState::InStringAnnotation(enclosing_node_key) => enclosing_node_key,
+            _ => NodeKey::from_node(node),
         }
     }
 
@@ -881,7 +880,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_alias_definition(type_alias.node(), definition);
             }
             DefinitionKind::Import(import) => {
-                self.infer_import_definition(import.alias(), definition);
+                self.infer_import_definition(import.import(), import.alias(), definition);
             }
             DefinitionKind::ImportFrom(import_from) => {
                 self.infer_import_from_definition(
@@ -3119,7 +3118,39 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_import_definition(&mut self, alias: &'db ast::Alias, definition: Definition<'db>) {
+    fn report_unresolved_import(
+        &self,
+        import_node: NodeKey,
+        range: TextRange,
+        level: u32,
+        module: Option<&str>,
+    ) {
+        let file_scope_id = self.scope().file_scope_id(self.db());
+        let is_import_reachable =
+            self.index
+                .is_node_reachable(self.db(), file_scope_id, import_node);
+
+        if !is_import_reachable {
+            return;
+        }
+
+        self.context.report_lint_old(
+            &UNRESOLVED_IMPORT,
+            range,
+            format_args!(
+                "Cannot resolve import `{}{}`",
+                ".".repeat(level as usize),
+                module.unwrap_or_default()
+            ),
+        );
+    }
+
+    fn infer_import_definition(
+        &mut self,
+        node: &ast::StmtImport,
+        alias: &'db ast::Alias,
+        definition: Definition<'db>,
+    ) {
         let ast::Alias {
             range: _,
             name,
@@ -3135,7 +3166,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
-            report_unresolved_module(&self.context, alias, 0, Some(name));
+            self.report_unresolved_import(NodeKey::from_node(node), alias.range(), 0, Some(name));
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -3248,6 +3279,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         alias: &ast::Alias,
     ) -> Option<(ModuleName, Type<'db>)> {
         let ast::StmtImportFrom { module, level, .. } = import_from;
+
+        let node_key = NodeKey::from_node(import_from);
+
         // For diagnostics, we want to highlight the unresolvable
         // module and not the entire `from ... import ...` statement.
         let module_ref = module
@@ -3276,7 +3310,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
-                report_unresolved_module(&self.context, module_ref, *level, module);
+                self.report_unresolved_import(node_key, module_ref.range(), *level, module);
                 return None;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
@@ -3285,13 +3319,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_import_from_module(*level, module),
                     self.file().path(self.db())
                 );
-                report_unresolved_module(&self.context, module_ref, *level, module);
+                self.report_unresolved_import(node_key, module_ref.range(), *level, module);
                 return None;
             }
         };
 
         let Some(module_ty) = self.module_type_from_name(&module_name) else {
-            report_unresolved_module(&self.context, module_ref, *level, module);
+            self.report_unresolved_import(node_key, module_ref.range(), *level, module);
             return None;
         };
 
@@ -3376,11 +3410,20 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         if &alias.name != "*" {
-            self.context.report_lint_old(
-                &UNRESOLVED_IMPORT,
-                AnyNodeRef::Alias(alias),
-                format_args!("Module `{module_name}` has no member `{name}`",),
+            let file_scope_id = self.scope().file_scope_id(self.db());
+            let is_import_reachable = self.index.is_node_reachable(
+                self.db(),
+                file_scope_id,
+                NodeKey::from_node(import_from),
             );
+
+            if is_import_reachable {
+                self.context.report_lint_old(
+                    &UNRESOLVED_IMPORT,
+                    AnyNodeRef::Alias(alias),
+                    format_args!("Module `{module_name}` has no member `{name}`",),
+                );
+            }
         }
 
         self.add_unknown_declaration_with_binding(alias.into(), definition);
@@ -4461,10 +4504,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         });
 
         let report_unresolved_usage = || {
-            self.index.is_expression_reachable(
+            self.index.is_node_reachable(
                 db,
                 file_scope_id,
-                self.enclosing_expression_id(name_node),
+                self.enclosing_node_key(name_node.into()),
             )
         };
 
@@ -4512,10 +4555,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 LookupError::Unbound(_) => {
                     let report_unresolved_attribute = self
                         .index
-                        .is_expression_reachable(
+                        .is_node_reachable(
                             db,
                             self.scope().file_scope_id(db),
-                            self.enclosing_expression_id(attribute),
+                            self.enclosing_node_key(attribute.into()),
                         );
 
                     if report_unresolved_attribute {
@@ -6395,7 +6438,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_annotation_expression(
                     parsed.expr(),
                     DeferredExpressionState::InStringAnnotation(
-                        self.enclosing_expression_id(string),
+                        self.enclosing_node_key(string.into()),
                     ),
                 )
             }
@@ -6761,7 +6804,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression_with_state(
                     parsed.expr(),
                     DeferredExpressionState::InStringAnnotation(
-                        self.enclosing_expression_id(string),
+                        self.enclosing_node_key(string.into()),
                     ),
                 )
             }
@@ -7480,9 +7523,9 @@ enum DeferredExpressionState {
     /// The annotation of `a` is completely inside a string while for `b`, it's only partially
     /// stringified.
     ///
-    /// This variant wraps a [`ScopedExpressionId`] that allows us to retrieve
-    /// the original [`ast::ExprStringLiteral`] node which created the string annotation
-    InStringAnnotation(ScopedExpressionId),
+    /// This variant wraps a [`NodeKey`] that allows us to retrieve the original
+    /// [`ast::ExprStringLiteral`] node which created the string annotation.
+    InStringAnnotation(NodeKey),
 }
 
 impl DeferredExpressionState {

@@ -117,8 +117,6 @@ python-version = "3.10"
 import sys
 
 if sys.version_info >= (3, 11):
-    # TODO: we should not emit an error here
-    # error: [unresolved-import]
     from typing import Self
 ```
 
@@ -391,22 +389,14 @@ diagnostics:
 import sys
 
 if sys.version_info >= (3, 11):
-    # TODO
-    # error: [unresolved-import]
     from builtins import ExceptionGroup
 
-    # TODO
-    # error: [unresolved-import]
     import builtins.ExceptionGroup
 
     # See https://docs.python.org/3/whatsnew/3.11.html#new-modules
 
-    # TODO
-    # error: [unresolved-import]
     import tomllib
 
-    # TODO
-    # error: [unresolved-import]
     import wsgiref.types
 ```
 
@@ -435,8 +425,6 @@ import sys
 import typing
 
 if sys.version_info >= (3, 11):
-    # TODO (silence diagnostics for imports, see above)
-    # error: [unresolved-import]
     from typing import Self
 
     class C:
