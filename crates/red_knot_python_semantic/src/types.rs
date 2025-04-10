@@ -4475,17 +4475,24 @@ pub struct InvalidTypeExpressionError<'db> {
 }
 
 impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type(self, context: &InferContext, node: &ast::Expr) -> Type<'db> {
+    fn into_fallback_type(
+        self,
+        context: &InferContext,
+        node: &ast::Expr,
+        is_reachable: bool,
+    ) -> Type<'db> {
         let InvalidTypeExpressionError {
             fallback_type,
             invalid_expressions,
         } = self;
-        for error in invalid_expressions {
-            context.report_lint_old(
-                &INVALID_TYPE_FORM,
-                node,
-                format_args!("{}", error.reason(context.db())),
-            );
+        if is_reachable {
+            for error in invalid_expressions {
+                context.report_lint_old(
+                    &INVALID_TYPE_FORM,
+                    node,
+                    format_args!("{}", error.reason(context.db())),
+                );
+            }
         }
         fallback_type
     }
