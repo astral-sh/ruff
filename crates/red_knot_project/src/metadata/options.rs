@@ -54,20 +54,25 @@ impl Options {
         project_root: &SystemPath,
         system: &dyn System,
     ) -> ProgramSettings {
-        let (python_version, python_platform) = self
+        let python_version = self
             .environment
             .as_ref()
-            .map(|env| {
-                (
-                    env.python_version.as_deref().copied(),
-                    env.python_platform.as_deref(),
-                )
-            })
+            .and_then(|env| env.python_version.as_deref().copied())
             .unwrap_or_default();
-
+        let python_platform = self
+            .environment
+            .as_ref()
+            .and_then(|env| env.python_platform.as_deref().cloned())
+            .unwrap_or_else(|| {
+                let default = PythonPlatform::default();
+                tracing::info!(
+                    "Defaulting to default python version for this platform: '{default}'",
+                );
+                default
+            });
         ProgramSettings {
-            python_version: python_version.unwrap_or_default(),
-            python_platform: python_platform.cloned().unwrap_or_default(),
+            python_version,
+            python_platform,
             search_paths: self.to_search_path_settings(project_root, system),
         }
     }
@@ -224,7 +229,7 @@ impl Options {
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct EnvironmentOptions {
-    /// Specifies the version of Python that will be used to execute the source code.
+    /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
     /// and `m` is the minor (e.g. "3.0" or "3.6").
     /// If a version is provided, knot will generate errors if the source code makes use of language features
@@ -233,11 +238,16 @@ pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub python_version: Option<RangedValue<PythonVersion>>,
 
-    /// Specifies the target platform that will be used to execute the source code.
+    /// Specifies the target platform that will be used to analyze the source code.
     /// If specified, Red Knot will tailor its use of type stub files,
     /// which conditionalize type definitions based on the platform.
     ///
-    /// If no platform is specified, knot will use `all` or the current platform in the LSP use case.
+    /// If no platform is specified, knot will use the current platform:
+    /// - `win32` for Windows
+    /// - `darwin` for macOS
+    /// - `android` for Android
+    /// - `ios` for iOS
+    /// - `linux` for everything else
     #[serde(skip_serializing_if = "Option::is_none")]
     pub python_platform: Option<RangedValue<PythonPlatform>>,
 

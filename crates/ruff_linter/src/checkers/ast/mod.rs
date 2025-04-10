@@ -27,7 +27,8 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    Checkpoint, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxErrorKind,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -282,7 +283,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
-            semantic_checker: SemanticSyntaxChecker::new(),
+            semantic_checker: SemanticSyntaxChecker::new(source_type),
             semantic_errors: RefCell::default(),
         }
     }
@@ -525,10 +526,14 @@ impl<'a> Checker<'a> {
         self.target_version
     }
 
-    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
+    fn with_semantic_checker(
+        &mut self,
+        f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker) -> Checkpoint,
+    ) -> Checkpoint {
         let mut checker = std::mem::take(&mut self.semantic_checker);
-        f(&mut checker, self);
+        let checkpoint = f(&mut checker, self);
         self.semantic_checker = checker;
+        checkpoint
     }
 }
 
@@ -576,7 +581,8 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::InvalidExpression(..)
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
-            | SemanticSyntaxErrorKind::InvalidStarExpression => {
+            | SemanticSyntaxErrorKind::InvalidStarExpression
+            | SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(_) => {
                 if self.settings.preview.is_enabled() {
                     self.semantic_errors.borrow_mut().push(error);
                 }
@@ -587,11 +593,21 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn source(&self) -> &str {
         self.source()
     }
+
+    fn future_annotations_or_stub(&self) -> bool {
+        self.semantic.future_annotations_or_stub()
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        // For functions, defer semantic syntax error checks until the body of the function is
+        // visited
+        let checkpoint = if stmt.is_function_def_stmt() {
+            None
+        } else {
+            Some(self.with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context)))
+        };
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
@@ -1194,6 +1210,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
         self.last_stmt_end = stmt.end();
+
+        if let Some(checkpoint) = checkpoint {
+            self.semantic_checker.exit_stmt(checkpoint);
+        }
     }
 
     fn visit_annotation(&mut self, expr: &'a Expr) {
@@ -1204,7 +1224,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+        let checkpoint =
+            self.with_semantic_checker(|semantic, context| semantic.enter_expr(expr, context));
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()
@@ -1669,7 +1690,15 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 }
                                 self.visit_expr_context(ctx);
                             } else {
-                                debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                if self.semantic.in_type_definition() {
+                                    // this should potentially trigger some kind of violation in the
+                                    // future, since it would indicate an invalid type expression
+                                    debug!("Found non-Expr::Tuple argument to PEP 593 Annotation.");
+                                }
+                                // even if the expression is invalid as a type expression, we should
+                                // still visit it so we don't accidentally treat variables as unused
+                                self.visit_expr(slice);
+                                self.visit_expr_context(ctx);
                             }
                         }
                         Some(typing::SubscriptKind::TypedDict) => {
@@ -1743,6 +1772,8 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
         analyze::expression(expr, self);
         self.semantic.pop_node();
+
+        self.semantic_checker.exit_expr(checkpoint);
     }
 
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
@@ -2578,17 +2609,24 @@ impl<'a> Checker<'a> {
             for snapshot in deferred_functions {
                 self.semantic.restore(snapshot);
 
+                let stmt = self.semantic.current_statement();
+
                 let Stmt::FunctionDef(ast::StmtFunctionDef {
                     body, parameters, ..
-                }) = self.semantic.current_statement()
+                }) = stmt
                 else {
                     unreachable!("Expected Stmt::FunctionDef")
                 };
+
+                let checkpoint = self
+                    .with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context));
 
                 self.visit_parameters(parameters);
                 // Set the docstring state before visiting the function body.
                 self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
                 self.visit_body(body);
+
+                self.semantic_checker.exit_stmt(checkpoint);
             }
         }
         self.semantic.restore(snapshot);

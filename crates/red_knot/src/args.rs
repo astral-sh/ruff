@@ -71,6 +71,15 @@ pub(crate) struct CheckCommand {
     #[arg(long, value_name = "VERSION", alias = "target-version")]
     pub(crate) python_version: Option<PythonVersion>,
 
+    /// Target platform to assume when resolving types.
+    ///
+    /// This is used to specialize the type of `sys.platform` and will affect the visibility
+    /// of platform-specific functions and attributes. If the value is set to `all`, no
+    /// assumptions are made about the target platform. If unspecified, the current system's
+    /// platform will be used.
+    #[arg(long, value_name = "PLATFORM", alias = "platform")]
+    pub(crate) python_platform: Option<String>,
+
     #[clap(flatten)]
     pub(crate) verbosity: Verbosity,
 
@@ -116,6 +125,9 @@ impl CheckCommand {
                 python_version: self
                     .python_version
                     .map(|version| RangedValue::cli(version.into())),
+                python_platform: self
+                    .python_platform
+                    .map(|platform| RangedValue::cli(platform.into())),
                 python: self.python.map(RelativePathBuf::cli),
                 typeshed: self.typeshed.map(RelativePathBuf::cli),
                 extra_paths: self.extra_search_path.map(|extra_search_paths| {
@@ -124,7 +136,6 @@ impl CheckCommand {
                         .map(RelativePathBuf::cli)
                         .collect()
                 }),
-                ..EnvironmentOptions::default()
             }),
             terminal: Some(TerminalOptions {
                 output_format: self

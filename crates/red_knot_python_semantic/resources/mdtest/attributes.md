@@ -1395,6 +1395,59 @@ def _(ns: argparse.Namespace):
     reveal_type(ns.whatever)  # revealed: Any
 ```
 
+## Classes with custom `__setattr__` methods
+
+### Basic
+
+If a type provides a custom `__setattr__` method, we use the parameter type of that method as the
+type to validate attribute assignments. Consider the following `CustomSetAttr` class:
+
+```py
+class CustomSetAttr:
+    def __setattr__(self, name: str, value: int) -> None:
+        pass
+```
+
+We can set arbitrary attributes on instances of this class:
+
+```py
+c = CustomSetAttr()
+
+c.whatever = 42
+```
+
+### Type of the `name` parameter
+
+If the `name` parameter of the `__setattr__` method is annotated with a (union of) literal type(s),
+we only consider the attribute assignment to be valid if the assigned attribute is one of them:
+
+```py
+from typing import Literal
+
+class Date:
+    def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
+        pass
+
+date = Date()
+date.day = 8
+date.month = 4
+date.year = 2025
+
+# error: [unresolved-attribute] "Can not assign object of `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
+date.tz = "UTC"
+```
+
+### `argparse.Namespace`
+
+A standard library example of a class with a custom `__setattr__` method is `argparse.Namespace`:
+
+```py
+import argparse
+
+def _(ns: argparse.Namespace):
+    ns.whatever = 42
+```
+
 ## Objects of all types have a `__class__` method
 
 The type of `x.__class__` is the same as `x`'s meta-type. `x.__class__` is always the same value as

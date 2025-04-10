@@ -1,8 +1,10 @@
 //! [`SemanticSyntaxChecker`] for AST-based syntax errors.
 //!
 //! This checker is not responsible for traversing the AST itself. Instead, its
-//! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
-//! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
+//! [`SemanticSyntaxChecker::enter_stmt`] and [`SemanticSyntaxChecker::enter_expr`] methods should
+//! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively, and
+//! followed by matching calls to [`SemanticSyntaxChecker::exit_stmt`] and
+//! [`SemanticSyntaxChecker::exit_expr`].
 
 use std::fmt::Display;
 
@@ -10,13 +12,18 @@ use ruff_python_ast::{
     self as ast,
     comparable::ComparableExpr,
     visitor::{walk_expr, Visitor},
-    Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
-    StmtImportFrom,
+    Expr, ExprContext, IrrefutablePatternKind, Pattern, PySourceType, PythonVersion, Stmt,
+    StmtExpr, StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
 #[derive(Debug)]
+pub struct Checkpoint {
+    in_async_context: bool,
+}
+
+#[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the `__future__` import boundary.
     ///
@@ -33,12 +40,20 @@ pub struct SemanticSyntaxChecker {
     /// Python considers it a syntax error to import from `__future__` after any other
     /// non-`__future__`-importing statements.
     seen_futures_boundary: bool,
+
+    /// The checker is currently in an `async` context: either the body of an `async` function or an
+    /// `async` comprehension.
+    ///
+    /// Note that this should be updated *after* checking the current statement or expression
+    /// because the parent context is what matters.
+    in_async_context: bool,
 }
 
 impl SemanticSyntaxChecker {
-    pub fn new() -> Self {
+    pub fn new(source_type: PySourceType) -> Self {
         Self {
             seen_futures_boundary: false,
+            in_async_context: source_type.is_ipynb(),
         }
     }
 }
@@ -119,27 +134,73 @@ impl SemanticSyntaxChecker {
 
     fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
+            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+                if ctx.python_version() > PythonVersion::PY313 {
+                    // test_ok valid_annotation_py313
+                    // # parse_options: {"target-version": "3.13"}
+                    // a: (x := 1)
+                    // def outer():
+                    //     b: (yield 1)
+                    //     c: (yield from 1)
+                    // async def outer():
+                    //     d: (await 1)
+
+                    // test_err invalid_annotation_py314
+                    // # parse_options: {"target-version": "3.14"}
+                    // a: (x := 1)
+                    // def outer():
+                    //     b: (yield 1)
+                    //     c: (yield from 1)
+                    // async def outer():
+                    //     d: (await 1)
+                    let mut visitor = InvalidExpressionVisitor {
+                        position: InvalidExpressionPosition::TypeAnnotation,
+                        ctx,
+                    };
+                    visitor.visit_expr(annotation);
+                }
+            }
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 type_params,
                 parameters,
                 returns,
                 ..
             }) => {
-                // test_ok valid_annotation_function
+                // test_ok valid_annotation_function_py313
+                // # parse_options: {"target-version": "3.13"}
                 // def f() -> (y := 3): ...
                 // def g(arg: (x := 1)): ...
+                // def outer():
+                //     def i(x: (yield 1)): ...
+                //     def k() -> (yield 1): ...
+                //     def m(x: (yield from 1)): ...
+                //     def o() -> (yield from 1): ...
+                // async def outer():
+                //     def f() -> (await 1): ...
+                //     def g(arg: (await 1)): ...
+
+                // test_err invalid_annotation_function_py314
+                // # parse_options: {"target-version": "3.14"}
+                // def f() -> (y := 3): ...
+                // def g(arg: (x := 1)): ...
+                // def outer():
+                //     def i(x: (yield 1)): ...
+                //     def k() -> (yield 1): ...
+                //     def m(x: (yield from 1)): ...
+                //     def o() -> (yield from 1): ...
+                // async def outer():
+                //     def f() -> (await 1): ...
+                //     def g(arg: (await 1)): ...
 
                 // test_err invalid_annotation_function
+                // def d[T]() -> (await 1): ...
+                // def e[T](arg: (await 1)): ...
                 // def f[T]() -> (y := 3): ...
                 // def g[T](arg: (x := 1)): ...
                 // def h[T](x: (yield 1)): ...
-                // def i(x: (yield 1)): ...
                 // def j[T]() -> (yield 1): ...
-                // def k() -> (yield 1): ...
                 // def l[T](x: (yield from 1)): ...
-                // def m(x: (yield from 1)): ...
                 // def n[T]() -> (yield from 1): ...
-                // def o() -> (yield from 1): ...
                 // def p[T: (yield 1)](): ...      # yield in TypeVar bound
                 // def q[T = (yield 1)](): ...     # yield in TypeVar default
                 // def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
@@ -148,19 +209,24 @@ impl SemanticSyntaxChecker {
                 // def u[T = (x := 1)](): ...      # named expr in TypeVar default
                 // def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
                 // def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
-                let is_generic = type_params.is_some();
+                // def t[T: (await 1)](): ...       # await in TypeVar bound
+                // def u[T = (await 1)](): ...      # await in TypeVar default
+                // def v[*Ts = (await 1)](): ...    # await in TypeVarTuple default
+                // def w[**Ts = (await 1)](): ...   # await in ParamSpec default
                 let mut visitor = InvalidExpressionVisitor {
-                    allow_named_expr: !is_generic,
                     position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
                 };
                 if let Some(type_params) = type_params {
                     visitor.visit_type_params(type_params);
                 }
-                if is_generic {
+                // the __future__ annotation error takes precedence over the generic error
+                if ctx.future_annotations_or_stub() || ctx.python_version() > PythonVersion::PY313 {
+                    visitor.position = InvalidExpressionPosition::TypeAnnotation;
+                } else if type_params.is_some() {
                     visitor.position = InvalidExpressionPosition::GenericDefinition;
                 } else {
-                    visitor.position = InvalidExpressionPosition::TypeAnnotation;
+                    return;
                 }
                 for param in parameters
                     .iter()
@@ -173,36 +239,33 @@ impl SemanticSyntaxChecker {
                 }
             }
             Stmt::ClassDef(ast::StmtClassDef {
-                type_params,
+                type_params: Some(type_params),
                 arguments,
                 ..
             }) => {
                 // test_ok valid_annotation_class
                 // class F(y := list): ...
+                // def f():
+                //     class G((yield 1)): ...
+                //     class H((yield from 1)): ...
+                // async def f():
+                //     class G((await 1)): ...
 
                 // test_err invalid_annotation_class
                 // class F[T](y := list): ...
-                // class G((yield 1)): ...
-                // class H((yield from 1)): ...
                 // class I[T]((yield 1)): ...
                 // class J[T]((yield from 1)): ...
                 // class K[T: (yield 1)]: ...      # yield in TypeVar
                 // class L[T: (x := 1)]: ...       # named expr in TypeVar
-                let is_generic = type_params.is_some();
+                // class M[T]((await 1)): ...
+                // class N[T: (await 1)]: ...
                 let mut visitor = InvalidExpressionVisitor {
-                    allow_named_expr: !is_generic,
                     position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
                 };
-                if let Some(type_params) = type_params {
-                    visitor.visit_type_params(type_params);
-                }
-                if is_generic {
-                    visitor.position = InvalidExpressionPosition::GenericDefinition;
-                } else {
-                    visitor.position = InvalidExpressionPosition::BaseClass;
-                }
+                visitor.visit_type_params(type_params);
                 if let Some(arguments) = arguments {
+                    visitor.position = InvalidExpressionPosition::GenericDefinition;
                     visitor.visit_arguments(arguments);
                 }
             }
@@ -216,8 +279,9 @@ impl SemanticSyntaxChecker {
                 // type X[**Ts = (yield 1)] = int  # ParamSpec default
                 // type Y = (yield 1)              # yield in value
                 // type Y = (x := 1)               # named expr in value
+                // type Y[T: (await 1)] = int      # await in bound
+                // type Y = (await 1)              # await in value
                 let mut visitor = InvalidExpressionVisitor {
-                    allow_named_expr: false,
                     position: InvalidExpressionPosition::TypeAlias,
                     ctx,
                 };
@@ -424,7 +488,27 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
+    /// Check `stmt` for semantic syntax errors and update the checker's internal state.
+    ///
+    /// This should be followed by a call to [`SemanticSyntaxChecker::exit_stmt`] to reset any state
+    /// specific to scopes introduced by `stmt`, such as whether the body of a function is async.
+    ///
+    /// Note that this method should only be called when traversing `stmt` *and* its children. For
+    /// example, if traversal of function bodies needs to be deferred, avoid calling `enter_stmt` on
+    /// the function itself until the deferred body is visited too. Failing to defer `enter_stmt` in
+    /// this case will break any internal state that depends on function scopes, such as `async`
+    /// context detection.
+    #[must_use]
+    pub fn enter_stmt<Ctx: SemanticSyntaxContext>(
+        &mut self,
+        stmt: &ast::Stmt,
+        ctx: &Ctx,
+    ) -> Checkpoint {
+        // check for errors
+        self.check_stmt(stmt, ctx);
+
+        let checkpoint = self.checkpoint();
+
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
@@ -435,26 +519,63 @@ impl SemanticSyntaxChecker {
                     self.seen_futures_boundary = true;
                 }
             }
+            Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
+                self.in_async_context = *is_async;
+                self.seen_futures_boundary = true;
+            }
             _ => {
                 self.seen_futures_boundary = true;
             }
         }
 
-        // check for errors
-        self.check_stmt(stmt, ctx);
+        checkpoint
     }
 
-    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
+    pub fn exit_stmt(&mut self, checkpoint: Checkpoint) {
+        self.restore_checkpoint(checkpoint);
+    }
+
+    /// Check `expr` for semantic syntax errors and update the checker's internal state.
+    ///
+    /// This should be followed by a call to [`SemanticSyntaxChecker::exit_expr`] to reset any state
+    /// specific to scopes introduced by `expr`, such as whether the body of a comprehension is
+    /// async.
+    #[must_use]
+    pub fn enter_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) -> Checkpoint {
+        self.check_expr(expr, ctx);
+        let checkpoint = self.checkpoint();
+        match expr {
+            Expr::ListComp(ast::ExprListComp { generators, .. })
+            | Expr::SetComp(ast::ExprSetComp { generators, .. })
+            | Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
+                self.in_async_context = generators.iter().any(|g| g.is_async);
+            }
+            _ => {}
+        }
+
+        checkpoint
+    }
+
+    pub fn exit_expr(&mut self, checkpoint: Checkpoint) {
+        self.restore_checkpoint(checkpoint);
+    }
+
+    fn check_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt, generators, ..
             })
             | Expr::SetComp(ast::ExprSetComp {
                 elt, generators, ..
-            })
-            | Expr::Generator(ast::ExprGenerator {
+            }) => {
+                Self::check_generator_expr(elt, generators, ctx);
+                self.async_comprehension_outside_async_function(ctx, generators);
+            }
+            Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
-            }) => Self::check_generator_expr(elt, generators, ctx),
+            }) => {
+                Self::check_generator_expr(elt, generators, ctx);
+            }
             Expr::DictComp(ast::ExprDictComp {
                 key,
                 value,
@@ -463,6 +584,7 @@ impl SemanticSyntaxChecker {
             }) => {
                 Self::check_generator_expr(key, generators, ctx);
                 Self::check_generator_expr(value, generators, ctx);
+                self.async_comprehension_outside_async_function(ctx, generators);
             }
             Expr::Name(ast::ExprName {
                 range,
@@ -574,11 +696,64 @@ impl SemanticSyntaxChecker {
             );
         }
     }
-}
 
-impl Default for SemanticSyntaxChecker {
-    fn default() -> Self {
-        Self::new()
+    fn async_comprehension_outside_async_function<Ctx: SemanticSyntaxContext>(
+        &self,
+        ctx: &Ctx,
+        generators: &[ast::Comprehension],
+    ) {
+        let python_version = ctx.python_version();
+        if python_version >= PythonVersion::PY311 {
+            return;
+        }
+        for generator in generators {
+            if generator.is_async && !self.in_async_context {
+                // test_ok nested_async_comprehension_py311
+                // # parse_options: {"target-version": "3.11"}
+                // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+                // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+                // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+
+                // test_ok nested_async_comprehension_py310
+                // # parse_options: {"target-version": "3.10"}
+                // # this case fails if exit_expr doesn't run
+                // async def f():
+                //     [_ for n in range(3)]
+                //     [_ async for n in range(3)]
+                // # and this fails without exit_stmt
+                // async def f():
+                //     def g(): ...
+                //     [_ async for n in range(3)]
+
+                // test_ok all_async_comprehension_py310
+                // # parse_options: {"target-version": "3.10"}
+                // async def test(): return [[x async for x in elements(n)] async for n in range(3)]
+
+                // test_err nested_async_comprehension_py310
+                // # parse_options: {"target-version": "3.10"}
+                // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+                // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+                // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+                // async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
+                // async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
+                Self::add_error(
+                    ctx,
+                    SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version),
+                    generator.range,
+                );
+            }
+        }
+    }
+
+    fn checkpoint(&self) -> Checkpoint {
+        Checkpoint {
+            in_async_context: self.in_async_context,
+        }
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    fn restore_checkpoint(&mut self, checkpoint: Checkpoint) {
+        self.in_async_context = checkpoint.in_async_context;
     }
 }
 
@@ -625,12 +800,6 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
-            SemanticSyntaxErrorKind::InvalidExpression(
-                kind,
-                InvalidExpressionPosition::BaseClass,
-            ) => {
-                write!(f, "{kind} cannot be used as a base class")
-            }
             SemanticSyntaxErrorKind::InvalidExpression(kind, position) => {
                 write!(f, "{kind} cannot be used within a {position}")
             }
@@ -649,6 +818,13 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::InvalidStarExpression => {
                 f.write_str("can't use starred expression here")
+            }
+            SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version) => {
+                write!(
+                    f,
+                    "cannot use an asynchronous comprehension outside of an asynchronous \
+                                function on Python {python_version} (syntax was added in 3.11)",
+                )
             }
         }
     }
@@ -849,6 +1025,25 @@ pub enum SemanticSyntaxErrorKind {
     /// for *x in xs: ...
     /// ```
     InvalidStarExpression,
+
+    /// Represents the use of an asynchronous comprehension inside of a synchronous comprehension
+    /// before Python 3.11.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.11, code like this produces a syntax error because of the implicit function
+    /// scope introduced by the outer comprehension:
+    ///
+    /// ```python
+    /// async def elements(n): yield n
+    ///
+    /// async def test(): return { n: [x async for x in elements(n)] for n in range(3)}
+    /// ```
+    ///
+    /// This was discussed in [BPO 33346] and fixed in Python 3.11.
+    ///
+    /// [BPO 33346]: https://github.com/python/cpython/issues/77527
+    AsyncComprehensionOutsideAsyncFunction(PythonVersion),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -858,7 +1053,6 @@ pub enum InvalidExpressionPosition {
     TypeVarTupleDefault,
     ParamSpecDefault,
     TypeAnnotation,
-    BaseClass,
     GenericDefinition,
     TypeAlias,
 }
@@ -872,7 +1066,6 @@ impl Display for InvalidExpressionPosition {
             InvalidExpressionPosition::ParamSpecDefault => "ParamSpec default",
             InvalidExpressionPosition::TypeAnnotation => "type annotation",
             InvalidExpressionPosition::GenericDefinition => "generic definition",
-            InvalidExpressionPosition::BaseClass => "base class",
             InvalidExpressionPosition::TypeAlias => "type alias",
         })
     }
@@ -882,6 +1075,7 @@ impl Display for InvalidExpressionPosition {
 pub enum InvalidExpressionKind {
     Yield,
     NamedExpr,
+    Await,
 }
 
 impl Display for InvalidExpressionKind {
@@ -889,6 +1083,7 @@ impl Display for InvalidExpressionKind {
         f.write_str(match self {
             InvalidExpressionKind::Yield => "yield expression",
             InvalidExpressionKind::NamedExpr => "named expression",
+            InvalidExpressionKind::Await => "await expression",
         })
     }
 }
@@ -1086,16 +1281,6 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
 }
 
 struct InvalidExpressionVisitor<'a, Ctx> {
-    /// Allow named expressions (`x := ...`) to appear in annotations.
-    ///
-    /// These are allowed in non-generic functions, for example:
-    ///
-    /// ```python
-    /// def foo(arg: (x := int)): ...     # ok
-    /// def foo[T](arg: (x := int)): ...  # syntax error
-    /// ```
-    allow_named_expr: bool,
-
     /// Context used for emitting errors.
     ctx: &'a Ctx,
 
@@ -1108,7 +1293,7 @@ where
 {
     fn visit_expr(&mut self, expr: &Expr) {
         match expr {
-            Expr::Named(ast::ExprNamed { range, .. }) if !self.allow_named_expr => {
+            Expr::Named(ast::ExprNamed { range, .. }) => {
                 SemanticSyntaxChecker::add_error(
                     self.ctx,
                     SemanticSyntaxErrorKind::InvalidExpression(
@@ -1124,6 +1309,16 @@ where
                     self.ctx,
                     SemanticSyntaxErrorKind::InvalidExpression(
                         InvalidExpressionKind::Yield,
+                        self.position,
+                    ),
+                    *range,
+                );
+            }
+            Expr::Await(ast::ExprAwait { range, .. }) => {
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::InvalidExpression(
+                        InvalidExpressionKind::Await,
                         self.position,
                     ),
                     *range,
@@ -1166,6 +1361,9 @@ pub trait SemanticSyntaxContext {
     /// Returns `true` if a module's docstring boundary has been passed.
     fn seen_docstring_boundary(&self) -> bool;
 
+    /// Returns `true` if `__future__`-style type annotations are enabled.
+    fn future_annotations_or_stub(&self) -> bool;
+
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
 
@@ -1187,7 +1385,7 @@ pub struct SemanticSyntaxCheckerVisitor<Ctx> {
 impl<Ctx> SemanticSyntaxCheckerVisitor<Ctx> {
     pub fn new(context: Ctx) -> Self {
         Self {
-            checker: SemanticSyntaxChecker::new(),
+            checker: SemanticSyntaxChecker::new(PySourceType::Python),
             context,
         }
     }
@@ -1202,13 +1400,15 @@ where
     Ctx: SemanticSyntaxContext,
 {
     fn visit_stmt(&mut self, stmt: &'_ Stmt) {
-        self.checker.visit_stmt(stmt, &self.context);
+        let checkpoint = self.checker.enter_stmt(stmt, &self.context);
         ruff_python_ast::visitor::walk_stmt(self, stmt);
+        self.checker.exit_stmt(checkpoint);
     }
 
     fn visit_expr(&mut self, expr: &'_ Expr) {
-        self.checker.visit_expr(expr, &self.context);
+        let checkpoint = self.checker.enter_expr(expr, &self.context);
         ruff_python_ast::visitor::walk_expr(self, expr);
+        self.checker.exit_expr(checkpoint);
     }
 }
 

@@ -11,6 +11,8 @@ use ruff_python_ast::name::Name;
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
 /// given a db.
+///
+/// TODO: We should add some variants that exercise generic classes and specializations thereof.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Ty {
     Never,
@@ -167,7 +169,7 @@ impl Ty {
                     .symbol
                     .expect_type()
                     .expect_class_literal()
-                    .class,
+                    .default_specialization(db),
             ),
             Ty::SubclassOfAbcClass(s) => SubclassOfType::from(
                 db,
@@ -175,7 +177,7 @@ impl Ty {
                     .symbol
                     .expect_type()
                     .expect_class_literal()
-                    .class,
+                    .default_specialization(db),
             ),
             Ty::AlwaysTruthy => Type::AlwaysTruthy,
             Ty::AlwaysFalsy => Type::AlwaysFalsy,

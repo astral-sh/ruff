@@ -453,6 +453,5 @@ def _(
     # TODO: should be `(x: int) -> Foo`
     reveal_type(c4)  # revealed: (...) -> Foo
 
-    # TODO: `self` is bound here; this should probably be `(x: int) -> str`?
-    reveal_type(c5)  #  revealed: (self, x: int) -> str
+    reveal_type(c5)  #  revealed: (x: int) -> str
 ```

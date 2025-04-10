@@ -11,7 +11,7 @@ use crate::types::{
     binding_type, declaration_type, infer_narrowing_constraint, todo_type, IntersectionBuilder,
     KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
 };
-use crate::{resolve_module, Db, KnownModule, Module, Program};
+use crate::{resolve_module, Db, KnownModule, Program};
 
 pub(crate) use implicit_globals::module_type_implicit_global_symbol;
 
@@ -255,7 +255,7 @@ pub(crate) fn global_symbol<'db>(
 /// Infers the public type of an imported symbol.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
-    module: &Module,
+    file: File,
     name: &str,
 ) -> SymbolAndQualifiers<'db> {
     // If it's not found in the global scope, check if it's present as an instance on
@@ -273,7 +273,7 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    external_symbol_impl(db, module.file(), name).or_fall_back_to(db, || {
+    external_symbol_impl(db, file, name).or_fall_back_to(db, || {
         if name == "__getattr__" {
             Symbol::Unbound.into()
         } else {
@@ -311,7 +311,7 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
-        .map(|module| imported_symbol(db, &module, symbol))
+        .map(|module| imported_symbol(db, module.file(), symbol))
         .unwrap_or_default()
 }
 
@@ -423,6 +423,17 @@ impl<'db> SymbolAndQualifiers<'db> {
     /// Returns `true` if the symbol has a `ClassVar` type qualifier.
     pub(crate) fn is_class_var(&self) -> bool {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
+    }
+
+    #[must_use]
+    pub(crate) fn map_type(
+        self,
+        f: impl FnOnce(Type<'db>) -> Type<'db>,
+    ) -> SymbolAndQualifiers<'db> {
+        SymbolAndQualifiers {
+            symbol: self.symbol.map_type(f),
+            qualifiers: self.qualifiers,
+        }
     }
 
     /// Transform symbol and qualifiers into a [`LookupResult`],

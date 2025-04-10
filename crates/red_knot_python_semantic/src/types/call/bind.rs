@@ -18,8 +18,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    todo_type, BoundMethodType, ClassLiteralType, FunctionDecorators, KnownClass, KnownFunction,
-    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
+    todo_type, BoundMethodType, FunctionDecorators, KnownClass, KnownFunction, KnownInstanceType,
+    MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
 use ruff_python_ast as ast;
@@ -566,7 +566,7 @@ impl<'db> Bindings<'db> {
                     _ => {}
                 },
 
-                Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
+                Type::ClassLiteral(class) => match class.known(db) {
                     Some(KnownClass::Bool) => match overload.parameter_types() {
                         [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
                         [None] => overload.set_return_type(Type::BooleanLiteral(false)),
@@ -924,8 +924,14 @@ impl<'db> Binding<'db> {
                     first_excess_argument_index,
                     num_synthetic_args,
                 ),
-                expected_positional_count: parameters.positional().count(),
-                provided_positional_count: next_positional,
+                expected_positional_count: parameters
+                    .positional()
+                    .count()
+                    // using saturating_sub to avoid negative values due to invalid syntax in source code
+                    .saturating_sub(num_synthetic_args),
+                provided_positional_count: next_positional
+                    // using saturating_sub to avoid negative values due to invalid syntax in source code
+                    .saturating_sub(num_synthetic_args),
             });
         }
         let mut missing = vec![];
@@ -1058,7 +1064,7 @@ impl<'db> CallableDescription<'db> {
             }),
             Type::ClassLiteral(class_type) => Some(CallableDescription {
                 kind: "class",
-                name: class_type.class().name(db),
+                name: class_type.name(db),
             }),
             Type::BoundMethod(bound_method) => Some(CallableDescription {
                 kind: "bound method",

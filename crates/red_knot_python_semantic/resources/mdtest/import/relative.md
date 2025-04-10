@@ -236,3 +236,36 @@ X: int = 42
 ```py
 from .parser import X  # error: [unresolved-import]
 ```
+
+## Relative imports in `site-packages`
+
+Relative imports in `site-packages` are correctly resolved even when the `site-packages` search path
+is a subdirectory of the first-party search path. Note that mdtest sets the first-party search path
+to `/src/`, which is why the virtual environment in this test is a subdirectory of `/src/`, even
+though this is not how a typical Python project would be structured:
+
+```toml
+[environment]
+python = "/src/.venv"
+python-version = "3.13"
+```
+
+`/src/bar.py`:
+
+```py
+from foo import A
+
+reveal_type(A)  # revealed: Literal[A]
+```
+
+`/src/.venv/<path-to-site-packages>/foo/__init__.py`:
+
+```py
+from .a import A as A
+```
+
+`/src/.venv/<path-to-site-packages>/foo/a.py`:
+
+```py
+class A: ...
+```
