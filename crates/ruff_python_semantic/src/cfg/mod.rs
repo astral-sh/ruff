@@ -19,6 +19,7 @@ mod tests {
     #[test_case("jumps.py")]
     #[test_case("loops.py")]
     #[test_case("switch.py")]
+    #[test_case("exceptions.py")]
     fn control_flow_graph(filename: &str) {
         let path = PathBuf::from("resources/test/fixtures/cfg").join(filename);
         let source = fs::read_to_string(path).expect("failed to read file");
