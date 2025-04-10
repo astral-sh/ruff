@@ -8,7 +8,7 @@ mod text_document;
 pub(crate) use location::ToLink;
 use lsp_types::{PositionEncodingKind, Url};
 pub use notebook::NotebookDocument;
-pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, ToRangeExt};
+pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt};
 pub(crate) use text_document::DocumentVersion;
 pub use text_document::TextDocument;
 
