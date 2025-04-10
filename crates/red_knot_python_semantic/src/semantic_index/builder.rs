@@ -8,7 +8,7 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{self as ast, ExprContext};
+use ruff_python_ast::{self as ast};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
@@ -1770,7 +1770,8 @@ where
                 if is_use {
                     self.mark_symbol_used(symbol);
                     let use_id = self.current_ast_ids().record_use(expr);
-                    self.current_use_def_map_mut().record_use(symbol, use_id);
+                    self.current_use_def_map_mut()
+                        .record_use(symbol, use_id, expression_id);
                 }
 
                 if is_definition {
@@ -2011,23 +2012,38 @@ where
             ast::Expr::Attribute(ast::ExprAttribute {
                 value: object,
                 attr,
-                ctx: ExprContext::Store,
+                ctx,
                 range: _,
             }) => {
-                if let Some(unpack) = self
-                    .current_assignment()
-                    .as_ref()
-                    .and_then(CurrentAssignment::unpack)
-                {
-                    self.register_attribute_assignment(
-                        object,
-                        attr,
-                        AttributeAssignment::Unpack {
-                            attribute_expression_id: expression_id,
-                            unpack,
-                        },
-                    );
+                if ctx.is_store() {
+                    if let Some(unpack) = self
+                        .current_assignment()
+                        .as_ref()
+                        .and_then(CurrentAssignment::unpack)
+                    {
+                        self.register_attribute_assignment(
+                            object,
+                            attr,
+                            AttributeAssignment::Unpack {
+                                attribute_expression_id: expression_id,
+                                unpack,
+                            },
+                        );
+                    }
                 }
+
+                // Track reachability of attribute expressions to silence `unresolved-attribute`
+                // diagnostics in unreachable code.
+                self.current_use_def_map_mut()
+                    .record_expression_reachability(expression_id);
+
+                walk_expr(self, expr);
+            }
+            ast::Expr::StringLiteral(_) => {
+                // Track reachability of string literals, as they could be a stringified annotation
+                // with child expressions whose reachability we are interested in.
+                self.current_use_def_map_mut()
+                    .record_expression_reachability(expression_id);
 
                 walk_expr(self, expr);
             }
