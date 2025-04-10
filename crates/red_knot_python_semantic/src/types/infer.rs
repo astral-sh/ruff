@@ -7847,6 +7847,50 @@ mod tests {
         check_typevar("Y", None, None, None);
     }
 
+    /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
+    /// visibility-constraint checks in that scope.
+    #[test]
+    fn unbound_symbol_no_visibility_constraint_check() {
+        let mut db = setup_db();
+
+        // If the bug we are testing for is not fixed, what happens is that when inferring the
+        // `flag: bool = True` definitions, we look up `bool` as a deferred name (thus from end of
+        // scope), and because of the early return its "unbound" binding has a visibility
+        // constraint of `~flag`, which we evaluate, meaning we have to evaluate the definition of
+        // `flag` -- and we are in a cycle. With the fix, we short-circuit evaluating visibility
+        // constraints on "unbound" if a symbol is otherwise not bound.
+        db.write_dedented(
+            "src/a.py",
+            "
+            from __future__ import annotations
+
+            def f():
+                flag: bool = True
+                if flag:
+                    return True
+            ",
+        )
+        .unwrap();
+
+        db.clear_salsa_events();
+        assert_file_diagnostics(&db, "src/a.py", &[]);
+        let events = db.take_salsa_events();
+        let cycles = salsa::plumbing::attach(&db, || {
+            events
+                .iter()
+                .filter_map(|event| {
+                    if let salsa::EventKind::WillIterateCycle { database_key } = event.kind {
+                        Some(format!("{:?}", database_key))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
+        let expected: Vec<String> = vec![];
+        assert_eq!(cycles, expected);
+    }
+
     // Incremental inference tests
     #[track_caller]
     fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
