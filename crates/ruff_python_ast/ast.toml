@@ -52,7 +52,9 @@
 #    * `Expr*` - A vector of Expr.
 #    * `&Expr*` - A boxed slice of Expr.
 #    These properties cannot be nested, for example we cannot create a vector of option types.
-# * source_order - (Optional) Defines in what order the fields appear in source
+#
+# source_order:
+# Defines in what order the fields appear in source
 #
 # variant:
 #   The name of the enum variant for this syntax node.  Defaults to the node
@@ -108,7 +110,6 @@ fields = [{ name = "value", type = "Expr?" }]
 doc = "See also [Delete](https://docs.python.org/3/library/ast.html#ast.Delete)"
 fields = [{ name = "targets", type = "Expr*" }]
 
-
 [Stmt.nodes.StmtTypeAlias]
 doc = "See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeAlias)"
 fields = [
@@ -162,7 +163,6 @@ fields = [
   { name = "body", type = "Stmt*" },
   { name = "orelse", type = "Stmt*" },
 ]
-
 
 [Stmt.nodes.StmtIf]
 doc = "See also [If](https://docs.python.org/3/library/ast.html#ast.If)"
