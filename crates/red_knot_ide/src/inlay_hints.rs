@@ -123,7 +123,10 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
             // TODO
             Stmt::FunctionDef(_) => {}
             Stmt::For(_) => {}
-            Stmt::Expr(_) => {}
+            Stmt::Expr(_) => {
+                // Don't traverse into expression statements because we don't show any hints.
+                return;
+            }
             _ => {}
         }
 
@@ -150,20 +153,20 @@ mod tests {
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
 
-    const START: &str = "<START>";
-    const END: &str = "<END>";
-
     pub(super) fn inlay_hint_test(source: &str) -> InlayHintTest {
+        const START: &str = "<START>";
+        const END: &str = "<END>";
+
         let mut db = TestDb::new();
 
-        let start = source.find(START).unwrap_or(0);
+        let start = source.find(START);
         let end = source
             .find(END)
-            .map(|x| x - START.len())
+            .map(|x| if start.is_some() { x - START.len() } else { x })
             .unwrap_or(source.len());
 
         let range = TextRange::new(
-            TextSize::try_from(start).unwrap(),
+            TextSize::try_from(start.unwrap_or_default()).unwrap(),
             TextSize::try_from(end).unwrap(),
         );
 
@@ -220,7 +223,7 @@ mod tests {
 
     #[test]
     fn test_assign_statement() {
-        let test = inlay_hint_test(&format!("{START}x = 1{END}"));
+        let test = inlay_hint_test("x = 1");
 
         assert_snapshot!(test.inlay_hints(), @r"
         x[: Literal[1]] = 1
@@ -229,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_tuple_assignment() {
-        let test = inlay_hint_test(&format!("{START}x, y = (1, 'abc'){END}"));
+        let test = inlay_hint_test("x, y = (1, 'abc')");
 
         assert_snapshot!(test.inlay_hints(), @r#"
         x[: Literal[1]], y[: Literal["abc"]] = (1, 'abc')
@@ -238,7 +241,7 @@ mod tests {
 
     #[test]
     fn test_nested_tuple_assignment() {
-        let test = inlay_hint_test(&format!("{START}x, (y, z) = (1, ('abc', 2)){END}"));
+        let test = inlay_hint_test("x, (y, z) = (1, ('abc', 2))");
 
         assert_snapshot!(test.inlay_hints(), @r#"
         x[: Literal[1]], (y[: Literal["abc"]], z[: Literal[2]]) = (1, ('abc', 2))
@@ -247,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_assign_statement_with_type_annotation() {
-        let test = inlay_hint_test(&format!("{START}x: int = 1{END}"));
+        let test = inlay_hint_test("x: int = 1");
 
         assert_snapshot!(test.inlay_hints(), @r"
         x: int = 1
@@ -256,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_assign_statement_out_of_range() {
-        let test = inlay_hint_test(&format!("{START}x = 1{END}\ny = 2"));
+        let test = inlay_hint_test("<START>x = 1<END>\ny = 2");
 
         assert_snapshot!(test.inlay_hints(), @r"
         x[: Literal[1]] = 1
