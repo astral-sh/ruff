@@ -161,6 +161,9 @@ int(1 +
 int(round(1,
           0))
 
+int(-
+1) # Carriage return as newline
+
 # function calls may need to retain parentheses
 # if the parentheses for the call itself
 # lie on the next line.
@@ -203,6 +206,6 @@ int(
 int(
     round(
         42
-    ) 
+    )
 # unsafe fix because of this comment
 )
