@@ -672,6 +672,9 @@ fn symbol_from_bindings_impl<'db>(
         _ => None,
     };
 
+    // Evaluate this lazily because we don't always need it (for example, if there are no visible
+    // bindings at all, we don't need it), and it can cause us to evaluate visibility constraint
+    // expressions, which is extra work and can lead to cycles.
     let unbound_visibility = || {
         unbound_visibility_constraint
             .map(|visibility_constraint| {
