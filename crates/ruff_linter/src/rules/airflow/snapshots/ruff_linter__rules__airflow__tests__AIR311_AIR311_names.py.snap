@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR311_names.py:17:1: AIR311 [*] `airflow.Dataset` is removed in Airflow 3.0
+AIR311_names.py:17:1: AIR311 [*] `airflow.Dataset` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 15 | from airflow.utils.dag_parsing_context import get_parsing_context
 16 |
@@ -24,7 +24,7 @@ AIR311_names.py:17:1: AIR311 [*] `airflow.Dataset` is removed in Airflow 3.0
 19 20 | # airflow.datasets
 20 21 | Dataset()
 
-AIR311_names.py:20:1: AIR311 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0
+AIR311_names.py:20:1: AIR311 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 19 | # airflow.datasets
 20 | Dataset()
@@ -49,7 +49,7 @@ AIR311_names.py:20:1: AIR311 [*] `airflow.datasets.Dataset` is removed in Airflo
 22 23 | DatasetAll()
 23 24 | DatasetAny()
 
-AIR311_names.py:21:1: AIR311 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
+AIR311_names.py:21:1: AIR311 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 19 | # airflow.datasets
 20 | Dataset()
@@ -60,7 +60,7 @@ AIR311_names.py:21:1: AIR311 `airflow.datasets.DatasetAlias` is removed in Airfl
    |
    = help: Use `airflow.sdk.AssetAlias` instead
 
-AIR311_names.py:22:1: AIR311 `airflow.datasets.DatasetAll` is removed in Airflow 3.0
+AIR311_names.py:22:1: AIR311 `airflow.datasets.DatasetAll` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 20 | Dataset()
 21 | DatasetAlias()
@@ -71,7 +71,7 @@ AIR311_names.py:22:1: AIR311 `airflow.datasets.DatasetAll` is removed in Airflow
    |
    = help: Use `airflow.sdk.AssetAll` instead
 
-AIR311_names.py:23:1: AIR311 `airflow.datasets.DatasetAny` is removed in Airflow 3.0
+AIR311_names.py:23:1: AIR311 `airflow.datasets.DatasetAny` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 21 | DatasetAlias()
 22 | DatasetAll()
@@ -82,7 +82,7 @@ AIR311_names.py:23:1: AIR311 `airflow.datasets.DatasetAny` is removed in Airflow
    |
    = help: Use `airflow.sdk.AssetAny` instead
 
-AIR311_names.py:24:1: AIR311 `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0
+AIR311_names.py:24:1: AIR311 `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 22 | DatasetAll()
 23 | DatasetAny()
@@ -92,7 +92,7 @@ AIR311_names.py:24:1: AIR311 `airflow.datasets.metadata.Metadata` is removed in 
    |
    = help: Use `airflow.sdk.Metadata` instead
 
-AIR311_names.py:25:1: AIR311 `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0
+AIR311_names.py:25:1: AIR311 `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 23 | DatasetAny()
 24 | Metadata()
@@ -103,7 +103,7 @@ AIR311_names.py:25:1: AIR311 `airflow.datasets.expand_alias_to_datasets` is remo
    |
    = help: Use `airflow.sdk.expand_alias_to_assets` instead
 
-AIR311_names.py:28:1: AIR311 `airflow.models.baseoperator.chain` is removed in Airflow 3.0
+AIR311_names.py:28:1: AIR311 `airflow.models.baseoperator.chain` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 27 | # airflow.models.baseoperator
 28 | chain()
@@ -113,7 +113,7 @@ AIR311_names.py:28:1: AIR311 `airflow.models.baseoperator.chain` is removed in A
    |
    = help: Use `airflow.sdk.chain` instead
 
-AIR311_names.py:29:1: AIR311 `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0
+AIR311_names.py:29:1: AIR311 `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 27 | # airflow.models.baseoperator
 28 | chain()
@@ -123,7 +123,7 @@ AIR311_names.py:29:1: AIR311 `airflow.models.baseoperator.chain_linear` is remov
    |
    = help: Use `airflow.sdk.chain_linear` instead
 
-AIR311_names.py:30:1: AIR311 `airflow.models.baseoperator.cross_downstream` is removed in Airflow 3.0
+AIR311_names.py:30:1: AIR311 `airflow.models.baseoperator.cross_downstream` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 28 | chain()
 29 | chain_linear()
@@ -134,7 +134,7 @@ AIR311_names.py:30:1: AIR311 `airflow.models.baseoperator.cross_downstream` is r
    |
    = help: Use `airflow.sdk.cross_downstream` instead
 
-AIR311_names.py:36:1: AIR311 `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0
+AIR311_names.py:36:1: AIR311 `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 35 | # airflow.timetables.datasets
 36 | DatasetOrTimeSchedule()
@@ -144,7 +144,7 @@ AIR311_names.py:36:1: AIR311 `airflow.timetables.datasets.DatasetOrTimeSchedule`
    |
    = help: Use `airflow.timetables.assets.AssetOrTimeSchedule` instead
 
-AIR311_names.py:39:1: AIR311 `airflow.utils.dag_parsing_context.get_parsing_context` is removed in Airflow 3.0
+AIR311_names.py:39:1: AIR311 `airflow.utils.dag_parsing_context.get_parsing_context` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
    |
 38 | # airflow.utils.dag_parsing_context
 39 | get_parsing_context()

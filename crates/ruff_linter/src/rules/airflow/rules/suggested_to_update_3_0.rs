@@ -10,12 +10,15 @@ use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 /// ## What it does
-/// Checks for uses of deprecated Airflow functions and values.
+/// Checks for uses of deprecated Airflow functions and values that still have
+/// a compatibility layer.
 ///
 /// ## Why is this bad?
 /// Airflow 3.0 removed various deprecated functions, members, and other
 /// values. Some have more modern replacements. Others are considered too niche
 /// and not worth to be maintained in Airflow.
+/// Even though these symbols still work fine on Airflow 3.0, they are expected to be removed in a future version.
+/// The user is suggested to replace the original usage with the new ones.
 ///
 /// ## Example
 /// ```python
@@ -52,10 +55,15 @@ impl Violation for Airflow3SuggestedUpdate {
             | Replacement::Name(_)
             | Replacement::AutoImport { module: _, name: _ }
             | Replacement::SourceModuleMoved { module: _, name: _ } => {
-                format!("`{deprecated}` is removed in Airflow 3.0")
+                format!("`{deprecated}` is removed in Airflow 3.0; \
+                         It still works in Airflow 3.0 but is expected to be removed in a future version."
+                )
             }
             Replacement::Message(message) => {
-                format!("`{deprecated}` is removed in Airflow 3.0; {message}")
+                format!("`{deprecated}` is removed in Airflow 3.0; \
+                         It still works in Airflow 3.0 but is expected to be removed in a future version.;
+                         {message}"
+                )
             }
         }
     }
