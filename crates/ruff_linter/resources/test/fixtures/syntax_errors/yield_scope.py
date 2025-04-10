@@ -15,6 +15,6 @@ async def outer():
     class C:
         [await x for x in range(3)]  # error, classes break async scope
 
-    lambda x: await x  # error, lambda also breaks async scope
+    lambda x: await x  # okay for now, lambda breaks _async_ scope but is a function
 
 await 1  # error

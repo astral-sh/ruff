@@ -63,22 +63,12 @@ resources/test/fixtures/syntax_errors/yield_scope.py:16:10: F704 `await` stateme
 16 |         [await x for x in range(3)]  # error, classes break async scope
    |          ^^^^^^^ F704
 17 |
-18 |     lambda x: await x  # error, lambda also breaks async scope
-   |
-
-resources/test/fixtures/syntax_errors/yield_scope.py:18:15: F704 `await` statement outside of a function
-   |
-16 |         [await x for x in range(3)]  # error, classes break async scope
-17 |
-18 |     lambda x: await x  # error, lambda also breaks async scope
-   |               ^^^^^^^ F704
-19 |
-20 | await 1  # error
+18 |     lambda x: await x  # okay for now, lambda breaks _async_ scope but is a function
    |
 
 resources/test/fixtures/syntax_errors/yield_scope.py:20:1: F704 `await` statement outside of a function
    |
-18 |     lambda x: await x  # error, lambda also breaks async scope
+18 |     lambda x: await x  # okay for now, lambda breaks _async_ scope but is a function
 19 |
 20 | await 1  # error
    | ^^^^^^^ F704

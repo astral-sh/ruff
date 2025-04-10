@@ -619,6 +619,17 @@ impl SemanticSyntaxContext for Checker<'_> {
         false
     }
 
+    fn in_function_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) => return false,
+                ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+            }
+        }
+        false
+    }
+
     fn in_sync_comprehension(&self) -> bool {
         for scope in self.semantic.current_scopes() {
             if let ScopeKind::Generator {
@@ -639,13 +650,17 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.current_scope().kind.is_module()
     }
 
-    fn in_notebook(&self) -> bool {
-        self.source_type.is_ipynb()
-    }
-
     fn in_function_scope(&self) -> bool {
         let kind = &self.semantic.current_scope().kind;
         kind.is_function() || kind.is_lambda()
+    }
+
+    fn in_generator_scope(&self) -> bool {
+        self.semantic.current_scope().kind.is_generator()
+    }
+
+    fn in_notebook(&self) -> bool {
+        self.source_type.is_ipynb()
     }
 }
 

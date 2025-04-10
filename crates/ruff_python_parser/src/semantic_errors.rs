@@ -615,7 +615,7 @@ impl SemanticSyntaxChecker {
         // await-outside-async is PLE1142 instead, so we'll end up emitting both syntax errors for
         // cases that trigger F704
         if kind.is_await() {
-            if ctx.in_async_context() || ctx.in_module_scope() && ctx.in_notebook() {
+            if ctx.in_function_context() || ctx.in_module_scope() && ctx.in_notebook() {
                 return;
             }
         } else if ctx.in_function_scope() {
@@ -1067,6 +1067,56 @@ pub enum SemanticSyntaxErrorKind {
     AsyncComprehensionOutsideAsyncFunction(PythonVersion),
 
     /// Represents the use of `yield`, `yield from`, or `await` outside of a function scope.
+    ///
+    ///
+    /// ## Examples
+    ///
+    /// `yield` and `yield from` are only allowed if the immediately-enclosing scope is a function
+    /// or lambda and not allowed otherwise:
+    ///
+    /// ```python
+    /// yield  # error
+    /// yield 1  # error
+    /// yield from x  # error
+    ///
+    /// def _(): yield  # okay
+    /// def _(): [(yield 1) for x in y]  # error
+    /// lambda: (yield)  # okay
+    /// lambda: [(yield) for x in y]  # error
+    /// [x for x in (yield 1)]  # error
+    /// def _(): [x for x in (yield 1)]  # okay, generators evaluated in outer scope
+    ///
+    /// def f():
+    ///     class C:
+    ///         yield 1  # error
+    /// ```
+    ///
+    /// `await` is additionally allowed in comprehensions, if the comprehension itself is in a
+    /// function scope:
+    ///
+    /// ```python
+    /// await 1  # error
+    /// async def _(): await 1  # okay
+    /// async def _(): [await 1 for x in y]  # also okay
+    /// async def _():
+    ///     class C:
+    ///         await 1  # error
+    /// async def _():
+    ///     lambda: await 1  # okay (here)
+    /// ```
+    ///
+    /// This last case _is_ an error, but it has to do with the lambda not being an async function.
+    /// For the sake of this error kind, this is okay.
+    ///
+    /// ## References
+    ///
+    /// See [PEP 255] for details on `yield`, [PEP 380] for the extension to `yield from`, [PEP 492]
+    /// for async-await syntax, and [PEP 530] for async comprehensions.
+    ///
+    /// [PEP 255]: https://peps.python.org/pep-0255/
+    /// [PEP 380]: https://peps.python.org/pep-0380/
+    /// [PEP 492]: https://peps.python.org/pep-0492/
+    /// [PEP 530]: https://peps.python.org/pep-0530/
     YieldOutsideFunction(YieldOutsideFunctionKind),
 }
 
@@ -1404,6 +1454,40 @@ where
     }
 }
 
+/// Information needed from a parent visitor to emit semantic syntax errors.
+///
+/// Note that the `in_*_scope` methods should refer to the immediately-enclosing scope. For example,
+/// `in_function_scope` should return true for this case:
+///
+/// ```python
+/// def f():
+///     x  # here
+/// ```
+///
+/// but not for this case:
+///
+/// ```python
+/// def f():
+///     class C:
+///         x  # here
+/// ```
+///
+/// In contrast, the `in_*_context` methods should traverse parent scopes. For example,
+/// `in_function_context` should return true for this case:
+///
+/// ```python
+/// def f():
+///     [x  # here
+///         for x in range(3)]
+/// ```
+///
+/// but not here:
+///
+/// ```python
+/// def f():
+///     class C:
+///         x  # here, classes break function scopes
+/// ```
 pub trait SemanticSyntaxContext {
     /// Returns `true` if a module's docstring boundary has been passed.
     fn seen_docstring_boundary(&self) -> bool;
@@ -1423,6 +1507,8 @@ pub trait SemanticSyntaxContext {
     /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
     fn in_async_context(&self) -> bool;
 
+    fn in_function_context(&self) -> bool;
+
     /// Returns `true` if the visitor is currently inside of a synchronous comprehension.
     ///
     /// This method is necessary because `in_async_context` only checks for the nearest, enclosing
@@ -1436,6 +1522,9 @@ pub trait SemanticSyntaxContext {
 
     /// Returns `true` if the visitor is in a function scope.
     fn in_function_scope(&self) -> bool;
+
+    /// Returns `true` if the visitor is in a generator scope.
+    fn in_generator_scope(&self) -> bool;
 
     /// Returns `true` if the source file is a Jupyter notebook.
     fn in_notebook(&self) -> bool;
