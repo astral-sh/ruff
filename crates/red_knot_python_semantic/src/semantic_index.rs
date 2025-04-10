@@ -241,9 +241,8 @@ impl<'db> SemanticIndex<'db> {
     }
 
     fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {
-        match self.parent_scope_id(scope_id) {
-            None => true,
-            Some(parent_scope_id) => {
+        self.parent_scope_id(scope_id)
+            .is_none_or(|parent_scope_id| {
                 if !self.is_scope_reachable(db, parent_scope_id) {
                     return false;
                 }
@@ -252,8 +251,7 @@ impl<'db> SemanticIndex<'db> {
                 let reachability = self.scope(scope_id).reachability();
 
                 parent_use_def.is_reachable(db, reachability)
-            }
-        }
+            })
     }
 
     /// Returns true if a given 'use' of a symbol is reachable from the start of the scope.
