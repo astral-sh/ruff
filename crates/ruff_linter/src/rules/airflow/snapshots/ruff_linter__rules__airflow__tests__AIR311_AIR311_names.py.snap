@@ -1,4 +1,153 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
+AIR311_names.py:17:1: AIR311 [*] `airflow.Dataset` is removed in Airflow 3.0
+   |
+15 | from airflow.utils.dag_parsing_context import get_parsing_context
+16 |
+17 | DatasetFromRoot()
+   | ^^^^^^^^^^^^^^^ AIR311
+18 |
+19 | # airflow.datasets
+   |
+   = help: Use `airflow.sdk.Asset` instead
 
+ℹ Safe fix
+13 13 | from airflow.models.baseoperatorlink import BaseOperatorLink
+14 14 | from airflow.timetables.datasets import DatasetOrTimeSchedule
+15 15 | from airflow.utils.dag_parsing_context import get_parsing_context
+   16 |+from airflow.sdk import Asset
+16 17 | 
+17    |-DatasetFromRoot()
+   18 |+Asset()
+18 19 | 
+19 20 | # airflow.datasets
+20 21 | Dataset()
+
+AIR311_names.py:20:1: AIR311 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0
+   |
+19 | # airflow.datasets
+20 | Dataset()
+   | ^^^^^^^ AIR311
+21 | DatasetAlias()
+22 | DatasetAll()
+   |
+   = help: Use `airflow.sdk.Asset` instead
+
+ℹ Safe fix
+13 13 | from airflow.models.baseoperatorlink import BaseOperatorLink
+14 14 | from airflow.timetables.datasets import DatasetOrTimeSchedule
+15 15 | from airflow.utils.dag_parsing_context import get_parsing_context
+   16 |+from airflow.sdk import Asset
+16 17 | 
+17 18 | DatasetFromRoot()
+18 19 | 
+19 20 | # airflow.datasets
+20    |-Dataset()
+   21 |+Asset()
+21 22 | DatasetAlias()
+22 23 | DatasetAll()
+23 24 | DatasetAny()
+
+AIR311_names.py:21:1: AIR311 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
+   |
+19 | # airflow.datasets
+20 | Dataset()
+21 | DatasetAlias()
+   | ^^^^^^^^^^^^ AIR311
+22 | DatasetAll()
+23 | DatasetAny()
+   |
+   = help: Use `airflow.sdk.AssetAlias` instead
+
+AIR311_names.py:22:1: AIR311 `airflow.datasets.DatasetAll` is removed in Airflow 3.0
+   |
+20 | Dataset()
+21 | DatasetAlias()
+22 | DatasetAll()
+   | ^^^^^^^^^^ AIR311
+23 | DatasetAny()
+24 | Metadata()
+   |
+   = help: Use `airflow.sdk.AssetAll` instead
+
+AIR311_names.py:23:1: AIR311 `airflow.datasets.DatasetAny` is removed in Airflow 3.0
+   |
+21 | DatasetAlias()
+22 | DatasetAll()
+23 | DatasetAny()
+   | ^^^^^^^^^^ AIR311
+24 | Metadata()
+25 | expand_alias_to_datasets()
+   |
+   = help: Use `airflow.sdk.AssetAny` instead
+
+AIR311_names.py:24:1: AIR311 `airflow.datasets.metadata.Metadata` is removed in Airflow 3.0
+   |
+22 | DatasetAll()
+23 | DatasetAny()
+24 | Metadata()
+   | ^^^^^^^^ AIR311
+25 | expand_alias_to_datasets()
+   |
+   = help: Use `airflow.sdk.Metadata` instead
+
+AIR311_names.py:25:1: AIR311 `airflow.datasets.expand_alias_to_datasets` is removed in Airflow 3.0
+   |
+23 | DatasetAny()
+24 | Metadata()
+25 | expand_alias_to_datasets()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR311
+26 |
+27 | # airflow.models.baseoperator
+   |
+   = help: Use `airflow.sdk.expand_alias_to_assets` instead
+
+AIR311_names.py:28:1: AIR311 `airflow.models.baseoperator.chain` is removed in Airflow 3.0
+   |
+27 | # airflow.models.baseoperator
+28 | chain()
+   | ^^^^^ AIR311
+29 | chain_linear()
+30 | cross_downstream()
+   |
+   = help: Use `airflow.sdk.chain` instead
+
+AIR311_names.py:29:1: AIR311 `airflow.models.baseoperator.chain_linear` is removed in Airflow 3.0
+   |
+27 | # airflow.models.baseoperator
+28 | chain()
+29 | chain_linear()
+   | ^^^^^^^^^^^^ AIR311
+30 | cross_downstream()
+   |
+   = help: Use `airflow.sdk.chain_linear` instead
+
+AIR311_names.py:30:1: AIR311 `airflow.models.baseoperator.cross_downstream` is removed in Airflow 3.0
+   |
+28 | chain()
+29 | chain_linear()
+30 | cross_downstream()
+   | ^^^^^^^^^^^^^^^^ AIR311
+31 |
+32 | # airflow.models.baseoperatolinker
+   |
+   = help: Use `airflow.sdk.cross_downstream` instead
+
+AIR311_names.py:36:1: AIR311 `airflow.timetables.datasets.DatasetOrTimeSchedule` is removed in Airflow 3.0
+   |
+35 | # airflow.timetables.datasets
+36 | DatasetOrTimeSchedule()
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR311
+37 |
+38 | # airflow.utils.dag_parsing_context
+   |
+   = help: Use `airflow.timetables.assets.AssetOrTimeSchedule` instead
+
+AIR311_names.py:39:1: AIR311 `airflow.utils.dag_parsing_context.get_parsing_context` is removed in Airflow 3.0
+   |
+38 | # airflow.utils.dag_parsing_context
+39 | get_parsing_context()
+   | ^^^^^^^^^^^^^^^^^^^ AIR311
+   |
+   = help: Use `airflow.sdk.get_parsing_context` instead
