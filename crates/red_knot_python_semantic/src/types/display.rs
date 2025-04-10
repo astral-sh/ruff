@@ -75,9 +75,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::Instance(instance) => match (instance, instance.class(self.db).known(self.db)) {
                 (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                 (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
-                (InstanceType::Class(ClassType::NonGeneric(class)), _)
-                | (
-                    InstanceType::UninitializedGenericClass(ClassLiteralType::NonGeneric(class)),
+                (
+                    InstanceType::Class(ClassType::NonGeneric(class))
+                    | InstanceType::UninitializedGenericClass(ClassLiteralType::NonGeneric(class)),
                     _,
                 ) => f.write_str(&class.class(self.db).name),
                 (InstanceType::Class(ClassType::Generic(alias)), _) => {
