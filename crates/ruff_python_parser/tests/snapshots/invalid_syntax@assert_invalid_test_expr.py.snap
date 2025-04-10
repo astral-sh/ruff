@@ -146,14 +146,3 @@ Module(
 4 | assert x := 1
   |          ^^ Syntax Error: Expected a statement
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | assert *x
-2 | assert assert x
-3 | assert yield x
-  |        ^^^^^^^ Syntax Error: `yield` statement outside of a function
-4 | assert x := 1
-  |

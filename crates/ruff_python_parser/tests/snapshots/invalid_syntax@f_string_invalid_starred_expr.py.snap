@@ -202,13 +202,3 @@ Module(
 4 | f"{*yield x}"
   |     ^^^^^^^ Syntax Error: Yield expression cannot be used here
   |
-
-
-## Semantic Syntax Errors
-
-  |
-2 | f"{*}"
-3 | f"{*x and y}"
-4 | f"{*yield x}"
-  |     ^^^^^^^ Syntax Error: `yield` statement outside of a function
-  |

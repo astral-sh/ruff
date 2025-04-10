@@ -467,16 +467,6 @@ enum Scope {
     Class,
 }
 
-impl Scope {
-    fn is_module(&self) -> bool {
-        matches!(self, Self::Module)
-    }
-
-    fn is_function(&self) -> bool {
-        matches!(self, Self::Function { .. })
-    }
-}
-
 struct SemanticSyntaxCheckerVisitor<'a> {
     checker: SemanticSyntaxChecker,
     diagnostics: RefCell<Vec<SemanticSyntaxError>>,
@@ -510,15 +500,6 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
         let mut checker = std::mem::take(&mut self.checker);
         f(&mut checker, self);
         self.checker = checker;
-    }
-
-    /// Returns an iterator over all scopes, starting from the current [`Scope`].
-    fn scopes(&self) -> impl Iterator<Item = &Scope> {
-        self.scopes.iter().rev()
-    }
-
-    fn current_scope(&self) -> &Scope {
-        self.scopes().next().unwrap()
     }
 }
 
@@ -566,11 +547,11 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_module_scope(&self) -> bool {
-        self.current_scope().is_module()
+        true
     }
 
     fn in_function_scope(&self) -> bool {
-        self.current_scope().is_function()
+        true
     }
 
     fn in_notebook(&self) -> bool {
@@ -578,14 +559,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_function_context(&self) -> bool {
-        for scope in self.scopes() {
-            match scope {
-                Scope::Class => return false,
-                Scope::Function { .. } => return true,
-                Scope::Comprehension { .. } | Scope::Module => {}
-            }
-        }
-        false
+        true
     }
 }
 

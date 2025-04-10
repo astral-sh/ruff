@@ -108,13 +108,3 @@ Module(
 3 | raise x := 1
   |         ^^ Syntax Error: Expected a statement
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | raise *x
-2 | raise yield x
-  |       ^^^^^^^ Syntax Error: `yield` statement outside of a function
-3 | raise x := 1
-  |

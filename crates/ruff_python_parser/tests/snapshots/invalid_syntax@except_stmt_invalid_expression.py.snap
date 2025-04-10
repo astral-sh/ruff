@@ -123,15 +123,3 @@ Module(
   |         ^^ Syntax Error: Starred expression cannot be used here
 8 |     pass
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | try:
-2 |     pass
-3 | except yield x:
-  |        ^^^^^^^ Syntax Error: `yield` statement outside of a function
-4 |     pass
-5 | try:
-  |

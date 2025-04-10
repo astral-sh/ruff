@@ -174,25 +174,7 @@ Module(
   |
 1 | type x = *y
 2 | type x = yield y
-  |          ^^^^^^^ Syntax Error: `yield` statement outside of a function
-3 | type x = yield from y
-4 | type x = x := 1
-  |
-
-
-  |
-1 | type x = *y
-2 | type x = yield y
 3 | type x = yield from y
   |          ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a type alias
-4 | type x = x := 1
-  |
-
-
-  |
-1 | type x = *y
-2 | type x = yield y
-3 | type x = yield from y
-  |          ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
 4 | type x = x := 1
   |

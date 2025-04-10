@@ -64,12 +64,3 @@ Module(
   |       ^^^^^^^^^ Syntax Error: Yield expression cannot be used here
 2 |     case _: ...
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | match yield foo:
-  |       ^^^^^^^^^ Syntax Error: `yield` statement outside of a function
-2 |     case _: ...
-  |

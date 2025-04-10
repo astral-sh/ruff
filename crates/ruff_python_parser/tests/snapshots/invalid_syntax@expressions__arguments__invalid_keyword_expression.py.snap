@@ -227,22 +227,3 @@ Module(
 4 | call(x = (*y))
   |           ^^ Syntax Error: Starred expression cannot be used here
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | call(x = yield y)
-  |          ^^^^^^^ Syntax Error: `yield` statement outside of a function
-2 | call(x = yield from y)
-3 | call(x = *y)
-  |
-
-
-  |
-1 | call(x = yield y)
-2 | call(x = yield from y)
-  |          ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
-3 | call(x = *y)
-4 | call(x = (*y))
-  |

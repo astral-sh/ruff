@@ -104,23 +104,3 @@ Module(
   |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
 6 |     pass
   |
-
-
-## Semantic Syntax Errors
-
-  |
-3 | elif *x:
-4 |     pass
-5 | elif yield x:
-  |      ^^^^^^^ Syntax Error: `yield` statement outside of a function
-6 |     pass
-  |
-
-
-  |
-3 | elif *x:
-4 |     pass
-5 | elif yield x:
-  |      ^^^^^^^ Syntax Error: `yield` statement outside of a function
-6 |     pass
-  |

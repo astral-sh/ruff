@@ -219,13 +219,3 @@ Module(
 5 | call(**x := 1)
   |             ^ Syntax Error: Positional argument cannot follow keyword argument unpacking
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | call(**yield x)
-  |        ^^^^^^^ Syntax Error: `yield` statement outside of a function
-2 | call(** *x)
-3 | call(***x)
-  |

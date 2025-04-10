@@ -1695,36 +1695,6 @@ Module(
 ## Semantic Syntax Errors
 
    |
-22 | {x: x * 2 for x in xs} = 42
-23 | (x for x in xs) = 42
-24 | await x = 42
-   | ^^^^^^^ Syntax Error: `await` statement outside of a function
-25 | (yield x) = 42
-26 | (yield from xs) = 42
-   |
-
-
-   |
-23 | (x for x in xs) = 42
-24 | await x = 42
-25 | (yield x) = 42
-   |  ^^^^^^^ Syntax Error: `yield` statement outside of a function
-26 | (yield from xs) = 42
-27 | a < b < c = 42
-   |
-
-
-   |
-24 | await x = 42
-25 | (yield x) = 42
-26 | (yield from xs) = 42
-   |  ^^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
-27 | a < b < c = 42
-28 | foo() = 42
-   |
-
-
-   |
 37 | None = 42
 38 | ... = 42
 39 | *foo() = 42

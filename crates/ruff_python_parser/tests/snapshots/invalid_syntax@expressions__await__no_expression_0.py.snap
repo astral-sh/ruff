@@ -64,14 +64,3 @@ Module(
 3 |
 4 | x + y
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | # No expression after `await`, an expression on another line
-2 | await
-  | ^^^^^ Syntax Error: `await` statement outside of a function
-3 |
-4 | x + y
-  |

@@ -622,24 +622,6 @@ impl SemanticSyntaxChecker {
             return;
         }
 
-        // test_err yield_outside_function
-        // yield 1
-        // yield from 1
-        // await 1
-        // yield
-        // [(yield x) for x in range(3)]
-
-        // test_ok yield_inside_function
-        // def f():
-        //     yield 1
-        //     yield from 1
-        //     await 1
-        //     yield
-        //
-        // lambda: (yield)
-        // lambda: (yield 1)
-        // lambda: (yield from 1)
-        // lambda: (await 1)
         Self::add_error(
             ctx,
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind),

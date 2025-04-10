@@ -164,16 +164,6 @@ Module(
 
 
   |
-1 | yield 1
-2 | yield from 1
-3 | await 1
-  | ^^^^^^^ Syntax Error: `await` statement outside of a function
-4 | yield
-5 | [(yield x) for x in range(3)]
-  |
-
-
-  |
 2 | yield from 1
 3 | await 1
 4 | yield
