@@ -159,7 +159,7 @@ impl<'a> ResolvedDiagnostic<'a> {
                 ResolvedAnnotation::new(path, &input, ann)
             })
             .collect();
-        let message = if diag.inner.message.is_empty() {
+        let message = if diag.inner.message.as_str().is_empty() {
             diag.inner.id.to_string()
         } else {
             // TODO: See the comment on `Renderable::id` for
@@ -168,7 +168,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             format!(
                 "{id}: {message}",
                 id = diag.inner.id,
-                message = diag.inner.message
+                message = diag.inner.message.as_str(),
             )
         };
         ResolvedDiagnostic {
@@ -195,7 +195,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             .collect();
         ResolvedDiagnostic {
             severity: diag.inner.severity,
-            message: diag.inner.message.to_string(),
+            message: diag.inner.message.as_str().to_string(),
             annotations,
         }
     }
