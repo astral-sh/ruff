@@ -77,16 +77,14 @@ fn is_contextmanager_decorated(function_def: &ast::StmtFunctionDef, checker: &Ch
 
 struct YieldPathTracker {
     has_multiple_yields: bool,
-    path_yields: Vec<usize>,
-    branch_stack: Vec<Vec<usize>>,
+    yield_counts: Vec<usize>,
 }
 
 impl Default for YieldPathTracker {
     fn default() -> Self {
         Self {
             has_multiple_yields: false,
-            path_yields: vec![0],
-            branch_stack: vec![],
+            yield_counts: vec![0],
         }
     }
 }
@@ -97,23 +95,18 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
             return source_order::TraversalSignal::Skip;
         }
         match node {
-            AnyNodeRef::StmtTry(_) | AnyNodeRef::StmtIf(_) | AnyNodeRef::StmtMatch(_) => {
-                self.branch_stack.push(vec![]);
-            }
-            AnyNodeRef::ElifElseClause(_)
-            | AnyNodeRef::MatchCase(_)
-            | AnyNodeRef::ExceptHandlerExceptHandler(_) => {
-                // Save the yield count of previous branch
-                let current = self.path_yields.pop().unwrap();
-                if let Some(branch) = self.branch_stack.last_mut() {
-                    branch.push(current);
-                }
-                // Start fresh path count for this branch
-                self.path_yields.push(0);
+            AnyNodeRef::StmtTry(_)
+            | AnyNodeRef::StmtIf(_)
+            | AnyNodeRef::StmtMatch(_)
+            | AnyNodeRef::ExceptHandlerExceptHandler(_)
+            | AnyNodeRef::ElifElseClause(_)
+            | AnyNodeRef::MatchCase(_) => {
+                self.yield_counts.push(0);
             }
             AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
                 // Yields in loops are at high risk of being executed multiple times
                 self.has_multiple_yields = true;
+                return source_order::TraversalSignal::Skip;
             }
             _ => {}
         }
@@ -122,33 +115,79 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
 
     fn leave_node(&mut self, node: AnyNodeRef<'a>) {
         match node {
-            AnyNodeRef::StmtTry(_) | AnyNodeRef::StmtIf(_) => {
-                let current = self.path_yields.pop().unwrap();
-                let mut branch = self.branch_stack.pop().unwrap_or_default();
-                branch.push(current);
-                let max_yield = branch.iter().max().copied().unwrap_or(0);
+            AnyNodeRef::StmtTry(try_stmt) => {
+                let finally_yields = if try_stmt.finalbody.is_empty() {
+                    0
+                } else {
+                    self.yield_counts.pop().unwrap_or(0)
+                };
 
-                if max_yield > 1 {
-                    self.has_multiple_yields = true;
+                let else_yields = if try_stmt.orelse.is_empty() {
+                    0
+                } else {
+                    self.yield_counts.pop().unwrap_or(0)
+                };
+
+                let mut max_except_yields = 0;
+                for _ in 0..try_stmt.handlers.len() {
+                    let except_yields = self.yield_counts.pop().unwrap_or(0);
+                    max_except_yields = max_except_yields.max(except_yields);
                 }
 
-                self.path_yields.push(max_yield);
+                let try_yields = self.yield_counts.pop().unwrap_or(0);
+
+                let try_except_finally = try_yields + max_except_yields + finally_yields;
+                let try_else_finally = try_yields + else_yields + finally_yields;
+
+                let max_path_yields = try_except_finally.max(try_else_finally);
+
+                if let Some(root) = self.yield_counts.pop() {
+                    self.yield_counts.push(root + max_path_yields);
+                }
+            }
+            AnyNodeRef::StmtIf(if_stmt) => {
+                let branch_counts = 1 + if_stmt.elif_else_clauses.len();
+
+                let mut max_branch_yields = 0;
+                for _ in 0..branch_counts {
+                    let branch_yields = self.yield_counts.pop().unwrap_or(0);
+                    max_branch_yields = max_branch_yields.max(branch_yields);
+                }
+
+                if let Some(root) = self.yield_counts.pop() {
+                    self.yield_counts.push(root + max_branch_yields);
+                }
+            }
+            AnyNodeRef::StmtMatch(match_stmt) => {
+                let branch_counts = match_stmt.cases.len();
+                let mut max_branch_yields = 0;
+
+                for _ in 0..branch_counts {
+                    let branch_yields = self.yield_counts.pop().unwrap_or(0);
+                    max_branch_yields = max_branch_yields.max(branch_yields);
+                }
+
+                if let Some(root) = self.yield_counts.pop() {
+                    self.yield_counts.push(root + max_branch_yields);
+                }
             }
             AnyNodeRef::ElifElseClause(_) | AnyNodeRef::MatchCase(_) => {
                 // Handled on enter/leave of outer structure
             }
             _ => {}
         }
+        if let Some(count) = self.yield_counts.last() {
+            if *count > 1 {
+                self.has_multiple_yields = true;
+            }
+        }
     }
 
     fn visit_expr(&mut self, expr: &'a ast::Expr) {
         match expr {
             ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
-                if let Some(count) = self.path_yields.last_mut() {
+                if let Some(count) = self.yield_counts.last_mut() {
                     *count += 1;
-                    if *count > 1 {
-                        self.has_multiple_yields = true;
-                    }
                 }
             }
             _ => source_order::walk_expr(self, expr),
@@ -159,6 +198,23 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
         match stmt {
             ast::Stmt::FunctionDef(nested) => {
                 function_def_visit_preorder_except_body(nested, self);
+            }
+            ast::Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => {
+                source_order::walk_body(self, body);
+                for handler in handlers {
+                    self.yield_counts.push(0);
+                    source_order::walk_except_handler(self, handler);
+                }
+                self.yield_counts.push(0);
+                source_order::walk_body(self, orelse);
+                self.yield_counts.push(0);
+                source_order::walk_body(self, finalbody);
             }
             _ => source_order::walk_stmt(self, stmt),
         }
