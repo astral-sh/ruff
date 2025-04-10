@@ -1,0 +1,36 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR311_args.py:13:34: AIR301 `sla_miss_callback` is removed in Airflow 3.0
+   |
+13 | DAG(dag_id="class_sla_callback", sla_miss_callback=sla_callback)
+   |                                  ^^^^^^^^^^^^^^^^^ AIR301
+   |
+
+AIR311_args.py:16:6: AIR301 `sla_miss_callback` is removed in Airflow 3.0
+   |
+16 | @dag(sla_miss_callback=sla_callback)
+   |      ^^^^^^^^^^^^^^^^^ AIR301
+17 | def decorator_sla_callback():
+18 |     pass
+   |
+
+AIR311_args.py:25:9: AIR301 `use_task_execution_day` is removed in Airflow 3.0
+   |
+23 |     branch_dt_op2 = BranchDateTimeOperator(
+24 |         task_id="branch_dt_op2",
+25 |         use_task_execution_day=True,
+   |         ^^^^^^^^^^^^^^^^^^^^^^ AIR301
+26 |         sla=timedelta(seconds=10),
+27 |     )
+   |
+   = help: Use `use_task_logical_date` instead
+
+AIR311_args.py:26:9: AIR301 `sla` is removed in Airflow 3.0
+   |
+24 |         task_id="branch_dt_op2",
+25 |         use_task_execution_day=True,
+26 |         sla=timedelta(seconds=10),
+   |         ^^^ AIR301
+27 |     )
+   |
