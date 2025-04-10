@@ -4481,7 +4481,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
             invalid_expressions,
         } = self;
         for error in invalid_expressions {
-            context.report_lint(
+            context.report_lint_old(
                 &INVALID_TYPE_FORM,
                 node,
                 format_args!("{}", error.reason(context.db())),
@@ -4715,7 +4715,7 @@ impl<'db> ContextManagerError<'db> {
             } => format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
         };
 
-        context.report_lint(
+        context.report_lint_old(
             &INVALID_CONTEXT_MANAGER,
             context_expression_node,
             format_args!(
@@ -4818,7 +4818,7 @@ impl<'db> IterationError<'db> {
         let db = context.db();
 
         let report_not_iterable = |arguments: std::fmt::Arguments| {
-            context.report_lint(&NOT_ITERABLE, iterable_node, arguments);
+            context.report_lint_old(&NOT_ITERABLE, iterable_node, arguments);
         };
 
         // TODO: for all of these error variants, the "explanation" for the diagnostic
@@ -5096,7 +5096,7 @@ impl<'db> BoolError<'db> {
             Self::IncorrectArguments {
                 not_boolable_type, ..
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
@@ -5109,7 +5109,7 @@ impl<'db> BoolError<'db> {
                 not_boolable_type,
                 return_type,
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
@@ -5120,7 +5120,7 @@ impl<'db> BoolError<'db> {
                 );
             }
             Self::NotCallable { not_boolable_type } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
@@ -5136,7 +5136,7 @@ impl<'db> BoolError<'db> {
                     .find_map(|element| element.try_bool(context.db()).err())
                     .unwrap();
 
-                context.report_lint(
+                context.report_lint_old(
                         &UNSUPPORTED_BOOL_CONVERSION,
                         condition,
                         format_args!(
@@ -5148,7 +5148,7 @@ impl<'db> BoolError<'db> {
             }
 
             Self::Other { not_boolable_type } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
@@ -5189,7 +5189,7 @@ impl<'db> ConstructorCallError<'db> {
                 // If we are using vendored typeshed, it should be impossible to have missing
                 // or unbound `__init__` method on a class, as all classes have `object` in MRO.
                 // Thus the following may only trigger if a custom typeshed is used.
-                context.report_lint(
+                context.report_lint_old(
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
@@ -5199,7 +5199,7 @@ impl<'db> ConstructorCallError<'db> {
                 );
             }
             CallDunderError::PossiblyUnbound(bindings) => {
-                context.report_lint(
+                context.report_lint_old(
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
@@ -5222,7 +5222,7 @@ impl<'db> ConstructorCallError<'db> {
                 unreachable!("`__new__` method may not be called if missing");
             }
             CallDunderError::PossiblyUnbound(bindings) => {
-                context.report_lint(
+                context.report_lint_old(
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
