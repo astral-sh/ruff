@@ -80,6 +80,21 @@ struct YieldPathTracker {
     yield_counts: Vec<usize>,
 }
 
+impl YieldPathTracker {
+    fn handle_exclusive_branches(&mut self, branch_count: usize) {
+        let mut max_yields_branches = 0;
+        for _ in 0..branch_count {
+            let branch_yields = self.yield_counts.pop().unwrap();
+            max_yields_branches = max_yields_branches.max(branch_yields);
+        }
+        if let Some(root) = self.yield_counts.pop() {
+            self.yield_counts.push(root + max_yields_branches);
+        } else {
+            panic!("Invalid yield stack length when traversing AST")
+        };
+    }
+}
+
 impl Default for YieldPathTracker {
     fn default() -> Self {
         Self {
@@ -100,10 +115,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
             | AnyNodeRef::StmtTry(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtMatch(_)
-            | AnyNodeRef::ExceptHandlerExceptHandler(_)
-            | AnyNodeRef::ElifElseClause(_)
             | AnyNodeRef::MatchCase(_) => {
-                // Nodes that branch or repeat control flow
+                // New control flow entry point (try, match)
                 self.yield_counts.push(0);
             }
             _ => {}
@@ -114,17 +127,17 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
     fn leave_node(&mut self, node: AnyNodeRef<'a>) {
         match node {
             AnyNodeRef::StmtTry(try_stmt) => {
-                let finally_yields = self.yield_counts.pop().unwrap_or(0);
+                let finally_yields = self.yield_counts.pop().unwrap();
 
-                let else_yields = self.yield_counts.pop().unwrap_or(0);
+                let else_yields = self.yield_counts.pop().unwrap();
 
                 let mut max_except_yields = 0;
                 for _ in 0..try_stmt.handlers.len() {
-                    let except_yields = self.yield_counts.pop().unwrap_or(0);
+                    let except_yields = self.yield_counts.pop().unwrap();
                     max_except_yields = max_except_yields.max(except_yields);
                 }
 
-                let try_yields = self.yield_counts.pop().unwrap_or(0);
+                let try_yields = self.yield_counts.pop().unwrap();
 
                 let max_path_yields =
                     try_yields + max_except_yields.max(else_yields) + finally_yields;
@@ -134,34 +147,16 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 }
             }
             AnyNodeRef::StmtIf(if_stmt) => {
-                let branch_counts = 1 + if_stmt.elif_else_clauses.len();
-
-                let mut max_branch_yields = 0;
-                for _ in 0..branch_counts {
-                    let branch_yields = self.yield_counts.pop().unwrap_or(0);
-                    max_branch_yields = max_branch_yields.max(branch_yields);
-                }
-
-                if let Some(root) = self.yield_counts.pop() {
-                    self.yield_counts.push(root + max_branch_yields);
-                }
+                let branch_count = 1 + if_stmt.elif_else_clauses.len();
+                self.handle_exclusive_branches(branch_count);
             }
             AnyNodeRef::StmtMatch(match_stmt) => {
-                let branch_counts = match_stmt.cases.len();
-                let mut max_branch_yields = 0;
-
-                for _ in 0..branch_counts {
-                    let branch_yields = self.yield_counts.pop().unwrap_or(0);
-                    max_branch_yields = max_branch_yields.max(branch_yields);
-                }
-
-                if let Some(root) = self.yield_counts.pop() {
-                    self.yield_counts.push(root + max_branch_yields);
-                }
+                let branch_count = match_stmt.cases.len();
+                self.handle_exclusive_branches(branch_count);
             }
             AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
-                let else_yields = self.yield_counts.pop().unwrap_or(0);
-                let body_yields = self.yield_counts.pop().unwrap_or(0);
+                let else_yields = self.yield_counts.pop().unwrap();
+                let body_yields = self.yield_counts.pop().unwrap();
 
                 if body_yields > 0 {
                     // A yield in a loop body is at high risk to yield multiple times
@@ -171,12 +166,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     self.yield_counts.push(root + else_yields);
                 }
             }
-            AnyNodeRef::ElifElseClause(_) => {
+            AnyNodeRef::ElifElseClause(_) | AnyNodeRef::MatchCase(_) => {
                 // Handled on enter/leave of outer structure.
-            }
-
-            AnyNodeRef::MatchCase(_) => {
-                // Handled on enter/leave of outer structure
             }
             _ => {}
         }
@@ -224,6 +215,23 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     self.leave_node(node);
                 }
             }
+            ast::Stmt::If(
+                if_stmt @ ast::StmtIf {
+                    body,
+                    elif_else_clauses,
+                    ..
+                },
+            ) => {
+                let node = ruff_python_ast::AnyNodeRef::StmtIf(if_stmt);
+                if self.enter_node(node).is_traverse() {
+                    self.visit_body(body);
+                    for clause in elif_else_clauses {
+                        self.yield_counts.push(0);
+                        self.visit_elif_else_clause(clause);
+                    }
+                    self.leave_node(node);
+                }
+            }
             ast::Stmt::Try(
                 try_stmt @ ast::StmtTry {
                     body,
@@ -238,7 +246,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     self.visit_body(body);
 
                     for handler in handlers {
-                        // Pushed on stack in except handler
+                        self.yield_counts.push(0);
                         self.visit_except_handler(handler);
                     }
 
