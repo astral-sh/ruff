@@ -23,9 +23,8 @@ a | b < c | d not in e & f
 not x not in y
 
 x or y not in z and a
-def outer():
-    x == await y
-    x is not await y
+x == await y
+x is not await y
 
 # All operators have the same precedence
 a < b == c > d is e not in f is not g <= h >= i != j

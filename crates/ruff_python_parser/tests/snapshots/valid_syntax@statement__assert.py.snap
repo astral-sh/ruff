@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/assert.py
+snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..204,
+        range: 0..186,
         body: [
             Assert(
                 StmtAssert {
@@ -133,69 +134,46 @@ Module(
                     msg: None,
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 61..84,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("_"),
-                        range: 65..66,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 66..68,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Assert(
-                            StmtAssert {
-                                range: 70..84,
-                                test: Await(
-                                    ExprAwait {
-                                        range: 77..84,
-                                        value: Name(
-                                            ExprName {
-                                                range: 83..84,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
-                                msg: None,
-                            },
-                        ),
-                    ],
+            Assert(
+                StmtAssert {
+                    range: 61..75,
+                    test: Await(
+                        ExprAwait {
+                            range: 68..75,
+                            value: Name(
+                                ExprName {
+                                    range: 74..75,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                    msg: None,
                 },
             ),
             Assert(
                 StmtAssert {
-                    range: 85..108,
+                    range: 76..99,
                     test: If(
                         ExprIf {
-                            range: 92..108,
+                            range: 83..99,
                             test: BooleanLiteral(
                                 ExprBooleanLiteral {
-                                    range: 97..101,
+                                    range: 88..92,
                                     value: true,
                                 },
                             ),
                             body: Name(
                                 ExprName {
-                                    range: 92..93,
+                                    range: 83..84,
                                     id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
                             orelse: Name(
                                 ExprName {
-                                    range: 107..108,
+                                    range: 98..99,
                                     id: Name("y"),
                                     ctx: Load,
                                 },
@@ -207,10 +185,10 @@ Module(
             ),
             Assert(
                 StmtAssert {
-                    range: 110..127,
+                    range: 101..118,
                     test: Name(
                         ExprName {
-                            range: 117..118,
+                            range: 108..109,
                             id: Name("x"),
                             ctx: Load,
                         },
@@ -218,11 +196,11 @@ Module(
                     msg: Some(
                         StringLiteral(
                             ExprStringLiteral {
-                                range: 120..127,
+                                range: 111..118,
                                 value: StringLiteralValue {
                                     inner: Single(
                                         StringLiteral {
-                                            range: 120..127,
+                                            range: 111..118,
                                             value: "error",
                                             flags: StringLiteralFlags {
                                                 quote_style: Double,
@@ -239,10 +217,10 @@ Module(
             ),
             Assert(
                 StmtAssert {
-                    range: 128..149,
+                    range: 119..140,
                     test: Name(
                         ExprName {
-                            range: 135..136,
+                            range: 126..127,
                             id: Name("x"),
                             ctx: Load,
                         },
@@ -250,19 +228,19 @@ Module(
                     msg: Some(
                         Lambda(
                             ExprLambda {
-                                range: 138..149,
+                                range: 129..140,
                                 parameters: Some(
                                     Parameters {
-                                        range: 145..146,
+                                        range: 136..137,
                                         posonlyargs: [],
                                         args: [
                                             ParameterWithDefault {
-                                                range: 145..146,
+                                                range: 136..137,
                                                 parameter: Parameter {
-                                                    range: 145..146,
+                                                    range: 136..137,
                                                     name: Identifier {
                                                         id: Name("x"),
-                                                        range: 145..146,
+                                                        range: 136..137,
                                                     },
                                                     annotation: None,
                                                 },
@@ -276,7 +254,7 @@ Module(
                                 ),
                                 body: Name(
                                     ExprName {
-                                        range: 148..149,
+                                        range: 139..140,
                                         id: Name("y"),
                                         ctx: Load,
                                     },
@@ -286,61 +264,38 @@ Module(
                     ),
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 150..176,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("_"),
-                        range: 154..155,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 155..157,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Assert(
-                            StmtAssert {
-                                range: 159..176,
-                                test: Name(
+            Assert(
+                StmtAssert {
+                    range: 141..158,
+                    test: Name(
+                        ExprName {
+                            range: 148..149,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    msg: Some(
+                        Await(
+                            ExprAwait {
+                                range: 151..158,
+                                value: Name(
                                     ExprName {
-                                        range: 166..167,
+                                        range: 157..158,
                                         id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
-                                msg: Some(
-                                    Await(
-                                        ExprAwait {
-                                            range: 169..176,
-                                            value: Name(
-                                                ExprName {
-                                                    range: 175..176,
-                                                    id: Name("x"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                ),
                             },
                         ),
-                    ],
+                    ),
                 },
             ),
             Assert(
                 StmtAssert {
-                    range: 177..203,
+                    range: 159..185,
                     test: Name(
                         ExprName {
-                            range: 184..185,
+                            range: 166..167,
                             id: Name("x"),
                             ctx: Load,
                         },
@@ -348,23 +303,23 @@ Module(
                     msg: Some(
                         If(
                             ExprIf {
-                                range: 187..203,
+                                range: 169..185,
                                 test: BooleanLiteral(
                                     ExprBooleanLiteral {
-                                        range: 192..196,
+                                        range: 174..178,
                                         value: true,
                                     },
                                 ),
                                 body: Name(
                                     ExprName {
-                                        range: 187..188,
+                                        range: 169..170,
                                         id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
                                 orelse: Name(
                                     ExprName {
-                                        range: 202..203,
+                                        range: 184..185,
                                         id: Name("y"),
                                         ctx: Load,
                                     },

@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/match_stmt_valid_guard_expr.py
+snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..175,
+        range: 0..158,
         body: [
             Match(
                 StmtMatch {
@@ -218,83 +219,60 @@ Module(
                     ],
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 120..174,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("_"),
-                        range: 124..125,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 125..127,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Match(
-                            StmtMatch {
-                                range: 133..174,
-                                subject: Name(
-                                    ExprName {
-                                        range: 139..140,
-                                        id: Name("x"),
-                                        ctx: Load,
+            Match(
+                StmtMatch {
+                    range: 120..157,
+                    subject: Name(
+                        ExprName {
+                            range: 126..127,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
+                    cases: [
+                        MatchCase {
+                            range: 133..157,
+                            pattern: MatchAs(
+                                PatternMatchAs {
+                                    range: 138..139,
+                                    pattern: None,
+                                    name: Some(
+                                        Identifier {
+                                            id: Name("y"),
+                                            range: 138..139,
+                                        },
+                                    ),
+                                },
+                            ),
+                            guard: Some(
+                                Yield(
+                                    ExprYield {
+                                        range: 144..151,
+                                        value: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 150..151,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
                                     },
                                 ),
-                                cases: [
-                                    MatchCase {
-                                        range: 150..174,
-                                        pattern: MatchAs(
-                                            PatternMatchAs {
-                                                range: 155..156,
-                                                pattern: None,
-                                                name: Some(
-                                                    Identifier {
-                                                        id: Name("y"),
-                                                        range: 155..156,
-                                                    },
-                                                ),
+                            ),
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        range: 154..157,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                range: 154..157,
                                             },
                                         ),
-                                        guard: Some(
-                                            Yield(
-                                                ExprYield {
-                                                    range: 161..168,
-                                                    value: Some(
-                                                        Name(
-                                                            ExprName {
-                                                                range: 167..168,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ),
-                                                },
-                                            ),
-                                        ),
-                                        body: [
-                                            Expr(
-                                                StmtExpr {
-                                                    range: 171..174,
-                                                    value: EllipsisLiteral(
-                                                        ExprEllipsisLiteral {
-                                                            range: 171..174,
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                        ],
                                     },
-                                ],
-                            },
-                        ),
+                                ),
+                            ],
+                        },
                     ],
                 },
             ),

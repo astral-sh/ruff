@@ -11,9 +11,8 @@ not-+~1
 not not x
 
 # Precedence check
-def outer():
-    - await 1
-    + await 1 ** -2
+- await 1
++ await 1 ** -2
 ~(1, 2)
 -1 + 2
 

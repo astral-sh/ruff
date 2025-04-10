@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/try.py
+snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..1316,
+        range: 0..1223,
         body: [
             Try(
                 StmtTry {
@@ -1187,366 +1188,343 @@ Module(
                     is_star: true,
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 833..1168,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("outer"),
-                        range: 837..842,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 842..844,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
+            Try(
+                StmtTry {
+                    range: 833..1075,
                     body: [
-                        Try(
-                            StmtTry {
-                                range: 850..1168,
-                                body: [
-                                    Pass(
-                                        StmtPass {
-                                            range: 863..867,
-                                        },
-                                    ),
-                                ],
-                                handlers: [
-                                    ExceptHandler(
-                                        ExceptHandlerExceptHandler {
-                                            range: 872..904,
-                                            type_: Some(
-                                                StringLiteral(
-                                                    ExprStringLiteral {
-                                                        range: 879..890,
-                                                        value: StringLiteralValue {
-                                                            inner: Single(
-                                                                StringLiteral {
-                                                                    range: 879..890,
-                                                                    value: "exception",
-                                                                    flags: StringLiteralFlags {
-                                                                        quote_style: Double,
-                                                                        prefix: Empty,
-                                                                        triple_quoted: false,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        },
-                                                    },
-                                                ),
-                                            ),
-                                            name: None,
-                                            body: [
-                                                Pass(
-                                                    StmtPass {
-                                                        range: 900..904,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                    ExceptHandler(
-                                        ExceptHandlerExceptHandler {
-                                            range: 909..931,
-                                            type_: Some(
-                                                NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        range: 916..917,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                            name: None,
-                                            body: [
-                                                Pass(
-                                                    StmtPass {
-                                                        range: 927..931,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                    ExceptHandler(
-                                        ExceptHandlerExceptHandler {
-                                            range: 936..961,
-                                            type_: Some(
-                                                BooleanLiteral(
-                                                    ExprBooleanLiteral {
-                                                        range: 943..947,
-                                                        value: true,
-                                                    },
-                                                ),
-                                            ),
-                                            name: None,
-                                            body: [
-                                                Pass(
-                                                    StmtPass {
-                                                        range: 957..961,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                    ExceptHandler(
-                                        ExceptHandlerExceptHandler {
-                                            range: 966..992,
-                                            type_: Some(
-                                                BinOp(
-                                                    ExprBinOp {
-                                                        range: 973..978,
-                                                        left: NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 973..974,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                            },
-                                                        ),
-                                                        op: Add,
-                                                        right: NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 977..978,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                            name: None,
-                                            body: [
-                                                Pass(
-                                                    StmtPass {
-                                                        range: 988..992,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                    ExceptHandler(
-                                        ExceptHandlerExceptHandler {
-                                            range: 997..1023,
-                                            type_: Some(
-                                                BinOp(
-                                                    ExprBinOp {
-                                                        range: 1004..1009,
-                                                        left: Name(
-                                                            ExprName {
-                                                                range: 1004..1005,
-                                                                id: Name("a"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        op: BitOr,
-                                                        right: Name(
-                                                            ExprName {
-                                                                range: 1008..1009,
-                                                                id: Name("b"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                            name: None,
-                                            body: [
-                                                Pass(
-                                                    StmtPass {
-                                                        range: 1019..1023,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                    ExceptHandler(
-                                        ExceptHandlerExceptHandler {
-                                            range: 1028..1056,
-                                            type_: Some(
-                                                BoolOp(
-                                                    ExprBoolOp {
-                                                        range: 1035..1042,
-                                                        op: And,
-                                                        values: [
-                                                            Name(
-                                                                ExprName {
-                                                                    range: 1035..1036,
-                                                                    id: Name("x"),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                            Name(
-                                                                ExprName {
-                                                                    range: 1041..1042,
-                                                                    id: Name("y"),
-                                                                    ctx: Load,
-                                                                },
-                                                            ),
-                                                        ],
-                                                    },
-                                                ),
-                                            ),
-                                            name: None,
-                                            body: [
-                                                Pass(
-                                                    StmtPass {
-                                                        range: 1052..1056,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                    ExceptHandler(
-                                        ExceptHandlerExceptHandler {
-                                            range: 1061..1089,
-                                            type_: Some(
-                                                Await(
-                                                    ExprAwait {
-                                                        range: 1068..1075,
-                                                        value: Name(
-                                                            ExprName {
-                                                                range: 1074..1075,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                            name: None,
-                                            body: [
-                                                Pass(
-                                                    StmtPass {
-                                                        range: 1085..1089,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                    ExceptHandler(
-                                        ExceptHandlerExceptHandler {
-                                            range: 1094..1126,
-                                            type_: Some(
-                                                Lambda(
-                                                    ExprLambda {
-                                                        range: 1101..1112,
-                                                        parameters: Some(
-                                                            Parameters {
-                                                                range: 1108..1109,
-                                                                posonlyargs: [],
-                                                                args: [
-                                                                    ParameterWithDefault {
-                                                                        range: 1108..1109,
-                                                                        parameter: Parameter {
-                                                                            range: 1108..1109,
-                                                                            name: Identifier {
-                                                                                id: Name("x"),
-                                                                                range: 1108..1109,
-                                                                            },
-                                                                            annotation: None,
-                                                                        },
-                                                                        default: None,
-                                                                    },
-                                                                ],
-                                                                vararg: None,
-                                                                kwonlyargs: [],
-                                                                kwarg: None,
-                                                            },
-                                                        ),
-                                                        body: Name(
-                                                            ExprName {
-                                                                range: 1111..1112,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                            name: None,
-                                            body: [
-                                                Pass(
-                                                    StmtPass {
-                                                        range: 1122..1126,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                    ExceptHandler(
-                                        ExceptHandlerExceptHandler {
-                                            range: 1131..1168,
-                                            type_: Some(
-                                                If(
-                                                    ExprIf {
-                                                        range: 1138..1154,
-                                                        test: BooleanLiteral(
-                                                            ExprBooleanLiteral {
-                                                                range: 1143..1147,
-                                                                value: true,
-                                                            },
-                                                        ),
-                                                        body: Name(
-                                                            ExprName {
-                                                                range: 1138..1139,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        orelse: Name(
-                                                            ExprName {
-                                                                range: 1153..1154,
-                                                                id: Name("y"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    },
-                                                ),
-                                            ),
-                                            name: None,
-                                            body: [
-                                                Pass(
-                                                    StmtPass {
-                                                        range: 1164..1168,
-                                                    },
-                                                ),
-                                            ],
-                                        },
-                                    ),
-                                ],
-                                orelse: [],
-                                finalbody: [],
-                                is_star: false,
+                        Pass(
+                            StmtPass {
+                                range: 842..846,
                             },
                         ),
                     ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 847..875,
+                                type_: Some(
+                                    StringLiteral(
+                                        ExprStringLiteral {
+                                            range: 854..865,
+                                            value: StringLiteralValue {
+                                                inner: Single(
+                                                    StringLiteral {
+                                                        range: 854..865,
+                                                        value: "exception",
+                                                        flags: StringLiteralFlags {
+                                                            quote_style: Double,
+                                                            prefix: Empty,
+                                                            triple_quoted: false,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 871..875,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 876..894,
+                                type_: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            range: 883..884,
+                                            value: Int(
+                                                1,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 890..894,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 895..916,
+                                type_: Some(
+                                    BooleanLiteral(
+                                        ExprBooleanLiteral {
+                                            range: 902..906,
+                                            value: true,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 912..916,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 917..939,
+                                type_: Some(
+                                    BinOp(
+                                        ExprBinOp {
+                                            range: 924..929,
+                                            left: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 924..925,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            op: Add,
+                                            right: NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 928..929,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 935..939,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 940..962,
+                                type_: Some(
+                                    BinOp(
+                                        ExprBinOp {
+                                            range: 947..952,
+                                            left: Name(
+                                                ExprName {
+                                                    range: 947..948,
+                                                    id: Name("a"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            op: BitOr,
+                                            right: Name(
+                                                ExprName {
+                                                    range: 951..952,
+                                                    id: Name("b"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 958..962,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 963..987,
+                                type_: Some(
+                                    BoolOp(
+                                        ExprBoolOp {
+                                            range: 970..977,
+                                            op: And,
+                                            values: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 970..971,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 976..977,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 983..987,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 988..1012,
+                                type_: Some(
+                                    Await(
+                                        ExprAwait {
+                                            range: 995..1002,
+                                            value: Name(
+                                                ExprName {
+                                                    range: 1001..1002,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 1008..1012,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 1013..1041,
+                                type_: Some(
+                                    Lambda(
+                                        ExprLambda {
+                                            range: 1020..1031,
+                                            parameters: Some(
+                                                Parameters {
+                                                    range: 1027..1028,
+                                                    posonlyargs: [],
+                                                    args: [
+                                                        ParameterWithDefault {
+                                                            range: 1027..1028,
+                                                            parameter: Parameter {
+                                                                range: 1027..1028,
+                                                                name: Identifier {
+                                                                    id: Name("x"),
+                                                                    range: 1027..1028,
+                                                                },
+                                                                annotation: None,
+                                                            },
+                                                            default: None,
+                                                        },
+                                                    ],
+                                                    vararg: None,
+                                                    kwonlyargs: [],
+                                                    kwarg: None,
+                                                },
+                                            ),
+                                            body: Name(
+                                                ExprName {
+                                                    range: 1030..1031,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 1037..1041,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 1042..1075,
+                                type_: Some(
+                                    If(
+                                        ExprIf {
+                                            range: 1049..1065,
+                                            test: BooleanLiteral(
+                                                ExprBooleanLiteral {
+                                                    range: 1054..1058,
+                                                    value: true,
+                                                },
+                                            ),
+                                            body: Name(
+                                                ExprName {
+                                                    range: 1049..1050,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            orelse: Name(
+                                                ExprName {
+                                                    range: 1064..1065,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 1071..1075,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
                 },
             ),
             If(
                 StmtIf {
-                    range: 1170..1315,
+                    range: 1077..1222,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            range: 1173..1177,
+                            range: 1080..1084,
                             value: true,
                         },
                     ),
                     body: [
                         Try(
                             StmtTry {
-                                range: 1183..1226,
+                                range: 1090..1133,
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            range: 1196..1200,
+                                            range: 1103..1107,
                                         },
                                     ),
                                 ],
@@ -1555,7 +1533,7 @@ Module(
                                 finalbody: [
                                     Pass(
                                         StmtPass {
-                                            range: 1222..1226,
+                                            range: 1129..1133,
                                         },
                                     ),
                                 ],
@@ -1565,12 +1543,12 @@ Module(
                     ],
                     elif_else_clauses: [
                         ElifElseClause {
-                            range: 1301..1315,
+                            range: 1208..1222,
                             test: None,
                             body: [
                                 Pass(
                                     StmtPass {
-                                        range: 1311..1315,
+                                        range: 1218..1222,
                                     },
                                 ),
                             ],

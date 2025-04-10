@@ -22,14 +22,13 @@ call(x=1, **y, z=1)
 
 # Keyword expression
 call(x=1 if True else 2)
-def _(): call(x=await y)
+call(x=await y)
 call(x=lambda y: y)
 call(x=(y := 1))
 
 # Yield expression
-def _():
-    call((yield x))
-    call((yield from x))
+call((yield x))
+call((yield from x))
 
 # Named expression
 call(x := 1)
@@ -38,14 +37,14 @@ call(x := 1 for i in iter)
 # Starred expressions
 call(*x and y)
 call(*x | y)
-def _(): call(*await x)
+call(*await x)
 call(*lambda x: x)
 call(*x if True else y)
 
 # Double starred
 call(**x)
 call(**x and y)
-def _(): call(**await x)
+call(**await x)
 call(**x if True else y)
-def _(): call(**(yield x))
+call(**(yield x))
 call(**lambda x: x)

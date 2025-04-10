@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/named.py
+snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..175,
+        range: 0..157,
         body: [
             Expr(
                 StmtExpr {
@@ -250,87 +251,64 @@ Module(
                     ),
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 113..174,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("_"),
-                        range: 117..118,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 118..120,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 126..145,
-                                value: Named(
-                                    ExprNamed {
-                                        range: 127..144,
-                                        target: Name(
+            Expr(
+                StmtExpr {
+                    range: 113..132,
+                    value: Named(
+                        ExprNamed {
+                            range: 114..131,
+                            target: Name(
+                                ExprName {
+                                    range: 114..118,
+                                    id: Name("name"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: Yield(
+                                ExprYield {
+                                    range: 123..130,
+                                    value: Some(
+                                        Name(
                                             ExprName {
-                                                range: 127..131,
-                                                id: Name("name"),
-                                                ctx: Store,
+                                                range: 129..130,
+                                                id: Name("x"),
+                                                ctx: Load,
                                             },
                                         ),
-                                        value: Yield(
-                                            ExprYield {
-                                                range: 136..143,
-                                                value: Some(
-                                                    Name(
-                                                        ExprName {
-                                                            range: 142..143,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 150..174,
-                                value: Named(
-                                    ExprNamed {
-                                        range: 151..173,
-                                        target: Name(
-                                            ExprName {
-                                                range: 151..155,
-                                                id: Name("name"),
-                                                ctx: Store,
-                                            },
-                                        ),
-                                        value: YieldFrom(
-                                            ExprYieldFrom {
-                                                range: 160..172,
-                                                value: Name(
-                                                    ExprName {
-                                                        range: 171..172,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 133..157,
+                    value: Named(
+                        ExprNamed {
+                            range: 134..156,
+                            target: Name(
+                                ExprName {
+                                    range: 134..138,
+                                    id: Name("name"),
+                                    ctx: Store,
+                                },
+                            ),
+                            value: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 143..155,
+                                    value: Name(
+                                        ExprName {
+                                            range: 154..155,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                        },
+                    ),
                 },
             ),
         ],

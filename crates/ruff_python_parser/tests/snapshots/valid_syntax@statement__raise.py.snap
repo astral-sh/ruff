@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/raise.py
+snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..307,
+        range: 0..289,
         body: [
             Raise(
                 StmtRaise {
@@ -169,72 +170,49 @@ Module(
                     cause: None,
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 79..101,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("_"),
-                        range: 83..84,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 84..86,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Raise(
-                            StmtRaise {
-                                range: 88..101,
-                                exc: Some(
-                                    Await(
-                                        ExprAwait {
-                                            range: 94..101,
-                                            value: Name(
-                                                ExprName {
-                                                    range: 100..101,
-                                                    id: Name("x"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                    ),
+            Raise(
+                StmtRaise {
+                    range: 79..92,
+                    exc: Some(
+                        Await(
+                            ExprAwait {
+                                range: 85..92,
+                                value: Name(
+                                    ExprName {
+                                        range: 91..92,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
                                 ),
-                                cause: None,
                             },
                         ),
-                    ],
+                    ),
+                    cause: None,
                 },
             ),
             Raise(
                 StmtRaise {
-                    range: 102..124,
+                    range: 93..115,
                     exc: Some(
                         If(
                             ExprIf {
-                                range: 108..124,
+                                range: 99..115,
                                 test: BooleanLiteral(
                                     ExprBooleanLiteral {
-                                        range: 113..117,
+                                        range: 104..108,
                                         value: true,
                                     },
                                 ),
                                 body: Name(
                                     ExprName {
-                                        range: 108..109,
+                                        range: 99..100,
                                         id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
                                 orelse: Name(
                                     ExprName {
-                                        range: 123..124,
+                                        range: 114..115,
                                         id: Name("y"),
                                         ctx: Load,
                                     },
@@ -247,11 +225,11 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    range: 147..161,
+                    range: 138..152,
                     exc: Some(
                         Name(
                             ExprName {
-                                range: 153..154,
+                                range: 144..145,
                                 id: Name("x"),
                                 ctx: Load,
                             },
@@ -260,7 +238,7 @@ Module(
                     cause: Some(
                         Name(
                             ExprName {
-                                range: 160..161,
+                                range: 151..152,
                                 id: Name("a"),
                                 ctx: Load,
                             },
@@ -270,11 +248,11 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    range: 162..181,
+                    range: 153..172,
                     exc: Some(
                         Name(
                             ExprName {
-                                range: 168..169,
+                                range: 159..160,
                                 id: Name("x"),
                                 ctx: Load,
                             },
@@ -283,18 +261,18 @@ Module(
                     cause: Some(
                         Tuple(
                             ExprTuple {
-                                range: 175..181,
+                                range: 166..172,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            range: 176..177,
+                                            range: 167..168,
                                             id: Name("a"),
                                             ctx: Load,
                                         },
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 179..180,
+                                            range: 170..171,
                                             id: Name("b"),
                                             ctx: Load,
                                         },
@@ -309,11 +287,11 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    range: 182..200,
+                    range: 173..191,
                     exc: Some(
                         Name(
                             ExprName {
-                                range: 188..189,
+                                range: 179..180,
                                 id: Name("x"),
                                 ctx: Load,
                             },
@@ -322,10 +300,10 @@ Module(
                     cause: Some(
                         Compare(
                             ExprCompare {
-                                range: 195..200,
+                                range: 186..191,
                                 left: NumberLiteral(
                                     ExprNumberLiteral {
-                                        range: 195..196,
+                                        range: 186..187,
                                         value: Int(
                                             1,
                                         ),
@@ -337,7 +315,7 @@ Module(
                                 comparators: [
                                     NumberLiteral(
                                         ExprNumberLiteral {
-                                            range: 199..200,
+                                            range: 190..191,
                                             value: Int(
                                                 2,
                                             ),
@@ -351,11 +329,11 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    range: 201..221,
+                    range: 192..212,
                     exc: Some(
                         Name(
                             ExprName {
-                                range: 207..208,
+                                range: 198..199,
                                 id: Name("x"),
                                 ctx: Load,
                             },
@@ -364,19 +342,19 @@ Module(
                     cause: Some(
                         BoolOp(
                             ExprBoolOp {
-                                range: 214..221,
+                                range: 205..212,
                                 op: And,
                                 values: [
                                     Name(
                                         ExprName {
-                                            range: 214..215,
+                                            range: 205..206,
                                             id: Name("a"),
                                             ctx: Load,
                                         },
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 220..221,
+                                            range: 211..212,
                                             id: Name("b"),
                                             ctx: Load,
                                         },
@@ -389,11 +367,11 @@ Module(
             ),
             Raise(
                 StmtRaise {
-                    range: 222..246,
+                    range: 213..237,
                     exc: Some(
                         Name(
                             ExprName {
-                                range: 228..229,
+                                range: 219..220,
                                 id: Name("x"),
                                 ctx: Load,
                             },
@@ -402,19 +380,19 @@ Module(
                     cause: Some(
                         Lambda(
                             ExprLambda {
-                                range: 235..246,
+                                range: 226..237,
                                 parameters: Some(
                                     Parameters {
-                                        range: 242..243,
+                                        range: 233..234,
                                         posonlyargs: [],
                                         args: [
                                             ParameterWithDefault {
-                                                range: 242..243,
+                                                range: 233..234,
                                                 parameter: Parameter {
-                                                    range: 242..243,
+                                                    range: 233..234,
                                                     name: Identifier {
                                                         id: Name("x"),
-                                                        range: 242..243,
+                                                        range: 233..234,
                                                     },
                                                     annotation: None,
                                                 },
@@ -428,7 +406,7 @@ Module(
                                 ),
                                 body: Name(
                                     ExprName {
-                                        range: 245..246,
+                                        range: 236..237,
                                         id: Name("y"),
                                         ctx: Load,
                                     },
@@ -438,64 +416,41 @@ Module(
                     ),
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 247..276,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("_"),
-                        range: 251..252,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 252..254,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Raise(
-                            StmtRaise {
-                                range: 256..276,
-                                exc: Some(
-                                    Name(
-                                        ExprName {
-                                            range: 262..263,
-                                            id: Name("x"),
-                                            ctx: Load,
-                                        },
-                                    ),
-                                ),
-                                cause: Some(
-                                    Await(
-                                        ExprAwait {
-                                            range: 269..276,
-                                            value: Name(
-                                                ExprName {
-                                                    range: 275..276,
-                                                    id: Name("x"),
-                                                    ctx: Load,
-                                                },
-                                            ),
-                                        },
-                                    ),
+            Raise(
+                StmtRaise {
+                    range: 238..258,
+                    exc: Some(
+                        Name(
+                            ExprName {
+                                range: 244..245,
+                                id: Name("x"),
+                                ctx: Load,
+                            },
+                        ),
+                    ),
+                    cause: Some(
+                        Await(
+                            ExprAwait {
+                                range: 251..258,
+                                value: Name(
+                                    ExprName {
+                                        range: 257..258,
+                                        id: Name("x"),
+                                        ctx: Load,
+                                    },
                                 ),
                             },
                         ),
-                    ],
+                    ),
                 },
             ),
             Raise(
                 StmtRaise {
-                    range: 277..306,
+                    range: 259..288,
                     exc: Some(
                         Name(
                             ExprName {
-                                range: 283..284,
+                                range: 265..266,
                                 id: Name("x"),
                                 ctx: Load,
                             },
@@ -504,23 +459,23 @@ Module(
                     cause: Some(
                         If(
                             ExprIf {
-                                range: 290..306,
+                                range: 272..288,
                                 test: BooleanLiteral(
                                     ExprBooleanLiteral {
-                                        range: 295..299,
+                                        range: 277..281,
                                         value: true,
                                     },
                                 ),
                                 body: Name(
                                     ExprName {
-                                        range: 290..291,
+                                        range: 272..273,
                                         id: Name("x"),
                                         ctx: Load,
                                     },
                                 ),
                                 orelse: Name(
                                     ExprName {
-                                        range: 305..306,
+                                        range: 287..288,
                                         id: Name("y"),
                                         ctx: Load,
                                     },

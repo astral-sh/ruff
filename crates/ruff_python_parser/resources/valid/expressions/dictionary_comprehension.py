@@ -8,11 +8,9 @@
 
 # Non-parenthesized iter/if for the following expressions aren't allowed, so make sure
 # it parses correctly for the parenthesized cases
-def outer():
-    {x: y for x in (yield y)}
-    {x: y for x in (yield from y)}
+{x: y for x in (yield y)}
+{x: y for x in (yield from y)}
 {x: y for x in (lambda y: y)}
-def outer():
-    {x: y for x in data if (yield y)}
-    {x: y for x in data if (yield from y)}
+{x: y for x in data if (yield y)}
+{x: y for x in data if (yield from y)}
 {x: y for x in data if (lambda y: y)}

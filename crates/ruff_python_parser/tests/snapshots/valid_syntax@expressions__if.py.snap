@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/expressions/if.py
+snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..441,
+        range: 0..423,
         body: [
             Expr(
                 StmtExpr {
@@ -443,124 +444,101 @@ Module(
                     ),
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 302..367,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("_"),
-                        range: 306..307,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 307..309,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 315..336,
-                                value: If(
-                                    ExprIf {
-                                        range: 315..336,
-                                        test: Yield(
-                                            ExprYield {
-                                                range: 321..328,
-                                                value: Some(
-                                                    Name(
-                                                        ExprName {
-                                                            range: 327..328,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        ),
-                                        body: Name(
+            Expr(
+                StmtExpr {
+                    range: 302..323,
+                    value: If(
+                        ExprIf {
+                            range: 302..323,
+                            test: Yield(
+                                ExprYield {
+                                    range: 308..315,
+                                    value: Some(
+                                        Name(
                                             ExprName {
-                                                range: 315..316,
+                                                range: 314..315,
                                                 id: Name("x"),
                                                 ctx: Load,
                                             },
                                         ),
-                                        orelse: Name(
-                                            ExprName {
-                                                range: 335..336,
-                                                id: Name("y"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 341..367,
-                                value: If(
-                                    ExprIf {
-                                        range: 341..367,
-                                        test: YieldFrom(
-                                            ExprYieldFrom {
-                                                range: 347..359,
-                                                value: Name(
-                                                    ExprName {
-                                                        range: 358..359,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        body: Name(
-                                            ExprName {
-                                                range: 341..342,
-                                                id: Name("x"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        orelse: Name(
-                                            ExprName {
-                                                range: 366..367,
-                                                id: Name("y"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
+                                    ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 302..303,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 322..323,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
                 },
             ),
             Expr(
                 StmtExpr {
-                    range: 368..393,
+                    range: 324..350,
                     value: If(
                         ExprIf {
-                            range: 368..393,
+                            range: 324..350,
+                            test: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 330..342,
+                                    value: Name(
+                                        ExprName {
+                                            range: 341..342,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            body: Name(
+                                ExprName {
+                                    range: 324..325,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    range: 349..350,
+                                    id: Name("y"),
+                                    ctx: Load,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 351..376,
+                    value: If(
+                        ExprIf {
+                            range: 351..376,
                             test: Lambda(
                                 ExprLambda {
-                                    range: 374..385,
+                                    range: 357..368,
                                     parameters: Some(
                                         Parameters {
-                                            range: 381..382,
+                                            range: 364..365,
                                             posonlyargs: [],
                                             args: [
                                                 ParameterWithDefault {
-                                                    range: 381..382,
+                                                    range: 364..365,
                                                     parameter: Parameter {
-                                                        range: 381..382,
+                                                        range: 364..365,
                                                         name: Identifier {
                                                             id: Name("x"),
-                                                            range: 381..382,
+                                                            range: 364..365,
                                                         },
                                                         annotation: None,
                                                     },
@@ -574,7 +552,7 @@ Module(
                                     ),
                                     body: Name(
                                         ExprName {
-                                            range: 384..385,
+                                            range: 367..368,
                                             id: Name("x"),
                                             ctx: Load,
                                         },
@@ -583,14 +561,14 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
-                                    range: 368..369,
+                                    range: 351..352,
                                     id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
                             orelse: Name(
                                 ExprName {
-                                    range: 392..393,
+                                    range: 375..376,
                                     id: Name("y"),
                                     ctx: Load,
                                 },
@@ -601,27 +579,27 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    range: 425..440,
+                    range: 408..423,
                     value: If(
                         ExprIf {
-                            range: 426..439,
+                            range: 409..422,
                             test: Name(
                                 ExprName {
-                                    range: 431..432,
+                                    range: 414..415,
                                     id: Name("y"),
                                     ctx: Load,
                                 },
                             ),
                             body: Name(
                                 ExprName {
-                                    range: 426..427,
+                                    range: 409..410,
                                     id: Name("x"),
                                     ctx: Load,
                                 },
                             ),
                             orelse: Name(
                                 ExprName {
-                                    range: 438..439,
+                                    range: 421..422,
                                     id: Name("z"),
                                     ctx: Load,
                                 },

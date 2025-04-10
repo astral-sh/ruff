@@ -15,12 +15,10 @@ a, b,
 # Starred expression
 *a,
 a, *b
-def outer():
-    *a | b, *await x, (), *()
+*a | b, *await x, (), *()
 (*a,)
 (a, *b)
-def outer():
-    (*a | b, *await x, (), *())
+(*a | b, *await x, (), *())
 
 # Named expression
 (x := 1,)

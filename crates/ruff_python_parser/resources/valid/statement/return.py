@@ -8,6 +8,5 @@ return 1 < 2
 return 1, 2,
 return call()
 return attr.value()
-def outer():
-    return await x
+return await x
 return lambda x: y
