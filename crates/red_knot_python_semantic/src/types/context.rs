@@ -261,6 +261,17 @@ impl LintReporter<'_, '_> {
 /// relevant suppression.
 impl Drop for LintReporter<'_, '_> {
     fn drop(&mut self) {
+        // The comment below was copied from the original
+        // implementation of diagnostic reporting. The code
+        // has been refactored, but this still kind of looked
+        // relevant, so I've preserved the note. ---AG
+        //
+        // TODO: Don't emit the diagnostic if:
+        // * The enclosing node contains any syntax errors
+        // * The rule is disabled for this file. We probably want to introduce a new query that
+        //   returns a rule selector for a given file that respects the package's settings,
+        //   any global pragma comments in the file, and any per-file-ignores.
+
         // OK because the only way `self.diag` is `None`
         // is via this impl, which can only run at most
         // once.
@@ -406,17 +417,6 @@ impl DiagnosticReporter<'_, '_> {
 /// This will add the diagnostic to the typing context if appropriate.
 impl Drop for DiagnosticReporter<'_, '_> {
     fn drop(&mut self) {
-        // The comment below was copied from the original
-        // implementation of diagnostic reporting. The code
-        // has been refactored, but this still kind of looked
-        // relevant, so I've preserved the note. ---AG
-        //
-        // TODO: Don't emit the diagnostic if:
-        // * The enclosing node contains any syntax errors
-        // * The rule is disabled for this file. We probably want to introduce a new query that
-        //   returns a rule selector for a given file that respects the package's settings,
-        //   any global pragma comments in the file, and any per-file-ignores.
-
         // OK because the only way `self.diag` is `None`
         // is via this impl, which can only run at most
         // once.
