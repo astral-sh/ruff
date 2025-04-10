@@ -91,11 +91,11 @@ impl<'db> InferContext<'db> {
         diag.annotate(Annotation::primary(span).message(message));
     }
 
-    /// Optionally return a reporter for adding a lint diagnostic.
+    /// Optionally return a reporter builder for adding a lint diagnostic.
     ///
-    /// If the current context believes a diagnostic should be reported for
-    /// the given lint, then a reporter is returned that enables building up a
-    /// diagnostic. The severity of the diagnostic returned is automatically
+    /// If the current context believes a diagnostic should be reported for the
+    /// given lint, then a reporter builder is returned that enables building
+    /// a diagnostic. The severity of the diagnostic returned is automatically
     /// determined by the given lint and configuration. The message given is
     /// used to construct the initial diagnostic and should be considered the
     /// "primary message" of the diagnostic. (i.e., If nothing else about the
@@ -117,12 +117,13 @@ impl<'db> InferContext<'db> {
         LintReporterBuilder::new(self, lint)
     }
 
-    /// Optionally return a reporter for adding a diagnostic.
+    /// Optionally return a reporter builder for adding a diagnostic.
     ///
-    /// This only returns a reporter if the current context allows a diagnostic
-    /// with the given information to be added. In general, the requirements
-    /// here are quite a bit less than for `InferContext::lint`, since this
-    /// routine doesn't take rule selection into account.
+    /// This only returns a reporter builder if the current context
+    /// allows a diagnostic with the given information to be added.
+    /// In general, the requirements here are quite a bit less than
+    /// for `InferContext::lint`, since this routine doesn't take rule
+    /// selection into account.
     ///
     /// After using the builder to make a reporter, once the reporter is
     /// dropped, the diagnostic is added to the context, unless there is
