@@ -64,6 +64,7 @@ pub fn inlay_hints(db: &dyn Db, file: File, range: TextRange) -> Vec<InlayHint<'
 struct InlayHintVisitor<'db> {
     model: SemanticModel<'db>,
     hints: Vec<InlayHint<'db>>,
+    in_assignment: bool,
     range: TextRange,
 }
 
@@ -72,6 +73,7 @@ impl<'db> InlayHintVisitor<'db> {
         Self {
             model: SemanticModel::new(db.upcast(), file),
             hints: Vec::new(),
+            in_assignment: false,
             range,
         }
     }
@@ -81,20 +83,6 @@ impl<'db> InlayHintVisitor<'db> {
             position,
             content: InlayHintContent::Type(ty),
         });
-    }
-
-    fn handle_assign_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Tuple(tuple) => {
-                for element in &tuple.elts {
-                    self.handle_assign_expr(element);
-                }
-            }
-            _ => {
-                let ty = expr.inferred_type(&self.model);
-                self.add_type_hint(expr.range().end(), ty);
-            }
-        }
     }
 }
 
@@ -116,9 +104,13 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
 
         match stmt {
             Stmt::Assign(assign) => {
+                self.in_assignment = true;
                 for target in &assign.targets {
-                    self.handle_assign_expr(target);
+                    self.visit_expr(target);
                 }
+                self.in_assignment = false;
+
+                return;
             }
             // TODO
             Stmt::FunctionDef(_) => {}
@@ -131,6 +123,24 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_> {
         }
 
         source_order::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'_ Expr) {
+        if !self.in_assignment {
+            return;
+        }
+
+        match expr {
+            Expr::Name(name) => {
+                if name.ctx.is_store() {
+                    let ty = expr.inferred_type(&self.model);
+                    self.add_type_hint(expr.range().end(), ty);
+                }
+            }
+            _ => {
+                source_order::walk_expr(self, expr);
+            }
+        }
     }
 }
 
