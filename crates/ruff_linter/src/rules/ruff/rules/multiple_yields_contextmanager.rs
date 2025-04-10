@@ -95,18 +95,16 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
             return source_order::TraversalSignal::Skip;
         }
         match node {
-            AnyNodeRef::StmtTry(_)
+            AnyNodeRef::StmtFor(_)
+            | AnyNodeRef::StmtWhile(_)
+            | AnyNodeRef::StmtTry(_)
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::ExceptHandlerExceptHandler(_)
             | AnyNodeRef::ElifElseClause(_)
             | AnyNodeRef::MatchCase(_) => {
+                // Nodes that branch or repeat control flow
                 self.yield_counts.push(0);
-            }
-            AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
-                // Yields in loops are at high risk of being executed multiple times
-                self.has_multiple_yields = true;
-                return source_order::TraversalSignal::Skip;
             }
             _ => {}
         }
@@ -116,17 +114,9 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
     fn leave_node(&mut self, node: AnyNodeRef<'a>) {
         match node {
             AnyNodeRef::StmtTry(try_stmt) => {
-                let finally_yields = if try_stmt.finalbody.is_empty() {
-                    0
-                } else {
-                    self.yield_counts.pop().unwrap_or(0)
-                };
+                let finally_yields = self.yield_counts.pop().unwrap_or(0);
 
-                let else_yields = if try_stmt.orelse.is_empty() {
-                    0
-                } else {
-                    self.yield_counts.pop().unwrap_or(0)
-                };
+                let else_yields = self.yield_counts.pop().unwrap_or(0);
 
                 let mut max_except_yields = 0;
                 for _ in 0..try_stmt.handlers.len() {
@@ -136,10 +126,8 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
 
                 let try_yields = self.yield_counts.pop().unwrap_or(0);
 
-                let try_except_finally = try_yields + max_except_yields + finally_yields;
-                let try_else_finally = try_yields + else_yields + finally_yields;
-
-                let max_path_yields = try_except_finally.max(try_else_finally);
+                let max_path_yields =
+                    try_yields + max_except_yields.max(else_yields) + finally_yields;
 
                 if let Some(root) = self.yield_counts.pop() {
                     self.yield_counts.push(root + max_path_yields);
@@ -171,7 +159,23 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     self.yield_counts.push(root + max_branch_yields);
                 }
             }
-            AnyNodeRef::ElifElseClause(_) | AnyNodeRef::MatchCase(_) => {
+            AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
+                let else_yields = self.yield_counts.pop().unwrap_or(0);
+                let body_yields = self.yield_counts.pop().unwrap_or(0);
+
+                if body_yields > 0 {
+                    // A yield in a loop body is at high risk to yield multiple times
+                    self.has_multiple_yields = true
+                }
+                if let Some(root) = self.yield_counts.pop() {
+                    self.yield_counts.push(root + else_yields);
+                }
+            }
+            AnyNodeRef::ElifElseClause(_) => {
+                // Handled on enter/leave of outer structure.
+            }
+
+            AnyNodeRef::MatchCase(_) => {
                 // Handled on enter/leave of outer structure
             }
             _ => {}
@@ -199,22 +203,52 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
             ast::Stmt::FunctionDef(nested) => {
                 function_def_visit_preorder_except_body(nested, self);
             }
-            ast::Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                source_order::walk_body(self, body);
-                for handler in handlers {
+            ast::Stmt::While(loop_stmt @ ast::StmtWhile { body, orelse, .. }) => {
+                let node = ruff_python_ast::AnyNodeRef::StmtWhile(loop_stmt);
+
+                if self.enter_node(node).is_traverse() {
+                    self.visit_body(body);
                     self.yield_counts.push(0);
-                    source_order::walk_except_handler(self, handler);
+                    self.visit_body(orelse);
+
+                    self.leave_node(node);
                 }
-                self.yield_counts.push(0);
-                source_order::walk_body(self, orelse);
-                self.yield_counts.push(0);
-                source_order::walk_body(self, finalbody);
+            }
+            ast::Stmt::For(loop_stmt @ ast::StmtFor { body, orelse, .. }) => {
+                let node = ruff_python_ast::AnyNodeRef::StmtFor(loop_stmt);
+                if self.enter_node(node).is_traverse() {
+                    self.visit_body(body);
+                    self.yield_counts.push(0);
+                    self.visit_body(orelse);
+
+                    self.leave_node(node);
+                }
+            }
+            ast::Stmt::Try(
+                try_stmt @ ast::StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    ..
+                },
+            ) => {
+                let node = ruff_python_ast::AnyNodeRef::StmtTry(try_stmt);
+                if self.enter_node(node).is_traverse() {
+                    self.visit_body(body);
+
+                    for handler in handlers {
+                        // Pushed on stack in except handler
+                        self.visit_except_handler(handler);
+                    }
+
+                    self.yield_counts.push(0);
+                    self.visit_body(orelse);
+                    self.yield_counts.push(0);
+                    self.visit_body(finalbody);
+
+                    self.leave_node(node);
+                }
             }
             _ => source_order::walk_stmt(self, stmt),
         }
