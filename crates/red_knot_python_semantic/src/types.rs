@@ -769,7 +769,7 @@ impl<'db> Type<'db> {
     ///
     /// This method returns `false` if either `self` or `other` is not fully static.
     ///
-    /// [subtype of]: https://typing.readthedocs.io/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
+    /// [subtype of]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         // Two equivalent types are always subtypes of each other.
         //
@@ -1059,7 +1059,7 @@ impl<'db> Type<'db> {
 
     /// Return true if this type is [assignable to] type `target`.
     ///
-    /// [assignable to]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+    /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         if self.is_gradual_equivalent_to(db, target) {
             return true;
@@ -1277,7 +1277,7 @@ impl<'db> Type<'db> {
     ///
     /// This method returns `false` if either `self` or `other` is not fully static.
     ///
-    /// [equivalent to]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
+    /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         // TODO equivalent but not identical types: TypedDicts, Protocols, type aliases, etc.
 
@@ -1321,7 +1321,7 @@ impl<'db> Type<'db> {
     ///
     /// This powers the `assert_type()` directive.
     ///
-    /// [Summary of type relations]: https://typing.readthedocs.io/en/latest/spec/concepts.html#summary-of-type-relations
+    /// [Summary of type relations]: https://typing.python.org/en/latest/spec/concepts.html#summary-of-type-relations
     pub(crate) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
         if self == other {
             return true;
@@ -3899,7 +3899,7 @@ impl<'db> Type<'db> {
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
-            // https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex
+            // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
             Type::ClassLiteral(class) => {
                 let ty = match class.known(db) {
                     Some(KnownClass::Any) => Type::any(),
@@ -4076,6 +4076,9 @@ impl<'db> Type<'db> {
                 )),
                 Some(KnownClass::GenericAlias) => Ok(todo_type!(
                     "Support for `typing.GenericAlias` instances in type expressions"
+                )),
+                Some(KnownClass::UnionType) => Ok(todo_type!(
+                    "Support for `types.UnionType` instances in type expressions"
                 )),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
@@ -4525,7 +4528,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
             invalid_expressions,
         } = self;
         for error in invalid_expressions {
-            context.report_lint(
+            context.report_lint_old(
                 &INVALID_TYPE_FORM,
                 node,
                 format_args!("{}", error.reason(context.db())),
@@ -4763,7 +4766,7 @@ impl<'db> ContextManagerError<'db> {
             } => format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
         };
 
-        context.report_lint(
+        context.report_lint_old(
             &INVALID_CONTEXT_MANAGER,
             context_expression_node,
             format_args!(
@@ -4866,7 +4869,7 @@ impl<'db> IterationError<'db> {
         let db = context.db();
 
         let report_not_iterable = |arguments: std::fmt::Arguments| {
-            context.report_lint(&NOT_ITERABLE, iterable_node, arguments);
+            context.report_lint_old(&NOT_ITERABLE, iterable_node, arguments);
         };
 
         // TODO: for all of these error variants, the "explanation" for the diagnostic
@@ -5144,7 +5147,7 @@ impl<'db> BoolError<'db> {
             Self::IncorrectArguments {
                 not_boolable_type, ..
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
@@ -5157,7 +5160,7 @@ impl<'db> BoolError<'db> {
                 not_boolable_type,
                 return_type,
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
@@ -5168,7 +5171,7 @@ impl<'db> BoolError<'db> {
                 );
             }
             Self::NotCallable { not_boolable_type } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
@@ -5184,7 +5187,7 @@ impl<'db> BoolError<'db> {
                     .find_map(|element| element.try_bool(context.db()).err())
                     .unwrap();
 
-                context.report_lint(
+                context.report_lint_old(
                         &UNSUPPORTED_BOOL_CONVERSION,
                         condition,
                         format_args!(
@@ -5196,7 +5199,7 @@ impl<'db> BoolError<'db> {
             }
 
             Self::Other { not_boolable_type } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNSUPPORTED_BOOL_CONVERSION,
                     condition,
                     format_args!(
@@ -5237,7 +5240,7 @@ impl<'db> ConstructorCallError<'db> {
                 // If we are using vendored typeshed, it should be impossible to have missing
                 // or unbound `__init__` method on a class, as all classes have `object` in MRO.
                 // Thus the following may only trigger if a custom typeshed is used.
-                context.report_lint(
+                context.report_lint_old(
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
@@ -5247,7 +5250,7 @@ impl<'db> ConstructorCallError<'db> {
                 );
             }
             CallDunderError::PossiblyUnbound(bindings) => {
-                context.report_lint(
+                context.report_lint_old(
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
@@ -5270,7 +5273,7 @@ impl<'db> ConstructorCallError<'db> {
                 unreachable!("`__new__` method may not be called if missing");
             }
             CallDunderError::PossiblyUnbound(bindings) => {
-                context.report_lint(
+                context.report_lint_old(
                     &CALL_POSSIBLY_UNBOUND_METHOD,
                     context_expression_node,
                     format_args!(
@@ -5526,7 +5529,7 @@ pub enum KnownFunction {
     /// `typing(_extensions).final`
     Final,
 
-    /// [`typing(_extensions).no_type_check`](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
+    /// [`typing(_extensions).no_type_check`](https://typing.python.org/en/latest/spec/directives.html#no-type-check)
     NoTypeCheck,
 
     /// `typing(_extensions).assert_type`

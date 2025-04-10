@@ -254,4 +254,4 @@ from knot_extensions import is_equivalent_to, static_assert
 static_assert(is_equivalent_to(int | Callable[[int | str], None], Callable[[str | int], None] | int))
 ```
 
-[the equivalence relation]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-equivalent
+[the equivalence relation]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent

@@ -46,7 +46,7 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// is 3.9 or below.
 ///
 /// ## References
-/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
+/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 #[derive(ViolationMetadata)]
 pub(crate) struct RedundantNoneLiteral {
     union_kind: UnionKind,

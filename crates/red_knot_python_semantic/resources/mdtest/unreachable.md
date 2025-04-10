@@ -117,8 +117,6 @@ python-version = "3.10"
 import sys
 
 if sys.version_info >= (3, 11):
-    # TODO: we should not emit an error here
-    # error: [unresolved-import]
     from typing import Self
 ```
 
@@ -166,8 +164,6 @@ python-platform = "linux"
 import sys
 
 if sys.platform == "win32":
-    # TODO: we should not emit an error here
-    # error: [unresolved-attribute]
     sys.getwindowsversion()
 ```
 
@@ -381,8 +377,6 @@ import sys
 import builtins
 
 if sys.version_info >= (3, 11):
-    # TODO
-    # error: [unresolved-attribute]
     builtins.ExceptionGroup
 ```
 
@@ -395,22 +389,14 @@ diagnostics:
 import sys
 
 if sys.version_info >= (3, 11):
-    # TODO
-    # error: [unresolved-import]
     from builtins import ExceptionGroup
 
-    # TODO
-    # error: [unresolved-import]
     import builtins.ExceptionGroup
 
     # See https://docs.python.org/3/whatsnew/3.11.html#new-modules
 
-    # TODO
-    # error: [unresolved-import]
     import tomllib
 
-    # TODO
-    # error: [unresolved-import]
     import wsgiref.types
 ```
 
@@ -423,15 +409,36 @@ if False:
     x = 1
 
     def f():
-        # TODO
-        # error: [unresolved-reference]
         print(x)
 
     class C:
         def __init__(self):
-            # TODO
-            # error: [unresolved-reference]
             print(x)
+```
+
+### Type annotations
+
+Silencing of diagnostics also works for type annotations, even if they are stringified:
+
+```py
+import sys
+import typing
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+
+    class C:
+        def name_expr(self) -> Self:
+            return self
+
+        def name_expr_stringified(self) -> "Self":
+            return self
+
+        def attribute_expr(self) -> typing.Self:
+            return self
+
+        def attribute_expr_stringified(self) -> "typing.Self":
+            return self
 ```
 
 ### Use of unreachable symbols in type annotations, or as class bases

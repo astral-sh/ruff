@@ -28,6 +28,29 @@ pub(crate) trait PositionExt {
     fn to_text_size(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> TextSize;
 }
 
+pub(crate) trait TextSizeExt {
+    fn to_position(
+        self,
+        text: &str,
+        index: &LineIndex,
+        encoding: PositionEncoding,
+    ) -> types::Position
+    where
+        Self: Sized;
+}
+
+impl TextSizeExt for TextSize {
+    fn to_position(
+        self,
+        text: &str,
+        index: &LineIndex,
+        encoding: PositionEncoding,
+    ) -> types::Position {
+        let source_location = offset_to_source_location(self, text, index, encoding);
+        source_location_to_position(&source_location)
+    }
+}
+
 pub(crate) trait ToRangeExt {
     fn to_lsp_range(
         &self,
@@ -107,18 +130,8 @@ impl ToRangeExt for TextRange {
         encoding: PositionEncoding,
     ) -> types::Range {
         types::Range {
-            start: source_location_to_position(&offset_to_source_location(
-                self.start(),
-                text,
-                index,
-                encoding,
-            )),
-            end: source_location_to_position(&offset_to_source_location(
-                self.end(),
-                text,
-                index,
-                encoding,
-            )),
+            start: self.start().to_position(text, index, encoding),
+            end: self.end().to_position(text, index, encoding),
         }
     }
 

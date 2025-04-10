@@ -663,15 +663,24 @@ fn symbol_from_bindings_impl<'db>(
         requires_explicit_reexport.is_yes() && !binding.is_reexported(db)
     };
 
-    let unbound_visibility = match bindings_with_constraints.peek() {
+    let unbound_visibility_constraint = match bindings_with_constraints.peek() {
         Some(BindingWithConstraints {
             binding,
             visibility_constraint,
             narrowing_constraint: _,
-        }) if binding.is_none_or(is_non_exported) => {
-            visibility_constraints.evaluate(db, predicates, *visibility_constraint)
-        }
-        _ => Truthiness::AlwaysFalse,
+        }) if binding.is_none_or(is_non_exported) => Some(*visibility_constraint),
+        _ => None,
+    };
+
+    // Evaluate this lazily because we don't always need it (for example, if there are no visible
+    // bindings at all, we don't need it), and it can cause us to evaluate visibility constraint
+    // expressions, which is extra work and can lead to cycles.
+    let unbound_visibility = || {
+        unbound_visibility_constraint
+            .map(|visibility_constraint| {
+                visibility_constraints.evaluate(db, predicates, visibility_constraint)
+            })
+            .unwrap_or(Truthiness::AlwaysFalse)
     };
 
     let mut types = bindings_with_constraints.filter_map(
@@ -733,7 +742,7 @@ fn symbol_from_bindings_impl<'db>(
                 // code. However, it is still okay to return `Never` in this case, because we will
                 // union the types of all bindings, and `Never` will be eliminated automatically.
 
-                if unbound_visibility.is_always_false() {
+                if unbound_visibility().is_always_false() {
                     // The scope-start is not visible
                     return Some(Type::Never);
                 }
@@ -762,7 +771,7 @@ fn symbol_from_bindings_impl<'db>(
     );
 
     if let Some(first) = types.next() {
-        let boundness = match unbound_visibility {
+        let boundness = match unbound_visibility() {
             Truthiness::AlwaysTrue => {
                 unreachable!("If we have at least one binding, the scope-start should not be definitely visible")
             }

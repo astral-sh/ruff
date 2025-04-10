@@ -207,7 +207,7 @@ first argument:
 def wrong_signature(f: int) -> str:
     return "a"
 
-# error: [invalid-argument-type] "Object of type `Literal[f]` cannot be assigned to parameter 1 (`f`) of function `wrong_signature`; expected type `int`"
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal[f]`"
 @wrong_signature
 def f(x): ...
 

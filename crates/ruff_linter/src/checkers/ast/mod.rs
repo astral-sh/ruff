@@ -27,8 +27,7 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_parser::semantic_errors::{
-    Checkpoint, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
-    SemanticSyntaxErrorKind,
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -283,7 +282,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
-            semantic_checker: SemanticSyntaxChecker::new(source_type),
+            semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
         }
     }
@@ -526,14 +525,10 @@ impl<'a> Checker<'a> {
         self.target_version
     }
 
-    fn with_semantic_checker(
-        &mut self,
-        f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker) -> Checkpoint,
-    ) -> Checkpoint {
+    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
         let mut checker = std::mem::take(&mut self.semantic_checker);
-        let checkpoint = f(&mut checker, self);
+        f(&mut checker, self);
         self.semantic_checker = checker;
-        checkpoint
     }
 }
 
@@ -597,17 +592,43 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn future_annotations_or_stub(&self) -> bool {
         self.semantic.future_annotations_or_stub()
     }
+
+    fn in_async_context(&self) -> bool {
+        self.semantic.in_async_context()
+    }
+
+    fn in_sync_comprehension(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            if let ScopeKind::Generator {
+                kind:
+                    GeneratorKind::ListComprehension
+                    | GeneratorKind::DictComprehension
+                    | GeneratorKind::SetComprehension,
+                is_async: false,
+            } = scope.kind
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn in_module_scope(&self) -> bool {
+        self.semantic.current_scope().kind.is_module()
+    }
+
+    fn in_notebook(&self) -> bool {
+        self.source_type.is_ipynb()
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
-        let checkpoint = if stmt.is_function_def_stmt() {
-            None
-        } else {
-            Some(self.with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context)))
-        };
+        if !stmt.is_function_def_stmt() {
+            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        }
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
@@ -1210,10 +1231,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
         self.last_stmt_end = stmt.end();
-
-        if let Some(checkpoint) = checkpoint {
-            self.semantic_checker.exit_stmt(checkpoint);
-        }
     }
 
     fn visit_annotation(&mut self, expr: &'a Expr) {
@@ -1224,8 +1241,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        let checkpoint =
-            self.with_semantic_checker(|semantic, context| semantic.enter_expr(expr, context));
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()
@@ -1772,8 +1788,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
         analyze::expression(expr, self);
         self.semantic.pop_node();
-
-        self.semantic_checker.exit_expr(checkpoint);
     }
 
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
@@ -2012,7 +2026,10 @@ impl<'a> Checker<'a> {
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
-        self.semantic.push_scope(ScopeKind::Generator(kind));
+        self.semantic.push_scope(ScopeKind::Generator {
+            kind,
+            is_async: generators.iter().any(|gen| gen.is_async),
+        });
 
         self.visit_expr(&generator.target);
         self.semantic.flags = flags;
@@ -2618,15 +2635,12 @@ impl<'a> Checker<'a> {
                     unreachable!("Expected Stmt::FunctionDef")
                 };
 
-                let checkpoint = self
-                    .with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context));
+                self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
                 self.visit_parameters(parameters);
                 // Set the docstring state before visiting the function body.
                 self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
                 self.visit_body(body);
-
-                self.semantic_checker.exit_stmt(checkpoint);
             }
         }
         self.semantic.restore(snapshot);

@@ -12,6 +12,7 @@ use rustc_hash::FxHasher;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
+use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
 use crate::semantic_index::{semantic_index, SymbolMap};
 use crate::Db;
 
@@ -176,6 +177,7 @@ pub struct Scope {
     parent: Option<FileScopeId>,
     node: NodeWithScopeKind,
     descendants: Range<FileScopeId>,
+    reachability: ScopedVisibilityConstraintId,
 }
 
 impl Scope {
@@ -183,11 +185,13 @@ impl Scope {
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
+        reachability: ScopedVisibilityConstraintId,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
+            reachability,
         }
     }
 
@@ -213,6 +217,10 @@ impl Scope {
 
     pub(crate) fn is_eager(&self) -> bool {
         self.kind().is_eager()
+    }
+
+    pub(crate) fn reachability(&self) -> ScopedVisibilityConstraintId {
+        self.reachability
     }
 }
 

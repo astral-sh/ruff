@@ -175,7 +175,7 @@ impl Unmatched for &Diagnostic {
 
         maybe_add_undefined_reveal_clarification(
             self,
-            format_args!(r#"[{id}] "{message}""#, message = self.primary_message()),
+            format_args!(r#"[{id}] "{message}""#, message = self.concise_message()),
         )
     }
 }
@@ -191,7 +191,7 @@ impl UnmatchedWithColumn for &Diagnostic {
             self,
             format_args!(
                 r#"{column} [{id}] "{message}""#,
-                message = self.primary_message()
+                message = self.concise_message()
             ),
         )
     }
@@ -283,14 +283,16 @@ impl Matcher {
         match assertion {
             ParsedAssertion::Error(error) => {
                 let position = unmatched.iter().position(|diagnostic| {
-                    !error.rule.is_some_and(|rule| {
+                    let lint_name_matches = !error.rule.is_some_and(|rule| {
                         !(diagnostic.id().is_lint_named(rule) || diagnostic.id().matches(rule))
-                    }) && error
+                    });
+                    let column_matches = error
                         .column
-                        .is_none_or(|col| col == self.column(diagnostic))
-                        && error
-                            .message_contains
-                            .is_none_or(|needle| diagnostic.primary_message().contains(needle))
+                        .is_none_or(|col| col == self.column(diagnostic));
+                    let message_matches = error.message_contains.is_none_or(|needle| {
+                        diagnostic.concise_message().to_string().contains(needle)
+                    });
+                    lint_name_matches && column_matches && message_matches
                 });
                 if let Some(position) = position {
                     unmatched.swap_remove(position);
@@ -305,11 +307,15 @@ impl Matcher {
 
                 let mut matched_revealed_type = None;
                 let mut matched_undefined_reveal = None;
-                let expected_reveal_type_message = format!("Revealed type is `{expected_type}`");
+                let expected_reveal_type_message = format!("`{expected_type}`");
                 for (index, diagnostic) in unmatched.iter().enumerate() {
                     if matched_revealed_type.is_none()
                         && diagnostic.id() == DiagnosticId::RevealedType
-                        && diagnostic.primary_message() == expected_reveal_type_message
+                        && diagnostic
+                            .primary_annotation()
+                            .and_then(|a| a.get_message())
+                            .unwrap_or_default()
+                            == expected_reveal_type_message
                     {
                         matched_revealed_type = Some(index);
                     } else if matched_undefined_reveal.is_none()
@@ -361,7 +367,11 @@ mod tests {
         }
 
         fn into_diagnostic(self, file: File) -> Diagnostic {
-            let mut diag = Diagnostic::new(self.id, Severity::Error, "");
+            let mut diag = if self.id == DiagnosticId::RevealedType {
+                Diagnostic::new(self.id, Severity::Error, "Revealed type")
+            } else {
+                Diagnostic::new(self.id, Severity::Error, "")
+            };
             let span = Span::from(file).with_range(self.range);
             diag.annotate(Annotation::primary(span).message(self.message));
             diag
@@ -417,7 +427,7 @@ mod tests {
             "x # revealed: Foo",
             vec![ExpectedDiagnostic::new(
                 DiagnosticId::RevealedType,
-                "Revealed type is `Foo`",
+                "`Foo`",
                 0,
             )],
         );
@@ -431,7 +441,7 @@ mod tests {
             "x # revealed: Foo",
             vec![ExpectedDiagnostic::new(
                 DiagnosticId::lint("not-revealed-type"),
-                "Revealed type is `Foo`",
+                "`Foo`",
                 0,
             )],
         );
@@ -442,7 +452,7 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: revealed: Foo",
-                    r#"unexpected error: 1 [not-revealed-type] "Revealed type is `Foo`""#,
+                    r#"unexpected error: 1 [not-revealed-type] "`Foo`""#,
                 ],
             )],
         );
@@ -465,7 +475,7 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: revealed: Foo",
-                    r#"unexpected error: 1 [revealed-type] "Something else""#,
+                    r#"unexpected error: 1 [revealed-type] "Revealed type: Something else""#,
                 ],
             )],
         );
@@ -483,7 +493,7 @@ mod tests {
         let result = get_result(
             "x # revealed: Foo",
             vec![
-                ExpectedDiagnostic::new(DiagnosticId::RevealedType, "Revealed type is `Foo`", 0),
+                ExpectedDiagnostic::new(DiagnosticId::RevealedType, "`Foo`", 0),
                 ExpectedDiagnostic::new(
                     DiagnosticId::lint("undefined-reveal"),
                     "Doesn't matter",
@@ -514,7 +524,7 @@ mod tests {
         let result = get_result(
             "x # revealed: Foo",
             vec![
-                ExpectedDiagnostic::new(DiagnosticId::RevealedType, "Revealed type is `Bar`", 0),
+                ExpectedDiagnostic::new(DiagnosticId::RevealedType, "`Bar`", 0),
                 ExpectedDiagnostic::new(
                     DiagnosticId::lint("undefined-reveal"),
                     "Doesn't matter",
@@ -529,7 +539,7 @@ mod tests {
                 0,
                 &[
                     "unmatched assertion: revealed: Foo",
-                    r#"unexpected error: 1 [revealed-type] "Revealed type is `Bar`""#,
+                    r#"unexpected error: 1 [revealed-type] "Revealed type: `Bar`""#,
                 ],
             )],
         );
@@ -545,11 +555,7 @@ mod tests {
                     "undefined reveal message",
                     0,
                 ),
-                ExpectedDiagnostic::new(
-                    DiagnosticId::RevealedType,
-                    "Revealed type is `Literal[1]`",
-                    12,
-                ),
+                ExpectedDiagnostic::new(DiagnosticId::RevealedType, "`Literal[1]`", 12),
             ],
         );
 
@@ -560,7 +566,7 @@ mod tests {
                 &[
                     "used built-in `reveal_type`: add a `# revealed` assertion on this line (\
                     original diagnostic: [undefined-reveal] \"undefined reveal message\")",
-                    r#"unexpected error: [revealed-type] "Revealed type is `Literal[1]`""#,
+                    r#"unexpected error: [revealed-type] "Revealed type: `Literal[1]`""#,
                 ],
             )],
         );
@@ -576,11 +582,7 @@ mod tests {
                     "undefined reveal message",
                     0,
                 ),
-                ExpectedDiagnostic::new(
-                    DiagnosticId::RevealedType,
-                    "Revealed type is `Literal[1]`",
-                    12,
-                ),
+                ExpectedDiagnostic::new(DiagnosticId::RevealedType, "`Literal[1]`", 12),
             ],
         );
 
@@ -592,7 +594,7 @@ mod tests {
                     "unmatched assertion: error: [something-else]",
                     "used built-in `reveal_type`: add a `# revealed` assertion on this line (\
                     original diagnostic: 1 [undefined-reveal] \"undefined reveal message\")",
-                    r#"unexpected error: 13 [revealed-type] "Revealed type is `Literal[1]`""#,
+                    r#"unexpected error: 13 [revealed-type] "Revealed type: `Literal[1]`""#,
                 ],
             )],
         );
@@ -1008,11 +1010,7 @@ mod tests {
             &source,
             vec![
                 ExpectedDiagnostic::new(DiagnosticId::lint("undefined-reveal"), "msg", reveal),
-                ExpectedDiagnostic::new(
-                    DiagnosticId::RevealedType,
-                    "Revealed type is `Literal[5]`",
-                    reveal,
-                ),
+                ExpectedDiagnostic::new(DiagnosticId::RevealedType, "`Literal[5]`", reveal),
             ],
         );
 

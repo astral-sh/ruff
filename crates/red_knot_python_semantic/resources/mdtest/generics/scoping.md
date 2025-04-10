@@ -79,7 +79,7 @@ class C[T]:
 c: C[int] = C[int]()
 c.m1(1)
 c.m2(1)
-# error: [invalid-argument-type] "Object of type `Literal["string"]` cannot be assigned to parameter 2 (`x`) of bound method `m2`; expected type `int`"
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["string"]`"
 c.m2("string")
 ```
 
@@ -293,4 +293,4 @@ class C[T]:
     ok2: Inner[T]
 ```
 
-[scoping]: https://typing.readthedocs.io/en/latest/spec/generics.html#scoping-rules-for-type-variables
+[scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables

@@ -38,13 +38,13 @@ error: lint:not-iterable
 ```
 
 ```
-info: revealed-type
+info: revealed-type: Revealed type
  --> /src/mdtest_snippet.py:9:5
   |
 7 | # error: [not-iterable]
 8 | for x in Bad():
 9 |     reveal_type(x)  # revealed: Unknown
-  |     ^^^^^^^^^^^^^^ Revealed type is `Unknown`
+  |     ^^^^^^^^^^^^^^ `Unknown`
   |
 
 ```

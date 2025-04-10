@@ -98,7 +98,7 @@ def _(flag: bool) -> None:
             def __new__(cls, x: int, y: int = 1): ...
 
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [invalid-argument-type] "Object of type `Literal["1"]` cannot be assigned to parameter 2 (`x`) of function `__new__`; expected type `int`"
+    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["1"]`"
     reveal_type(Foo("1"))  # revealed: Foo
     # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
     reveal_type(Foo())  # revealed: Foo
@@ -210,7 +210,7 @@ def _(flag: bool) -> None:
             def __init__(self, x: int, y: int = 1): ...
 
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [invalid-argument-type] "Object of type `Literal["1"]` cannot be assigned to parameter 2 (`x`) of bound method `__init__`; expected type `int`"
+    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["1"]`"
     reveal_type(Foo("1"))  # revealed: Foo
     # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
     reveal_type(Foo())  # revealed: Foo

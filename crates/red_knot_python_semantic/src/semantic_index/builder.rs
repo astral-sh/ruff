@@ -8,11 +8,12 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{self as ast, ExprContext};
+use ruff_python_ast::{self as ast};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
+use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::attribute_assignment::{AttributeAssignment, AttributeAssignments};
@@ -129,7 +130,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             eager_bindings: FxHashMap::default(),
         };
 
-        builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
+        builder.push_scope_with_parent(
+            NodeWithScopeRef::Module,
+            None,
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
 
         builder
     }
@@ -191,17 +196,28 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
         let parent = self.current_scope();
-        self.push_scope_with_parent(node, Some(parent));
+        let reachabililty = self.current_use_def_map().reachability;
+        self.push_scope_with_parent(node, Some(parent), reachabililty);
     }
 
-    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
+    fn push_scope_with_parent(
+        &mut self,
+        node: NodeWithScopeRef,
+        parent: Option<FileScopeId>,
+        reachability: ScopedVisibilityConstraintId,
+    ) {
         let children_start = self.scopes.next_index() + 1;
 
         // SAFETY: `node` is guaranteed to be a child of `self.module`
         #[allow(unsafe_code)]
         let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
 
-        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
+        let scope = Scope::new(
+            parent,
+            node_with_kind,
+            children_start..children_start,
+            reachability,
+        );
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
@@ -331,12 +347,15 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().merge(state);
     }
 
-    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
+    /// Return a 2-element tuple, where the first element is the [`ScopedSymbolId`] of the
+    /// symbol added, and the second element is a boolean indicating whether the symbol was *newly*
+    /// added or not
+    fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
         let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_symbol(symbol_id);
         }
-        symbol_id
+        (symbol_id, added)
     }
 
     fn mark_symbol_bound(&mut self, id: ScopedSymbolId) {
@@ -516,6 +535,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     /// Records a visibility constraint by applying it to all live bindings and declarations.
+    #[must_use = "A visibility constraint must always be negated after it is added"]
     fn record_visibility_constraint(
         &mut self,
         predicate: Predicate<'db>,
@@ -747,7 +767,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                         ..
                     }) => (name, &None, default),
                 };
-                let symbol = self.add_symbol(name.id.clone());
+                let (symbol, _) = self.add_symbol(name.id.clone());
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
@@ -841,20 +861,20 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.declare_parameter(parameter);
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
+            let (symbol, _) = self.add_symbol(vararg.name.id().clone());
             self.add_definition(
                 symbol,
                 DefinitionNodeRef::VariadicPositionalParameter(vararg),
             );
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
+            let (symbol, _) = self.add_symbol(kwarg.name.id().clone());
             self.add_definition(symbol, DefinitionNodeRef::VariadicKeywordParameter(kwarg));
         }
     }
 
     fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
+        let (symbol, _) = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 
@@ -1071,7 +1091,7 @@ where
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self.add_symbol(name.id.clone());
+                let (symbol, _) = self.add_symbol(name.id.clone());
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
@@ -1095,11 +1115,11 @@ where
                 );
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
-                let symbol = self.add_symbol(class.name.id.clone());
+                let (symbol, _) = self.add_symbol(class.name.id.clone());
                 self.add_definition(symbol, class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
-                let symbol = self.add_symbol(
+                let (symbol, _) = self.add_symbol(
                     type_alias
                         .name
                         .as_name_expr()
@@ -1120,7 +1140,10 @@ where
                 );
             }
             ast::Stmt::Import(node) => {
-                for alias in &node.names {
+                self.current_use_def_map_mut()
+                    .record_node_reachability(NodeKey::from_node(node));
+
+                for (alias_index, alias) in node.names.iter().enumerate() {
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
                     if let Some(module_name) = ModuleName::new(&alias.name) {
@@ -1133,17 +1156,21 @@ where
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
                     };
 
-                    let symbol = self.add_symbol(symbol_name);
+                    let (symbol, _) = self.add_symbol(symbol_name);
                     self.add_definition(
                         symbol,
                         ImportDefinitionNodeRef {
-                            alias,
+                            node,
+                            alias_index,
                             is_reexported,
                         },
                     );
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                self.current_use_def_map_mut()
+                    .record_node_reachability(NodeKey::from_node(node));
+
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     if &alias.name == "*" {
@@ -1200,7 +1227,7 @@ where
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
                         for export in exported_names(self.db, referenced_module) {
-                            let symbol_id = self.add_symbol(export.clone());
+                            let (symbol_id, newly_added) = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
@@ -1210,13 +1237,38 @@ where
                             );
                             let pre_definition = self.flow_snapshot();
                             self.push_additional_definition(symbol_id, node_ref);
-                            let constraint_id =
-                                self.record_visibility_constraint(star_import.into());
-                            let post_definition = self.flow_snapshot();
-                            self.flow_restore(pre_definition.clone());
-                            self.record_negated_visibility_constraint(constraint_id);
-                            self.flow_merge(post_definition);
-                            self.simplify_visibility_constraints(pre_definition);
+
+                            // Fast path for if there were no previous definitions
+                            // of the symbol defined through the `*` import:
+                            // we can apply the visibility constraint to *only* the added definition,
+                            // rather than all definitions
+                            if newly_added {
+                                let constraint_id = self
+                                    .current_use_def_map_mut()
+                                    .record_star_import_visibility_constraint(
+                                        star_import,
+                                        symbol_id,
+                                    );
+
+                                let post_definition = self.flow_snapshot();
+                                self.flow_restore(pre_definition);
+
+                                self.current_use_def_map_mut()
+                                    .negate_star_import_visibility_constraint(
+                                        symbol_id,
+                                        constraint_id,
+                                    );
+
+                                self.flow_merge(post_definition);
+                            } else {
+                                let constraint_id =
+                                    self.record_visibility_constraint(star_import.into());
+                                let post_definition = self.flow_snapshot();
+                                self.flow_restore(pre_definition.clone());
+                                self.record_negated_visibility_constraint(constraint_id);
+                                self.flow_merge(post_definition);
+                                self.simplify_visibility_constraints(pre_definition);
+                            }
                         }
 
                         continue;
@@ -1236,7 +1288,7 @@ where
                     self.has_future_annotations |= alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
-                    let symbol = self.add_symbol(symbol_name.clone());
+                    let (symbol, _) = self.add_symbol(symbol_name.clone());
 
                     self.add_definition(
                         symbol,
@@ -1636,7 +1688,7 @@ where
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
                         if let Some(symbol_name) = symbol_name {
-                            let symbol = self.add_symbol(symbol_name.id.clone());
+                            let (symbol, _) = self.add_symbol(symbol_name.id.clone());
 
                             self.add_definition(
                                 symbol,
@@ -1709,6 +1761,8 @@ where
             .insert(expr.into(), self.current_scope());
         let expression_id = self.current_ast_ids().record_expression(expr);
 
+        let node_key = NodeKey::from_node(expr);
+
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
                 let (is_use, is_definition) = match (ctx, self.current_assignment()) {
@@ -1721,12 +1775,13 @@ where
                     (ast::ExprContext::Del, _) => (false, true),
                     (ast::ExprContext::Invalid, _) => (false, false),
                 };
-                let symbol = self.add_symbol(id.clone());
+                let (symbol, _) = self.add_symbol(id.clone());
 
                 if is_use {
                     self.mark_symbol_used(symbol);
                     let use_id = self.current_ast_ids().record_use(expr);
-                    self.current_use_def_map_mut().record_use(symbol, use_id);
+                    self.current_use_def_map_mut()
+                        .record_use(symbol, use_id, node_key);
                 }
 
                 if is_definition {
@@ -1967,23 +2022,38 @@ where
             ast::Expr::Attribute(ast::ExprAttribute {
                 value: object,
                 attr,
-                ctx: ExprContext::Store,
+                ctx,
                 range: _,
             }) => {
-                if let Some(unpack) = self
-                    .current_assignment()
-                    .as_ref()
-                    .and_then(CurrentAssignment::unpack)
-                {
-                    self.register_attribute_assignment(
-                        object,
-                        attr,
-                        AttributeAssignment::Unpack {
-                            attribute_expression_id: expression_id,
-                            unpack,
-                        },
-                    );
+                if ctx.is_store() {
+                    if let Some(unpack) = self
+                        .current_assignment()
+                        .as_ref()
+                        .and_then(CurrentAssignment::unpack)
+                    {
+                        self.register_attribute_assignment(
+                            object,
+                            attr,
+                            AttributeAssignment::Unpack {
+                                attribute_expression_id: expression_id,
+                                unpack,
+                            },
+                        );
+                    }
                 }
+
+                // Track reachability of attribute expressions to silence `unresolved-attribute`
+                // diagnostics in unreachable code.
+                self.current_use_def_map_mut()
+                    .record_node_reachability(node_key);
+
+                walk_expr(self, expr);
+            }
+            ast::Expr::StringLiteral(_) => {
+                // Track reachability of string literals, as they could be a stringified annotation
+                // with child expressions whose reachability we are interested in.
+                self.current_use_def_map_mut()
+                    .record_node_reachability(node_key);
 
                 walk_expr(self, expr);
             }
@@ -2007,7 +2077,7 @@ where
             range: _,
         }) = pattern
         {
-            let symbol = self.add_symbol(name.id().clone());
+            let (symbol, _) = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
@@ -2028,7 +2098,7 @@ where
             rest: Some(name), ..
         }) = pattern
         {
-            let symbol = self.add_symbol(name.id().clone());
+            let (symbol, _) = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
