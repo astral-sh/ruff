@@ -614,13 +614,11 @@ impl SemanticSyntaxChecker {
         // We are intentionally not inspecting the async status of the scope for now to mimic F704.
         // await-outside-async is PLE1142 instead, so we'll end up emitting both syntax errors for
         // cases that trigger F704
-        if ctx.in_function_scope() {
-            return;
-        }
-        if ctx.in_module_scope()
-            && ctx.in_notebook()
-            && matches!(kind, YieldOutsideFunctionKind::Await)
-        {
+        if kind.is_await() {
+            if ctx.in_async_context() || ctx.in_module_scope() && ctx.in_notebook() {
+                return;
+            }
+        } else if ctx.in_function_scope() {
             return;
         }
 
@@ -1077,6 +1075,12 @@ pub enum YieldOutsideFunctionKind {
     Yield,
     YieldFrom,
     Await,
+}
+
+impl YieldOutsideFunctionKind {
+    pub fn is_await(&self) -> bool {
+        matches!(self, Self::Await)
+    }
 }
 
 impl Display for YieldOutsideFunctionKind {
