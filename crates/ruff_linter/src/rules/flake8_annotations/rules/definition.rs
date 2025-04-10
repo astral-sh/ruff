@@ -721,12 +721,7 @@ pub(crate) fn definition(
                 } else {
                     auto_return_type(function)
                         .and_then(|return_type| {
-                            return_type.into_expression(
-                                checker.importer(),
-                                function.parameters.start(),
-                                checker.semantic(),
-                                checker.target_version(),
-                            )
+                            return_type.into_expression(checker, function.parameters.start())
                         })
                         .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
                 };
@@ -752,12 +747,7 @@ pub(crate) fn definition(
                 } else {
                     auto_return_type(function)
                         .and_then(|return_type| {
-                            return_type.into_expression(
-                                checker.importer(),
-                                function.parameters.start(),
-                                checker.semantic(),
-                                checker.target_version(),
-                            )
+                            return_type.into_expression(checker, function.parameters.start())
                         })
                         .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
                 };
@@ -822,12 +812,8 @@ pub(crate) fn definition(
                         } else {
                             auto_return_type(function)
                                 .and_then(|return_type| {
-                                    return_type.into_expression(
-                                        checker.importer(),
-                                        function.parameters.start(),
-                                        checker.semantic(),
-                                        checker.target_version(),
-                                    )
+                                    return_type
+                                        .into_expression(checker, function.parameters.start())
                                 })
                                 .map(|(return_type, edits)| {
                                     (checker.generator().expr(&return_type), edits)
@@ -861,12 +847,8 @@ pub(crate) fn definition(
                         } else {
                             auto_return_type(function)
                                 .and_then(|return_type| {
-                                    return_type.into_expression(
-                                        checker.importer(),
-                                        function.parameters.start(),
-                                        checker.semantic(),
-                                        checker.target_version(),
-                                    )
+                                    return_type
+                                        .into_expression(checker, function.parameters.start())
                                 })
                                 .map(|(return_type, edits)| {
                                     (checker.generator().expr(&return_type), edits)
