@@ -20,7 +20,7 @@ use ruff_db::Upcast;
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextSize};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -277,16 +277,9 @@ impl Workspace {
 
         Ok(result
             .into_iter()
-            .map(|hint| {
-                let source_location = index.source_location(hint.position, &source);
-
-                InlayHint {
-                    markdown: hint.display(&self.db).to_string(),
-                    position: Position::new(
-                        source_location.row.get(),
-                        source_location.column.get(),
-                    ),
-                }
+            .map(|hint| InlayHint {
+                markdown: hint.display(&self.db).to_string(),
+                position: Position::from_text_size(hint.position, &index, &source),
             })
             .collect())
     }
@@ -397,9 +390,10 @@ impl Range {
         line_index: &LineIndex,
         source: &str,
     ) -> Self {
-        let start = line_index.source_location(text_range.start(), source);
-        let end = line_index.source_location(text_range.end(), source);
-        Self::from((start, end))
+        Self {
+            start: Position::from_text_size(text_range.start(), line_index, source),
+            end: Position::from_text_size(text_range.end(), line_index, source),
+        }
     }
 
     fn to_text_range(
@@ -442,11 +436,7 @@ impl Position {
 }
 
 impl Position {
-    pub fn to_text_size(
-        self,
-        text: &str,
-        index: &LineIndex,
-    ) -> Result<ruff_text_size::TextSize, Error> {
+    fn to_text_size(self, text: &str, index: &LineIndex) -> Result<TextSize, Error> {
         let text_size = index.offset(
             OneIndexed::new(self.line).ok_or_else(|| {
                 Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
@@ -460,6 +450,10 @@ impl Position {
         );
 
         Ok(text_size)
+    }
+
+    fn from_text_size(offset: TextSize, line_index: &LineIndex, source: &str) -> Self {
+        line_index.source_location(offset, source).into()
     }
 }
 
@@ -481,13 +475,13 @@ pub enum Severity {
     Fatal,
 }
 
-impl From<ruff_db::diagnostic::Severity> for Severity {
-    fn from(value: ruff_db::diagnostic::Severity) -> Self {
+impl From<diagnostic::Severity> for Severity {
+    fn from(value: diagnostic::Severity) -> Self {
         match value {
-            ruff_db::diagnostic::Severity::Info => Self::Info,
-            ruff_db::diagnostic::Severity::Warning => Self::Warning,
-            ruff_db::diagnostic::Severity::Error => Self::Error,
-            ruff_db::diagnostic::Severity::Fatal => Self::Fatal,
+            diagnostic::Severity::Info => Self::Info,
+            diagnostic::Severity::Warning => Self::Warning,
+            diagnostic::Severity::Error => Self::Error,
+            diagnostic::Severity::Fatal => Self::Fatal,
         }
     }
 }
