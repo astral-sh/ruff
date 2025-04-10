@@ -4302,7 +4302,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             let use_id = name_node.scoped_use_id(db, scope);
             let symbol = symbol_from_bindings(db, use_def.bindings_at_use(use_id));
-            let report_unresolved_usage = use_def.is_symbol_use_reachable(db, use_id);
+            let report_unresolved_usage =
+                self.index
+                    .is_symbol_use_reachable(db, file_scope_id, use_id);
             (symbol, report_unresolved_usage)
         };
 

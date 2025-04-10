@@ -348,22 +348,19 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    /// Returns true if a given 'use' of a symbol is reachable from the start of the scope.
-    /// For example, in the following code, use `2` is reachable, but `1` and `3` are not:
-    /// ```py
-    /// def f():
-    ///     x = 1
-    ///     if False:
-    ///         x  # 1
-    ///     x  # 2
-    ///     return
-    ///     x  # 3
-    /// ```
-    pub(crate) fn is_symbol_use_reachable(&self, db: &dyn crate::Db, use_id: ScopedUseId) -> bool {
+    pub(super) fn is_reachable(
+        &self,
+        db: &dyn crate::Db,
+        reachability: ScopedVisibilityConstraintId,
+    ) -> bool {
         !self
             .visibility_constraints
-            .evaluate(db, &self.predicates, self.reachability_by_use[use_id])
+            .evaluate(db, &self.predicates, reachability)
             .is_always_false()
+    }
+
+    pub(super) fn is_symbol_use_reachable(&self, db: &dyn crate::Db, use_id: ScopedUseId) -> bool {
+        self.is_reachable(db, self.reachability_by_use[use_id])
     }
 
     pub(crate) fn public_bindings(
@@ -618,7 +615,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// ```
     /// Depending on the value of `test`, the `y = 1`, `y = 2`, or both bindings may be visible.
     /// The use of `x` is recorded with a reachability constraint of `[test]`.
-    reachability: ScopedVisibilityConstraintId,
+    pub(super) reachability: ScopedVisibilityConstraintId,
 
     /// Tracks whether or not a given use of a symbol is reachable from the start of the scope.
     reachability_by_use: IndexVec<ScopedUseId, ScopedVisibilityConstraintId>,
