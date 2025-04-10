@@ -447,15 +447,16 @@ We should not show any diagnostics in type annotations inside unreachable sectio
 
 ```py
 def _():
-    class C: ...
+    class C:
+        class Inner: ...
+
     return
 
-    # TODO
-    # error: [invalid-type-form] "Variable of type `Never` is not allowed in a type expression"
-    c: C = C()
+    c1: C = C()
+    c2: C.Inner = C.Inner()
+    c3: tuple[C, C] = (C(), C())
+    c4: tuple[C.Inner, C.Inner] = (C.Inner(), C.Inner())
 
-    # TODO
-    # error: [invalid-base] "Invalid class base with type `Never` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
     class Sub(C): ...
 ```
 
