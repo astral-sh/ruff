@@ -464,6 +464,7 @@ enum Scope {
     Module,
     Function { is_async: bool },
     Comprehension { is_async: bool },
+    Class,
 }
 
 impl Scope {
@@ -575,12 +576,28 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     fn in_notebook(&self) -> bool {
         false
     }
+
+    fn in_function_context(&self) -> bool {
+        for scope in self.scopes() {
+            match scope {
+                Scope::Class => return false,
+                Scope::Function { .. } => return true,
+                Scope::Comprehension { .. } | Scope::Module => {}
+            }
+        }
+        false
+    }
 }
 
 impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         match stmt {
+            ast::Stmt::ClassDef(_) => {
+                self.scopes.push(Scope::Class);
+                ast::visitor::walk_stmt(self, stmt);
+                self.scopes.pop().unwrap();
+            }
             ast::Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
                 self.scopes.push(Scope::Function {
                     is_async: *is_async,

@@ -655,10 +655,6 @@ impl SemanticSyntaxContext for Checker<'_> {
         kind.is_function() || kind.is_lambda()
     }
 
-    fn in_generator_scope(&self) -> bool {
-        self.semantic.current_scope().kind.is_generator()
-    }
-
     fn in_notebook(&self) -> bool {
         self.source_type.is_ipynb()
     }

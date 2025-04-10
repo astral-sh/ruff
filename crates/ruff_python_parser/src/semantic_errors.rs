@@ -1523,9 +1523,6 @@ pub trait SemanticSyntaxContext {
     /// Returns `true` if the visitor is in a function scope.
     fn in_function_scope(&self) -> bool;
 
-    /// Returns `true` if the visitor is in a generator scope.
-    fn in_generator_scope(&self) -> bool;
-
     /// Returns `true` if the source file is a Jupyter notebook.
     fn in_notebook(&self) -> bool;
 
