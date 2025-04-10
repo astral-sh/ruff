@@ -24,7 +24,6 @@
 ### Documentation
 
 - Fix formatting of "See Style Guide" link ([#17272](https://github.com/astral-sh/ruff/pull/17272))
-- [syntax-errors] Document behavior of `global` declarations in `try` nodes before 3.13 ([#17285](https://github.com/astral-sh/ruff/pull/17285))
 
 ## 0.11.4
 
