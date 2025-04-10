@@ -314,7 +314,7 @@ impl<'a> ResolvedAnnotation<'a> {
             range,
             line_start,
             line_end,
-            message: ann.message.as_deref(),
+            message: ann.get_message(),
             is_primary: ann.is_primary,
         })
     }
