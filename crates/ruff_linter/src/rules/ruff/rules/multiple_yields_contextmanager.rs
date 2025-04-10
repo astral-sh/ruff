@@ -81,17 +81,25 @@ struct YieldPathTracker {
 }
 
 impl YieldPathTracker {
+    fn increment_yield_counts_top_by(&mut self, by: usize) {
+        if let Some(root) = self.yield_counts.pop() {
+            let yield_count = root + by;
+            if yield_count > 1 {
+                self.has_multiple_yields = true;
+            }
+            self.yield_counts.push(yield_count);
+        } else {
+            panic!("Invalid yield stack length when traversing AST")
+        };
+    }
+
     fn handle_exclusive_branches(&mut self, branch_count: usize) {
         let mut max_yields_branches = 0;
         for _ in 0..branch_count {
             let branch_yields = self.yield_counts.pop().unwrap();
             max_yields_branches = max_yields_branches.max(branch_yields);
         }
-        if let Some(root) = self.yield_counts.pop() {
-            self.yield_counts.push(root + max_yields_branches);
-        } else {
-            panic!("Invalid yield stack length when traversing AST")
-        };
+        self.increment_yield_counts_top_by(max_yields_branches);
     }
 }
 
@@ -116,7 +124,9 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
             | AnyNodeRef::StmtIf(_)
             | AnyNodeRef::StmtMatch(_)
             | AnyNodeRef::MatchCase(_) => {
-                // New control flow entry point (try, match)
+                // Track yields for primary control flow structures
+                // Optional branches like else/finally clauses are handled in leave_node
+                // Except is handled in leave node to maintain logical locality
                 self.yield_counts.push(0);
             }
             _ => {}
@@ -142,9 +152,7 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 let max_path_yields =
                     try_yields + max_except_yields.max(else_yields) + finally_yields;
 
-                if let Some(root) = self.yield_counts.pop() {
-                    self.yield_counts.push(root + max_path_yields);
-                }
+                self.increment_yield_counts_top_by(max_path_yields);
             }
             AnyNodeRef::StmtIf(if_stmt) => {
                 let branch_count = 1 + if_stmt.elif_else_clauses.len();
@@ -162,19 +170,12 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     // A yield in a loop body is at high risk to yield multiple times
                     self.has_multiple_yields = true
                 }
-                if let Some(root) = self.yield_counts.pop() {
-                    self.yield_counts.push(root + else_yields);
-                }
+                self.increment_yield_counts_top_by(else_yields);
             }
             AnyNodeRef::ElifElseClause(_) | AnyNodeRef::MatchCase(_) => {
                 // Handled on enter/leave of outer structure.
             }
             _ => {}
-        }
-        if let Some(count) = self.yield_counts.last() {
-            if *count > 1 {
-                self.has_multiple_yields = true;
-            }
         }
     }
 
@@ -183,6 +184,9 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
             ast::Expr::Yield(_) | ast::Expr::YieldFrom(_) => {
                 if let Some(count) = self.yield_counts.last_mut() {
                     *count += 1;
+                    if *count > 1 {
+                        self.has_multiple_yields = true;
+                    }
                 }
             }
             _ => source_order::walk_expr(self, expr),
