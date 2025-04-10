@@ -94,6 +94,8 @@ export default function Editor({
 
   const handleMount: OnMount = useCallback(
     (editor, instance) => {
+      serverRef.current?.dispose();
+
       const server = new PlaygroundServer(instance, {
         workspace,
         files,
