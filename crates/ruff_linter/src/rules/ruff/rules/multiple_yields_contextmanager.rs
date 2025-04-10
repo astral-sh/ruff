@@ -59,20 +59,19 @@ pub(crate) fn multiple_yields_in_contextmanager(
 }
 
 fn is_contextmanager_decorated(function_def: &ast::StmtFunctionDef, checker: &Checker) -> bool {
-    for decorator in &function_def.decorator_list {
-        if let Some(qualified) = checker
+    function_def.decorator_list.iter().any(|decorator| {
+        let callable = map_callable(&decorator.expression);
+
+        checker
             .semantic()
-            .resolve_qualified_name(map_callable(&decorator.expression))
-        {
-            if matches!(
-                qualified.segments(),
-                ["contextlib", "contextmanager" | "asynccontextmanager"]
-            ) {
-                return true;
-            }
-        }
-    }
-    false
+            .resolve_qualified_name(callable)
+            .is_some_and(|qualified| {
+                matches!(
+                    qualified.segments(),
+                    ["contextlib", "contextmanager" | "asynccontextmanager"]
+                )
+            })
+    })
 }
 
 struct YieldPathTracker {
@@ -89,14 +88,18 @@ impl YieldPathTracker {
             }
             self.yield_counts.push(yield_count);
         } else {
-            panic!("Invalid yield stack length when traversing AST")
+            self.yield_counts.push(by);
+            debug_assert!(false, "Invalid yield stack size when traversing AST")
         };
     }
 
     fn handle_exclusive_branches(&mut self, branch_count: usize) {
         let mut max_yields_branches = 0;
         for _ in 0..branch_count {
-            let branch_yields = self.yield_counts.pop().unwrap();
+            let branch_yields = self
+                .yield_counts
+                .pop()
+                .expect("AST branch stack has less elements than branches");
             max_yields_branches = max_yields_branches.max(branch_yields);
         }
         self.increment_yield_counts_top_by(max_yields_branches);
@@ -137,17 +140,26 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
     fn leave_node(&mut self, node: AnyNodeRef<'a>) {
         match node {
             AnyNodeRef::StmtTry(try_stmt) => {
-                let finally_yields = self.yield_counts.pop().unwrap();
+                let finally_yields = self.yield_counts.pop().expect(
+                    "Yield counts stack did not contain finally yield counts for try block",
+                );
 
-                let else_yields = self.yield_counts.pop().unwrap();
+                let else_yields = self
+                    .yield_counts
+                    .pop()
+                    .expect("Yield counts stack did not contain else yield counts for try block");
 
                 let mut max_except_yields = 0;
                 for _ in 0..try_stmt.handlers.len() {
-                    let except_yields = self.yield_counts.pop().unwrap();
+                    let except_yields = self.yield_counts.pop().expect(
+                        "Yield counts stack did not contain except yield counts for try block",
+                    );
                     max_except_yields = max_except_yields.max(except_yields);
                 }
 
-                let try_yields = self.yield_counts.pop().unwrap();
+                let try_yields = self.yield_counts.pop().expect(
+                    "Yield counts stack did not contain try body yield counts for try block",
+                );
 
                 let max_path_yields =
                     try_yields + max_except_yields.max(else_yields) + finally_yields;
@@ -163,13 +175,17 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 self.handle_exclusive_branches(branch_count);
             }
             AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
-                let else_yields = self.yield_counts.pop().unwrap();
-                let body_yields = self.yield_counts.pop().unwrap();
+                let else_yields = self
+                    .yield_counts
+                    .pop()
+                    .expect("Yield counts stack did not contain else yield counts for loop");
+                let body_yields = self
+                    .yield_counts
+                    .pop()
+                    .expect("Yield counts stack did not contain body yield counts for loop");
 
-                if body_yields > 0 {
-                    // A yield in a loop body is at high risk to yield multiple times
-                    self.has_multiple_yields = true
-                }
+                // Yield in loop is likely to yield multiple times
+                self.has_multiple_yields |= body_yields > 0;
                 self.increment_yield_counts_top_by(else_yields);
             }
             AnyNodeRef::ElifElseClause(_) | AnyNodeRef::MatchCase(_) => {
