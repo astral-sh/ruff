@@ -1080,12 +1080,16 @@ mod tests {
     #[test]
     fn test_await_scope_notebook() -> Result<()> {
         let path = Path::new("resources/test/fixtures/syntax_errors/await_scope.ipynb");
-        let messages = test_contents_syntax_errors(
-            &SourceKind::IpyNotebook(Notebook::from_path(path)?),
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = assert_notebook_path(
+            path,
             path,
             &settings::LinterSettings::for_rule(Rule::YieldOutsideFunction),
-        );
-        assert_messages!(messages);
+        )?;
+        assert_messages!(messages, path, source_notebook);
 
         Ok(())
     }

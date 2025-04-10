@@ -1,10 +1,9 @@
 ---
 source: crates/ruff_linter/src/linter.rs
 ---
-resources/test/fixtures/syntax_errors/await_scope.ipynb:5:5: F704 `await` statement outside of a function
+await_scope.ipynb:cell 3:2:5: F704 `await` statement outside of a function
   |
-3 |     await 1  # SyntaxError: await outside async function
-4 | class _:
-5 |     await 1  # SyntaxError: await outside function
+1 | class _:
+2 |     await 1  # SyntaxError: await outside function
   |     ^^^^^^^ F704
   |
