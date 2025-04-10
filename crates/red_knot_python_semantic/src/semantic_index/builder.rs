@@ -13,6 +13,7 @@ use ruff_python_ast::{self as ast};
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
+use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::attribute_assignment::{AttributeAssignment, AttributeAssignments};
@@ -1139,7 +1140,10 @@ where
                 );
             }
             ast::Stmt::Import(node) => {
-                for alias in &node.names {
+                self.current_use_def_map_mut()
+                    .record_node_reachability(NodeKey::from_node(node));
+
+                for (alias_index, alias) in node.names.iter().enumerate() {
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
                     if let Some(module_name) = ModuleName::new(&alias.name) {
@@ -1156,13 +1160,17 @@ where
                     self.add_definition(
                         symbol,
                         ImportDefinitionNodeRef {
-                            alias,
+                            node,
+                            alias_index,
                             is_reexported,
                         },
                     );
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                self.current_use_def_map_mut()
+                    .record_node_reachability(NodeKey::from_node(node));
+
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     if &alias.name == "*" {
@@ -1753,6 +1761,8 @@ where
             .insert(expr.into(), self.current_scope());
         let expression_id = self.current_ast_ids().record_expression(expr);
 
+        let node_key = NodeKey::from_node(expr);
+
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
                 let (is_use, is_definition) = match (ctx, self.current_assignment()) {
@@ -1771,7 +1781,7 @@ where
                     self.mark_symbol_used(symbol);
                     let use_id = self.current_ast_ids().record_use(expr);
                     self.current_use_def_map_mut()
-                        .record_use(symbol, use_id, expression_id);
+                        .record_use(symbol, use_id, node_key);
                 }
 
                 if is_definition {
@@ -2035,7 +2045,7 @@ where
                 // Track reachability of attribute expressions to silence `unresolved-attribute`
                 // diagnostics in unreachable code.
                 self.current_use_def_map_mut()
-                    .record_expression_reachability(expression_id);
+                    .record_node_reachability(node_key);
 
                 walk_expr(self, expr);
             }
@@ -2043,7 +2053,7 @@ where
                 // Track reachability of string literals, as they could be a stringified annotation
                 // with child expressions whose reachability we are interested in.
                 self.current_use_def_map_mut()
-                    .record_expression_reachability(expression_id);
+                    .record_node_reachability(node_key);
 
                 walk_expr(self, expr);
             }

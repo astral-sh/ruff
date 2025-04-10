@@ -993,23 +993,6 @@ pub(super) fn report_non_subscriptable(
     );
 }
 
-pub(super) fn report_unresolved_module<'db>(
-    context: &InferContext,
-    import_node: impl Into<AnyNodeRef<'db>>,
-    level: u32,
-    module: Option<&str>,
-) {
-    context.report_lint_old(
-        &UNRESOLVED_IMPORT,
-        import_node.into(),
-        format_args!(
-            "Cannot resolve import `{}{}`",
-            ".".repeat(level as usize),
-            module.unwrap_or_default()
-        ),
-    );
-}
-
 pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {
     context.report_lint_old(
         &ZERO_STEPSIZE_IN_SLICE,
