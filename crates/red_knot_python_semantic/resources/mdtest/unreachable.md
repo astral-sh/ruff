@@ -423,14 +423,10 @@ if False:
     x = 1
 
     def f():
-        # TODO
-        # error: [unresolved-reference]
         print(x)
 
     class C:
         def __init__(self):
-            # TODO
-            # error: [unresolved-reference]
             print(x)
 ```
 

@@ -11,7 +11,7 @@ use salsa::Update;
 
 use crate::module_name::ModuleName;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::ast_ids::AstIds;
+use crate::semantic_index::ast_ids::{AstIds, ScopedUseId};
 use crate::semantic_index::attribute_assignment::AttributeAssignments;
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
@@ -238,6 +238,45 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub(crate) fn parent_scope(&self, scope_id: FileScopeId) -> Option<&Scope> {
         Some(&self.scopes[self.parent_scope_id(scope_id)?])
+    }
+
+    fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {
+        match self.parent_scope_id(scope_id) {
+            None => true,
+            Some(parent_scope_id) => {
+                if !self.is_scope_reachable(db, parent_scope_id) {
+                    return false;
+                }
+
+                let parent_use_def = self.use_def_map(parent_scope_id);
+                let reachability = self.scope(scope_id).reachability();
+
+                parent_use_def.is_reachable(db, reachability)
+            }
+        }
+    }
+
+    /// Returns true if a given 'use' of a symbol is reachable from the start of the scope.
+    /// For example, in the following code, use `2` is reachable, but `1` and `3` are not:
+    /// ```py
+    /// def f():
+    ///     x = 1
+    ///     if False:
+    ///         x  # 1
+    ///     x  # 2
+    ///     return
+    ///     x  # 3
+    /// ```
+    pub(crate) fn is_symbol_use_reachable(
+        &self,
+        db: &'db dyn crate::Db,
+        scope_id: FileScopeId,
+        use_id: ScopedUseId,
+    ) -> bool {
+        self.is_scope_reachable(db, scope_id)
+            && self
+                .use_def_map(scope_id)
+                .is_symbol_use_reachable(db, use_id)
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.

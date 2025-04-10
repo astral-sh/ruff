@@ -129,7 +129,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             eager_bindings: FxHashMap::default(),
         };
 
-        builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
+        builder.push_scope_with_parent(
+            NodeWithScopeRef::Module,
+            None,
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
 
         builder
     }
@@ -191,17 +195,28 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
         let parent = self.current_scope();
-        self.push_scope_with_parent(node, Some(parent));
+        let reachabililty = self.current_use_def_map().reachability;
+        self.push_scope_with_parent(node, Some(parent), reachabililty);
     }
 
-    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
+    fn push_scope_with_parent(
+        &mut self,
+        node: NodeWithScopeRef,
+        parent: Option<FileScopeId>,
+        reachability: ScopedVisibilityConstraintId,
+    ) {
         let children_start = self.scopes.next_index() + 1;
 
         // SAFETY: `node` is guaranteed to be a child of `self.module`
         #[allow(unsafe_code)]
         let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
 
-        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
+        let scope = Scope::new(
+            parent,
+            node_with_kind,
+            children_start..children_start,
+            reachability,
+        );
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
