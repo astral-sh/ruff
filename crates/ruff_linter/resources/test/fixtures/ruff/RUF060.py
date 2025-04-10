@@ -62,17 +62,6 @@ def valid_conditional_yield(condition):
         yield "for else condition"
     print("Cleaning up")
 
-# Valid: Yields in different branches of try/except
-@contextlib.contextmanager
-def valid_try_except_yields():
-    print("Setting up")
-    try:
-        yield "try yield"
-    except Exception:
-        yield "except yield"
-    print("Cleaning up")
-
-
 # Valid: Only one yield executes per run
 @contextlib.contextmanager
 def valid_try_else_finally():
@@ -131,6 +120,16 @@ def valid_multiple_elifs():
         yield "this does"
     else:
         yield "This would if reached"
+
+# Invalid: Yields in consecutive branches of try/except
+@contextlib.contextmanager
+def valid_try_except_yields():
+    print("Setting up")
+    try:
+        yield "try yield"
+    except Exception:
+        yield "except yield"
+    print("Cleaning up")
 
 # Invalid: Variable number of yields based on conditions
 @contextlib.contextmanager
