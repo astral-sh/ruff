@@ -731,7 +731,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // (1) Check that the class does not have a cyclic definition
             if let Some(inheritance_cycle) = class.inheritance_cycle(self.db()) {
                 if inheritance_cycle.is_participant() {
-                    self.context.report_lint(
+                    self.context.report_lint_old(
                         &CYCLIC_CLASS_DEFINITION,
                         class_node,
                         format_args!(
@@ -754,7 +754,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if !base_class.is_final(self.db()) {
                     continue;
                 }
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &SUBCLASS_OF_FINAL_CLASS,
                     &class_node.bases()[i],
                     format_args!(
@@ -772,7 +772,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         MroErrorKind::DuplicateBases(duplicates) => {
                             let base_nodes = class_node.bases();
                             for (index, duplicate) in duplicates {
-                                self.context.report_lint(
+                                self.context.report_lint_old(
                                     &DUPLICATE_BASE,
                                     &base_nodes[*index],
                                     format_args!("Duplicate base class `{}`", duplicate.name(self.db())),
@@ -782,7 +782,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         MroErrorKind::InvalidBases(bases) => {
                             let base_nodes = class_node.bases();
                             for (index, base_ty) in bases {
-                                self.context.report_lint(
+                                self.context.report_lint_old(
                                     &INVALID_BASE,
                                     &base_nodes[*index],
                                     format_args!(
@@ -792,7 +792,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 );
                             }
                         }
-                        MroErrorKind::UnresolvableMro { bases_list } => self.context.report_lint(
+                        MroErrorKind::UnresolvableMro { bases_list } => self.context.report_lint_old(
                             &INCONSISTENT_MRO,
                             class_node,
                             format_args!(
@@ -809,12 +809,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             // (4) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
-                    MetaclassErrorKind::NotCallable(ty) => self.context.report_lint(
+                    MetaclassErrorKind::NotCallable(ty) => self.context.report_lint_old(
                         &INVALID_METACLASS,
                         class_node,
                         format_args!("Metaclass type `{}` is not callable", ty.display(self.db())),
                     ),
-                    MetaclassErrorKind::PartlyNotCallable(ty) => self.context.report_lint(
+                    MetaclassErrorKind::PartlyNotCallable(ty) => self.context.report_lint_old(
                         &INVALID_METACLASS,
                         class_node,
                         format_args!(
@@ -836,7 +836,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         candidate1_is_base_class,
                     } => {
                         if *candidate1_is_base_class {
-                            self.context.report_lint(
+                            self.context.report_lint_old(
                                 &CONFLICTING_METACLASS,
                                 class_node,
                                 format_args!(
@@ -851,7 +851,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ),
                             );
                         } else {
-                            self.context.report_lint(
+                            self.context.report_lint_old(
                                 &CONFLICTING_METACLASS,
                                 class_node,
                                 format_args!(
@@ -1005,7 +1005,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             _ => return false,
         };
 
-        self.context.report_lint(
+        self.context.report_lint_old(
             &DIVISION_BY_ZERO,
             node,
             format_args!(
@@ -1033,7 +1033,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // TODO point out the conflicting declarations in the diagnostic?
                 let symbol_table = self.index.symbol_table(binding.file_scope(self.db()));
                 let symbol_name = symbol_table.symbol(binding.symbol(self.db())).name();
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &CONFLICTING_DECLARATIONS,
                     node,
                     format_args!(
@@ -1071,7 +1071,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let ty = if inferred_ty.is_assignable_to(self.db(), ty.inner_type()) {
             ty
         } else {
-            self.context.report_lint(
+            self.context.report_lint_old(
                 &INVALID_DECLARATION,
                 node,
                 format_args!(
@@ -1596,7 +1596,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 {
                     DeclaredAndInferredType::AreTheSame(declared_ty)
                 } else {
-                    self.context.report_lint(
+                    self.context.report_lint_old(
                         &INVALID_PARAMETER_DEFAULT,
                         parameter_with_default,
                         format_args!(
@@ -2044,7 +2044,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let bound_or_constraint = match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
                 if elts.len() < 2 {
-                    self.context.report_lint(
+                    self.context.report_lint_old(
                         &INVALID_TYPE_VARIABLE_CONSTRAINTS,
                         expr,
                         format_args!("TypeVar must have at least two constrained types"),
@@ -2363,7 +2363,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // TODO: This is not a very helpful error message, as it does not include the underlying reason
                     // why the assignment is invalid. This would be a good use case for nested diagnostics.
                     if emit_diagnostics {
-                        self.context.report_lint(&INVALID_ASSIGNMENT, target, format_args!(
+                        self.context.report_lint_old(&INVALID_ASSIGNMENT, target, format_args!(
                             "Object of type `{}` is not assignable to attribute `{attribute}` on type `{}`",
                             value_ty.display(self.db()),
                             object_ty.display(self.db()),
@@ -2383,7 +2383,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 } else {
                     if emit_diagnostics {
                         // TODO: same here, see above
-                        self.context.report_lint(&INVALID_ASSIGNMENT, target, format_args!(
+                        self.context.report_lint_old(&INVALID_ASSIGNMENT, target, format_args!(
                             "Object of type `{}` is not assignable to attribute `{attribute}` on type `{}`",
                             value_ty.display(self.db()),
                             object_ty.display(self.db()),
@@ -2416,7 +2416,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 match object_ty.class_member(db, attribute.into()) {
                     meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
                         if emit_diagnostics {
-                            self.context.report_lint(
+                            self.context.report_lint_old(
                                 &INVALID_ATTRIBUTE_ACCESS,
                                 target,
                                 format_args!(
@@ -2447,7 +2447,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             if !successful_call && emit_diagnostics {
                                 // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                                self.context.report_lint(
+                                self.context.report_lint_old(
                                 &INVALID_ASSIGNMENT,
                                 target,
                                 format_args!(
@@ -2529,7 +2529,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 Ok(_) | Err(CallDunderError::PossiblyUnbound(_)) => true,
                                 Err(CallDunderError::CallError(..)) => {
                                     if emit_diagnostics {
-                                        self.context.report_lint(
+                                        self.context.report_lint_old(
                                         &UNRESOLVED_ATTRIBUTE,
                                         target,
                                         format_args!(
@@ -2543,7 +2543,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 }
                                 Err(CallDunderError::MethodNotAvailable) => {
                                     if emit_diagnostics {
-                                        self.context.report_lint(
+                                        self.context.report_lint_old(
                                             &UNRESOLVED_ATTRIBUTE,
                                             target,
                                             format_args!(
@@ -2584,7 +2584,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             if !successful_call && emit_diagnostics {
                                 // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                                self.context.report_lint(
+                                self.context.report_lint_old(
                                     &INVALID_ASSIGNMENT,
                                     target,
                                     format_args!(
@@ -2662,7 +2662,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             // Attribute is declared or bound on instance. Forbid access from the class object
                             if emit_diagnostics {
                                 if attribute_is_bound_on_instance {
-                                    self.context.report_lint(
+                                    self.context.report_lint_old(
                                     &INVALID_ATTRIBUTE_ACCESS,
                                     target,
                                     format_args!(
@@ -2670,7 +2670,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         ty = object_ty.display(self.db()),
                                 ));
                                 } else {
-                                    self.context.report_lint(
+                                    self.context.report_lint_old(
                                         &UNRESOLVED_ATTRIBUTE,
                                         target,
                                         format_args!(
@@ -2703,7 +2703,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     false
                 } else {
-                    self.context.report_lint(
+                    self.context.report_lint_old(
                         &UNRESOLVED_ATTRIBUTE,
                         target,
                         format_args!(
@@ -2955,7 +2955,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let db = self.db();
 
         let report_unsupported_augmented_op = |ctx: &mut InferContext| {
-            ctx.report_lint(
+            ctx.report_lint_old(
                 &UNSUPPORTED_OPERATOR,
                 assignment,
                 format_args!(
@@ -3333,7 +3333,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if &alias.name != "*" && boundness == Boundness::PossiblyUnbound {
                 // TODO: Consider loading _both_ the attribute and any submodule and unioning them
                 // together if the attribute exists but is possibly-unbound.
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &POSSIBLY_UNBOUND_IMPORT,
                     AnyNodeRef::Alias(alias),
                     format_args!("Member `{name}` of module `{module_name}` is possibly unbound",),
@@ -3376,7 +3376,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         if &alias.name != "*" {
-            self.context.report_lint(
+            self.context.report_lint_old(
                 &UNRESOLVED_IMPORT,
                 AnyNodeRef::Alias(alias),
                 format_args!("Module `{module_name}` has no member `{name}`",),
@@ -4107,7 +4107,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             if let [Some(revealed_type)] = overload.parameter_types() {
                                 if let Some(builder) = self
                                     .context
-                                    .report(DiagnosticId::RevealedType, Severity::Info)
+                                    .report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
                                 {
                                     let mut reporter = builder.build("Revealed type");
                                     let span = self.context.span(call_expression);
@@ -4124,7 +4124,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             if let [Some(actual_ty), Some(asserted_ty)] = overload.parameter_types()
                             {
                                 if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
-                                    self.context.report_lint(
+                                    self.context.report_lint_old(
                                             &TYPE_ASSERTION_FAILURE,
                                             call_expression,
                                             format_args!(
@@ -4139,7 +4139,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         KnownFunction::AssertNever => {
                             if let [Some(actual_ty)] = overload.parameter_types() {
                                 if !actual_ty.is_equivalent_to(self.db(), Type::Never) {
-                                    self.context.report_lint(
+                                    self.context.report_lint_old(
                                         &TYPE_ASSERTION_FAILURE,
                                         call_expression,
                                         format_args!(
@@ -4178,19 +4178,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                                         .and_then(Type::into_string_literal)
                                         .map(|s| &**s.value(self.db()))
                                     {
-                                        self.context.report_lint(
+                                        self.context.report_lint_old(
                                             &STATIC_ASSERT_ERROR,
                                             call_expression,
                                             format_args!("Static assertion error: {message}"),
                                         );
                                     } else if *parameter_ty == Type::BooleanLiteral(false) {
-                                        self.context.report_lint(
+                                        self.context.report_lint_old(
                                             &STATIC_ASSERT_ERROR,
                                             call_expression,
                                             format_args!("Static assertion error: argument evaluates to `False`"),
                                         );
                                     } else if truthiness.is_always_false() {
-                                        self.context.report_lint(
+                                        self.context.report_lint_old(
                                             &STATIC_ASSERT_ERROR,
                                             call_expression,
                                             format_args!(
@@ -4199,7 +4199,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             ),
                                         );
                                     } else {
-                                        self.context.report_lint(
+                                        self.context.report_lint_old(
                                             &STATIC_ASSERT_ERROR,
                                             call_expression,
                                             format_args!(
@@ -4220,7 +4220,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     || source_type.normalized(db) == casted_type.normalized(db))
                                     && !source_type.contains_todo(db)
                                 {
-                                    self.context.report_lint(
+                                    self.context.report_lint_old(
                                         &REDUNDANT_CAST,
                                         call_expression,
                                         format_args!(
@@ -4445,7 +4445,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Still not found? It might be `reveal_type`...
                 .or_fall_back_to(db, || {
                     if symbol_name == "reveal_type" {
-                        self.context.report_lint(
+                        self.context.report_lint_old(
                             &UNDEFINED_REVEAL,
                             name_node,
                             format_args!(
@@ -4537,7 +4537,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         };
 
                         if bound_on_instance {
-                            self.context.report_lint(
+                            self.context.report_lint_old(
                                 &UNRESOLVED_ATTRIBUTE,
                                 attribute,
                                 format_args!(
@@ -4547,7 +4547,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ),
                             );
                         } else {
-                            self.context.report_lint(
+                            self.context.report_lint_old(
                                 &UNRESOLVED_ATTRIBUTE,
                                 attribute,
                                 format_args!(
@@ -4667,7 +4667,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ) {
                     Ok(outcome) => outcome.return_type(self.db()),
                     Err(e) => {
-                        self.context.report_lint(
+                        self.context.report_lint_old(
                             &UNSUPPORTED_OPERATOR,
                             unary,
                             format_args!(
@@ -4695,7 +4695,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &UNSUPPORTED_OPERATOR,
                     binary,
                     format_args!(
@@ -5145,7 +5145,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .infer_binary_type_comparison(left_ty, *op, right_ty, range)
                     .unwrap_or_else(|error| {
                         // Handle unsupported operators (diagnostic, `bool`/`Unknown` outcome)
-                        builder.context.report_lint(
+                        builder.context.report_lint_old(
                             &UNSUPPORTED_OPERATOR,
                             range,
                             format_args!(
@@ -6031,7 +6031,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ) {
                     Ok(outcome) => return outcome.return_type(self.db()),
                     Err(err @ CallDunderError::PossiblyUnbound { .. }) => {
-                        self.context.report_lint(
+                        self.context.report_lint_old(
                             &CALL_POSSIBLY_UNBOUND_METHOD,
                             value_node,
                             format_args!(
@@ -6043,7 +6043,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return err.fallback_return_type(self.db());
                     }
                     Err(CallDunderError::CallError(_, bindings)) => {
-                        self.context.report_lint(
+                        self.context.report_lint_old(
                             &CALL_NON_CALLABLE,
                             value_node,
                             format_args!(
@@ -6077,7 +6077,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         Symbol::Unbound => {}
                         Symbol::Type(ty, boundness) => {
                             if boundness == Boundness::PossiblyUnbound {
-                                self.context.report_lint(
+                                self.context.report_lint_old(
                                     &CALL_POSSIBLY_UNBOUND_METHOD,
                                     value_node,
                                     format_args!(
@@ -6093,7 +6093,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             ) {
                                 Ok(bindings) => return bindings.return_type(self.db()),
                                 Err(CallError(_, bindings)) => {
-                                    self.context.report_lint(
+                                    self.context.report_lint_old(
                                         &CALL_NON_CALLABLE,
                                         value_node,
                                         format_args!(
@@ -6260,7 +6260,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred).into(),
 
             ast::Expr::BytesLiteral(bytes) => {
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &BYTE_STRING_TYPE_ANNOTATION,
                     bytes,
                     format_args!("Type expressions cannot use bytes literal"),
@@ -6269,7 +6269,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             ast::Expr::FString(fstring) => {
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &FSTRING_TYPE_ANNOTATION,
                     fstring,
                     format_args!("Type expressions cannot use f-strings"),
@@ -6343,7 +6343,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         known_instance @ (KnownInstanceType::ClassVar | KnownInstanceType::Final),
                     ) => match slice {
                         ast::Expr::Tuple(..) => {
-                            self.context.report_lint(
+                            self.context.report_lint_old(
                                 &INVALID_TYPE_FORM,
                                 subscript,
                                 format_args!(
@@ -6444,7 +6444,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         message: std::fmt::Arguments,
     ) -> Type<'db> {
         self.context
-            .report_lint(&INVALID_TYPE_FORM, expression, message);
+            .report_lint_old(&INVALID_TYPE_FORM, expression, message);
         Type::unknown()
     }
 
@@ -6881,7 +6881,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             ast::Expr::Tuple(_) => {
                 self.infer_type_expression(slice);
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &INVALID_TYPE_FORM,
                     slice,
                     format_args!("type[...] must have exactly one type argument"),
@@ -6937,7 +6937,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         match value_ty {
             Type::ClassLiteral(literal) if literal.is_known(self.db(), KnownClass::Any) => {
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &INVALID_TYPE_FORM,
                     subscript,
                     format_args!("Type `typing.Any` expected no type parameter",),
@@ -7002,7 +7002,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     Ok(ty) => ty,
                     Err(nodes) => {
                         for node in nodes {
-                            self.context.report_lint(
+                            self.context.report_lint_old(
                                 &INVALID_TYPE_FORM,
                                 node,
                                 format_args!(
@@ -7091,7 +7091,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // Type API special forms
             KnownInstanceType::Not => match arguments_slice {
                 ast::Expr::Tuple(_) => {
-                    self.context.report_lint(
+                    self.context.report_lint_old(
                         &INVALID_TYPE_FORM,
                         subscript,
                         format_args!(
@@ -7120,7 +7120,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::TypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {
-                    self.context.report_lint(
+                    self.context.report_lint_old(
                         &INVALID_TYPE_FORM,
                         subscript,
                         format_args!(
@@ -7138,7 +7138,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             KnownInstanceType::CallableTypeOf => match arguments_slice {
                 ast::Expr::Tuple(_) => {
-                    self.context.report_lint(
+                    self.context.report_lint_old(
                         &INVALID_TYPE_FORM,
                         subscript,
                         format_args!(
@@ -7154,7 +7154,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     // TODO overloads
                     let Some(signature) = signatures.iter().flatten().next() else {
-                        self.context.report_lint(
+                        self.context.report_lint_old(
                             &INVALID_TYPE_FORM,
                             arguments_slice,
                             format_args!(
@@ -7223,7 +7223,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 todo_type!("`NotRequired[]` type qualifier")
             }
             KnownInstanceType::ClassVar | KnownInstanceType::Final => {
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &INVALID_TYPE_FORM,
                     subscript,
                     format_args!(
@@ -7262,7 +7262,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | KnownInstanceType::Any
             | KnownInstanceType::AlwaysTruthy
             | KnownInstanceType::AlwaysFalsy => {
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &INVALID_TYPE_FORM,
                     subscript,
                     format_args!(
@@ -7275,7 +7275,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             KnownInstanceType::TypingSelf
             | KnownInstanceType::TypeAlias
             | KnownInstanceType::Unknown => {
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &INVALID_TYPE_FORM,
                     subscript,
                     format_args!(
@@ -7286,7 +7286,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::unknown()
             }
             KnownInstanceType::LiteralString => {
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &INVALID_TYPE_FORM,
                     subscript,
                     format_args!(
@@ -7432,7 +7432,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => {
                 // TODO: Check whether `Expr::Name` is a ParamSpec
-                self.context.report_lint(
+                self.context.report_lint_old(
                     &INVALID_TYPE_FORM,
                     parameters,
                     format_args!(

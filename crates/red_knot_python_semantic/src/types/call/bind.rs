@@ -170,7 +170,7 @@ impl<'db> Bindings<'db> {
         // If all union elements are not callable, report that the union as a whole is not
         // callable.
         if self.into_iter().all(|b| !b.is_callable()) {
-            context.report_lint(
+            context.report_lint_old(
                 &CALL_NON_CALLABLE,
                 node,
                 format_args!(
@@ -183,7 +183,7 @@ impl<'db> Bindings<'db> {
 
         for (index, conflicting_form) in self.conflicting_forms.iter().enumerate() {
             if *conflicting_form {
-                context.report_lint(
+                context.report_lint_old(
                     &CONFLICTING_ARGUMENT_FORMS,
                     BindingError::get_node(node, Some(index)),
                     format_args!("Argument is used as both a value and a type form in call"),
@@ -764,7 +764,7 @@ impl<'db> CallableBinding<'db> {
 
     fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         if !self.is_callable() {
-            context.report_lint(
+            context.report_lint_old(
                 &CALL_NON_CALLABLE,
                 node,
                 format_args!(
@@ -776,7 +776,7 @@ impl<'db> CallableBinding<'db> {
         }
 
         if self.dunder_call_is_possibly_unbound {
-            context.report_lint(
+            context.report_lint_old(
                 &CALL_NON_CALLABLE,
                 node,
                 format_args!(
@@ -789,7 +789,7 @@ impl<'db> CallableBinding<'db> {
 
         let callable_description = CallableDescription::new(context.db(), self.callable_type);
         if self.overloads.len() > 1 {
-            context.report_lint(
+            context.report_lint_old(
                 &NO_MATCHING_OVERLOAD,
                 node,
                 format_args!(
@@ -1238,7 +1238,7 @@ impl<'db> BindingError<'db> {
                 expected_ty,
                 provided_ty,
             } => {
-                let Some(builder) = context.lint(&INVALID_ARGUMENT_TYPE) else {
+                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE) else {
                     return;
                 };
 
@@ -1268,7 +1268,7 @@ impl<'db> BindingError<'db> {
                 expected_positional_count,
                 provided_positional_count,
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &TOO_MANY_POSITIONAL_ARGUMENTS,
                     Self::get_node(node, *first_excess_argument_index),
                     format_args!(
@@ -1285,7 +1285,7 @@ impl<'db> BindingError<'db> {
 
             Self::MissingArguments { parameters } => {
                 let s = if parameters.0.len() == 1 { "" } else { "s" };
-                context.report_lint(
+                context.report_lint_old(
                     &MISSING_ARGUMENT,
                     node,
                     format_args!(
@@ -1303,7 +1303,7 @@ impl<'db> BindingError<'db> {
                 argument_name,
                 argument_index,
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNKNOWN_ARGUMENT,
                     Self::get_node(node, *argument_index),
                     format_args!(
@@ -1321,7 +1321,7 @@ impl<'db> BindingError<'db> {
                 argument_index,
                 parameter,
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &PARAMETER_ALREADY_ASSIGNED,
                     Self::get_node(node, *argument_index),
                     format_args!(
@@ -1336,7 +1336,7 @@ impl<'db> BindingError<'db> {
             }
 
             Self::InternalCallError(reason) => {
-                context.report_lint(
+                context.report_lint_old(
                     &CALL_NON_CALLABLE,
                     Self::get_node(node, None),
                     format_args!(

@@ -74,7 +74,7 @@ impl<'db> InferContext<'db> {
     }
 
     /// Reports a lint located at `ranged`.
-    pub(super) fn report_lint<T>(
+    pub(super) fn report_lint_old<T>(
         &self,
         lint: &'static LintMetadata,
         ranged: T,
@@ -82,7 +82,7 @@ impl<'db> InferContext<'db> {
     ) where
         T: Ranged,
     {
-        let Some(builder) = self.lint(lint) else {
+        let Some(builder) = self.report_lint(lint) else {
             return;
         };
         let mut reporter = builder.build("");
@@ -109,8 +109,8 @@ impl<'db> InferContext<'db> {
     /// constructed diagnostic will be ignored.
     ///
     /// If callers need to create a non-lint diagnostic, you'll want to use
-    /// the lower level `InferContext::report` routine.
-    pub(super) fn lint<'ctx>(
+    /// the lower level `InferContext::report_diagnostic` routine.
+    pub(super) fn report_lint<'ctx>(
         &'ctx self,
         lint: &'static LintMetadata,
     ) -> Option<LintReporterBuilder<'ctx, 'db>> {
@@ -122,7 +122,7 @@ impl<'db> InferContext<'db> {
     /// This only returns a reporter builder if the current context
     /// allows a diagnostic with the given information to be added.
     /// In general, the requirements here are quite a bit less than
-    /// for `InferContext::lint`, since this routine doesn't take rule
+    /// for `InferContext::report_lint`, since this routine doesn't take rule
     /// selection into account.
     ///
     /// After using the builder to make a reporter, once the reporter is
@@ -130,8 +130,8 @@ impl<'db> InferContext<'db> {
     /// something in the diagnostic that excludes it.
     ///
     /// Callers should generally prefer adding a lint diagnostic via
-    /// `InferContext::lint` whenever possible.
-    pub(super) fn report<'ctx>(
+    /// `InferContext::report_lint` whenever possible.
+    pub(super) fn report_diagnostic<'ctx>(
         &'ctx self,
         id: DiagnosticId,
         severity: Severity,
@@ -205,7 +205,7 @@ pub(crate) enum InNoTypeCheck {
 
 /// An abstraction for reporting lints as diagnostics.
 ///
-/// Callers can build a reporter via `InferContext::lint`.
+/// Callers can build a reporter via `InferContext::report_lint`.
 ///
 /// A reporter encapsulates the logic for determining if a diagnostic *should*
 /// be reported according to the environment, configuration, and any relevant
@@ -225,8 +225,8 @@ pub(crate) enum InNoTypeCheck {
 ///
 /// If callers need to report a diagnostic with an identifier type other
 /// than `DiagnosticId::Lint`, then they should use the more general
-/// `InferContext::report` API. But note that this API will not take rule
-/// selection or suppressions into account.
+/// `InferContext::report_diagnostic` API. But note that this API will not take
+/// rule selection or suppressions into account.
 pub(super) struct LintReporter<'db, 'ctx> {
     /// The typing context.
     ctx: &'ctx InferContext<'db>,
@@ -307,7 +307,7 @@ impl Drop for LintReporter<'_, '_> {
 ///
 /// This type exists to separate the phases of "check if a diagnostic should
 /// be reported" and "build the actual diagnostic." It's why, for example,
-/// `InferContext::lint` only requires a `LintMetadata`, but this builder
+/// `InferContext::report_lint` only requires a `LintMetadata`, but this builder
 /// further requires a message before one can mutate the diagnostic. This is
 /// because the `LintMetadata` can be used to derive the diagnostic ID and its
 /// severity (based on configuration). Combined with a message you get the
@@ -366,7 +366,7 @@ impl<'db, 'ctx> LintReporterBuilder<'db, 'ctx> {
 
 /// An abstraction for reporting diagnostics.
 ///
-/// Callers can build a reporter via `InferContext::report`.
+/// Callers can build a reporter via `InferContext::report_diagnostic`.
 ///
 /// A reporter encapsulates the logic for determining if a diagnostic *should*
 /// be reported according to the environment, configuration, and any relevant
@@ -377,8 +377,8 @@ impl<'db, 'ctx> LintReporterBuilder<'db, 'ctx> {
 /// The diagnostic is added to the typing context, if appropriate, when this
 /// reporter is dropped.
 ///
-/// Callers likely should use `LintReporter` via `InferContext::lint` instead.
-/// This reporter is only intended for use with non-lint diagnostics.
+/// Callers likely should use `LintReporter` via `InferContext::report_lint`
+/// instead. This reporter is only intended for use with non-lint diagnostics.
 pub(super) struct DiagnosticReporter<'db, 'ctx> {
     ctx: &'ctx InferContext<'db>,
     /// The diagnostic that we want to report.
@@ -429,10 +429,10 @@ impl Drop for DiagnosticReporter<'_, '_> {
 ///
 /// This type exists to separate the phases of "check if a diagnostic should
 /// be reported" and "build the actual diagnostic." It's why, for example,
-/// `InferContext::report` only requires an ID and a severity, but this builder
-/// further requires a message (with those three things being the minimal
-/// amount of information with which to construct a diagnostic) before one can
-/// mutate the diagnostic.
+/// `InferContext::report_diagnostic` only requires an ID and a severity, but
+/// this builder further requires a message (with those three things being the
+/// minimal amount of information with which to construct a diagnostic) before
+/// one can mutate the diagnostic.
 pub(super) struct DiagnosticReporterBuilder<'db, 'ctx> {
     ctx: &'ctx InferContext<'db>,
     id: DiagnosticId,
