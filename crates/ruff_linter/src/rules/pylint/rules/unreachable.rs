@@ -135,5 +135,8 @@ fn taken(condition: &Condition, semantic: &SemanticModel) -> Option<bool> {
             subject: _,
             case: _,
         } => None,
+        Condition::ExceptHandler(_) => None,
+        Condition::UncaughtException => None,
+        Condition::Deferred(stmt) => None,
     }
 }
