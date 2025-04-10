@@ -1,5 +1,5 @@
 use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::{Expr, MatchCase, Stmt};
+use ruff_python_ast::{ExceptHandlerExceptHandler, Expr, MatchCase, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 /// Returns the control flow graph associated to an array of statements
@@ -102,6 +102,8 @@ pub(crate) enum BlockKind {
     /// Terminal block for the control flow graph
     Terminal,
     LoopGuard,
+    ExceptionDispatch,
+    Recovery,
 }
 
 /// Holds a collection of edges. Each edge is determined by:
@@ -166,6 +168,12 @@ pub enum Condition<'stmt> {
     NotStopIter(&'stmt Expr),
     /// A fallback case (else/wildcard case/etc.)
     Else,
+    /// An except handler for try/except blocks
+    ExceptHandler(&'stmt ExceptHandlerExceptHandler),
+    /// An uncaught exception
+    UncaughtException,
+    /// Deferred
+    Deferred(&'stmt Stmt),
 }
 
 struct CFGBuilder<'stmt> {
@@ -177,6 +185,8 @@ struct CFGBuilder<'stmt> {
     exit: BlockId,
     /// Loop contexts
     loops: Vec<LoopContext>,
+    /// Try contexts
+    try_contexts: Vec<TryContext<'stmt>>,
 }
 
 impl<'stmt> CFGBuilder<'stmt> {
@@ -201,6 +211,7 @@ impl<'stmt> CFGBuilder<'stmt> {
             current: initial,
             exit: terminal,
             loops: Vec::default(),
+            try_contexts: Vec::default(),
         }
     }
 
@@ -607,6 +618,26 @@ impl<'stmt> CFGBuilder<'stmt> {
         self.loops.pop()
     }
 
+    /// Creates a new block to handle dispatching control flow at the end
+    /// of a `try` block.
+    fn new_exception_dispatch(&mut self) -> BlockId {
+        self.cfg.blocks.push(BlockData {
+            kind: BlockKind::ExceptionDispatch,
+            ..BlockData::default()
+        })
+    }
+
+    fn new_recovery(&mut self) -> BlockId {
+        self.cfg.blocks.push(BlockData {
+            kind: BlockKind::Recovery,
+            ..BlockData::default()
+        })
+    }
+
+    fn push_try_context(&mut self, kind: TryKind) {
+        self.try_contexts.push(TryContext::new(kind));
+    }
+
     /// Populates the current basic block with the given set of statements.
     ///
     /// This should only be called once on any given block.
@@ -634,4 +665,83 @@ impl<'stmt> CFGBuilder<'stmt> {
 pub struct LoopContext {
     guard: BlockId,
     exit: BlockId,
+}
+
+#[derive(Debug, Clone)]
+pub struct TryContext<'stmt> {
+    kind: TryKind,
+    state: TryState,
+    deferred_jumps: Vec<&'stmt Stmt>,
+}
+
+impl<'stmt> TryContext<'stmt> {
+    pub fn new(kind: TryKind) -> Self {
+        Self {
+            kind,
+            state: TryState::Try,
+            deferred_jumps: Vec::new(),
+        }
+    }
+
+    fn has_except(&self) -> bool {
+        matches!(
+            self.kind,
+            TryKind::TryExcept
+                | TryKind::TryExceptElse
+                | TryKind::TryExceptFinally
+                | TryKind::TryExceptElseFinally
+        )
+    }
+
+    fn has_else(&self) -> bool {
+        matches!(
+            self.kind,
+            TryKind::TryExceptElse | TryKind::TryExceptElseFinally
+        )
+    }
+
+    fn has_finally(&self) -> bool {
+        matches!(
+            self.kind,
+            TryKind::TryFinally | TryKind::TryExceptFinally | TryKind::TryExceptElseFinally
+        )
+    }
+
+    fn in_try(&self) -> bool {
+        matches!(self.state, TryState::Try)
+    }
+    fn in_dispatch(&self) -> bool {
+        matches!(self.state, TryState::Dispatch)
+    }
+    fn in_except(&self) -> bool {
+        matches!(self.state, TryState::Except)
+    }
+    fn in_else(&self) -> bool {
+        matches!(self.state, TryState::Else)
+    }
+    fn in_finally(&self) -> bool {
+        matches!(self.state, TryState::Finally)
+    }
+    fn in_recovery(&self) -> bool {
+        matches!(self.state, TryState::Recovery)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TryKind {
+    TryFinally,
+    TryExcept,
+    TryExceptElse,
+    TryExceptFinally,
+    TryExceptElseFinally,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum TryState {
+    Try,
+    Dispatch,
+    Except,
+    Else,
+    Finally,
+    Recovery,
 }

@@ -216,6 +216,8 @@ impl MermaidGraph for CFGWithSource<'_, '_> {
                     shape: MermaidNodeShape::default(),
                 }
             }
+            BlockKind::ExceptionDispatch => "EXCEPTION DISPATCH".to_string(),
+            BlockKind::Recovery => "RECOVERY".to_string(),
         };
 
         MermaidNode::with_content(content)
@@ -257,6 +259,42 @@ impl MermaidGraph for CFGWithSource<'_, '_> {
                         kind: MermaidEdgeKind::Arrow,
                         content: self.source[case.pattern.range()].to_string(),
                     },
+                    Condition::ExceptHandler(handler) => {
+                        let exc_types = match &handler.type_ {
+                            Some(t) => self.source[t.range()].to_string(),
+                            None => "any exception".to_string(),
+                        };
+                        MermaidEdge {
+                            kind: MermaidEdgeKind::Arrow,
+                            content: format!("except {}", exc_types),
+                        }
+                    }
+                    Condition::UncaughtException => {
+                        if target == self.cfg.terminal() {
+                            MermaidEdge {
+                                kind: MermaidEdgeKind::ThickArrow,
+                                content: "Uncaught Exception".to_string(),
+                            }
+                        } else {
+                            MermaidEdge {
+                                kind: MermaidEdgeKind::Arrow,
+                                content: "Uncaught Exception".to_string(),
+                            }
+                        }
+                    }
+                    Condition::Deferred(_) => {
+                        if target == self.cfg.terminal() {
+                            MermaidEdge {
+                                kind: MermaidEdgeKind::ThickArrow,
+                                content: "Deferred".to_string(),
+                            }
+                        } else {
+                            MermaidEdge {
+                                kind: MermaidEdgeKind::Arrow,
+                                content: "Deferred".to_string(),
+                            }
+                        }
+                    }
                 };
                 (target, edge)
             })
