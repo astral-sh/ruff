@@ -412,17 +412,20 @@ impl<'db> Type<'db> {
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
         self.into_instance()
-            .is_some_and(|instance| instance.class.is_known(db, KnownClass::NoneType))
+            .is_some_and(|instance| instance.class(db).is_known(db, KnownClass::NoneType))
     }
 
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
-        self.into_instance()
-            .is_some_and(|instance| instance.class.is_known(db, KnownClass::NotImplementedType))
+        self.into_instance().is_some_and(|instance| {
+            instance
+                .class(db)
+                .is_known(db, KnownClass::NotImplementedType)
+        })
     }
 
     pub fn is_object(&self, db: &'db dyn Db) -> bool {
         self.into_instance()
-            .is_some_and(|instance| instance.class.is_object(db))
+            .is_some_and(|instance| instance.class(db).is_object(db))
     }
 
     pub const fn is_todo(&self) -> bool {
@@ -684,7 +687,7 @@ impl<'db> Type<'db> {
     }
 
     pub const fn instance(class: ClassType<'db>) -> Self {
-        Self::Instance(InstanceType { class })
+        Self::Instance(InstanceType::Class(class))
     }
 
     pub fn string_literal(db: &'db dyn Db, string: &str) -> Self {
@@ -815,7 +818,7 @@ impl<'db> Type<'db> {
             (_, Type::Never) => false,
 
             // Everything is a subtype of `object`.
-            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
+            (_, Type::Instance(InstanceType::Class(class))) if class.is_object(db) => true,
 
             // A fully static typevar is always a subtype of itself, and is never a subtype of any
             // other typevar, since there is no guarantee that they will be specialized to the same
@@ -1083,7 +1086,7 @@ impl<'db> Type<'db> {
 
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
-            (_, Type::Instance(InstanceType { class })) if class.is_object(db) => true,
+            (_, Type::Instance(InstanceType::Class(class))) if class.is_object(db) => true,
 
             // A typevar is always assignable to itself, and is never assignable to any other
             // typevar, since there is no guarantee that they will be specialized to the same
@@ -1236,11 +1239,11 @@ impl<'db> Type<'db> {
 
             // TODO: This is a workaround to avoid false positives (e.g. when checking function calls
             // with `SupportsIndex` parameters), which should be removed when we understand protocols.
-            (lhs, Type::Instance(InstanceType { class }))
+            (lhs, Type::Instance(InstanceType::Class(class)))
                 if class.is_known(db, KnownClass::SupportsIndex) =>
             {
                 match lhs {
-                    Type::Instance(InstanceType { class })
+                    Type::Instance(InstanceType::Class(class))
                         if matches!(
                             class.known(db),
                             Some(KnownClass::Int | KnownClass::SupportsIndex)
@@ -1254,7 +1257,7 @@ impl<'db> Type<'db> {
             }
 
             // TODO: ditto for avoiding false positives when checking function calls with `Sized` parameters.
-            (lhs, Type::Instance(InstanceType { class }))
+            (lhs, Type::Instance(InstanceType::Class(class)))
                 if class.is_known(db, KnownClass::Sized) =>
             {
                 matches!(
@@ -1568,9 +1571,9 @@ impl<'db> Type<'db> {
                     .is_disjoint_from(db, other),
             },
 
-            (Type::KnownInstance(known_instance), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::KnownInstance(known_instance)) => {
-                !known_instance.is_instance_of(db, class)
+            (Type::KnownInstance(known_instance), Type::Instance(instance))
+            | (Type::Instance(instance), Type::KnownInstance(known_instance)) => {
+                !known_instance.is_instance_of(db, instance.class(db))
             }
 
             (known_instance_ty @ Type::KnownInstance(_), Type::Tuple(_))
@@ -1578,20 +1581,20 @@ impl<'db> Type<'db> {
                 known_instance_ty.is_disjoint_from(db, KnownClass::Tuple.to_instance(db))
             }
 
-            (Type::BooleanLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::BooleanLiteral(..)) => {
+            (Type::BooleanLiteral(..), Type::Instance(instance))
+            | (Type::Instance(instance), Type::BooleanLiteral(..)) => {
                 // A `Type::BooleanLiteral()` must be an instance of exactly `bool`
                 // (it cannot be an instance of a `bool` subclass)
-                !KnownClass::Bool.is_subclass_of(db, class)
+                !KnownClass::Bool.is_subclass_of(db, instance.class(db))
             }
 
             (Type::BooleanLiteral(..), _) | (_, Type::BooleanLiteral(..)) => true,
 
-            (Type::IntLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::IntLiteral(..)) => {
+            (Type::IntLiteral(..), Type::Instance(instance))
+            | (Type::Instance(instance), Type::IntLiteral(..)) => {
                 // A `Type::IntLiteral()` must be an instance of exactly `int`
                 // (it cannot be an instance of an `int` subclass)
-                !KnownClass::Int.is_subclass_of(db, class)
+                !KnownClass::Int.is_subclass_of(db, instance.class(db))
             }
 
             (Type::IntLiteral(..), _) | (_, Type::IntLiteral(..)) => true,
@@ -1599,34 +1602,28 @@ impl<'db> Type<'db> {
             (Type::StringLiteral(..), Type::LiteralString)
             | (Type::LiteralString, Type::StringLiteral(..)) => false,
 
-            (
-                Type::StringLiteral(..) | Type::LiteralString,
-                Type::Instance(InstanceType { class }),
-            )
-            | (
-                Type::Instance(InstanceType { class }),
-                Type::StringLiteral(..) | Type::LiteralString,
-            ) => {
+            (Type::StringLiteral(..) | Type::LiteralString, Type::Instance(instance))
+            | (Type::Instance(instance), Type::StringLiteral(..) | Type::LiteralString) => {
                 // A `Type::StringLiteral()` or a `Type::LiteralString` must be an instance of exactly `str`
                 // (it cannot be an instance of a `str` subclass)
-                !KnownClass::Str.is_subclass_of(db, class)
+                !KnownClass::Str.is_subclass_of(db, instance.class(db))
             }
 
             (Type::LiteralString, Type::LiteralString) => false,
             (Type::LiteralString, _) | (_, Type::LiteralString) => true,
 
-            (Type::BytesLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::BytesLiteral(..)) => {
+            (Type::BytesLiteral(..), Type::Instance(instance))
+            | (Type::Instance(instance), Type::BytesLiteral(..)) => {
                 // A `Type::BytesLiteral()` must be an instance of exactly `bytes`
                 // (it cannot be an instance of a `bytes` subclass)
-                !KnownClass::Bytes.is_subclass_of(db, class)
+                !KnownClass::Bytes.is_subclass_of(db, instance.class(db))
             }
 
-            (Type::SliceLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::SliceLiteral(..)) => {
+            (Type::SliceLiteral(..), Type::Instance(instance))
+            | (Type::Instance(instance), Type::SliceLiteral(..)) => {
                 // A `Type::SliceLiteral` must be an instance of exactly `slice`
                 // (it cannot be an instance of a `slice` subclass)
-                !KnownClass::Slice.is_subclass_of(db, class)
+                !KnownClass::Slice.is_subclass_of(db, instance.class(db))
             }
 
             // A class-literal type `X` is always disjoint from an instance type `Y`,
@@ -1641,11 +1638,11 @@ impl<'db> Type<'db> {
                 .metaclass_instance_type(db)
                 .is_subtype_of(db, instance),
 
-            (Type::FunctionLiteral(..), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::FunctionLiteral(..)) => {
+            (Type::FunctionLiteral(..), Type::Instance(instance))
+            | (Type::Instance(instance), Type::FunctionLiteral(..)) => {
                 // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
                 // (it cannot be an instance of a `types.FunctionType` subclass)
-                !KnownClass::FunctionType.is_subclass_of(db, class)
+                !KnownClass::FunctionType.is_subclass_of(db, instance.class(db))
             }
 
             (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => KnownClass::MethodType
@@ -1697,10 +1694,9 @@ impl<'db> Type<'db> {
                 other.is_disjoint_from(db, KnownClass::ModuleType.to_instance(db))
             }
 
-            (
-                Type::Instance(InstanceType { class: left_class }),
-                Type::Instance(InstanceType { class: right_class }),
-            ) => {
+            (Type::Instance(left_instance), Type::Instance(right_instance)) => {
+                let left_class = left_instance.class(db);
+                let right_class = right_instance.class(db);
                 (left_class.is_final(db) && !left_class.is_subclass_of(db, right_class))
                     || (right_class.is_final(db) && !right_class.is_subclass_of(db, left_class))
             }
@@ -1861,9 +1857,10 @@ impl<'db> Type<'db> {
                 // (this variant represents `f.__get__`, where `f` is any function)
                 false
             }
-            Type::Instance(InstanceType { class }) => {
-                class.known(db).is_some_and(KnownClass::is_singleton)
-            }
+            Type::Instance(instance) => instance
+                .class(db)
+                .known(db)
+                .is_some_and(KnownClass::is_singleton),
             Type::PropertyInstance(_) => false,
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
@@ -1935,9 +1932,10 @@ impl<'db> Type<'db> {
                 .iter()
                 .all(|elem| elem.is_single_valued(db)),
 
-            Type::Instance(InstanceType { class }) => {
-                class.known(db).is_some_and(KnownClass::is_single_valued)
-            }
+            Type::Instance(instance) => instance
+                .class(db)
+                .known(db)
+                .is_some_and(KnownClass::is_single_valued),
 
             Type::Dynamic(_)
             | Type::Never
@@ -2065,7 +2063,7 @@ impl<'db> Type<'db> {
             // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`, i.e. Type::Instance(type).
             // So looking up a name in the MRO of `Type::Instance(type)` is equivalent to looking up the name in the
             // MRO of the class `object`.
-            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Type) => {
+            Type::Instance(instance) if instance.class(db).is_known(db, KnownClass::Type) => {
                 KnownClass::Object
                     .to_class_literal(db)
                     .find_name_in_mro_with_policy(db, name, policy)
@@ -2153,7 +2151,10 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Never => Symbol::bound(self).into(),
 
-            Type::Instance(InstanceType { class }) => class.instance_member(db, name),
+            Type::Instance(InstanceType::Class(class)) => class.instance_member(db, name),
+            Type::Instance(InstanceType::UninitializedGenericClass(generic)) => {
+                generic.instance_member(db, None, name)
+            }
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
                 .to_instance(db)
@@ -2568,9 +2569,9 @@ impl<'db> Type<'db> {
                 .member(db, &name),
             Type::Callable(_) => KnownClass::Object.to_instance(db).member(db, &name),
 
-            Type::Instance(InstanceType { class })
+            Type::Instance(instance)
                 if matches!(name.as_str(), "major" | "minor")
-                    && class.is_known(db, KnownClass::VersionInfo) =>
+                    && instance.class(db).is_known(db, KnownClass::VersionInfo) =>
             {
                 let python_version = Program::get(db).python_version(db);
                 let segment = if name == "major" {
@@ -2581,7 +2582,7 @@ impl<'db> Type<'db> {
                 Symbol::bound(Type::IntLiteral(segment.into())).into()
             }
 
-            Type::Instance(InstanceType { class }) if class.is_known(db, KnownClass::Super) => {
+            Type::Instance(instance) if instance.class(db).is_known(db, KnownClass::Super) => {
                 SymbolAndQualifiers::todo("super() support")
             }
 
@@ -2645,8 +2646,8 @@ impl<'db> Type<'db> {
                     // It will need a special handling, so it remember the origin type to properly
                     // resolve the attribute.
                     if self.into_instance().is_some_and(|instance| {
-                        instance.class.is_known(db, KnownClass::ModuleType)
-                            || instance.class.is_known(db, KnownClass::GenericAlias)
+                        instance.class(db).is_known(db, KnownClass::ModuleType)
+                            || instance.class(db).is_known(db, KnownClass::GenericAlias)
                     }) {
                         return Symbol::Unbound.into();
                     }
@@ -2890,7 +2891,7 @@ impl<'db> Type<'db> {
                 }
             },
 
-            Type::Instance(InstanceType { class }) => match class.known(db) {
+            Type::Instance(instance) => match instance.class(db).known(db) {
                 Some(known_class) => known_class.bool(),
                 None => try_dunder_bool()?,
             },
@@ -4079,7 +4080,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => Ok(*self),
 
-            Type::Instance(InstanceType { class }) => match class.known(db) {
+            Type::Instance(instance) => match instance.class(db).known(db) {
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),
@@ -4152,7 +4153,10 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            Type::Instance(InstanceType { class }) => SubclassOfType::from(db, *class),
+            Type::Instance(InstanceType::Class(class)) => SubclassOfType::from(db, *class),
+            Type::Instance(InstanceType::UninitializedGenericClass(generic)) => {
+                Type::from(*generic)
+            }
             Type::KnownInstance(known_instance) => known_instance.class().to_class_literal(db),
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
@@ -4375,7 +4379,9 @@ impl<'db> Type<'db> {
                 Some(TypeDefinition::Class(class_literal.definition(db)))
             }
             Self::GenericAlias(alias) => Some(TypeDefinition::Class(alias.definition(db))),
-            Self::Instance(instance) => Some(TypeDefinition::Class(instance.class.definition(db))),
+            Self::Instance(instance) => {
+                Some(TypeDefinition::Class(instance.class(db).definition(db)))
+            }
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
                     Some(TypeDefinition::TypeVar(var.definition(db)))
