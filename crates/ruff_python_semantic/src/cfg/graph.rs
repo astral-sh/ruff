@@ -520,7 +520,7 @@ impl<'stmt> CFGBuilder<'stmt> {
                             let mut conditions = Vec::with_capacity(stmt_try.handlers.len());
                             let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len());
 
-                            for ExceptHandler::ExceptHandler(handler) in stmt_try.handlers.iter() {
+                            for ExceptHandler::ExceptHandler(handler) in &stmt_try.handlers {
                                 except_blocks.push(self.new_block());
                                 conditions.push(Condition::ExceptHandler(handler));
                             }
@@ -556,7 +556,7 @@ impl<'stmt> CFGBuilder<'stmt> {
                             let mut conditions = Vec::with_capacity(stmt_try.handlers.len() + 1);
                             let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len());
 
-                            for ExceptHandler::ExceptHandler(handler) in stmt_try.handlers.iter() {
+                            for ExceptHandler::ExceptHandler(handler) in &stmt_try.handlers {
                                 except_blocks.push(self.new_block());
                                 conditions.push(Condition::ExceptHandler(handler));
                             }
@@ -601,7 +601,7 @@ impl<'stmt> CFGBuilder<'stmt> {
                             let mut conditions = Vec::with_capacity(stmt_try.handlers.len() + 1);
                             let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len());
 
-                            for ExceptHandler::ExceptHandler(handler) in stmt_try.handlers.iter() {
+                            for ExceptHandler::ExceptHandler(handler) in &stmt_try.handlers {
                                 except_blocks.push(self.new_block());
                                 conditions.push(Condition::ExceptHandler(handler));
                             }
@@ -653,7 +653,7 @@ impl<'stmt> CFGBuilder<'stmt> {
                             let mut conditions = Vec::with_capacity(stmt_try.handlers.len() + 1);
                             let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len());
 
-                            for ExceptHandler::ExceptHandler(handler) in stmt_try.handlers.iter() {
+                            for ExceptHandler::ExceptHandler(handler) in &stmt_try.handlers {
                                 except_blocks.push(self.new_block());
                                 conditions.push(Condition::ExceptHandler(handler));
                             }
@@ -1010,7 +1010,7 @@ pub struct TryContext<'stmt> {
     deferred_jumps: Vec<&'stmt Stmt>,
 }
 
-impl<'stmt> TryContext<'stmt> {
+impl TryContext<'_> {
     pub fn new(kind: TryKind) -> Self {
         Self {
             kind,
@@ -1019,47 +1019,11 @@ impl<'stmt> TryContext<'stmt> {
         }
     }
 
-    fn has_except(&self) -> bool {
-        matches!(
-            self.kind,
-            TryKind::TryExcept
-                | TryKind::TryExceptElse
-                | TryKind::TryExceptFinally
-                | TryKind::TryExceptElseFinally
-        )
-    }
-
-    fn has_else(&self) -> bool {
-        matches!(
-            self.kind,
-            TryKind::TryExceptElse | TryKind::TryExceptElseFinally
-        )
-    }
-
     fn has_finally(&self) -> bool {
         matches!(
             self.kind,
             TryKind::TryFinally | TryKind::TryExceptFinally | TryKind::TryExceptElseFinally
         )
-    }
-
-    fn in_try(&self) -> bool {
-        matches!(self.state, TryState::Try)
-    }
-    fn in_dispatch(&self) -> bool {
-        matches!(self.state, TryState::Dispatch)
-    }
-    fn in_except(&self) -> bool {
-        matches!(self.state, TryState::Except)
-    }
-    fn in_else(&self) -> bool {
-        matches!(self.state, TryState::Else)
-    }
-    fn in_finally(&self) -> bool {
-        matches!(self.state, TryState::Finally)
-    }
-    fn in_recovery(&self) -> bool {
-        matches!(self.state, TryState::Recovery)
     }
 }
 

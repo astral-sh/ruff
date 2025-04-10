@@ -266,7 +266,7 @@ impl MermaidGraph for CFGWithSource<'_, '_> {
                         };
                         MermaidEdge {
                             kind: MermaidEdgeKind::Arrow,
-                            content: format!("except {}", exc_types),
+                            content: format!("except {exc_types}"),
                         }
                     }
                     Condition::UncaughtException => {
