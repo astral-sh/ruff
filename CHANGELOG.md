@@ -12,23 +12,21 @@
 - [syntax-errors] Check annotations in annotated assignments ([#17283](https://github.com/astral-sh/ruff/pull/17283))
 - [syntax-errors] Extend annotation checks to `await` ([#17282](https://github.com/astral-sh/ruff/pull/17282))
 
+### Bug fixes
+
+- [`flake8-pie`] Avoid false positive for multiple assignment with `auto()` (`PIE796`) ([#17274](https://github.com/astral-sh/ruff/pull/17274))
+
 ### Rule changes
 
-- Fix RUF100 to detect unused file-level noqa directives with specific codes (#17042) ([#17061](https://github.com/astral-sh/ruff/pull/17061))
+- [`ruff`] Fix `RUF100` to detect unused file-level `noqa` directives with specific codes (#17042) ([#17061](https://github.com/astral-sh/ruff/pull/17061))
 - [`flake8-pytest-style`] Avoid false positive for legacy form of `pytest.raises` (`PT011`) ([#17231](https://github.com/astral-sh/ruff/pull/17231))
 
 ### Documentation
 
-- [docs] fix formatting of "See Style Guide" link ([#17272](https://github.com/astral-sh/ruff/pull/17272))
+- Fix formatting of "See Style Guide" link ([#17272](https://github.com/astral-sh/ruff/pull/17272))
 - [syntax-errors] Document behavior of `global` declarations in `try` nodes before 3.13 ([#17285](https://github.com/astral-sh/ruff/pull/17285))
 
-### Other changes
 
-- Run fuzzer with `--preview` ([#17210](https://github.com/astral-sh/ruff/pull/17210))
-- [`flake8-pie`] Avoid false positive for multiple assignment with `auto()` (`PIE796`) ([#17274](https://github.com/astral-sh/ruff/pull/17274))
-- [playground] Add Reset button ([#17236](https://github.com/astral-sh/ruff/pull/17236))
-- [playground] Provide fallback monospace-font ([#17242](https://github.com/astral-sh/ruff/pull/17242))
-- update cargo-dist ([#17325](https://github.com/astral-sh/ruff/pull/17325))
 
 ## 0.11.4
 
