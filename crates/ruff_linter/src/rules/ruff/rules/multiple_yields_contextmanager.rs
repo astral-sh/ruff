@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 use crate::rules::ruff::rules::helpers::function_def_visit_preorder_except_body;
 
 /// ## What it does
-/// Checks that a function decorated with `contextlib.contextmanager` yields only once.
+/// Checks that a function decorated with `contextlib.contextmanager` yields at most once.
 ///
 /// ### Why is this bad?
 /// A context manager must yield exactly once. Multiple yields cause a runtime error.
@@ -61,7 +61,6 @@ pub(crate) fn multiple_yields_in_contextmanager(
 fn is_contextmanager_decorated(function_def: &ast::StmtFunctionDef, checker: &Checker) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
         let callable = map_callable(&decorator.expression);
-
         checker
             .semantic()
             .resolve_qualified_name(callable)
@@ -81,25 +80,35 @@ struct YieldPathTracker {
 
 impl YieldPathTracker {
     fn increment_yield_counts_top_by(&mut self, by: usize) {
-        if let Some(root) = self.yield_counts.pop() {
-            let yield_count = root + by;
-            if yield_count > 1 {
-                self.has_multiple_yields = true;
+        match self.yield_counts.pop() {
+            Some(root) => {
+                let new_root = root + by;
+                if new_root > 1 {
+                    self.has_multiple_yields = true;
+                }
+                self.yield_counts.push(new_root);
             }
-            self.yield_counts.push(yield_count);
-        } else {
-            self.yield_counts.push(by);
-            debug_assert!(false, "Invalid yield stack size when traversing AST")
-        };
+            None => {
+                self.yield_counts.push(by);
+                debug_assert!(false, "Invalid yield stack size when traversing AST");
+            }
+        }
+    }
+
+    fn pop_yields(&mut self) -> usize {
+        match self.yield_counts.pop() {
+            Some(counts) => counts,
+            None => {
+                debug_assert!(false, "Invalid yield stack size when traversing AST");
+                0
+            }
+        }
     }
 
     fn handle_exclusive_branches(&mut self, branch_count: usize) {
         let mut max_yields_branches = 0;
         for _ in 0..branch_count {
-            let branch_yields = self
-                .yield_counts
-                .pop()
-                .expect("AST branch stack has less elements than branches");
+            let branch_yields = self.pop_yields();
             max_yields_branches = max_yields_branches.max(branch_yields);
         }
         self.increment_yield_counts_top_by(max_yields_branches);
@@ -140,26 +149,16 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
     fn leave_node(&mut self, node: AnyNodeRef<'a>) {
         match node {
             AnyNodeRef::StmtTry(try_stmt) => {
-                let finally_yields = self.yield_counts.pop().expect(
-                    "Yield counts stack did not contain finally yield counts for try block",
-                );
-
-                let else_yields = self
-                    .yield_counts
-                    .pop()
-                    .expect("Yield counts stack did not contain else yield counts for try block");
+                let finally_yields = self.pop_yields();
+                let else_yields = self.pop_yields();
 
                 let mut max_except_yields = 0;
                 for _ in 0..try_stmt.handlers.len() {
-                    let except_yields = self.yield_counts.pop().expect(
-                        "Yield counts stack did not contain except yield counts for try block",
-                    );
+                    let except_yields = self.pop_yields();
                     max_except_yields = max_except_yields.max(except_yields);
                 }
 
-                let try_yields = self.yield_counts.pop().expect(
-                    "Yield counts stack did not contain try body yield counts for try block",
-                );
+                let try_yields = self.pop_yields();
 
                 let max_path_yields =
                     try_yields + max_except_yields.max(else_yields) + finally_yields;
@@ -175,21 +174,12 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 self.handle_exclusive_branches(branch_count);
             }
             AnyNodeRef::StmtFor(_) | AnyNodeRef::StmtWhile(_) => {
-                let else_yields = self
-                    .yield_counts
-                    .pop()
-                    .expect("Yield counts stack did not contain else yield counts for loop");
-                let body_yields = self
-                    .yield_counts
-                    .pop()
-                    .expect("Yield counts stack did not contain body yield counts for loop");
+                let else_yields = self.pop_yields();
+                let body_yields = self.pop_yields();
 
                 // Yield in loop is likely to yield multiple times
                 self.has_multiple_yields |= body_yields > 0;
                 self.increment_yield_counts_top_by(else_yields);
-            }
-            AnyNodeRef::ElifElseClause(_) | AnyNodeRef::MatchCase(_) => {
-                // Handled on enter/leave of outer structure.
             }
             _ => {}
         }
@@ -221,7 +211,6 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     self.visit_body(body);
                     self.yield_counts.push(0);
                     self.visit_body(orelse);
-
                     self.leave_node(node);
                 }
             }
@@ -231,7 +220,6 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     self.visit_body(body);
                     self.yield_counts.push(0);
                     self.visit_body(orelse);
-
                     self.leave_node(node);
                 }
             }
@@ -264,17 +252,14 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                 let node = ruff_python_ast::AnyNodeRef::StmtTry(try_stmt);
                 if self.enter_node(node).is_traverse() {
                     self.visit_body(body);
-
                     for handler in handlers {
                         self.yield_counts.push(0);
                         self.visit_except_handler(handler);
                     }
-
                     self.yield_counts.push(0);
                     self.visit_body(orelse);
                     self.yield_counts.push(0);
                     self.visit_body(finalbody);
-
                     self.leave_node(node);
                 }
             }
