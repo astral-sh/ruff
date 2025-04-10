@@ -183,7 +183,7 @@ fn generate_union_fix(
 
     // Request `typing.Union`
     let (import_edit, binding) =
-        checker.import_from_typing("Union", annotation.start(), PythonVersion::PY38)?;
+        checker.import_from_typing("Union", annotation.start(), PythonVersion::lowest())?;
 
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {

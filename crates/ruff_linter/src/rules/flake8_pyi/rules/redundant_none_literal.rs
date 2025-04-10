@@ -228,7 +228,7 @@ fn create_fix(
             let (import_edit, bound_name) = checker.import_from_typing(
                 "Optional",
                 literal_expr.start(),
-                PythonVersion::PY38,
+                PythonVersion::lowest(),
             )?;
             let optional_expr = typing_optional(new_literal_expr, Name::from(bound_name));
             let content = checker.generator().expr(&optional_expr);
