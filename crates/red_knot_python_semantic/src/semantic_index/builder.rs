@@ -1572,11 +1572,12 @@ where
                     return;
                 }
 
+                let mut no_case_matched = self.flow_snapshot();
+
                 let has_catchall = cases
                     .last()
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard());
 
-                let mut no_case_matched = self.flow_snapshot();
                 let mut vis_constraints = vec![];
                 let mut post_case_snapshots = vec![];
                 let mut match_predicate;
@@ -1585,7 +1586,10 @@ where
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
-                    no_case_matched = self.flow_snapshot();
+                    // unlike in [Stmt::If], we don't reset [no_case_matched]
+                    // here because the effects of visiting a pattern is binding
+                    // symbols, and this doesn't occur unless the pattern
+                    // actually matches
                     match_predicate = self.add_pattern_narrowing_constraint(
                         subject_expr,
                         &case.pattern,
@@ -1627,6 +1631,7 @@ where
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
                         }
+                        no_case_matched = self.flow_snapshot();
                     }
                 }
 
