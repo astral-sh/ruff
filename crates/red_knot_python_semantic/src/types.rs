@@ -3803,9 +3803,13 @@ impl<'db> Type<'db> {
             .to_instance(db)
             .expect("Class literal, generic alias, and subclass-of types should always be convertible to instance type");
 
-        match (new_call_outcome, init_call_outcome) {
+        match (generic_origin, new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
-            (new_call_outcome @ (None | Some(Ok(_))), init_call_outcome @ (None | Some(Ok(_)))) => {
+            (
+                Some(generic_origin),
+                new_call_outcome @ (None | Some(Ok(_))),
+                init_call_outcome @ (None | Some(Ok(_))),
+            ) => {
                 let new_specialization = new_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
@@ -3818,12 +3822,11 @@ impl<'db> Type<'db> {
                     .and_then(Bindings::single_element)
                     .and_then(CallableBinding::matching_overload)
                     .and_then(|(_, binding)| binding.specialization());
-                let specialized = generic_origin
-                    .zip(new_specialization.or(init_specialization))
-                    .map(|(origin, specialization)| {
+                let specialized = (new_specialization.or(init_specialization))
+                    .map(|specialization| {
                         Type::instance(ClassType::Generic(GenericAlias::new(
                             db,
-                            origin,
+                            generic_origin,
                             specialization,
                         )))
                     })
@@ -3831,15 +3834,17 @@ impl<'db> Type<'db> {
                 Ok(specialized)
             }
 
-            (None | Some(Ok(_)), Some(Err(error))) => {
+            (None, None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
+
+            (_, None | Some(Ok(_)), Some(Err(error))) => {
                 // no custom `__new__` or it was called and succeeded, but `__init__` failed.
                 Err(ConstructorCallError::Init(instance_ty, error))
             }
-            (Some(Err(error)), None | Some(Ok(_))) => {
+            (_, Some(Err(error)), None | Some(Ok(_))) => {
                 // custom `__new__` was called and failed, but init is ok
                 Err(ConstructorCallError::New(instance_ty, error))
             }
-            (Some(Err(new_error)), Some(Err(init_error))) => {
+            (_, Some(Err(new_error)), Some(Err(init_error))) => {
                 // custom `__new__` was called and failed, and `__init__` is also not ok
                 Err(ConstructorCallError::NewAndInit(
                     instance_ty,
