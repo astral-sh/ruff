@@ -27,6 +27,10 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// y = 0b1111011.bit_count()
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe, as the `bit_count()` method can be used when the argument
+/// to the `bin()` is an instance of a type that implements the `__index__` and `bit_count` methods.
+///
 /// ## Options
 /// - `target-version`
 ///
@@ -116,21 +120,23 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
     }
     // Extract, e.g., `x` in `bin(x)`.
     let literal_text = checker.locator().slice(arg);
-
     // If we're calling a method on an integer, or an expression with lower precedence, parenthesize
-    // it.
-    let parenthesize = match arg {
+    // it. Moreover, we check if the fix is safe.
+    let (parenthesize, fix_is_safe): (bool, bool) = match arg {
         Expr::NumberLiteral(ast::ExprNumberLiteral { .. }) => {
             let mut chars = literal_text.chars();
-            !matches!(
-                (chars.next(), chars.next()),
-                (Some('0'), Some('b' | 'B' | 'x' | 'X' | 'o' | 'O'))
+            (
+                !matches!(
+                    (chars.next(), chars.next()),
+                    (Some('0'), Some('b' | 'B' | 'x' | 'X' | 'o' | 'O'))
+                ),
+                true,
             )
         }
 
-        Expr::StringLiteral(inner) => inner.value.is_implicit_concatenated(),
-        Expr::BytesLiteral(inner) => inner.value.is_implicit_concatenated(),
-        Expr::FString(inner) => inner.value.is_implicit_concatenated(),
+        Expr::StringLiteral(inner) => (inner.value.is_implicit_concatenated(), false),
+        Expr::BytesLiteral(inner) => (inner.value.is_implicit_concatenated(), false),
+        Expr::FString(inner) => (inner.value.is_implicit_concatenated(), false),
 
         Expr::Await(_)
         | Expr::Starred(_)
@@ -148,7 +154,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         | Expr::Compare(_)
         | Expr::Tuple(_)
         | Expr::Generator(_)
-        | Expr::IpyEscapeCommand(_) => true,
+        | Expr::IpyEscapeCommand(_) => (true, false),
 
         Expr::Call(_)
         | Expr::Dict(_)
@@ -160,7 +166,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
         | Expr::Attribute(_)
-        | Expr::Subscript(_) => false,
+        | Expr::Subscript(_) => (false, false),
     };
 
     let replacement = if parenthesize {
@@ -177,10 +183,17 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         call.range(),
     );
 
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        replacement,
-        call.range(),
-    )));
+    if fix_is_safe {
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            replacement,
+            call.range(),
+        )));
+    } else {
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+            replacement,
+            call.range(),
+        )));
+    }
 
     checker.report_diagnostic(diagnostic);
 }
