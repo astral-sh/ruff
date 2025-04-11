@@ -615,7 +615,7 @@ impl SemanticSyntaxChecker {
         // await-outside-async is PLE1142 instead, so we'll end up emitting both syntax errors for
         // cases that trigger F704
         if kind.is_await() {
-            if ctx.in_function_context() {
+            if ctx.in_await_allowed_context() {
                 return;
             }
             // `await` is allowed at the top level of a Jupyter notebook.
@@ -1481,7 +1481,28 @@ pub trait SemanticSyntaxContext {
     /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
     fn in_async_context(&self) -> bool;
 
-    fn in_function_context(&self) -> bool;
+    /// Returns `true` if the visitor is currently in a context where the `await` keyword is
+    /// allowed.
+    ///
+    /// Note that this is method is primarily used to report `YieldOutsideFunction` errors for
+    /// `await` outside function scopes, irrespective of their async status. As such, this differs
+    /// from `in_async_context` in two ways:
+    ///
+    /// 1. `await` is allowed in a lambda, despite it not being async
+    /// 2. `await` is allowed in any function, regardless of its async status
+    ///
+    /// In short, only nested class definitions should cause this method to return `false`, for
+    /// example:
+    ///
+    /// ```python
+    /// def f():
+    ///     await 1  # okay, in a function
+    ///     class C:
+    ///         await 1  # error
+    /// ```
+    ///
+    /// See the trait-level documentation for more details.
+    fn in_await_allowed_context(&self) -> bool;
 
     /// Returns `true` if the visitor is currently inside of a synchronous comprehension.
     ///

@@ -558,7 +558,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         false
     }
 
-    fn in_function_context(&self) -> bool {
+    fn in_await_allowed_context(&self) -> bool {
         true
     }
 }

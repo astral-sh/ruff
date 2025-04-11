@@ -612,7 +612,7 @@ impl SemanticSyntaxContext for Checker<'_> {
         false
     }
 
-    fn in_function_context(&self) -> bool {
+    fn in_await_allowed_context(&self) -> bool {
         for scope in self.semantic.current_scopes() {
             match scope.kind {
                 ScopeKind::Class(_) => return false,
