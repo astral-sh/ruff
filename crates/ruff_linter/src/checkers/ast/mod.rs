@@ -533,15 +533,17 @@ impl<'a> Checker<'a> {
 
     /// Attempt to create an [`Edit`] that imports `member`.
     ///
-    /// On Python <`python_version`, `member` is imported from `typing_extensions`, while on Python
-    /// >=`python_version`, it is imported from `typing`.
+    /// On Python <`version_added_to_typing`, `member` is imported from `typing_extensions`, while
+    /// on Python >=`version_added_to_typing`, it is imported from `typing`.
+    ///
+    /// See [`Importer::get_or_import_symbol`] for more details on the returned values.
     pub(crate) fn import_from_typing(
         &self,
         member: &str,
         position: TextSize,
-        python_version: PythonVersion,
+        version_added_to_typing: PythonVersion,
     ) -> Result<(Edit, String), ResolutionError> {
-        let source_module = if self.target_version() >= python_version {
+        let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
         } else {
             "typing_extensions"
