@@ -226,6 +226,25 @@ impl Diagnostic {
     pub fn primary_span(&self) -> Option<Span> {
         self.primary_annotation().map(|ann| ann.span.clone())
     }
+
+    /// Returns all annotations, skipping the first primary annotation.
+    pub fn non_primary_annotations(&self) -> impl Iterator<Item = &Annotation> {
+        let mut seen_primary = false;
+        self.inner.annotations.iter().filter(move |ann| {
+            if seen_primary {
+                true
+            } else if ann.is_primary {
+                seen_primary = true;
+                false
+            } else {
+                true
+            }
+        })
+    }
+
+    pub fn sub_diagnostics(&self) -> &[SubDiagnostic] {
+        &self.inner.subs
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -293,6 +312,10 @@ impl SubDiagnostic {
     /// have no annotations.
     pub fn annotate(&mut self, ann: Annotation) {
         self.inner.annotations.push(ann);
+    }
+
+    pub fn annotations(&self) -> &[Annotation] {
+        &self.inner.annotations
     }
 }
 
