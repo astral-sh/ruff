@@ -1169,31 +1169,14 @@ impl InheritanceCycle {
 
 /// A type representing the set of runtime objects which are instances of a certain class.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
-pub enum InstanceType<'db> {
-    /// Once constructed, an object is always an instance of a class type — if needed, we will have
-    /// applied the default specialization to a generic class to produce the generic alias that the
-    /// object is an instance of.
-    Class(ClassType<'db>),
-
-    /// While constructing a non-specialized generic class, we want to look up the `__init__`
-    /// method as an instance method _without_ applying default specialization. In only this one
-    /// case, we consider the (not yet initialized) object to be an instance of the generic class,
-    /// since we don't know what specialization to apply until we have inferred one from the
-    /// `__init__` arguments.
-    UninitializedGenericClass(ClassLiteralType<'db>),
+pub struct InstanceType<'db> {
+    pub class: ClassType<'db>,
 }
 
 impl<'db> InstanceType<'db> {
-    pub fn class(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            InstanceType::Class(class) => class,
-            InstanceType::UninitializedGenericClass(generic) => generic.default_specialization(db),
-        }
-    }
-
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
         // N.B. The subclass relation is fully static
-        self.class(db).is_subclass_of(db, other.class(db))
+        self.class.is_subclass_of(db, other.class)
     }
 }
 

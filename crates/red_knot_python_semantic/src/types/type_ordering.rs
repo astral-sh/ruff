@@ -108,21 +108,16 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 }
             }
         }
+
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
-
-        (Type::Instance(InstanceType::Class(left)), Type::Instance(InstanceType::Class(right))) => {
-            left.cmp(right)
-        }
-        (Type::Instance(InstanceType::Class(_)), _) => Ordering::Less,
-        (_, Type::Instance(InstanceType::Class(_))) => Ordering::Greater,
-
         (
-            Type::Instance(InstanceType::UninitializedGenericClass(left)),
-            Type::Instance(InstanceType::UninitializedGenericClass(right)),
+            Type::Instance(InstanceType { class: left }),
+            Type::Instance(InstanceType { class: right }),
         ) => left.cmp(right),
-        (Type::Instance(InstanceType::UninitializedGenericClass(_)), _) => Ordering::Less,
-        (_, Type::Instance(InstanceType::UninitializedGenericClass(_))) => Ordering::Greater,
+
+        (Type::Instance(_), _) => Ordering::Less,
+        (_, Type::Instance(_)) => Ordering::Greater,
 
         (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
         (Type::TypeVar(_), _) => Ordering::Less,

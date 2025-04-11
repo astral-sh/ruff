@@ -6,7 +6,7 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::class::{ClassLiteralType, ClassType, GenericAlias, GenericClass};
+use crate::types::class::{ClassType, GenericAlias, GenericClass};
 use crate::types::class_base::ClassBase;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
@@ -72,21 +72,11 @@ impl Display for DisplayRepresentation<'_> {
         match self.ty {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Instance(instance) => match (instance, instance.class(self.db).known(self.db)) {
+            Type::Instance(InstanceType { class }) => match (class, class.known(self.db)) {
                 (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                 (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
-                (
-                    InstanceType::Class(ClassType::NonGeneric(class))
-                    | InstanceType::UninitializedGenericClass(ClassLiteralType::NonGeneric(class)),
-                    _,
-                ) => f.write_str(&class.class(self.db).name),
-                (InstanceType::Class(ClassType::Generic(alias)), _) => {
-                    write!(f, "{}", alias.display(self.db))
-                }
-                (
-                    InstanceType::UninitializedGenericClass(ClassLiteralType::Generic(generic)),
-                    _,
-                ) => f.write_str(&generic.class(self.db).name),
+                (ClassType::NonGeneric(class), _) => f.write_str(&class.class(self.db).name),
+                (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
             },
             Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
@@ -116,9 +106,9 @@ impl Display for DisplayRepresentation<'_> {
                 let function = bound_method.function(self.db);
                 let self_instance = bound_method.self_instance(self.db);
                 let self_instance_specialization = match self_instance {
-                    Type::Instance(InstanceType::Class(ClassType::Generic(alias))) => {
-                        Some(alias.specialization(self.db))
-                    }
+                    Type::Instance(InstanceType {
+                        class: ClassType::Generic(alias),
+                    }) => Some(alias.specialization(self.db)),
                     _ => None,
                 };
                 let specialization = match function.specialization(self.db) {
