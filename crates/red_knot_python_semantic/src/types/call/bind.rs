@@ -1248,18 +1248,18 @@ impl<'db> BindingError<'db> {
                 expected_ty,
                 provided_ty,
             } => {
-                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE) else {
+                let range = Self::get_node(node, *argument_index);
+                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
                     return;
                 };
 
                 let provided_ty_display = provided_ty.display(context.db());
                 let expected_ty_display = expected_ty.display(context.db());
 
-                let mut diag = builder.build("Argument to this function is incorrect");
-                let span = context.span(Self::get_node(node, *argument_index));
-                diag.annotate(Annotation::primary(span).message(format_args!(
+                let mut diag = builder.into_diagnostic("Argument to this function is incorrect");
+                diag.set_primary_message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
-                )));
+                ));
                 if let Some((name_span, parameter_span)) =
                     Self::parameter_span_from_index(context.db(), callable_ty, parameter.index)
                 {

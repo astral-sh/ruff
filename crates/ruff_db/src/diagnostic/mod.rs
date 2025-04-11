@@ -406,6 +406,11 @@ impl Annotation {
     pub fn get_message(&self) -> Option<&str> {
         self.message.as_ref().map(|m| m.as_str())
     }
+
+    /// Returns the `Span` associated with this annotation.
+    pub fn get_span(&self) -> &Span {
+        &self.span
+    }
 }
 
 /// A string identifier for a lint rule.
