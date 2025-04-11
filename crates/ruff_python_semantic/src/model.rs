@@ -1900,6 +1900,13 @@ impl<'a> SemanticModel<'a> {
         self.flags.intersects(SemanticModelFlags::TYPE_ALIAS)
     }
 
+    /// Return `true` if the model is visiting the type expression of
+    /// a `typing.cast` call.
+    pub const fn in_cast_type_expression(&self) -> bool {
+        self.flags
+            .intersects(SemanticModelFlags::CAST_TYPE_EXPRESSION)
+    }
+
     /// Return `true` if the model is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.flags.intersects(SemanticModelFlags::EXCEPTION_HANDLER)
@@ -2524,6 +2531,16 @@ bitflags! {
         /// [no_type_check]: https://docs.python.org/3/library/typing.html#typing.no_type_check
         /// [#13824]: https://github.com/astral-sh/ruff/issues/13824
         const NO_TYPE_CHECK = 1 << 28;
+
+        /// The model is visiting the type expression of a `typing.cast` call.
+        ///
+        /// For example, the model might be visiting `float` in
+        /// ```python
+        /// from typing import cast
+        ///
+        /// cast(float, 5)
+        /// ```
+        const CAST_TYPE_EXPRESSION = 1 << 31;
 
         /// The context is in any type annotation.
         const ANNOTATION = Self::TYPING_ONLY_ANNOTATION.bits() | Self::RUNTIME_EVALUATED_ANNOTATION.bits() | Self::RUNTIME_REQUIRED_ANNOTATION.bits();
