@@ -99,6 +99,7 @@ mod tests {
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
+    #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -308,6 +309,50 @@ mod tests {
                     Rule::LineTooLong,
                     Rule::CommentedOutCode,
                 ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_noqa_filedirective_unused() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_6.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_noqa_filedirective_unused_last_of_many() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_7.py"),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::UnusedNOQA,
+                    Rule::FStringMissingPlaceholders,
+                    Rule::LineTooLong,
+                    Rule::UnusedVariable,
+                ])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_rule_code_external_rules() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF102.py"),
+            &settings::LinterSettings {
+                external: vec!["V".to_string()],
+                ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
             },
         )?;
         assert_messages!(diagnostics);

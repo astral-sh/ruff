@@ -1,4 +1,5 @@
 @import "tailwindcss";
+
 @source "../../shared/";
 
 @custom-variant dark (&:is(.dark *));
@@ -37,7 +38,9 @@
   --font-body:
     Alliance Text, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
     sans-serif, Apple Color Emoji, Segoe UI Emoji;
-  --font-mono: Roboto Mono;
+  --font-mono:
+    Roboto Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
 
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;

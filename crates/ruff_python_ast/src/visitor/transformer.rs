@@ -263,10 +263,10 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
         }) => {
             if let Some(expr) = exc {
                 visitor.visit_expr(expr);
-            };
+            }
             if let Some(expr) = cause {
                 visitor.visit_expr(expr);
-            };
+            }
         }
         Stmt::Try(ast::StmtTry {
             body,

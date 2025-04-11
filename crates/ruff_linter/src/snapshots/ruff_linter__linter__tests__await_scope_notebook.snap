@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+await_scope.ipynb:cell 3:2:5: F704 `await` statement outside of a function
+  |
+1 | class _:
+2 |     await 1  # SyntaxError: await outside function
+  |     ^^^^^^^ F704
+  |

@@ -8,11 +8,12 @@ use ruff_db::parsed::ParsedModule;
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{self as ast, ExprContext};
+use ruff_python_ast::{self as ast};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
 use crate::module_resolver::resolve_module;
+use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
@@ -26,6 +27,7 @@ use crate::semantic_index::definition::{
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
+    StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
@@ -128,7 +130,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             eager_bindings: FxHashMap::default(),
         };
 
-        builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
+        builder.push_scope_with_parent(
+            NodeWithScopeRef::Module,
+            None,
+            ScopedVisibilityConstraintId::ALWAYS_TRUE,
+        );
 
         builder
     }
@@ -190,17 +196,28 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
         let parent = self.current_scope();
-        self.push_scope_with_parent(node, Some(parent));
+        let reachabililty = self.current_use_def_map().reachability;
+        self.push_scope_with_parent(node, Some(parent), reachabililty);
     }
 
-    fn push_scope_with_parent(&mut self, node: NodeWithScopeRef, parent: Option<FileScopeId>) {
+    fn push_scope_with_parent(
+        &mut self,
+        node: NodeWithScopeRef,
+        parent: Option<FileScopeId>,
+        reachability: ScopedVisibilityConstraintId,
+    ) {
         let children_start = self.scopes.next_index() + 1;
 
         // SAFETY: `node` is guaranteed to be a child of `self.module`
         #[allow(unsafe_code)]
         let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
 
-        let scope = Scope::new(parent, node_with_kind, children_start..children_start);
+        let scope = Scope::new(
+            parent,
+            node_with_kind,
+            children_start..children_start,
+            reachability,
+        );
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
@@ -337,12 +354,15 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().merge(state);
     }
 
-    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
+    /// Return a 2-element tuple, where the first element is the [`ScopedSymbolId`] of the
+    /// symbol added, and the second element is a boolean indicating whether the symbol was *newly*
+    /// added or not
+    fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
         let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_symbol(symbol_id);
         }
-        symbol_id
+        (symbol_id, added)
     }
 
     fn add_attribute(&mut self, name: Name) -> ScopedSymbolId {
@@ -549,6 +569,7 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     /// Records a visibility constraint by applying it to all live bindings and declarations.
+    #[must_use = "A visibility constraint must always be negated after it is added"]
     fn record_visibility_constraint(
         &mut self,
         predicate: Predicate<'db>,
@@ -578,6 +599,42 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn simplify_visibility_constraints(&mut self, snapshot: FlowSnapshot) {
         self.current_use_def_map_mut()
             .simplify_visibility_constraints(snapshot);
+    }
+
+    /// Record a constraint that affects the reachability of the current position in the semantic
+    /// index analysis. For example, if we encounter a `if test:` branch, we immediately record
+    /// a `test` constraint, because if `test` later (during type checking) evaluates to `False`,
+    /// we know that all statements that follow in this path of control flow will be unreachable.
+    fn record_reachability_constraint(
+        &mut self,
+        predicate: Predicate<'db>,
+    ) -> ScopedVisibilityConstraintId {
+        let predicate_id = self.add_predicate(predicate);
+        self.record_reachability_constraint_id(predicate_id)
+    }
+
+    /// Similar to [`Self::record_reachability_constraint`], but takes a [`ScopedPredicateId`].
+    fn record_reachability_constraint_id(
+        &mut self,
+        predicate_id: ScopedPredicateId,
+    ) -> ScopedVisibilityConstraintId {
+        let visibility_constraint = self
+            .current_visibility_constraints_mut()
+            .add_atom(predicate_id);
+        self.current_use_def_map_mut()
+            .record_reachability_constraint(visibility_constraint)
+    }
+
+    /// Record the negation of a given reachability/visibility constraint.
+    fn record_negated_reachability_constraint(
+        &mut self,
+        reachability_constraint: ScopedVisibilityConstraintId,
+    ) {
+        let negated_constraint = self
+            .current_visibility_constraints_mut()
+            .add_not_constraint(reachability_constraint);
+        self.current_use_def_map_mut()
+            .record_reachability_constraint(negated_constraint);
     }
 
     fn push_assignment(&mut self, assignment: CurrentAssignment<'db>) {
@@ -740,7 +797,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                         ..
                     }) => (name, &None, default),
                 };
-                let symbol = self.add_symbol(name.id.clone());
+                let (symbol, _) = self.add_symbol(name.id.clone());
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
@@ -834,20 +891,20 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.declare_parameter(parameter);
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
-            let symbol = self.add_symbol(vararg.name.id().clone());
+            let (symbol, _) = self.add_symbol(vararg.name.id().clone());
             self.add_definition(
                 symbol,
                 DefinitionNodeRef::VariadicPositionalParameter(vararg),
             );
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let symbol = self.add_symbol(kwarg.name.id().clone());
+            let (symbol, _) = self.add_symbol(kwarg.name.id().clone());
             self.add_definition(symbol, DefinitionNodeRef::VariadicKeywordParameter(kwarg));
         }
     }
 
     fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
-        let symbol = self.add_symbol(parameter.name().id().clone());
+        let (symbol, _) = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 
@@ -1057,7 +1114,7 @@ where
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self.add_symbol(name.id.clone());
+                let (symbol, _) = self.add_symbol(name.id.clone());
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
@@ -1081,11 +1138,11 @@ where
                 );
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
-                let symbol = self.add_symbol(class.name.id.clone());
+                let (symbol, _) = self.add_symbol(class.name.id.clone());
                 self.add_definition(symbol, class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
-                let symbol = self.add_symbol(
+                let (symbol, _) = self.add_symbol(
                     type_alias
                         .name
                         .as_name_expr()
@@ -1106,7 +1163,10 @@ where
                 );
             }
             ast::Stmt::Import(node) => {
-                for alias in &node.names {
+                self.current_use_def_map_mut()
+                    .record_node_reachability(NodeKey::from_node(node));
+
+                for (alias_index, alias) in node.names.iter().enumerate() {
                     // Mark the imported module, and all of its parents, as being imported in this
                     // file.
                     if let Some(module_name) = ModuleName::new(&alias.name) {
@@ -1119,17 +1179,21 @@ where
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
                     };
 
-                    let symbol = self.add_symbol(symbol_name);
+                    let (symbol, _) = self.add_symbol(symbol_name);
                     self.add_definition(
                         symbol,
                         ImportDefinitionNodeRef {
-                            alias,
+                            node,
+                            alias_index,
                             is_reexported,
                         },
                     );
                 }
             }
             ast::Stmt::ImportFrom(node) => {
+                self.current_use_def_map_mut()
+                    .record_node_reachability(NodeKey::from_node(node));
+
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     if &alias.name == "*" {
@@ -1169,10 +1233,65 @@ where
                             continue;
                         };
 
-                        for export in exported_names(self.db, module.file()) {
-                            let symbol_id = self.add_symbol(export.clone());
+                        let referenced_module = module.file();
+
+                        // In order to understand the visibility of definitions created by a `*` import,
+                        // we need to know the visibility of the global-scope definitions in the
+                        // `referenced_module` the symbols imported from. Much like predicates for `if`
+                        // statements can only have their visibility constraints resolved at type-inference
+                        // time, the visibility of these global-scope definitions in the external module
+                        // cannot be resolved at this point. As such, we essentially model each definition
+                        // stemming from a `from exporter *` import as something like:
+                        //
+                        // ```py
+                        // if <external_definition_is_visible>:
+                        //     from exporter import name
+                        // ```
+                        //
+                        // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
+                        for export in exported_names(self.db, referenced_module) {
+                            let (symbol_id, newly_added) = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
+                            let star_import = StarImportPlaceholderPredicate::new(
+                                self.db,
+                                self.file,
+                                symbol_id,
+                                referenced_module,
+                            );
+                            let pre_definition = self.flow_snapshot();
                             self.push_additional_definition(symbol_id, node_ref);
+
+                            // Fast path for if there were no previous definitions
+                            // of the symbol defined through the `*` import:
+                            // we can apply the visibility constraint to *only* the added definition,
+                            // rather than all definitions
+                            if newly_added {
+                                let constraint_id = self
+                                    .current_use_def_map_mut()
+                                    .record_star_import_visibility_constraint(
+                                        star_import,
+                                        symbol_id,
+                                    );
+
+                                let post_definition = self.flow_snapshot();
+                                self.flow_restore(pre_definition);
+
+                                self.current_use_def_map_mut()
+                                    .negate_star_import_visibility_constraint(
+                                        symbol_id,
+                                        constraint_id,
+                                    );
+
+                                self.flow_merge(post_definition);
+                            } else {
+                                let constraint_id =
+                                    self.record_visibility_constraint(star_import.into());
+                                let post_definition = self.flow_snapshot();
+                                self.flow_restore(pre_definition.clone());
+                                self.record_negated_visibility_constraint(constraint_id);
+                                self.flow_merge(post_definition);
+                                self.simplify_visibility_constraints(pre_definition);
+                            }
                         }
 
                         continue;
@@ -1192,7 +1311,7 @@ where
                     self.has_future_annotations |= alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
-                    let symbol = self.add_symbol(symbol_name.clone());
+                    let (symbol, _) = self.add_symbol(symbol_name.clone());
 
                     self.add_definition(
                         symbol,
@@ -1260,6 +1379,8 @@ where
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
                 let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
+                let mut reachability_constraint =
+                    self.record_reachability_constraint(last_predicate);
                 self.visit_body(&node.body);
 
                 let visibility_constraint_id = self.record_visibility_constraint(last_predicate);
@@ -1289,11 +1410,14 @@ where
                     // taken
                     self.flow_restore(no_branch_taken.clone());
                     self.record_negated_narrowing_constraint(last_predicate);
+                    self.record_negated_reachability_constraint(reachability_constraint);
 
                     let elif_predicate = if let Some(elif_test) = clause_test {
                         self.visit_expr(elif_test);
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
+                        reachability_constraint =
+                            self.record_reachability_constraint(last_predicate);
                         let predicate = self.record_expression_narrowing_constraint(elif_test);
                         Some(predicate)
                     } else {
@@ -1328,6 +1452,7 @@ where
 
                 let pre_loop = self.flow_snapshot();
                 let predicate = self.record_expression_narrowing_constraint(test);
+                self.record_reachability_constraint(predicate);
 
                 // We need multiple copies of the visibility constraint for the while condition,
                 // since we need to model situations where the first evaluation of the condition
@@ -1456,7 +1581,7 @@ where
                 self.visit_expr(subject);
                 if cases.is_empty() {
                     return;
-                };
+                }
 
                 let after_subject = self.flow_snapshot();
                 let mut vis_constraints = vec![];
@@ -1475,6 +1600,7 @@ where
                         &case.pattern,
                         case.guard.as_deref(),
                     );
+                    self.record_reachability_constraint(predicate);
                     if let Some(expr) = &case.guard {
                         self.visit_expr(expr);
                     }
@@ -1570,7 +1696,7 @@ where
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
                         if let Some(symbol_name) = symbol_name {
-                            let symbol = self.add_symbol(symbol_name.id.clone());
+                            let (symbol, _) = self.add_symbol(symbol_name.id.clone());
 
                             self.add_definition(
                                 symbol,
@@ -1643,6 +1769,8 @@ where
             .insert(expr.into(), self.current_scope());
         self.current_ast_ids().record_expression(expr);
 
+        let node_key = NodeKey::from_node(expr);
+
         match expr {
             ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
                 let (is_use, is_definition) = match (ctx, self.current_assignment()) {
@@ -1655,12 +1783,13 @@ where
                     (ast::ExprContext::Del, _) => (false, true),
                     (ast::ExprContext::Invalid, _) => (false, false),
                 };
-                let symbol = self.add_symbol(id.clone());
+                let (symbol, _) = self.add_symbol(id.clone());
 
                 if is_use {
                     self.mark_symbol_used(symbol);
                     let use_id = self.current_ast_ids().record_use(expr);
-                    self.current_use_def_map_mut().record_use(symbol, use_id);
+                    self.current_use_def_map_mut()
+                        .record_use(symbol, use_id, node_key);
                 }
 
                 if is_definition {
@@ -1786,12 +1915,14 @@ where
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
                 let predicate = self.record_expression_narrowing_constraint(test);
+                let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.visit_expr(body);
                 let visibility_constraint = self.record_visibility_constraint(predicate);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if.clone());
 
                 self.record_negated_narrowing_constraint(predicate);
+                self.record_negated_reachability_constraint(reachability_constraint);
                 self.visit_expr(orelse);
                 self.record_negated_visibility_constraint(visibility_constraint);
                 self.flow_merge(post_body);
@@ -1864,7 +1995,7 @@ where
                         self.record_visibility_constraint_id(*vid);
                     }
 
-                    // For the last value, we don't need to model control flow. There is short-circuiting
+                    // For the last value, we don't need to model control flow. There is no short-circuiting
                     // anymore.
                     if index < values.len() - 1 {
                         let predicate = self.build_predicate(value);
@@ -1893,6 +2024,7 @@ where
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
                         self.record_narrowing_constraint_id(predicate_id);
+                        self.record_reachability_constraint_id(predicate_id);
                         visibility_constraints.push(visibility_constraint);
                     }
                 }
@@ -1906,87 +2038,104 @@ where
             ast::Expr::Attribute(ast::ExprAttribute {
                 value: object,
                 attr,
-                ctx: ExprContext::Store,
+                ctx,
                 range: _,
             }) => {
-                match self.current_assignment() {
-                    Some(CurrentAssignment::Assign { node, unpack, .. }) => {
-                        // SAFETY: `value` and `expr` belong to the `self.module` tree
-                        #[allow(unsafe_code)]
-                        let assignment = AssignmentDefinitionKind::new(
-                            TargetKind::from(unpack),
-                            unsafe { AstNodeRef::new(self.module.clone(), &node.value) },
-                            unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                        );
-                        self.register_attribute_assignment(
-                            object,
-                            attr,
-                            DefinitionKind::Assignment(assignment),
-                        );
-                    }
-                    Some(CurrentAssignment::AnnAssign(ann_assign)) => {
-                        self.add_standalone_type_expression(&ann_assign.annotation);
-                        // SAFETY: `annotation`, `value` and `expr` belong to the `self.module` tree
-                        #[allow(unsafe_code)]
-                        let assignment = AnnotatedAssignmentDefinitionKind::new(
-                            unsafe { AstNodeRef::new(self.module.clone(), &ann_assign.annotation) },
-                            ann_assign.value.as_deref().map(|value| unsafe {
-                                AstNodeRef::new(self.module.clone(), value)
-                            }),
-                            unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                        );
-                        self.register_attribute_assignment(
-                            object,
-                            attr,
-                            DefinitionKind::AnnotatedAssignment(assignment),
-                        );
-                    }
-                    Some(CurrentAssignment::For { node, unpack, .. }) => {
-                        // // SAFETY: `iter` and `expr` belong to the `self.module` tree
-                        #[allow(unsafe_code)]
-                        let assignment = ForStmtDefinitionKind::new(
-                            TargetKind::from(unpack),
-                            unsafe { AstNodeRef::new(self.module.clone(), &node.iter) },
-                            unsafe { AstNodeRef::new(self.module.clone(), expr) },
-                            node.is_async,
-                        );
-                        self.register_attribute_assignment(
-                            object,
-                            attr,
-                            DefinitionKind::For(assignment),
-                        );
-                    }
-                    Some(CurrentAssignment::WithItem {
-                        item,
-                        unpack,
-                        is_async,
-                        ..
-                    }) => {
-                        // SAFETY: `context_expr` and `expr` belong to the `self.module` tree
-                        #[allow(unsafe_code)]
-                        let assignment = WithItemDefinitionKind::new(
-                            TargetKind::from(unpack),
-                            unsafe { AstNodeRef::new(self.module.clone(), &item.context_expr) },
-                            unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                if ctx.is_store() {
+                    match self.current_assignment() {
+                        Some(CurrentAssignment::Assign { node, unpack, .. }) => {
+                            // SAFETY: `value` and `expr` belong to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            let assignment = AssignmentDefinitionKind::new(
+                                TargetKind::from(unpack),
+                                unsafe { AstNodeRef::new(self.module.clone(), &node.value) },
+                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                            );
+                            self.register_attribute_assignment(
+                                object,
+                                attr,
+                                DefinitionKind::Assignment(assignment),
+                            );
+                        }
+                        Some(CurrentAssignment::AnnAssign(ann_assign)) => {
+                            self.add_standalone_type_expression(&ann_assign.annotation);
+                            // SAFETY: `annotation`, `value` and `expr` belong to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            let assignment = AnnotatedAssignmentDefinitionKind::new(
+                                unsafe {
+                                    AstNodeRef::new(self.module.clone(), &ann_assign.annotation)
+                                },
+                                ann_assign.value.as_deref().map(|value| unsafe {
+                                    AstNodeRef::new(self.module.clone(), value)
+                                }),
+                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                            );
+                            self.register_attribute_assignment(
+                                object,
+                                attr,
+                                DefinitionKind::AnnotatedAssignment(assignment),
+                            );
+                        }
+                        Some(CurrentAssignment::For { node, unpack, .. }) => {
+                            // // SAFETY: `iter` and `expr` belong to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            let assignment = ForStmtDefinitionKind::new(
+                                TargetKind::from(unpack),
+                                unsafe { AstNodeRef::new(self.module.clone(), &node.iter) },
+                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                                node.is_async,
+                            );
+                            self.register_attribute_assignment(
+                                object,
+                                attr,
+                                DefinitionKind::For(assignment),
+                            );
+                        }
+                        Some(CurrentAssignment::WithItem {
+                            item,
+                            unpack,
                             is_async,
-                        );
-                        self.register_attribute_assignment(
-                            object,
-                            attr,
-                            DefinitionKind::WithItem(assignment),
-                        );
+                            ..
+                        }) => {
+                            // SAFETY: `context_expr` and `expr` belong to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            let assignment = WithItemDefinitionKind::new(
+                                TargetKind::from(unpack),
+                                unsafe { AstNodeRef::new(self.module.clone(), &item.context_expr) },
+                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                                is_async,
+                            );
+                            self.register_attribute_assignment(
+                                object,
+                                attr,
+                                DefinitionKind::WithItem(assignment),
+                            );
+                        }
+                        Some(CurrentAssignment::Comprehension { .. }) => {
+                            // TODO:
+                        }
+                        Some(CurrentAssignment::AugAssign(_)) => {
+                            // TODO:
+                        }
+                        Some(CurrentAssignment::Named(_)) => {
+                            // TODO:
+                        }
+                        None => {}
                     }
-                    Some(CurrentAssignment::Comprehension { .. }) => {
-                        // TODO:
-                    }
-                    Some(CurrentAssignment::AugAssign(_)) => {
-                        // TODO:
-                    }
-                    Some(CurrentAssignment::Named(_)) => {
-                        // TODO:
-                    }
-                    None => {}
                 }
+
+                // Track reachability of attribute expressions to silence `unresolved-attribute`
+                // diagnostics in unreachable code.
+                self.current_use_def_map_mut()
+                    .record_node_reachability(node_key);
+
+                walk_expr(self, expr);
+            }
+            ast::Expr::StringLiteral(_) => {
+                // Track reachability of string literals, as they could be a stringified annotation
+                // with child expressions whose reachability we are interested in.
+                self.current_use_def_map_mut()
+                    .record_node_reachability(node_key);
 
                 walk_expr(self, expr);
             }
@@ -2010,7 +2159,7 @@ where
             range: _,
         }) = pattern
         {
-            let symbol = self.add_symbol(name.id().clone());
+            let (symbol, _) = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
@@ -2031,7 +2180,7 @@ where
             rest: Some(name), ..
         }) = pattern
         {
-            let symbol = self.add_symbol(name.id().clone());
+            let (symbol, _) = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,

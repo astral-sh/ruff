@@ -1,5 +1,4 @@
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
@@ -214,17 +213,8 @@ fn replace_with_self_fix(
 ) -> anyhow::Result<Fix> {
     let semantic = checker.semantic();
 
-    let (self_import, self_binding) = {
-        let source_module = if checker.target_version() >= PythonVersion::PY311 {
-            "typing"
-        } else {
-            "typing_extensions"
-        };
-
-        let (importer, semantic) = (checker.importer(), checker.semantic());
-        let request = ImportRequest::import_from(source_module, "Self");
-        importer.get_or_import_symbol(&request, returns.start(), semantic)?
-    };
+    let (self_import, self_binding) =
+        checker.import_from_typing("Self", returns.start(), PythonVersion::PY311)?;
 
     let mut others = Vec::with_capacity(2);
 

@@ -94,7 +94,7 @@ def _(flag: bool):
     else:
         f = f2
 
-    # error: [invalid-argument-type] "Object of type `Literal[3]` cannot be assigned to parameter 1 (`a`) of function `f2`; expected type `str`"
+    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[3]`"
     x = f(3)
     reveal_type(x)  # revealed: int | str
 ```

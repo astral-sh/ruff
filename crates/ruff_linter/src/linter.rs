@@ -777,14 +777,22 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
+    use ruff_python_ast::{PySourceType, PythonVersion};
+    use ruff_python_codegen::Stylist;
+    use ruff_python_index::Indexer;
+    use ruff_python_parser::ParseOptions;
+    use ruff_python_trivia::textwrap::dedent;
+    use ruff_text_size::Ranged;
     use test_case::test_case;
 
     use ruff_notebook::{Notebook, NotebookError};
 
+    use crate::linter::check_path;
+    use crate::message::Message;
     use crate::registry::Rule;
     use crate::source_kind::SourceKind;
     use crate::test::{assert_notebook_path, test_contents, TestedNotebook};
-    use crate::{assert_messages, settings};
+    use crate::{assert_messages, directives, settings, Locator};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
     fn notebook_path(path: impl AsRef<Path>) -> std::path::PathBuf {
@@ -932,6 +940,157 @@ mod tests {
         } else {
             assert!(!actual.contains(r#""id":"#));
         }
+        Ok(())
+    }
+
+    /// Wrapper around `test_contents_syntax_errors` for testing a snippet of code instead of a
+    /// file.
+    fn test_snippet_syntax_errors(
+        contents: &str,
+        settings: &settings::LinterSettings,
+    ) -> Vec<Message> {
+        let contents = dedent(contents);
+        test_contents_syntax_errors(
+            &SourceKind::Python(contents.to_string()),
+            Path::new("<filename>"),
+            settings,
+        )
+    }
+
+    /// A custom test runner that prints syntax errors in addition to other diagnostics. Adapted
+    /// from `flakes` in pyflakes/mod.rs.
+    fn test_contents_syntax_errors(
+        source_kind: &SourceKind,
+        path: &Path,
+        settings: &settings::LinterSettings,
+    ) -> Vec<Message> {
+        let source_type = PySourceType::from(path);
+        let options =
+            ParseOptions::from(source_type).with_target_version(settings.unresolved_target_version);
+        let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
+            .try_into_module()
+            .expect("PySourceType always parses into a module");
+        let locator = Locator::new(source_kind.source_code());
+        let stylist = Stylist::from_tokens(parsed.tokens(), locator.contents());
+        let indexer = Indexer::from_tokens(parsed.tokens(), locator.contents());
+        let directives = directives::extract_directives(
+            parsed.tokens(),
+            directives::Flags::from_settings(settings),
+            &locator,
+            &indexer,
+        );
+        let mut messages = check_path(
+            path,
+            None,
+            &locator,
+            &stylist,
+            &indexer,
+            &directives,
+            settings,
+            settings::flags::Noqa::Enabled,
+            source_kind,
+            source_type,
+            &parsed,
+            settings.unresolved_target_version,
+        );
+        messages.sort_by_key(Ranged::start);
+        messages
+    }
+
+    #[test_case(
+        "error_on_310",
+        "async def f(): return [[x async for x in foo(n)] for n in range(3)]",
+        PythonVersion::PY310
+    )]
+    #[test_case(
+        "okay_on_311",
+        "async def f(): return [[x async for x in foo(n)] for n in range(3)]",
+        PythonVersion::PY311
+    )]
+    #[test_case(
+        "okay_on_310",
+        "async def test(): return [[x async for x in elements(n)] async for n in range(3)]",
+        PythonVersion::PY310
+    )]
+    #[test_case(
+        "deferred_function_body",
+        "
+		async def f(): [x for x in foo()] and [x async for x in foo()]
+		async def f():
+			def g(): ...
+			[x async for x in foo()]
+		",
+        PythonVersion::PY310
+    )]
+    fn test_async_comprehension_in_sync_comprehension(
+        name: &str,
+        contents: &str,
+        python_version: PythonVersion,
+    ) {
+        let snapshot = format!("async_comprehension_in_sync_comprehension_{name}_{python_version}");
+        let messages = test_snippet_syntax_errors(
+            contents,
+            &settings::LinterSettings {
+                rules: settings::rule_table::RuleTable::empty(),
+                unresolved_target_version: python_version,
+                preview: settings::types::PreviewMode::Enabled,
+                ..Default::default()
+            },
+        );
+        assert_messages!(snapshot, messages);
+    }
+
+    #[test_case(PythonVersion::PY310)]
+    #[test_case(PythonVersion::PY311)]
+    fn test_async_comprehension_notebook(python_version: PythonVersion) -> Result<()> {
+        let snapshot =
+            format!("async_comprehension_in_sync_comprehension_notebook_{python_version}");
+        let path = Path::new("resources/test/fixtures/syntax_errors/async_comprehension.ipynb");
+        let messages = test_contents_syntax_errors(
+            &SourceKind::IpyNotebook(Notebook::from_path(path)?),
+            path,
+            &settings::LinterSettings {
+                unresolved_target_version: python_version,
+                rules: settings::rule_table::RuleTable::empty(),
+                preview: settings::types::PreviewMode::Enabled,
+                ..Default::default()
+            },
+        );
+        assert_messages!(snapshot, messages);
+
+        Ok(())
+    }
+
+    #[test_case(Path::new("yield_scope.py"); "yield_scope")]
+    fn test_yield_scope(path: &Path) -> Result<()> {
+        let snapshot = path.to_string_lossy().to_string();
+        let path = Path::new("resources/test/fixtures/syntax_errors").join(path);
+        let messages = test_contents_syntax_errors(
+            &SourceKind::Python(std::fs::read_to_string(&path)?),
+            &path,
+            &settings::LinterSettings::for_rule(Rule::YieldOutsideFunction),
+        );
+        insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+            assert_messages!(snapshot, messages);
+        });
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_await_scope_notebook() -> Result<()> {
+        let path = Path::new("resources/test/fixtures/syntax_errors/await_scope.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = assert_notebook_path(
+            path,
+            path,
+            &settings::LinterSettings::for_rule(Rule::YieldOutsideFunction),
+        )?;
+        assert_messages!(messages, path, source_notebook);
+
         Ok(())
     }
 }

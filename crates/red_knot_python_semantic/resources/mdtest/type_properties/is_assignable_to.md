@@ -183,7 +183,7 @@ static_assert(is_assignable_to(Meta, type[Unknown]))
 ## Tuple types
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
+from knot_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
 from typing import Literal, Any
 
 static_assert(is_assignable_to(tuple[()], tuple[()]))
@@ -194,6 +194,17 @@ static_assert(is_assignable_to(tuple[int, str], tuple[int, str]))
 static_assert(is_assignable_to(tuple[Literal[1], Literal[2]], tuple[int, int]))
 static_assert(is_assignable_to(tuple[Any, Literal[2]], tuple[int, int]))
 static_assert(is_assignable_to(tuple[Literal[1], Any], tuple[int, int]))
+static_assert(is_assignable_to(tuple[()], tuple))
+static_assert(is_assignable_to(tuple[int, str], tuple))
+static_assert(is_assignable_to(tuple[Any], tuple))
+
+# TODO: It is not yet clear if we want the following two assertions to hold.
+# See https://github.com/astral-sh/ruff/issues/15528 for more details. The
+# short version is: We either need to special-case enforcement of the Liskov
+# substitution principle on `__bool__` and `__len__` for tuple subclasses,
+# or we need to negate these assertions.
+static_assert(is_assignable_to(tuple[()], AlwaysFalsy))
+static_assert(is_assignable_to(tuple[int], AlwaysTruthy))
 
 static_assert(not is_assignable_to(tuple[()], tuple[int]))
 static_assert(not is_assignable_to(tuple[int], tuple[str]))
@@ -493,4 +504,4 @@ c: Callable[[Any], str] = f
 c: Callable[[Any], str] = g
 ```
 
-[typing documentation]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
+[typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

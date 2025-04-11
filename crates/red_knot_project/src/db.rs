@@ -159,7 +159,7 @@ impl salsa::Database for ProjectDatabase {
         }
 
         let event = event();
-        if matches!(event.kind, salsa::EventKind::WillCheckCancellation { .. }) {
+        if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
             return;
         }
 
@@ -171,6 +171,32 @@ impl salsa::Database for ProjectDatabase {
 impl Db for ProjectDatabase {
     fn project(&self) -> Project {
         self.project.unwrap()
+    }
+}
+
+#[cfg(feature = "format")]
+mod format {
+    use crate::ProjectDatabase;
+    use ruff_db::files::File;
+    use ruff_db::Upcast;
+    use ruff_python_formatter::{Db as FormatDb, PyFormatOptions};
+
+    #[salsa::db]
+    impl FormatDb for ProjectDatabase {
+        fn format_options(&self, file: File) -> PyFormatOptions {
+            let source_ty = file.source_type(self);
+            PyFormatOptions::from_source_type(source_ty)
+        }
+    }
+
+    impl Upcast<dyn FormatDb> for ProjectDatabase {
+        fn upcast(&self) -> &(dyn FormatDb + 'static) {
+            self
+        }
+
+        fn upcast_mut(&mut self) -> &mut (dyn FormatDb + 'static) {
+            self
+        }
     }
 }
 

@@ -48,7 +48,7 @@ use crate::checkers::ast::Checker;
 /// Further, the `Literal` slice may contain trailing-line comments which the fix would remove.
 ///
 /// ## References
-/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.readthedocs.io/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
+/// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 /// - [Python documentation: Boolean type - `bool`](https://docs.python.org/3/library/stdtypes.html#boolean-type-bool)
 ///
 /// [mypy]: https://github.com/python/mypy/blob/master/mypy/typeops.py#L985

@@ -4263,4 +4263,22 @@ lambda: fu
             &[],
         );
     }
+
+    #[test]
+    fn gh_issue_17196_regression_test() {
+        flakes(
+            r#"
+            from typing import Annotated
+
+            def type_annotations_from_tuple():
+                annos = (str, "foo", "bar")
+                return Annotated[annos]
+
+            def type_annotations_from_filtered_tuple():
+                annos = (str, None, "foo", None, "bar")
+                return Annotated[tuple([a for a in annos if a is not None])]
+        "#,
+            &[],
+        );
+    }
 }

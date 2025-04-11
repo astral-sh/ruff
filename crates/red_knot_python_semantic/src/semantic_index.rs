@@ -10,6 +10,7 @@ use salsa::plumbing::AsId;
 use salsa::Update;
 
 use crate::module_name::ModuleName;
+use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::builder::SemanticIndexBuilder;
@@ -241,6 +242,41 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub(crate) fn parent_scope(&self, scope_id: FileScopeId) -> Option<&Scope> {
         Some(&self.scopes[self.parent_scope_id(scope_id)?])
+    }
+
+    fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {
+        self.parent_scope_id(scope_id)
+            .is_none_or(|parent_scope_id| {
+                if !self.is_scope_reachable(db, parent_scope_id) {
+                    return false;
+                }
+
+                let parent_use_def = self.use_def_map(parent_scope_id);
+                let reachability = self.scope(scope_id).reachability();
+
+                parent_use_def.is_reachable(db, reachability)
+            })
+    }
+
+    /// Returns true if a given AST node is reachable from the start of the scope. For example,
+    /// in the following code, expression `2` is reachable, but expressions `1` and `3` are not:
+    /// ```py
+    /// def f():
+    ///     x = 1
+    ///     if False:
+    ///         x  # 1
+    ///     x  # 2
+    ///     return
+    ///     x  # 3
+    /// ```
+    pub(crate) fn is_node_reachable(
+        &self,
+        db: &'db dyn crate::Db,
+        scope_id: FileScopeId,
+        node_key: NodeKey,
+    ) -> bool {
+        self.is_scope_reachable(db, scope_id)
+            && self.use_def_map(scope_id).is_node_reachable(db, node_key)
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.

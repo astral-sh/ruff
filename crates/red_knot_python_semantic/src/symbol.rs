@@ -11,7 +11,7 @@ use crate::types::{
     binding_type, declaration_type, infer_narrowing_constraint, todo_type, IntersectionBuilder,
     KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
 };
-use crate::{resolve_module, Db, KnownModule, Module, Program};
+use crate::{resolve_module, Db, KnownModule, Program};
 
 pub(crate) use implicit_globals::module_type_implicit_global_symbol;
 
@@ -259,7 +259,7 @@ pub(crate) fn global_symbol<'db>(
 /// Infers the public type of an imported symbol.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
-    module: &Module,
+    file: File,
     name: &str,
 ) -> SymbolAndQualifiers<'db> {
     // If it's not found in the global scope, check if it's present as an instance on
@@ -277,7 +277,7 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    external_symbol_impl(db, module.file(), name).or_fall_back_to(db, || {
+    external_symbol_impl(db, file, name).or_fall_back_to(db, || {
         if name == "__getattr__" {
             Symbol::Unbound.into()
         } else {
@@ -315,7 +315,7 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
-        .map(|module| imported_symbol(db, &module, symbol))
+        .map(|module| imported_symbol(db, module.file(), symbol))
         .unwrap_or_default()
 }
 
@@ -429,6 +429,17 @@ impl<'db> SymbolAndQualifiers<'db> {
         self.qualifiers.contains(TypeQualifiers::CLASS_VAR)
     }
 
+    #[must_use]
+    pub(crate) fn map_type(
+        self,
+        f: impl FnOnce(Type<'db>) -> Type<'db>,
+    ) -> SymbolAndQualifiers<'db> {
+        SymbolAndQualifiers {
+            symbol: self.symbol.map_type(f),
+            qualifiers: self.qualifiers,
+        }
+    }
+
     /// Transform symbol and qualifiers into a [`LookupResult`],
     /// a [`Result`] type in which the `Ok` variant represents a definitely bound symbol
     /// and the `Err` variant represents a symbol that is either definitely or possibly unbound.
@@ -468,11 +479,11 @@ impl<'db> SymbolAndQualifiers<'db> {
     ///
     /// 1. If `self` is definitely bound, return `self` without evaluating `fallback_fn()`.
     /// 2. Else, evaluate `fallback_fn()`:
-    ///    a. If `self` is definitely unbound, return the result of `fallback_fn()`.
-    ///    b. Else, if `fallback` is definitely unbound, return `self`.
-    ///    c. Else, if `self` is possibly unbound and `fallback` is definitely bound,
+    ///    1. If `self` is definitely unbound, return the result of `fallback_fn()`.
+    ///    2. Else, if `fallback` is definitely unbound, return `self`.
+    ///    3. Else, if `self` is possibly unbound and `fallback` is definitely bound,
     ///       return `Symbol(<union of self-type and fallback-type>, Boundness::Bound)`
-    ///    d. Else, if `self` is possibly unbound and `fallback` is possibly unbound,
+    ///    4. Else, if `self` is possibly unbound and `fallback` is possibly unbound,
     ///       return `Symbol(<union of self-type and fallback-type>, Boundness::PossiblyUnbound)`
     #[must_use]
     pub(crate) fn or_fall_back_to(
@@ -656,15 +667,24 @@ fn symbol_from_bindings_impl<'db>(
         requires_explicit_reexport.is_yes() && !binding.is_reexported(db)
     };
 
-    let unbound_visibility = match bindings_with_constraints.peek() {
+    let unbound_visibility_constraint = match bindings_with_constraints.peek() {
         Some(BindingWithConstraints {
             binding,
             visibility_constraint,
             narrowing_constraint: _,
-        }) if binding.map_or(true, is_non_exported) => {
-            visibility_constraints.evaluate(db, predicates, *visibility_constraint)
-        }
-        _ => Truthiness::AlwaysFalse,
+        }) if binding.is_none_or(is_non_exported) => Some(*visibility_constraint),
+        _ => None,
+    };
+
+    // Evaluate this lazily because we don't always need it (for example, if there are no visible
+    // bindings at all, we don't need it), and it can cause us to evaluate visibility constraint
+    // expressions, which is extra work and can lead to cycles.
+    let unbound_visibility = || {
+        unbound_visibility_constraint
+            .map(|visibility_constraint| {
+                visibility_constraints.evaluate(db, predicates, visibility_constraint)
+            })
+            .unwrap_or(Truthiness::AlwaysFalse)
     };
 
     let mut types = bindings_with_constraints.filter_map(
@@ -683,6 +703,53 @@ fn symbol_from_bindings_impl<'db>(
                 visibility_constraints.evaluate(db, predicates, visibility_constraint);
 
             if static_visibility.is_always_false() {
+                // We found a binding that we have statically determined to not be visible from
+                // the use of the symbol that we are investigating. There are three interesting
+                // cases to consider:
+                //
+                // ```py
+                // def f1():
+                //     if False:
+                //         x = 1
+                //     use(x)
+                //
+                // def f2():
+                //     y = 1
+                //     return
+                //     use(y)
+                //
+                // def f3(flag: bool):
+                //     z = 1
+                //     if flag:
+                //         z = 2
+                //         return
+                //     use(z)
+                // ```
+                //
+                // In the first case, there is a single binding for `x`, and due to the statically
+                // known `False` condition, it is not visible at the use of `x`. However, we *can*
+                // see/reach the start of the scope from `use(x)`. This means that `x` is unbound
+                // and we should return `None`.
+                //
+                // In the second case, `y` is also not visible at the use of `y`, but here, we can
+                // not see/reach the start of the scope. There is only one path of control flow,
+                // and it passes through that binding of `y` (which we can not see). This implies
+                // that we are in an unreachable section of code. We return `Never` in order to
+                // silence the `unresolve-reference` diagnostic that would otherwise be emitted at
+                // the use of `y`.
+                //
+                // In the third case, we have two bindings for `z`. The first one is visible, so we
+                // consider the case that we now encounter the second binding `z = 2`, which is not
+                // visible due to the early return. We *also* can not see the start of the scope
+                // from `use(z)` because both paths of control flow pass through a binding of `z`.
+                // The `z = 1` binding is visible, and so we are *not* in an unreachable section of
+                // code. However, it is still okay to return `Never` in this case, because we will
+                // union the types of all bindings, and `Never` will be eliminated automatically.
+
+                if unbound_visibility().is_always_false() {
+                    // The scope-start is not visible
+                    return Some(Type::Never);
+                }
                 return None;
             }
 
@@ -708,7 +775,7 @@ fn symbol_from_bindings_impl<'db>(
     );
 
     if let Some(first) = types.next() {
-        let boundness = match unbound_visibility {
+        let boundness = match unbound_visibility() {
             Truthiness::AlwaysTrue => {
                 unreachable!("If we have at least one binding, the scope-start should not be definitely visible")
             }
@@ -751,7 +818,7 @@ fn symbol_from_declarations_impl<'db>(
         Some(DeclarationWithConstraint {
             declaration,
             visibility_constraint,
-        }) if declaration.map_or(true, is_non_exported) => {
+        }) if declaration.is_none_or(is_non_exported) => {
             visibility_constraints.evaluate(db, predicates, *visibility_constraint)
         }
         _ => Truthiness::AlwaysFalse,

@@ -13,17 +13,13 @@ use crate::Db;
 
 /// A definition of a symbol.
 ///
-/// ## Module-local type
-/// This type should not be used as part of any cross-module API because
-/// it holds a reference to the AST node. Range-offset changes
-/// then propagate through all usages, and deserialization requires
-/// reparsing the entire module.
+/// ## ID stability
+/// The `Definition`'s ID is stable when the only field that change is its `kind` (AST node).
 ///
-/// E.g. don't use this type in:
-///
-/// * a return type of a cross-module query
-/// * a field of a type that is a return type of a cross-module query
-/// * an argument of a cross-module query
+/// The `Definition` changes when the `file`, `scope`, or `symbol` change. This can be
+/// because a new scope gets inserted before the `Definition` or a new symbol is inserted
+/// before this `Definition`. However, the ID can be considered stable and it is okay to use
+/// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
 #[salsa::tracked(debug)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
@@ -228,7 +224,8 @@ impl<'a> From<StarImportDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportDefinitionNodeRef<'a> {
-    pub(crate) alias: &'a ast::Alias,
+    pub(crate) node: &'a ast::StmtImport,
+    pub(crate) alias_index: usize,
     pub(crate) is_reexported: bool,
 }
 
@@ -306,10 +303,12 @@ impl<'db> DefinitionNodeRef<'db> {
     pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind<'db> {
         match self {
             DefinitionNodeRef::Import(ImportDefinitionNodeRef {
-                alias,
+                node,
+                alias_index,
                 is_reexported,
             }) => DefinitionKind::Import(ImportDefinitionKind {
-                alias: AstNodeRef::new(parsed, alias),
+                node: AstNodeRef::new(parsed, node),
+                alias_index,
                 is_reexported,
             }),
 
@@ -436,9 +435,10 @@ impl<'db> DefinitionNodeRef<'db> {
     pub(super) fn key(self) -> DefinitionNodeKey {
         match self {
             Self::Import(ImportDefinitionNodeRef {
-                alias,
+                node,
+                alias_index,
                 is_reexported: _,
-            }) => alias.into(),
+            }) => (&node.names[alias_index]).into(),
             Self::ImportFrom(ImportFromDefinitionNodeRef {
                 node,
                 alias_index,
@@ -776,13 +776,18 @@ impl ComprehensionDefinitionKind {
 
 #[derive(Clone, Debug)]
 pub struct ImportDefinitionKind {
-    alias: AstNodeRef<ast::Alias>,
+    node: AstNodeRef<ast::StmtImport>,
+    alias_index: usize,
     is_reexported: bool,
 }
 
 impl ImportDefinitionKind {
+    pub(crate) fn import(&self) -> &ast::StmtImport {
+        self.node.node()
+    }
+
     pub(crate) fn alias(&self) -> &ast::Alias {
-        self.alias.node()
+        &self.node.node().names[self.alias_index]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {

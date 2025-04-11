@@ -1,5 +1,5 @@
 use compact_str::CompactString;
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
@@ -1028,7 +1028,7 @@ impl<'src> Parser<'src> {
                         ..
                     }) = &**slice
                     {
-                        buffer.push_str(&format!("{integer}"));
+                        let _ = write!(buffer, "{integer}");
                     } else {
                         parser.add_error(
                             ParseErrorType::OtherError(
@@ -1891,7 +1891,6 @@ impl<'src> Parser<'src> {
                 // test_ok function_def_valid_return_expr
                 // def foo() -> int | str: ...
                 // def foo() -> lambda x: x: ...
-                // def foo() -> (yield x): ...
                 // def foo() -> int if True else str: ...
 
                 // test_err function_def_invalid_return_expr
@@ -2986,7 +2985,6 @@ impl<'src> Parser<'src> {
                             // test_ok param_with_annotation
                             // def foo(arg: int): ...
                             // def foo(arg: lambda x: x): ...
-                            // def foo(arg: (yield x)): ...
                             // def foo(arg: (x := int)): ...
 
                             // test_err param_with_invalid_annotation

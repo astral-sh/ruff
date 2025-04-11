@@ -16,7 +16,7 @@ use crate::{checkers::ast::Checker, fix};
 /// statement has no effect and should be omitted.
 ///
 /// ## References
-/// - [Static Typing with Python: Type Stubs](https://typing.readthedocs.io/en/latest/source/stubs.html)
+/// - [Static Typing with Python: Type Stubs](https://typing.python.org/en/latest/source/stubs.html)
 #[derive(ViolationMetadata)]
 pub(crate) struct FutureAnnotationsInStub;
 
@@ -47,7 +47,7 @@ pub(crate) fn from_future_import(checker: &Checker, target: &StmtImportFrom) {
 
     if module_name != "__future__" {
         return;
-    };
+    }
 
     if names.iter().all(|alias| &*alias.name != "annotations") {
         return;

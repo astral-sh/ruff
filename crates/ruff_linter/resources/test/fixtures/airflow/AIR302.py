@@ -39,7 +39,7 @@ from airflow.hooks.S3_hook import S3Hook, provide_bucket_name
 from airflow.hooks.samba_hook import SambaHook
 from airflow.hooks.slack_hook import SlackHook
 from airflow.hooks.sqlite_hook import SqliteHook
-from airflow.hooks.subprocess import SubprocessHook
+from airflow.hooks.subprocess import SubprocessHook, SubprocessResult, working_directory
 from airflow.hooks.webhdfs_hook import WebHDFSHook
 from airflow.hooks.zendesk_hook import ZendeskHook
 from airflow.kubernetes.k8s_model import K8SModel, append_to_pod
@@ -112,9 +112,12 @@ from airflow.operators.check_operator import (
     ThresholdCheckOperator,
     ValueCheckOperator,
 )
-from airflow.operators.datetime import BranchDateTimeOperator
+from airflow.operators.datetime import BranchDateTimeOperator, target_times_as_dates
 from airflow.operators.docker_operator import DockerOperator
 from airflow.operators.druid_check_operator import DruidCheckOperator
+from airflow.operators.dummy import DummyOperator, EmptyOperator
+from airflow.operators.email import EmailOperator
+from airflow.operators.email_operator import EmailOperator
 from airflow.operators.gcs_to_s3 import GCSToS3Operator
 from airflow.operators.google_api_to_s3_transfer import (
     GoogleApiToS3Operator,
@@ -153,6 +156,12 @@ from airflow.operators.presto_to_mysql import (
     PrestoToMySqlOperator,
     PrestoToMySqlTransfer,
 )
+from airflow.operators.python import (
+    BranchPythonOperator,
+    PythonOperator,
+    PythonVirtualenvOperator,
+    ShortCircuitOperator,
+)
 from airflow.operators.redshift_to_s3_operator import (
     RedshiftToS3Operator,
     RedshiftToS3Transfer,
@@ -189,23 +198,28 @@ from airflow.operators.sql import (
 from airflow.operators.sqlite_operator import SqliteOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.operators.weekday import BranchDayOfWeekOperator
-from airflow.sensors.date_time import DateTimeSensor
-from airflow.sensors.external_task import ExternalTaskMarker, ExternalTaskSensor
+from airflow.sensors import filesystem
+from airflow.sensors.date_time import DateTimeSensor, DateTimeSensorAsync
+from airflow.sensors.date_time_sensor import DateTimeSensor
+from airflow.sensors.external_task import (
+    ExternalTaskMarker,
+    ExternalTaskSensor,
+    ExternalTaskSensorLink,
+)
 from airflow.sensors.filesystem import FileSensor
 from airflow.sensors.hive_partition_sensor import HivePartitionSensor
 from airflow.sensors.http_sensor import HttpSensor
 from airflow.sensors.metastore_partition_sensor import MetastorePartitionSensor
 from airflow.sensors.named_hive_partition_sensor import NamedHivePartitionSensor
-from airflow.sensors.s3_key_sensor import S3KeySensor
 from airflow.sensors.sql import SqlSensor
 from airflow.sensors.sql_sensor import SqlSensor2
-from airflow.sensors.time_delta import TimeDeltaSensor
-from airflow.sensors.time_sensor import TimeSensor
+from airflow.sensors.time_delta import TimeDeltaSensor, TimeDeltaSensorAsync, WaitSensor
+from airflow.sensors.time_sensor import TimeSensor, TimeSensorAsync
 from airflow.sensors.web_hdfs_sensor import WebHdfsSensor
 from airflow.sensors.weekday import DayOfWeekSensor
-from airflow.triggers.external_task import WorkflowTrigger
+from airflow.triggers.external_task import DagStateTrigger, WorkflowTrigger
 from airflow.triggers.file import FileTrigger
-from airflow.triggers.temporal import DateTimeTrigger
+from airflow.triggers.temporal import DateTimeTrigger, TimeDeltaTrigger
 from airflow.www.security import FabAirflowSecurityManagerOverride
 
 # apache-airflow-providers-amazon
@@ -217,7 +231,7 @@ RedshiftToS3Operator()
 RedshiftToS3Transfer()
 S3FileTransformOperator()
 S3Hook()
-S3KeySensor()
+SSQLTableCheckOperator3KeySensor()
 S3ToRedshiftOperator()
 S3ToRedshiftTransfer()
 
@@ -305,12 +319,24 @@ JdbcHook()
 JdbcOperator()
 
 # apache-airflow-providers-fab
-basic_auth, kerberos_auth
+basic_auth.CLIENT_AUTH
+basic_auth.init_app
+basic_auth.auth_current_user
+basic_auth.requires_authentication
+
+kerberos_auth.log
+kerberos_auth.CLIENT_AUTH
+kerberos_auth.find_user
+kerberos_auth.init_app
+kerberos_auth.requires_authentication
 auth_current_user
 backend_kerberos_auth
 fab_override
 FabAuthManager()
 FabAirflowSecurityManagerOverride()
+
+# check whether attribute access
+basic_auth.auth_current_user
 
 # apache-airflow-providers-cncf-kubernetes
 ALL_NAMESPACES
@@ -405,19 +431,51 @@ SqliteOperator()
 # apache-airflow-providers-zendesk
 ZendeskHook()
 
+# apache-airflow-providers-smtp
+EmailOperator()
+
 # apache-airflow-providers-standard
+filesystem.FileSensor()
 FileSensor()
 TriggerDagRunOperator()
-ExternalTaskMarker(), ExternalTaskSensor()
+ExternalTaskMarker()
+ExternalTaskSensor()
 BranchDateTimeOperator()
 BranchDayOfWeekOperator()
+BranchPythonOperator()
 DateTimeSensor()
+DateTimeSensorAsync()
 TimeSensor()
 TimeDeltaSensor()
 DayOfWeekSensor()
+DummyOperator()
+EmptyOperator()
+ExternalTaskMarker()
+ExternalTaskSensor()
+ExternalTaskSensorLink()
+FileSensor()
+FileTrigger()
 FSHook()
 PackageIndexHook()
 SubprocessHook()
+ShortCircuitOperator()
+TimeDeltaSensor()
+TimeSensor()
+TriggerDagRunOperator()
 WorkflowTrigger()
+PythonOperator()
+PythonVirtualenvOperator()
+DagStateTrigger()
 FileTrigger()
 DateTimeTrigger()
+TimeDeltaTrigger()
+SubprocessResult()
+SubprocessHook()
+TimeDeltaSensor()
+TimeDeltaSensorAsync()
+WaitSensor()
+TimeSensor()
+TimeSensorAsync()
+BranchDateTimeOperator()
+working_directory()
+target_times_as_dates()

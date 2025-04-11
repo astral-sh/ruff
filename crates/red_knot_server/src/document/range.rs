@@ -13,6 +13,7 @@ use ruff_source_file::OneIndexed;
 use ruff_source_file::{LineIndex, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+#[expect(dead_code)]
 pub(crate) struct NotebookRange {
     pub(crate) cell: notebook::CellId,
     pub(crate) range: types::Range,
@@ -27,8 +28,38 @@ pub(crate) trait PositionExt {
     fn to_text_size(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> TextSize;
 }
 
+pub(crate) trait TextSizeExt {
+    fn to_position(
+        self,
+        text: &str,
+        index: &LineIndex,
+        encoding: PositionEncoding,
+    ) -> types::Position
+    where
+        Self: Sized;
+}
+
+impl TextSizeExt for TextSize {
+    fn to_position(
+        self,
+        text: &str,
+        index: &LineIndex,
+        encoding: PositionEncoding,
+    ) -> types::Position {
+        let source_location = offset_to_source_location(self, text, index, encoding);
+        source_location_to_position(&source_location)
+    }
+}
+
 pub(crate) trait ToRangeExt {
-    fn to_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> types::Range;
+    fn to_lsp_range(
+        &self,
+        text: &str,
+        index: &LineIndex,
+        encoding: PositionEncoding,
+    ) -> types::Range;
+
+    #[expect(dead_code)]
     fn to_notebook_range(
         &self,
         text: &str,
@@ -92,20 +123,15 @@ impl RangeExt for lsp_types::Range {
 }
 
 impl ToRangeExt for TextRange {
-    fn to_range(&self, text: &str, index: &LineIndex, encoding: PositionEncoding) -> types::Range {
+    fn to_lsp_range(
+        &self,
+        text: &str,
+        index: &LineIndex,
+        encoding: PositionEncoding,
+    ) -> types::Range {
         types::Range {
-            start: source_location_to_position(&offset_to_source_location(
-                self.start(),
-                text,
-                index,
-                encoding,
-            )),
-            end: source_location_to_position(&offset_to_source_location(
-                self.end(),
-                text,
-                index,
-                encoding,
-            )),
+            start: self.start().to_position(text, index, encoding),
+            end: self.end().to_position(text, index, encoding),
         }
     }
 
@@ -222,7 +248,7 @@ impl FileRangeExt for FileRange {
         let source = source_text(db.upcast(), file);
         let line_index = line_index(db.upcast(), file);
 
-        let range = self.range().to_range(&source, &line_index, encoding);
+        let range = self.range().to_lsp_range(&source, &line_index, encoding);
         Some(Location { uri, range })
     }
 }

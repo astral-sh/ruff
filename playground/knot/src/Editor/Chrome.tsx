@@ -13,7 +13,7 @@ import {
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import type { Diagnostic, Workspace } from "red_knot_wasm";
+import type { Workspace } from "red_knot_wasm";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Files, isPythonFile } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";
@@ -21,7 +21,7 @@ import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
-import Diagnostics from "./Diagnostics";
+import Diagnostics, { Diagnostic } from "./Diagnostics";
 import { FileId, ReadonlyFiles } from "../Playground";
 import type { editor } from "monaco-editor";
 import type { Monaco } from "@monaco-editor/react";
@@ -40,15 +40,15 @@ export interface Props {
   theme: Theme;
   selectedFileName: string;
 
-  onFileAdded(workspace: Workspace, name: string): void;
+  onAddFile(workspace: Workspace, name: string): void;
 
-  onFileChanged(workspace: Workspace, content: string): void;
+  onChangeFile(workspace: Workspace, content: string): void;
 
-  onFileRenamed(workspace: Workspace, file: FileId, newName: string): void;
+  onRenameFile(workspace: Workspace, file: FileId, newName: string): void;
 
-  onFileRemoved(workspace: Workspace, file: FileId): void;
+  onRemoveFile(workspace: Workspace, file: FileId): void;
 
-  onFileSelected(id: FileId): void;
+  onSelectFile(id: FileId): void;
 }
 
 export default function Chrome({
@@ -56,11 +56,11 @@ export default function Chrome({
   selectedFileName,
   workspacePromise,
   theme,
-  onFileAdded,
-  onFileRenamed,
-  onFileRemoved,
-  onFileSelected,
-  onFileChanged,
+  onAddFile,
+  onRenameFile,
+  onRemoveFile,
+  onSelectFile,
+  onChangeFile,
 }: Props) {
   const workspace = use(workspacePromise);
 
@@ -74,7 +74,7 @@ export default function Chrome({
   } | null>(null);
 
   const handleFileRenamed = (file: FileId, newName: string) => {
-    onFileRenamed(workspace, file, newName);
+    onRenameFile(workspace, file, newName);
     editorRef.current?.editor.focus();
   };
 
@@ -129,9 +129,9 @@ export default function Chrome({
           ?.dispose();
       }
 
-      onFileRemoved(workspace, id);
+      onRemoveFile(workspace, id);
     },
-    [workspace, files.index, onFileRemoved],
+    [workspace, files.index, onRemoveFile],
   );
 
   const checkResult = useCheckResult(files, workspace, secondaryTool);
@@ -144,9 +144,9 @@ export default function Chrome({
             files={files.index}
             theme={theme}
             selected={files.selected}
-            onAdd={(name) => onFileAdded(workspace, name)}
+            onAdd={(name) => onAddFile(workspace, name)}
             onRename={handleFileRenamed}
-            onSelected={onFileSelected}
+            onSelect={onSelectFile}
             onRemove={handleRemoved}
           />
           <PanelGroup direction="horizontal" autoSaveId="main">
@@ -167,8 +167,8 @@ export default function Chrome({
                     diagnostics={checkResult.diagnostics}
                     workspace={workspace}
                     onMount={handleEditorMount}
-                    onChange={(content) => onFileChanged(workspace, content)}
-                    onOpenFile={onFileSelected}
+                    onChange={(content) => onChangeFile(workspace, content)}
+                    onOpenFile={onSelectFile}
                   />
                   {checkResult.error ? (
                     <div
@@ -192,7 +192,6 @@ export default function Chrome({
                 >
                   <Diagnostics
                     diagnostics={checkResult.diagnostics}
-                    workspace={workspace}
                     onGoTo={handleGoTo}
                     theme={theme}
                   />
@@ -290,8 +289,18 @@ function useCheckResult(
         };
       }
 
+      // Eagerly convert the diagnostic to avoid out of bound errors
+      // when the diagnostics are "deferred".
+      const serializedDiagnostics = diagnostics.map((diagnostic) => ({
+        id: diagnostic.id(),
+        message: diagnostic.message(),
+        severity: diagnostic.severity(),
+        range: diagnostic.toRange(workspace) ?? null,
+        textRange: diagnostic.textRange() ?? null,
+      }));
+
       return {
-        diagnostics,
+        diagnostics: serializedDiagnostics,
         error: null,
         secondary,
       };

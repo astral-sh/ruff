@@ -12,6 +12,7 @@ use rustc_hash::FxHasher;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
+use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
 use crate::semantic_index::{semantic_index, SymbolMap};
 use crate::Db;
 
@@ -176,6 +177,7 @@ pub struct Scope {
     parent: Option<FileScopeId>,
     node: NodeWithScopeKind,
     descendants: Range<FileScopeId>,
+    reachability: ScopedVisibilityConstraintId,
 }
 
 impl Scope {
@@ -183,11 +185,13 @@ impl Scope {
         parent: Option<FileScopeId>,
         node: NodeWithScopeKind,
         descendants: Range<FileScopeId>,
+        reachability: ScopedVisibilityConstraintId,
     ) -> Self {
         Scope {
             parent,
             node,
             descendants,
+            reachability,
         }
     }
 
@@ -213,6 +217,10 @@ impl Scope {
 
     pub(crate) fn is_eager(&self) -> bool {
         self.kind().is_eager()
+    }
+
+    pub(crate) fn reachability(&self) -> ScopedVisibilityConstraintId {
+        self.reachability
     }
 }
 
@@ -261,7 +269,7 @@ impl ScopeKind {
 }
 
 /// Symbol table for a specific [`Scope`].
-#[derive(Debug, Default, salsa::Update)]
+#[derive(Default, salsa::Update)]
 pub struct SymbolTable {
     /// The symbols in this scope.
     symbols: IndexVec<ScopedSymbolId, Symbol>,
@@ -321,6 +329,16 @@ impl PartialEq for SymbolTable {
 }
 
 impl Eq for SymbolTable {}
+
+impl std::fmt::Debug for SymbolTable {
+    /// Exclude the `symbols_by_name` field from the debug output.
+    /// It's very noisy and not useful for debugging.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SymbolTable")
+            .field(&self.symbols)
+            .finish_non_exhaustive()
+    }
+}
 
 #[derive(Debug, Default)]
 pub(super) struct SymbolTableBuilder {

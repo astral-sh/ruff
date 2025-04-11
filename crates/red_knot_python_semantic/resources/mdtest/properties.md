@@ -146,7 +146,7 @@ class C:
     @property
     def attr(self) -> int:
         return 1
-    # error: [invalid-argument-type] "Object of type `Literal[attr]` cannot be assigned to parameter 2 (`fset`) of bound method `setter`; expected type `(Any, Any, /) -> None`"
+    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `(Any, Any, /) -> None`, found `Literal[attr]`"
     @attr.setter
     def attr(self) -> None:
         pass
@@ -156,7 +156,7 @@ class C:
 
 ```py
 class C:
-    # error: [invalid-argument-type] "Object of type `Literal[attr]` cannot be assigned to parameter 1 (`fget`) of class `property`; expected type `((Any, /) -> Any) | None`"
+    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `((Any, /) -> Any) | None`, found `Literal[attr]`"
     @property
     def attr(self, x: int) -> int:
         return 1

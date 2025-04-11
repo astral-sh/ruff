@@ -7,8 +7,8 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{ClassLiteralType, KnownInstanceType, Type};
-use ruff_db::diagnostic::{Diagnostic, OldSecondaryDiagnosticMessage, Span};
+use crate::types::{KnownInstanceType, Type};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
@@ -682,7 +682,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `assert_type()` calls where the actual type
+    /// Checks for `assert_type()` and `assert_never()` calls where the actual type
     /// is not the same as the asserted type.
     ///
     /// ## Why is this bad?
@@ -966,7 +966,7 @@ pub(super) fn report_index_out_of_bounds(
     length: usize,
     index: i64,
 ) {
-    context.report_lint(
+    context.report_lint_old(
         &INDEX_OUT_OF_BOUNDS,
         node,
         format_args!(
@@ -983,7 +983,7 @@ pub(super) fn report_non_subscriptable(
     non_subscriptable_ty: Type,
     method: &str,
 ) {
-    context.report_lint(
+    context.report_lint_old(
         &NON_SUBSCRIPTABLE,
         node,
         format_args!(
@@ -993,25 +993,8 @@ pub(super) fn report_non_subscriptable(
     );
 }
 
-pub(super) fn report_unresolved_module<'db>(
-    context: &InferContext,
-    import_node: impl Into<AnyNodeRef<'db>>,
-    level: u32,
-    module: Option<&str>,
-) {
-    context.report_lint(
-        &UNRESOLVED_IMPORT,
-        import_node.into(),
-        format_args!(
-            "Cannot resolve import `{}{}`",
-            ".".repeat(level as usize),
-            module.unwrap_or_default()
-        ),
-    );
-}
-
 pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {
-    context.report_lint(
+    context.report_lint_old(
         &ZERO_STEPSIZE_IN_SLICE,
         node,
         format_args!("Slice step size can not be zero"),
@@ -1025,18 +1008,18 @@ fn report_invalid_assignment_with_message(
     message: std::fmt::Arguments,
 ) {
     match target_ty {
-        Type::ClassLiteral(ClassLiteralType { class }) => {
-            context.report_lint(&INVALID_ASSIGNMENT, node, format_args!(
+        Type::ClassLiteral(class) => {
+            context.report_lint_old(&INVALID_ASSIGNMENT, node, format_args!(
                     "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
                     class.name(context.db())));
         }
         Type::FunctionLiteral(function) => {
-            context.report_lint(&INVALID_ASSIGNMENT, node, format_args!(
+            context.report_lint_old(&INVALID_ASSIGNMENT, node, format_args!(
                     "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
                     function.name(context.db())));
         }
         _ => {
-            context.report_lint(&INVALID_ASSIGNMENT, node, message);
+            context.report_lint_old(&INVALID_ASSIGNMENT, node, message);
         }
     }
 }
@@ -1085,22 +1068,26 @@ pub(super) fn report_invalid_return_type(
     expected_ty: Type,
     actual_ty: Type,
 ) {
+    let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE) else {
+        return;
+    };
+
+    let object_span = Span::from(context.file()).with_range(object_range.range());
     let return_type_span = Span::from(context.file()).with_range(return_type_range.range());
-    context.report_lint_with_secondary_messages(
-        &INVALID_RETURN_TYPE,
-        object_range,
-        format_args!(
-            "Object of type `{}` is not assignable to return type `{}`",
-            actual_ty.display(context.db()),
-            expected_ty.display(context.db())
-        ),
-        &[OldSecondaryDiagnosticMessage::new(
-            return_type_span,
-            format!(
-                "Return type is declared here as `{}`",
-                expected_ty.display(context.db())
-            ),
-        )],
+
+    let mut reporter = builder.build("Return type does not match returned value");
+
+    let diag = reporter.diagnostic();
+    diag.annotate(Annotation::primary(object_span).message(format_args!(
+        "Expected `{expected_ty}`, found `{actual_ty}`",
+        expected_ty = expected_ty.display(context.db()),
+        actual_ty = actual_ty.display(context.db()),
+    )));
+    diag.annotate(
+        Annotation::secondary(return_type_span).message(format_args!(
+            "Expected `{expected_ty}` because of return type",
+            expected_ty = expected_ty.display(context.db()),
+        )),
     );
 }
 
@@ -1109,7 +1096,7 @@ pub(super) fn report_implicit_return_type(
     range: impl Ranged,
     expected_ty: Type,
 ) {
-    context.report_lint(
+    context.report_lint_old(
         &INVALID_RETURN_TYPE,
         range,
         format_args!(
@@ -1120,7 +1107,7 @@ pub(super) fn report_implicit_return_type(
 }
 
 pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: AnyNodeRef) {
-    context.report_lint(
+    context.report_lint_old(
         &INVALID_TYPE_CHECKING_CONSTANT,
         node,
         format_args!("The name TYPE_CHECKING is reserved for use as a flag; only False can be assigned to it.",),
@@ -1133,7 +1120,7 @@ pub(super) fn report_possibly_unresolved_reference(
 ) {
     let ast::ExprName { id, .. } = expr_name_node;
 
-    context.report_lint(
+    context.report_lint_old(
         &POSSIBLY_UNRESOLVED_REFERENCE,
         expr_name_node,
         format_args!("Name `{id}` used when possibly not defined"),
@@ -1146,7 +1133,7 @@ pub(super) fn report_possibly_unbound_attribute(
     attribute: &str,
     object_ty: Type,
 ) {
-    context.report_lint(
+    context.report_lint_old(
         &POSSIBLY_UNBOUND_ATTRIBUTE,
         target,
         format_args!(
@@ -1159,7 +1146,7 @@ pub(super) fn report_possibly_unbound_attribute(
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
     let ast::ExprName { id, .. } = expr_name_node;
 
-    context.report_lint(
+    context.report_lint_old(
         &UNRESOLVED_REFERENCE,
         expr_name_node,
         format_args!("Name `{id}` used when not defined"),
@@ -1167,7 +1154,7 @@ pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node
 }
 
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
-    context.report_lint(
+    context.report_lint_old(
         &INVALID_EXCEPTION_CAUGHT,
         node,
         format_args!(
@@ -1179,7 +1166,7 @@ pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast
 }
 
 pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast::Expr, ty: Type) {
-    context.report_lint(
+    context.report_lint_old(
         &INVALID_RAISE,
         node,
         format_args!(
@@ -1190,7 +1177,7 @@ pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast
 }
 
 pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
-    context.report_lint(
+    context.report_lint_old(
         &INVALID_RAISE,
         node,
         format_args!(
@@ -1202,7 +1189,7 @@ pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast:
 }
 
 pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: &ast::Expr) {
-    context.report_lint(
+    context.report_lint_old(
         &INCOMPATIBLE_SLOTS,
         node,
         format_args!("Class base has incompatible `__slots__`"),
@@ -1213,7 +1200,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
-    context.report_lint(
+    context.report_lint_old(
         &INVALID_TYPE_FORM,
         subscript,
         format_args!(
@@ -1227,7 +1214,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
-    context.report_lint(
+    context.report_lint_old(
         &INVALID_TYPE_FORM,
         subscript,
         format_args!(

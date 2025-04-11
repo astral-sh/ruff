@@ -10,7 +10,6 @@ use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 
 use ruff_python_ast::PythonVersion;
 
@@ -137,11 +136,8 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             )))
         }
         ConversionType::Optional => {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from("typing", "Optional"),
-                expr.start(),
-                checker.semantic(),
-            )?;
+            let (import_edit, binding) =
+                checker.import_from_typing("Optional", expr.start(), PythonVersion::lowest())?;
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 value: Box::new(Expr::Name(ast::ExprName {

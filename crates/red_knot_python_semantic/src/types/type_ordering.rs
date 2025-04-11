@@ -2,10 +2,7 @@ use std::cmp::Ordering;
 
 use crate::db::Db;
 
-use super::{
-    class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType,
-    TodoType, Type,
-};
+use super::{class_base::ClassBase, DynamicType, InstanceType, KnownInstanceType, TodoType, Type};
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
 /// in an [`crate::types::IntersectionType`] or a [`crate::types::UnionType`] in order for them
@@ -93,12 +90,13 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ModuleLiteral(_), _) => Ordering::Less,
         (_, Type::ModuleLiteral(_)) => Ordering::Greater,
 
-        (
-            Type::ClassLiteral(ClassLiteralType { class: left }),
-            Type::ClassLiteral(ClassLiteralType { class: right }),
-        ) => left.cmp(right),
+        (Type::ClassLiteral(left), Type::ClassLiteral(right)) => left.cmp(right),
         (Type::ClassLiteral(_), _) => Ordering::Less,
         (_, Type::ClassLiteral(_)) => Ordering::Greater,
+
+        (Type::GenericAlias(left), Type::GenericAlias(right)) => left.cmp(right),
+        (Type::GenericAlias(_), _) => Ordering::Less,
+        (_, Type::GenericAlias(_)) => Ordering::Greater,
 
         (Type::SubclassOf(left), Type::SubclassOf(right)) => {
             match (left.subclass_of(), right.subclass_of()) {
@@ -120,6 +118,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::Instance(_), _) => Ordering::Less,
         (_, Type::Instance(_)) => Ordering::Greater,
+
+        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
+        (Type::TypeVar(_), _) => Ordering::Less,
+        (_, Type::TypeVar(_)) => Ordering::Greater,
 
         (Type::AlwaysTruthy, _) => Ordering::Less,
         (_, Type::AlwaysTruthy) => Ordering::Greater,

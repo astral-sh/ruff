@@ -8,13 +8,10 @@ In type stubs, classes can reference themselves in their base class definitions.
 ```pyi
 class Foo[T]: ...
 
-# TODO: actually is subscriptable
-# error: [non-subscriptable]
 class Bar(Foo[Bar]): ...
 
 reveal_type(Bar)  # revealed: Literal[Bar]
-# TODO: Instead of `Literal[Foo]`, we might eventually want to show a type that involves the type parameter.
-reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Foo], Literal[object]]
+reveal_type(Bar.__mro__)  # revealed: tuple[Literal[Bar], Literal[Foo[Bar]], Literal[object]]
 ```
 
 ## Access to attributes declared in stubs

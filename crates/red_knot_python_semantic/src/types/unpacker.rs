@@ -116,8 +116,10 @@ impl<'db> Unpacker<'db> {
                             // it's worth it.
                             TupleType::from_elements(
                                 self.db(),
-                                std::iter::repeat(Type::LiteralString)
-                                    .take(string_literal_ty.python_len(self.db())),
+                                std::iter::repeat_n(
+                                    Type::LiteralString,
+                                    string_literal_ty.python_len(self.db()),
+                                ),
                             )
                         }
                         _ => ty,
@@ -128,7 +130,7 @@ impl<'db> Unpacker<'db> {
 
                         let length_mismatch = match elts.len().cmp(&tuple_ty_elements.len()) {
                             Ordering::Less => {
-                                self.context.report_lint(
+                                self.context.report_lint_old(
                                     &INVALID_ASSIGNMENT,
                                     target,
                                     format_args!(
@@ -140,7 +142,7 @@ impl<'db> Unpacker<'db> {
                                 true
                             }
                             Ordering::Greater => {
-                                self.context.report_lint(
+                                self.context.report_lint_old(
                                     &INVALID_ASSIGNMENT,
                                     target,
                                     format_args!(
@@ -244,7 +246,7 @@ impl<'db> Unpacker<'db> {
 
             Cow::Owned(element_types)
         } else {
-            self.context.report_lint(
+            self.context.report_lint_old(
                 &INVALID_ASSIGNMENT,
                 expr,
                 format_args!(

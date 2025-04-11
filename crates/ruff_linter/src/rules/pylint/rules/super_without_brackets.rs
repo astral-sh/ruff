@@ -101,9 +101,9 @@ pub(crate) fn super_without_brackets(checker: &Checker, func: &Expr) {
     );
     if !matches!(
         classification,
-        function_type::FunctionType::Method { .. }
-            | function_type::FunctionType::ClassMethod { .. }
-            | function_type::FunctionType::StaticMethod { .. }
+        function_type::FunctionType::Method
+            | function_type::FunctionType::ClassMethod
+            | function_type::FunctionType::StaticMethod
     ) {
         return;
     }

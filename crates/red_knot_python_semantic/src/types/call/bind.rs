@@ -18,10 +18,10 @@ use crate::types::diagnostic::{
 };
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    todo_type, BoundMethodType, ClassLiteralType, FunctionDecorators, KnownClass, KnownFunction,
-    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
+    todo_type, BoundMethodType, FunctionDecorators, KnownClass, KnownFunction, KnownInstanceType,
+    MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
 };
-use ruff_db::diagnostic::{OldSecondaryDiagnosticMessage, Span};
+use ruff_db::diagnostic::{Annotation, Severity, Span, SubDiagnostic};
 use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
@@ -170,7 +170,7 @@ impl<'db> Bindings<'db> {
         // If all union elements are not callable, report that the union as a whole is not
         // callable.
         if self.into_iter().all(|b| !b.is_callable()) {
-            context.report_lint(
+            context.report_lint_old(
                 &CALL_NON_CALLABLE,
                 node,
                 format_args!(
@@ -183,7 +183,7 @@ impl<'db> Bindings<'db> {
 
         for (index, conflicting_form) in self.conflicting_forms.iter().enumerate() {
             if *conflicting_form {
-                context.report_lint(
+                context.report_lint_old(
                     &CONFLICTING_ARGUMENT_FORMS,
                     BindingError::get_node(node, Some(index)),
                     format_args!("Argument is used as both a value and a type form in call"),
@@ -395,6 +395,16 @@ impl<'db> Bindings<'db> {
                     }
                 }
 
+                Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)) => {
+                    if let [Some(Type::StringLiteral(prefix)), None, None] =
+                        overload.parameter_types()
+                    {
+                        overload.set_return_type(Type::BooleanLiteral(
+                            literal.value(db).starts_with(&**prefix.value(db)),
+                        ));
+                    }
+                }
+
                 Type::BoundMethod(bound_method)
                     if bound_method.self_instance(db).is_property_instance() =>
                 {
@@ -502,13 +512,13 @@ impl<'db> Bindings<'db> {
                             if let Some(len_ty) = first_arg.len(db) {
                                 overload.set_return_type(len_ty);
                             }
-                        };
+                        }
                     }
 
                     Some(KnownFunction::Repr) => {
                         if let [Some(first_arg)] = overload.parameter_types() {
                             overload.set_return_type(first_arg.repr(db));
-                        };
+                        }
                     }
 
                     Some(KnownFunction::Cast) => {
@@ -566,7 +576,7 @@ impl<'db> Bindings<'db> {
                     _ => {}
                 },
 
-                Type::ClassLiteral(ClassLiteralType { class }) => match class.known(db) {
+                Type::ClassLiteral(class) => match class.known(db) {
                     Some(KnownClass::Bool) => match overload.parameter_types() {
                         [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
                         [None] => overload.set_return_type(Type::BooleanLiteral(false)),
@@ -764,7 +774,7 @@ impl<'db> CallableBinding<'db> {
 
     fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         if !self.is_callable() {
-            context.report_lint(
+            context.report_lint_old(
                 &CALL_NON_CALLABLE,
                 node,
                 format_args!(
@@ -776,7 +786,7 @@ impl<'db> CallableBinding<'db> {
         }
 
         if self.dunder_call_is_possibly_unbound {
-            context.report_lint(
+            context.report_lint_old(
                 &CALL_NON_CALLABLE,
                 node,
                 format_args!(
@@ -789,7 +799,7 @@ impl<'db> CallableBinding<'db> {
 
         let callable_description = CallableDescription::new(context.db(), self.callable_type);
         if self.overloads.len() > 1 {
-            context.report_lint(
+            context.report_lint_old(
                 &NO_MATCHING_OVERLOAD,
                 node,
                 format_args!(
@@ -924,8 +934,14 @@ impl<'db> Binding<'db> {
                     first_excess_argument_index,
                     num_synthetic_args,
                 ),
-                expected_positional_count: parameters.positional().count(),
-                provided_positional_count: next_positional,
+                expected_positional_count: parameters
+                    .positional()
+                    .count()
+                    // using saturating_sub to avoid negative values due to invalid syntax in source code
+                    .saturating_sub(num_synthetic_args),
+                provided_positional_count: next_positional
+                    // using saturating_sub to avoid negative values due to invalid syntax in source code
+                    .saturating_sub(num_synthetic_args),
             });
         }
         let mut missing = vec![];
@@ -1058,7 +1074,7 @@ impl<'db> CallableDescription<'db> {
             }),
             Type::ClassLiteral(class_type) => Some(CallableDescription {
                 kind: "class",
-                name: class_type.class().name(db),
+                name: class_type.name(db),
             }),
             Type::BoundMethod(bound_method) => Some(CallableDescription {
                 kind: "bound method",
@@ -1177,15 +1193,23 @@ pub(crate) enum BindingError<'db> {
 }
 
 impl<'db> BindingError<'db> {
+    /// Returns a tuple of two spans. The first is
+    /// the span for the identifier of the function
+    /// definition for `callable_ty`. The second is
+    /// the span for the parameter in the function
+    /// definition for `callable_ty`.
+    ///
+    /// If there are no meaningful spans, then this
+    /// returns `None`.
     fn parameter_span_from_index(
         db: &'db dyn Db,
         callable_ty: Type<'db>,
         parameter_index: usize,
-    ) -> Option<Span> {
+    ) -> Option<(Span, Span)> {
         match callable_ty {
             Type::FunctionLiteral(function) => {
                 let function_scope = function.body_scope(db);
-                let mut span = Span::from(function_scope.file(db));
+                let span = Span::from(function_scope.file(db));
                 let node = function_scope.node(db);
                 if let Some(func_def) = node.as_function() {
                     let range = func_def
@@ -1194,8 +1218,9 @@ impl<'db> BindingError<'db> {
                         .nth(parameter_index)
                         .map(|param| param.range())
                         .unwrap_or(func_def.parameters.range);
-                    span = span.with_range(range);
-                    Some(span)
+                    let name_span = span.clone().with_range(func_def.name.range);
+                    let parameter_span = span.with_range(range);
+                    Some((name_span, parameter_span))
                 } else {
                     None
                 }
@@ -1223,32 +1248,29 @@ impl<'db> BindingError<'db> {
                 expected_ty,
                 provided_ty,
             } => {
-                let mut messages = vec![];
-                if let Some(span) =
-                    Self::parameter_span_from_index(context.db(), callable_ty, parameter.index)
-                {
-                    messages.push(OldSecondaryDiagnosticMessage::new(
-                        span,
-                        "parameter declared in function definition here",
-                    ));
-                }
+                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE) else {
+                    return;
+                };
 
                 let provided_ty_display = provided_ty.display(context.db());
                 let expected_ty_display = expected_ty.display(context.db());
-                context.report_lint_with_secondary_messages(
-                    &INVALID_ARGUMENT_TYPE,
-                    Self::get_node(node, *argument_index),
-                    format_args!(
-                        "Object of type `{provided_ty_display}` cannot be assigned to \
-                        parameter {parameter}{}; expected type `{expected_ty_display}`",
-                        if let Some(CallableDescription { kind, name }) = callable_description {
-                            format!(" of {kind} `{name}`")
-                        } else {
-                            String::new()
-                        }
-                    ),
-                    &messages,
-                );
+                let mut reporter = builder.build("Argument to this function is incorrect");
+
+                let diag = reporter.diagnostic();
+                let span = context.span(Self::get_node(node, *argument_index));
+                diag.annotate(Annotation::primary(span).message(format_args!(
+                    "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
+                )));
+                if let Some((name_span, parameter_span)) =
+                    Self::parameter_span_from_index(context.db(), callable_ty, parameter.index)
+                {
+                    let mut sub = SubDiagnostic::new(Severity::Info, "Function defined here");
+                    sub.annotate(Annotation::primary(name_span));
+                    sub.annotate(
+                        Annotation::secondary(parameter_span).message("Parameter declared here"),
+                    );
+                    diag.sub(sub);
+                }
             }
 
             Self::TooManyPositionalArguments {
@@ -1256,7 +1278,7 @@ impl<'db> BindingError<'db> {
                 expected_positional_count,
                 provided_positional_count,
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &TOO_MANY_POSITIONAL_ARGUMENTS,
                     Self::get_node(node, *first_excess_argument_index),
                     format_args!(
@@ -1273,7 +1295,7 @@ impl<'db> BindingError<'db> {
 
             Self::MissingArguments { parameters } => {
                 let s = if parameters.0.len() == 1 { "" } else { "s" };
-                context.report_lint(
+                context.report_lint_old(
                     &MISSING_ARGUMENT,
                     node,
                     format_args!(
@@ -1291,7 +1313,7 @@ impl<'db> BindingError<'db> {
                 argument_name,
                 argument_index,
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNKNOWN_ARGUMENT,
                     Self::get_node(node, *argument_index),
                     format_args!(
@@ -1309,7 +1331,7 @@ impl<'db> BindingError<'db> {
                 argument_index,
                 parameter,
             } => {
-                context.report_lint(
+                context.report_lint_old(
                     &PARAMETER_ALREADY_ASSIGNED,
                     Self::get_node(node, *argument_index),
                     format_args!(
@@ -1324,7 +1346,7 @@ impl<'db> BindingError<'db> {
             }
 
             Self::InternalCallError(reason) => {
-                context.report_lint(
+                context.report_lint_old(
                     &CALL_NON_CALLABLE,
                     Self::get_node(node, None),
                     format_args!(

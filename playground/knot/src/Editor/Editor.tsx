@@ -12,21 +12,22 @@ import {
   languages,
   MarkerSeverity,
   Position,
+  Range,
   Uri,
 } from "monaco-editor";
-import { RefObject, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Theme } from "shared";
 import {
-  Diagnostic,
+  Range as KnotRange,
   Severity,
-  Workspace,
+  type Workspace,
   Position as KnotPosition,
-  type Range as KnotRange,
 } from "red_knot_wasm";
 
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import { FileId, ReadonlyFiles } from "../Playground";
 import { isPythonFile } from "./Files";
+import { Diagnostic } from "./Diagnostics";
 
 type Props = {
   visible: boolean;
@@ -53,34 +54,26 @@ export default function Editor({
   onMount,
   onOpenFile,
 }: Props) {
-  const disposable = useRef<{
-    typeDefinition: IDisposable;
-    editorOpener: IDisposable;
-  } | null>(null);
-  const playgroundState = useRef<PlaygroundServerProps>({
-    monaco: null,
-    files,
-    workspace,
-    onOpenFile,
-  });
+  const serverRef = useRef<PlaygroundServer | null>(null);
 
-  playgroundState.current = {
-    monaco: playgroundState.current.monaco,
-    files,
-    workspace,
-    onOpenFile,
-  };
+  if (serverRef.current != null) {
+    serverRef.current.update({
+      files,
+      workspace,
+      onOpenFile,
+    });
+  }
 
   // Update the diagnostics in the editor.
   useEffect(() => {
-    const monaco = playgroundState.current.monaco;
+    const server = serverRef.current;
 
-    if (monaco == null) {
+    if (server == null) {
       return;
     }
 
-    updateMarkers(monaco, workspace, diagnostics);
-  }, [workspace, diagnostics]);
+    server.updateDiagnostics(diagnostics);
+  }, [diagnostics]);
 
   const handleChange = useCallback(
     (value: string | undefined) => {
@@ -91,36 +84,36 @@ export default function Editor({
 
   useEffect(() => {
     return () => {
-      disposable.current?.typeDefinition.dispose();
-      disposable.current?.editorOpener.dispose();
+      const server = serverRef.current;
+
+      if (server != null) {
+        server.dispose();
+      }
     };
   }, []);
 
   const handleMount: OnMount = useCallback(
     (editor, instance) => {
-      updateMarkers(instance, workspace, diagnostics);
+      serverRef.current?.dispose();
 
-      const server = new PlaygroundServer(playgroundState);
-      const typeDefinitionDisposable =
-        instance.languages.registerTypeDefinitionProvider("python", server);
-      const editorOpenerDisposable =
-        instance.editor.registerEditorOpener(server);
+      const server = new PlaygroundServer(instance, {
+        workspace,
+        files,
+        onOpenFile,
+      });
 
-      disposable.current = {
-        typeDefinition: typeDefinitionDisposable,
-        editorOpener: editorOpenerDisposable,
-      };
-
-      playgroundState.current.monaco = instance;
+      server.updateDiagnostics(diagnostics);
+      serverRef.current = server;
 
       onMount(editor, instance);
     },
 
-    [onMount, workspace, diagnostics],
+    [files, onOpenFile, workspace, onMount, diagnostics],
   );
 
   return (
     <Moncao
+      key={files.playgroundRevision}
       onMount={handleMount}
       options={{
         fixedOverflowWidgets: true,
@@ -141,63 +134,184 @@ export default function Editor({
   );
 }
 
-function updateMarkers(
-  monaco: Monaco,
-  workspace: Workspace,
-  diagnostics: Array<Diagnostic>,
-) {
-  const editor = monaco.editor;
-  const model = editor?.getModels()[0];
-
-  if (!model) {
-    return;
-  }
-
-  editor.setModelMarkers(
-    model,
-    "owner",
-    diagnostics.map((diagnostic) => {
-      const mapSeverity = (severity: Severity) => {
-        switch (severity) {
-          case Severity.Info:
-            return MarkerSeverity.Info;
-          case Severity.Warning:
-            return MarkerSeverity.Warning;
-          case Severity.Error:
-            return MarkerSeverity.Error;
-          case Severity.Fatal:
-            return MarkerSeverity.Error;
-        }
-      };
-
-      const range = diagnostic.toRange(workspace);
-
-      return {
-        code: diagnostic.id(),
-        startLineNumber: range?.start?.line ?? 0,
-        startColumn: range?.start?.column ?? 0,
-        endLineNumber: range?.end?.line ?? 0,
-        endColumn: range?.end?.column ?? 0,
-        message: diagnostic.message(),
-        severity: mapSeverity(diagnostic.severity()),
-        tags: [],
-      };
-    }),
-  );
-}
-
 interface PlaygroundServerProps {
-  monaco: Monaco | null;
   workspace: Workspace;
   files: ReadonlyFiles;
-
   onOpenFile: (file: FileId) => void;
 }
 
 class PlaygroundServer
-  implements languages.TypeDefinitionProvider, editor.ICodeEditorOpener
+  implements
+    languages.TypeDefinitionProvider,
+    editor.ICodeEditorOpener,
+    languages.HoverProvider,
+    languages.InlayHintsProvider,
+    languages.DocumentFormattingEditProvider
 {
-  constructor(private props: RefObject<PlaygroundServerProps>) {}
+  private typeDefinitionProviderDisposable: IDisposable;
+  private editorOpenerDisposable: IDisposable;
+  private hoverDisposable: IDisposable;
+  private inlayHintsDisposable: IDisposable;
+  private formatDisposable: IDisposable;
+
+  constructor(
+    private monaco: Monaco,
+    private props: PlaygroundServerProps,
+  ) {
+    this.typeDefinitionProviderDisposable =
+      monaco.languages.registerTypeDefinitionProvider("python", this);
+    this.hoverDisposable = monaco.languages.registerHoverProvider(
+      "python",
+      this,
+    );
+    this.inlayHintsDisposable = monaco.languages.registerInlayHintsProvider(
+      "python",
+      this,
+    );
+    this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
+    this.formatDisposable =
+      monaco.languages.registerDocumentFormattingEditProvider("python", this);
+  }
+
+  provideInlayHints(
+    _model: editor.ITextModel,
+    range: Range,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.InlayHintList> {
+    const workspace = this.props.workspace;
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const inlayHints = workspace.inlayHints(
+      selectedHandle,
+      iRangeToKnotRange(range),
+    );
+
+    if (inlayHints.length === 0) {
+      return undefined;
+    }
+
+    return {
+      dispose: () => {},
+      hints: inlayHints.map((hint) => ({
+        label: hint.markdown,
+        position: {
+          lineNumber: hint.position.line,
+          column: hint.position.column,
+        },
+      })),
+    };
+  }
+
+  resolveInlayHint(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _hint: languages.InlayHint,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.InlayHint> {
+    return undefined;
+  }
+
+  update(props: PlaygroundServerProps) {
+    this.props = props;
+  }
+
+  updateDiagnostics(diagnostics: Array<Diagnostic>) {
+    if (this.props.files.selected == null) {
+      return;
+    }
+
+    const handle = this.props.files.handles[this.props.files.selected];
+
+    if (handle == null) {
+      return;
+    }
+
+    const editor = this.monaco.editor;
+    const model = editor.getModel(Uri.parse(handle.path()));
+
+    if (model == null) {
+      return;
+    }
+
+    editor.setModelMarkers(
+      model,
+      "owner",
+      diagnostics.map((diagnostic) => {
+        const mapSeverity = (severity: Severity) => {
+          switch (severity) {
+            case Severity.Info:
+              return MarkerSeverity.Info;
+            case Severity.Warning:
+              return MarkerSeverity.Warning;
+            case Severity.Error:
+              return MarkerSeverity.Error;
+            case Severity.Fatal:
+              return MarkerSeverity.Error;
+          }
+        };
+
+        const range = diagnostic.range;
+
+        return {
+          code: diagnostic.id,
+          startLineNumber: range?.start?.line ?? 0,
+          startColumn: range?.start?.column ?? 0,
+          endLineNumber: range?.end?.line ?? 0,
+          endColumn: range?.end?.column ?? 0,
+          message: diagnostic.message,
+          severity: mapSeverity(diagnostic.severity),
+          tags: [],
+        };
+      }),
+    );
+  }
+
+  provideHover(
+    model: editor.ITextModel,
+    position: Position,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    context?: languages.HoverContext<languages.Hover> | undefined,
+  ): languages.ProviderResult<languages.Hover> {
+    const workspace = this.props.workspace;
+
+    const selectedFile = this.props.files.selected;
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const hover = workspace.hover(
+      selectedHandle,
+      new KnotPosition(position.lineNumber, position.column),
+    );
+
+    if (hover == null) {
+      return;
+    }
+
+    return {
+      range: knotRangeToIRange(hover.range),
+      contents: [{ value: hover.markdown, isTrusted: true }],
+    };
+  }
 
   provideTypeDefinition(
     model: editor.ITextModel,
@@ -205,14 +319,14 @@ class PlaygroundServer
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _: CancellationToken,
   ): languages.ProviderResult<languages.Definition | languages.LocationLink[]> {
-    const workspace = this.props.current.workspace;
+    const workspace = this.props.workspace;
 
-    const selectedFile = this.props.current.files.selected;
+    const selectedFile = this.props.files.selected;
     if (selectedFile == null) {
       return;
     }
 
-    const selectedHandle = this.props.current.files.handles[selectedFile];
+    const selectedHandle = this.props.files.handles[selectedFile];
 
     if (selectedHandle == null) {
       return;
@@ -223,26 +337,29 @@ class PlaygroundServer
       new KnotPosition(position.lineNumber, position.column),
     );
 
-    const locations = links.map((link) => {
-      const targetSelection =
-        link.selection_range == null
-          ? undefined
-          : knotRangeToIRange(link.selection_range);
+    return (
+      links
+        .map((link) => {
+          const targetSelection =
+            link.selection_range == null
+              ? undefined
+              : knotRangeToIRange(link.selection_range);
 
-      const originSelection =
-        link.origin_selection_range == null
-          ? undefined
-          : knotRangeToIRange(link.origin_selection_range);
+          const originSelection =
+            link.origin_selection_range == null
+              ? undefined
+              : knotRangeToIRange(link.origin_selection_range);
 
-      return {
-        uri: Uri.parse(link.path),
-        range: knotRangeToIRange(link.full_range),
-        targetSelectionRange: targetSelection,
-        originSelectionRange: originSelection,
-      } as languages.LocationLink;
-    });
-
-    return locations;
+          return {
+            uri: Uri.parse(link.path),
+            range: knotRangeToIRange(link.full_range),
+            targetSelectionRange: targetSelection,
+            originSelectionRange: originSelection,
+          } as languages.LocationLink;
+        })
+        // Filter out vendored files because they aren't open in the editor.
+        .filter((link) => link.uri.scheme !== "vendored")
+    );
   }
 
   openCodeEditor(
@@ -250,12 +367,7 @@ class PlaygroundServer
     resource: Uri,
     selectionOrPosition?: IRange | IPosition,
   ): boolean {
-    const files = this.props.current.files;
-    const monaco = this.props.current.monaco;
-
-    if (monaco == null) {
-      return false;
-    }
+    const files = this.props.files;
 
     const fileId = files.index.find((file) => {
       return Uri.file(file.name).toString() === resource.toString();
@@ -267,11 +379,11 @@ class PlaygroundServer
 
     const handle = files.handles[fileId];
 
-    let model = monaco.editor.getModel(resource);
+    let model = this.monaco.editor.getModel(resource);
     if (model == null) {
       const language =
         handle != null && isPythonFile(handle) ? "python" : undefined;
-      model = monaco.editor.createModel(
+      model = this.monaco.editor.createModel(
         files.contents[fileId],
         language,
         resource,
@@ -284,7 +396,7 @@ class PlaygroundServer
     if (files.selected !== fileId) {
       source.setModel(model);
 
-      this.props.current.onOpenFile(fileId);
+      this.props.onOpenFile(fileId);
     }
 
     if (selectionOrPosition != null) {
@@ -302,6 +414,40 @@ class PlaygroundServer
 
     return true;
   }
+
+  provideDocumentFormattingEdits(
+    model: editor.ITextModel,
+  ): languages.ProviderResult<languages.TextEdit[]> {
+    if (this.props.files.selected == null) {
+      return null;
+    }
+
+    const fileHandle = this.props.files.handles[this.props.files.selected];
+
+    if (fileHandle == null) {
+      return null;
+    }
+
+    const formatted = this.props.workspace.format(fileHandle);
+    if (formatted != null) {
+      return [
+        {
+          range: model.getFullModelRange(),
+          text: formatted,
+        },
+      ];
+    }
+
+    return null;
+  }
+
+  dispose() {
+    this.hoverDisposable.dispose();
+    this.editorOpenerDisposable.dispose();
+    this.typeDefinitionProviderDisposable.dispose();
+    this.inlayHintsDisposable.dispose();
+    this.formatDisposable.dispose();
+  }
 }
 
 function knotRangeToIRange(range: KnotRange): IRange {
@@ -311,4 +457,11 @@ function knotRangeToIRange(range: KnotRange): IRange {
     endLineNumber: range.end.line,
     endColumn: range.end.column,
   };
+}
+
+function iRangeToKnotRange(range: IRange): KnotRange {
+  return new KnotRange(
+    new KnotPosition(range.startLineNumber, range.startColumn),
+    new KnotPosition(range.endLineNumber, range.endColumn),
+  );
 }

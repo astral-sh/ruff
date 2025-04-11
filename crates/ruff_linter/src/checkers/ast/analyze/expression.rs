@@ -232,6 +232,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     if checker.enabled(Rule::Airflow3MovedToProvider) {
                         airflow::rules::moved_to_provider_in_3(checker, expr);
                     }
+                    if checker.enabled(Rule::Airflow3SuggestedToMoveToProvider) {
+                        airflow::rules::suggested_to_move_to_provider_in_3(checker, expr);
+                    }
                     if checker.any_enabled(&[
                         Rule::SuspiciousPickleUsage,
                         Rule::SuspiciousMarshalUsage,
@@ -447,6 +450,12 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
+            }
+            if checker.enabled(Rule::Airflow3MovedToProvider) {
+                airflow::rules::moved_to_provider_in_3(checker, expr);
+            }
+            if checker.enabled(Rule::Airflow3SuggestedToMoveToProvider) {
+                airflow::rules::suggested_to_move_to_provider_in_3(checker, expr);
             }
         }
         Expr::Call(
@@ -1194,17 +1203,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         Expr::Yield(_) => {
-            if checker.enabled(Rule::YieldOutsideFunction) {
-                pyflakes::rules::yield_outside_function(checker, expr);
-            }
             if checker.enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
             }
         }
         Expr::YieldFrom(yield_from) => {
-            if checker.enabled(Rule::YieldOutsideFunction) {
-                pyflakes::rules::yield_outside_function(checker, expr);
-            }
             if checker.enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
             }
@@ -1213,9 +1216,6 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         Expr::Await(_) => {
-            if checker.enabled(Rule::YieldOutsideFunction) {
-                pyflakes::rules::yield_outside_function(checker, expr);
-            }
             if checker.enabled(Rule::AwaitOutsideAsync) {
                 pylint::rules::await_outside_async(checker, expr);
             }
@@ -1749,5 +1749,5 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         _ => {}
-    };
+    }
 }

@@ -3,11 +3,11 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
-
 use std::fmt::Display;
 
 use ruff_python_ast::{
     self as ast,
+    comparable::ComparableExpr,
     visitor::{walk_expr, Visitor},
     Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtImportFrom,
@@ -15,7 +15,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the `__future__` import boundary.
     ///
@@ -36,9 +36,7 @@ pub struct SemanticSyntaxChecker {
 
 impl SemanticSyntaxChecker {
     pub fn new() -> Self {
-        Self {
-            seen_futures_boundary: false,
-        }
+        Self::default()
     }
 }
 
@@ -64,7 +62,13 @@ impl SemanticSyntaxChecker {
             }
             Stmt::Match(match_stmt) => {
                 Self::irrefutable_match_case(match_stmt, ctx);
-                Self::multiple_case_assignment(match_stmt, ctx);
+                for case in &match_stmt.cases {
+                    let mut visitor = MatchPatternVisitor {
+                        names: FxHashSet::default(),
+                        ctx,
+                    };
+                    visitor.visit_pattern(&case.pattern);
+                }
             }
             Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
             | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
@@ -107,6 +111,169 @@ impl SemanticSyntaxChecker {
         }
 
         Self::debug_shadowing(stmt, ctx);
+        Self::check_annotation(stmt, ctx);
+    }
+
+    fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
+        match stmt {
+            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+                if ctx.python_version() > PythonVersion::PY313 {
+                    // test_ok valid_annotation_py313
+                    // # parse_options: {"target-version": "3.13"}
+                    // a: (x := 1)
+                    // def outer():
+                    //     b: (yield 1)
+                    //     c: (yield from 1)
+                    // async def outer():
+                    //     d: (await 1)
+
+                    // test_err invalid_annotation_py314
+                    // # parse_options: {"target-version": "3.14"}
+                    // a: (x := 1)
+                    // def outer():
+                    //     b: (yield 1)
+                    //     c: (yield from 1)
+                    // async def outer():
+                    //     d: (await 1)
+                    let mut visitor = InvalidExpressionVisitor {
+                        position: InvalidExpressionPosition::TypeAnnotation,
+                        ctx,
+                    };
+                    visitor.visit_expr(annotation);
+                }
+            }
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                type_params,
+                parameters,
+                returns,
+                ..
+            }) => {
+                // test_ok valid_annotation_function_py313
+                // # parse_options: {"target-version": "3.13"}
+                // def f() -> (y := 3): ...
+                // def g(arg: (x := 1)): ...
+                // def outer():
+                //     def i(x: (yield 1)): ...
+                //     def k() -> (yield 1): ...
+                //     def m(x: (yield from 1)): ...
+                //     def o() -> (yield from 1): ...
+                // async def outer():
+                //     def f() -> (await 1): ...
+                //     def g(arg: (await 1)): ...
+
+                // test_err invalid_annotation_function_py314
+                // # parse_options: {"target-version": "3.14"}
+                // def f() -> (y := 3): ...
+                // def g(arg: (x := 1)): ...
+                // def outer():
+                //     def i(x: (yield 1)): ...
+                //     def k() -> (yield 1): ...
+                //     def m(x: (yield from 1)): ...
+                //     def o() -> (yield from 1): ...
+                // async def outer():
+                //     def f() -> (await 1): ...
+                //     def g(arg: (await 1)): ...
+
+                // test_err invalid_annotation_function
+                // def d[T]() -> (await 1): ...
+                // def e[T](arg: (await 1)): ...
+                // def f[T]() -> (y := 3): ...
+                // def g[T](arg: (x := 1)): ...
+                // def h[T](x: (yield 1)): ...
+                // def j[T]() -> (yield 1): ...
+                // def l[T](x: (yield from 1)): ...
+                // def n[T]() -> (yield from 1): ...
+                // def p[T: (yield 1)](): ...      # yield in TypeVar bound
+                // def q[T = (yield 1)](): ...     # yield in TypeVar default
+                // def r[*Ts = (yield 1)](): ...   # yield in TypeVarTuple default
+                // def s[**Ts = (yield 1)](): ...  # yield in ParamSpec default
+                // def t[T: (x := 1)](): ...       # named expr in TypeVar bound
+                // def u[T = (x := 1)](): ...      # named expr in TypeVar default
+                // def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
+                // def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+                // def t[T: (await 1)](): ...       # await in TypeVar bound
+                // def u[T = (await 1)](): ...      # await in TypeVar default
+                // def v[*Ts = (await 1)](): ...    # await in TypeVarTuple default
+                // def w[**Ts = (await 1)](): ...   # await in ParamSpec default
+                let mut visitor = InvalidExpressionVisitor {
+                    position: InvalidExpressionPosition::TypeAnnotation,
+                    ctx,
+                };
+                if let Some(type_params) = type_params {
+                    visitor.visit_type_params(type_params);
+                }
+                // the __future__ annotation error takes precedence over the generic error
+                if ctx.future_annotations_or_stub() || ctx.python_version() > PythonVersion::PY313 {
+                    visitor.position = InvalidExpressionPosition::TypeAnnotation;
+                } else if type_params.is_some() {
+                    visitor.position = InvalidExpressionPosition::GenericDefinition;
+                } else {
+                    return;
+                }
+                for param in parameters
+                    .iter()
+                    .filter_map(ast::AnyParameterRef::annotation)
+                {
+                    visitor.visit_expr(param);
+                }
+                if let Some(returns) = returns {
+                    visitor.visit_expr(returns);
+                }
+            }
+            Stmt::ClassDef(ast::StmtClassDef {
+                type_params: Some(type_params),
+                arguments,
+                ..
+            }) => {
+                // test_ok valid_annotation_class
+                // class F(y := list): ...
+                // def f():
+                //     class G((yield 1)): ...
+                //     class H((yield from 1)): ...
+                // async def f():
+                //     class G((await 1)): ...
+
+                // test_err invalid_annotation_class
+                // class F[T](y := list): ...
+                // class I[T]((yield 1)): ...
+                // class J[T]((yield from 1)): ...
+                // class K[T: (yield 1)]: ...      # yield in TypeVar
+                // class L[T: (x := 1)]: ...       # named expr in TypeVar
+                // class M[T]((await 1)): ...
+                // class N[T: (await 1)]: ...
+                let mut visitor = InvalidExpressionVisitor {
+                    position: InvalidExpressionPosition::TypeAnnotation,
+                    ctx,
+                };
+                visitor.visit_type_params(type_params);
+                if let Some(arguments) = arguments {
+                    visitor.position = InvalidExpressionPosition::GenericDefinition;
+                    visitor.visit_arguments(arguments);
+                }
+            }
+            Stmt::TypeAlias(ast::StmtTypeAlias {
+                type_params, value, ..
+            }) => {
+                // test_err invalid_annotation_type_alias
+                // type X[T: (yield 1)] = int      # TypeVar bound
+                // type X[T = (yield 1)] = int     # TypeVar default
+                // type X[*Ts = (yield 1)] = int   # TypeVarTuple default
+                // type X[**Ts = (yield 1)] = int  # ParamSpec default
+                // type Y = (yield 1)              # yield in value
+                // type Y = (x := 1)               # named expr in value
+                // type Y[T: (await 1)] = int      # await in bound
+                // type Y = (await 1)              # await in value
+                let mut visitor = InvalidExpressionVisitor {
+                    position: InvalidExpressionPosition::TypeAlias,
+                    ctx,
+                };
+                visitor.visit_expr(value);
+                if let Some(type_params) = type_params {
+                    visitor.visit_type_params(type_params);
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Emit a [`SemanticSyntaxErrorKind::InvalidStarExpression`] if `expr` is starred.
@@ -260,16 +427,6 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn multiple_case_assignment<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
-        for case in &stmt.cases {
-            let mut visitor = MultipleCaseAssignmentVisitor {
-                names: FxHashSet::default(),
-                ctx,
-            };
-            visitor.visit_pattern(&case.pattern);
-        }
-    }
-
     fn irrefutable_match_case<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
         // test_ok irrefutable_case_pattern_at_end
         // match x:
@@ -313,7 +470,17 @@ impl SemanticSyntaxChecker {
         }
     }
 
+    /// Check `stmt` for semantic syntax errors and update the checker's internal state.
+    ///
+    /// Note that this method should only be called when traversing `stmt` *and* its children. For
+    /// example, if traversal of function bodies needs to be deferred, avoid calling `visit_stmt` on
+    /// the function itself until the deferred body is visited too. Failing to defer `visit_stmt` in
+    /// this case will break any internal state that depends on function scopes, such as `async`
+    /// context detection.
     pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
+        // check for errors
+        self.check_stmt(stmt, ctx);
+
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
@@ -324,15 +491,16 @@ impl SemanticSyntaxChecker {
                     self.seen_futures_boundary = true;
                 }
             }
+            Stmt::FunctionDef(_) => {
+                self.seen_futures_boundary = true;
+            }
             _ => {
                 self.seen_futures_boundary = true;
             }
         }
-
-        // check for errors
-        self.check_stmt(stmt, ctx);
     }
 
+    /// Check `expr` for semantic syntax errors and update the checker's internal state.
     pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
@@ -340,10 +508,15 @@ impl SemanticSyntaxChecker {
             })
             | Expr::SetComp(ast::ExprSetComp {
                 elt, generators, ..
-            })
-            | Expr::Generator(ast::ExprGenerator {
+            }) => {
+                Self::check_generator_expr(elt, generators, ctx);
+                Self::async_comprehension_outside_async_function(ctx, generators);
+            }
+            Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
-            }) => Self::check_generator_expr(elt, generators, ctx),
+            }) => {
+                Self::check_generator_expr(elt, generators, ctx);
+            }
             Expr::DictComp(ast::ExprDictComp {
                 key,
                 value,
@@ -352,6 +525,7 @@ impl SemanticSyntaxChecker {
             }) => {
                 Self::check_generator_expr(key, generators, ctx);
                 Self::check_generator_expr(value, generators, ctx);
+                Self::async_comprehension_outside_async_function(ctx, generators);
             }
             Expr::Name(ast::ExprName {
                 range,
@@ -395,7 +569,7 @@ impl SemanticSyntaxChecker {
                             }
                         }
                         _ => {}
-                    };
+                    }
                 }
 
                 // PLE0118
@@ -413,15 +587,51 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Expr::Yield(ast::ExprYield {
-                value: Some(value), ..
-            }) => {
-                // test_err single_star_yield
-                // def f(): yield *x
-                Self::invalid_star_expression(value, ctx);
+            Expr::Yield(ast::ExprYield { value, .. }) => {
+                if let Some(value) = value {
+                    // test_err single_star_yield
+                    // def f(): yield *x
+                    Self::invalid_star_expression(value, ctx);
+                }
+                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
+            }
+            Expr::YieldFrom(_) => {
+                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
+            }
+            Expr::Await(_) => {
+                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
             }
             _ => {}
         }
+    }
+
+    /// F704
+    fn yield_outside_function<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        expr: &Expr,
+        kind: YieldOutsideFunctionKind,
+    ) {
+        // We are intentionally not inspecting the async status of the scope for now to mimic F704.
+        // await-outside-async is PLE1142 instead, so we'll end up emitting both syntax errors for
+        // cases that trigger F704
+        if kind.is_await() {
+            if ctx.in_await_allowed_context() {
+                return;
+            }
+            // `await` is allowed at the top level of a Jupyter notebook.
+            // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
+            if ctx.in_module_scope() && ctx.in_notebook() {
+                return;
+            }
+        } else if ctx.in_function_scope() {
+            return;
+        }
+
+        Self::add_error(
+            ctx,
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind),
+            expr.range(),
+        );
     }
 
     /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
@@ -463,11 +673,55 @@ impl SemanticSyntaxChecker {
             );
         }
     }
-}
 
-impl Default for SemanticSyntaxChecker {
-    fn default() -> Self {
-        Self::new()
+    fn async_comprehension_outside_async_function<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        generators: &[ast::Comprehension],
+    ) {
+        let python_version = ctx.python_version();
+        if python_version >= PythonVersion::PY311 {
+            return;
+        }
+        // async allowed at notebook top-level
+        if ctx.in_notebook() && ctx.in_module_scope() {
+            return;
+        }
+        if ctx.in_async_context() && !ctx.in_sync_comprehension() {
+            return;
+        }
+        for generator in generators.iter().filter(|gen| gen.is_async) {
+            // test_ok nested_async_comprehension_py311
+            // # parse_options: {"target-version": "3.11"}
+            // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+            // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+            // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+
+            // test_ok nested_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def f():
+            //     [_ for n in range(3)]
+            //     [_ async for n in range(3)]
+            // async def f():
+            //     def g(): ...
+            //     [_ async for n in range(3)]
+
+            // test_ok all_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def test(): return [[x async for x in elements(n)] async for n in range(3)]
+
+            // test_err nested_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+            // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+            // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+            // async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
+            // async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version),
+                generator.range,
+            );
+        }
     }
 }
 
@@ -514,11 +768,34 @@ impl Display for SemanticSyntaxError {
                     write!(f, "cannot delete `__debug__` on Python {python_version} (syntax was removed in 3.9)")
                 }
             },
+            SemanticSyntaxErrorKind::InvalidExpression(kind, position) => {
+                write!(f, "{kind} cannot be used within a {position}")
+            }
+            SemanticSyntaxErrorKind::DuplicateMatchKey(key) => {
+                write!(
+                    f,
+                    "mapping pattern checks duplicate key `{}`",
+                    EscapeDefault(key)
+                )
+            }
+            SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(name) => {
+                write!(f, "attribute name `{name}` repeated in class pattern",)
+            }
             SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration { name, start: _ } => {
                 write!(f, "name `{name}` is used prior to global declaration")
             }
             SemanticSyntaxErrorKind::InvalidStarExpression => {
                 f.write_str("can't use starred expression here")
+            }
+            SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version) => {
+                write!(
+                    f,
+                    "cannot use an asynchronous comprehension outside of an asynchronous \
+                                function on Python {python_version} (syntax was added in 3.11)",
+                )
+            }
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
+                write!(f, "`{kind}` statement outside of a function")
             }
         }
     }
@@ -634,6 +911,66 @@ pub enum SemanticSyntaxErrorKind {
     /// [BPO 45000]: https://github.com/python/cpython/issues/89163
     WriteToDebug(WriteToDebugKind),
 
+    /// Represents the use of an invalid expression kind in one of several locations.
+    ///
+    /// The kinds include `yield` and `yield from` expressions and named expressions, and locations
+    /// include type parameter bounds and defaults, type annotations, type aliases, and base class
+    /// lists.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// type X[T: (yield 1)] = int
+    /// type Y = (yield 1)
+    /// def f[T](x: int) -> (y := 3): return x
+    /// ```
+    InvalidExpression(InvalidExpressionKind, InvalidExpressionPosition),
+
+    /// Represents a duplicate key in a `match` mapping pattern.
+    ///
+    /// The [CPython grammar] allows keys in mapping patterns to be literals or attribute accesses:
+    ///
+    /// ```text
+    /// key_value_pattern:
+    ///     | (literal_expr | attr) ':' pattern
+    /// ```
+    ///
+    /// But only literals are checked for duplicates:
+    ///
+    /// ```pycon
+    /// >>> match x:
+    /// ...     case {"x": 1, "x": 2}: ...
+    /// ...
+    ///   File "<python-input-160>", line 2
+    ///     case {"x": 1, "x": 2}: ...
+    ///          ^^^^^^^^^^^^^^^^
+    /// SyntaxError: mapping pattern checks duplicate key ('x')
+    /// >>> match x:
+    /// ...     case {x.a: 1, x.a: 2}: ...
+    /// ...
+    /// >>>
+    /// ```
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case {"x": 1, "x": 2}: ...
+    /// ```
+    ///
+    /// [CPython grammar]: https://docs.python.org/3/reference/grammar.html
+    DuplicateMatchKey(String),
+
+    /// Represents a duplicate attribute name in a `match` class pattern.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case Class(x=1, x=2): ...
+    /// ```
+    DuplicateMatchClassAttribute(ast::name::Name),
+
     /// Represents the use of a `global` variable before its `global` declaration.
     ///
     /// ## Examples
@@ -645,6 +982,43 @@ pub enum SemanticSyntaxErrorKind {
     ///     global counter
     ///     counter += 1
     /// ```
+    ///
+    /// ## Known Issues
+    ///
+    /// Note that the order in which the parts of a `try` statement are visited was changed in 3.13,
+    /// as tracked in Python issue [#111123]. For example, this code was valid on Python 3.12:
+    ///
+    /// ```python
+    /// a = 10
+    /// def g():
+    ///     try:
+    ///         1 / 0
+    ///     except:
+    ///         a = 1
+    ///     else:
+    ///         global a
+    /// ```
+    ///
+    /// While this more intuitive behavior aligned with the textual order was a syntax error:
+    ///
+    /// ```python
+    /// a = 10
+    /// def f():
+    ///     try:
+    ///         pass
+    ///     except:
+    ///         global a
+    ///     else:
+    ///         a = 1  # SyntaxError: name 'a' is assigned to before global declaration
+    /// ```
+    ///
+    /// This was reversed in version 3.13 to make the second case valid and the first case a syntax
+    /// error. We intentionally enforce the 3.13 ordering, regardless of the Python version, which
+    /// will lead to both false positives and false negatives on 3.12 code that takes advantage of
+    /// the old behavior. However, as mentioned in the Python issue, we expect code relying on this
+    /// to be very rare and not worth the additional complexity to detect.
+    ///
+    /// [#111123]: https://github.com/python/cpython/issues/111123
     LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
@@ -659,6 +1033,130 @@ pub enum SemanticSyntaxErrorKind {
     /// for *x in xs: ...
     /// ```
     InvalidStarExpression,
+
+    /// Represents the use of an asynchronous comprehension inside of a synchronous comprehension
+    /// before Python 3.11.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.11, code like this produces a syntax error because of the implicit function
+    /// scope introduced by the outer comprehension:
+    ///
+    /// ```python
+    /// async def elements(n): yield n
+    ///
+    /// async def test(): return { n: [x async for x in elements(n)] for n in range(3)}
+    /// ```
+    ///
+    /// This was discussed in [BPO 33346] and fixed in Python 3.11.
+    ///
+    /// [BPO 33346]: https://github.com/python/cpython/issues/77527
+    AsyncComprehensionOutsideAsyncFunction(PythonVersion),
+
+    /// Represents the use of `yield`, `yield from`, or `await` outside of a function scope.
+    ///
+    ///
+    /// ## Examples
+    ///
+    /// `yield` and `yield from` are only allowed if the immediately-enclosing scope is a function
+    /// or lambda and not allowed otherwise:
+    ///
+    /// ```python
+    /// yield 1  # error
+    ///
+    /// def f():
+    ///     [(yield 1) for x in y]  # error
+    /// ```
+    ///
+    /// `await` is additionally allowed in comprehensions, if the comprehension itself is in a
+    /// function scope:
+    ///
+    /// ```python
+    /// await 1  # error
+    ///
+    /// async def f():
+    ///     await 1  # okay
+    ///     [await 1 for x in y]  # also okay
+    /// ```
+    ///
+    /// This last case _is_ an error, but it has to do with the lambda not being an async function.
+    /// For the sake of this error kind, this is okay.
+    ///
+    /// ## References
+    ///
+    /// See [PEP 255] for details on `yield`, [PEP 380] for the extension to `yield from`, [PEP 492]
+    /// for async-await syntax, and [PEP 530] for async comprehensions.
+    ///
+    /// [PEP 255]: https://peps.python.org/pep-0255/
+    /// [PEP 380]: https://peps.python.org/pep-0380/
+    /// [PEP 492]: https://peps.python.org/pep-0492/
+    /// [PEP 530]: https://peps.python.org/pep-0530/
+    YieldOutsideFunction(YieldOutsideFunctionKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YieldOutsideFunctionKind {
+    Yield,
+    YieldFrom,
+    Await,
+}
+
+impl YieldOutsideFunctionKind {
+    pub fn is_await(&self) -> bool {
+        matches!(self, Self::Await)
+    }
+}
+
+impl Display for YieldOutsideFunctionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            YieldOutsideFunctionKind::Yield => "yield",
+            YieldOutsideFunctionKind::YieldFrom => "yield from",
+            YieldOutsideFunctionKind::Await => "await",
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InvalidExpressionPosition {
+    TypeVarBound,
+    TypeVarDefault,
+    TypeVarTupleDefault,
+    ParamSpecDefault,
+    TypeAnnotation,
+    GenericDefinition,
+    TypeAlias,
+}
+
+impl Display for InvalidExpressionPosition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            InvalidExpressionPosition::TypeVarBound => "TypeVar bound",
+            InvalidExpressionPosition::TypeVarDefault => "TypeVar default",
+            InvalidExpressionPosition::TypeVarTupleDefault => "TypeVarTuple default",
+            InvalidExpressionPosition::ParamSpecDefault => "ParamSpec default",
+            InvalidExpressionPosition::TypeAnnotation => "type annotation",
+            InvalidExpressionPosition::GenericDefinition => "generic definition",
+            InvalidExpressionPosition::TypeAlias => "type alias",
+        })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum InvalidExpressionKind {
+    Yield,
+    NamedExpr,
+    Await,
+}
+
+impl Display for InvalidExpressionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            InvalidExpressionKind::Yield => "yield expression",
+            InvalidExpressionKind::NamedExpr => "named expression",
+            InvalidExpressionKind::Await => "await expression",
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -685,19 +1183,23 @@ impl Visitor<'_> for ReboundComprehensionVisitor<'_> {
                 }) {
                     self.rebound_variables.push(*range);
                 }
-            };
+            }
         }
         walk_expr(self, expr);
     }
 }
 
-struct MultipleCaseAssignmentVisitor<'a, Ctx> {
+struct MatchPatternVisitor<'a, Ctx> {
     names: FxHashSet<&'a ast::name::Name>,
     ctx: &'a Ctx,
 }
 
-impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
+impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
     fn visit_pattern(&mut self, pattern: &'a Pattern) {
+        // test_ok class_keyword_in_case_pattern
+        // match 2:
+        //     case Class(x=x): ...
+
         // test_err multiple_assignment_in_case_pattern
         // match 2:
         //     case [y, z, y]: ...  # MatchSequence
@@ -706,8 +1208,8 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
         //     case {1: x, 2: x}: ...  # MatchMapping duplicate pattern
         //     case {1: x, **x}: ...  # MatchMapping duplicate in **rest
         //     case Class(x, x): ...  # MatchClass positional
-        //     case Class(x=1, x=2): ...  # MatchClass keyword
-        //     case [x] | {1: x} | Class(x=1, x=2): ...  # MatchOr
+        //     case Class(y=x, z=x): ...  # MatchClass keyword
+        //     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
         //     case x as x: ...  # MatchAs
         match pattern {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
@@ -721,20 +1223,87 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
                     self.visit_pattern(pattern);
                 }
             }
-            Pattern::MatchMapping(ast::PatternMatchMapping { patterns, rest, .. }) => {
+            Pattern::MatchMapping(ast::PatternMatchMapping {
+                keys,
+                patterns,
+                rest,
+                ..
+            }) => {
                 for pattern in patterns {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
                     self.insert(rest);
                 }
+
+                let mut seen = FxHashSet::default();
+                for key in keys
+                    .iter()
+                    // complex numbers (`1 + 2j`) are allowed as keys but are not literals
+                    // because they are represented as a `BinOp::Add` between a real number and
+                    // an imaginary number
+                    .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
+                {
+                    if !seen.insert(ComparableExpr::from(key)) {
+                        let key_range = key.range();
+                        let duplicate_key = self.ctx.source()[key_range].to_string();
+                        // test_ok duplicate_match_key_attr
+                        // match x:
+                        //     case {x.a: 1, x.a: 2}: ...
+
+                        // test_err duplicate_match_key
+                        // match x:
+                        //     case {"x": 1, "x": 2}: ...
+                        //     case {b"x": 1, b"x": 2}: ...
+                        //     case {0: 1, 0: 2}: ...
+                        //     case {1.0: 1, 1.0: 2}: ...
+                        //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
+                        //     case {True: 1, True: 2}: ...
+                        //     case {None: 1, None: 2}: ...
+                        //     case {
+                        //     """x
+                        //     y
+                        //     z
+                        //     """: 1,
+                        //     """x
+                        //     y
+                        //     z
+                        //     """: 2}: ...
+                        //     case {"x": 1, "x": 2, "x": 3}: ...
+                        //     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+                        //     case [{"x": 1, "x": 2}]: ...
+                        //     case Foo(x=1, y={"x": 1, "x": 2}): ...
+                        //     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::DuplicateMatchKey(duplicate_key),
+                            key_range,
+                        );
+                    }
+                }
             }
             Pattern::MatchClass(ast::PatternMatchClass { arguments, .. }) => {
                 for pattern in &arguments.patterns {
                     self.visit_pattern(pattern);
                 }
+                let mut seen = FxHashSet::default();
                 for keyword in &arguments.keywords {
-                    self.insert(&keyword.attr);
+                    if !seen.insert(&keyword.attr.id) {
+                        // test_err duplicate_match_class_attr
+                        // match x:
+                        //     case Class(x=1, x=2): ...
+                        //     case [Class(x=1, x=2)]: ...
+                        //     case {"x": x, "y": Foo(x=1, x=2)}: ...
+                        //     case [{}, {"x": x, "y": Foo(x=1, x=2)}]: ...
+                        //     case Class(x=1, d={"x": 1, "x": 2}, other=Class(x=1, x=2)): ...
+                        SemanticSyntaxChecker::add_error(
+                            self.ctx,
+                            SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(
+                                keyword.attr.id.clone(),
+                            ),
+                            keyword.attr.range,
+                        );
+                    }
                     self.visit_pattern(&keyword.pattern);
                 }
             }
@@ -782,49 +1351,192 @@ impl<'a, Ctx: SemanticSyntaxContext> MultipleCaseAssignmentVisitor<'a, Ctx> {
     }
 }
 
+struct InvalidExpressionVisitor<'a, Ctx> {
+    /// Context used for emitting errors.
+    ctx: &'a Ctx,
+
+    position: InvalidExpressionPosition,
+}
+
+impl<Ctx> Visitor<'_> for InvalidExpressionVisitor<'_, Ctx>
+where
+    Ctx: SemanticSyntaxContext,
+{
+    fn visit_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Named(ast::ExprNamed { range, .. }) => {
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::InvalidExpression(
+                        InvalidExpressionKind::NamedExpr,
+                        self.position,
+                    ),
+                    *range,
+                );
+            }
+            Expr::Yield(ast::ExprYield { range, .. })
+            | Expr::YieldFrom(ast::ExprYieldFrom { range, .. }) => {
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::InvalidExpression(
+                        InvalidExpressionKind::Yield,
+                        self.position,
+                    ),
+                    *range,
+                );
+            }
+            Expr::Await(ast::ExprAwait { range, .. }) => {
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::InvalidExpression(
+                        InvalidExpressionKind::Await,
+                        self.position,
+                    ),
+                    *range,
+                );
+            }
+            _ => {}
+        }
+        ast::visitor::walk_expr(self, expr);
+    }
+
+    fn visit_type_param(&mut self, type_param: &ast::TypeParam) {
+        match type_param {
+            ast::TypeParam::TypeVar(ast::TypeParamTypeVar { bound, default, .. }) => {
+                if let Some(expr) = bound {
+                    self.position = InvalidExpressionPosition::TypeVarBound;
+                    self.visit_expr(expr);
+                }
+                if let Some(expr) = default {
+                    self.position = InvalidExpressionPosition::TypeVarDefault;
+                    self.visit_expr(expr);
+                }
+            }
+            ast::TypeParam::TypeVarTuple(ast::TypeParamTypeVarTuple { default, .. }) => {
+                if let Some(expr) = default {
+                    self.position = InvalidExpressionPosition::TypeVarTupleDefault;
+                    self.visit_expr(expr);
+                }
+            }
+            ast::TypeParam::ParamSpec(ast::TypeParamParamSpec { default, .. }) => {
+                if let Some(expr) = default {
+                    self.position = InvalidExpressionPosition::ParamSpecDefault;
+                    self.visit_expr(expr);
+                }
+            }
+        }
+    }
+}
+
+/// Information needed from a parent visitor to emit semantic syntax errors.
+///
+/// Note that the `in_*_scope` methods should refer to the immediately-enclosing scope. For example,
+/// `in_function_scope` should return true for this case:
+///
+/// ```python
+/// def f():
+///     x  # here
+/// ```
+///
+/// but not for this case:
+///
+/// ```python
+/// def f():
+///     class C:
+///         x  # here
+/// ```
+///
+/// In contrast, the `in_*_context` methods should traverse parent scopes. For example,
+/// `in_function_context` should return true for this case:
+///
+/// ```python
+/// def f():
+///     [x  # here
+///         for x in range(3)]
+/// ```
+///
+/// but not here:
+///
+/// ```python
+/// def f():
+///     class C:
+///         x  # here, classes break function scopes
+/// ```
 pub trait SemanticSyntaxContext {
     /// Returns `true` if a module's docstring boundary has been passed.
     fn seen_docstring_boundary(&self) -> bool;
 
+    /// Returns `true` if `__future__`-style type annotations are enabled.
+    fn future_annotations_or_stub(&self) -> bool;
+
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
+
+    /// Returns the source text under analysis.
+    fn source(&self) -> &str;
 
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
 
+    /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
+    fn in_async_context(&self) -> bool;
+
+    /// Returns `true` if the visitor is currently in a context where the `await` keyword is
+    /// allowed.
+    ///
+    /// Note that this is method is primarily used to report `YieldOutsideFunction` errors for
+    /// `await` outside function scopes, irrespective of their async status. As such, this differs
+    /// from `in_async_context` in two ways:
+    ///
+    /// 1. `await` is allowed in a lambda, despite it not being async
+    /// 2. `await` is allowed in any function, regardless of its async status
+    ///
+    /// In short, only nested class definitions should cause this method to return `false`, for
+    /// example:
+    ///
+    /// ```python
+    /// def f():
+    ///     await 1  # okay, in a function
+    ///     class C:
+    ///         await 1  # error
+    /// ```
+    ///
+    /// See the trait-level documentation for more details.
+    fn in_await_allowed_context(&self) -> bool;
+
+    /// Returns `true` if the visitor is currently inside of a synchronous comprehension.
+    ///
+    /// This method is necessary because `in_async_context` only checks for the nearest, enclosing
+    /// function to determine the (a)sync context. Instead, this method will search all enclosing
+    /// scopes until it finds a sync comprehension. As a result, the two methods will typically be
+    /// used together.
+    fn in_sync_comprehension(&self) -> bool;
+
+    /// Returns `true` if the visitor is at the top-level module scope.
+    fn in_module_scope(&self) -> bool;
+
+    /// Returns `true` if the visitor is in a function scope.
+    fn in_function_scope(&self) -> bool;
+
+    /// Returns `true` if the source file is a Jupyter notebook.
+    fn in_notebook(&self) -> bool;
+
     fn report_semantic_error(&self, error: SemanticSyntaxError);
 }
 
-#[derive(Default)]
-pub struct SemanticSyntaxCheckerVisitor<Ctx> {
-    checker: SemanticSyntaxChecker,
-    context: Ctx,
-}
+/// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.
+struct EscapeDefault<'a>(&'a str);
 
-impl<Ctx> SemanticSyntaxCheckerVisitor<Ctx> {
-    pub fn new(context: Ctx) -> Self {
-        Self {
-            checker: SemanticSyntaxChecker::new(),
-            context,
+impl Display for EscapeDefault<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use std::fmt::Write;
+
+        for c in self.0.chars() {
+            match c {
+                '\'' | '\"' => f.write_char(c)?,
+                _ => write!(f, "{}", c.escape_default())?,
+            }
         }
-    }
-
-    pub fn into_context(self) -> Ctx {
-        self.context
-    }
-}
-
-impl<Ctx> Visitor<'_> for SemanticSyntaxCheckerVisitor<Ctx>
-where
-    Ctx: SemanticSyntaxContext,
-{
-    fn visit_stmt(&mut self, stmt: &'_ Stmt) {
-        self.checker.visit_stmt(stmt, &self.context);
-        ruff_python_ast::visitor::walk_stmt(self, stmt);
-    }
-
-    fn visit_expr(&mut self, expr: &'_ Expr) {
-        self.checker.visit_expr(expr, &self.context);
-        ruff_python_ast::visitor::walk_expr(self, expr);
+        Ok(())
     }
 }

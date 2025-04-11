@@ -1,14 +1,11 @@
 use std::fmt;
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::Expr;
-use ruff_text_size::Ranged;
-
-use crate::checkers::ast::Checker;
+use ruff_python_parser::semantic_errors::YieldOutsideFunctionKind;
 
 #[derive(Debug, PartialEq, Eq)]
-enum DeferralKeyword {
+pub(crate) enum DeferralKeyword {
     Yield,
     YieldFrom,
     Await,
@@ -20,6 +17,16 @@ impl fmt::Display for DeferralKeyword {
             DeferralKeyword::Yield => fmt.write_str("yield"),
             DeferralKeyword::YieldFrom => fmt.write_str("yield from"),
             DeferralKeyword::Await => fmt.write_str("await"),
+        }
+    }
+}
+
+impl From<YieldOutsideFunctionKind> for DeferralKeyword {
+    fn from(value: YieldOutsideFunctionKind) -> Self {
+        match value {
+            YieldOutsideFunctionKind::Yield => Self::Yield,
+            YieldOutsideFunctionKind::YieldFrom => Self::YieldFrom,
+            YieldOutsideFunctionKind::Await => Self::Await,
         }
     }
 }
@@ -50,37 +57,18 @@ pub(crate) struct YieldOutsideFunction {
     keyword: DeferralKeyword,
 }
 
+impl YieldOutsideFunction {
+    pub(crate) fn new(keyword: impl Into<DeferralKeyword>) -> Self {
+        Self {
+            keyword: keyword.into(),
+        }
+    }
+}
+
 impl Violation for YieldOutsideFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         let YieldOutsideFunction { keyword } = self;
         format!("`{keyword}` statement outside of a function")
-    }
-}
-
-/// F704
-pub(crate) fn yield_outside_function(checker: &Checker, expr: &Expr) {
-    let scope = checker.semantic().current_scope();
-    if scope.kind.is_module() || scope.kind.is_class() {
-        let keyword = match expr {
-            Expr::Yield(_) => DeferralKeyword::Yield,
-            Expr::YieldFrom(_) => DeferralKeyword::YieldFrom,
-            Expr::Await(_) => DeferralKeyword::Await,
-            _ => return,
-        };
-
-        // `await` is allowed at the top level of a Jupyter notebook.
-        // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
-        if scope.kind.is_module()
-            && checker.source_type.is_ipynb()
-            && keyword == DeferralKeyword::Await
-        {
-            return;
-        }
-
-        checker.report_diagnostic(Diagnostic::new(
-            YieldOutsideFunction { keyword },
-            expr.range(),
-        ));
     }
 }

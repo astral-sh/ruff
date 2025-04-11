@@ -14,10 +14,10 @@ PYI026.pyi:3:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 
 ℹ Safe fix
 1 1 | from typing import Literal, Any
-  2 |+import typing_extensions
+  2 |+from typing_extensions import TypeAlias
 2 3 | 
 3   |-NewAny = Any
-  4 |+NewAny: typing_extensions.TypeAlias = Any
+  4 |+NewAny: TypeAlias = Any
 4 5 | OptionalStr = typing.Optional[str]
 5 6 | Foo = Literal["foo"]
 6 7 | IntOrStr = int | str
@@ -34,11 +34,11 @@ PYI026.pyi:4:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 
 ℹ Safe fix
 1 1 | from typing import Literal, Any
-  2 |+import typing_extensions
+  2 |+from typing_extensions import TypeAlias
 2 3 | 
 3 4 | NewAny = Any
 4   |-OptionalStr = typing.Optional[str]
-  5 |+OptionalStr: typing_extensions.TypeAlias = typing.Optional[str]
+  5 |+OptionalStr: TypeAlias = typing.Optional[str]
 5 6 | Foo = Literal["foo"]
 6 7 | IntOrStr = int | str
 7 8 | AliasNone = None
@@ -56,12 +56,12 @@ PYI026.pyi:5:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 
 ℹ Safe fix
 1 1 | from typing import Literal, Any
-  2 |+import typing_extensions
+  2 |+from typing_extensions import TypeAlias
 2 3 | 
 3 4 | NewAny = Any
 4 5 | OptionalStr = typing.Optional[str]
 5   |-Foo = Literal["foo"]
-  6 |+Foo: typing_extensions.TypeAlias = Literal["foo"]
+  6 |+Foo: TypeAlias = Literal["foo"]
 6 7 | IntOrStr = int | str
 7 8 | AliasNone = None
 8 9 | 
@@ -78,13 +78,13 @@ PYI026.pyi:6:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 
 ℹ Safe fix
 1 1 | from typing import Literal, Any
-  2 |+import typing_extensions
+  2 |+from typing_extensions import TypeAlias
 2 3 | 
 3 4 | NewAny = Any
 4 5 | OptionalStr = typing.Optional[str]
 5 6 | Foo = Literal["foo"]
 6   |-IntOrStr = int | str
-  7 |+IntOrStr: typing_extensions.TypeAlias = int | str
+  7 |+IntOrStr: TypeAlias = int | str
 7 8 | AliasNone = None
 8 9 | 
 9 10 | NewAny: typing.TypeAlias = Any
@@ -102,14 +102,14 @@ PYI026.pyi:7:1: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.g
 
 ℹ Safe fix
 1 1 | from typing import Literal, Any
-  2 |+import typing_extensions
+  2 |+from typing_extensions import TypeAlias
 2 3 | 
 3 4 | NewAny = Any
 4 5 | OptionalStr = typing.Optional[str]
 5 6 | Foo = Literal["foo"]
 6 7 | IntOrStr = int | str
 7   |-AliasNone = None
-  8 |+AliasNone: typing_extensions.TypeAlias = None
+  8 |+AliasNone: TypeAlias = None
 8 9 | 
 9 10 | NewAny: typing.TypeAlias = Any
 10 11 | OptionalStr: TypeAlias = typing.Optional[str]
@@ -126,7 +126,7 @@ PYI026.pyi:17:5: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.
 
 ℹ Safe fix
 1  1  | from typing import Literal, Any
-   2  |+import typing_extensions
+   2  |+from typing_extensions import TypeAlias
 2  3  | 
 3  4  | NewAny = Any
 4  5  | OptionalStr = typing.Optional[str]
@@ -135,7 +135,7 @@ PYI026.pyi:17:5: PYI026 [*] Use `typing_extensions.TypeAlias` for type alias, e.
 15 16 | 
 16 17 | class NotAnEnum:
 17    |-    FLAG_THIS = None
-   18 |+    FLAG_THIS: typing_extensions.TypeAlias = None
+   18 |+    FLAG_THIS: TypeAlias = None
 18 19 | 
 19 20 | # these are ok
 20 21 | from enum import Enum

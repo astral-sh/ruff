@@ -20,18 +20,23 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
     let id = req.id.clone();
 
     match req.method.as_str() {
-        request::DocumentDiagnosticRequestHandler::METHOD => {
-            background_request_task::<request::DocumentDiagnosticRequestHandler>(
-                req,
-                BackgroundSchedule::LatencySensitive,
-            )
+        request::DocumentDiagnosticRequestHandler::METHOD => background_request_task::<
+            request::DocumentDiagnosticRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        request::GotoTypeDefinitionRequestHandler::METHOD => background_request_task::<
+            request::GotoTypeDefinitionRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        request::HoverRequestHandler::METHOD => {
+            background_request_task::<request::HoverRequestHandler>(req, BackgroundSchedule::Worker)
         }
-        request::GotoTypeDefinitionRequestHandler::METHOD => {
-            background_request_task::<request::GotoTypeDefinitionRequestHandler>(
-                req,
-                BackgroundSchedule::LatencySensitive,
-            )
-        }
+        request::InlayHintRequestHandler::METHOD => background_request_task::<
+            request::InlayHintRequestHandler,
+        >(req, BackgroundSchedule::Worker),
+
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
             return Task::nothing();

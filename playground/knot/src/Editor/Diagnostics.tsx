@@ -1,11 +1,10 @@
-import { Diagnostic, Workspace } from "red_knot_wasm";
+import type { Severity, Range, TextRange } from "red_knot_wasm";
 import classNames from "classnames";
 import { Theme } from "shared";
 import { useMemo } from "react";
 
 interface Props {
   diagnostics: Diagnostic[];
-  workspace: Workspace;
   theme: Theme;
 
   onGoTo(line: number, column: number): void;
@@ -13,14 +12,13 @@ interface Props {
 
 export default function Diagnostics({
   diagnostics: unsorted,
-  workspace,
   theme,
   onGoTo,
 }: Props) {
   const diagnostics = useMemo(() => {
     const sorted = [...unsorted];
     sorted.sort((a, b) => {
-      return (a.textRange()?.start ?? 0) - (b.textRange()?.start ?? 0);
+      return (a.textRange?.start ?? 0) - (b.textRange?.start ?? 0);
     });
 
     return sorted;
@@ -43,11 +41,7 @@ export default function Diagnostics({
       </div>
 
       <div className="flex grow p-2 overflow-hidden">
-        <Items
-          diagnostics={diagnostics}
-          onGoTo={onGoTo}
-          workspace={workspace}
-        />
+        <Items diagnostics={diagnostics} onGoTo={onGoTo} />
       </div>
     </div>
   );
@@ -56,10 +50,8 @@ export default function Diagnostics({
 function Items({
   diagnostics,
   onGoTo,
-  workspace,
 }: {
   diagnostics: Array<Diagnostic>;
-  workspace: Workspace;
   onGoTo(line: number, column: number): void;
 }) {
   if (diagnostics.length === 0) {
@@ -70,23 +62,30 @@ function Items({
     );
   }
 
+  const uniqueIds: Map<string, number> = new Map();
+
   return (
     <ul className="space-y-0.5 grow overflow-y-scroll">
-      {diagnostics.map((diagnostic, index) => {
-        const position = diagnostic.toRange(workspace);
+      {diagnostics.map((diagnostic) => {
+        const position = diagnostic.range;
         const start = position?.start;
-        const id = diagnostic.id();
+        const id = diagnostic.id;
 
         const startLine = start?.line ?? 1;
         const startColumn = start?.column ?? 1;
 
+        const mostlyUniqueId = `${startLine}:${startColumn}-${id}`;
+
+        const disambiguator = uniqueIds.get(mostlyUniqueId) ?? 0;
+        uniqueIds.set(mostlyUniqueId, disambiguator + 1);
+
         return (
-          <li key={`${startLine}:${startColumn}-${id ?? index}`}>
+          <li key={`${mostlyUniqueId}-${disambiguator}`}>
             <button
               onClick={() => onGoTo(startLine, startColumn)}
               className="w-full text-start cursor-pointer select-text"
             >
-              {diagnostic.message()}
+              {diagnostic.message}
               <span className="text-gray-500">
                 {id != null && ` (${id})`} [Ln {startLine}, Col {startColumn}]
               </span>
@@ -96,4 +95,12 @@ function Items({
       })}
     </ul>
   );
+}
+
+export interface Diagnostic {
+  id: string;
+  message: string;
+  severity: Severity;
+  range: Range | null;
+  textRange: TextRange | null;
 }

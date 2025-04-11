@@ -208,7 +208,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
             fixed,
             call.range(),
         )));
-    };
+    }
 
     checker.report_diagnostic(diagnostic);
 }

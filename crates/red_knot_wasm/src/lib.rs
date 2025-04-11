@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use red_knot_ide::goto_type_definition;
+use red_knot_ide::{goto_type_definition, hover, inlay_hints, MarkupKind};
 use red_knot_project::metadata::options::Options;
 use red_knot_project::metadata::value::ValueSource;
 use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
@@ -18,8 +18,9 @@ use ruff_db::system::{
 };
 use ruff_db::Upcast;
 use ruff_notebook::Notebook;
+use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextSize};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(start)]
@@ -142,7 +143,11 @@ impl Workspace {
     }
 
     #[wasm_bindgen(js_name = "closeFile")]
-    pub fn close_file(&mut self, file_id: &FileHandle) -> Result<(), Error> {
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "It's intentional that the file handle is consumed because it is no longer valid after closing"
+    )]
+    pub fn close_file(&mut self, file_id: FileHandle) -> Result<(), Error> {
         let file = file_id.file;
 
         self.db.project().close_file(&mut self.db, file);
@@ -184,6 +189,10 @@ impl Workspace {
         Ok(format!("{:#?}", parsed.syntax()))
     }
 
+    pub fn format(&self, file_id: &FileHandle) -> Result<Option<String>, Error> {
+        formatted_file(&self.db, file_id.file).map_err(into_error)
+    }
+
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
         let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file);
@@ -207,17 +216,7 @@ impl Workspace {
         let source = source_text(&self.db, file_id.file);
         let index = line_index(&self.db, file_id.file);
 
-        let offset = index.offset(
-            OneIndexed::new(position.line).ok_or_else(|| {
-                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
-            })?,
-            OneIndexed::new(position.column).ok_or_else(|| {
-                Error::new(
-                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
-                )
-            })?,
-            &source,
-        );
+        let offset = position.to_text_size(&source, &index)?;
 
         let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
             return Ok(Vec::new());
@@ -242,6 +241,47 @@ impl Workspace {
             .collect();
 
         Ok(links)
+    }
+
+    #[wasm_bindgen]
+    pub fn hover(&self, file_id: &FileHandle, position: Position) -> Result<Option<Hover>, Error> {
+        let source = source_text(&self.db, file_id.file);
+        let index = line_index(&self.db, file_id.file);
+
+        let offset = position.to_text_size(&source, &index)?;
+
+        let Some(range_info) = hover(&self.db, file_id.file, offset) else {
+            return Ok(None);
+        };
+
+        let source_range = Range::from_text_range(range_info.file_range().range(), &index, &source);
+
+        Ok(Some(Hover {
+            markdown: range_info
+                .display(&self.db, MarkupKind::Markdown)
+                .to_string(),
+            range: source_range,
+        }))
+    }
+
+    #[wasm_bindgen(js_name = "inlayHints")]
+    pub fn inlay_hints(&self, file_id: &FileHandle, range: Range) -> Result<Vec<InlayHint>, Error> {
+        let index = line_index(&self.db, file_id.file);
+        let source = source_text(&self.db, file_id.file);
+
+        let result = inlay_hints(
+            &self.db,
+            file_id.file,
+            range.to_text_range(&index, &source)?,
+        );
+
+        Ok(result
+            .into_iter()
+            .map(|hint| InlayHint {
+                markdown: hint.display(&self.db).to_string(),
+                position: Position::from_text_size(hint.position, &index, &source),
+            })
+            .collect())
     }
 }
 
@@ -329,16 +369,20 @@ pub struct Range {
     pub end: Position,
 }
 
+#[wasm_bindgen]
 impl Range {
-    fn from_file_range(db: &dyn Db, range: FileRange) -> Self {
-        let index = line_index(db.upcast(), range.file());
-        let source = source_text(db.upcast(), range.file());
+    #[wasm_bindgen(constructor)]
+    pub fn new(start: Position, end: Position) -> Self {
+        Self { start, end }
+    }
+}
 
-        let text_range = range.range();
+impl Range {
+    fn from_file_range(db: &dyn Db, file_range: FileRange) -> Self {
+        let index = line_index(db.upcast(), file_range.file());
+        let source = source_text(db.upcast(), file_range.file());
 
-        let start = index.source_location(text_range.start(), &source);
-        let end = index.source_location(text_range.end(), &source);
-        Self::from((start, end))
+        Self::from_text_range(file_range.range(), &index, &source)
     }
 
     fn from_text_range(
@@ -346,9 +390,21 @@ impl Range {
         line_index: &LineIndex,
         source: &str,
     ) -> Self {
-        let start = line_index.source_location(text_range.start(), source);
-        let end = line_index.source_location(text_range.end(), source);
-        Self::from((start, end))
+        Self {
+            start: Position::from_text_size(text_range.start(), line_index, source),
+            end: Position::from_text_size(text_range.end(), line_index, source),
+        }
+    }
+
+    fn to_text_range(
+        self,
+        line_index: &LineIndex,
+        source: &str,
+    ) -> Result<ruff_text_size::TextRange, Error> {
+        let start = self.start.to_text_size(source, line_index)?;
+        let end = self.end.to_text_size(source, line_index)?;
+
+        Ok(ruff_text_size::TextRange::new(start, end))
     }
 }
 
@@ -379,6 +435,28 @@ impl Position {
     }
 }
 
+impl Position {
+    fn to_text_size(self, text: &str, index: &LineIndex) -> Result<TextSize, Error> {
+        let text_size = index.offset(
+            OneIndexed::new(self.line).ok_or_else(|| {
+                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
+            })?,
+            OneIndexed::new(self.column).ok_or_else(|| {
+                Error::new(
+                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                )
+            })?,
+            text,
+        );
+
+        Ok(text_size)
+    }
+
+    fn from_text_size(offset: TextSize, line_index: &LineIndex, source: &str) -> Self {
+        line_index.source_location(offset, source).into()
+    }
+}
+
 impl From<SourceLocation> for Position {
     fn from(location: SourceLocation) -> Self {
         Self {
@@ -397,13 +475,13 @@ pub enum Severity {
     Fatal,
 }
 
-impl From<ruff_db::diagnostic::Severity> for Severity {
-    fn from(value: ruff_db::diagnostic::Severity) -> Self {
+impl From<diagnostic::Severity> for Severity {
+    fn from(value: diagnostic::Severity) -> Self {
         match value {
-            ruff_db::diagnostic::Severity::Info => Self::Info,
-            ruff_db::diagnostic::Severity::Warning => Self::Warning,
-            ruff_db::diagnostic::Severity::Error => Self::Error,
-            ruff_db::diagnostic::Severity::Fatal => Self::Fatal,
+            diagnostic::Severity::Info => Self::Info,
+            diagnostic::Severity::Warning => Self::Warning,
+            diagnostic::Severity::Error => Self::Error,
+            diagnostic::Severity::Fatal => Self::Fatal,
         }
     }
 }
@@ -435,6 +513,22 @@ pub struct LocationLink {
     pub selection_range: Option<Range>,
     /// The range of the origin.
     pub origin_selection_range: Option<Range>,
+}
+
+#[wasm_bindgen]
+pub struct Hover {
+    #[wasm_bindgen(getter_with_clone)]
+    pub markdown: String,
+
+    pub range: Range,
+}
+
+#[wasm_bindgen]
+pub struct InlayHint {
+    #[wasm_bindgen(getter_with_clone)]
+    pub markdown: String,
+
+    pub position: Position,
 }
 
 #[derive(Debug, Clone)]

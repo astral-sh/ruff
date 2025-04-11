@@ -26,7 +26,7 @@ pub(crate) mod tests {
     use anyhow::Context;
     use ruff_db::files::{File, Files};
     use ruff_db::system::{
-        DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
+        DbWithTestSystem, DbWithWritableSystem as _, System, SystemPath, SystemPathBuf, TestSystem,
     };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
@@ -139,8 +139,6 @@ pub(crate) mod tests {
         python_version: PythonVersion,
         /// Target Python platform
         python_platform: PythonPlatform,
-        /// Path to a custom typeshed directory
-        custom_typeshed: Option<SystemPathBuf>,
         /// Path and content pairs for files that should be present
         files: Vec<(&'a str, &'a str)>,
     }
@@ -150,7 +148,6 @@ pub(crate) mod tests {
             Self {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
-                custom_typeshed: None,
                 files: vec![],
             }
         }
@@ -160,8 +157,12 @@ pub(crate) mod tests {
             self
         }
 
-        pub(crate) fn with_file(mut self, path: &'a str, content: &'a str) -> Self {
-            self.files.push((path, content));
+        pub(crate) fn with_file(
+            mut self,
+            path: &'a (impl AsRef<SystemPath> + ?Sized),
+            content: &'a str,
+        ) -> Self {
+            self.files.push((path.as_ref().as_str(), content));
             self
         }
 
@@ -174,15 +175,12 @@ pub(crate) mod tests {
             db.write_files(self.files)
                 .context("Failed to write test files")?;
 
-            let mut search_paths = SearchPathSettings::new(vec![src_root]);
-            search_paths.custom_typeshed = self.custom_typeshed;
-
             Program::from_settings(
                 &db,
                 ProgramSettings {
                     python_version: self.python_version,
                     python_platform: self.python_platform,
-                    search_paths,
+                    search_paths: SearchPathSettings::new(vec![src_root]),
                 },
             )
             .context("Failed to configure Program settings")?;

@@ -199,6 +199,7 @@ impl NotebookDocument {
     }
 
     /// Get the URI for a cell by its index within the cell array.
+    #[expect(dead_code)]
     pub(crate) fn cell_uri_by_index(&self, index: CellId) -> Option<&lsp_types::Url> {
         self.cells.get(index).map(|cell| &cell.url)
     }

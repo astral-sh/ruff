@@ -102,6 +102,19 @@ impl Expr {
 }
 
 impl ExprRef<'_> {
+    /// See [`Expr::is_literal_expr`].
+    pub fn is_literal_expr(&self) -> bool {
+        matches!(
+            self,
+            ExprRef::StringLiteral(_)
+                | ExprRef::BytesLiteral(_)
+                | ExprRef::NumberLiteral(_)
+                | ExprRef::BooleanLiteral(_)
+                | ExprRef::NoneLiteral(_)
+                | ExprRef::EllipsisLiteral(_)
+        )
+    }
+
     pub fn precedence(&self) -> OperatorPrecedence {
         OperatorPrecedence::from(self)
     }
@@ -1522,7 +1535,7 @@ impl BytesLiteralFlags {
                 self.0
                     .set(BytesLiteralFlagsInner::R_PREFIX_LOWER, !uppercase_r);
             }
-        };
+        }
         self
     }
 
@@ -1749,7 +1762,7 @@ impl AnyStringFlags {
         match quotes {
             Quote::Double => self.0 |= AnyStringFlagsInner::DOUBLE,
             Quote::Single => self.0 -= AnyStringFlagsInner::DOUBLE,
-        };
+        }
         self
     }
 

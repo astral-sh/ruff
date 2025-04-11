@@ -107,8 +107,7 @@ def good_return[T: int](x: T) -> T:
     return x
 
 def bad_return[T: int](x: T) -> T:
-    # TODO: error: int is not assignable to T
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T` and `Literal[1]`"
+    # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `int`"
     return x + 1
 ```
 
@@ -121,7 +120,7 @@ def different_types[T, S](cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # error: [invalid-return-type] "Object of type `S` is not assignable to return type `T`"
+        # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `S`"
         return s
 
 def same_types[T](cond: bool, t1: T, t2: T) -> T:
