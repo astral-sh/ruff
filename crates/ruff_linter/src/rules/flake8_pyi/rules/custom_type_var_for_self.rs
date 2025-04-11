@@ -8,10 +8,9 @@ use ruff_python_semantic::analyze::class::is_metaclass;
 use ruff_python_semantic::analyze::function_type::{self, FunctionType};
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::{Binding, ResolvedReference, ScopeId, SemanticModel};
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::importer::{ImportRequest, ResolutionError};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -317,7 +316,8 @@ fn replace_custom_typevar_with_self(
     self_or_cls_annotation: &ast::Expr,
 ) -> anyhow::Result<Fix> {
     // (1) Import `Self` (if necessary)
-    let (import_edit, self_symbol_binding) = import_self(checker, function_def.start())?;
+    let (import_edit, self_symbol_binding) =
+        checker.import_from_typing("Self", function_def.start(), PythonVersion::PY311)?;
 
     // (2) Remove the first parameter's annotation
     let mut other_edits = vec![Edit::deletion(
@@ -365,24 +365,6 @@ fn replace_custom_typevar_with_self(
         other_edits,
         applicability,
     ))
-}
-
-/// Attempt to create an [`Edit`] that imports `Self`.
-///
-/// On Python <3.11, `Self` is imported from `typing_extensions`;
-/// on Python >=3.11, it is imported from `typing`.
-/// This is because it was added to the `typing` module on Python 3.11,
-/// but is available from the backport package `typing_extensions` on all versions.
-fn import_self(checker: &Checker, position: TextSize) -> Result<(Edit, String), ResolutionError> {
-    let source_module = if checker.target_version() >= PythonVersion::PY311 {
-        "typing"
-    } else {
-        "typing_extensions"
-    };
-    let request = ImportRequest::import_from(source_module, "Self");
-    checker
-        .importer()
-        .get_or_import_symbol(&request, position, checker.semantic())
 }
 
 /// Returns a series of [`Edit`]s that modify all references to the given `typevar`.

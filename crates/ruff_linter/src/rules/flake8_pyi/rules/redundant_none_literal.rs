@@ -12,7 +12,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use smallvec::SmallVec;
 
-use crate::{checkers::ast::Checker, importer::ImportRequest};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for redundant `Literal[None]` annotations.
@@ -225,10 +225,10 @@ fn create_fix(
 
     let fix = match union_kind {
         UnionKind::TypingOptional => {
-            let (import_edit, bound_name) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from("typing", "Optional"),
+            let (import_edit, bound_name) = checker.import_from_typing(
+                "Optional",
                 literal_expr.start(),
-                checker.semantic(),
+                PythonVersion::lowest(),
             )?;
             let optional_expr = typing_optional(new_literal_expr, Name::from(bound_name));
             let content = checker.generator().expr(&optional_expr);

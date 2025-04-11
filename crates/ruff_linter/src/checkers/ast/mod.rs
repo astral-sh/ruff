@@ -31,7 +31,7 @@ use ruff_python_parser::semantic_errors::{
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, IsolationLevel};
+use ruff_diagnostics::{Diagnostic, Edit, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
@@ -62,7 +62,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
 use crate::docstrings::extraction::ExtractionTarget;
-use crate::importer::Importer;
+use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
@@ -529,6 +529,28 @@ impl<'a> Checker<'a> {
         let mut checker = std::mem::take(&mut self.semantic_checker);
         f(&mut checker, self);
         self.semantic_checker = checker;
+    }
+
+    /// Attempt to create an [`Edit`] that imports `member`.
+    ///
+    /// On Python <`version_added_to_typing`, `member` is imported from `typing_extensions`, while
+    /// on Python >=`version_added_to_typing`, it is imported from `typing`.
+    ///
+    /// See [`Importer::get_or_import_symbol`] for more details on the returned values.
+    pub(crate) fn import_from_typing(
+        &self,
+        member: &str,
+        position: TextSize,
+        version_added_to_typing: PythonVersion,
+    ) -> Result<(Edit, String), ResolutionError> {
+        let source_module = if self.target_version() >= version_added_to_typing {
+            "typing"
+        } else {
+            "typing_extensions"
+        };
+        let request = ImportRequest::import_from(source_module, member);
+        self.importer()
+            .get_or_import_symbol(&request, position, self.semantic())
     }
 }
 
