@@ -1062,20 +1062,10 @@ pub enum SemanticSyntaxErrorKind {
     /// or lambda and not allowed otherwise:
     ///
     /// ```python
-    /// yield  # error
     /// yield 1  # error
-    /// yield from x  # error
-    ///
-    /// def _(): yield  # okay
-    /// def _(): [(yield 1) for x in y]  # error
-    /// lambda: (yield)  # okay
-    /// lambda: [(yield) for x in y]  # error
-    /// [x for x in (yield 1)]  # error
-    /// def _(): [x for x in (yield 1)]  # okay, generators evaluated in outer scope
     ///
     /// def f():
-    ///     class C:
-    ///         yield 1  # error
+    ///     [(yield 1) for x in y]  # error
     /// ```
     ///
     /// `await` is additionally allowed in comprehensions, if the comprehension itself is in a
@@ -1083,13 +1073,10 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// ```python
     /// await 1  # error
-    /// async def _(): await 1  # okay
-    /// async def _(): [await 1 for x in y]  # also okay
-    /// async def _():
-    ///     class C:
-    ///         await 1  # error
-    /// async def _():
-    ///     lambda: await 1  # okay (here)
+    ///
+    /// async def f():
+    ///     await 1  # okay
+    ///     [await 1 for x in y]  # also okay
     /// ```
     ///
     /// This last case _is_ an error, but it has to do with the lambda not being an async function.
