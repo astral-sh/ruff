@@ -51,10 +51,10 @@ inside the module:
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: <bound method `__init__` of `ModuleType`>
+reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ellipsis) -> None
 
 # These come from `builtins.object`, not `types.ModuleType`:
-reveal_type(typing.__eq__)  # revealed: <bound method `__eq__` of `ModuleType`>
+reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
 
 reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
 

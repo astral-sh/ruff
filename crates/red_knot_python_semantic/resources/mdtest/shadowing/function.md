@@ -37,17 +37,17 @@ reveal_type(f)  # revealed: Literal[1]
 
 def f(): ...
 
-reveal_type(f)  # revealed: Literal[f]
+reveal_type(f)  # revealed: def f() -> Unknown
 
 def f(x: int) -> int:
     raise NotImplementedError
 
-reveal_type(f)  # revealed: Literal[f]
+reveal_type(f)  # revealed: def f(x: int) -> int
 
 f: int = 1
 reveal_type(f)  # revealed: Literal[1]
 
 def f(): ...
 
-reveal_type(f)  # revealed: Literal[f]
+reveal_type(f)  # revealed: def f() -> Unknown
 ```

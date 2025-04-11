@@ -563,18 +563,18 @@ from inspect import getattr_static
 def f(x: object) -> str:
     return "a"
 
-reveal_type(f)  # revealed: Literal[f]
+reveal_type(f)  # revealed: def f(x: object) -> str
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
-reveal_type(f.__get__(None, type(f)))  # revealed: Literal[f]
+reveal_type(f.__get__(None, type(f)))  # revealed: def f(x: object) -> str
 reveal_type(f.__get__(None, type(f))(1))  # revealed: str
 
 wrapper_descriptor = getattr_static(f, "__get__")
 
 reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor `__get__` of `function` objects>
-reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: Literal[f]
+reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: def f(x: object) -> str
 
 # Attribute access on the method-wrapper `f.__get__` falls back to `MethodWrapperType`:
-reveal_type(f.__get__.__hash__)  # revealed: <bound method `__hash__` of `MethodWrapperType`>
+reveal_type(f.__get__.__hash__)  # revealed: bound method MethodWrapperType.__hash__() -> int
 
 # Attribute access on the wrapper-descriptor falls back to `WrapperDescriptorType`:
 reveal_type(wrapper_descriptor.__qualname__)  # revealed: str
@@ -587,7 +587,7 @@ class C: ...
 
 bound_method = wrapper_descriptor(f, C(), C)
 
-reveal_type(bound_method)  # revealed: <bound method `f` of `C`>
+reveal_type(bound_method)  # revealed: bound method C.f() -> str
 ```
 
 We can then call it, and the instance of `C` is implicitly passed to the first parameter of `f`

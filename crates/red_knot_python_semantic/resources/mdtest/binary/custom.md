@@ -350,30 +350,30 @@ reveal_type(no() + no())  # revealed: Unknown
 def f():
     pass
 
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f + f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `-` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `-` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f - f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `*` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `*` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f * f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `@` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `@` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f @ f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `/` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `/` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f / f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `%` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `%` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f % f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `**` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `**` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f**f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<<` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `<<` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f << f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>>` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `>>` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f >> f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `|` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `|` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f | f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `^` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `^` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f ^ f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `&` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `&` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f & f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `//` is unsupported between objects of type `Literal[f]` and `Literal[f]`"
+# error: [unsupported-operator] "Operator `//` is unsupported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
 reveal_type(f // f)  # revealed: Unknown
 ```

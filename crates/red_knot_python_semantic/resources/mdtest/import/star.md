@@ -1034,8 +1034,8 @@ from exporter import *
 # At runtime, `f` is imported but `g` is not; to avoid false positives, however,
 # we treat `a` as though it does not have `__all__` at all,
 # which would imply that both symbols would be present.
-reveal_type(f)  # revealed: Literal[f]
-reveal_type(g)  # revealed: Literal[g]
+reveal_type(f)  # revealed: def f() -> str
+reveal_type(g)  # revealed: def g() -> int
 ```
 
 ### `__all__` conditionally defined in a statically known branch
@@ -1198,7 +1198,7 @@ f()
 ```py
 from a import *
 
-reveal_type(f)  # revealed: Literal[f]
+reveal_type(f)  # revealed: def f() -> Unknown
 
 # TODO: we're undecided about whether we should consider this a false positive or not.
 # Mutating the global scope to add a symbol from an inner scope will not *necessarily* result
