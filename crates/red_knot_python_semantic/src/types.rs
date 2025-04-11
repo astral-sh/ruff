@@ -3767,14 +3767,12 @@ impl<'db> Type<'db> {
         // TODO: we should use the actual return type of `__new__` to determine the instance type
         let init_ty = match self {
             Type::ClassLiteral(generic @ ClassLiteralType::Generic(_)) => {
-                Type::Instance(InstanceType::UninitializedGenericClass(generic))
+                Type::instance(generic.identity_specialization(db))
             }
             Type::ClassLiteral(ClassLiteralType::NonGeneric(non_generic)) => {
-                Type::Instance(InstanceType::Class(ClassType::NonGeneric(non_generic)))
+                Type::instance(ClassType::NonGeneric(non_generic))
             }
-            Type::GenericAlias(generic) => {
-                Type::Instance(InstanceType::Class(ClassType::Generic(generic)))
-            }
+            Type::GenericAlias(generic) => Type::instance(ClassType::Generic(generic)),
             Type::SubclassOf(subclass_of) => subclass_of.to_instance(),
             _ => panic!("type should be constructible"),
         };
@@ -5507,7 +5505,7 @@ impl<'db> FunctionType<'db> {
             self.known(db),
             self.body_scope(db),
             self.decorators(db),
-            None, // If the function was generic before, it isn't anymore
+            self.generic_context(db),
             Some(specialization),
         )
     }

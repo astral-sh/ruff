@@ -199,10 +199,7 @@ class C[T]:
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
 c: C[int] = C[int]()
-# TODO: no error
-# TODO: revealed: str or Literal["string"]
-# error: [invalid-argument-type]
-reveal_type(c.method("string"))  # revealed: U
+reveal_type(c.method("string"))  # revealed: Literal["string"]
 ```
 
 ## Cyclic class definition

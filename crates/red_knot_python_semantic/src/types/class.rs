@@ -278,7 +278,7 @@ impl<'db> ClassType<'db> {
     ) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
-            .class_member_inner(db, None, specialization, name, policy)
+            .class_member_inner(db, specialization, name, policy)
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
@@ -290,9 +290,23 @@ impl<'db> ClassType<'db> {
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
         let (class_literal, _) = self.class_literal(db);
-        class_literal
-            .own_class_member(db, name)
-            .map_type(|ty| self.specialize_type(db, ty))
+        class_literal.own_class_member(db, name).map_type(|ty| {
+            let specialized = self.specialize_type(db, ty);
+            // The `__new__` and `__init__` members of a non-specialized generic class are handled
+            // specially: they inherit the generic context of their class. That lets us treat them
+            // as generic functions when constructing the class, and infer the specialization of
+            // the class from the arguments that are passed in.
+            match (self, specialized, name) {
+                (
+                    ClassType::Generic(alias),
+                    Type::FunctionLiteral(function),
+                    "__new__" | "__init__",
+                ) => Type::FunctionLiteral(
+                    function.with_generic_context(db, alias.origin(db).generic_context(db)),
+                ),
+                _ => specialized,
+            }
+        })
     }
 
     /// Returns the `name` attribute of an instance of this class.
@@ -410,6 +424,19 @@ impl<'db> ClassLiteralType<'db> {
             Self::NonGeneric(non_generic) => ClassType::NonGeneric(non_generic),
             Self::Generic(generic) => {
                 let specialization = generic.generic_context(db).default_specialization(db);
+                ClassType::Generic(GenericAlias::new(db, generic, specialization))
+            }
+        }
+    }
+
+    /// Returns the identity specialization of this class. For non-generic classes, the class is
+    /// returned unchanged. For a non-specialized generic class, we return a generic alias that
+    /// applies the identity specialization to the class's typevars.
+    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
+        match self {
+            Self::NonGeneric(non_generic) => ClassType::NonGeneric(non_generic),
+            Self::Generic(generic) => {
+                let specialization = generic.generic_context(db).identity_specialization(db);
                 ClassType::Generic(GenericAlias::new(db, generic, specialization))
             }
         }
@@ -695,13 +722,12 @@ impl<'db> ClassLiteralType<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
-        self.class_member_inner(db, Some(self), None, name, policy)
+        self.class_member_inner(db, None, name, policy)
     }
 
     fn class_member_inner(
         self,
         db: &'db dyn Db,
-        self_type: Option<ClassLiteralType<'db>>,
         specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
@@ -722,7 +748,7 @@ impl<'db> ClassLiteralType<'db> {
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Unbound(TypeQualifiers::empty()));
 
-        for (idx, superclass) in self.iter_mro(db, specialization).enumerate() {
+        for superclass in self.iter_mro(db, specialization) {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
@@ -749,11 +775,7 @@ impl<'db> ClassLiteralType<'db> {
                     }
 
                     lookup_result = lookup_result.or_else(|lookup_error| {
-                        let member = match self_type {
-                            Some(self_type) if idx == 0 => self_type.own_class_member(db, name),
-                            _ => class.own_class_member(db, name),
-                        };
-                        lookup_error.or_fall_back_to(db, member)
+                        lookup_error.or_fall_back_to(db, class.own_class_member(db, name))
                     });
                 }
             }

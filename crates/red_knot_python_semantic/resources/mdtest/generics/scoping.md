@@ -151,10 +151,7 @@ class C[T]:
         return y
 
 c: C[int] = C()
-# TODO: no errors
-# TODO: revealed: str
-# error: [invalid-argument-type]
-reveal_type(c.m(1, "string"))  # revealed: S
+reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
 
 ## Unbound typevars
