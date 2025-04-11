@@ -212,6 +212,7 @@ impl Server {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some(crate::DIAGNOSTIC_NAME.into()),
+                inter_file_dependencies: true,
                 ..Default::default()
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
