@@ -1610,12 +1610,10 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bools are instances of that class:
 
 ```py
-reveal_type(
-    True.__and__
-)  # revealed: bound method Literal[True].__and__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
-reveal_type(
-    False.__or__
-)  # revealed: bound method Literal[False].__or__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
+# revealed: bound method Literal[True].__and__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
+reveal_type(True.__and__)
+# revealed: bound method Literal[False].__or__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
+reveal_type(False.__or__)
 ```
 
 Some attributes are special-cased, however:
@@ -1631,9 +1629,8 @@ All attribute access on literal `bytes` types is currently delegated to `builtin
 
 ```py
 reveal_type(b"foo".join)  # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: @Todo(generics), /) -> bytes
-reveal_type(
-    b"foo".endswith
-)  # revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`), start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`), start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+reveal_type(b"foo".endswith)
 ```
 
 ## Instance attribute edge cases
