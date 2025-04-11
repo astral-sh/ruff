@@ -1,0 +1,255 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301_names_fix.py:21:1: AIR301 [*] `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+   |
+20 | # airflow.datasets.manager
+21 | DatasetManager()
+   | ^^^^^^^^^^^^^^ AIR301
+22 | dataset_manager
+23 | resolve_dataset_manager
+   |
+   = help: Use `airflow.assets.manager.AssetManager` instead
+
+ℹ Safe fix
+14 14 | 
+15 15 | # from airflow.security.permissions import RESOURCE_DATASET
+16 16 | from airflow.timetables.simple import DatasetTriggeredTimetable
+   17 |+from airflow.assets.manager import AssetManager
+17 18 | 
+18 19 | # from airflow.www.auth import has_access_dataset
+19 20 | 
+20 21 | # airflow.datasets.manager
+21    |-DatasetManager()
+   22 |+AssetManager()
+22 23 | dataset_manager
+23 24 | resolve_dataset_manager
+24 25 | 
+
+AIR301_names_fix.py:22:1: AIR301 [*] `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
+   |
+20 | # airflow.datasets.manager
+21 | DatasetManager()
+22 | dataset_manager
+   | ^^^^^^^^^^^^^^^ AIR301
+23 | resolve_dataset_manager
+   |
+   = help: Use `airflow.assets.manager.asset_manager` instead
+
+ℹ Safe fix
+14 14 | 
+15 15 | # from airflow.security.permissions import RESOURCE_DATASET
+16 16 | from airflow.timetables.simple import DatasetTriggeredTimetable
+   17 |+from airflow.assets.manager import asset_manager
+17 18 | 
+18 19 | # from airflow.www.auth import has_access_dataset
+19 20 | 
+20 21 | # airflow.datasets.manager
+21 22 | DatasetManager()
+22    |-dataset_manager
+   23 |+asset_manager
+23 24 | resolve_dataset_manager
+24 25 | 
+25 26 | # airflow.auth.managers
+
+AIR301_names_fix.py:23:1: AIR301 [*] `airflow.datasets.manager.resolve_dataset_manager` is removed in Airflow 3.0
+   |
+21 | DatasetManager()
+22 | dataset_manager
+23 | resolve_dataset_manager
+   | ^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+24 |
+25 | # airflow.auth.managers
+   |
+   = help: Use `airflow.assets.manager.resolve_asset_manager` instead
+
+ℹ Safe fix
+14 14 | 
+15 15 | # from airflow.security.permissions import RESOURCE_DATASET
+16 16 | from airflow.timetables.simple import DatasetTriggeredTimetable
+   17 |+from airflow.assets.manager import resolve_asset_manager
+17 18 | 
+18 19 | # from airflow.www.auth import has_access_dataset
+19 20 | 
+20 21 | # airflow.datasets.manager
+21 22 | DatasetManager()
+22 23 | dataset_manager
+23    |-resolve_dataset_manager
+   24 |+resolve_asset_manager
+24 25 | 
+25 26 | # airflow.auth.managers
+26 27 | is_authorized_dataset
+
+AIR301_names_fix.py:26:1: AIR301 [*] `airflow.auth.managers.base_auth_manager.is_authorized_dataset` is removed in Airflow 3.0
+   |
+25 | # airflow.auth.managers
+26 | is_authorized_dataset
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR301
+27 | DatasetDetails()
+   |
+   = help: Use `airflow.api_fastapi.auth.managers.base_auth_manager.is_authorized_asset` instead
+
+ℹ Safe fix
+14 14 | 
+15 15 | # from airflow.security.permissions import RESOURCE_DATASET
+16 16 | from airflow.timetables.simple import DatasetTriggeredTimetable
+   17 |+from airflow.api_fastapi.auth.managers.base_auth_manager import is_authorized_asset
+17 18 | 
+18 19 | # from airflow.www.auth import has_access_dataset
+19 20 | 
+--------------------------------------------------------------------------------
+23 24 | resolve_dataset_manager
+24 25 | 
+25 26 | # airflow.auth.managers
+26    |-is_authorized_dataset
+   27 |+is_authorized_asset
+27 28 | DatasetDetails()
+28 29 | 
+29 30 | # airflow.lineage.hook
+
+AIR301_names_fix.py:30:1: AIR301 [*] `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
+   |
+29 | # airflow.lineage.hook
+30 | DatasetLineageInfo()
+   | ^^^^^^^^^^^^^^^^^^ AIR301
+31 |
+32 | # airflow.listeners.spec.dataset
+   |
+   = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
+
+ℹ Safe fix
+6  6  |     dataset_manager,
+7  7  |     resolve_dataset_manager,
+8  8  | )
+9     |-from airflow.lineage.hook import DatasetLineageInfo
+   9  |+from airflow.lineage.hook import DatasetLineageInfo, AssetLineageInfo
+10 10 | 
+11 11 | # from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+12 12 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+--------------------------------------------------------------------------------
+27 27 | DatasetDetails()
+28 28 | 
+29 29 | # airflow.lineage.hook
+30    |-DatasetLineageInfo()
+   30 |+AssetLineageInfo()
+31 31 | 
+32 32 | # airflow.listeners.spec.dataset
+33 33 | on_dataset_changed
+
+AIR301_names_fix.py:36:1: AIR301 [*] `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0
+   |
+34 | on_dataset_created
+35 | # airflow.metrics.validators
+36 | AllowListValidator()
+   | ^^^^^^^^^^^^^^^^^^ AIR301
+37 | BlockListValidator()
+   |
+   = help: Use `airflow.metrics.validators.PatternAllowListValidator` instead
+
+ℹ Safe fix
+9  9  | from airflow.lineage.hook import DatasetLineageInfo
+10 10 | 
+11 11 | # from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+12    |-from airflow.metrics.validators import AllowListValidator, BlockListValidator
+   12 |+from airflow.metrics.validators import AllowListValidator, BlockListValidator, PatternAllowListValidator
+13 13 | from airflow.secrets.local_filesystem import load_connections
+14 14 | 
+15 15 | # from airflow.security.permissions import RESOURCE_DATASET
+--------------------------------------------------------------------------------
+33 33 | on_dataset_changed
+34 34 | on_dataset_created
+35 35 | # airflow.metrics.validators
+36    |-AllowListValidator()
+   36 |+PatternAllowListValidator()
+37 37 | BlockListValidator()
+38 38 | 
+39 39 | # airflow.secrets.local_filesystem
+
+AIR301_names_fix.py:37:1: AIR301 [*] `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0
+   |
+35 | # airflow.metrics.validators
+36 | AllowListValidator()
+37 | BlockListValidator()
+   | ^^^^^^^^^^^^^^^^^^ AIR301
+38 |
+39 | # airflow.secrets.local_filesystem
+   |
+   = help: Use `airflow.metrics.validators.PatternBlockListValidator` instead
+
+ℹ Safe fix
+9  9  | from airflow.lineage.hook import DatasetLineageInfo
+10 10 | 
+11 11 | # from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+12    |-from airflow.metrics.validators import AllowListValidator, BlockListValidator
+   12 |+from airflow.metrics.validators import AllowListValidator, BlockListValidator, PatternBlockListValidator
+13 13 | from airflow.secrets.local_filesystem import load_connections
+14 14 | 
+15 15 | # from airflow.security.permissions import RESOURCE_DATASET
+--------------------------------------------------------------------------------
+34 34 | on_dataset_created
+35 35 | # airflow.metrics.validators
+36 36 | AllowListValidator()
+37    |-BlockListValidator()
+   37 |+PatternBlockListValidator()
+38 38 | 
+39 39 | # airflow.secrets.local_filesystem
+40 40 | load_connections()
+
+AIR301_names_fix.py:40:1: AIR301 [*] `airflow.secrets.local_filesystem.load_connections` is removed in Airflow 3.0
+   |
+39 | # airflow.secrets.local_filesystem
+40 | load_connections()
+   | ^^^^^^^^^^^^^^^^ AIR301
+41 |
+42 | # airflow.security.permissions
+   |
+   = help: Use `airflow.secrets.local_filesystem.load_connections_dict` instead
+
+ℹ Safe fix
+10 10 | 
+11 11 | # from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+12 12 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+13    |-from airflow.secrets.local_filesystem import load_connections
+   13 |+from airflow.secrets.local_filesystem import load_connections, load_connections_dict
+14 14 | 
+15 15 | # from airflow.security.permissions import RESOURCE_DATASET
+16 16 | from airflow.timetables.simple import DatasetTriggeredTimetable
+--------------------------------------------------------------------------------
+37 37 | BlockListValidator()
+38 38 | 
+39 39 | # airflow.secrets.local_filesystem
+40    |-load_connections()
+   40 |+load_connections_dict()
+41 41 | 
+42 42 | # airflow.security.permissions
+43 43 | # RESOURCE_DATASET
+
+AIR301_names_fix.py:45:1: AIR301 [*] `airflow.timetables.simple.DatasetTriggeredTimetable` is removed in Airflow 3.0
+   |
+43 | # RESOURCE_DATASET
+44 | # airflow.timetables
+45 | DatasetTriggeredTimetable()
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+46 |
+47 | # airflow.www.auth
+   |
+   = help: Use `airflow.timetables.simple.AssetTriggeredTimetable` instead
+
+ℹ Safe fix
+13 13 | from airflow.secrets.local_filesystem import load_connections
+14 14 | 
+15 15 | # from airflow.security.permissions import RESOURCE_DATASET
+16    |-from airflow.timetables.simple import DatasetTriggeredTimetable
+   16 |+from airflow.timetables.simple import DatasetTriggeredTimetable, AssetTriggeredTimetable
+17 17 | 
+18 18 | # from airflow.www.auth import has_access_dataset
+19 19 | 
+--------------------------------------------------------------------------------
+42 42 | # airflow.security.permissions
+43 43 | # RESOURCE_DATASET
+44 44 | # airflow.timetables
+45    |-DatasetTriggeredTimetable()
+   45 |+AssetTriggeredTimetable()
+46 46 | 
+47 47 | # airflow.www.auth
+48 48 | # has_access_dataset
