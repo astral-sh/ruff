@@ -3829,12 +3829,7 @@ impl<'db> Type<'db> {
                 .symbol
                 .is_unbound()
         {
-            Some(init_ty.try_call_dunder_with_policy(
-                db,
-                "__init__",
-                &mut argument_types,
-                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            ))
+            Some(init_ty.try_call_dunder(db, "__init__", argument_types))
         } else {
             None
         };
