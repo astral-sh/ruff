@@ -116,7 +116,7 @@ doc = "See also [TypeAlias](https://docs.python.org/3/library/ast.html#ast.TypeA
 fields = [
   { name = "name", type = "Expr" },
   { name = "type_params", type = "Box<crate::TypeParams>?" },
-  { name = "value", type = "Expr" },
+  { name = "value", type = "Expr", is_annotation = true },
 ]
 
 [Stmt.nodes.StmtAssign]
