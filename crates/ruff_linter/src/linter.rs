@@ -1061,14 +1061,15 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Path::new("yield_scope.py"); "yield_scope")]
-    fn test_yield_scope(path: &Path) -> Result<()> {
+    #[test_case(Rule::YieldOutsideFunction, Path::new("yield_scope.py"))]
+    #[test_case(Rule::ReturnOutsideFunction, Path::new("return_outside_function.py"))]
+    fn test_syntax_errors(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);
         let messages = test_contents_syntax_errors(
             &SourceKind::Python(std::fs::read_to_string(&path)?),
             &path,
-            &settings::LinterSettings::for_rule(Rule::YieldOutsideFunction),
+            &settings::LinterSettings::for_rule(rule),
         );
         insta::with_settings!({filters => vec![(r"\\", "/")]}, {
             assert_messages!(snapshot, messages);

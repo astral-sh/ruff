@@ -23,12 +23,11 @@ match x:
     case [0, 1] | [1, 0]:
         y = 0
 # case black_check_sequence_then_mapping
-def outer():
-    match x:
-        case [*_]:
-            return "seq"
-        case {}:
-            return "map"
+match x:
+    case [*_]:
+        return "seq"
+    case {}:
+        return "map"
 # case test_patma_035
 match x:
     case {0: [1, 2, {}]}:

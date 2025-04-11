@@ -1,110 +1,88 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/ok/simple_stmts_with_semicolons.py
+snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..68,
+        range: 0..51,
         body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 0..67,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("outer"),
-                        range: 4..9,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 9..11,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Return(
-                            StmtReturn {
-                                range: 17..23,
-                                value: None,
+            Return(
+                StmtReturn {
+                    range: 0..6,
+                    value: None,
+                },
+            ),
+            Import(
+                StmtImport {
+                    range: 8..16,
+                    names: [
+                        Alias {
+                            range: 15..16,
+                            name: Identifier {
+                                id: Name("a"),
+                                range: 15..16,
                             },
-                        ),
-                        Import(
-                            StmtImport {
-                                range: 25..33,
-                                names: [
-                                    Alias {
-                                        range: 32..33,
-                                        name: Identifier {
-                                            id: Name("a"),
-                                            range: 32..33,
-                                        },
-                                        asname: None,
-                                    },
-                                ],
-                            },
-                        ),
-                        ImportFrom(
-                            StmtImportFrom {
-                                range: 35..50,
-                                module: Some(
-                                    Identifier {
-                                        id: Name("x"),
-                                        range: 40..41,
-                                    },
-                                ),
-                                names: [
-                                    Alias {
-                                        range: 49..50,
-                                        name: Identifier {
-                                            id: Name("y"),
-                                            range: 49..50,
-                                        },
-                                        asname: None,
-                                    },
-                                ],
-                                level: 0,
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 52..53,
-                                value: Name(
-                                    ExprName {
-                                        range: 52..53,
-                                        id: Name("z"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            },
-                        ),
-                        TypeAlias(
-                            StmtTypeAlias {
-                                range: 55..67,
-                                name: Name(
-                                    ExprName {
-                                        range: 60..61,
-                                        id: Name("T"),
-                                        ctx: Store,
-                                    },
-                                ),
-                                type_params: None,
-                                value: Name(
-                                    ExprName {
-                                        range: 64..67,
-                                        id: Name("int"),
-                                        ctx: Load,
-                                    },
-                                ),
-                            },
-                        ),
+                            asname: None,
+                        },
                     ],
+                },
+            ),
+            ImportFrom(
+                StmtImportFrom {
+                    range: 18..33,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 23..24,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 32..33,
+                            name: Identifier {
+                                id: Name("y"),
+                                range: 32..33,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 35..36,
+                    value: Name(
+                        ExprName {
+                            range: 35..36,
+                            id: Name("z"),
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    range: 38..50,
+                    name: Name(
+                        ExprName {
+                            range: 43..44,
+                            id: Name("T"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: None,
+                    value: Name(
+                        ExprName {
+                            range: 47..50,
+                            id: Name("int"),
+                            ctx: Load,
+                        },
+                    ),
                 },
             ),
         ],

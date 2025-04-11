@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/invalid_keyword_expression.py
+snapshot_kind: text
 ---
 ## AST
 
@@ -226,23 +227,4 @@ Module(
 3 | call(x = *y)
 4 | call(x = (*y))
   |           ^^ Syntax Error: Starred expression cannot be used here
-  |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | call(x = yield y)
-  |          ^^^^^^^ Syntax Error: `yield` statement outside of a function
-2 | call(x = yield from y)
-3 | call(x = *y)
-  |
-
-
-  |
-1 | call(x = yield y)
-2 | call(x = yield from y)
-  |          ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
-3 | call(x = *y)
-4 | call(x = (*y))
   |

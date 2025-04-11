@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/simple.py
+snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..190,
+        range: 0..172,
         body: [
             Continue(
                 StmtContinue {
@@ -208,61 +209,38 @@ Module(
                     ],
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 158..188,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("outer"),
-                        range: 162..167,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 167..169,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
+            If(
+                StmtIf {
+                    range: 158..171,
+                    test: Name(
+                        ExprName {
+                            range: 161..162,
+                            id: Name("x"),
+                            ctx: Load,
+                        },
+                    ),
                     body: [
-                        If(
-                            StmtIf {
-                                range: 175..188,
-                                test: Name(
-                                    ExprName {
-                                        range: 178..179,
-                                        id: Name("x"),
-                                        ctx: Load,
-                                    },
-                                ),
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            range: 181..188,
-                                            value: Yield(
-                                                ExprYield {
-                                                    range: 181..188,
-                                                    value: Some(
-                                                        Name(
-                                                            ExprName {
-                                                                range: 187..188,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ),
+                        Expr(
+                            StmtExpr {
+                                range: 164..171,
+                                value: Yield(
+                                    ExprYield {
+                                        range: 164..171,
+                                        value: Some(
+                                            Name(
+                                                ExprName {
+                                                    range: 170..171,
+                                                    id: Name("x"),
+                                                    ctx: Load,
                                                 },
                                             ),
-                                        },
-                                    ),
-                                ],
-                                elif_else_clauses: [],
+                                        ),
+                                    },
+                                ),
                             },
                         ),
                     ],
+                    elif_else_clauses: [],
                 },
             ),
         ],

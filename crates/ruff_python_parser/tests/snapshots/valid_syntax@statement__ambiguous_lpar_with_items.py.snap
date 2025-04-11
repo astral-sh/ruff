@@ -1,13 +1,14 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/valid/statement/ambiguous_lpar_with_items.py
+snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..3658,
+        range: 0..3620,
         body: [
             With(
                 StmtWith {
@@ -2420,273 +2421,39 @@ Module(
                     ],
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 2211..2392,
+            With(
+                StmtWith {
+                    range: 2211..2230,
                     is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("outer"),
-                        range: 2215..2220,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 2220..2222,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
+                    items: [
+                        WithItem {
+                            range: 2216..2225,
+                            context_expr: Yield(
+                                ExprYield {
+                                    range: 2217..2224,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 2223..2224,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
                     body: [
-                        With(
-                            StmtWith {
-                                range: 2228..2247,
-                                is_async: false,
-                                items: [
-                                    WithItem {
-                                        range: 2233..2242,
-                                        context_expr: Yield(
-                                            ExprYield {
-                                                range: 2234..2241,
-                                                value: Some(
-                                                    Name(
-                                                        ExprName {
-                                                            range: 2240..2241,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        ),
-                                        optional_vars: None,
+                        Expr(
+                            StmtExpr {
+                                range: 2227..2230,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 2227..2230,
                                     },
-                                ],
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            range: 2244..2247,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
-                                                    range: 2244..2247,
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                        With(
-                            StmtWith {
-                                range: 2252..2273,
-                                is_async: false,
-                                items: [
-                                    WithItem {
-                                        range: 2258..2267,
-                                        context_expr: Yield(
-                                            ExprYield {
-                                                range: 2259..2266,
-                                                value: Some(
-                                                    Name(
-                                                        ExprName {
-                                                            range: 2265..2266,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        ),
-                                        optional_vars: None,
-                                    },
-                                ],
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            range: 2270..2273,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
-                                                    range: 2270..2273,
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                        With(
-                            StmtWith {
-                                range: 2278..2302,
-                                is_async: false,
-                                items: [
-                                    WithItem {
-                                        range: 2283..2297,
-                                        context_expr: YieldFrom(
-                                            ExprYieldFrom {
-                                                range: 2284..2296,
-                                                value: Name(
-                                                    ExprName {
-                                                        range: 2295..2296,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        optional_vars: None,
-                                    },
-                                ],
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            range: 2299..2302,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
-                                                    range: 2299..2302,
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                        With(
-                            StmtWith {
-                                range: 2307..2333,
-                                is_async: false,
-                                items: [
-                                    WithItem {
-                                        range: 2313..2327,
-                                        context_expr: YieldFrom(
-                                            ExprYieldFrom {
-                                                range: 2314..2326,
-                                                value: Name(
-                                                    ExprName {
-                                                        range: 2325..2326,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        optional_vars: None,
-                                    },
-                                ],
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            range: 2330..2333,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
-                                                    range: 2330..2333,
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                        With(
-                            StmtWith {
-                                range: 2338..2362,
-                                is_async: false,
-                                items: [
-                                    WithItem {
-                                        range: 2343..2357,
-                                        context_expr: Yield(
-                                            ExprYield {
-                                                range: 2344..2351,
-                                                value: Some(
-                                                    Name(
-                                                        ExprName {
-                                                            range: 2350..2351,
-                                                            id: Name("x"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        ),
-                                        optional_vars: Some(
-                                            Name(
-                                                ExprName {
-                                                    range: 2356..2357,
-                                                    id: Name("f"),
-                                                    ctx: Store,
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ],
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            range: 2359..2362,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
-                                                    range: 2359..2362,
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                ],
-                            },
-                        ),
-                        With(
-                            StmtWith {
-                                range: 2367..2392,
-                                is_async: false,
-                                items: [
-                                    WithItem {
-                                        range: 2372..2387,
-                                        context_expr: Yield(
-                                            ExprYield {
-                                                range: 2373..2381,
-                                                value: Some(
-                                                    Tuple(
-                                                        ExprTuple {
-                                                            range: 2379..2381,
-                                                            elts: [
-                                                                Name(
-                                                                    ExprName {
-                                                                        range: 2379..2380,
-                                                                        id: Name("x"),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                            ],
-                                                            ctx: Load,
-                                                            parenthesized: false,
-                                                        },
-                                                    ),
-                                                ),
-                                            },
-                                        ),
-                                        optional_vars: Some(
-                                            Name(
-                                                ExprName {
-                                                    range: 2386..2387,
-                                                    id: Name("f"),
-                                                    ctx: Store,
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ],
-                                body: [
-                                    Expr(
-                                        StmtExpr {
-                                            range: 2389..2392,
-                                            value: EllipsisLiteral(
-                                                ExprEllipsisLiteral {
-                                                    range: 2389..2392,
-                                                },
-                                            ),
-                                        },
-                                    ),
-                                ],
+                                ),
                             },
                         ),
                     ],
@@ -2694,14 +2461,225 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2778..2790,
+                    range: 2231..2252,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 2783..2785,
+                            range: 2237..2246,
+                            context_expr: Yield(
+                                ExprYield {
+                                    range: 2238..2245,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 2244..2245,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 2249..2252,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 2249..2252,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 2253..2277,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 2258..2272,
+                            context_expr: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 2259..2271,
+                                    value: Name(
+                                        ExprName {
+                                            range: 2270..2271,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 2274..2277,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 2274..2277,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 2278..2304,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 2284..2298,
+                            context_expr: YieldFrom(
+                                ExprYieldFrom {
+                                    range: 2285..2297,
+                                    value: Name(
+                                        ExprName {
+                                            range: 2296..2297,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 2301..2304,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 2301..2304,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 2305..2329,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 2310..2324,
+                            context_expr: Yield(
+                                ExprYield {
+                                    range: 2311..2318,
+                                    value: Some(
+                                        Name(
+                                            ExprName {
+                                                range: 2317..2318,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 2323..2324,
+                                        id: Name("f"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 2326..2329,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 2326..2329,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 2330..2355,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 2335..2350,
+                            context_expr: Yield(
+                                ExprYield {
+                                    range: 2336..2344,
+                                    value: Some(
+                                        Tuple(
+                                            ExprTuple {
+                                                range: 2342..2344,
+                                                elts: [
+                                                    Name(
+                                                        ExprName {
+                                                            range: 2342..2343,
+                                                            id: Name("x"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                                parenthesized: false,
+                                            },
+                                        ),
+                                    ),
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 2349..2350,
+                                        id: Name("f"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 2352..2355,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 2352..2355,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 2741..2753,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 2746..2748,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 2783..2785,
+                                    range: 2746..2748,
                                     elts: [],
                                     ctx: Load,
                                     parenthesized: true,
@@ -2713,10 +2691,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 2787..2790,
+                                range: 2750..2753,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 2787..2790,
+                                        range: 2750..2753,
                                     },
                                 ),
                             },
@@ -2726,14 +2704,14 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2791..2808,
+                    range: 2754..2771,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 2796..2803,
+                            range: 2759..2766,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 2796..2798,
+                                    range: 2759..2761,
                                     elts: [],
                                     ctx: Load,
                                     parenthesized: true,
@@ -2742,7 +2720,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        range: 2802..2803,
+                                        range: 2765..2766,
                                         id: Name("f"),
                                         ctx: Store,
                                     },
@@ -2753,10 +2731,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 2805..2808,
+                                range: 2768..2771,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 2805..2808,
+                                        range: 2768..2771,
                                     },
                                 ),
                             },
@@ -2766,28 +2744,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2809..2832,
+                    range: 2772..2795,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 2814..2827,
+                            range: 2777..2790,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 2814..2827,
+                                    range: 2777..2790,
                                     elts: [
                                         Named(
                                             ExprNamed {
-                                                range: 2815..2825,
+                                                range: 2778..2788,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 2815..2819,
+                                                        range: 2778..2782,
                                                         id: Name("item"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 2823..2825,
+                                                        range: 2786..2788,
                                                         value: Int(
                                                             42,
                                                         ),
@@ -2806,10 +2784,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 2829..2832,
+                                range: 2792..2795,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 2829..2832,
+                                        range: 2792..2795,
                                     },
                                 ),
                             },
@@ -2819,18 +2797,18 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2833..2857,
+                    range: 2796..2820,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 2838..2852,
+                            range: 2801..2815,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 2838..2852,
+                                    range: 2801..2815,
                                     elts: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
-                                                range: 2839..2840,
+                                                range: 2802..2803,
                                                 value: Int(
                                                     1,
                                                 ),
@@ -2838,17 +2816,17 @@ Module(
                                         ),
                                         Named(
                                             ExprNamed {
-                                                range: 2842..2851,
+                                                range: 2805..2814,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 2842..2846,
+                                                        range: 2805..2809,
                                                         id: Name("item"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 2850..2851,
+                                                        range: 2813..2814,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -2867,10 +2845,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 2854..2857,
+                                range: 2817..2820,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 2854..2857,
+                                        range: 2817..2820,
                                     },
                                 ),
                             },
@@ -2880,28 +2858,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2858..2888,
+                    range: 2821..2851,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 2863..2883,
+                            range: 2826..2846,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 2863..2883,
+                                    range: 2826..2846,
                                     elts: [
                                         Named(
                                             ExprNamed {
-                                                range: 2864..2875,
+                                                range: 2827..2838,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 2864..2869,
+                                                        range: 2827..2832,
                                                         id: Name("item1"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 2873..2875,
+                                                        range: 2836..2838,
                                                         value: Int(
                                                             10,
                                                         ),
@@ -2911,7 +2889,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 2877..2882,
+                                                range: 2840..2845,
                                                 id: Name("item2"),
                                                 ctx: Load,
                                             },
@@ -2927,10 +2905,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 2885..2888,
+                                range: 2848..2851,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 2885..2888,
+                                        range: 2848..2851,
                                     },
                                 ),
                             },
@@ -2940,35 +2918,35 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2889..2930,
+                    range: 2852..2893,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 2894..2925,
+                            range: 2857..2888,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 2894..2920,
+                                    range: 2857..2883,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 2895..2900,
+                                                range: 2858..2863,
                                                 id: Name("item1"),
                                                 ctx: Load,
                                             },
                                         ),
                                         Named(
                                             ExprNamed {
-                                                range: 2902..2912,
+                                                range: 2865..2875,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 2902..2907,
+                                                        range: 2865..2870,
                                                         id: Name("item2"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 2911..2912,
+                                                        range: 2874..2875,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -2978,7 +2956,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 2914..2919,
+                                                range: 2877..2882,
                                                 id: Name("item3"),
                                                 ctx: Load,
                                             },
@@ -2991,7 +2969,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        range: 2924..2925,
+                                        range: 2887..2888,
                                         id: Name("f"),
                                         ctx: Store,
                                     },
@@ -3002,10 +2980,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 2927..2930,
+                                range: 2890..2893,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 2927..2930,
+                                        range: 2890..2893,
                                     },
                                 ),
                             },
@@ -3015,18 +2993,18 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2931..2953,
+                    range: 2894..2916,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 2936..2948,
+                            range: 2899..2911,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 2936..2943,
+                                    range: 2899..2906,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 2937..2941,
+                                                range: 2900..2904,
                                                 id: Name("item"),
                                                 ctx: Load,
                                             },
@@ -3039,7 +3017,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        range: 2947..2948,
+                                        range: 2910..2911,
                                         id: Name("f"),
                                         ctx: Store,
                                     },
@@ -3050,10 +3028,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 2950..2953,
+                                range: 2913..2916,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 2950..2953,
+                                        range: 2913..2916,
                                     },
                                 ),
                             },
@@ -3063,21 +3041,21 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2954..2972,
+                    range: 2917..2935,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 2959..2967,
+                            range: 2922..2930,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 2959..2967,
+                                    range: 2922..2930,
                                     elts: [
                                         Starred(
                                             ExprStarred {
-                                                range: 2960..2965,
+                                                range: 2923..2928,
                                                 value: Name(
                                                     ExprName {
-                                                        range: 2961..2965,
+                                                        range: 2924..2928,
                                                         id: Name("item"),
                                                         ctx: Load,
                                                     },
@@ -3096,10 +3074,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 2969..2972,
+                                range: 2932..2935,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 2969..2972,
+                                        range: 2932..2935,
                                     },
                                 ),
                             },
@@ -3109,21 +3087,21 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2973..2996,
+                    range: 2936..2959,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 2978..2991,
+                            range: 2941..2954,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 2978..2986,
+                                    range: 2941..2949,
                                     elts: [
                                         Starred(
                                             ExprStarred {
-                                                range: 2979..2984,
+                                                range: 2942..2947,
                                                 value: Name(
                                                     ExprName {
-                                                        range: 2980..2984,
+                                                        range: 2943..2947,
                                                         id: Name("item"),
                                                         ctx: Load,
                                                     },
@@ -3139,7 +3117,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        range: 2990..2991,
+                                        range: 2953..2954,
                                         id: Name("f"),
                                         ctx: Store,
                                     },
@@ -3150,10 +3128,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 2993..2996,
+                                range: 2956..2959,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 2993..2996,
+                                        range: 2956..2959,
                                     },
                                 ),
                             },
@@ -3163,25 +3141,80 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 2997..3026,
+                    range: 2960..2989,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3002..3021,
+                            range: 2965..2984,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 3002..3016,
+                                    range: 2965..2979,
                                     elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 2966..2971,
+                                                id: Name("item1"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        Name(
+                                            ExprName {
+                                                range: 2973..2978,
+                                                id: Name("item2"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 2983..2984,
+                                        id: Name("f"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 2986..2989,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 2986..2989,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 2990..3020,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 2995..3015,
+                            context_expr: Tuple(
+                                ExprTuple {
+                                    range: 2995..3010,
+                                    elts: [
+                                        Name(
+                                            ExprName {
+                                                range: 2996..3001,
+                                                id: Name("item1"),
+                                                ctx: Load,
+                                            },
+                                        ),
                                         Name(
                                             ExprName {
                                                 range: 3003..3008,
-                                                id: Name("item1"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                range: 3010..3015,
                                                 id: Name("item2"),
                                                 ctx: Load,
                                             },
@@ -3194,7 +3227,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        range: 3020..3021,
+                                        range: 3014..3015,
                                         id: Name("f"),
                                         ctx: Store,
                                     },
@@ -3205,10 +3238,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3023..3026,
+                                range: 3017..3020,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3023..3026,
+                                        range: 3017..3020,
                                     },
                                 ),
                             },
@@ -3218,80 +3251,25 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3027..3057,
+                    range: 3021..3052,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3032..3052,
+                            range: 3026..3040,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 3032..3047,
+                                    range: 3026..3040,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 3033..3038,
+                                                range: 3027..3032,
                                                 id: Name("item1"),
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 3040..3045,
-                                                id: Name("item2"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        range: 3051..3052,
-                                        id: Name("f"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 3054..3057,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 3054..3057,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    range: 3058..3089,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 3063..3077,
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    range: 3063..3077,
-                                    elts: [
-                                        Name(
-                                            ExprName {
-                                                range: 3064..3069,
-                                                id: Name("item1"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        Name(
-                                            ExprName {
-                                                range: 3071..3076,
+                                                range: 3034..3039,
                                                 id: Name("item2"),
                                                 ctx: Load,
                                             },
@@ -3304,10 +3282,10 @@ Module(
                             optional_vars: None,
                         },
                         WithItem {
-                            range: 3079..3084,
+                            range: 3042..3047,
                             context_expr: Name(
                                 ExprName {
-                                    range: 3079..3084,
+                                    range: 3042..3047,
                                     id: Name("item3"),
                                     ctx: Load,
                                 },
@@ -3318,10 +3296,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3086..3089,
+                                range: 3049..3052,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3086..3089,
+                                        range: 3049..3052,
                                     },
                                 ),
                             },
@@ -3331,29 +3309,29 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3090..3128,
+                    range: 3053..3091,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3095..3123,
+                            range: 3058..3086,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 3095..3118,
+                                    range: 3058..3081,
                                     elts: [
                                         Tuple(
                                             ExprTuple {
-                                                range: 3096..3110,
+                                                range: 3059..3073,
                                                 elts: [
                                                     Name(
                                                         ExprName {
-                                                            range: 3097..3102,
+                                                            range: 3060..3065,
                                                             id: Name("item1"),
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     Name(
                                                         ExprName {
-                                                            range: 3104..3109,
+                                                            range: 3067..3072,
                                                             id: Name("item2"),
                                                             ctx: Load,
                                                         },
@@ -3365,7 +3343,7 @@ Module(
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 3112..3117,
+                                                range: 3075..3080,
                                                 id: Name("item3"),
                                                 ctx: Load,
                                             },
@@ -3378,7 +3356,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        range: 3122..3123,
+                                        range: 3085..3086,
                                         id: Name("f"),
                                         ctx: Store,
                                     },
@@ -3389,10 +3367,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3125..3128,
+                                range: 3088..3091,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3125..3128,
+                                        range: 3088..3091,
                                     },
                                 ),
                             },
@@ -3402,18 +3380,18 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3129..3175,
+                    range: 3092..3138,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3134..3142,
+                            range: 3097..3105,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 3134..3142,
+                                    range: 3097..3105,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 3135..3140,
+                                                range: 3098..3103,
                                                 id: Name("item1"),
                                                 ctx: Load,
                                             },
@@ -3426,10 +3404,10 @@ Module(
                             optional_vars: None,
                         },
                         WithItem {
-                            range: 3144..3149,
+                            range: 3107..3112,
                             context_expr: Name(
                                 ExprName {
-                                    range: 3144..3149,
+                                    range: 3107..3112,
                                     id: Name("item2"),
                                     ctx: Load,
                                 },
@@ -3437,21 +3415,21 @@ Module(
                             optional_vars: None,
                         },
                         WithItem {
-                            range: 3151..3170,
+                            range: 3114..3133,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 3151..3165,
+                                    range: 3114..3128,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 3152..3157,
+                                                range: 3115..3120,
                                                 id: Name("item3"),
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 3159..3164,
+                                                range: 3122..3127,
                                                 id: Name("item4"),
                                                 ctx: Load,
                                             },
@@ -3464,7 +3442,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        range: 3169..3170,
+                                        range: 3132..3133,
                                         id: Name("f"),
                                         ctx: Store,
                                     },
@@ -3475,10 +3453,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3172..3175,
+                                range: 3135..3138,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3172..3175,
+                                        range: 3135..3138,
                                     },
                                 ),
                             },
@@ -3488,25 +3466,25 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3176..3219,
+                    range: 3139..3182,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3181..3201,
+                            range: 3144..3164,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 3181..3195,
+                                    range: 3144..3158,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 3182..3187,
+                                                range: 3145..3150,
                                                 id: Name("item1"),
                                                 ctx: Load,
                                             },
                                         ),
                                         Name(
                                             ExprName {
-                                                range: 3189..3194,
+                                                range: 3152..3157,
                                                 id: Name("item2"),
                                                 ctx: Load,
                                             },
@@ -3519,7 +3497,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        range: 3199..3201,
+                                        range: 3162..3164,
                                         id: Name("f1"),
                                         ctx: Store,
                                     },
@@ -3527,10 +3505,10 @@ Module(
                             ),
                         },
                         WithItem {
-                            range: 3203..3214,
+                            range: 3166..3177,
                             context_expr: Name(
                                 ExprName {
-                                    range: 3203..3208,
+                                    range: 3166..3171,
                                     id: Name("item3"),
                                     ctx: Load,
                                 },
@@ -3538,7 +3516,7 @@ Module(
                             optional_vars: Some(
                                 Name(
                                     ExprName {
-                                        range: 3212..3214,
+                                        range: 3175..3177,
                                         id: Name("f2"),
                                         ctx: Store,
                                     },
@@ -3549,10 +3527,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3216..3219,
+                                range: 3179..3182,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3216..3219,
+                                        range: 3179..3182,
                                     },
                                 ),
                             },
@@ -3562,28 +3540,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3220..3245,
+                    range: 3183..3208,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3225..3240,
+                            range: 3188..3203,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 3225..3240,
+                                    range: 3188..3203,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 3226..3231,
+                                                range: 3189..3194,
                                                 id: Name("item1"),
                                                 ctx: Load,
                                             },
                                         ),
                                         Starred(
                                             ExprStarred {
-                                                range: 3233..3239,
+                                                range: 3196..3202,
                                                 value: Name(
                                                     ExprName {
-                                                        range: 3234..3239,
+                                                        range: 3197..3202,
                                                         id: Name("item2"),
                                                         ctx: Load,
                                                     },
@@ -3602,10 +3580,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3242..3245,
+                                range: 3205..3208,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3242..3245,
+                                        range: 3205..3208,
                                     },
                                 ),
                             },
@@ -3615,20 +3593,94 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3246..3276,
+                    range: 3209..3239,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3251..3271,
+                            range: 3214..3234,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 3251..3266,
+                                    range: 3214..3229,
                                     elts: [
                                         Name(
                                             ExprName {
-                                                range: 3252..3257,
+                                                range: 3215..3220,
                                                 id: Name("item1"),
                                                 ctx: Load,
+                                            },
+                                        ),
+                                        Starred(
+                                            ExprStarred {
+                                                range: 3222..3228,
+                                                value: Name(
+                                                    ExprName {
+                                                        range: 3223..3228,
+                                                        id: Name("item2"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    ],
+                                    ctx: Load,
+                                    parenthesized: true,
+                                },
+                            ),
+                            optional_vars: Some(
+                                Name(
+                                    ExprName {
+                                        range: 3233..3234,
+                                        id: Name("f"),
+                                        ctx: Store,
+                                    },
+                                ),
+                            ),
+                        },
+                    ],
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 3236..3239,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 3236..3239,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            With(
+                StmtWith {
+                    range: 3240..3271,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 3245..3266,
+                            context_expr: Tuple(
+                                ExprTuple {
+                                    range: 3245..3266,
+                                    elts: [
+                                        Named(
+                                            ExprNamed {
+                                                range: 3246..3257,
+                                                target: Name(
+                                                    ExprName {
+                                                        range: 3246..3251,
+                                                        id: Name("item1"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 3255..3257,
+                                                        value: Int(
+                                                            10,
+                                                        ),
+                                                    },
+                                                ),
                                             },
                                         ),
                                         Starred(
@@ -3649,24 +3701,16 @@ Module(
                                     parenthesized: true,
                                 },
                             ),
-                            optional_vars: Some(
-                                Name(
-                                    ExprName {
-                                        range: 3270..3271,
-                                        id: Name("f"),
-                                        ctx: Store,
-                                    },
-                                ),
-                            ),
+                            optional_vars: None,
                         },
                     ],
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3273..3276,
+                                range: 3268..3271,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3273..3276,
+                                        range: 3268..3271,
                                     },
                                 ),
                             },
@@ -3676,28 +3720,28 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3277..3308,
+                    range: 3272..3305,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3282..3303,
+                            range: 3277..3300,
                             context_expr: Tuple(
                                 ExprTuple {
-                                    range: 3282..3303,
+                                    range: 3277..3300,
                                     elts: [
                                         Named(
                                             ExprNamed {
-                                                range: 3283..3294,
+                                                range: 3279..3290,
                                                 target: Name(
                                                     ExprName {
-                                                        range: 3283..3288,
+                                                        range: 3279..3284,
                                                         id: Name("item1"),
                                                         ctx: Store,
                                                     },
                                                 ),
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
-                                                        range: 3292..3294,
+                                                        range: 3288..3290,
                                                         value: Int(
                                                             10,
                                                         ),
@@ -3707,10 +3751,10 @@ Module(
                                         ),
                                         Starred(
                                             ExprStarred {
-                                                range: 3296..3302,
+                                                range: 3293..3299,
                                                 value: Name(
                                                     ExprName {
-                                                        range: 3297..3302,
+                                                        range: 3294..3299,
                                                         id: Name("item2"),
                                                         ctx: Load,
                                                     },
@@ -3729,10 +3773,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3305..3308,
+                                range: 3302..3305,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3305..3308,
+                                        range: 3302..3305,
                                     },
                                 ),
                             },
@@ -3742,113 +3786,47 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3309..3342,
+                    range: 3510..3542,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3314..3337,
-                            context_expr: Tuple(
-                                ExprTuple {
-                                    range: 3314..3337,
-                                    elts: [
-                                        Named(
-                                            ExprNamed {
-                                                range: 3316..3327,
-                                                target: Name(
-                                                    ExprName {
-                                                        range: 3316..3321,
-                                                        id: Name("item1"),
-                                                        ctx: Store,
-                                                    },
-                                                ),
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        range: 3325..3327,
-                                                        value: Int(
-                                                            10,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        Starred(
-                                            ExprStarred {
-                                                range: 3330..3336,
-                                                value: Name(
-                                                    ExprName {
-                                                        range: 3331..3336,
-                                                        id: Name("item2"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                    ],
-                                    ctx: Load,
-                                    parenthesized: true,
-                                },
-                            ),
-                            optional_vars: None,
-                        },
-                    ],
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 3339..3342,
-                                value: EllipsisLiteral(
-                                    ExprEllipsisLiteral {
-                                        range: 3339..3342,
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                },
-            ),
-            With(
-                StmtWith {
-                    range: 3547..3579,
-                    is_async: false,
-                    items: [
-                        WithItem {
-                            range: 3552..3574,
+                            range: 3515..3537,
                             context_expr: Generator(
                                 ExprGenerator {
-                                    range: 3552..3574,
+                                    range: 3515..3537,
                                     elt: Name(
                                         ExprName {
-                                            range: 3553..3554,
+                                            range: 3516..3517,
                                             id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
                                     generators: [
                                         Comprehension {
-                                            range: 3555..3573,
+                                            range: 3518..3536,
                                             target: Name(
                                                 ExprName {
-                                                    range: 3559..3560,
+                                                    range: 3522..3523,
                                                     id: Name("x"),
                                                     ctx: Store,
                                                 },
                                             ),
                                             iter: Call(
                                                 ExprCall {
-                                                    range: 3564..3573,
+                                                    range: 3527..3536,
                                                     func: Name(
                                                         ExprName {
-                                                            range: 3564..3569,
+                                                            range: 3527..3532,
                                                             id: Name("range"),
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     arguments: Arguments {
-                                                        range: 3569..3573,
+                                                        range: 3532..3536,
                                                         args: [
                                                             NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 3570..3572,
+                                                                    range: 3533..3535,
                                                                     value: Int(
                                                                         10,
                                                                     ),
@@ -3872,10 +3850,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3576..3579,
+                                range: 3539..3542,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3576..3579,
+                                        range: 3539..3542,
                                     },
                                 ),
                             },
@@ -3885,47 +3863,47 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3580..3618,
+                    range: 3543..3581,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3585..3613,
+                            range: 3548..3576,
                             context_expr: Generator(
                                 ExprGenerator {
-                                    range: 3585..3613,
+                                    range: 3548..3576,
                                     elt: Name(
                                         ExprName {
-                                            range: 3586..3587,
+                                            range: 3549..3550,
                                             id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
                                     generators: [
                                         Comprehension {
-                                            range: 3588..3612,
+                                            range: 3551..3575,
                                             target: Name(
                                                 ExprName {
-                                                    range: 3598..3599,
+                                                    range: 3561..3562,
                                                     id: Name("x"),
                                                     ctx: Store,
                                                 },
                                             ),
                                             iter: Call(
                                                 ExprCall {
-                                                    range: 3603..3612,
+                                                    range: 3566..3575,
                                                     func: Name(
                                                         ExprName {
-                                                            range: 3603..3608,
+                                                            range: 3566..3571,
                                                             id: Name("range"),
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     arguments: Arguments {
-                                                        range: 3608..3612,
+                                                        range: 3571..3575,
                                                         args: [
                                                             NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 3609..3611,
+                                                                    range: 3572..3574,
                                                                     value: Int(
                                                                         10,
                                                                     ),
@@ -3949,10 +3927,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3615..3618,
+                                range: 3578..3581,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3615..3618,
+                                        range: 3578..3581,
                                     },
                                 ),
                             },
@@ -3962,47 +3940,47 @@ Module(
             ),
             With(
                 StmtWith {
-                    range: 3619..3657,
+                    range: 3582..3620,
                     is_async: false,
                     items: [
                         WithItem {
-                            range: 3624..3646,
+                            range: 3587..3609,
                             context_expr: Generator(
                                 ExprGenerator {
-                                    range: 3624..3646,
+                                    range: 3587..3609,
                                     elt: Name(
                                         ExprName {
-                                            range: 3625..3626,
+                                            range: 3588..3589,
                                             id: Name("x"),
                                             ctx: Load,
                                         },
                                     ),
                                     generators: [
                                         Comprehension {
-                                            range: 3627..3645,
+                                            range: 3590..3608,
                                             target: Name(
                                                 ExprName {
-                                                    range: 3631..3632,
+                                                    range: 3594..3595,
                                                     id: Name("x"),
                                                     ctx: Store,
                                                 },
                                             ),
                                             iter: Call(
                                                 ExprCall {
-                                                    range: 3636..3645,
+                                                    range: 3599..3608,
                                                     func: Name(
                                                         ExprName {
-                                                            range: 3636..3641,
+                                                            range: 3599..3604,
                                                             id: Name("range"),
                                                             ctx: Load,
                                                         },
                                                     ),
                                                     arguments: Arguments {
-                                                        range: 3641..3645,
+                                                        range: 3604..3608,
                                                         args: [
                                                             NumberLiteral(
                                                                 ExprNumberLiteral {
-                                                                    range: 3642..3644,
+                                                                    range: 3605..3607,
                                                                     value: Int(
                                                                         10,
                                                                     ),
@@ -4023,10 +4001,10 @@ Module(
                             optional_vars: None,
                         },
                         WithItem {
-                            range: 3648..3652,
+                            range: 3611..3615,
                             context_expr: Name(
                                 ExprName {
-                                    range: 3648..3652,
+                                    range: 3611..3615,
                                     id: Name("item"),
                                     ctx: Load,
                                 },
@@ -4037,10 +4015,10 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                range: 3654..3657,
+                                range: 3617..3620,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        range: 3654..3657,
+                                        range: 3617..3620,
                                     },
                                 ),
                             },

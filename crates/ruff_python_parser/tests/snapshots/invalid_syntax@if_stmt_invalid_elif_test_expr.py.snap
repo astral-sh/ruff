@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/if_stmt_invalid_elif_test_expr.py
+snapshot_kind: text
 ---
 ## AST
 
@@ -102,25 +103,5 @@ Module(
 4 |     pass
 5 | elif yield x:
   |      ^^^^^^^ Syntax Error: Yield expression cannot be used here
-6 |     pass
-  |
-
-
-## Semantic Syntax Errors
-
-  |
-3 | elif *x:
-4 |     pass
-5 | elif yield x:
-  |      ^^^^^^^ Syntax Error: `yield` statement outside of a function
-6 |     pass
-  |
-
-
-  |
-3 | elif *x:
-4 |     pass
-5 | elif yield x:
-  |      ^^^^^^^ Syntax Error: `yield` statement outside of a function
 6 |     pass
   |

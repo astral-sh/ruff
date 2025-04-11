@@ -254,8 +254,7 @@ impl<'src> Parser<'src> {
         }
 
         // test_ok simple_stmts_with_semicolons
-        // def outer():
-        //     return; import a; from x import y; z; type T = int
+        // return; import a; from x import y; z; type T = int
         stmts
     }
 
@@ -2480,9 +2479,8 @@ impl<'src> Parser<'src> {
         // # Starred expressions are only allowed in tuple expression
         // match *x | y, z:
         //     case _: ...
-        // def outer():
-        //     match await x:
-        //         case _: ...
+        // match await x:
+        //     case _: ...
 
         // test_err match_stmt_invalid_subject_expr
         // match (*x):
@@ -3687,11 +3685,10 @@ impl<'src> Parser<'src> {
             //     case _: ...
             // match not foo:
             //     case _: ...
+            // match await foo():
+            //     case _: ...
             // match lambda foo: foo:
             //     case _: ...
-            // def outer():
-            //     match await foo():
-            //         case _: ...
 
             // test_err match_classify_as_keyword
             // match yield foo:

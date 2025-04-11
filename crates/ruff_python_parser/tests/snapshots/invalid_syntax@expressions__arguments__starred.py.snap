@@ -1,6 +1,7 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/invalid/expressions/arguments/starred.py
+snapshot_kind: text
 ---
 ## AST
 
@@ -183,22 +184,4 @@ Module(
 2 | call(*yield x)
 3 | call(*yield from x)
   |       ^^^^^^^^^^^^ Syntax Error: Yield expression cannot be used here
-  |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | call(*data for data in iter)
-2 | call(*yield x)
-  |       ^^^^^^^ Syntax Error: `yield` statement outside of a function
-3 | call(*yield from x)
-  |
-
-
-  |
-1 | call(*data for data in iter)
-2 | call(*yield x)
-3 | call(*yield from x)
-  |       ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
   |

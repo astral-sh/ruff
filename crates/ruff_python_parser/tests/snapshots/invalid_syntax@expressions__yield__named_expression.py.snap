@@ -114,22 +114,3 @@ Module(
 4 | yield 1, x := 2, 3
   |            ^^ Syntax Error: Expected ',', found ':='
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | # Unparenthesized named expressions are not allowed
-2 | yield x := 1
-  | ^^^^^^^ Syntax Error: `yield` statement outside of a function
-3 |
-4 | yield 1, x := 2, 3
-  |
-
-
-  |
-2 | yield x := 1
-3 |
-4 | yield 1, x := 2, 3
-  | ^^^^^^^^^^^^^^^^^^ Syntax Error: `yield` statement outside of a function
-  |

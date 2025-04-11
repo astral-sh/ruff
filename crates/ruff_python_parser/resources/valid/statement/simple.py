@@ -10,5 +10,4 @@ if True: pass
 
 if c: B; del A
 else: C
-def outer():
-    if x: yield x;
+if x: yield x;

@@ -100,13 +100,6 @@ impl SemanticSyntaxChecker {
                     Self::invalid_star_expression(value, ctx);
                 }
                 if !ctx.in_function_scope() {
-                    // test_ok return_inside_function
-                    // def f(): return 1
-                    // def f(): return
-
-                    // test_err return_outside_function
-                    // return 1
-                    // return
                     Self::add_error(ctx, SemanticSyntaxErrorKind::ReturnOutsideFunction, *range);
                 }
             }

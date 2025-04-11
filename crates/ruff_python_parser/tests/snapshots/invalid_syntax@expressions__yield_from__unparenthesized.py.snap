@@ -156,31 +156,3 @@ Module(
 9 | yield from (x, *x and y)
   |                 ^^^^^^^ Syntax Error: Boolean expression cannot be used here
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | # Unparenthesized named expression
-2 | yield from x := 1
-  | ^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
-3 |
-4 | # Unparenthesized tuple expression
-  |
-
-
-  |
-4 | # Unparenthesized tuple expression
-5 | yield from x, y
-  | ^^^^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
-6 |
-7 | # This is a tuple expression parsing
-  |
-
-
-  |
-7 | # This is a tuple expression parsing
-8 | #          vvvvvvvvvvvvv
-9 | yield from (x, *x and y)
-  | ^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
-  |

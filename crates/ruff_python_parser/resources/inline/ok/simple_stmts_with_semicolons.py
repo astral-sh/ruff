@@ -1,2 +1,1 @@
-def outer():
-    return; import a; from x import y; z; type T = int
+return; import a; from x import y; z; type T = int

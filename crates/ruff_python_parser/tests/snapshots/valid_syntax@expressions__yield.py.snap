@@ -7,477 +7,454 @@ input_file: crates/ruff_python_parser/resources/valid/expressions/yield.py
 ```
 Module(
     ModModule {
-        range: 0..235,
+        range: 0..166,
         body: [
-            FunctionDef(
-                StmtFunctionDef {
-                    range: 0..234,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("outer"),
-                        range: 4..9,
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 9..11,
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        Expr(
-                            StmtExpr {
-                                range: 17..22,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 17..22,
-                                        value: None,
+            Expr(
+                StmtExpr {
+                    range: 0..5,
+                    value: Yield(
+                        ExprYield {
+                            range: 0..5,
+                            value: None,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 6..13,
+                    value: Yield(
+                        ExprYield {
+                            range: 6..13,
+                            value: Some(
+                                Name(
+                                    ExprName {
+                                        range: 12..13,
+                                        id: Name("x"),
+                                        ctx: Load,
                                     },
                                 ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 27..34,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 27..34,
-                                        value: Some(
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 14..25,
+                    value: Yield(
+                        ExprYield {
+                            range: 14..25,
+                            value: Some(
+                                BinOp(
+                                    ExprBinOp {
+                                        range: 20..25,
+                                        left: Name(
+                                            ExprName {
+                                                range: 20..21,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        op: Add,
+                                        right: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 24..25,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 26..39,
+                    value: Yield(
+                        ExprYield {
+                            range: 26..39,
+                            value: Some(
+                                BoolOp(
+                                    ExprBoolOp {
+                                        range: 32..39,
+                                        op: And,
+                                        values: [
                                             Name(
                                                 ExprName {
-                                                    range: 33..34,
+                                                    range: 32..33,
                                                     id: Name("x"),
                                                     ctx: Load,
                                                 },
                                             ),
-                                        ),
+                                            Name(
+                                                ExprName {
+                                                    range: 38..39,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
                                     },
                                 ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 39..50,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 39..50,
-                                        value: Some(
-                                            BinOp(
-                                                ExprBinOp {
-                                                    range: 45..50,
-                                                    left: Name(
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 40..52,
+                    value: Yield(
+                        ExprYield {
+                            range: 40..52,
+                            value: Some(
+                                Call(
+                                    ExprCall {
+                                        range: 46..52,
+                                        func: Name(
+                                            ExprName {
+                                                range: 46..50,
+                                                id: Name("call"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        arguments: Arguments {
+                                            range: 50..52,
+                                            args: [],
+                                            keywords: [],
+                                        },
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 53..65,
+                    value: Yield(
+                        ExprYield {
+                            range: 53..65,
+                            value: Some(
+                                List(
+                                    ExprList {
+                                        range: 59..65,
+                                        elts: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 60..61,
+                                                    value: Int(
+                                                        1,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 63..64,
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 66..78,
+                    value: Yield(
+                        ExprYield {
+                            range: 66..78,
+                            value: Some(
+                                Set(
+                                    ExprSet {
+                                        range: 72..78,
+                                        elts: [
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 73..74,
+                                                    value: Int(
+                                                        3,
+                                                    ),
+                                                },
+                                            ),
+                                            NumberLiteral(
+                                                ExprNumberLiteral {
+                                                    range: 76..77,
+                                                    value: Int(
+                                                        4,
+                                                    ),
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 79..91,
+                    value: Yield(
+                        ExprYield {
+                            range: 79..91,
+                            value: Some(
+                                Dict(
+                                    ExprDict {
+                                        range: 85..91,
+                                        items: [
+                                            DictItem {
+                                                key: Some(
+                                                    Name(
                                                         ExprName {
-                                                            range: 45..46,
+                                                            range: 86..87,
                                                             id: Name("x"),
                                                             ctx: Load,
                                                         },
                                                     ),
-                                                    op: Add,
-                                                    right: NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            range: 49..50,
-                                                            value: Int(
-                                                                1,
-                                                            ),
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 55..68,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 55..68,
-                                        value: Some(
-                                            BoolOp(
-                                                ExprBoolOp {
-                                                    range: 61..68,
-                                                    op: And,
-                                                    values: [
-                                                        Name(
-                                                            ExprName {
-                                                                range: 61..62,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
+                                                ),
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        range: 89..90,
+                                                        value: Int(
+                                                            5,
                                                         ),
-                                                        Name(
-                                                            ExprName {
-                                                                range: 67..68,
-                                                                id: Name("y"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ],
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 73..85,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 73..85,
-                                        value: Some(
-                                            Call(
-                                                ExprCall {
-                                                    range: 79..85,
-                                                    func: Name(
-                                                        ExprName {
-                                                            range: 79..83,
-                                                            id: Name("call"),
-                                                            ctx: Load,
-                                                        },
-                                                    ),
-                                                    arguments: Arguments {
-                                                        range: 83..85,
-                                                        args: [],
-                                                        keywords: [],
                                                     },
-                                                },
-                                            ),
-                                        ),
+                                                ),
+                                            },
+                                        ],
                                     },
                                 ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 90..102,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 90..102,
-                                        value: Some(
-                                            List(
-                                                ExprList {
-                                                    range: 96..102,
-                                                    elts: [
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 97..98,
-                                                                value: Int(
-                                                                    1,
-                                                                ),
-                                                            },
-                                                        ),
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 100..101,
-                                                                value: Int(
-                                                                    2,
-                                                                ),
-                                                            },
-                                                        ),
-                                                    ],
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 92..102,
+                    value: Yield(
+                        ExprYield {
+                            range: 92..102,
+                            value: Some(
+                                Tuple(
+                                    ExprTuple {
+                                        range: 98..102,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    range: 98..99,
+                                                    id: Name("x"),
                                                     ctx: Load,
                                                 },
                                             ),
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 107..119,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 107..119,
-                                        value: Some(
-                                            Set(
-                                                ExprSet {
-                                                    range: 113..119,
-                                                    elts: [
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 114..115,
-                                                                value: Int(
-                                                                    3,
-                                                                ),
-                                                            },
-                                                        ),
-                                                        NumberLiteral(
-                                                            ExprNumberLiteral {
-                                                                range: 117..118,
-                                                                value: Int(
-                                                                    4,
-                                                                ),
-                                                            },
-                                                        ),
-                                                    ],
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 124..136,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 124..136,
-                                        value: Some(
-                                            Dict(
-                                                ExprDict {
-                                                    range: 130..136,
-                                                    items: [
-                                                        DictItem {
-                                                            key: Some(
-                                                                Name(
-                                                                    ExprName {
-                                                                        range: 131..132,
-                                                                        id: Name("x"),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                            ),
-                                                            value: NumberLiteral(
-                                                                ExprNumberLiteral {
-                                                                    range: 134..135,
-                                                                    value: Int(
-                                                                        5,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                        },
-                                                    ],
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 141..151,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 141..151,
-                                        value: Some(
-                                            Tuple(
-                                                ExprTuple {
-                                                    range: 147..151,
-                                                    elts: [
-                                                        Name(
-                                                            ExprName {
-                                                                range: 147..148,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        Name(
-                                                            ExprName {
-                                                                range: 150..151,
-                                                                id: Name("y"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ],
+                                            Name(
+                                                ExprName {
+                                                    range: 101..102,
+                                                    id: Name("y"),
                                                     ctx: Load,
-                                                    parenthesized: false,
                                                 },
                                             ),
-                                        ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: false,
                                     },
                                 ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 156..168,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 156..168,
-                                        value: Some(
-                                            Tuple(
-                                                ExprTuple {
-                                                    range: 162..168,
-                                                    elts: [
-                                                        Name(
-                                                            ExprName {
-                                                                range: 163..164,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        Name(
-                                                            ExprName {
-                                                                range: 166..167,
-                                                                id: Name("y"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ],
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 103..115,
+                    value: Yield(
+                        ExprYield {
+                            range: 103..115,
+                            value: Some(
+                                Tuple(
+                                    ExprTuple {
+                                        range: 109..115,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    range: 110..111,
+                                                    id: Name("x"),
                                                     ctx: Load,
-                                                    parenthesized: true,
                                                 },
                                             ),
+                                            Name(
+                                                ExprName {
+                                                    range: 113..114,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: true,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 116..128,
+                    value: Yield(
+                        ExprYield {
+                            range: 116..128,
+                            value: Some(
+                                Compare(
+                                    ExprCompare {
+                                        range: 122..128,
+                                        left: Name(
+                                            ExprName {
+                                                range: 122..123,
+                                                id: Name("x"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ops: [
+                                            Eq,
+                                        ],
+                                        comparators: [
+                                            Name(
+                                                ExprName {
+                                                    range: 127..128,
+                                                    id: Name("y"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 129..143,
+                    value: Yield(
+                        ExprYield {
+                            range: 129..143,
+                            value: Some(
+                                Named(
+                                    ExprNamed {
+                                        range: 136..142,
+                                        target: Name(
+                                            ExprName {
+                                                range: 136..137,
+                                                id: Name("x"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 141..142,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
                                         ),
                                     },
                                 ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 173..185,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 173..185,
-                                        value: Some(
-                                            Compare(
-                                                ExprCompare {
-                                                    range: 179..185,
-                                                    left: Name(
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 144..155,
+                    value: Yield(
+                        ExprYield {
+                            range: 144..155,
+                            value: Some(
+                                Tuple(
+                                    ExprTuple {
+                                        range: 150..155,
+                                        elts: [
+                                            Name(
+                                                ExprName {
+                                                    range: 150..151,
+                                                    id: Name("x"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 153..155,
+                                                    value: Name(
                                                         ExprName {
-                                                            range: 179..180,
+                                                            range: 154..155,
+                                                            id: Name("y"),
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: false,
+                                    },
+                                ),
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 156..165,
+                    value: Yield(
+                        ExprYield {
+                            range: 156..165,
+                            value: Some(
+                                Tuple(
+                                    ExprTuple {
+                                        range: 162..165,
+                                        elts: [
+                                            Starred(
+                                                ExprStarred {
+                                                    range: 162..164,
+                                                    value: Name(
+                                                        ExprName {
+                                                            range: 163..164,
                                                             id: Name("x"),
                                                             ctx: Load,
                                                         },
                                                     ),
-                                                    ops: [
-                                                        Eq,
-                                                    ],
-                                                    comparators: [
-                                                        Name(
-                                                            ExprName {
-                                                                range: 184..185,
-                                                                id: Name("y"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ],
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 190..204,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 190..204,
-                                        value: Some(
-                                            Named(
-                                                ExprNamed {
-                                                    range: 197..203,
-                                                    target: Name(
-                                                        ExprName {
-                                                            range: 197..198,
-                                                            id: Name("x"),
-                                                            ctx: Store,
-                                                        },
-                                                    ),
-                                                    value: NumberLiteral(
-                                                        ExprNumberLiteral {
-                                                            range: 202..203,
-                                                            value: Int(
-                                                                1,
-                                                            ),
-                                                        },
-                                                    ),
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 209..220,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 209..220,
-                                        value: Some(
-                                            Tuple(
-                                                ExprTuple {
-                                                    range: 215..220,
-                                                    elts: [
-                                                        Name(
-                                                            ExprName {
-                                                                range: 215..216,
-                                                                id: Name("x"),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                        Starred(
-                                                            ExprStarred {
-                                                                range: 218..220,
-                                                                value: Name(
-                                                                    ExprName {
-                                                                        range: 219..220,
-                                                                        id: Name("y"),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ],
                                                     ctx: Load,
-                                                    parenthesized: false,
                                                 },
                                             ),
-                                        ),
+                                        ],
+                                        ctx: Load,
+                                        parenthesized: false,
                                     },
                                 ),
-                            },
-                        ),
-                        Expr(
-                            StmtExpr {
-                                range: 225..234,
-                                value: Yield(
-                                    ExprYield {
-                                        range: 225..234,
-                                        value: Some(
-                                            Tuple(
-                                                ExprTuple {
-                                                    range: 231..234,
-                                                    elts: [
-                                                        Starred(
-                                                            ExprStarred {
-                                                                range: 231..233,
-                                                                value: Name(
-                                                                    ExprName {
-                                                                        range: 232..233,
-                                                                        id: Name("x"),
-                                                                        ctx: Load,
-                                                                    },
-                                                                ),
-                                                                ctx: Load,
-                                                            },
-                                                        ),
-                                                    ],
-                                                    ctx: Load,
-                                                    parenthesized: false,
-                                                },
-                                            ),
-                                        ),
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
+                            ),
+                        },
+                    ),
                 },
             ),
         ],

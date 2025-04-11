@@ -10,7 +10,7 @@ slice[:1]()
 (x for x in iter)()
 {1, 2, 3}()
 {1: 2, 3: 4}()
-def outer(): (yield x)()
+(yield x)()
 
 # These are `TypeError`, so make sure it parses correctly.
 True()

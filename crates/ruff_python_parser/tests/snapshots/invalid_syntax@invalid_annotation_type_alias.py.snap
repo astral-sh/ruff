@@ -373,25 +373,8 @@ Module(
 
   |
 1 | type X[T: (yield 1)] = int      # TypeVar bound
-  |            ^^^^^^^ Syntax Error: `yield` statement outside of a function
-2 | type X[T = (yield 1)] = int     # TypeVar default
-3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
-  |
-
-
-  |
-1 | type X[T: (yield 1)] = int      # TypeVar bound
 2 | type X[T = (yield 1)] = int     # TypeVar default
   |             ^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVar default
-3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
-4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
-  |
-
-
-  |
-1 | type X[T: (yield 1)] = int      # TypeVar bound
-2 | type X[T = (yield 1)] = int     # TypeVar default
-  |             ^^^^^^^ Syntax Error: `yield` statement outside of a function
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
   |
@@ -408,16 +391,6 @@ Module(
 
 
   |
-1 | type X[T: (yield 1)] = int      # TypeVar bound
-2 | type X[T = (yield 1)] = int     # TypeVar default
-3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
-  |               ^^^^^^^ Syntax Error: `yield` statement outside of a function
-4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
-5 | type Y = (yield 1)              # yield in value
-  |
-
-
-  |
 2 | type X[T = (yield 1)] = int     # TypeVar default
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
@@ -428,30 +401,10 @@ Module(
 
 
   |
-2 | type X[T = (yield 1)] = int     # TypeVar default
-3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
-4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
-  |                ^^^^^^^ Syntax Error: `yield` statement outside of a function
-5 | type Y = (yield 1)              # yield in value
-6 | type Y = (x := 1)               # named expr in value
-  |
-
-
-  |
 3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
 4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
 5 | type Y = (yield 1)              # yield in value
   |           ^^^^^^^ Syntax Error: yield expression cannot be used within a type alias
-6 | type Y = (x := 1)               # named expr in value
-7 | type Y[T: (await 1)] = int      # await in bound
-  |
-
-
-  |
-3 | type X[*Ts = (yield 1)] = int   # TypeVarTuple default
-4 | type X[**Ts = (yield 1)] = int  # ParamSpec default
-5 | type Y = (yield 1)              # yield in value
-  |           ^^^^^^^ Syntax Error: `yield` statement outside of a function
 6 | type Y = (x := 1)               # named expr in value
 7 | type Y[T: (await 1)] = int      # await in bound
   |
@@ -477,25 +430,8 @@ Module(
 
 
   |
-5 | type Y = (yield 1)              # yield in value
-6 | type Y = (x := 1)               # named expr in value
-7 | type Y[T: (await 1)] = int      # await in bound
-  |            ^^^^^^^ Syntax Error: `await` statement outside of a function
-8 | type Y = (await 1)              # await in value
-  |
-
-
-  |
 6 | type Y = (x := 1)               # named expr in value
 7 | type Y[T: (await 1)] = int      # await in bound
 8 | type Y = (await 1)              # await in value
   |           ^^^^^^^ Syntax Error: await expression cannot be used within a type alias
-  |
-
-
-  |
-6 | type Y = (x := 1)               # named expr in value
-7 | type Y[T: (await 1)] = int      # await in bound
-8 | type Y = (await 1)              # await in value
-  |           ^^^^^^^ Syntax Error: `await` statement outside of a function
   |

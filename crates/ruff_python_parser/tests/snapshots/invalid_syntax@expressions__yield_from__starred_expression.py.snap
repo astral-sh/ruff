@@ -91,21 +91,3 @@ Module(
 4 | yield from *x, y
   |            ^^ Syntax Error: Starred expression cannot be used here
   |
-
-
-## Semantic Syntax Errors
-
-  |
-1 | # Yield from doesn't allow top-level starred expression unlike yield
-2 |
-3 | yield from *x
-  | ^^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
-4 | yield from *x, y
-  |
-
-
-  |
-3 | yield from *x
-4 | yield from *x, y
-  | ^^^^^^^^^^^^^^^^ Syntax Error: `yield from` statement outside of a function
-  |
