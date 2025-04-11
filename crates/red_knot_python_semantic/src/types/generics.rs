@@ -183,7 +183,7 @@ impl<'db> SpecializationBuilder<'db> {
                 self.types
                     .remove(variable)
                     .map(UnionBuilder::build)
-                    .unwrap_or(variable.default_type(self.db))
+                    .unwrap_or(variable.default_ty(self.db).unwrap_or(Type::unknown()))
             })
             .collect();
         Specialization::new(self.db, self.generic_context, types)

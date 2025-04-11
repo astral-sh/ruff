@@ -4652,10 +4652,6 @@ impl<'db> TypeVarInstance<'db> {
             None
         }
     }
-
-    pub(crate) fn default_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.default_ty(db).unwrap_or(Type::unknown())
-    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
