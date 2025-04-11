@@ -82,12 +82,13 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     todo_type, CallDunderError, CallableSignature, CallableType, Class, ClassLiteralType,
-    DynamicType, FunctionDecorators, FunctionType, GenericAlias, GenericClass, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, NonGenericClass, Parameter, ParameterForm, Parameters, Signature,
-    Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
-    Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    DataclassMetadata, DynamicType, FunctionDecorators, FunctionType, GenericAlias, GenericClass,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MemberLookupPolicy, MetaclassCandidate, NonGenericClass, Parameter, ParameterForm, Parameters,
+    Signature, Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol,
+    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
+    UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -1725,8 +1726,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             body: _,
         } = class_node;
 
+        let mut dataclass_metadata = None;
         for decorator in decorator_list {
-            self.infer_decorator(decorator);
+            let decorator_ty = self.infer_decorator(decorator);
+            if decorator_ty
+                .into_function_literal()
+                .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
+            {
+                dataclass_metadata = Some(DataclassMetadata::default());
+                continue;
+            }
+
+            if let Type::DataclassDecorator(metadata) = decorator_ty {
+                dataclass_metadata = Some(metadata);
+                continue;
+            }
         }
 
         let generic_context = type_params.as_ref().map(|type_params| {
@@ -1744,6 +1758,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             name: name.id.clone(),
             body_scope,
             known: maybe_known_class,
+            dataclass_metadata,
         };
         let class_literal = match generic_context {
             Some(generic_context) => {
@@ -2432,6 +2447,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::BoundMethod(_)
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
@@ -4677,6 +4693,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::Callable(..)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
+                | Type::DataclassDecorator(_)
                 | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
@@ -4955,6 +4972,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::BoundMethod(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
+                | Type::DataclassDecorator(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
@@ -4977,6 +4995,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::BoundMethod(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
+                | Type::DataclassDecorator(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)

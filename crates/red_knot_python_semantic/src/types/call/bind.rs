@@ -18,8 +18,8 @@ use crate::types::diagnostic::{
 };
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    todo_type, BoundMethodType, FunctionDecorators, KnownClass, KnownFunction, KnownInstanceType,
-    MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
+    todo_type, BoundMethodType, DataclassMetadata, FunctionDecorators, KnownClass, KnownFunction,
+    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Severity, Span, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -571,6 +571,56 @@ impl<'db> Bindings<'db> {
                                 Symbol::Unbound => default,
                             },
                         );
+                    }
+
+                    Some(KnownFunction::Dataclass) => {
+                        if let [init, repr, eq, order, unsafe_hash, frozen, match_args, kw_only, slots, weakref_slot] =
+                            overload.parameter_types()
+                        {
+                            let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
+                                if let Some(Type::BooleanLiteral(value)) = ty {
+                                    *value
+                                } else {
+                                    // TODO: emit a diagnostic if we receive `bool`
+                                    default
+                                }
+                            };
+
+                            let mut metadata = DataclassMetadata::empty();
+
+                            if to_bool(init, true) {
+                                metadata |= DataclassMetadata::INIT;
+                            }
+                            if to_bool(repr, true) {
+                                metadata |= DataclassMetadata::REPR;
+                            }
+                            if to_bool(eq, true) {
+                                metadata |= DataclassMetadata::EQ;
+                            }
+                            if to_bool(order, false) {
+                                metadata |= DataclassMetadata::ORDER;
+                            }
+                            if to_bool(unsafe_hash, false) {
+                                metadata |= DataclassMetadata::UNSAFE_HASH;
+                            }
+                            if to_bool(frozen, false) {
+                                metadata |= DataclassMetadata::FROZEN;
+                            }
+                            if to_bool(match_args, true) {
+                                metadata |= DataclassMetadata::MATCH_ARGS;
+                            }
+                            if to_bool(kw_only, false) {
+                                metadata |= DataclassMetadata::KW_ONLY;
+                            }
+                            if to_bool(slots, false) {
+                                metadata |= DataclassMetadata::SLOTS;
+                            }
+                            if to_bool(weakref_slot, false) {
+                                metadata |= DataclassMetadata::WEAKREF_SLOT;
+                            }
+
+                            overload.set_return_type(Type::DataclassDecorator(metadata));
+                        }
                     }
 
                     _ => {}

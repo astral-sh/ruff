@@ -311,6 +311,32 @@ impl<'db> PropertyInstanceType<'db> {
     }
 }
 
+bitflags! {
+    /// Used as the return type of `dataclass(…)` calls. Keeps track of the arguments
+    /// that were passed in. For the precise meaning of the fields, see [1].
+    ///
+    /// [1]: https://docs.python.org/3/library/dataclasses.html
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct DataclassMetadata: u16 {
+        const INIT = 0b0000_0000_0001;
+        const REPR = 0b0000_0000_0010;
+        const EQ = 0b0000_0000_0100;
+        const ORDER = 0b0000_0000_1000;
+        const UNSAFE_HASH = 0b0000_0001_0000;
+        const FROZEN = 0b0000_0010_0000;
+        const MATCH_ARGS = 0b0000_0100_0000;
+        const KW_ONLY = 0b0000_1000_0000;
+        const SLOTS = 0b0001_0000_0000;
+        const WEAKREF_SLOT = 0b0010_0000_0000;
+    }
+}
+
+impl Default for DataclassMetadata {
+    fn default() -> Self {
+        Self::INIT | Self::REPR | Self::EQ | Self::MATCH_ARGS
+    }
+}
+
 /// Representation of a type: a set of possible values at runtime.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub enum Type<'db> {
@@ -348,6 +374,10 @@ pub enum Type<'db> {
     /// type. We currently add this as a separate variant because `FunctionType.__get__`
     /// is an overloaded method and we do not support `@overload` yet.
     WrapperDescriptor(WrapperDescriptorKind),
+    /// A special callable that is returned by a `dataclass(…)` call. It is usually
+    /// used as a decorator. Note that this is only used as a return type for actual
+    /// `dataclass` calls, not for the argumentless `@dataclass` decorator.
+    DataclassDecorator(DataclassMetadata),
     /// The type of an arbitrary callable object with a certain specified signature.
     Callable(CallableType<'db>),
     /// A specific module object
@@ -458,7 +488,8 @@ impl<'db> Type<'db> {
             | Self::Dynamic(DynamicType::Unknown | DynamicType::Any)
             | Self::BoundMethod(_)
             | Self::WrapperDescriptor(_)
-            | Self::MethodWrapper(_) => false,
+            | Self::MethodWrapper(_)
+            | Self::DataclassDecorator(_) => false,
 
             Self::GenericAlias(generic) => generic
                 .specialization(db)
@@ -747,6 +778,7 @@ impl<'db> Type<'db> {
             | Type::MethodWrapper(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
+            | Self::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::KnownInstance(_)
@@ -978,6 +1010,11 @@ impl<'db> Type<'db> {
             (Type::Callable(self_callable), Type::Callable(other_callable)) => self_callable
                 .signature(db)
                 .is_subtype_of(db, other_callable.signature(db)),
+
+            (Type::DataclassDecorator(_), _) => {
+                // TODO: Implement subtyping using an equivalent `Callable` type.
+                false
+            }
 
             (Type::Callable(_), _) => {
                 // TODO: Implement subtyping between callable types and other types like
@@ -1507,6 +1544,7 @@ impl<'db> Type<'db> {
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
                 | Type::WrapperDescriptor(..)
+                | Type::DataclassDecorator(..)
                 | Type::IntLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::StringLiteral(..)
@@ -1522,6 +1560,7 @@ impl<'db> Type<'db> {
                 | Type::BoundMethod(..)
                 | Type::MethodWrapper(..)
                 | Type::WrapperDescriptor(..)
+                | Type::DataclassDecorator(..)
                 | Type::IntLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::StringLiteral(..)
@@ -1694,6 +1733,8 @@ impl<'db> Type<'db> {
                     .is_disjoint_from(db, other)
             }
 
+            (Type::DataclassDecorator(_), _) | (_, Type::DataclassDecorator(_)) => false,
+
             (Type::Callable(_) | Type::FunctionLiteral(_), Type::Callable(_))
             | (Type::Callable(_), Type::FunctionLiteral(_)) => {
                 // No two callable types are ever disjoint because
@@ -1773,6 +1814,7 @@ impl<'db> Type<'db> {
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
+            | Type::DataclassDecorator(_)
             | Type::ModuleLiteral(..)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
@@ -1891,6 +1933,7 @@ impl<'db> Type<'db> {
                 // (this variant represents `f.__get__`, where `f` is any function)
                 false
             }
+            Type::DataclassDecorator(_) => false,
             Type::Instance(InstanceType { class }) => {
                 class.known(db).is_some_and(KnownClass::is_singleton)
             }
@@ -1977,7 +2020,8 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::Callable(_)
-            | Type::PropertyInstance(_) => false,
+            | Type::PropertyInstance(_)
+            | Type::DataclassDecorator(_) => false,
         }
     }
 
@@ -2106,6 +2150,7 @@ impl<'db> Type<'db> {
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
+            | Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
             | Type::KnownInstance(_)
             | Type::AlwaysTruthy
@@ -2196,6 +2241,9 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
+                .to_instance(db)
+                .instance_member(db, name),
+            Type::DataclassDecorator(_) => KnownClass::FunctionType
                 .to_instance(db)
                 .instance_member(db, name),
             Type::Callable(_) => KnownClass::Object.to_instance(db).instance_member(db, name),
@@ -2604,6 +2652,9 @@ impl<'db> Type<'db> {
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
                 .member(db, &name),
+            Type::DataclassDecorator(_) => {
+                KnownClass::FunctionType.to_instance(db).member(db, &name)
+            }
             Type::Callable(_) => KnownClass::Object.to_instance(db).member(db, &name),
 
             Type::Instance(InstanceType { class })
@@ -2898,6 +2949,7 @@ impl<'db> Type<'db> {
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
+            | Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
             | Type::SliceLiteral(_)
             | Type::AlwaysTruthy => Truthiness::AlwaysTrue,
@@ -3286,6 +3338,83 @@ impl<'db> Type<'db> {
                             Some(Type::any()),
                         ),
                     );
+                    Signatures::single(signature)
+                }
+
+                Some(KnownFunction::Dataclass) => {
+                    let signature = CallableSignature::from_overloads(
+                        self,
+                        [
+                            // def dataclass(cls: None, /) -> Callable[[type[_T]], type[_T]]: ...
+                            Signature::new(
+                                Parameters::new([Parameter::positional_only(Some(
+                                    Name::new_static("cls"),
+                                ))
+                                .with_annotated_type(Type::none(db))]),
+                                None,
+                            ),
+                            // def dataclass(cls: type[_T], /) -> type[_T]: ...
+                            Signature::new(
+                                Parameters::new([Parameter::positional_only(Some(
+                                    Name::new_static("cls"),
+                                ))
+                                // TODO: type[_T]
+                                .with_annotated_type(Type::any())]),
+                                None,
+                            ),
+                            // TODO: make this overload Python-version-dependent
+
+                            // def dataclass(
+                            //     *,
+                            //     init: bool = True,
+                            //     repr: bool = True,
+                            //     eq: bool = True,
+                            //     order: bool = False,
+                            //     unsafe_hash: bool = False,
+                            //     frozen: bool = False,
+                            //     match_args: bool = True,
+                            //     kw_only: bool = False,
+                            //     slots: bool = False,
+                            //     weakref_slot: bool = False,
+                            // ) -> Callable[[type[_T]], type[_T]]: ...
+                            Signature::new(
+                                Parameters::new([
+                                    Parameter::keyword_only(Name::new_static("init"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(true)),
+                                    Parameter::keyword_only(Name::new_static("repr"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(true)),
+                                    Parameter::keyword_only(Name::new_static("eq"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(true)),
+                                    Parameter::keyword_only(Name::new_static("order"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(false)),
+                                    Parameter::keyword_only(Name::new_static("unsafe_hash"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(false)),
+                                    Parameter::keyword_only(Name::new_static("frozen"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(false)),
+                                    Parameter::keyword_only(Name::new_static("match_args"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(true)),
+                                    Parameter::keyword_only(Name::new_static("kw_only"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(false)),
+                                    Parameter::keyword_only(Name::new_static("slots"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(false)),
+                                    Parameter::keyword_only(Name::new_static("weakref_slot"))
+                                        .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                        .with_default_type(Type::BooleanLiteral(false)),
+                                ]),
+                                None,
+                            ),
+                        ],
+                    );
+
                     Signatures::single(signature)
                 }
 
@@ -3911,6 +4040,7 @@ impl<'db> Type<'db> {
             | Type::MethodWrapper(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
             | Type::Instance(_)
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
@@ -3979,6 +4109,7 @@ impl<'db> Type<'db> {
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
+            | Type::DataclassDecorator(_)
             | Type::Never
             | Type::FunctionLiteral(_)
             | Type::PropertyInstance(_) => Err(InvalidTypeExpressionError {
@@ -4188,6 +4319,7 @@ impl<'db> Type<'db> {
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
+            Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::Callable(_) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
@@ -4326,6 +4458,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
+            | Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
             // A non-generic class never needs to be specialized. A generic class is specialized
             // explicitly (via a subscript expression) or implicitly (via a call), and not because
@@ -4430,6 +4563,7 @@ impl<'db> Type<'db> {
             | Self::SliceLiteral(_)
             | Self::MethodWrapper(_)
             | Self::WrapperDescriptor(_)
+            | Self::DataclassDecorator(_)
             | Self::PropertyInstance(_)
             | Self::Tuple(_) => self.to_meta_type(db).definition(db),
 
@@ -5581,6 +5715,9 @@ pub enum KnownFunction {
     #[strum(serialize = "abstractmethod")]
     AbstractMethod,
 
+    /// `dataclasses.dataclass`
+    Dataclass,
+
     /// `inspect.getattr_static`
     GetattrStatic,
 
@@ -5639,6 +5776,9 @@ impl KnownFunction {
             }
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
+            }
+            Self::Dataclass => {
+                matches!(module, KnownModule::Dataclasses)
             }
             Self::GetattrStatic => module.is_inspect(),
             Self::IsAssignableTo
@@ -6577,6 +6717,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsSubclass => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
+
+                KnownFunction::Dataclass => KnownModule::Dataclasses,
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
