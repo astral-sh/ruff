@@ -198,12 +198,25 @@ impl Diagnostic {
         self.inner.severity
     }
 
-    /// Returns the "primary" annotation of this diagnostic if one exists.
+    /// Returns a shared borrow of the "primary" annotation of this diagnostic
+    /// if one exists.
     ///
-    /// When there are multiple primary annotation, then the first one that was
-    /// added to this diagnostic is returned.
+    /// When there are multiple primary annotations, then the first one that
+    /// was added to this diagnostic is returned.
     pub fn primary_annotation(&self) -> Option<&Annotation> {
         self.inner.annotations.iter().find(|ann| ann.is_primary)
+    }
+
+    /// Returns a mutable borrow of the "primary" annotation of this diagnostic
+    /// if one exists.
+    ///
+    /// When there are multiple primary annotations, then the first one that
+    /// was added to this diagnostic is returned.
+    pub fn primary_annotation_mut(&mut self) -> Option<&mut Annotation> {
+        Arc::make_mut(&mut self.inner)
+            .annotations
+            .iter_mut()
+            .find(|ann| ann.is_primary)
     }
 
     /// Returns the "primary" span of this diagnostic if one exists.
@@ -376,6 +389,17 @@ impl Annotation {
     pub fn message<'a>(self, message: impl IntoDiagnosticMessage + 'a) -> Annotation {
         let message = Some(message.into_diagnostic_message());
         Annotation { message, ..self }
+    }
+
+    /// Sets the message on this annotation.
+    ///
+    /// If one was already set, then this overwrites it.
+    ///
+    /// This is useful if one needs to set the message on an annotation,
+    /// and all one has is a `&mut Annotation`. For example, via
+    /// `Diagnostic::primary_annotation_mut`.
+    pub fn set_message<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
+        self.message = Some(message.into_diagnostic_message());
     }
 
     /// Returns the message attached to this annotation, if one exists.
