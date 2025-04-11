@@ -1991,6 +1991,18 @@ pub struct Flake8TidyImportsOptions {
         "#
     )]
     pub banned_module_level_imports: Option<Vec<String>>,
+
+    /// Whether to require sibling imports to be relative imports.
+    /// To be used with `ban-relative-imports = "parents"`.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Require sibling imports to be relative.
+            relative-sibling-imports = true
+        "#
+    )]
+    pub relative_sibling_imports: Option<bool>,
 }
 
 impl Flake8TidyImportsOptions {
@@ -1999,6 +2011,7 @@ impl Flake8TidyImportsOptions {
             ban_relative_imports: self.ban_relative_imports.unwrap_or(Strictness::Parents),
             banned_api: self.banned_api.unwrap_or_default(),
             banned_module_level_imports: self.banned_module_level_imports.unwrap_or_default(),
+            relative_sibling_imports: self.relative_sibling_imports.unwrap_or_default(),
         }
     }
 }

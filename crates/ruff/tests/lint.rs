@@ -2288,6 +2288,7 @@ requires-python = ">= 3.11"
         linter.flake8_tidy_imports.ban_relative_imports = "parents"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_tidy_imports.relative_sibling_imports = false
         linter.flake8_type_checking.strict = false
         linter.flake8_type_checking.exempt_modules = [
         	typing,
@@ -2599,6 +2600,7 @@ requires-python = ">= 3.11"
         linter.flake8_tidy_imports.ban_relative_imports = "parents"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_tidy_imports.relative_sibling_imports = false
         linter.flake8_type_checking.strict = false
         linter.flake8_type_checking.exempt_modules = [
         	typing,
@@ -2962,6 +2964,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.flake8_tidy_imports.ban_relative_imports = "parents"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_tidy_imports.relative_sibling_imports = false
         linter.flake8_type_checking.strict = false
         linter.flake8_type_checking.exempt_modules = [
         	typing,
@@ -3341,6 +3344,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.flake8_tidy_imports.ban_relative_imports = "parents"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_tidy_imports.relative_sibling_imports = false
         linter.flake8_type_checking.strict = false
         linter.flake8_type_checking.exempt_modules = [
         	typing,
@@ -3668,6 +3672,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.flake8_tidy_imports.ban_relative_imports = "parents"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_tidy_imports.relative_sibling_imports = false
         linter.flake8_type_checking.strict = false
         linter.flake8_type_checking.exempt_modules = [
         	typing,
@@ -3995,6 +4000,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.flake8_tidy_imports.ban_relative_imports = "parents"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_tidy_imports.relative_sibling_imports = false
         linter.flake8_type_checking.strict = false
         linter.flake8_type_checking.exempt_modules = [
         	typing,
@@ -4279,6 +4285,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.flake8_tidy_imports.ban_relative_imports = "parents"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_tidy_imports.relative_sibling_imports = false
         linter.flake8_type_checking.strict = false
         linter.flake8_type_checking.exempt_modules = [
         	typing,
@@ -4616,6 +4623,7 @@ from typing import Union;foo: Union[int, str] = 1
         linter.flake8_tidy_imports.ban_relative_imports = "parents"
         linter.flake8_tidy_imports.banned_api = {}
         linter.flake8_tidy_imports.banned_module_level_imports = []
+        linter.flake8_tidy_imports.relative_sibling_imports = false
         linter.flake8_type_checking.strict = false
         linter.flake8_type_checking.exempt_modules = [
         	typing,
