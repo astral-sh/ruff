@@ -600,6 +600,22 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    /// Check if a given AST node is reachable.
+    ///
+    /// Note that this only works if reachability is explicitly tracked for this specific
+    /// type of node (see `node_reachability` in the use-def map).
+    fn is_reachable<'a, N>(&self, node: N) -> bool
+    where
+        N: Into<AnyNodeRef<'a>>,
+    {
+        let file_scope_id = self.scope().file_scope_id(self.db());
+        self.index.is_node_reachable(
+            self.db(),
+            file_scope_id,
+            self.enclosing_node_key(node.into()),
+        )
+    }
+
     fn in_stub(&self) -> bool {
         self.context.in_stub()
     }
@@ -781,6 +797,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                         MroErrorKind::InvalidBases(bases) => {
                             let base_nodes = class_node.bases();
                             for (index, base_ty) in bases {
+                                if base_ty.is_never() {
+                                    // A class base of type `Never` can appear in unreachable code. It
+                                    // does not indicate a problem, since the actual construction of the
+                                    // class will never happen.
+                                    continue;
+                                }
                                 self.context.report_lint_old(
                                     &INVALID_BASE,
                                     &base_nodes[*index],
@@ -802,7 +824,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         )
                     }
                 }
-                Ok(_) => check_class_slots(&self.context, class, class_node)
+                Ok(_) => check_class_slots(&self.context, class, class_node),
             }
 
             // (4) Check that the class's metaclass can be determined without error.
@@ -3126,15 +3148,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn report_unresolved_import(
         &self,
-        import_node: NodeKey,
+        import_node: AnyNodeRef<'_>,
         range: TextRange,
         level: u32,
         module: Option<&str>,
     ) {
-        let file_scope_id = self.scope().file_scope_id(self.db());
-        let is_import_reachable =
-            self.index
-                .is_node_reachable(self.db(), file_scope_id, import_node);
+        let is_import_reachable = self.is_reachable(import_node);
 
         if !is_import_reachable {
             return;
@@ -3172,7 +3191,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Resolve the module being imported.
         let Some(full_module_ty) = self.module_type_from_name(&full_module_name) else {
-            self.report_unresolved_import(NodeKey::from_node(node), alias.range(), 0, Some(name));
+            self.report_unresolved_import(node.into(), alias.range(), 0, Some(name));
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -3286,8 +3305,6 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Option<(ModuleName, Type<'db>)> {
         let ast::StmtImportFrom { module, level, .. } = import_from;
 
-        let node_key = NodeKey::from_node(import_from);
-
         // For diagnostics, we want to highlight the unresolvable
         // module and not the entire `from ... import ...` statement.
         let module_ref = module
@@ -3316,7 +3333,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
-                self.report_unresolved_import(node_key, module_ref.range(), *level, module);
+                self.report_unresolved_import(
+                    import_from.into(),
+                    module_ref.range(),
+                    *level,
+                    module,
+                );
                 return None;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
@@ -3325,13 +3347,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                     format_import_from_module(*level, module),
                     self.file().path(self.db())
                 );
-                self.report_unresolved_import(node_key, module_ref.range(), *level, module);
+                self.report_unresolved_import(
+                    import_from.into(),
+                    module_ref.range(),
+                    *level,
+                    module,
+                );
                 return None;
             }
         };
 
         let Some(module_ty) = self.module_type_from_name(&module_name) else {
-            self.report_unresolved_import(node_key, module_ref.range(), *level, module);
+            self.report_unresolved_import(import_from.into(), module_ref.range(), *level, module);
             return None;
         };
 
@@ -3416,12 +3443,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         if &alias.name != "*" {
-            let file_scope_id = self.scope().file_scope_id(self.db());
-            let is_import_reachable = self.index.is_node_reachable(
-                self.db(),
-                file_scope_id,
-                NodeKey::from_node(import_from),
-            );
+            let is_import_reachable = self.is_reachable(import_from);
 
             if is_import_reachable {
                 self.context.report_lint_old(
@@ -4508,24 +4530,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                 })
         });
 
-        let report_unresolved_usage = || {
-            self.index.is_node_reachable(
-                db,
-                file_scope_id,
-                self.enclosing_node_key(name_node.into()),
-            )
-        };
-
         symbol
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(qualifiers) => {
-                    if report_unresolved_usage() {
+                    if self.is_reachable(name_node) {
                         report_unresolved_reference(&self.context, name_node);
                     }
                     TypeAndQualifiers::new(Type::unknown(), qualifiers)
                 }
                 LookupError::PossiblyUnbound(type_when_bound) => {
-                    if report_unresolved_usage() {
+                    if self.is_reachable(name_node) {
                         report_possibly_unresolved_reference(&self.context, name_node);
                     }
                     type_when_bound
@@ -4558,13 +4572,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .member(db, &attr.id)
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
-                    let report_unresolved_attribute = self
-                        .index
-                        .is_node_reachable(
-                            db,
-                            self.scope().file_scope_id(db),
-                            self.enclosing_node_key(attribute.into()),
-                        );
+                    let report_unresolved_attribute = self.is_reachable(attribute);
 
                     if report_unresolved_attribute {
                         let bound_on_instance = match value_type {
@@ -6339,7 +6347,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         _ => name_expr_ty
                             .in_type_expression(self.db())
                             .unwrap_or_else(|error| {
-                                error.into_fallback_type(&self.context, annotation)
+                                error.into_fallback_type(
+                                    &self.context,
+                                    annotation,
+                                    self.is_reachable(annotation),
+                                )
                             })
                             .into(),
                     }
@@ -6504,7 +6516,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::ExprContext::Load => self
                     .infer_name_expression(name)
                     .in_type_expression(self.db())
-                    .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
+                    .unwrap_or_else(|error| {
+                        error.into_fallback_type(
+                            &self.context,
+                            expression,
+                            self.is_reachable(expression),
+                        )
+                    }),
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Name expression annotation in Store/Del context")
@@ -6515,7 +6533,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
                     .in_type_expression(self.db())
-                    .unwrap_or_else(|error| error.into_fallback_type(&self.context, expression)),
+                    .unwrap_or_else(|error| {
+                        error.into_fallback_type(
+                            &self.context,
+                            expression,
+                            self.is_reachable(expression),
+                        )
+                    }),
                 ast::ExprContext::Invalid => Type::unknown(),
                 ast::ExprContext::Store | ast::ExprContext::Del => {
                     todo_type!("Attribute expression annotation in Store/Del context")

@@ -6,7 +6,6 @@ use ruff_python_semantic::{analyze::class::is_enumeration, ScopeKind, SemanticMo
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::rules::flake8_pyi::rules::TypingModule;
 use crate::Locator;
 use ruff_python_ast::PythonVersion;
@@ -682,11 +681,8 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         target.range(),
     );
     diagnostic.try_set_fix(|| {
-        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-            &ImportRequest::import(module.as_str(), "TypeAlias"),
-            target.start(),
-            checker.semantic(),
-        )?;
+        let (import_edit, binding) =
+            checker.import_from_typing("TypeAlias", target.start(), PythonVersion::PY310)?;
         Ok(Fix::safe_edits(
             Edit::range_replacement(format!("{id}: {binding}"), target.range()),
             [import_edit],

@@ -145,6 +145,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(_)) => {
                 write!(f, "<method-wrapper `__set__` of `property` object>",)
             }
+            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => {
+                write!(f, "<method-wrapper `startswith` of `str` object>",)
+            }
             Type::WrapperDescriptor(kind) => {
                 let (method, object) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),

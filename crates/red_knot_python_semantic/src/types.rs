@@ -2508,6 +2508,10 @@ impl<'db> Type<'db> {
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)),
             )
             .into(),
+            Type::StringLiteral(literal) if name == "startswith" => Symbol::bound(
+                Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)),
+            )
+            .into(),
 
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
@@ -3108,6 +3112,34 @@ impl<'db> Type<'db> {
                                 .with_annotated_type(Type::object(db)),
                         ]),
                         None,
+                    ),
+                ))
+            }
+
+            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => {
+                Signatures::single(CallableSignature::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("prefix")))
+                                .with_annotated_type(UnionType::from_elements(
+                                    db,
+                                    [
+                                        KnownClass::Str.to_instance(db),
+                                        // TODO: tuple[str, ...]
+                                        KnownClass::Tuple.to_instance(db),
+                                    ],
+                                )),
+                            Parameter::positional_only(Some(Name::new_static("start")))
+                                // TODO: SupportsIndex | None
+                                .with_annotated_type(Type::object(db))
+                                .with_default_type(Type::none(db)),
+                            Parameter::positional_only(Some(Name::new_static("end")))
+                                // TODO: SupportsIndex | None
+                                .with_annotated_type(Type::object(db))
+                                .with_default_type(Type::none(db)),
+                        ]),
+                        Some(KnownClass::Bool.to_instance(db)),
                     ),
                 ))
             }
@@ -4293,6 +4325,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
+            | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
             | Type::ModuleLiteral(_)
             // A non-generic class never needs to be specialized. A generic class is specialized
             // explicitly (via a subscript expression) or implicitly (via a call), and not because
@@ -4530,17 +4563,24 @@ pub struct InvalidTypeExpressionError<'db> {
 }
 
 impl<'db> InvalidTypeExpressionError<'db> {
-    fn into_fallback_type(self, context: &InferContext, node: &ast::Expr) -> Type<'db> {
+    fn into_fallback_type(
+        self,
+        context: &InferContext,
+        node: &ast::Expr,
+        is_reachable: bool,
+    ) -> Type<'db> {
         let InvalidTypeExpressionError {
             fallback_type,
             invalid_expressions,
         } = self;
-        for error in invalid_expressions {
-            context.report_lint_old(
-                &INVALID_TYPE_FORM,
-                node,
-                format_args!("{}", error.reason(context.db())),
-            );
+        if is_reachable {
+            for error in invalid_expressions {
+                context.report_lint_old(
+                    &INVALID_TYPE_FORM,
+                    node,
+                    format_args!("{}", error.reason(context.db())),
+                );
+            }
         }
         fallback_type
     }
@@ -6219,6 +6259,8 @@ pub enum MethodWrapperKind<'db> {
     PropertyDunderGet(PropertyInstanceType<'db>),
     /// Method wrapper for `some_property.__set__`
     PropertyDunderSet(PropertyInstanceType<'db>),
+    /// Method wrapper for `str.startswith`
+    StrStartswith(StringLiteralType<'db>),
 }
 
 /// Represents a specific instance of `types.WrapperDescriptorType`
