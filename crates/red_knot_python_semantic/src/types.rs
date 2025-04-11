@@ -3742,6 +3742,12 @@ impl<'db> Type<'db> {
     ) -> Result<Type<'db>, ConstructorCallError<'db>> {
         debug_assert!(matches!(self, Type::ClassLiteral(_) | Type::SubclassOf(_)));
 
+        if let Type::ClassLiteral(class) = self {
+            if class.is_dataclass(db) {
+                return Ok(Type::Never); // TODO
+            }
+        }
+
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
         // The logic is roughly as follows:
@@ -5518,6 +5524,9 @@ pub enum KnownFunction {
     #[strum(serialize = "abstractmethod")]
     AbstractMethod,
 
+    /// `dataclasses.dataclass`
+    Dataclass,
+
     /// `inspect.getattr_static`
     GetattrStatic,
 
@@ -5576,6 +5585,9 @@ impl KnownFunction {
             }
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
+            }
+            Self::Dataclass => {
+                matches!(module, KnownModule::Dataclasses)
             }
             Self::GetattrStatic => module.is_inspect(),
             Self::IsAssignableTo
@@ -7031,6 +7043,8 @@ pub(crate) mod tests {
                 | KnownFunction::IsSubclass => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
+
+                KnownFunction::Dataclass => KnownModule::Dataclasses,
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 
