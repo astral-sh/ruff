@@ -1060,4 +1060,37 @@ mod tests {
 
         Ok(())
     }
+
+    #[test_case(Path::new("yield_scope.py"); "yield_scope")]
+    fn test_yield_scope(path: &Path) -> Result<()> {
+        let snapshot = path.to_string_lossy().to_string();
+        let path = Path::new("resources/test/fixtures/syntax_errors").join(path);
+        let messages = test_contents_syntax_errors(
+            &SourceKind::Python(std::fs::read_to_string(&path)?),
+            &path,
+            &settings::LinterSettings::for_rule(Rule::YieldOutsideFunction),
+        );
+        insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+            assert_messages!(snapshot, messages);
+        });
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_await_scope_notebook() -> Result<()> {
+        let path = Path::new("resources/test/fixtures/syntax_errors/await_scope.ipynb");
+        let TestedNotebook {
+            messages,
+            source_notebook,
+            ..
+        } = assert_notebook_path(
+            path,
+            path,
+            &settings::LinterSettings::for_rule(Rule::YieldOutsideFunction),
+        )?;
+        assert_messages!(messages, path, source_notebook);
+
+        Ok(())
+    }
 }

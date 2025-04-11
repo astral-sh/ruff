@@ -464,6 +464,7 @@ enum Scope {
     Module,
     Function { is_async: bool },
     Comprehension { is_async: bool },
+    Class,
 }
 
 struct SemanticSyntaxCheckerVisitor<'a> {
@@ -546,13 +547,19 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_module_scope(&self) -> bool {
-        self.scopes
-            .last()
-            .is_some_and(|scope| matches!(scope, Scope::Module))
+        true
+    }
+
+    fn in_function_scope(&self) -> bool {
+        true
     }
 
     fn in_notebook(&self) -> bool {
         false
+    }
+
+    fn in_await_allowed_context(&self) -> bool {
+        true
     }
 }
 
@@ -560,6 +567,26 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
     fn visit_stmt(&mut self, stmt: &ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         match stmt {
+            ast::Stmt::ClassDef(ast::StmtClassDef {
+                arguments,
+                body,
+                decorator_list,
+                type_params,
+                ..
+            }) => {
+                for decorator in decorator_list {
+                    self.visit_decorator(decorator);
+                }
+                if let Some(type_params) = type_params {
+                    self.visit_type_params(type_params);
+                }
+                if let Some(arguments) = arguments {
+                    self.visit_arguments(arguments);
+                }
+                self.scopes.push(Scope::Class);
+                self.visit_body(body);
+                self.scopes.pop().unwrap();
+            }
             ast::Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
                 self.scopes.push(Scope::Function {
                     is_async: *is_async,
@@ -581,13 +608,38 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 ast::visitor::walk_expr(self, expr);
                 self.scopes.pop().unwrap();
             }
-            ast::Expr::ListComp(ast::ExprListComp { generators, .. })
-            | ast::Expr::SetComp(ast::ExprSetComp { generators, .. })
-            | ast::Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
+            ast::Expr::ListComp(ast::ExprListComp {
+                elt, generators, ..
+            })
+            | ast::Expr::SetComp(ast::ExprSetComp {
+                elt, generators, ..
+            })
+            | ast::Expr::Generator(ast::ExprGenerator {
+                elt, generators, ..
+            }) => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
                 self.scopes.push(Scope::Comprehension {
                     is_async: generators.iter().any(|gen| gen.is_async),
                 });
-                ast::visitor::walk_expr(self, expr);
+                self.visit_expr(elt);
+                self.scopes.pop().unwrap();
+            }
+            ast::Expr::DictComp(ast::ExprDictComp {
+                key,
+                value,
+                generators,
+                ..
+            }) => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
+                self.scopes.push(Scope::Comprehension {
+                    is_async: generators.iter().any(|gen| gen.is_async),
+                });
+                self.visit_expr(key);
+                self.visit_expr(value);
                 self.scopes.pop().unwrap();
             }
             _ => {

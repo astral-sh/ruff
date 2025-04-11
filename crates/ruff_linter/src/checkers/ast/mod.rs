@@ -66,7 +66,7 @@ use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
-use crate::rules::pyflakes::rules::LateFutureImport;
+use crate::rules::pyflakes::rules::{LateFutureImport, YieldOutsideFunction};
 use crate::rules::pylint::rules::LoadBeforeGlobalDeclaration;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
@@ -589,6 +589,14 @@ impl SemanticSyntaxContext for Checker<'_> {
                     ));
                 }
             }
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
+                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
+                    self.report_diagnostic(Diagnostic::new(
+                        YieldOutsideFunction::new(kind),
+                        error.range,
+                    ));
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
@@ -616,7 +624,25 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn in_async_context(&self) -> bool {
-        self.semantic.in_async_context()
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+            }
+        }
+        false
+    }
+
+    fn in_await_allowed_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) => return false,
+                ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+            }
+        }
+        false
     }
 
     fn in_sync_comprehension(&self) -> bool {
@@ -637,6 +663,11 @@ impl SemanticSyntaxContext for Checker<'_> {
 
     fn in_module_scope(&self) -> bool {
         self.semantic.current_scope().kind.is_module()
+    }
+
+    fn in_function_scope(&self) -> bool {
+        let kind = &self.semantic.current_scope().kind;
+        matches!(kind, ScopeKind::Function(_) | ScopeKind::Lambda(_))
     }
 
     fn in_notebook(&self) -> bool {
