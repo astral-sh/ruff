@@ -85,8 +85,7 @@ impl<'db> InferContext<'db> {
         let Some(builder) = self.report_lint(lint) else {
             return;
         };
-        let mut reporter = builder.build("");
-        let diag = reporter.diagnostic();
+        let mut diag = builder.build("");
         let span = Span::from(self.file).with_range(ranged.range());
         diag.annotate(Annotation::primary(span).message(message));
     }
@@ -240,15 +239,17 @@ pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     lint_id: LintId,
 }
 
-impl LintDiagnosticGuard<'_, '_> {
-    /// Return a mutable borrow of the diagnostic on this reporter.
-    ///
-    /// Callers may mutate the diagnostic to add new sub-diagnostics
-    /// or annotations.
-    ///
-    /// The diagnostic is added to the typing context, if appropriate,
-    /// when this reporter is dropped.
-    pub(super) fn diagnostic(&mut self) -> &mut Diagnostic {
+impl std::ops::Deref for LintDiagnosticGuard<'_, '_> {
+    type Target = Diagnostic;
+
+    fn deref(&self) -> &Diagnostic {
+        // OK because `self.diag` is only `None` within `Drop`.
+        self.diag.as_ref().unwrap()
+    }
+}
+
+impl std::ops::DerefMut for LintDiagnosticGuard<'_, '_> {
+    fn deref_mut(&mut self) -> &mut Diagnostic {
         // OK because `self.diag` is only `None` within `Drop`.
         self.diag.as_mut().unwrap()
     }
@@ -398,15 +399,24 @@ pub(super) struct DiagnosticGuard<'db, 'ctx> {
     diag: Option<Diagnostic>,
 }
 
-impl DiagnosticGuard<'_, '_> {
-    /// Return a mutable borrow of the diagnostic on this reporter.
-    ///
-    /// Callers may mutate the diagnostic to add new sub-diagnostics
-    /// or annotations.
-    ///
-    /// The diagnostic is added to the typing context, if appropriate,
-    /// when this reporter is dropped.
-    pub(super) fn diagnostic(&mut self) -> &mut Diagnostic {
+impl std::ops::Deref for DiagnosticGuard<'_, '_> {
+    type Target = Diagnostic;
+
+    fn deref(&self) -> &Diagnostic {
+        // OK because `self.diag` is only `None` within `Drop`.
+        self.diag.as_ref().unwrap()
+    }
+}
+
+/// Return a mutable borrow of the diagnostic on this reporter.
+///
+/// Callers may mutate the diagnostic to add new sub-diagnostics
+/// or annotations.
+///
+/// The diagnostic is added to the typing context, if appropriate,
+/// when this reporter is dropped.
+impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
+    fn deref_mut(&mut self) -> &mut Diagnostic {
         // OK because `self.diag` is only `None` within `Drop`.
         self.diag.as_mut().unwrap()
     }
