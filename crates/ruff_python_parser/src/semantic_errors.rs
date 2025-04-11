@@ -93,12 +93,15 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
-            Stmt::Return(ast::StmtReturn {
-                value: Some(value), ..
-            }) => {
-                // test_err single_star_return
-                // def f(): return *x
-                Self::invalid_star_expression(value, ctx);
+            Stmt::Return(ast::StmtReturn { value, range }) => {
+                if let Some(value) = value {
+                    // test_err single_star_return
+                    // def f(): return *x
+                    Self::invalid_star_expression(value, ctx);
+                }
+                if !ctx.in_function_scope() {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::ReturnOutsideFunction, *range);
+                }
             }
             Stmt::For(ast::StmtFor { target, iter, .. }) => {
                 // test_err single_star_for
@@ -797,6 +800,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
                 write!(f, "`{kind}` statement outside of a function")
             }
+            SemanticSyntaxErrorKind::ReturnOutsideFunction => {
+                f.write_str("`return` statement outside of a function")
+            }
         }
     }
 }
@@ -1092,6 +1098,9 @@ pub enum SemanticSyntaxErrorKind {
     /// [PEP 492]: https://peps.python.org/pep-0492/
     /// [PEP 530]: https://peps.python.org/pep-0530/
     YieldOutsideFunction(YieldOutsideFunctionKind),
+
+    /// Represents the use of `return` outside of a function scope.
+    ReturnOutsideFunction,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
