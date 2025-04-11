@@ -395,6 +395,16 @@ impl<'db> Bindings<'db> {
                     }
                 }
 
+                Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)) => {
+                    if let [Some(Type::StringLiteral(prefix)), None, None] =
+                        overload.parameter_types()
+                    {
+                        overload.set_return_type(Type::BooleanLiteral(
+                            literal.value(db).starts_with(&**prefix.value(db)),
+                        ));
+                    }
+                }
+
                 Type::BoundMethod(bound_method)
                     if bound_method.self_instance(db).is_property_instance() =>
                 {
