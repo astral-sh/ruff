@@ -7320,7 +7320,7 @@ impl StmtAnnAssign {
             range: _,
         } = self;
         visitor.visit_expr(target);
-        visitor.visit_expr(annotation);
+        visitor.visit_annotation(annotation);
 
         if let Some(value) = value {
             visitor.visit_expr(value);

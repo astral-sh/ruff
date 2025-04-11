@@ -52,6 +52,7 @@
 #    * `Expr*` - A vector of Expr.
 #    * `&Expr*` - A boxed slice of Expr.
 #    These properties cannot be nested, for example we cannot create a vector of option types.
+# * is_annotation - If this field is a type annotation.
 #
 # source_order:
 # Defines in what order the fields appear in source
@@ -137,7 +138,7 @@ fields = [
 doc = "See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)"
 fields = [
   { name = "target", type = "Expr" },
-  { name = "annotation", type = "Expr" },
+  { name = "annotation", type = "Expr", is_annotation = true },
   { name = "value", type = "Expr?" },
   { name = "simple", type = "bool" },
 ]
@@ -443,7 +444,7 @@ custom_source_order = true
 doc = """An AST node that represents either a single-part bytestring literal
 or an implicitly concatenated bytestring literal."""
 fields = [{ name = "value", type = "BytesLiteralValue" }]
-# Because StringLiteralValue type is an iterator and it's not clear from the type
+# Because BytesLiteralValue type is an iterator and it's not clear from the type
 custom_source_order = true
 
 [Expr.nodes.ExprNumberLiteral]
