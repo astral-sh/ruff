@@ -1569,6 +1569,26 @@
             }
           ]
         },
+        "pragma-tags": {
+          "description": "A list of pragma tags to be ignored for line-too-long by the formatter.\n\nBy default, the formatter ignores certain pragma comments (like \"noqa\", \"type:\", \"pyright:\", \"pylint:\", \"flake8:\", \"ruff:\", \"isort:\", \"nosec\") when computing the width of a line. This prevents the formatter from moving these pragmas around, which could change their meaning.\n\nThis option allows you to specify the pragma tags that should be treated this way.\n\nFor example, when this value is set to `[\"pragma:\"]`, then this code:\n\n```python def f(x): x = (\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",) # pragma: no cover y = (\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",) # todo: nothing print(\"Hello, world!\") ```\n\n... will be reformatted as:\n\n```python def f(x): x = (\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",)  # pragma: no cover y = ( \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", )  # todo: nothing print(\"Hello, world!\") ```",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "pragma-tags-case-insensitive": {
+          "description": "A list of pragma tags to be ignored for line-too-long by the formatter, with case-insensitive matching.\n\nBy default, the formatter ignores \"noqa\" comments (case-insensitive) when computing the width of a line. This prevents the formatter from moving these pragmas around, which could change their meaning.\n\nThis option allows you to specify additional pragma tags that should be treated the same way with case-insensitive matching.\n\nFor example, when this value is set to `[\"noqa\"]`, then this code:\n\n```python def f(x): x = (\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",) # NoQa y = (\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",) # ToDo print(\"Hello, world!\") ```\n\n... will be reformatted as:\n\n```python def f(x): x = (\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",)  # NoQa y = ( \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", )  # ToDo print(\"Hello, world!\") ```",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
         "preview": {
           "description": "Whether to enable the unstable preview style formatting.",
           "type": [
