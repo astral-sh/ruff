@@ -670,9 +670,6 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Currently live bindings for each instance attribute.
     instance_attribute_states: IndexVec<ScopedSymbolId, SymbolState>,
 
-    /// true if the scope has already been terminated (e.g. by a return statement).
-    terminated: bool,
-
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
     eager_bindings: EagerBindings,
@@ -694,14 +691,12 @@ impl Default for UseDefMapBuilder<'_> {
             symbol_states: IndexVec::new(),
             eager_bindings: EagerBindings::default(),
             instance_attribute_states: IndexVec::new(),
-            terminated: false,
         }
     }
 }
 
 impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn mark_unreachable(&mut self) {
-        self.terminated = true;
         self.record_visibility_constraint(ScopedVisibilityConstraintId::ALWAYS_FALSE);
         self.reachability = ScopedVisibilityConstraintId::ALWAYS_FALSE;
     }
@@ -750,13 +745,9 @@ impl<'db> UseDefMapBuilder<'db> {
             state
                 .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
         }
-        if !self.terminated {
-            for state in &mut self.instance_attribute_states {
-                state.record_narrowing_constraint(
-                    &mut self.narrowing_constraints,
-                    narrowing_constraint,
-                );
-            }
+        for state in &mut self.instance_attribute_states {
+            state
+                .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
         }
     }
 
@@ -767,10 +758,8 @@ impl<'db> UseDefMapBuilder<'db> {
         for state in &mut self.symbol_states {
             state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
         }
-        if !self.terminated {
-            for state in &mut self.instance_attribute_states {
-                state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
-            }
+        for state in &mut self.instance_attribute_states {
+            state.record_visibility_constraint(&mut self.visibility_constraints, constraint);
         }
         self.scope_start_visibility = self
             .visibility_constraints
