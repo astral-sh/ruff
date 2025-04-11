@@ -3131,12 +3131,16 @@ impl<'db> Type<'db> {
                                     ],
                                 )),
                             Parameter::positional_only(Some(Name::new_static("start")))
-                                // TODO: SupportsIndex | None
-                                .with_annotated_type(Type::object(db))
+                                .with_annotated_type(UnionType::from_elements(
+                                    db,
+                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                                ))
                                 .with_default_type(Type::none(db)),
                             Parameter::positional_only(Some(Name::new_static("end")))
-                                // TODO: SupportsIndex | None
-                                .with_annotated_type(Type::object(db))
+                                .with_annotated_type(UnionType::from_elements(
+                                    db,
+                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                                ))
                                 .with_default_type(Type::none(db)),
                         ]),
                         Some(KnownClass::Bool.to_instance(db)),
@@ -6188,7 +6192,11 @@ pub enum MethodWrapperKind<'db> {
     PropertyDunderGet(PropertyInstanceType<'db>),
     /// Method wrapper for `some_property.__set__`
     PropertyDunderSet(PropertyInstanceType<'db>),
-    /// Method wrapper for `str.startswith`
+    /// Method wrapper for `str.startswith`.
+    /// We treat this method specially because we want to be able to infer precise Boolean
+    /// literal return types if the instance and the prefix are both string literals, and
+    /// this allows us to understand statically known branches for common tests such as
+    /// `if sys.platform.startswith("freebsd")`.
     StrStartswith(StringLiteralType<'db>),
 }
 
