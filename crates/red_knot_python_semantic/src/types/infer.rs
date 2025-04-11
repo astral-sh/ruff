@@ -1475,6 +1475,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
+        let generic_context = type_params.as_ref().map(|type_params| {
+            GenericContext::from_type_params(self.db(), self.index, type_params)
+        });
+
         let function_kind =
             KnownFunction::try_from_definition_and_name(self.db(), definition, name);
 
@@ -1491,6 +1495,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             function_kind,
             body_scope,
             function_decorators,
+            generic_context,
             specialization,
         ));
 
@@ -2536,14 +2541,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let result = object_ty.try_call_dunder_with_policy(
                                 db,
                                 "__setattr__",
-                                CallArgumentTypes::positional([
+                                &mut CallArgumentTypes::positional([
                                     Type::StringLiteral(StringLiteralType::new(
                                         db,
                                         Box::from(attribute),
                                     )),
                                     value_ty,
                                 ]),
-                                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                                    | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                             );
 
                             match result {
@@ -4108,14 +4114,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         // For class literals we model the entire class instantiation logic, so it is handled
         // in a separate function.
         let class = match callable_type {
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                ClassBase::Dynamic(_) => None,
-                ClassBase::Class(class) => {
-                    let (class_literal, _) = class.class_literal(self.db());
-                    Some(class_literal)
-                }
-            },
-            Type::ClassLiteral(class) => Some(class),
+            Type::ClassLiteral(_) | Type::GenericAlias(_) => Some(callable_type),
+            Type::SubclassOf(subclass) if matches!(subclass.subclass_of(), ClassBase::Class(_)) => {
+                Some(callable_type)
+            }
             _ => None,
         };
 
@@ -4124,16 +4126,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             // below. TODO: it should be possible to move these special cases into the
             // `try_call_constructor` path instead, or even remove some entirely once we support
             // overloads fully.
-            class.known(self.db()).is_none_or(|class| {
-                !matches!(
-                    class,
-                    KnownClass::Bool
-                        | KnownClass::Str
-                        | KnownClass::Type
-                        | KnownClass::Object
-                        | KnownClass::Property
-                )
-            })
+            match class {
+                Type::ClassLiteral(class) => class.known(self.db()).is_none_or(|class| {
+                    !matches!(
+                        class,
+                        KnownClass::Bool
+                            | KnownClass::Str
+                            | KnownClass::Type
+                            | KnownClass::Object
+                            | KnownClass::Property
+                    )
+                }),
+                _ => true,
+            }
         }) {
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
             let call_argument_types =

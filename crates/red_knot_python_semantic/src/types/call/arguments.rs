@@ -109,21 +109,6 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
         result
     }
 
-    /// Create a new [`CallArgumentTypes`] by prepending a synthetic argument to the front of this
-    /// argument list.
-    pub(crate) fn prepend_synthetic(&self, synthetic: Type<'db>) -> Self {
-        Self {
-            arguments: CallArguments(
-                std::iter::once(Argument::Synthetic)
-                    .chain(self.arguments.iter())
-                    .collect(),
-            ),
-            types: std::iter::once(synthetic)
-                .chain(self.types.iter().copied())
-                .collect(),
-        }
-    }
-
     pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + '_ {
         self.arguments.iter().zip(self.types.iter().copied())
     }

@@ -156,8 +156,7 @@ parameter:
 class E[T]:
     def __init__(self, x: T) -> None: ...
 
-# TODO: revealed: E[int] or E[Literal[1]]
-reveal_type(E(1))  # revealed: E[Unknown]
+reveal_type(E(1))  # revealed: E[Literal[1]]
 ```
 
 The types inferred from a type context and from a constructor parameter must be consistent with each
@@ -200,10 +199,7 @@ class C[T]:
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
 c: C[int] = C[int]()
-# TODO: no error
-# TODO: revealed: str or Literal["string"]
-# error: [invalid-argument-type]
-reveal_type(c.method("string"))  # revealed: U
+reveal_type(c.method("string"))  # revealed: Literal["string"]
 ```
 
 ## Cyclic class definition
