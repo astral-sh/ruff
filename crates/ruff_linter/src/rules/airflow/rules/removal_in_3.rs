@@ -1,6 +1,8 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::{is_guarded_by_try_except, Replacement};
+use crate::rules::airflow::helpers::{
+    is_airflow_builtin_or_provider, is_airflow_operator, is_guarded_by_try_except, Replacement,
+};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
@@ -586,14 +588,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.auth.managers
         ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
-            Replacement::Name(
-                "airflow.api_fastapi.auth.managers.models.resource_details.AssetDetails",
-            )
+            Replacement::AutoImport {
+                module: "airflow.api_fastapi.auth.managers.models.resource_details",
+                name: "AssetDetails",
+            }
         }
         ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => {
-            Replacement::Name(
-                "airflow.api_fastapi.auth.managers.base_auth_manager.is_authorized_asset",
-            )
+            Replacement::AutoImport {
+                module: "airflow.api_fastapi.auth.managers.base_auth_manager",
+                name: "is_authorized_asset",
+            }
         }
 
         // airflow.configuration
@@ -610,27 +614,22 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.datasets.manager
         ["airflow", "datasets", "manager", rest] => match *rest {
-            "DatasetManager" => Replacement::Name("airflow.assets.manager.AssetManager"),
-            "dataset_manager" => Replacement::Name("airflow.assets.manager.asset_manager"),
-            "resolve_dataset_manager" => Replacement::Name("airflow.assets.resolve_asset_manager"),
+            "DatasetManager" => Replacement::AutoImport {
+                module: "airflow.assets.manager",
+                name: "AssetManager",
+            },
+            "dataset_manager" => Replacement::AutoImport {
+                module: "airflow.assets.manager",
+                name: "asset_manager",
+            },
+            "resolve_dataset_manager" => Replacement::AutoImport {
+                module: "airflow.assets.manager",
+                name: "resolve_asset_manager",
+            },
             _ => return,
         },
-        ["airflow", "datasets", "metadata", "Metadata"] => {
-            Replacement::Name("airflow.sdk.Metadata")
-        }
         // airflow.datasets
-        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::AutoImport {
-            module: "airflow.sdk",
-            name: "Asset",
-        },
-        ["airflow", "datasets", rest] => match *rest {
-            "DatasetAliasEvent" => Replacement::None,
-            "DatasetAlias" => Replacement::Name("airflow.sdk.AssetAlias"),
-            "DatasetAll" => Replacement::Name("airflow.sdk.AssetAll"),
-            "DatasetAny" => Replacement::Name("airflow.sdk.AssetAny"),
-            "expand_alias_to_datasets" => Replacement::Name("airflow.sdk.expand_alias_to_assets"),
-            _ => return,
-        },
+        ["airflow", "datasets", "DatasetAliasEvent"] => Replacement::None,
 
         // airflow.hooks
         ["airflow", "hooks", "base_hook", "BaseHook"] => {
@@ -638,42 +637,35 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.lineage.hook
-        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => {
-            Replacement::Name("airflow.lineage.hook.AssetLineageInfo")
-        }
+        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => Replacement::AutoImport {
+            module: "airflow.lineage.hook",
+            name: "AssetLineageInfo",
+        },
 
         // airflow.listeners.spec
         // TODO: this is removed
         ["airflow", "listeners", "spec", "dataset", rest] => match *rest {
-            "on_dataset_created" => {
-                Replacement::Name("airflow.listeners.spec.asset.on_asset_created")
-            }
-            "on_dataset_changed" => {
-                Replacement::Name("airflow.listeners.spec.asset.on_asset_changed")
-            }
+            "on_dataset_created" => Replacement::AutoImport {
+                module: "airflow.listeners.spec.asset",
+                name: "on_asset_created",
+            },
+            "on_dataset_changed" => Replacement::AutoImport {
+                module: "airflow.listeners.spec.asset",
+                name: "on_asset_changed",
+            },
             _ => return,
         },
 
         // airflow.metrics.validators
         ["airflow", "metrics", "validators", rest] => match *rest {
-            "AllowListValidator" => {
-                Replacement::Name("airflow.metrics.validators.PatternAllowListValidator")
-            }
-            "BlockListValidator" => {
-                Replacement::Name("airflow.metrics.validators.PatternBlockListValidator")
-            }
-            _ => return,
-        },
-
-        // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", rest] => match *rest {
-            "chain" | "chain_linear" | "cross_downstream" => Replacement::SourceModuleMoved {
-                module: "airflow.sdk",
-                name: (*rest).to_string(),
+            "AllowListValidator" => Replacement::AutoImport {
+                module: "airflow.metrics.validators",
+                name: "PatternAllowListValidator",
             },
-            "BaseOperatorLink" => {
-                Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
-            }
+            "BlockListValidator" => Replacement::AutoImport {
+                module: "airflow.metrics.validators",
+                name: "PatternBlockListValidator",
+            },
             _ => return,
         },
 
@@ -688,14 +680,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.secrets
-        ["airflow", "secrets", "local_filesystem", "load_connections"] => {
-            Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
-        }
+        ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::AutoImport {
+            module: "airflow.secrets.local_filesystem",
+            name: "load_connections_dict",
+        },
 
         // airflow.security
-        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => {
-            Replacement::Name("airflow.security.permissions.RESOURCE_ASSET")
-        }
+        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => Replacement::AutoImport {
+            module: "airflow.security.permissions",
+            name: "RESOURCE_ASSET",
+        },
 
         // airflow.sensors
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
@@ -703,15 +697,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.timetables
-        ["airflow", "timetables", rest @ ..] => match &rest {
-            ["datasets", "DatasetOrTimeSchedule"] => {
-                Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule")
+        ["airflow", "timetables", "simple", "DatasetTriggeredTimetable"] => {
+            Replacement::AutoImport {
+                module: "airflow.timetables.simple",
+                name: "AssetTriggeredTimetable",
             }
-            ["simple", "DatasetTriggeredTimetable"] => {
-                Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
-            }
-            _ => return,
-        },
+        }
 
         // airflow.triggers
         ["airflow", "triggers", "external_task", "TaskStateTrigger"] => Replacement::None,
@@ -769,9 +760,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "www", "auth", "has_access"] => {
             Replacement::Name("airflow.www.auth.has_access_*")
         }
-        ["airflow", "www", "auth", "has_access_dataset"] => {
-            Replacement::Name("airflow.www.auth.has_access_dataset")
-        }
+        ["airflow", "www", "auth", "has_access_dataset"] => Replacement::AutoImport {
+            module: "airflow.www.auth",
+            name: "has_access_dataset",
+        },
         ["airflow", "www", "utils", "get_sensitive_variables_fields"] => {
             Replacement::Name("airflow.utils.log.secrets_masker.get_sensitive_variables_fields")
         }
@@ -980,12 +972,6 @@ fn is_airflow_hook(segments: &[&str]) -> bool {
     is_airflow_builtin_or_provider(segments, "hooks", "Hook")
 }
 
-/// Check whether the symbol is coming from the `operators` builtin or provider module which ends
-/// with `Operator`.
-fn is_airflow_operator(segments: &[&str]) -> bool {
-    is_airflow_builtin_or_provider(segments, "operators", "Operator")
-}
-
 /// Check whether the symbol is coming from the `log` builtin or provider module which ends
 /// with `TaskHandler`.
 fn is_airflow_task_handler(segments: &[&str]) -> bool {
@@ -1009,44 +995,6 @@ fn is_airflow_auth_manager(segments: &[&str]) -> bool {
                 (rest.iter().position(|&s| s == "auth_manager"), rest.last())
             {
                 pos + 1 < rest.len() && last_element.ends_with("AuthManager")
-            } else {
-                false
-            }
-        }
-
-        _ => false,
-    }
-}
-
-/// Check whether the segments corresponding to the fully qualified name points to a symbol that's
-/// either a builtin or coming from one of the providers in Airflow.
-///
-/// The pattern it looks for are:
-/// - `airflow.providers.**.<module>.**.*<symbol_suffix>` for providers
-/// - `airflow.<module>.**.*<symbol_suffix>` for builtins
-///
-/// where `**` is one or more segments separated by a dot, and `*` is one or more characters.
-///
-/// Examples for the above patterns:
-/// - `airflow.providers.google.cloud.secrets.secret_manager.CloudSecretManagerBackend` (provider)
-/// - `airflow.secrets.base_secrets.BaseSecretsBackend` (builtin)
-fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix: &str) -> bool {
-    match segments {
-        ["airflow", "providers", rest @ ..] => {
-            if let (Some(pos), Some(last_element)) =
-                (rest.iter().position(|&s| s == module), rest.last())
-            {
-                // Check that the module is not the last element i.e., there's a symbol that's
-                // being used from the `module` that ends with `symbol_suffix`.
-                pos + 1 < rest.len() && last_element.ends_with(symbol_suffix)
-            } else {
-                false
-            }
-        }
-
-        ["airflow", first, rest @ ..] => {
-            if let Some(last) = rest.last() {
-                *first == module && last.ends_with(symbol_suffix)
             } else {
                 false
             }
