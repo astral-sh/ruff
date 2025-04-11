@@ -10,7 +10,7 @@ from airflow import (
     PY312,
 )
 from airflow.api_connexion.security import requires_access, requires_access_dataset
-from airflow.auth.managers.base_auth_manager import is_authorized_dataset
+
 from airflow.auth.managers.models.resource_details import DatasetDetails
 from airflow.configuration import (
     as_dict,
@@ -24,15 +24,15 @@ from airflow.configuration import (
 )
 from airflow.contrib.aws_athena_hook import AWSAthenaHook
 from airflow.datasets import DatasetAliasEvent
-from airflow.datasets.manager import (
-    DatasetManager,
-    dataset_manager,
-    resolve_dataset_manager,
-)
+
+
+
+
+
 from airflow.hooks.base_hook import BaseHook
-from airflow.lineage.hook import DatasetLineageInfo
-from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
-from airflow.metrics.validators import AllowListValidator, BlockListValidator
+
+
+
 from airflow.operators.subdag import SubDagOperator
 from airflow.providers.amazon.aws.auth_manager.avp.entities import AvpEntities
 from airflow.providers.amazon.aws.datasets import s3
@@ -46,10 +46,10 @@ from airflow.providers.openlineage.utils.utils import (
 )
 from airflow.providers.postgres.datasets import postgres
 from airflow.providers.trino.datasets import trino
-from airflow.secrets.local_filesystem import LocalFilesystemBackend, load_connections
+from airflow.secrets.local_filesystem import LocalFilesystemBackend
 from airflow.security.permissions import RESOURCE_DATASET
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
-from airflow.timetables.simple import DatasetTriggeredTimetable
+
 from airflow.triggers.external_task import TaskStateTrigger
 from airflow.utils import dates
 from airflow.utils.dag_cycle_tester import test_cycle
@@ -70,7 +70,7 @@ from airflow.utils.helpers import cross_downstream as helper_cross_downstream
 from airflow.utils.log import secrets_masker
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.trigger_rule import TriggerRule
-from airflow.www.auth import has_access, has_access_dataset
+from airflow.www.auth import has_access
 from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
 
 # airflow root
@@ -80,9 +80,9 @@ DatasetFromRoot()
 # airflow.api_connexion.security
 requires_access, requires_access_dataset
 
-# airflow.auth.managers
-is_authorized_dataset
-DatasetDetails()
+
+
+
 
 # airflow.configuration
 get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
@@ -95,24 +95,26 @@ AWSAthenaHook()
 # airflow.datasets
 DatasetAliasEvent()
 
-# airflow.datasets.manager
-DatasetManager()
-dataset_manager
-resolve_dataset_manager
+
+
+
+
 
 # airflow.hooks
 BaseHook()
 
-# airflow.lineage.hook
-DatasetLineageInfo()
 
-# airflow.listeners.spec.dataset
-on_dataset_changed
-on_dataset_created
 
-# airflow.metrics.validators
-AllowListValidator()
-BlockListValidator()
+
+
+
+
+
+
+
+
+
+
 
 
 # airflow.operators.branch_operator
@@ -174,17 +176,17 @@ trino.sanitize_uri
 # airflow.secrets
 # get_connection
 LocalFilesystemBackend()
-load_connections
 
-# airflow.security.permissions
-RESOURCE_DATASET
+
+
+
 
 # airflow.sensors.base_sensor_operator
 BaseSensorOperator()
 
 
-# airflow.timetables
-DatasetTriggeredTimetable()
+
+
 
 # airflow.triggers.external_task
 TaskStateTrigger()
@@ -235,7 +237,7 @@ TriggerRule.NONE_FAILED_OR_SKIPPED
 
 # airflow.www.auth
 has_access
-has_access_dataset
+
 
 # airflow.www.utils
 get_sensitive_variables_fields

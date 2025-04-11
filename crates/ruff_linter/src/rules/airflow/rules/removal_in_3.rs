@@ -588,14 +588,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.auth.managers
         ["airflow", "auth", "managers", "models", "resource_details", "DatasetDetails"] => {
-            Replacement::Name(
-                "airflow.api_fastapi.auth.managers.models.resource_details.AssetDetails",
-            )
+            Replacement::AutoImport {
+                module: "airflow.api_fastapi.auth.managers.models.resource_details",
+                name: "AssetDetails",
+            }
         }
         ["airflow", "auth", "managers", "base_auth_manager", "is_authorized_dataset"] => {
-            Replacement::Name(
-                "airflow.api_fastapi.auth.managers.base_auth_manager.is_authorized_asset",
-            )
+            Replacement::AutoImport {
+                module: "airflow.api_fastapi.auth.managers.base_auth_manager",
+                name: "is_authorized_asset",
+            }
         }
 
         // airflow.configuration
@@ -612,9 +614,18 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.datasets.manager
         ["airflow", "datasets", "manager", rest] => match *rest {
-            "DatasetManager" => Replacement::Name("airflow.assets.manager.AssetManager"),
-            "dataset_manager" => Replacement::Name("airflow.assets.manager.asset_manager"),
-            "resolve_dataset_manager" => Replacement::Name("airflow.assets.resolve_asset_manager"),
+            "DatasetManager" => Replacement::AutoImport {
+                module: "airflow.assets.manager",
+                name: "AssetManager",
+            },
+            "dataset_manager" => Replacement::AutoImport {
+                module: "airflow.assets.manager",
+                name: "asset_manager",
+            },
+            "resolve_dataset_manager" => Replacement::AutoImport {
+                module: "airflow.assets.manager",
+                name: "resolve_asset_manager",
+            },
             _ => return,
         },
         // airflow.datasets
@@ -626,30 +637,35 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.lineage.hook
-        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => {
-            Replacement::Name("airflow.lineage.hook.AssetLineageInfo")
-        }
+        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => Replacement::AutoImport {
+            module: "airflow.lineage.hook",
+            name: "AssetLineageInfo",
+        },
 
         // airflow.listeners.spec
         // TODO: this is removed
         ["airflow", "listeners", "spec", "dataset", rest] => match *rest {
-            "on_dataset_created" => {
-                Replacement::Name("airflow.listeners.spec.asset.on_asset_created")
-            }
-            "on_dataset_changed" => {
-                Replacement::Name("airflow.listeners.spec.asset.on_asset_changed")
-            }
+            "on_dataset_created" => Replacement::AutoImport {
+                module: "airflow.listeners.spec.asset",
+                name: "on_asset_created",
+            },
+            "on_dataset_changed" => Replacement::AutoImport {
+                module: "airflow.listeners.spec.asset",
+                name: "on_asset_changed",
+            },
             _ => return,
         },
 
         // airflow.metrics.validators
         ["airflow", "metrics", "validators", rest] => match *rest {
-            "AllowListValidator" => {
-                Replacement::Name("airflow.metrics.validators.PatternAllowListValidator")
-            }
-            "BlockListValidator" => {
-                Replacement::Name("airflow.metrics.validators.PatternBlockListValidator")
-            }
+            "AllowListValidator" => Replacement::AutoImport {
+                module: "airflow.metrics.validators",
+                name: "PatternAllowListValidator",
+            },
+            "BlockListValidator" => Replacement::AutoImport {
+                module: "airflow.metrics.validators",
+                name: "PatternBlockListValidator",
+            },
             _ => return,
         },
 
@@ -664,14 +680,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.secrets
-        ["airflow", "secrets", "local_filesystem", "load_connections"] => {
-            Replacement::Name("airflow.secrets.local_filesystem.load_connections_dict")
-        }
+        ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::AutoImport {
+            module: "airflow.secrets.local_filesystem",
+            name: "load_connections_dict",
+        },
 
         // airflow.security
-        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => {
-            Replacement::Name("airflow.security.permissions.RESOURCE_ASSET")
-        }
+        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => Replacement::AutoImport {
+            module: "airflow.security.permissions",
+            name: "RESOURCE_ASSET",
+        },
 
         // airflow.sensors
         ["airflow", "sensors", "base_sensor_operator", "BaseSensorOperator"] => {
@@ -680,7 +698,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.timetables
         ["airflow", "timetables", "simple", "DatasetTriggeredTimetable"] => {
-            Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
+            Replacement::AutoImport {
+                module: "airflow.timetables.simple",
+                name: "AssetTriggeredTimetable",
+            }
         }
 
         // airflow.triggers
@@ -739,9 +760,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "www", "auth", "has_access"] => {
             Replacement::Name("airflow.www.auth.has_access_*")
         }
-        ["airflow", "www", "auth", "has_access_dataset"] => {
-            Replacement::Name("airflow.www.auth.has_access_dataset")
-        }
+        ["airflow", "www", "auth", "has_access_dataset"] => Replacement::AutoImport {
+            module: "airflow.www.auth",
+            name: "has_access_dataset",
+        },
         ["airflow", "www", "utils", "get_sensitive_variables_fields"] => {
             Replacement::Name("airflow.utils.log.secrets_masker.get_sensitive_variables_fields")
         }
