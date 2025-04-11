@@ -1724,8 +1724,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             body: _,
         } = class_node;
 
+        let mut is_dataclass = false;
         for decorator in decorator_list {
-            self.infer_decorator(decorator);
+            let decorator_ty = self.infer_decorator(decorator);
+            if decorator_ty
+                .into_function_literal()
+                .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
+            {
+                is_dataclass = true;
+            }
         }
 
         let generic_context = type_params.as_ref().map(|type_params| {
@@ -1743,6 +1750,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             name: name.id.clone(),
             body_scope,
             known: maybe_known_class,
+            is_dataclass,
         };
         let class_literal = match generic_context {
             Some(generic_context) => {

@@ -94,6 +94,8 @@ pub struct Class<'db> {
     pub(crate) body_scope: ScopeId<'db>,
 
     pub(crate) known: Option<KnownClass>,
+
+    pub(crate) is_dataclass: bool,
 }
 
 impl<'db> Class<'db> {
@@ -358,6 +360,10 @@ impl<'db> ClassLiteralType<'db> {
 
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
         self.class(db).known
+    }
+
+    pub(crate) fn is_dataclass(self, db: &'db dyn Db) -> bool {
+        self.class(db).is_dataclass
     }
 
     /// Return `true` if this class represents `known_class`

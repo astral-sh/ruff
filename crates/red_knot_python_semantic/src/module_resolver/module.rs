@@ -116,6 +116,7 @@ pub enum KnownModule {
     Sys,
     #[allow(dead_code)]
     Abc, // currently only used in tests
+    Dataclasses,
     Collections,
     Inspect,
     KnotExtensions,
@@ -132,6 +133,7 @@ impl KnownModule {
             Self::TypingExtensions => "typing_extensions",
             Self::Sys => "sys",
             Self::Abc => "abc",
+            Self::Dataclasses => "dataclasses",
             Self::Collections => "collections",
             Self::Inspect => "inspect",
             Self::KnotExtensions => "knot_extensions",
