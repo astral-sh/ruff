@@ -80,11 +80,11 @@ reveal_type(~No)  # revealed: Unknown
 def f():
     pass
 
-# error: [unsupported-operator] "Unary operator `+` is unsupported for type `Literal[f]`"
+# error: [unsupported-operator] "Unary operator `+` is unsupported for type `def f() -> Unknown`"
 reveal_type(+f)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is unsupported for type `Literal[f]`"
+# error: [unsupported-operator] "Unary operator `-` is unsupported for type `def f() -> Unknown`"
 reveal_type(-f)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is unsupported for type `Literal[f]`"
+# error: [unsupported-operator] "Unary operator `~` is unsupported for type `def f() -> Unknown`"
 reveal_type(~f)  # revealed: Unknown
 ```
 

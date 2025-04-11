@@ -44,8 +44,7 @@ impl Display for DisplayType<'_> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::ClassLiteral(_)
-            | Type::GenericAlias(_)
-            | Type::FunctionLiteral(_) => {
+            | Type::GenericAlias(_) => {
                 write!(f, "Literal[{representation}]")
             }
             _ => representation.fmt(f),
@@ -95,35 +94,37 @@ impl Display for DisplayRepresentation<'_> {
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => {
-                f.write_str(function.name(self.db))?;
-                if let Some(specialization) = function.specialization(self.db) {
-                    specialization.display_short(self.db).fmt(f)?;
-                }
-                Ok(())
+                let signature = function.signature(self.db);
+                // TODO: use the specialization from the function when it gives
+                // a specialization of the function itself. As of time of writing
+                // it would be non-empty only for class methods and will have the class
+                // specialization instead.
+                // let specialization = function
+                //     .specialization(self.db)
+                //     .map(|s| s.display_short(self.db).to_string())
+                //     .unwrap_or_default();
+
+                write!(
+                    f,
+                    // "def {name}{specialization}{signature}",
+                    "def {name}{signature}",
+                    name = function.name(self.db),
+                    signature = signature.display(self.db)
+                )
             }
             Type::Callable(callable) => callable.signature(self.db).display(self.db).fmt(f),
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
-                let self_instance = bound_method.self_instance(self.db);
-                let self_instance_specialization = match self_instance {
-                    Type::Instance(InstanceType {
-                        class: ClassType::Generic(alias),
-                    }) => Some(alias.specialization(self.db)),
-                    _ => None,
-                };
-                let specialization = match function.specialization(self.db) {
-                    Some(specialization)
-                        if self_instance_specialization.is_none_or(|sis| specialization == sis) =>
-                    {
-                        specialization.display_short(self.db).to_string()
-                    }
-                    _ => String::new(),
-                };
+
+                // TODO: use the specialization from the method. Similar to the comment above
+                // about the function specialization,
+
                 write!(
                     f,
-                    "<bound method `{method}{specialization}` of `{instance}`>",
+                    "bound method {instance}.{method}{signature}",
                     method = function.name(self.db),
                     instance = bound_method.self_instance(self.db).display(self.db),
+                    signature = function.signature(self.db).bind_self().display(self.db)
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
