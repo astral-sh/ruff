@@ -14,6 +14,7 @@ use smallvec::{smallvec, SmallVec};
 
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
+use crate::types::generics::Specialization;
 use crate::types::todo_type;
 use crate::Db;
 use ruff_python_ast::{self as ast, name::Name};
@@ -261,6 +262,17 @@ impl<'db> Signature<'db> {
         }
     }
 
+    pub(crate) fn apply_specialization(
+        &mut self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) {
+        self.parameters.apply_specialization(db, specialization);
+        self.return_ty = self
+            .return_ty
+            .map(|ty| ty.apply_specialization(db, specialization));
+    }
+
     /// Return the parameters in this signature.
     pub(crate) fn parameters(&self) -> &Parameters<'db> {
         &self.parameters
@@ -445,6 +457,12 @@ impl<'db> Parameters<'db> {
         )
     }
 
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        self.value
+            .iter_mut()
+            .for_each(|param| param.apply_specialization(db, specialization));
+    }
+
     pub(crate) fn len(&self) -> usize {
         self.value.len()
     }
@@ -604,6 +622,13 @@ impl<'db> Parameter<'db> {
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
+    }
+
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        self.annotated_type = self
+            .annotated_type
+            .map(|ty| ty.apply_specialization(db, specialization));
+        self.kind.apply_specialization(db, specialization);
     }
 
     /// Strip information from the parameter so that two equivalent parameters compare equal.
@@ -790,6 +815,19 @@ pub(crate) enum ParameterKind<'db> {
         /// Parameter name.
         name: Name,
     },
+}
+
+impl<'db> ParameterKind<'db> {
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        match self {
+            Self::PositionalOnly { default_type, .. }
+            | Self::PositionalOrKeyword { default_type, .. }
+            | Self::KeywordOnly { default_type, .. } => {
+                *default_type = default_type.map(|ty| ty.apply_specialization(db, specialization));
+            }
+            Self::Variadic { .. } | Self::KeywordVariadic { .. } => {}
+        }
+    }
 }
 
 /// Whether a parameter is used as a value or a type form.

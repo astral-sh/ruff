@@ -56,7 +56,7 @@ We can access attributes on objects of all kinds:
 ```py
 import sys
 
-reveal_type(inspect.getattr_static(sys, "platform"))  # revealed: LiteralString
+reveal_type(inspect.getattr_static(sys, "dont_write_bytecode"))  # revealed: bool
 reveal_type(inspect.getattr_static(inspect, "getattr_static"))  # revealed: Literal[getattr_static]
 
 reveal_type(inspect.getattr_static(1, "real"))  # revealed: property
@@ -114,7 +114,7 @@ inspect.getattr_static()
 # error: [missing-argument] "No argument provided for required parameter `attr`"
 inspect.getattr_static(C())
 
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`attr`) of function `getattr_static`; expected type `str`"
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[1]`"
 inspect.getattr_static(C(), 1)
 
 # error: [too-many-positional-arguments] "Too many positional arguments to function `getattr_static`: expected 3, got 4"

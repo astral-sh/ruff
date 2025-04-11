@@ -1,16 +1,19 @@
-use crate::types::{todo_type, Class, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::types::{todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, Type};
 use crate::Db;
 use itertools::Either;
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
-/// This is much more limited than the [`Type`] enum:
-/// all types that would be invalid to have as a class base are
-/// transformed into [`ClassBase::unknown`]
+/// This is much more limited than the [`Type`] enum: all types that would be invalid to have as a
+/// class base are transformed into [`ClassBase::unknown`]
+///
+/// Note that a non-specialized generic class _cannot_ be a class base. When we see a
+/// non-specialized generic class in any type expression (including the list of base classes), we
+/// automatically construct the default specialization for that class.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update)]
 pub(crate) enum ClassBase<'db> {
     Dynamic(DynamicType),
-    Class(Class<'db>),
+    Class(ClassType<'db>),
 }
 
 impl<'db> ClassBase<'db> {
@@ -39,7 +42,12 @@ impl<'db> ClassBase<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.base {
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
-                    ClassBase::Class(class) => write!(f, "<class '{}'>", class.name(self.db)),
+                    ClassBase::Class(class @ ClassType::NonGeneric(_)) => {
+                        write!(f, "<class '{}'>", class.name(self.db))
+                    }
+                    ClassBase::Class(ClassType::Generic(alias)) => {
+                        write!(f, "<class '{}'>", alias.display(self.db))
+                    }
                 }
             }
         }
@@ -51,8 +59,8 @@ impl<'db> ClassBase<'db> {
     pub(super) fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
             .to_class_literal(db)
-            .into_class_literal()
-            .map_or(Self::unknown(), |literal| Self::Class(literal.class()))
+            .into_class_type()
+            .map_or(Self::unknown(), Self::Class)
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -61,11 +69,12 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => Some(if literal.class().is_known(db, KnownClass::Any) {
+            Type::ClassLiteral(literal) => Some(if literal.is_known(db, KnownClass::Any) {
                 Self::Dynamic(DynamicType::Any)
             } else {
-                Self::Class(literal.class())
+                Self::Class(literal.default_specialization(db))
             }),
+            Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
             Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
@@ -159,7 +168,7 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(super) fn into_class(self) -> Option<Class<'db>> {
+    pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
             Self::Dynamic(_) => None,
@@ -178,8 +187,8 @@ impl<'db> ClassBase<'db> {
     }
 }
 
-impl<'db> From<Class<'db>> for ClassBase<'db> {
-    fn from(value: Class<'db>) -> Self {
+impl<'db> From<ClassType<'db>> for ClassBase<'db> {
+    fn from(value: ClassType<'db>) -> Self {
         ClassBase::Class(value)
     }
 }
@@ -188,7 +197,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
     fn from(value: ClassBase<'db>) -> Self {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            ClassBase::Class(class) => Type::class_literal(class),
+            ClassBase::Class(class) => class.into(),
         }
     }
 }

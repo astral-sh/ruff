@@ -44,6 +44,11 @@ impl PythonVersion {
         .into_iter()
     }
 
+    /// The minimum supported Python version.
+    pub const fn lowest() -> Self {
+        Self::PY37
+    }
+
     pub const fn latest() -> Self {
         Self::PY313
     }

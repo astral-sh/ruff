@@ -224,7 +224,8 @@ impl<'a> From<StarImportDefinitionNodeRef<'a>> for DefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportDefinitionNodeRef<'a> {
-    pub(crate) alias: &'a ast::Alias,
+    pub(crate) node: &'a ast::StmtImport,
+    pub(crate) alias_index: usize,
     pub(crate) is_reexported: bool,
 }
 
@@ -294,10 +295,12 @@ impl<'db> DefinitionNodeRef<'db> {
     pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind<'db> {
         match self {
             DefinitionNodeRef::Import(ImportDefinitionNodeRef {
-                alias,
+                node,
+                alias_index,
                 is_reexported,
             }) => DefinitionKind::Import(ImportDefinitionKind {
-                alias: AstNodeRef::new(parsed, alias),
+                node: AstNodeRef::new(parsed, node),
+                alias_index,
                 is_reexported,
             }),
 
@@ -417,9 +420,10 @@ impl<'db> DefinitionNodeRef<'db> {
     pub(super) fn key(self) -> DefinitionNodeKey {
         match self {
             Self::Import(ImportDefinitionNodeRef {
-                alias,
+                node,
+                alias_index,
                 is_reexported: _,
-            }) => alias.into(),
+            }) => (&node.names[alias_index]).into(),
             Self::ImportFrom(ImportFromDefinitionNodeRef {
                 node,
                 alias_index,
@@ -757,13 +761,18 @@ impl ComprehensionDefinitionKind {
 
 #[derive(Clone, Debug)]
 pub struct ImportDefinitionKind {
-    alias: AstNodeRef<ast::Alias>,
+    node: AstNodeRef<ast::StmtImport>,
+    alias_index: usize,
     is_reexported: bool,
 }
 
 impl ImportDefinitionKind {
+    pub(crate) fn import(&self) -> &ast::StmtImport {
+        self.node.node()
+    }
+
     pub(crate) fn alias(&self) -> &ast::Alias {
-        self.alias.node()
+        &self.node.node().names[self.alias_index]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {

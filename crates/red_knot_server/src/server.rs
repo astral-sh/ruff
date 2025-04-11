@@ -8,8 +8,9 @@ use std::panic::PanicInfo;
 use lsp_server::Message;
 use lsp_types::{
     ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
-    MessageType, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TypeDefinitionProviderCapability, Url,
+    InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, Url,
 };
 
 use self::connection::{Connection, ConnectionInitializer};
@@ -211,6 +212,7 @@ impl Server {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
                 identifier: Some(crate::DIAGNOSTIC_NAME.into()),
+                inter_file_dependencies: true,
                 ..Default::default()
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Options(
@@ -222,6 +224,9 @@ impl Server {
             )),
             type_definition_provider: Some(TypeDefinitionProviderCapability::Simple(true)),
             hover_provider: Some(HoverProviderCapability::Simple(true)),
+            inlay_hint_provider: Some(lsp_types::OneOf::Right(
+                InlayHintServerCapabilities::Options(InlayHintOptions::default()),
+            )),
             ..Default::default()
         }
     }

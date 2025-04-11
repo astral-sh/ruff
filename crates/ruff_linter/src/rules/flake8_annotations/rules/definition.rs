@@ -480,7 +480,7 @@ impl Violation for MissingReturnTypeClassMethod {
 /// ```
 ///
 /// ## References
-/// - [Typing spec: `Any`](https://typing.readthedocs.io/en/latest/spec/special-types.html#any)
+/// - [Typing spec: `Any`](https://typing.python.org/en/latest/spec/special-types.html#any)
 /// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy documentation: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[derive(ViolationMetadata)]
@@ -721,12 +721,7 @@ pub(crate) fn definition(
                 } else {
                     auto_return_type(function)
                         .and_then(|return_type| {
-                            return_type.into_expression(
-                                checker.importer(),
-                                function.parameters.start(),
-                                checker.semantic(),
-                                checker.target_version(),
-                            )
+                            return_type.into_expression(checker, function.parameters.start())
                         })
                         .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
                 };
@@ -752,12 +747,7 @@ pub(crate) fn definition(
                 } else {
                     auto_return_type(function)
                         .and_then(|return_type| {
-                            return_type.into_expression(
-                                checker.importer(),
-                                function.parameters.start(),
-                                checker.semantic(),
-                                checker.target_version(),
-                            )
+                            return_type.into_expression(checker, function.parameters.start())
                         })
                         .map(|(return_type, edits)| (checker.generator().expr(&return_type), edits))
                 };
@@ -822,12 +812,8 @@ pub(crate) fn definition(
                         } else {
                             auto_return_type(function)
                                 .and_then(|return_type| {
-                                    return_type.into_expression(
-                                        checker.importer(),
-                                        function.parameters.start(),
-                                        checker.semantic(),
-                                        checker.target_version(),
-                                    )
+                                    return_type
+                                        .into_expression(checker, function.parameters.start())
                                 })
                                 .map(|(return_type, edits)| {
                                     (checker.generator().expr(&return_type), edits)
@@ -861,12 +847,8 @@ pub(crate) fn definition(
                         } else {
                             auto_return_type(function)
                                 .and_then(|return_type| {
-                                    return_type.into_expression(
-                                        checker.importer(),
-                                        function.parameters.start(),
-                                        checker.semantic(),
-                                        checker.target_version(),
-                                    )
+                                    return_type
+                                        .into_expression(checker, function.parameters.start())
                                 })
                                 .map(|(return_type, edits)| {
                                     (checker.generator().expr(&return_type), edits)

@@ -117,8 +117,6 @@ python-version = "3.10"
 import sys
 
 if sys.version_info >= (3, 11):
-    # TODO: we should not emit an error here
-    # error: [unresolved-import]
     from typing import Self
 ```
 
@@ -166,8 +164,6 @@ python-platform = "linux"
 import sys
 
 if sys.platform == "win32":
-    # TODO: we should not emit an error here
-    # error: [unresolved-attribute]
     sys.getwindowsversion()
 ```
 
@@ -185,24 +181,6 @@ statically determine the truthiness of a branch like `sys.platform == "win32"`.
 
 See <https://github.com/astral-sh/ruff/issues/16983#issuecomment-2777146188> for a plan on how this
 could be improved.
-
-```py
-import sys
-
-if sys.platform == "win32":
-    # TODO: we should not emit an error here
-    # error: [possibly-unbound-attribute]
-    sys.getwindowsversion()
-```
-
-##### Checking without a specified platform
-
-If `python-platform` is not specified, we currently default to `all`:
-
-```toml
-[environment]
-# python-platform not specified
-```
 
 ```py
 import sys
@@ -399,8 +377,6 @@ import sys
 import builtins
 
 if sys.version_info >= (3, 11):
-    # TODO
-    # error: [unresolved-attribute]
     builtins.ExceptionGroup
 ```
 
@@ -413,23 +389,75 @@ diagnostics:
 import sys
 
 if sys.version_info >= (3, 11):
-    # TODO
-    # error: [unresolved-import]
     from builtins import ExceptionGroup
 
-    # TODO
-    # error: [unresolved-import]
     import builtins.ExceptionGroup
 
     # See https://docs.python.org/3/whatsnew/3.11.html#new-modules
 
-    # TODO
-    # error: [unresolved-import]
     import tomllib
 
-    # TODO
-    # error: [unresolved-import]
     import wsgiref.types
+```
+
+### Nested scopes
+
+When we have nested scopes inside the unreachable section, we should not emit diagnostics either:
+
+```py
+if False:
+    x = 1
+
+    def f():
+        print(x)
+
+    class C:
+        def __init__(self):
+            print(x)
+```
+
+### Type annotations
+
+Silencing of diagnostics also works for type annotations, even if they are stringified:
+
+```py
+import sys
+import typing
+
+if sys.version_info >= (3, 11):
+    from typing import Self
+
+    class C:
+        def name_expr(self) -> Self:
+            return self
+
+        def name_expr_stringified(self) -> "Self":
+            return self
+
+        def attribute_expr(self) -> typing.Self:
+            return self
+
+        def attribute_expr_stringified(self) -> "typing.Self":
+            return self
+```
+
+### Use of unreachable symbols in type annotations, or as class bases
+
+We should not show any diagnostics in type annotations inside unreachable sections.
+
+```py
+def _():
+    class C:
+        class Inner: ...
+
+    return
+
+    c1: C = C()
+    c2: C.Inner = C.Inner()
+    c3: tuple[C, C] = (C(), C())
+    c4: tuple[C.Inner, C.Inner] = (C.Inner(), C.Inner())
+
+    class Sub(C): ...
 ```
 
 ### Emit diagnostics for definitely wrong code

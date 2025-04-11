@@ -27,12 +27,11 @@ use std::path::Path;
 use itertools::Itertools;
 use log::debug;
 use ruff_python_parser::semantic_errors::{
-    Checkpoint, SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
-    SemanticSyntaxErrorKind, YieldOutsideFunctionKind,
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, IsolationLevel};
+use ruff_diagnostics::{Diagnostic, Edit, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
@@ -63,12 +62,12 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
 use crate::docstrings::extraction::ExtractionTarget;
-use crate::importer::Importer;
+use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
-    DeferralKeyword, LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
+    LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::LoadBeforeGlobalDeclaration;
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
@@ -285,7 +284,7 @@ impl<'a> Checker<'a> {
             last_stmt_end: TextSize::default(),
             docstring_state: DocstringState::default(),
             target_version,
-            semantic_checker: SemanticSyntaxChecker::new(source_type),
+            semantic_checker: SemanticSyntaxChecker::new(),
             semantic_errors: RefCell::default(),
         }
     }
@@ -528,14 +527,32 @@ impl<'a> Checker<'a> {
         self.target_version
     }
 
-    fn with_semantic_checker(
-        &mut self,
-        f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker) -> Checkpoint,
-    ) -> Checkpoint {
+    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
         let mut checker = std::mem::take(&mut self.semantic_checker);
-        let checkpoint = f(&mut checker, self);
+        f(&mut checker, self);
         self.semantic_checker = checker;
-        checkpoint
+    }
+
+    /// Attempt to create an [`Edit`] that imports `member`.
+    ///
+    /// On Python <`version_added_to_typing`, `member` is imported from `typing_extensions`, while
+    /// on Python >=`version_added_to_typing`, it is imported from `typing`.
+    ///
+    /// See [`Importer::get_or_import_symbol`] for more details on the returned values.
+    pub(crate) fn import_from_typing(
+        &self,
+        member: &str,
+        position: TextSize,
+        version_added_to_typing: PythonVersion,
+    ) -> Result<(Edit, String), ResolutionError> {
+        let source_module = if self.target_version() >= version_added_to_typing {
+            "typing"
+        } else {
+            "typing_extensions"
+        };
+        let request = ImportRequest::import_from(source_module, member);
+        self.importer()
+            .get_or_import_symbol(&request, position, self.semantic())
     }
 }
 
@@ -577,13 +594,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
                 if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
                     self.report_diagnostic(Diagnostic::new(
-                        YieldOutsideFunction {
-                            keyword: match kind {
-                                YieldOutsideFunctionKind::Yield => DeferralKeyword::Yield,
-                                YieldOutsideFunctionKind::YieldFrom => DeferralKeyword::YieldFrom,
-                                YieldOutsideFunctionKind::Await => DeferralKeyword::Await,
-                            },
-                        },
+                        YieldOutsideFunction::new(kind),
                         error.range,
                     ));
                 }
@@ -618,17 +629,66 @@ impl SemanticSyntaxContext for Checker<'_> {
     fn future_annotations_or_stub(&self) -> bool {
         self.semantic.future_annotations_or_stub()
     }
+
+    fn in_async_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+            }
+        }
+        false
+    }
+
+    fn in_await_allowed_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) => return false,
+                ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+            }
+        }
+        false
+    }
+
+    fn in_sync_comprehension(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            if let ScopeKind::Generator {
+                kind:
+                    GeneratorKind::ListComprehension
+                    | GeneratorKind::DictComprehension
+                    | GeneratorKind::SetComprehension,
+                is_async: false,
+            } = scope.kind
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn in_module_scope(&self) -> bool {
+        self.semantic.current_scope().kind.is_module()
+    }
+
+    fn in_function_scope(&self) -> bool {
+        let kind = &self.semantic.current_scope().kind;
+        matches!(kind, ScopeKind::Function(_) | ScopeKind::Lambda(_))
+    }
+
+    fn in_notebook(&self) -> bool {
+        self.source_type.is_ipynb()
+    }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
-        let checkpoint = if stmt.is_function_def_stmt() {
-            None
-        } else {
-            Some(self.with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context)))
-        };
+        if !stmt.is_function_def_stmt() {
+            self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+        }
 
         // Step 0: Pre-processing
         self.semantic.push_node(stmt);
@@ -1231,10 +1291,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
         self.semantic.pop_node();
         self.last_stmt_end = stmt.end();
-
-        if let Some(checkpoint) = checkpoint {
-            self.semantic_checker.exit_stmt(checkpoint);
-        }
     }
 
     fn visit_annotation(&mut self, expr: &'a Expr) {
@@ -1245,8 +1301,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        let checkpoint =
-            self.with_semantic_checker(|semantic, context| semantic.enter_expr(expr, context));
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
 
         // Step 0: Pre-processing
         if self.source_type.is_stub()
@@ -1793,8 +1848,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         self.semantic.flags = flags_snapshot;
         analyze::expression(expr, self);
         self.semantic.pop_node();
-
-        self.semantic_checker.exit_expr(checkpoint);
     }
 
     fn visit_except_handler(&mut self, except_handler: &'a ExceptHandler) {
@@ -2033,7 +2086,10 @@ impl<'a> Checker<'a> {
         // while all subsequent reads and writes are evaluated in the inner scope. In particular,
         // `x` is local to `foo`, and the `T` in `y=T` skips the class scope when resolving.
         self.visit_expr(&generator.iter);
-        self.semantic.push_scope(ScopeKind::Generator(kind));
+        self.semantic.push_scope(ScopeKind::Generator {
+            kind,
+            is_async: generators.iter().any(|gen| gen.is_async),
+        });
 
         self.visit_expr(&generator.target);
         self.semantic.flags = flags;
@@ -2639,15 +2695,12 @@ impl<'a> Checker<'a> {
                     unreachable!("Expected Stmt::FunctionDef")
                 };
 
-                let checkpoint = self
-                    .with_semantic_checker(|semantic, context| semantic.enter_stmt(stmt, context));
+                self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
                 self.visit_parameters(parameters);
                 // Set the docstring state before visiting the function body.
                 self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
                 self.visit_body(body);
-
-                self.semantic_checker.exit_stmt(checkpoint);
             }
         }
         self.semantic.restore(snapshot);

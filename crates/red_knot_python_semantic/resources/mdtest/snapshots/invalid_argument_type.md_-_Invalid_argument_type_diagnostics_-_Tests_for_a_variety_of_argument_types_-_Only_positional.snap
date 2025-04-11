@@ -21,19 +21,19 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invali
 # Diagnostics
 
 ```
-error: lint:invalid-argument-type
+error: lint:invalid-argument-type: Argument to this function is incorrect
  --> /src/mdtest_snippet.py:4:8
   |
 2 |     return x * y * z
 3 |
 4 | foo(1, "hello", 3)  # error: [invalid-argument-type]
-  |        ^^^^^^^ Object of type `Literal["hello"]` cannot be assigned to parameter 2 (`y`) of function `foo`; expected type `int`
+  |        ^^^^^^^ Expected `int`, found `Literal["hello"]`
   |
-info
- --> /src/mdtest_snippet.py:1:17
+info: Function defined here
+ --> /src/mdtest_snippet.py:1:5
   |
 1 | def foo(x: int, y: int, z: int, /) -> int:
-  |                 ------ parameter declared in function definition here
+  |     ^^^         ------ Parameter declared here
 2 |     return x * y * z
   |
 
