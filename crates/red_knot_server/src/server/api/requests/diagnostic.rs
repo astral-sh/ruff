@@ -7,12 +7,13 @@ use lsp_types::{
     RelatedFullDocumentDiagnosticReport, Url,
 };
 
-use crate::document::ToRangeExt;
+use crate::document::{FileRangeExt, ToRangeExt};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
 use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Severity;
+use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
 
 pub(crate) struct DocumentDiagnosticRequestHandler;
@@ -92,6 +93,27 @@ fn to_lsp_diagnostic(
         Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,
     };
 
+    let related_information = diagnostic
+        .non_primary_annotations()
+        .chain(
+            diagnostic
+                .sub_diagnostics()
+                .iter()
+                .flat_map(ruff_db::diagnostic::SubDiagnostic::annotations),
+        )
+        .filter_map(|annotation| {
+            let span = annotation.get_span();
+            let range = FileRange::try_from(span).ok()?;
+
+            let location = range.to_location(db, encoding)?;
+
+            Some(lsp_types::DiagnosticRelatedInformation {
+                location,
+                message: annotation.get_message()?.to_string(),
+            })
+        })
+        .collect();
+
     Diagnostic {
         range,
         severity: Some(severity),
@@ -100,7 +122,7 @@ fn to_lsp_diagnostic(
         code_description: None,
         source: Some("red-knot".into()),
         message: diagnostic.primary_message().to_string(),
-        related_information: None,
+        related_information: Some(related_information),
         data: None,
     }
 }

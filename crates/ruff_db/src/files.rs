@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 use salsa::plumbing::AsId;
 use salsa::{Durability, Setter};
 
+use crate::diagnostic::Span;
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
@@ -542,6 +543,25 @@ impl Ranged for FileRange {
     #[inline]
     fn range(&self) -> TextRange {
         self.range
+    }
+}
+
+impl TryFrom<&Span> for FileRange {
+    type Error = ();
+
+    fn try_from(value: &Span) -> Result<Self, Self::Error> {
+        Ok(Self {
+            file: value.file(),
+            range: value.range().ok_or(())?,
+        })
+    }
+}
+
+impl TryFrom<Span> for FileRange {
+    type Error = ();
+
+    fn try_from(value: Span) -> Result<Self, Self::Error> {
+        Self::try_from(&value)
     }
 }
 
