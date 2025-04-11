@@ -221,10 +221,10 @@ enum UnusedImportContext {
 }
 
 fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
-    let qualified_name = import.qualified_name();
+    let source_name = import.source_name().join(".");
     let category = isort::categorize(
-        &qualified_name.to_string(),
-        qualified_name.is_unresolved_import(),
+        &source_name,
+        import.qualified_name().is_unresolved_import(),
         &checker.settings.src,
         checker.package(),
         checker.settings.isort.detect_same_package,
