@@ -113,8 +113,8 @@ impl<'db> InferContext<'db> {
     pub(super) fn report_lint<'ctx>(
         &'ctx self,
         lint: &'static LintMetadata,
-    ) -> Option<LintReporterBuilder<'ctx, 'db>> {
-        LintReporterBuilder::new(self, lint)
+    ) -> Option<LintDiagnosticGuardBuilder<'ctx, 'db>> {
+        LintDiagnosticGuardBuilder::new(self, lint)
     }
 
     /// Optionally return a reporter builder for adding a diagnostic.
@@ -135,8 +135,8 @@ impl<'db> InferContext<'db> {
         &'ctx self,
         id: DiagnosticId,
         severity: Severity,
-    ) -> Option<DiagnosticReporterBuilder<'ctx, 'db>> {
-        DiagnosticReporterBuilder::new(self, id, severity)
+    ) -> Option<DiagnosticGuardBuilder<'ctx, 'db>> {
+        DiagnosticGuardBuilder::new(self, id, severity)
     }
 
     pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) {
@@ -227,7 +227,7 @@ pub(crate) enum InNoTypeCheck {
 /// than `DiagnosticId::Lint`, then they should use the more general
 /// `InferContext::report_diagnostic` API. But note that this API will not take
 /// rule selection or suppressions into account.
-pub(super) struct LintReporter<'db, 'ctx> {
+pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     /// The typing context.
     ctx: &'ctx InferContext<'db>,
     /// The diagnostic that we want to report.
@@ -240,7 +240,7 @@ pub(super) struct LintReporter<'db, 'ctx> {
     lint_id: LintId,
 }
 
-impl LintReporter<'_, '_> {
+impl LintDiagnosticGuard<'_, '_> {
     /// Return a mutable borrow of the diagnostic on this reporter.
     ///
     /// Callers may mutate the diagnostic to add new sub-diagnostics
@@ -259,7 +259,7 @@ impl LintReporter<'_, '_> {
 /// This will add the lint as a diagnostic to the typing context if
 /// appropriate. The diagnostic may be skipped, for example, if there is a
 /// relevant suppression.
-impl Drop for LintReporter<'_, '_> {
+impl Drop for LintDiagnosticGuard<'_, '_> {
     fn drop(&mut self) {
         // The comment below was copied from the original
         // implementation of diagnostic reporting. The code
@@ -323,18 +323,18 @@ impl Drop for LintReporter<'_, '_> {
 /// because the `LintMetadata` can be used to derive the diagnostic ID and its
 /// severity (based on configuration). Combined with a message you get the
 /// minimum amount of data required to build a `Diagnostic`.
-pub(super) struct LintReporterBuilder<'db, 'ctx> {
+pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
     ctx: &'ctx InferContext<'db>,
     id: DiagnosticId,
     severity: Severity,
     lint_id: LintId,
 }
 
-impl<'db, 'ctx> LintReporterBuilder<'db, 'ctx> {
+impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     fn new(
         ctx: &'ctx InferContext<'db>,
         lint: &'static LintMetadata,
-    ) -> Option<LintReporterBuilder<'db, 'ctx>> {
+    ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
         if !ctx.db.is_file_open(ctx.file) {
             return None;
         }
@@ -348,7 +348,7 @@ impl<'db, 'ctx> LintReporterBuilder<'db, 'ctx> {
             return None;
         }
         let id = DiagnosticId::Lint(lint.name());
-        Some(LintReporterBuilder {
+        Some(LintDiagnosticGuardBuilder {
             ctx,
             id,
             severity,
@@ -365,9 +365,9 @@ impl<'db, 'ctx> LintReporterBuilder<'db, 'ctx> {
     /// The diagnostic can be further mutated via
     /// `LintReporter::diagnostic`.
     #[must_use]
-    pub(super) fn build(self, message: impl std::fmt::Display) -> LintReporter<'db, 'ctx> {
+    pub(super) fn build(self, message: impl std::fmt::Display) -> LintDiagnosticGuard<'db, 'ctx> {
         let diag = Some(Diagnostic::new(self.id, self.severity, message));
-        LintReporter {
+        LintDiagnosticGuard {
             ctx: self.ctx,
             diag,
             lint_id: self.lint_id,
@@ -390,7 +390,7 @@ impl<'db, 'ctx> LintReporterBuilder<'db, 'ctx> {
 ///
 /// Callers likely should use `LintReporter` via `InferContext::report_lint`
 /// instead. This reporter is only intended for use with non-lint diagnostics.
-pub(super) struct DiagnosticReporter<'db, 'ctx> {
+pub(super) struct DiagnosticGuard<'db, 'ctx> {
     ctx: &'ctx InferContext<'db>,
     /// The diagnostic that we want to report.
     ///
@@ -398,7 +398,7 @@ pub(super) struct DiagnosticReporter<'db, 'ctx> {
     diag: Option<Diagnostic>,
 }
 
-impl DiagnosticReporter<'_, '_> {
+impl DiagnosticGuard<'_, '_> {
     /// Return a mutable borrow of the diagnostic on this reporter.
     ///
     /// Callers may mutate the diagnostic to add new sub-diagnostics
@@ -415,7 +415,7 @@ impl DiagnosticReporter<'_, '_> {
 /// Finishes use of this reporter.
 ///
 /// This will add the diagnostic to the typing context if appropriate.
-impl Drop for DiagnosticReporter<'_, '_> {
+impl Drop for DiagnosticGuard<'_, '_> {
     fn drop(&mut self) {
         // OK because the only way `self.diag` is `None`
         // is via this impl, which can only run at most
@@ -433,22 +433,22 @@ impl Drop for DiagnosticReporter<'_, '_> {
 /// this builder further requires a message (with those three things being the
 /// minimal amount of information with which to construct a diagnostic) before
 /// one can mutate the diagnostic.
-pub(super) struct DiagnosticReporterBuilder<'db, 'ctx> {
+pub(super) struct DiagnosticGuardBuilder<'db, 'ctx> {
     ctx: &'ctx InferContext<'db>,
     id: DiagnosticId,
     severity: Severity,
 }
 
-impl<'db, 'ctx> DiagnosticReporterBuilder<'db, 'ctx> {
+impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
     fn new(
         ctx: &'ctx InferContext<'db>,
         id: DiagnosticId,
         severity: Severity,
-    ) -> Option<DiagnosticReporterBuilder<'db, 'ctx>> {
+    ) -> Option<DiagnosticGuardBuilder<'db, 'ctx>> {
         if !ctx.db.is_file_open(ctx.file) {
             return None;
         }
-        Some(DiagnosticReporterBuilder { ctx, id, severity })
+        Some(DiagnosticGuardBuilder { ctx, id, severity })
     }
 
     /// Create a new reporter.
@@ -459,9 +459,12 @@ impl<'db, 'ctx> DiagnosticReporterBuilder<'db, 'ctx> {
     /// The diagnostic can be further mutated via
     /// `DiagnosticReporter::diagnostic`.
     #[must_use]
-    pub(super) fn build(self, message: impl std::fmt::Display) -> DiagnosticReporter<'db, 'ctx> {
+    pub(super) fn into_diagnostic(
+        self,
+        message: impl std::fmt::Display,
+    ) -> DiagnosticGuard<'db, 'ctx> {
         let diag = Some(Diagnostic::new(self.id, self.severity, message));
-        DiagnosticReporter {
+        DiagnosticGuard {
             ctx: self.ctx,
             diag,
         }
