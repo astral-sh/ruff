@@ -3763,8 +3763,19 @@ impl<'db> Type<'db> {
             }
         });
 
+        // Construct an instance type that we can use to look up the `__init__` instance method.
+        // This performs the same logic as `Type::to_instance`, except for generic class literals.
         // TODO: we should use the actual return type of `__new__` to determine the instance type
         let init_ty = match self {
+            // This is the only match arm that is different from `Type::to_instance`. Instead of
+            // using the _default_ specialization, we use the _identity_ specialization, which maps
+            // each of the class's generic typevars to itself. The end result is a generic alias
+            // that still has the typevars in it, which we need to be able to infer a
+            // specialization when we call the `__init__` method. This is how we simulate a
+            // "partially initialized" object, where we don't yet know the actual specialization
+            // (so we simulate that with the identity specialization), while still being able to do
+            // an _instance_ lookup of `__init__` (which would apply the default specialization if
+            // we were to perform it directly on the non-specialized generic class literal).
             Type::ClassLiteral(generic @ ClassLiteralType::Generic(_)) => {
                 Type::instance(generic.identity_specialization(db))
             }
