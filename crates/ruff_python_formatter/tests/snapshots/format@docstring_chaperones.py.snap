@@ -159,3 +159,37 @@ def a18():
     doesn't need chaperone\
     """
 ```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -23,7 +23,7 @@
+ 
+ 
+ def a7():
+-    """Doesn't need chaperone\" """
++    """Doesn't need chaperone\""""
+ 
+ 
+ def a8():
+@@ -31,7 +31,7 @@
+ 
+ 
+ def a9():
+-    """Doesn't need chaperone\\\" """
++    """Doesn't need chaperone\\\""""
+ 
+ 
+ def a10():
+@@ -51,7 +51,7 @@
+ 
+ 
+ def a13():
+-    """Doesn't need chaperone\\\"\"\" """
++    """Doesn't need chaperone\\\"\"\""""
+ 
+ 
+ def a14():
+```

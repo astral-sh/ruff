@@ -13,3 +13,10 @@ pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
 ) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the [`no_chaperone_for_escaped_quote_in_triple_quoted_docstring](https://github.com/astral-sh/ruff/pull/17216) preview style is enabled.
+pub(crate) const fn is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled(
+    context: &PyFormatContext,
+) -> bool {
+    context.is_preview()
+}
