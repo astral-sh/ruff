@@ -84,6 +84,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
+    #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_CR.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_if.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_for.py"))]
     #[test_case(Rule::NeedlessElse, Path::new("RUF047_while.py"))]

@@ -12,6 +12,9 @@ crates/ruff_python_parser/resources/invalid/re_lexing/line_continuation_windows_
 crates/ruff_python_parser/resources/invalid/re_lex_logical_token_windows_eol.py text eol=crlf
 crates/ruff_python_parser/resources/invalid/re_lex_logical_token_mac_eol.py text eol=cr
 
+crates/ruff_linter/resources/test/fixtures/ruff/RUF046_CR.py text eol=keep
+crates/ruff_linter/src/rules/ruff/snapshots/ruff_linter__rules__ruff__tests__RUF046_RUF046_CR.py.snap text eol=keep
+
 crates/ruff_python_parser/resources/inline linguist-generated=true
 
 ruff.schema.json -diff linguist-generated=true text=auto eol=lf
