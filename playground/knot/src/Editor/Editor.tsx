@@ -12,15 +12,16 @@ import {
   languages,
   MarkerSeverity,
   Position,
+  Range,
   Uri,
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
 import { Theme } from "shared";
 import {
+  Range as KnotRange,
   Severity,
   type Workspace,
   Position as KnotPosition,
-  type Range as KnotRange,
 } from "red_knot_wasm";
 
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
@@ -93,6 +94,8 @@ export default function Editor({
 
   const handleMount: OnMount = useCallback(
     (editor, instance) => {
+      serverRef.current?.dispose();
+
       const server = new PlaygroundServer(instance, {
         workspace,
         files,
@@ -142,11 +145,13 @@ class PlaygroundServer
     languages.TypeDefinitionProvider,
     editor.ICodeEditorOpener,
     languages.HoverProvider,
+    languages.InlayHintsProvider,
     languages.DocumentFormattingEditProvider
 {
   private typeDefinitionProviderDisposable: IDisposable;
   private editorOpenerDisposable: IDisposable;
   private hoverDisposable: IDisposable;
+  private inlayHintsDisposable: IDisposable;
   private formatDisposable: IDisposable;
 
   constructor(
@@ -159,9 +164,62 @@ class PlaygroundServer
       "python",
       this,
     );
+    this.inlayHintsDisposable = monaco.languages.registerInlayHintsProvider(
+      "python",
+      this,
+    );
     this.editorOpenerDisposable = monaco.editor.registerEditorOpener(this);
     this.formatDisposable =
       monaco.languages.registerDocumentFormattingEditProvider("python", this);
+  }
+
+  provideInlayHints(
+    _model: editor.ITextModel,
+    range: Range,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.InlayHintList> {
+    const workspace = this.props.workspace;
+    const selectedFile = this.props.files.selected;
+
+    if (selectedFile == null) {
+      return;
+    }
+
+    const selectedHandle = this.props.files.handles[selectedFile];
+
+    if (selectedHandle == null) {
+      return;
+    }
+
+    const inlayHints = workspace.inlayHints(
+      selectedHandle,
+      iRangeToKnotRange(range),
+    );
+
+    if (inlayHints.length === 0) {
+      return undefined;
+    }
+
+    return {
+      dispose: () => {},
+      hints: inlayHints.map((hint) => ({
+        label: hint.markdown,
+        position: {
+          lineNumber: hint.position.line,
+          column: hint.position.column,
+        },
+      })),
+    };
+  }
+
+  resolveInlayHint(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _hint: languages.InlayHint,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _token: CancellationToken,
+  ): languages.ProviderResult<languages.InlayHint> {
+    return undefined;
   }
 
   update(props: PlaygroundServerProps) {
@@ -387,6 +445,7 @@ class PlaygroundServer
     this.hoverDisposable.dispose();
     this.editorOpenerDisposable.dispose();
     this.typeDefinitionProviderDisposable.dispose();
+    this.inlayHintsDisposable.dispose();
     this.formatDisposable.dispose();
   }
 }
@@ -398,4 +457,11 @@ function knotRangeToIRange(range: KnotRange): IRange {
     endLineNumber: range.end.line,
     endColumn: range.end.column,
   };
+}
+
+function iRangeToKnotRange(range: IRange): KnotRange {
+  return new KnotRange(
+    new KnotPosition(range.startLineNumber, range.startColumn),
+    new KnotPosition(range.endLineNumber, range.endColumn),
+  );
 }

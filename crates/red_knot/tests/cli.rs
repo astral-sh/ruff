@@ -83,13 +83,13 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info: revealed-type
+    info: revealed-type: Revealed type
      --> <temp_dir>/test.py:5:1
       |
     3 | from typing_extensions import reveal_type
     4 |
     5 | reveal_type(sys.platform)
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^ Revealed type is `Literal["linux"]`
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^ `Literal["linux"]`
       |
 
     Found 1 diagnostic
@@ -101,13 +101,13 @@ fn config_override_python_platform() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info: revealed-type
+    info: revealed-type: Revealed type
      --> <temp_dir>/test.py:5:1
       |
     3 | from typing_extensions import reveal_type
     4 |
     5 | reveal_type(sys.platform)
-      | ^^^^^^^^^^^^^^^^^^^^^^^^^ Revealed type is `LiteralString`
+      | ^^^^^^^^^^^^^^^^^^^^^^^^^ `LiteralString`
       |
 
     Found 1 diagnostic
@@ -584,12 +584,12 @@ fn exit_code_only_info() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info: revealed-type
+    info: revealed-type: Revealed type
      --> <temp_dir>/test.py:3:1
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | ^^^^^^^^^^^^^^ Revealed type is `Literal[1]`
+      | ^^^^^^^^^^^^^^ `Literal[1]`
       |
 
     Found 1 diagnostic
@@ -614,12 +614,12 @@ fn exit_code_only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info: revealed-type
+    info: revealed-type: Revealed type
      --> <temp_dir>/test.py:3:1
       |
     2 | from typing_extensions import reveal_type
     3 | reveal_type(1)
-      | ^^^^^^^^^^^^^^ Revealed type is `Literal[1]`
+      | ^^^^^^^^^^^^^^ `Literal[1]`
       |
 
     Found 1 diagnostic
@@ -1048,6 +1048,39 @@ fn concise_diagnostics() -> anyhow::Result<()> {
 
     ----- stderr -----
     ");
+
+    Ok(())
+}
+
+/// This tests the diagnostic format for revealed type.
+///
+/// This test was introduced because changes were made to
+/// how the revealed type diagnostic was constructed and
+/// formatted in "verbose" mode. But it required extra
+/// logic to ensure the concise version didn't regress on
+/// information content. So this test was introduced to
+/// capture that.
+#[test]
+fn concise_revealed_type() -> anyhow::Result<()> {
+    let case = TestCase::with_file(
+        "test.py",
+        r#"
+        from typing_extensions import reveal_type
+
+        x = "hello"
+        reveal_type(x)
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command().arg("--output-format=concise"), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    info[revealed-type] <temp_dir>/test.py:5:1: Revealed type: `Literal["hello"]`
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "#);
 
     Ok(())
 }

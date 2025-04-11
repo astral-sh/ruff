@@ -3,7 +3,7 @@
 > If a type checker supports the `no_type_check` decorator for functions, it should suppress all
 > type errors for the def statement and its body including any nested functions or classes. It
 > should also ignore all parameter and return type annotations and treat the function as if it were
-> unannotated. [source](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check)
+> unannotated. [source](https://typing.python.org/en/latest/spec/directives.html#no-type-check)
 
 ## Error in the function body
 
@@ -95,7 +95,7 @@ def test() -> Undefined:
 
 Red Knot does not support decorating classes with `no_type_check`. The behaviour of `no_type_check`
 when applied to classes is
-[not specified currently](https://typing.readthedocs.io/en/latest/spec/directives.html#no-type-check),
+[not specified currently](https://typing.python.org/en/latest/spec/directives.html#no-type-check),
 and is not supported by Pyright or mypy.
 
 A future improvement might be to emit a diagnostic if a `no_type_check` annotation is applied to a

@@ -42,7 +42,7 @@ def f(w: Wrapper) -> None:
     v: int | None = w.value
 
     # This function call is incorrect, because `w.value` could be `None`. We therefore emit the following
-    # error: "`Unknown | None` cannot be assigned to parameter 1 (`i`) of function `accepts_int`; expected type `int`"
+    # error: "Argument to this function is incorrect: Expected `int`, found `Unknown | None`"
     c = accepts_int(w.value)
 ```
 
@@ -122,4 +122,4 @@ class Wrapper:
 reveal_type(Wrapper.value)  # revealed: Unknown | None
 ```
 
-[gradual guarantee]: https://typing.readthedocs.io/en/latest/spec/concepts.html#the-gradual-guarantee
+[gradual guarantee]: https://typing.python.org/en/latest/spec/concepts.html#the-gradual-guarantee

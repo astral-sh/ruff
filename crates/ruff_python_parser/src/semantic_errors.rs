@@ -1,27 +1,19 @@
 //! [`SemanticSyntaxChecker`] for AST-based syntax errors.
 //!
 //! This checker is not responsible for traversing the AST itself. Instead, its
-//! [`SemanticSyntaxChecker::enter_stmt`] and [`SemanticSyntaxChecker::enter_expr`] methods should
-//! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively, and
-//! followed by matching calls to [`SemanticSyntaxChecker::exit_stmt`] and
-//! [`SemanticSyntaxChecker::exit_expr`].
-
+//! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
+//! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 use std::fmt::Display;
 
 use ruff_python_ast::{
     self as ast,
     comparable::ComparableExpr,
     visitor::{walk_expr, Visitor},
-    Expr, ExprContext, IrrefutablePatternKind, Pattern, PySourceType, PythonVersion, Stmt,
-    StmtExpr, StmtImportFrom,
+    Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
+    StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
-
-#[derive(Debug)]
-pub struct Checkpoint {
-    in_async_context: bool,
-}
 
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
@@ -40,21 +32,11 @@ pub struct SemanticSyntaxChecker {
     /// Python considers it a syntax error to import from `__future__` after any other
     /// non-`__future__`-importing statements.
     seen_futures_boundary: bool,
-
-    /// The checker is currently in an `async` context: either the body of an `async` function or an
-    /// `async` comprehension.
-    ///
-    /// Note that this should be updated *after* checking the current statement or expression
-    /// because the parent context is what matters.
-    in_async_context: bool,
 }
 
 impl SemanticSyntaxChecker {
-    pub fn new(source_type: PySourceType) -> Self {
-        Self {
-            seen_futures_boundary: false,
-            in_async_context: source_type.is_ipynb(),
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -490,24 +472,14 @@ impl SemanticSyntaxChecker {
 
     /// Check `stmt` for semantic syntax errors and update the checker's internal state.
     ///
-    /// This should be followed by a call to [`SemanticSyntaxChecker::exit_stmt`] to reset any state
-    /// specific to scopes introduced by `stmt`, such as whether the body of a function is async.
-    ///
     /// Note that this method should only be called when traversing `stmt` *and* its children. For
-    /// example, if traversal of function bodies needs to be deferred, avoid calling `enter_stmt` on
-    /// the function itself until the deferred body is visited too. Failing to defer `enter_stmt` in
+    /// example, if traversal of function bodies needs to be deferred, avoid calling `visit_stmt` on
+    /// the function itself until the deferred body is visited too. Failing to defer `visit_stmt` in
     /// this case will break any internal state that depends on function scopes, such as `async`
     /// context detection.
-    #[must_use]
-    pub fn enter_stmt<Ctx: SemanticSyntaxContext>(
-        &mut self,
-        stmt: &ast::Stmt,
-        ctx: &Ctx,
-    ) -> Checkpoint {
+    pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         // check for errors
         self.check_stmt(stmt, ctx);
-
-        let checkpoint = self.checkpoint();
 
         // update internal state
         match stmt {
@@ -519,48 +491,17 @@ impl SemanticSyntaxChecker {
                     self.seen_futures_boundary = true;
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
-                self.in_async_context = *is_async;
+            Stmt::FunctionDef(_) => {
                 self.seen_futures_boundary = true;
             }
             _ => {
                 self.seen_futures_boundary = true;
             }
         }
-
-        checkpoint
-    }
-
-    pub fn exit_stmt(&mut self, checkpoint: Checkpoint) {
-        self.restore_checkpoint(checkpoint);
     }
 
     /// Check `expr` for semantic syntax errors and update the checker's internal state.
-    ///
-    /// This should be followed by a call to [`SemanticSyntaxChecker::exit_expr`] to reset any state
-    /// specific to scopes introduced by `expr`, such as whether the body of a comprehension is
-    /// async.
-    #[must_use]
-    pub fn enter_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) -> Checkpoint {
-        self.check_expr(expr, ctx);
-        let checkpoint = self.checkpoint();
-        match expr {
-            Expr::ListComp(ast::ExprListComp { generators, .. })
-            | Expr::SetComp(ast::ExprSetComp { generators, .. })
-            | Expr::DictComp(ast::ExprDictComp { generators, .. }) => {
-                self.in_async_context = generators.iter().any(|g| g.is_async);
-            }
-            _ => {}
-        }
-
-        checkpoint
-    }
-
-    pub fn exit_expr(&mut self, checkpoint: Checkpoint) {
-        self.restore_checkpoint(checkpoint);
-    }
-
-    fn check_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
+    pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
                 elt, generators, ..
@@ -569,7 +510,7 @@ impl SemanticSyntaxChecker {
                 elt, generators, ..
             }) => {
                 Self::check_generator_expr(elt, generators, ctx);
-                self.async_comprehension_outside_async_function(ctx, generators);
+                Self::async_comprehension_outside_async_function(ctx, generators);
             }
             Expr::Generator(ast::ExprGenerator {
                 elt, generators, ..
@@ -584,7 +525,7 @@ impl SemanticSyntaxChecker {
             }) => {
                 Self::check_generator_expr(key, generators, ctx);
                 Self::check_generator_expr(value, generators, ctx);
-                self.async_comprehension_outside_async_function(ctx, generators);
+                Self::async_comprehension_outside_async_function(ctx, generators);
             }
             Expr::Name(ast::ExprName {
                 range,
@@ -698,7 +639,6 @@ impl SemanticSyntaxChecker {
     }
 
     fn async_comprehension_outside_async_function<Ctx: SemanticSyntaxContext>(
-        &self,
         ctx: &Ctx,
         generators: &[ast::Comprehension],
     ) {
@@ -706,54 +646,46 @@ impl SemanticSyntaxChecker {
         if python_version >= PythonVersion::PY311 {
             return;
         }
-        for generator in generators {
-            if generator.is_async && !self.in_async_context {
-                // test_ok nested_async_comprehension_py311
-                // # parse_options: {"target-version": "3.11"}
-                // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
-                // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
-                // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
-
-                // test_ok nested_async_comprehension_py310
-                // # parse_options: {"target-version": "3.10"}
-                // # this case fails if exit_expr doesn't run
-                // async def f():
-                //     [_ for n in range(3)]
-                //     [_ async for n in range(3)]
-                // # and this fails without exit_stmt
-                // async def f():
-                //     def g(): ...
-                //     [_ async for n in range(3)]
-
-                // test_ok all_async_comprehension_py310
-                // # parse_options: {"target-version": "3.10"}
-                // async def test(): return [[x async for x in elements(n)] async for n in range(3)]
-
-                // test_err nested_async_comprehension_py310
-                // # parse_options: {"target-version": "3.10"}
-                // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
-                // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
-                // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
-                // async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
-                // async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
-                Self::add_error(
-                    ctx,
-                    SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version),
-                    generator.range,
-                );
-            }
+        // async allowed at notebook top-level
+        if ctx.in_notebook() && ctx.in_module_scope() {
+            return;
         }
-    }
-
-    fn checkpoint(&self) -> Checkpoint {
-        Checkpoint {
-            in_async_context: self.in_async_context,
+        if ctx.in_async_context() && !ctx.in_sync_comprehension() {
+            return;
         }
-    }
+        for generator in generators.iter().filter(|gen| gen.is_async) {
+            // test_ok nested_async_comprehension_py311
+            // # parse_options: {"target-version": "3.11"}
+            // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+            // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+            // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
 
-    #[allow(clippy::needless_pass_by_value)]
-    fn restore_checkpoint(&mut self, checkpoint: Checkpoint) {
-        self.in_async_context = checkpoint.in_async_context;
+            // test_ok nested_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def f():
+            //     [_ for n in range(3)]
+            //     [_ async for n in range(3)]
+            // async def f():
+            //     def g(): ...
+            //     [_ async for n in range(3)]
+
+            // test_ok all_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def test(): return [[x async for x in elements(n)] async for n in range(3)]
+
+            // test_err nested_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+            // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+            // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+            // async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
+            // async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version),
+                generator.range,
+            );
+        }
     }
 }
 
@@ -1011,6 +943,43 @@ pub enum SemanticSyntaxErrorKind {
     ///     global counter
     ///     counter += 1
     /// ```
+    ///
+    /// ## Known Issues
+    ///
+    /// Note that the order in which the parts of a `try` statement are visited was changed in 3.13,
+    /// as tracked in Python issue [#111123]. For example, this code was valid on Python 3.12:
+    ///
+    /// ```python
+    /// a = 10
+    /// def g():
+    ///     try:
+    ///         1 / 0
+    ///     except:
+    ///         a = 1
+    ///     else:
+    ///         global a
+    /// ```
+    ///
+    /// While this more intuitive behavior aligned with the textual order was a syntax error:
+    ///
+    /// ```python
+    /// a = 10
+    /// def f():
+    ///     try:
+    ///         pass
+    ///     except:
+    ///         global a
+    ///     else:
+    ///         a = 1  # SyntaxError: name 'a' is assigned to before global declaration
+    /// ```
+    ///
+    /// This was reversed in version 3.13 to make the second case valid and the first case a syntax
+    /// error. We intentionally enforce the 3.13 ordering, regardless of the Python version, which
+    /// will lead to both false positives and false negatives on 3.12 code that takes advantage of
+    /// the old behavior. However, as mentioned in the Python issue, we expect code relying on this
+    /// to be very rare and not worth the additional complexity to detect.
+    ///
+    /// [#111123]: https://github.com/python/cpython/issues/111123
     LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
@@ -1373,43 +1342,24 @@ pub trait SemanticSyntaxContext {
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
 
+    /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
+    fn in_async_context(&self) -> bool;
+
+    /// Returns `true` if the visitor is currently inside of a synchronous comprehension.
+    ///
+    /// This method is necessary because `in_async_context` only checks for the nearest, enclosing
+    /// function to determine the (a)sync context. Instead, this method will search all enclosing
+    /// scopes until it finds a sync comprehension. As a result, the two methods will typically be
+    /// used together.
+    fn in_sync_comprehension(&self) -> bool;
+
+    /// Returns `true` if the visitor is at the top-level module scope.
+    fn in_module_scope(&self) -> bool;
+
+    /// Returns `true` if the source file is a Jupyter notebook.
+    fn in_notebook(&self) -> bool;
+
     fn report_semantic_error(&self, error: SemanticSyntaxError);
-}
-
-#[derive(Default)]
-pub struct SemanticSyntaxCheckerVisitor<Ctx> {
-    checker: SemanticSyntaxChecker,
-    context: Ctx,
-}
-
-impl<Ctx> SemanticSyntaxCheckerVisitor<Ctx> {
-    pub fn new(context: Ctx) -> Self {
-        Self {
-            checker: SemanticSyntaxChecker::new(PySourceType::Python),
-            context,
-        }
-    }
-
-    pub fn into_context(self) -> Ctx {
-        self.context
-    }
-}
-
-impl<Ctx> Visitor<'_> for SemanticSyntaxCheckerVisitor<Ctx>
-where
-    Ctx: SemanticSyntaxContext,
-{
-    fn visit_stmt(&mut self, stmt: &'_ Stmt) {
-        let checkpoint = self.checker.enter_stmt(stmt, &self.context);
-        ruff_python_ast::visitor::walk_stmt(self, stmt);
-        self.checker.exit_stmt(checkpoint);
-    }
-
-    fn visit_expr(&mut self, expr: &'_ Expr) {
-        let checkpoint = self.checker.enter_expr(expr, &self.context);
-        ruff_python_ast::visitor::walk_expr(self, expr);
-        self.checker.exit_expr(checkpoint);
-    }
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.

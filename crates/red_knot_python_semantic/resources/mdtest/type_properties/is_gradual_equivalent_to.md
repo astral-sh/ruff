@@ -157,4 +157,4 @@ def f6(a, /): ...
 static_assert(not is_gradual_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f6]))
 ```
 
-[materializations]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-materialize
+[materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize

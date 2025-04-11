@@ -350,7 +350,7 @@ class D:
         # This function is wrongly annotated, it should be `type[D]` instead of `D`
         pass
 
-# error: [invalid-argument-type] "Object of type `Literal[D]` cannot be assigned to parameter 1 (`cls`) of bound method `f`; expected type `D`"
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `D`, found `Literal[D]`"
 D.f()
 ```
 

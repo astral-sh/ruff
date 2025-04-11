@@ -1,6 +1,6 @@
 # Literal
 
-<https://typing.readthedocs.io/en/latest/spec/literal.html#literals>
+<https://typing.python.org/en/latest/spec/literal.html#literals>
 
 ## Parameterization
 

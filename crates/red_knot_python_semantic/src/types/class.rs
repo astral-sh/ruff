@@ -1178,6 +1178,7 @@ pub(crate) enum KnownClass {
     MethodType,
     MethodWrapperType,
     WrapperDescriptorType,
+    UnionType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
@@ -1242,6 +1243,7 @@ impl<'db> KnownClass {
             | Self::TypeVarTuple
             | Self::Super
             | Self::WrapperDescriptorType
+            | Self::UnionType
             | Self::MethodWrapperType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
@@ -1313,6 +1315,7 @@ impl<'db> KnownClass {
             Self::ModuleType => "ModuleType",
             Self::FunctionType => "FunctionType",
             Self::MethodType => "MethodType",
+            Self::UnionType => "UnionType",
             Self::MethodWrapperType => "MethodWrapperType",
             Self::WrapperDescriptorType => "WrapperDescriptorType",
             Self::NoneType => "NoneType",
@@ -1495,6 +1498,7 @@ impl<'db> KnownClass {
             | Self::FunctionType
             | Self::MethodType
             | Self::MethodWrapperType
+            | Self::UnionType
             | Self::WrapperDescriptorType => KnownModule::Types,
             Self::NoneType => KnownModule::Typeshed,
             Self::Any
@@ -1547,6 +1551,7 @@ impl<'db> KnownClass {
             | Self::VersionInfo
             | Self::EllipsisType
             | Self::TypeAliasType
+            | Self::UnionType
             | Self::NotImplementedType => true,
 
             Self::Any
@@ -1651,6 +1656,7 @@ impl<'db> KnownClass {
             | Self::Sized
             | Self::Enum
             | Self::Super
+            | Self::UnionType
             | Self::NewType => false,
         }
     }
@@ -1689,6 +1695,7 @@ impl<'db> KnownClass {
             "ModuleType" => Self::ModuleType,
             "FunctionType" => Self::FunctionType,
             "MethodType" => Self::MethodType,
+            "UnionType" => Self::UnionType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
             "NewType" => Self::NewType,
@@ -1766,6 +1773,7 @@ impl<'db> KnownClass {
             | Self::Enum
             | Self::Super
             | Self::NotImplementedType
+            | Self::UnionType
             | Self::WrapperDescriptorType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
@@ -2267,6 +2275,7 @@ mod tests {
 
         for class in KnownClass::iter() {
             let version_added = match class {
+                KnownClass::UnionType => PythonVersion::PY310,
                 KnownClass::BaseExceptionGroup => PythonVersion::PY311,
                 KnownClass::GenericAlias => PythonVersion::PY39,
                 _ => PythonVersion::PY37,

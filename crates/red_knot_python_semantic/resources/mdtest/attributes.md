@@ -1786,5 +1786,5 @@ Some of the tests in the *Class and instance variables* section draw inspiration
 
 [descriptor protocol tests]: descriptor_protocol.md
 [pyright's documentation]: https://microsoft.github.io/pyright/#/type-concepts-advanced?id=class-and-instance-variables
-[typing spec on `classvar`]: https://typing.readthedocs.io/en/latest/spec/class-compat.html#classvar
+[typing spec on `classvar`]: https://typing.python.org/en/latest/spec/class-compat.html#classvar
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar

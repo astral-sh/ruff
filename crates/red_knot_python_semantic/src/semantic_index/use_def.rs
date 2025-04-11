@@ -263,13 +263,14 @@ use self::symbol_state::{
     LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator, ScopedDefinitionId,
     SymbolBindings, SymbolDeclarations, SymbolState,
 };
+use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::narrowing_constraints::{
     NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
 use crate::semantic_index::predicate::{
-    Predicate, Predicates, PredicatesBuilder, ScopedPredicateId,
+    Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
 use crate::semantic_index::visibility_constraints::{
@@ -297,8 +298,8 @@ pub(crate) struct UseDefMap<'db> {
     /// [`SymbolBindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, SymbolBindings>,
 
-    /// Tracks whether or not a given use of a symbol is reachable from the start of the scope.
-    reachability_by_use: IndexVec<ScopedUseId, ScopedVisibilityConstraintId>,
+    /// Tracks whether or not a given AST node is reachable from the start of the scope.
+    node_reachability: FxHashMap<NodeKey, ScopedVisibilityConstraintId>,
 
     /// If the definition is a binding (only) -- `x = 1` for example -- then we need
     /// [`SymbolDeclarations`] to know whether this binding is permitted by the live declarations.
@@ -348,21 +349,33 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
-    /// Returns true if a given 'use' of a symbol is reachable from the start of the scope.
-    /// For example, in the following code, use `2` is reachable, but `1` and `3` are not:
-    /// ```py
-    /// def f():
-    ///     x = 1
-    ///     if False:
-    ///         x  # 1
-    ///     x  # 2
-    ///     return
-    ///     x  # 3
-    /// ```
-    pub(crate) fn is_symbol_use_reachable(&self, db: &dyn crate::Db, use_id: ScopedUseId) -> bool {
+    pub(super) fn is_reachable(
+        &self,
+        db: &dyn crate::Db,
+        reachability: ScopedVisibilityConstraintId,
+    ) -> bool {
         !self
             .visibility_constraints
-            .evaluate(db, &self.predicates, self.reachability_by_use[use_id])
+            .evaluate(db, &self.predicates, reachability)
+            .is_always_false()
+    }
+
+    /// Check whether or not a given expression is reachable from the start of the scope. This
+    /// is a local analysis which does not capture the possibility that the entire scope might
+    /// be unreachable. Use [`super::SemanticIndex::is_node_reachable`] for the global
+    /// analysis.
+    #[track_caller]
+    pub(super) fn is_node_reachable(&self, db: &dyn crate::Db, node_key: NodeKey) -> bool {
+        !self
+            .visibility_constraints
+            .evaluate(
+                db,
+                &self.predicates,
+                *self
+                    .node_reachability
+                    .get(&node_key)
+                    .expect("`is_node_reachable` should only be called on AST nodes with recorded reachability"),
+            )
             .is_always_false()
     }
 
@@ -603,7 +616,7 @@ pub(super) struct UseDefMapBuilder<'db> {
     ///    x  # we store a reachability constraint of [test] for this use of `x`
     ///
     ///    y = 2
-    ///    
+    ///
     ///    # we record a visibility constraint of [test] here, which retroactively affects
     ///    # the `y = 1` and the `y = 2` binding.
     /// else:
@@ -618,10 +631,10 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// ```
     /// Depending on the value of `test`, the `y = 1`, `y = 2`, or both bindings may be visible.
     /// The use of `x` is recorded with a reachability constraint of `[test]`.
-    reachability: ScopedVisibilityConstraintId,
+    pub(super) reachability: ScopedVisibilityConstraintId,
 
-    /// Tracks whether or not a given use of a symbol is reachable from the start of the scope.
-    reachability_by_use: IndexVec<ScopedUseId, ScopedVisibilityConstraintId>,
+    /// Tracks whether or not a given AST node is reachable from the start of the scope.
+    node_reachability: FxHashMap<NodeKey, ScopedVisibilityConstraintId>,
 
     /// Live declarations for each so-far-recorded binding.
     declarations_by_binding: FxHashMap<Definition<'db>, SymbolDeclarations>,
@@ -647,7 +660,7 @@ impl Default for UseDefMapBuilder<'_> {
             scope_start_visibility: ScopedVisibilityConstraintId::ALWAYS_TRUE,
             bindings_by_use: IndexVec::new(),
             reachability: ScopedVisibilityConstraintId::ALWAYS_TRUE,
-            reachability_by_use: IndexVec::new(),
+            node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
             bindings_by_declaration: FxHashMap::default(),
             symbol_states: IndexVec::new(),
@@ -699,6 +712,34 @@ impl<'db> UseDefMapBuilder<'db> {
         self.scope_start_visibility = self
             .visibility_constraints
             .add_and_constraint(self.scope_start_visibility, constraint);
+    }
+
+    #[must_use = "A `*`-import visibility constraint must always be negated after it is added"]
+    pub(super) fn record_star_import_visibility_constraint(
+        &mut self,
+        star_import: StarImportPlaceholderPredicate<'db>,
+        symbol: ScopedSymbolId,
+    ) -> StarImportVisibilityConstraintId {
+        let predicate_id = self.add_predicate(star_import.into());
+        let visibility_id = self.visibility_constraints.add_atom(predicate_id);
+        self.symbol_states[symbol]
+            .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
+        StarImportVisibilityConstraintId(visibility_id)
+    }
+
+    pub(super) fn negate_star_import_visibility_constraint(
+        &mut self,
+        symbol_id: ScopedSymbolId,
+        constraint: StarImportVisibilityConstraintId,
+    ) {
+        let negated_constraint = self
+            .visibility_constraints
+            .add_not_constraint(constraint.into_scoped_constraint_id());
+        self.symbol_states[symbol_id]
+            .record_visibility_constraint(&mut self.visibility_constraints, negated_constraint);
+        self.scope_start_visibility = self
+            .visibility_constraints
+            .add_and_constraint(self.scope_start_visibility, negated_constraint);
     }
 
     /// This method resets the visibility constraints for all symbols to a previous state
@@ -774,7 +815,12 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol_state.record_binding(def_id, self.scope_start_visibility);
     }
 
-    pub(super) fn record_use(&mut self, symbol: ScopedSymbolId, use_id: ScopedUseId) {
+    pub(super) fn record_use(
+        &mut self,
+        symbol: ScopedSymbolId,
+        use_id: ScopedUseId,
+        node_key: NodeKey,
+    ) {
         // We have a use of a symbol; clone the current bindings for that symbol, and record them
         // as the live bindings for this use.
         let new_use = self
@@ -782,8 +828,13 @@ impl<'db> UseDefMapBuilder<'db> {
             .push(self.symbol_states[symbol].bindings().clone());
         debug_assert_eq!(use_id, new_use);
 
-        let new_use = self.reachability_by_use.push(self.reachability);
-        debug_assert_eq!(use_id, new_use);
+        // Track reachability of all uses of symbols to silence `unresolved-reference`
+        // diagnostics in unreachable code.
+        self.record_node_reachability(node_key);
+    }
+
+    pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {
+        self.node_reachability.insert(node_key, self.reachability);
     }
 
     pub(super) fn snapshot_eager_bindings(
@@ -880,7 +931,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.all_definitions.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
-        self.reachability_by_use.shrink_to_fit();
+        self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_declaration.shrink_to_fit();
         self.eager_bindings.shrink_to_fit();
@@ -891,12 +942,33 @@ impl<'db> UseDefMapBuilder<'db> {
             narrowing_constraints: self.narrowing_constraints.build(),
             visibility_constraints: self.visibility_constraints.build(),
             bindings_by_use: self.bindings_by_use,
-            reachability_by_use: self.reachability_by_use,
+            node_reachability: self.node_reachability,
             public_symbols: self.symbol_states,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
             eager_bindings: self.eager_bindings,
             scope_start_visibility: self.scope_start_visibility,
         }
+    }
+}
+
+/// Newtype wrapper over [`ScopedVisibilityConstraintId`] to improve type safety.
+///
+/// By returning this type from [`UseDefMapBuilder::record_star_import_visibility_constraint`]
+/// rather than [`ScopedVisibilityConstraintId`] directly, we ensure that
+/// [`UseDefMapBuilder::negate_star_import_visibility_constraint`] must be called after the
+/// visibility constraint has been added, and we ensure that
+/// [`super::SemanticIndexBuilder::record_negated_visibility_constraint`] *cannot* be called with
+/// the narrowing constraint (which would lead to incorrect behaviour).
+///
+/// This type is defined here rather than in the [`super::visibility_constraints`] module
+/// because it should only ever be constructed and deconstructed from methods in the
+/// [`UseDefMapBuilder`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct StarImportVisibilityConstraintId(ScopedVisibilityConstraintId);
+
+impl StarImportVisibilityConstraintId {
+    fn into_scoped_constraint_id(self) -> ScopedVisibilityConstraintId {
+        self.0
     }
 }

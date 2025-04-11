@@ -57,13 +57,13 @@ warning: lint:possibly-unresolved-reference
 ```
 
 ```
-info: revealed-type
+info: revealed-type: Revealed type
   --> /src/mdtest_snippet.py:16:5
    |
 14 |     # revealed: Unknown
 15 |     # error: [possibly-unresolved-reference]
 16 |     reveal_type(x)
-   |     ^^^^^^^^^^^^^^ Revealed type is `Unknown`
+   |     ^^^^^^^^^^^^^^ `Unknown`
    |
 
 ```

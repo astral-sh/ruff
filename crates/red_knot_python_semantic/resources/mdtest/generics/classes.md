@@ -81,10 +81,10 @@ class IntSubclass(int): ...
 reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
-# error: [invalid-argument-type] "Object of type `str` cannot be assigned to parameter 1 (`T`) of class `Bounded`; expected type `int`"
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `str`"
 reveal_type(Bounded[str]())  # revealed: Unknown
 
-# error:  [invalid-argument-type] "Object of type `int | str` cannot be assigned to parameter 1 (`T`) of class `Bounded`; expected type `int`"
+# error:  [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `int | str`"
 reveal_type(Bounded[int | str]())  # revealed: Unknown
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
@@ -110,7 +110,7 @@ reveal_type(Constrained[str]())  # revealed: Constrained[str]
 # TODO: revealed: Unknown
 reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 
-# error: [invalid-argument-type] "Object of type `object` cannot be assigned to parameter 1 (`T`) of class `Constrained`; expected type `int | str`"
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int | str`, found `object`"
 reveal_type(Constrained[object]())  # revealed: Unknown
 ```
 

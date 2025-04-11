@@ -20,7 +20,7 @@ class C:
 def _(subclass_of_c: type[C]):
     reveal_type(subclass_of_c(1))  # revealed: C
 
-    # error: [invalid-argument-type] "Object of type `Literal["a"]` cannot be assigned to parameter 2 (`x`) of bound method `__init__`; expected type `int`"
+    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["a"]`"
     reveal_type(subclass_of_c("a"))  # revealed: C
     # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
     reveal_type(subclass_of_c())  # revealed: C
