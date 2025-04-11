@@ -84,9 +84,3 @@ str(
     '''Lorem
     ipsum'''  # Comment
 ).foo
-
-# These keep braces around preserved newline
-int(-
-    1)
-int(+
-    1)

@@ -1237,7 +1237,7 @@ RUF046.py:203:1: RUF046 [*] Value being cast to `int` is already an integer
 203 | / int(
 204 | |     round(
 205 | |         42
-206 | |     )
+206 | |     ) 
 207 | | # unsafe fix because of this comment
 208 | | )
     | |_^ RUF046
@@ -1252,6 +1252,7 @@ RUF046.py:203:1: RUF046 [*] Value being cast to `int` is already an integer
 204     |-    round(
     203 |+round(
 205 204 |         42
-206 205 |     )
+206     |-    ) 
 207     |-# unsafe fix because of this comment
 208     |-)
+    205 |+    )

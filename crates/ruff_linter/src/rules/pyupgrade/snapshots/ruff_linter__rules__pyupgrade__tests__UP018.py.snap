@@ -602,8 +602,6 @@ UP018.py:83:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 85 | |     ipsum'''  # Comment
 86 | | ).foo
    | |_^ UP018
-87 |
-88 |   # These keep braces around preserved newline
    |
    = help: Replace with string literal
 
@@ -617,45 +615,3 @@ UP018.py:83:1: UP018 [*] Unnecessary `str` call (rewrite as a literal)
 86    |-).foo
    83 |+'''Lorem
    84 |+    ipsum'''.foo
-87 85 | 
-88 86 | # These keep braces around preserved newline
-89 87 | int(-
-
-UP018.py:89:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
-   |
-88 |   # These keep braces around preserved newline
-89 | / int(-
-90 | |     1)
-   | |______^ UP018
-91 |   int(+
-92 |       1)
-   |
-   = help: Replace with integer literal
-
-ℹ Safe fix
-86 86 | ).foo
-87 87 | 
-88 88 | # These keep braces around preserved newline
-89    |-int(-
-   89 |+(-
-90 90 |     1)
-91 91 | int(+
-92 92 |     1)
-
-UP018.py:91:1: UP018 [*] Unnecessary `int` call (rewrite as a literal)
-   |
-89 |   int(-
-90 |       1)
-91 | / int(+
-92 | |     1)
-   | |______^ UP018
-   |
-   = help: Replace with integer literal
-
-ℹ Safe fix
-88 88 | # These keep braces around preserved newline
-89 89 | int(-
-90 90 |     1)
-91    |-int(+
-   91 |+(+
-92 92 |     1)
