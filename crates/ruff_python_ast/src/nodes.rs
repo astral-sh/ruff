@@ -26,20 +26,6 @@ use crate::{
     TypeParam,
 };
 
-/// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModModule {
-    pub range: TextRange,
-    pub body: Vec<Stmt>,
-}
-
-/// See also [Expression](https://docs.python.org/3/library/ast.html#ast.Expression)
-#[derive(Clone, Debug, PartialEq)]
-pub struct ModExpression {
-    pub range: TextRange,
-    pub body: Box<Expr>,
-}
-
 impl StmtClassDef {
     /// Return an iterator over the bases of the class.
     pub fn bases(&self) -> &[Expr] {
