@@ -4174,14 +4174,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     .context
                                     .report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
                                 {
-                                    let mut reporter = builder.build("Revealed type");
+                                    let mut diag = builder.into_diagnostic("Revealed type");
                                     let span = self.context.span(call_expression);
-                                    reporter.diagnostic().annotate(
-                                        Annotation::primary(span).message(format_args!(
-                                            "`{}`",
-                                            revealed_type.display(self.db())
-                                        )),
-                                    );
+                                    diag.annotate(Annotation::primary(span).message(format_args!(
+                                        "`{}`",
+                                        revealed_type.display(self.db())
+                                    )));
                                 }
                             }
                         }

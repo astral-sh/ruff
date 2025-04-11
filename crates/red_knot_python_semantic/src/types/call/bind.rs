@@ -1254,9 +1254,8 @@ impl<'db> BindingError<'db> {
 
                 let provided_ty_display = provided_ty.display(context.db());
                 let expected_ty_display = expected_ty.display(context.db());
-                let mut reporter = builder.build("Argument to this function is incorrect");
 
-                let diag = reporter.diagnostic();
+                let mut diag = builder.build("Argument to this function is incorrect");
                 let span = context.span(Self::get_node(node, *argument_index));
                 diag.annotate(Annotation::primary(span).message(format_args!(
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"

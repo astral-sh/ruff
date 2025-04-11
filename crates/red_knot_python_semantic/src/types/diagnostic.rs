@@ -1075,9 +1075,7 @@ pub(super) fn report_invalid_return_type(
     let object_span = Span::from(context.file()).with_range(object_range.range());
     let return_type_span = Span::from(context.file()).with_range(return_type_range.range());
 
-    let mut reporter = builder.build("Return type does not match returned value");
-
-    let diag = reporter.diagnostic();
+    let mut diag = builder.build("Return type does not match returned value");
     diag.annotate(Annotation::primary(object_span).message(format_args!(
         "Expected `{expected_ty}`, found `{actual_ty}`",
         expected_ty = expected_ty.display(context.db()),
