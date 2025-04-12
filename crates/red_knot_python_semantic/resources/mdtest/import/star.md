@@ -865,18 +865,13 @@ from exporter import *
 
 reveal_type(X)  # revealed: bool
 
-# TODO none of these should error, should all reveal `bool`
-# error: [unresolved-reference]
-reveal_type(_private)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(__protected)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(__dunder__)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(___thunder___)  # revealed: Unknown
+reveal_type(_private)  # revealed: bool
+reveal_type(__protected)  # revealed: bool
+reveal_type(__dunder__)  # revealed: bool
+reveal_type(___thunder___)  # revealed: bool
 
-# TODO: should emit [unresolved-reference] diagnostic & reveal `Unknown`
-reveal_type(Y)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
 ```
 
 ### Simple list `__all__`
@@ -897,8 +892,8 @@ from exporter import *
 
 reveal_type(X)  # revealed: bool
 
-# TODO: should emit [unresolved-reference] diagnostic & reveal `Unknown`
-reveal_type(Y)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
 ```
 
 ### `__all__` with additions later on in the global scope
@@ -1072,6 +1067,44 @@ reveal_type(Y)  # revealed: bool
 reveal_type(Z)  # revealed: Unknown
 ```
 
+### `__all__` conditionally defined in a statically known branch (2)
+
+The same example again, but with a different `python-version` set:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+`exporter.py`:
+
+```py
+import sys
+
+X: bool = True
+
+if sys.version_info >= (3, 11):
+    __all__ = ["X", "Y"]
+    Y: bool = True
+else:
+    __all__ = ("Z",)
+    Z: bool = True
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+# TODO: should reveal `Unknown` and emit `[unresolved-reference]`
+reveal_type(X)  # revealed: bool
+
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
+
+reveal_type(Z)  # revealed: bool
+```
+
 ### `__all__` conditionally mutated in a statically known branch
 
 ```toml
@@ -1084,11 +1117,11 @@ python-version = "3.11"
 ```py
 import sys
 
-__all__ = ["X"]
+__all__ = []
 X: bool = True
 
 if sys.version_info >= (3, 11):
-    __all__.append("Y")
+    __all__.extend(["X", "Y"])
     Y: bool = True
 else:
     __all__.append("Z")
@@ -1105,6 +1138,45 @@ reveal_type(Y)  # revealed: bool
 
 # error: [unresolved-reference]
 reveal_type(Z)  # revealed: Unknown
+```
+
+### `__all__` conditionally mutated in a statically known branch (2)
+
+The same example again, but with a different `python-version` set:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+`exporter.py`:
+
+```py
+import sys
+
+__all__ = []
+X: bool = True
+
+if sys.version_info >= (3, 11):
+    __all__.extend(["X", "Y"])
+    Y: bool = True
+else:
+    __all__.append("Z")
+    Z: bool = True
+```
+
+`importer.py`:
+
+```py
+from exporter import *
+
+# TODO: should reveal `Unknown` & emit `[unresolved-reference]
+reveal_type(X)  # revealed: bool
+
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
+
+reveal_type(Z)  # revealed: bool
 ```
 
 ### Empty `__all__`
@@ -1134,9 +1206,10 @@ __all__ = []
 from a import *
 from b import *
 
-# TODO: both of these should have [unresolved-reference] diagnostics and reveal `Unknown`
-reveal_type(X)  # revealed: bool
-reveal_type(Y)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(X)  # revealed: Unknown
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
 ```
 
 ### `__all__` in a stub file
@@ -1166,6 +1239,7 @@ from b import *
 
 # TODO: should not error, should reveal `bool`
 # (`X` is re-exported from `b.pyi` due to presence in `__all__`)
+# See https://github.com/astral-sh/ruff/issues/16159
 #
 # error: [unresolved-reference]
 reveal_type(X)  # revealed: Unknown
