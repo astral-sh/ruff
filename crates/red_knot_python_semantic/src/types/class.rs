@@ -971,9 +971,9 @@ impl<'db> ClassLiteralType<'db> {
                                 //     [.., self.name, ..] = <value>
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let name_ast_id =
+                                let target_ast_id =
                                     assign.target().scoped_expression_id(db, method_scope);
-                                let inferred_ty = unpacked.expression_type(name_ast_id);
+                                let inferred_ty = unpacked.expression_type(target_ast_id);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -997,9 +997,9 @@ impl<'db> ClassLiteralType<'db> {
                                 //     for .., self.name, .. in <iterable>:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let name_ast_id =
+                                let target_ast_id =
                                     for_stmt.target().scoped_expression_id(db, method_scope);
-                                let inferred_ty = unpacked.expression_type(name_ast_id);
+                                let inferred_ty = unpacked.expression_type(target_ast_id);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
@@ -1027,9 +1027,9 @@ impl<'db> ClassLiteralType<'db> {
                                 //     with <context_manager> as .., self.name, ..:
 
                                 let unpacked = infer_unpack_types(db, unpack);
-                                let name_ast_id =
+                                let target_ast_id =
                                     with_item.target().scoped_expression_id(db, method_scope);
-                                let inferred_ty = unpacked.expression_type(name_ast_id);
+                                let inferred_ty = unpacked.expression_type(target_ast_id);
 
                                 union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                             }
