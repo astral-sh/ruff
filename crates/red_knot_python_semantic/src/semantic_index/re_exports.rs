@@ -26,36 +26,37 @@ use ruff_python_ast::{
     name::Name,
     visitor::{walk_expr, walk_pattern, walk_stmt, Visitor},
 };
-use rustc_hash::FxHashSet;
+use rustc_hash::FxHashMap;
 
 use crate::{module_name::ModuleName, resolve_module, Db};
 
 fn exports_cycle_recover(
     _db: &dyn Db,
-    _value: &FxHashSet<Name>,
+    _value: &[Name],
     _count: u32,
     _file: File,
-) -> salsa::CycleRecoveryAction<FxHashSet<Name>> {
+) -> salsa::CycleRecoveryAction<Box<[Name]>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn exports_cycle_initial(_db: &dyn Db, _file: File) -> FxHashSet<Name> {
-    FxHashSet::default()
+fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
+    Box::default()
 }
 
 #[salsa::tracked(return_ref, cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial)]
-pub(super) fn exported_names(db: &dyn Db, file: File) -> FxHashSet<Name> {
+pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
     let module = parsed_module(db.upcast(), file);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
-    finder.exports
+    finder.resolve_exports()
 }
 
 struct ExportFinder<'db> {
     db: &'db dyn Db,
     file: File,
     visiting_stub_file: bool,
-    exports: FxHashSet<Name>,
+    exports: FxHashMap<&'db Name, PossibleExportKind>,
+    dunder_all: DunderAll,
 }
 
 impl<'db> ExportFinder<'db> {
@@ -64,30 +65,59 @@ impl<'db> ExportFinder<'db> {
             db,
             file,
             visiting_stub_file: file.is_stub(db.upcast()),
-            exports: FxHashSet::default(),
+            exports: FxHashMap::default(),
+            dunder_all: DunderAll::NotPresent,
         }
     }
 
-    fn possibly_add_export(&mut self, name: &Name) {
-        if name.starts_with('_') {
-            return;
+    fn possibly_add_export(&mut self, export: &'db Name, kind: PossibleExportKind) {
+        self.exports.insert(export, kind);
+
+        if export == "__all__" {
+            self.dunder_all = DunderAll::Present;
         }
-        self.exports.insert(name.clone());
+    }
+
+    fn resolve_exports(self) -> Box<[Name]> {
+        match self.dunder_all {
+            DunderAll::NotPresent => self
+                .exports
+                .into_iter()
+                .filter_map(|(name, kind)| {
+                    if kind == PossibleExportKind::StubImportWithoutRedundantAlias {
+                        return None;
+                    }
+                    if name.starts_with('_') {
+                        return None;
+                    }
+                    Some(name.clone())
+                })
+                .collect(),
+            DunderAll::Present => self.exports.into_keys().cloned().collect(),
+        }
     }
 }
 
 impl<'db> Visitor<'db> for ExportFinder<'db> {
     fn visit_alias(&mut self, alias: &'db ast::Alias) {
-        let ast::Alias { name, asname, .. } = alias;
-        if self.visiting_stub_file {
-            // If the source is a stub, names defined by imports are only exported
-            // if they use the explicit `foo as foo` syntax:
-            if asname.as_ref().is_some_and(|asname| asname.id == name.id) {
-                self.possibly_add_export(&name.id);
-            }
+        let ast::Alias {
+            name,
+            asname,
+            range: _,
+        } = alias;
+
+        let name = &name.id;
+        let asname = asname.as_ref().map(|asname| &asname.id);
+
+        // If the source is a stub, names defined by imports are only exported
+        // if they use the explicit `foo as foo` syntax:
+        let kind = if self.visiting_stub_file && asname.is_none_or(|asname| asname != name) {
+            PossibleExportKind::StubImportWithoutRedundantAlias
         } else {
-            self.possibly_add_export(&asname.as_ref().unwrap_or(name).id);
-        }
+            PossibleExportKind::Normal
+        };
+
+        self.possibly_add_export(asname.unwrap_or(name), kind);
     }
 
     fn visit_pattern(&mut self, pattern: &'db ast::Pattern) {
@@ -106,7 +136,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     // all names with leading underscores, but this will not always be the case
                     // (in the future we will want to support modules with `__all__ = ['_']`).
                     if name != "_" {
-                        self.possibly_add_export(&name.id);
+                        self.possibly_add_export(&name.id, PossibleExportKind::Normal);
                     }
                 }
             }
@@ -120,12 +150,12 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.visit_pattern(pattern);
                 }
                 if let Some(rest) = rest {
-                    self.possibly_add_export(&rest.id);
+                    self.possibly_add_export(&rest.id, PossibleExportKind::Normal);
                 }
             }
             ast::Pattern::MatchStar(ast::PatternMatchStar { name, range: _ }) => {
                 if let Some(name) = name {
-                    self.possibly_add_export(&name.id);
+                    self.possibly_add_export(&name.id, PossibleExportKind::Normal);
                 }
             }
             ast::Pattern::MatchSequence(_)
@@ -137,7 +167,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         }
     }
 
-    fn visit_stmt(&mut self, stmt: &'db ruff_python_ast::Stmt) {
+    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
         match stmt {
             ast::Stmt::ClassDef(ast::StmtClassDef {
                 name,
@@ -147,7 +177,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 body: _,        // We don't want to visit the body of the class
                 range: _,
             }) => {
-                self.possibly_add_export(&name.id);
+                self.possibly_add_export(&name.id, PossibleExportKind::Normal);
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -155,6 +185,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.visit_arguments(arguments);
                 }
             }
+
             ast::Stmt::FunctionDef(ast::StmtFunctionDef {
                 name,
                 decorator_list,
@@ -165,7 +196,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 range: _,
                 is_async: _,
             }) => {
-                self.possibly_add_export(&name.id);
+                self.possibly_add_export(&name.id, PossibleExportKind::Normal);
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -174,6 +205,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.visit_expr(returns);
                 }
             }
+
             ast::Stmt::AnnAssign(ast::StmtAnnAssign {
                 target,
                 value,
@@ -189,6 +221,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                     self.visit_expr(value);
                 }
             }
+
             ast::Stmt::TypeAlias(ast::StmtTypeAlias {
                 name,
                 type_params: _,
@@ -199,20 +232,22 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                 // Neither walrus expressions nor statements cannot appear in type aliases;
                 // no need to recursively visit the `value` or `type_params`
             }
+
             ast::Stmt::ImportFrom(node) => {
                 let mut found_star = false;
                 for name in &node.names {
                     if &name.name.id == "*" {
                         if !found_star {
                             found_star = true;
-                            self.exports.extend(
+                            for export in
                                 ModuleName::from_import_statement(self.db, self.file, node)
                                     .ok()
                                     .and_then(|module_name| resolve_module(self.db, &module_name))
                                     .iter()
                                     .flat_map(|module| exported_names(self.db, module.file()))
-                                    .cloned(),
-                            );
+                            {
+                                self.possibly_add_export(export, PossibleExportKind::Normal);
+                            }
                         }
                     } else {
                         self.visit_alias(name);
@@ -248,7 +283,7 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
         match expr {
             ast::Expr::Name(ast::ExprName { id, ctx, range: _ }) => {
                 if ctx.is_store() {
-                    self.possibly_add_export(id);
+                    self.possibly_add_export(id, PossibleExportKind::Normal);
                 }
             }
 
@@ -325,7 +360,8 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
                     range: _,
                 }) = &**target
                 {
-                    self.export_finder.possibly_add_export(id);
+                    self.export_finder
+                        .possibly_add_export(id, PossibleExportKind::Normal);
                 }
             }
 
@@ -357,4 +393,16 @@ impl<'db> Visitor<'db> for WalrusFinder<'_, 'db> {
             | ast::Expr::Await(_) => walk_expr(self, expr),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PossibleExportKind {
+    Normal,
+    StubImportWithoutRedundantAlias,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DunderAll {
+    NotPresent,
+    Present,
 }
