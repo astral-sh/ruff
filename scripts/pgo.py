@@ -1,4 +1,7 @@
-"""Creates Profile-Guided-Optimized binaries for ruff."""
+"""
+Creates Profile-Guided-Optimized binaries for ruff.
+Ensure `cargo-pgo` is installed and configured to run this code.
+"""
 
 import json
 import os
