@@ -5270,12 +5270,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             };
 
             match (op, result) {
-                (ast::CmpOp::Eq, Some(Type::BooleanLiteral(true))) => {
-                    return Ok(Type::BooleanLiteral(false));
-                }
-                (ast::CmpOp::NotEq, Some(Type::BooleanLiteral(false))) => {
-                    return Ok(Type::BooleanLiteral(true));
-                }
                 (ast::CmpOp::Is, Some(Type::BooleanLiteral(true))) => {
                     return Ok(Type::BooleanLiteral(false));
                 }

@@ -23,10 +23,6 @@ def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
     reveal_type(n2)  # revealed: int
     reveal_type(n3)  # revealed: ~int
 
-def static_truthiness(not_one: Not[Literal[1]]) -> None:
-    static_assert(not_one != 1)
-    static_assert(not (not_one == 1))
-
 # error: "Special form `knot_extensions.Not` expected exactly one type parameter"
 n: Not[int, str]
 ```
@@ -170,13 +166,11 @@ Static assertions can be used to enforce narrowing constraints:
 ```py
 from knot_extensions import static_assert
 
-def f(x: int) -> None:
-    if x != 0:
-        static_assert(x != 0)
+def f(x: int | None) -> None:
+    if x is not None:
+        static_assert(x is not None)
     else:
-        # `int` can be subclassed, so we cannot assert that `x == 0` here:
-        # error: "Static assertion error: argument of type `bool` has an ambiguous static truthiness"
-        static_assert(x == 0)
+        static_assert(x is None)
 ```
 
 ### Truthy expressions
