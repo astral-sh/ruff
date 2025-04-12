@@ -99,7 +99,7 @@ fn to_lsp_diagnostic(
         code: Some(NumberOrString::String(diagnostic.id().to_string())),
         code_description: None,
         source: Some("red-knot".into()),
-        message: diagnostic.primary_message().to_string(),
+        message: diagnostic.concise_message().to_string(),
         related_information: None,
         data: None,
     }
