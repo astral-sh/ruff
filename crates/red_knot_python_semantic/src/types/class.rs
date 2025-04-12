@@ -869,6 +869,7 @@ impl<'db> ClassLiteralType<'db> {
         let file = class_body_scope.file(db);
         let index = semantic_index(db, file);
         let class_map = use_def_map(db, class_body_scope);
+        let class_table = symbol_table(db, class_body_scope);
 
         for (attribute_assignments, method_scope_id) in
             attribute_assignments(db, class_body_scope, name)
@@ -879,7 +880,6 @@ impl<'db> ClassLiteralType<'db> {
             // The attribute assignment inherits the visibility of the method which contains it
             let is_method_visible = if let Some(method_def) = method_scope.node(db).as_function() {
                 let method = index.expect_single_definition(method_def);
-                let class_table = symbol_table(db, class_body_scope);
                 let method_symbol = class_table.symbol_id_by_name(&method_def.name).unwrap();
                 class_map
                     .public_bindings(method_symbol)
