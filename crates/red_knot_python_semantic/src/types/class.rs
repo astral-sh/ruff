@@ -694,12 +694,14 @@ impl<'db> ClassLiteralType<'db> {
             return Symbol::bound(TupleType::from_elements(db, tuple_elements)).into();
         }
 
-        Self::class_member_from_mro(db, name, self.iter_mro(db, specialization))
+        self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
     }
 
     pub(super) fn class_member_from_mro(
+        self,
         db: &'db dyn Db,
         name: &str,
+        policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> SymbolAndQualifiers<'db> {
         // If we encounter a dynamic type in this class's MRO, we'll save that dynamic type

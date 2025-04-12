@@ -3,10 +3,9 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    class_base::ClassBase, ClassLiteralType, DynamicType, InstanceType, KnownInstanceType,
-    SuperOwnerKind, TodoType, Type,
+    class_base::ClassBase, DynamicType, InstanceType, KnownInstanceType, SuperOwnerKind, TodoType,
+    Type,
 };
-use super::{class_base::ClassBase, DynamicType, InstanceType, KnownInstanceType, TodoType, Type};
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
 /// in an [`crate::types::IntersectionType`] or a [`crate::types::UnionType`] in order for them
@@ -143,10 +142,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 }
             })
             .then_with(|| match (left.owner(db), right.owner(db)) {
-                (
-                    SuperOwnerKind::Class(ClassLiteralType { class: left }),
-                    SuperOwnerKind::Class(ClassLiteralType { class: right }),
-                ) => left.cmp(right),
+                (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => left.cmp(right),
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
                 (

@@ -2100,7 +2100,7 @@ impl<'db> Type<'db> {
 
             Type::BoundSuper(_) => KnownClass::Super
                 .to_class_literal(db)
-                .find_name_in_mro(db, name),
+                .find_name_in_mro_with_policy(db, name, policy),
 
             // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`, i.e. Type::Instance(type).
             // So looking up a name in the MRO of `Type::Instance(type)` is equivalent to looking up the name in the
@@ -2241,7 +2241,10 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
 
-            Type::BoundSuper(bound_super) => bound_super.fine_name_in_owner_mro(db, name),
+            // Note: This only looks up instance members of `builtins.super()` itself.
+            // If you want to look up a member in the MRO of the `super`'s owner,
+            // refer to `Type::member_lookup_with_policy` instead.
+            Type::BoundSuper(_) => KnownClass::Super.to_instance(db).instance_member(db, name),
 
             // TODO: we currently don't model the fact that class literals and subclass-of types have
             // a `__dict__` that is filled with class level attributes. Modeling this is currently not
@@ -2748,21 +2751,17 @@ impl<'db> Type<'db> {
                 )
             }
 
+            // Unlike other objects, `super` has a unique member lookup behavior.
+            // It's simpler than other objects:
+            //
+            // 1. Search for the attribute in the MRO, starting just after the pivot class.
+            // 2. If the attribute is a descriptor, invoke its `__get__` method.
             Type::BoundSuper(bound_super) => {
-                let owner_attr_plain = bound_super.fine_name_in_owner_mro(db, name_str);
+                let owner_attr = bound_super.find_name_in_mro_after_pivot(db, name_str, policy);
 
-                let Some((owner_attr_fallback, _)) =
-                    bound_super.try_call_dunder_get_on_attribute(db, owner_attr_plain.clone())
-                else {
-                    return owner_attr_plain;
-                };
-
-                self.invoke_descriptor_protocol(
-                    db,
-                    name_str,
-                    owner_attr_fallback,
-                    InstanceFallbackShadowsNonDataDescriptor::Yes,
-                )
+                bound_super
+                    .try_call_dunder_get_on_attribute(db, owner_attr.clone())
+                    .unwrap_or(owner_attr)
             }
         }
     }
@@ -3432,7 +3431,7 @@ impl<'db> Type<'db> {
                                 .with_annotated_type(Type::any())]),
                                 Some(KnownClass::Super.to_instance(db)),
                             ),
-                            Signature::new(Parameters::gradual_form(), None),
+                            Signature::new(Parameters::new([]), None),
                         ],
                     );
                     Signatures::single(signature)
@@ -4357,6 +4356,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
+            | Type::BoundSuper(_)
             // Instance contains a ClassType, which has already been specialized if needed, like
             // above with BoundMethod's self_instance.
             | Type::Instance(_)
@@ -6944,18 +6944,18 @@ impl BoundSuperError<'_> {
     pub(super) fn report_diagnostic(&self, context: &InferContext, node: AnyNodeRef) {
         match self {
             BoundSuperError::InvalidArgument { pivot_class, owner } => {
-                context.report_lint(
+                context.report_lint_old(
                     &INVALID_SUPER_ARGUMENT,
                     node,
                     format_args!(
-                        "Second argument `{owner}` is not an instance or subclass of `{pivot_class}` in `super({pivot_class}, {owner})` call",
+                        "`{owner}` is not an instance or subclass of `{pivot_class}` in `super({pivot_class}, {owner})` call",
                         pivot_class = pivot_class.display(context.db()),
                         owner = owner.display(context.db()),
                     ),
                 );
             }
             BoundSuperError::UnavailableImplicitArguments => {
-                context.report_lint(
+                context.report_lint_old(
                     &UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
                     node,
                     format_args!(
@@ -6970,7 +6970,7 @@ impl BoundSuperError<'_> {
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType),
-    Class(ClassLiteralType<'db>),
+    Class(ClassType<'db>),
     Instance(InstanceType<'db>),
 }
 
@@ -6981,33 +6981,34 @@ impl<'db> SuperOwnerKind<'db> {
     ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => Either::Left(ClassBase::Dynamic(dynamic).mro(db)),
-            SuperOwnerKind::Class(class_literal) => {
-                Either::Right(class_literal.class().iter_mro(db))
-            }
-            SuperOwnerKind::Instance(instance) => Either::Right(instance.class().iter_mro(db)),
+            SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
+            SuperOwnerKind::Instance(instance) => Either::Right(instance.class.iter_mro(db)),
         }
     }
 
     fn into_type(self) -> Type<'db> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SuperOwnerKind::Class(class_literal) => Type::ClassLiteral(class_literal),
-            SuperOwnerKind::Instance(instance) => Type::Instance(instance),
+            SuperOwnerKind::Class(class) => class.into(),
+            SuperOwnerKind::Instance(instance) => instance.into(),
         }
     }
 
-    fn into_class(self) -> Option<Class<'db>> {
+    fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             SuperOwnerKind::Dynamic(_) => None,
-            SuperOwnerKind::Class(class_literal) => Some(class_literal.class()),
-            SuperOwnerKind::Instance(instance) => Some(instance.class()),
+            SuperOwnerKind::Class(class) => Some(class),
+            SuperOwnerKind::Instance(instance) => Some(instance.class),
         }
     }
 
     fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(SuperOwnerKind::Dynamic(dynamic)),
-            Type::ClassLiteral(class_literal) => Some(SuperOwnerKind::Class(class_literal)),
+            Type::ClassLiteral(class_literal) => Some(SuperOwnerKind::Class(
+                // Note that a non-generic class never needs to be specialized.
+                class_literal.apply_optional_specialization(db, None),
+            )),
             Type::Instance(instance) => Some(SuperOwnerKind::Instance(instance)),
             Type::BooleanLiteral(_) => {
                 SuperOwnerKind::try_from_type(db, KnownClass::Bool.to_instance(db))
@@ -7048,6 +7049,7 @@ impl<'db> BoundSuperType<'db> {
     /// - `super(pivot, owner_class)` is valid only if `issubclass(owner_class, pivot)`
     /// - `super(pivot, owner_instance)` is valid only if `isinstance(owner_instance, pivot)`
     ///
+    /// return TODO
     fn build(
         db: &'db dyn Db,
         pivot_class_type: Type<'db>,
@@ -7062,9 +7064,8 @@ impl<'db> BoundSuperType<'db> {
 
         let owner = SuperOwnerKind::try_from_type(db, owner_type)
             .and_then(|owner| {
-                if matches!(pivot_class, ClassBase::Dynamic(_))
-                    || matches!(owner, SuperOwnerKind::Dynamic(_))
-                {
+                // subclass checks are only valid for fully static types
+                if !pivot_class_type.is_fully_static(db) || !owner_type.is_fully_static(db) {
                     return Some(owner);
                 }
 
@@ -7088,13 +7089,16 @@ impl<'db> BoundSuperType<'db> {
         )))
     }
 
-    fn skip_past_pivot_class(
+    // Skips elements in MRO until (and including) the pivot class.
+    // If no pivot class is defined, returns the MRO iterator as-is.
+    fn skip_until_after_pivot(
         self,
         db: &'db dyn Db,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
-            return Either::Left(mro_iter);
+            // If the pivot class is a dynamic type, we can't determine the MRO
+            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db));
         };
 
         let mut pivot_found = false;
@@ -7111,45 +7115,68 @@ impl<'db> BoundSuperType<'db> {
         }))
     }
 
-    /// Try to call `__get__` on the attribute.
-    /// Depending on whether the owner is an instance or a class, the arguments passed to `__get__` differ.
-    /// You can refer to the cpython code: <https://github.com/python/cpython/blob/3b3720f1a26ab34377542b48eb6a6565f78ff892/Objects/typeobject.c#L11690-L11693>
+    /// Tries to call `__get__` on the attribute.
+    /// The arguments passed to `__get__` depend on whether the owner is an instance or a class.
+    /// See the `CPython` implementation for reference:
+    /// <https://github.com/python/cpython/blob/3b3720f1a26ab34377542b48eb6a6565f78ff892/Objects/typeobject.c#L11690-L11693>
     fn try_call_dunder_get_on_attribute(
         self,
         db: &'db dyn Db,
         attribute: SymbolAndQualifiers<'db>,
-    ) -> Option<(SymbolAndQualifiers<'db>, AttributeKind)> {
-        match self.owner(db) {
+    ) -> Option<SymbolAndQualifiers<'db>> {
+        let owner = self.owner(db);
+
+        match owner {
+            // If the owner is a dynamic type, we can't tell whether it's a class or an instance.
+            // Also, invoking a descriptor on a dynamic type is meaningless, so we return `None`.
             SuperOwnerKind::Dynamic(_) => None,
-            SuperOwnerKind::Class(class_literal) => Some(Type::try_call_dunder_get_on_attribute(
-                db,
-                attribute,
-                Type::none(db),
-                Type::ClassLiteral(*class_literal),
-            )),
-            SuperOwnerKind::Instance(instance) => Some(Type::try_call_dunder_get_on_attribute(
-                db,
-                attribute,
-                Type::Instance(*instance),
-                Type::class_literal(instance.class()),
-            )),
+            SuperOwnerKind::Class(_) => Some(
+                Type::try_call_dunder_get_on_attribute(
+                    db,
+                    attribute,
+                    Type::none(db),
+                    owner.into_type(),
+                )
+                .0,
+            ),
+            SuperOwnerKind::Instance(_) => Some(
+                Type::try_call_dunder_get_on_attribute(
+                    db,
+                    attribute,
+                    owner.into_type(),
+                    owner.into_type().to_meta_type(db),
+                )
+                .0,
+            ),
         }
     }
 
-    /// Finds the member in the owner's MRO starting after the pivot class.
-    /// Note: This does not execute descriptors.
-    fn fine_name_in_owner_mro(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    /// Similar to `Type::find_name_in_mro_with_policy`, but performs lookup starting *after* the
+    /// pivot class in the MRO, based on the `owner` type instead of the `super` type.
+    fn find_name_in_mro_after_pivot(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
         let owner = self.owner(db);
         match owner {
             SuperOwnerKind::Dynamic(_) => owner
                 .into_type()
-                .find_name_in_mro(db, name)
-                .unwrap_or_default(),
-            SuperOwnerKind::Class(_) | SuperOwnerKind::Instance(_) => Class::class_member_from_mro(
-                db,
-                name,
-                self.skip_past_pivot_class(db, owner.iter_mro(db)),
-            ),
+                .find_name_in_mro_with_policy(db, name, policy)
+                .expect("Dynamic type should return `Some(symbol)`"),
+            SuperOwnerKind::Class(class) | SuperOwnerKind::Instance(InstanceType { class }) => {
+                // We assume that `class` is non-generic, as it should have been specialized earlier.
+                let (class_literal, _) = class.class_literal(db);
+                debug_assert!(matches!(class_literal, ClassLiteralType::NonGeneric(_)));
+
+                class_literal.class_member_from_mro(
+                    db,
+                    name,
+                    policy,
+                    self.skip_until_after_pivot(db, owner.iter_mro(db)),
+                )
+            }
         }
     }
 }

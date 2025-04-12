@@ -10,9 +10,11 @@ A **bound super object** is created either by calling `super(pivot_class, owner)
 implicit form `super()`, where both the pivot class and the owner are inferred. This is the most
 common usage.
 
+In this test, we will only handle bound super objects.
+
 ## Basic Usage
 
-### Explicit Bound Super Object
+### Explicit Super Object
 
 `super(pivot_class, owner)` performs attribute lookup along the MRO, starting immediately after the
 specified pivot class.
@@ -56,7 +58,7 @@ reveal_type(super(C, C()).aa)  # revealed: int
 reveal_type(super(C, C()).bb)  # revealed: int
 ```
 
-### Implicit Bound Super Object
+### Implicit Super Object
 
 The implicit form `super()` is same as `super(__class__, <first argument>)`. The `__class__` refers
 to the class that contains the function where `super()` is used. The first argument refers to the
@@ -85,26 +87,11 @@ class B(A):
         super().f()
 ```
 
-### Plain `super` Instance
-
-In certain cases, the inferred type may be as a plain `super` instance. This typically happens when
-the proper MRO cannot be determined.
-
-A plain `super` instance does not allow attribute access, since its MRO is meaningless.
-
-#### Unbound Super Object
-
-```py
-class A:
-    a: int = 1
-
-class B(A):
-    b: int = 2
-
-reveal_type(super(B))  # revealed: super
-```
-
 ## Dynamic Types
+
+If any of the arguments is dynamic, we cannot determine the MRO to traverse and we may not even be
+able to construct the super object successfully. In such cases, super() should effectively be
+treated as Unknown.
 
 ```py
 class A:
@@ -112,13 +99,14 @@ class A:
 
 def f(x):
     reveal_type(x)  # revealed: Unknown
+
     reveal_type(super(x, x))  # revealed: <super: Unknown, Unknown>
     reveal_type(super(int, x))  # revealed: <super: Literal[int], Unknown>
     reveal_type(super(x, int()))  # revealed: <super: Unknown, int>
 
     reveal_type(super(x, x).a)  # revealed: Unknown
     reveal_type(super(A, x).a)  # revealed: Unknown
-    reveal_type(super(x, A()).a)  # revealed: int
+    reveal_type(super(x, A()).a)  # revealed: Unknown
 ```
 
 ## Implicit Bound Super in Complex Structure
@@ -154,7 +142,7 @@ reveal_type(super(int, bool()))  # revealed: <super: Literal[int], bool>
 ## Descriptor Behavior with Super
 
 Accessing attributes through `super` still invokes descriptor protocol. However, the behavior can
-differ depending on whether the second argument to super is a class or an instance.
+differ depending on whether the to super is a class or an instance.
 
 ```py
 class A:
@@ -167,7 +155,7 @@ class B(A): ...
 # A.__dict__["a1"].__get__(B(), B)
 reveal_type(super(B, B()).a1)  # revealed: <bound method `a1` of `B`>
 # A.__dict__["a2"].__get__(B(), B)
-reveal_type(super(B, B()).a2)  # revealed: <bound method `a2` of `Literal[B]`>
+reveal_type(super(B, B()).a2)  # revealed: <bound method `a2` of `type[B]`>
 
 # A.__dict__["a1"].__get__(None, B)
 reveal_type(super(B, B).a1)  # revealed: Literal[a1]
@@ -175,7 +163,7 @@ reveal_type(super(B, B).a1)  # revealed: Literal[a1]
 reveal_type(super(B, B).a2)  # revealed: <bound method `a2` of `Literal[B]`>
 ```
 
-## Union of supers
+## Union of Supers
 
 ```py
 class A:
@@ -202,6 +190,20 @@ def f(flag: bool):
 
     # error: [possibly-unbound-attribute] "Attribute `a` on type `<super: Literal[B], B> | <super: Literal[D], D>` is possibly unbound"
     reveal_type(s.a)  # revealed: str
+```
+
+## Supers with Generic Classes
+
+```py
+from knot_extensions import TypeOf, static_assert, is_subtype_of
+
+class A[T]:
+    def f(self, a: T) -> T:
+        return a
+
+class B[T](A[T]):
+    def f(self, b: T) -> T:
+        return super().f(b)
 ```
 
 ## Invalid Usages
@@ -244,26 +246,32 @@ class A:
 ### Failing Condition Checks
 
 ```py
-# does not satisfy `isinstance(str(), int)`
-# error: [invalid-super-argument] "Second argument `Literal[""]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[""])` call"
-reveal_type(super(int, str()))  # revealed: Unknown
+# error: [invalid-super-argument] "`Literal[""]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[""])` call"
+# revealed: Unknown
+reveal_type(super(int, str()))
 
-# does not satisfy `issubclass(str, int)`
-# error: [invalid-super-argument] "Second argument `Literal[str]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[str])` call"
-reveal_type(super(int, str))  # revealed: Unknown
+# error: [invalid-super-argument] "`Literal[str]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[str])` call"
+# revealed: Unknown
+reveal_type(super(int, str))
 
 class A: ...
 class B(A): ...
 
-# error: [invalid-super-argument] "Second argument `A` is not an instance or subclass of `Literal[B]` in `super(Literal[B], A)` call"
-reveal_type(super(B, A()))  # revealed: Unknown
-# error: [invalid-super-argument] "Second argument `object` is not an instance or subclass of `Literal[B]` in `super(Literal[B], object)` call"
-reveal_type(super(B, object()))  # revealed: Unknown
+# error: [invalid-super-argument] "`A` is not an instance or subclass of `Literal[B]` in `super(Literal[B], A)` call"
+# revealed: Unknown
+reveal_type(super(B, A()))
 
-# error: [invalid-super-argument] "Second argument `Literal[A]` is not an instance or subclass of `Literal[B]` in `super(Literal[B], Literal[A])` call"
-reveal_type(super(B, A))  # revealed: Unknown
-# error: [invalid-super-argument] "Second argument `Literal[object]` is not an instance or subclass of `Literal[B]` in `super(Literal[B], Literal[object])` call"
-reveal_type(super(B, object))  # revealed: Unknown
+# error: [invalid-super-argument] "`object` is not an instance or subclass of `Literal[B]` in `super(Literal[B], object)` call"
+# revealed: Unknown
+reveal_type(super(B, object()))
+
+# error: [invalid-super-argument] "`Literal[A]` is not an instance or subclass of `Literal[B]` in `super(Literal[B], Literal[A])` call"
+# revealed: Unknown
+reveal_type(super(B, A))
+
+# error: [invalid-super-argument] "`Literal[object]` is not an instance or subclass of `Literal[B]` in `super(Literal[B], Literal[object])` call"
+# revealed: Unknown
+reveal_type(super(B, object))
 ```
 
 ### Instance Member Access via `super`
@@ -282,6 +290,9 @@ class B(A):
         super().__init__(a)
         # TODO: Once `Self` is supported, this should raise `unresolved-attribute` error
         super().a
+
+        # error: [unresolved-attribute] "Type `<super: Literal[B], B>` has no attribute `a`"
+        super(B, B(a)).a
 ```
 
 ### Dunder Method Resolution

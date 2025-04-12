@@ -2416,7 +2416,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // super type doesn't allow attribute assignment
-            Type::Instance(instance) if instance.class().is_known(db, KnownClass::Super) => false,
+            Type::Instance(instance) if instance.class.is_known(db, KnownClass::Super) => false,
             Type::BoundSuper(..) => false,
 
             Type::Dynamic(..) | Type::Never => true,
@@ -4172,6 +4172,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         | KnownClass::Type
                         | KnownClass::Object
                         | KnownClass::Property
+                        | KnownClass::Super
                 )
             })
         }) {
@@ -4348,15 +4349,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 _ => {}
                             }
                         }
-                        Type::ClassLiteral(class_literal)
-                            if class_literal.class().is_known(self.db(), KnownClass::Super) =>
+                        Type::ClassLiteral(class)
+                            if class.is_known(self.db(), KnownClass::Super) =>
                         {
                             // Handle the case where `super()` is called with no arguments.
                             // In this case, we need to infer the two arguments:
                             //   1. The nearest enclosing class
                             //   2. The first parameter of the current function (typically `self` or `cls`)
                             match overload.parameter_types() {
-                                [None, None] => {
+                                [] => {
                                     let scope = self.scope();
 
                                     let Some(enclosing_class) = self.enclosing_class_symbol(scope)
