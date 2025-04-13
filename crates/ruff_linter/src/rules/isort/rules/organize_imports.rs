@@ -36,6 +36,13 @@ use crate::Locator;
 /// import numpy as np
 /// import pandas
 /// ```
+///
+/// ## Preview
+/// When [`preview`](https://docs.astral.sh/ruff/preview/) mode is enabled, Ruff applies a stricter criterion
+/// for determining whether an import should be classified as first-party.
+/// Specifically, for an import of the form `import foo.bar.baz`, Ruff will
+/// check that `foo/bar`, relative to a [user-specified `src`](https://docs.astral.sh/ruff/settings/#src) directory, contains either
+/// the directory `baz` or else a file with the name `baz.py` or `baz.pyi`.
 #[derive(ViolationMetadata)]
 pub(crate) struct UnsortedImports;
 

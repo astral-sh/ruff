@@ -64,6 +64,12 @@ use crate::rules::isort::{categorize, ImportSection, ImportType};
 ///     return len(sized)
 /// ```
 ///
+///
+/// ## Preview
+/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
+/// the criterion for determining whether an import is first-party
+/// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-third-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
+///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
 /// - `lint.flake8-type-checking.runtime-evaluated-base-classes`
@@ -138,6 +144,11 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// def func(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
+///
+/// ## Preview
+/// When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
+/// the criterion for determining whether an import is first-party
+/// is stricter, which could affect whether this lint is triggered vs [`TC001`](https://docs.astral.sh/ruff/rules/typing-only-first-party-import/). See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 ///
 /// ## Options
 /// - `lint.flake8-type-checking.quote-annotations`
