@@ -446,13 +446,16 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Detects `super()` calls where the second argument is not a instance or subclass
-    /// of the first argument.
+    /// Detects `super()` calls where:
+    /// - the first argument is not a valid class literal, or
+    /// - the second argument is not an instance or subclass of the first argument.
     ///
     /// ## Why is this bad?
-    /// `super(type, obj)` expects its second argument to satisfy one of the following:
-    /// - `isinstance(obj, type) is True`
-    /// - `issubclass(obj, type) is True`
+    /// `super(type, obj)` expects:
+    /// - the first argument to be a class,
+    /// - and the second argument to satisfy one of the following:
+    ///   - `isinstance(obj, type)` is `True`
+    ///   - `issubclass(obj, type)` is `True`
     ///
     /// Violating this relationship will raise a `TypeError` at runtime.
     ///
@@ -464,6 +467,8 @@ declare_lint! {
     ///     ...
     ///
     /// super(A, B())  # it's okay! `A` satisfies `isinstance(B(), A)`
+    ///
+    /// super(A(), B()) # error: `A()` is not a class
     ///
     /// super(B, A())  # error: `A()` does not satisfy `isinstance(A(), B)`
     /// super(B, A)  # error: `A` does not satisfy `issubclass(A, B)`

@@ -6984,7 +6984,10 @@ impl<'db> TupleType<'db> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum BoundSuperError<'db> {
-    InvalidArgument {
+    InvalidPivotClassType {
+        pivot_class: Type<'db>,
+    },
+    FailingConditionCheck {
         pivot_class: Type<'db>,
         owner: Type<'db>,
     },
@@ -6994,7 +6997,17 @@ pub(crate) enum BoundSuperError<'db> {
 impl BoundSuperError<'_> {
     pub(super) fn report_diagnostic(&self, context: &InferContext, node: AnyNodeRef) {
         match self {
-            BoundSuperError::InvalidArgument { pivot_class, owner } => {
+            BoundSuperError::InvalidPivotClassType { pivot_class } => {
+                context.report_lint_old(
+                    &INVALID_SUPER_ARGUMENT,
+                    node,
+                    format_args!(
+                        "`{pivot_class}` is not a valid class",
+                        pivot_class = pivot_class.display(context.db()),
+                    ),
+                );
+            }
+            BoundSuperError::FailingConditionCheck { pivot_class, owner } => {
                 context.report_lint_old(
                     &INVALID_SUPER_ARGUMENT,
                     node,
@@ -7117,9 +7130,8 @@ impl<'db> BoundSuperType<'db> {
         }
 
         let pivot_class = ClassBase::try_from_type(db, pivot_class_type).ok_or({
-            BoundSuperError::InvalidArgument {
+            BoundSuperError::InvalidPivotClassType {
                 pivot_class: pivot_class_type,
-                owner: owner_type,
             }
         })?;
 
@@ -7138,7 +7150,7 @@ impl<'db> BoundSuperType<'db> {
                     None
                 }
             })
-            .ok_or(BoundSuperError::InvalidArgument {
+            .ok_or(BoundSuperError::FailingConditionCheck {
                 pivot_class: pivot_class_type,
                 owner: owner_type,
             })?;

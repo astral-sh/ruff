@@ -316,10 +316,19 @@ class A:
 
 ### Failing Condition Checks
 
-`super()` performs an `isinstance` or `issubclass` check at runtime, depending on the argument
-types, and raises an error if the check fails.
+`super()` requires its first argument to be a valid class, and its second argument to be either an
+instance or a subclass of the first. If either condition is violated, a `TypeError` is raised at
+runtime.
 
 ```py
+def f(x: int):
+    # error: [invalid-super-argument] "`int` is not a valid class"
+    super(x, x)
+
+    type IntAlias = int
+    # error: [invalid-super-argument] "`typing.TypeAliasType` is not a valid class"
+    super(IntAlias, 0)
+
 # error: [invalid-super-argument] "`Literal[""]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[""])` call"
 # revealed: Unknown
 reveal_type(super(int, str()))
