@@ -167,6 +167,41 @@ reveal_type(super(B, B).a2)  # revealed: <bound method `a2` of `Literal[B]`>
 
 ## Union of Supers
 
+When the owner is a union type, `super()` is built separately for each branch, and the resulting
+super objects are combined into a union.
+
+```py
+class A: ...
+
+class B:
+    b: int = 42
+
+class C(A, B): ...
+class D(B, A): ...
+
+def f(x: C | D):
+    reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[A], Literal[B], Literal[object]]
+    reveal_type(D.__mro__)  # revealed: tuple[Literal[D], Literal[B], Literal[A], Literal[object]]
+
+    s = super(A, x)
+    reveal_type(s)  # revealed: <super: Literal[A], C> | <super: Literal[A], D>
+
+    # error: [possibly-unbound-attribute] "Attribute `b` on type `<super: Literal[A], C> | <super: Literal[A], D>` is possibly unbound"
+    s.b
+
+def f(flag: bool):
+    x = str() if flag else str("hello")
+    reveal_type(x)  # revealed: Literal["", "hello"]
+    reveal_type(super(str, x))  # revealed: <super: Literal[str], str>
+
+def f(x: int | str):
+    # error: [invalid-super-argument] "`str` is not an instance or subclass of `Literal[int]` in `super(Literal[int], str)` call"
+    super(int, x)
+```
+
+Even when `super()` is constructed separately for each branch of a union, it should behave correctly
+in all cases.
+
 ```py
 def f(flag: bool):
     if flag:

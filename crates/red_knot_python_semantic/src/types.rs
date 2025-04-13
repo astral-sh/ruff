@@ -1754,6 +1754,7 @@ impl<'db> Type<'db> {
                 // Therefore, `super` instances and `BoundSuper` are always not disjoint.
                 !class.is_known(db, KnownClass::Super)
             }
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => !self.is_equivalent_to(db, other),
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => KnownClass::Super
                 .to_instance(db)
                 .is_disjoint_from(db, other),
@@ -7054,6 +7055,17 @@ impl<'db> BoundSuperType<'db> {
         pivot_class_type: Type<'db>,
         owner_type: Type<'db>,
     ) -> Result<Type<'db>, BoundSuperError<'db>> {
+        if let Type::Union(union) = owner_type {
+            return Ok(UnionType::from_elements(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|ty| BoundSuperType::build(db, pivot_class_type, *ty))
+                    .collect::<Result<Vec<_>, _>>()?,
+            ));
+        }
+
         let pivot_class = ClassBase::try_from_type(db, pivot_class_type).ok_or({
             BoundSuperError::InvalidArgument {
                 pivot_class: pivot_class_type,
