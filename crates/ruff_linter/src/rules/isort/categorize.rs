@@ -476,3 +476,447 @@ pub(crate) enum MatchSourceStrategy {
     /// Module is `foo.bar.baz` and `[SRC]/foo/bar/baz` exists
     FullPath,
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::rules::isort::categorize::{match_sources, MatchSourceStrategy};
+
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use tempfile::tempdir;
+
+    /// Helper function to create a file with parent directories
+    fn create_file<P: AsRef<Path>>(path: P) {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, "").unwrap();
+    }
+
+    /// Helper function to create a directory and all parent directories
+    fn create_dir<P: AsRef<Path>>(path: P) {
+        fs::create_dir_all(path).unwrap();
+    }
+
+    /// Tests a traditional Python package layout:
+    /// ```
+    /// project/
+    /// └── mypackage/
+    ///     ├── __init__.py
+    ///     ├── module1.py
+    ///     └── module2.py
+    /// ```
+    #[test]
+    fn test_traditional_layout() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create traditional layout
+        create_dir(project_dir.join("mypackage"));
+        create_file(project_dir.join("mypackage/__init__.py"));
+        create_file(project_dir.join("mypackage/module1.py"));
+        create_file(project_dir.join("mypackage/module2.py"));
+
+        let paths = vec![project_dir.clone()];
+
+        // Test with Root strategy
+
+        assert_eq!(
+            match_sources(&paths, "mypackage", MatchSourceStrategy::Root),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::Root),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.nonexistent", MatchSourceStrategy::Root),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "nonexistent", MatchSourceStrategy::Root),
+            None
+        );
+
+        // Test with FullPath strategy
+
+        assert_eq!(
+            match_sources(&paths, "mypackage", MatchSourceStrategy::FullPath),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::FullPath),
+            Some(project_dir.as_path())
+        );
+
+        // Differs in behavior from [`MatchSourceStrategy::Root`]
+        assert_eq!(
+            match_sources(
+                &paths,
+                "mypackage.nonexistent",
+                MatchSourceStrategy::FullPath
+            ),
+            None
+        );
+    }
+
+    /// Tests a src-based Python package layout:
+    /// ```
+    /// project/
+    /// └── src/
+    ///     └── mypackage/
+    ///         ├── __init__.py
+    ///         └── module1.py
+    /// ```
+    #[test]
+    fn test_src_layout() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+        let src_dir = project_dir.join("src");
+
+        // Create src layout
+        create_dir(src_dir.join("mypackage"));
+        create_file(src_dir.join("mypackage/__init__.py"));
+        create_file(src_dir.join("mypackage/module1.py"));
+
+        let paths = vec![src_dir.clone()];
+
+        // Test with Root strategy
+
+        assert_eq!(
+            match_sources(&paths, "mypackage", MatchSourceStrategy::Root),
+            Some(src_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::Root),
+            Some(src_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.nonexistent", MatchSourceStrategy::Root),
+            Some(src_dir.as_path())
+        );
+
+        // Test with FullPath strategy
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::FullPath),
+            Some(src_dir.as_path())
+        );
+
+        // Differs in behavior from [`MatchSourceStrategy::Root`]
+        assert_eq!(
+            match_sources(
+                &paths,
+                "mypackage.nonexistent",
+                MatchSourceStrategy::FullPath
+            ),
+            None
+        );
+    }
+
+    /// Tests a nested package layout:
+    /// ```
+    /// project/
+    /// └── mypackage/
+    ///     ├── __init__.py
+    ///     ├── module1.py
+    ///     └── subpackage/
+    ///         ├── __init__.py
+    ///         └── module2.py
+    /// ```
+    #[test]
+    fn test_nested_packages() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create nested package layout
+        create_dir(project_dir.join("mypackage/subpackage"));
+        create_file(project_dir.join("mypackage/__init__.py"));
+        create_file(project_dir.join("mypackage/module1.py"));
+        create_file(project_dir.join("mypackage/subpackage/__init__.py"));
+        create_file(project_dir.join("mypackage/subpackage/module2.py"));
+
+        let paths = vec![project_dir.clone()];
+
+        // Test with Root strategy
+        assert_eq!(
+            match_sources(&paths, "mypackage", MatchSourceStrategy::Root),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "mypackage.subpackage", MatchSourceStrategy::Root),
+            Some(project_dir.as_path())
+        );
+
+        // Test with FullPath strategy
+
+        assert_eq!(
+            match_sources(
+                &paths,
+                "mypackage.subpackage.module2",
+                MatchSourceStrategy::FullPath
+            ),
+            Some(project_dir.as_path())
+        );
+
+        // Differs in behavior from [`MatchSourceStrategy::Root`]
+        assert_eq!(
+            match_sources(
+                &paths,
+                "mypackage.subpackage.nonexistent",
+                MatchSourceStrategy::FullPath
+            ),
+            None
+        );
+    }
+
+    /// Tests a namespace package layout (PEP 420):
+    /// ```
+    /// project/
+    /// └── namespace/        # No __init__.py (namespace package)
+    ///     └── package1/
+    ///         ├── __init__.py
+    ///         └── module1.py
+    /// ```
+    #[test]
+    fn test_namespace_packages() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create namespace package layout
+        create_dir(project_dir.join("namespace/package1"));
+        create_file(project_dir.join("namespace/package1/__init__.py"));
+        create_file(project_dir.join("namespace/package1/module1.py"));
+
+        let paths = vec![project_dir.clone()];
+        // Test with Root strategy
+
+        assert_eq!(
+            match_sources(&paths, "namespace", MatchSourceStrategy::Root),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(&paths, "namespace.package1", MatchSourceStrategy::Root),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(
+                &paths,
+                "namespace.package2.module1",
+                MatchSourceStrategy::Root
+            ),
+            Some(project_dir.as_path())
+        );
+
+        // Test with FullPath strategy
+
+        assert_eq!(
+            match_sources(&paths, "namespace.package1", MatchSourceStrategy::FullPath),
+            Some(project_dir.as_path())
+        );
+
+        assert_eq!(
+            match_sources(
+                &paths,
+                "namespace.package1.module1",
+                MatchSourceStrategy::FullPath
+            ),
+            Some(project_dir.as_path())
+        );
+
+        // Differs in behavior from [`MatchSourceStrategy::Root`]
+        assert_eq!(
+            match_sources(
+                &paths,
+                "namespace.package2.module1",
+                MatchSourceStrategy::FullPath
+            ),
+            None
+        );
+    }
+
+    /// Tests a package with type stubs (.pyi files):
+    /// ```
+    /// project/
+    /// └── mypackage/
+    ///     ├── __init__.py
+    ///     └── module1.pyi   # Only .pyi file, no .py
+    /// ```
+    #[test]
+    fn test_type_stubs() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create package with type stub
+        create_dir(project_dir.join("mypackage"));
+        create_file(project_dir.join("mypackage/__init__.py"));
+        create_file(project_dir.join("mypackage/module1.pyi")); // Only create .pyi file, not .py
+
+        // Test with FullPath strategy
+        let paths = vec![project_dir.clone()];
+
+        // Module "mypackage.module1" should match project_dir using .pyi file
+        assert_eq!(
+            match_sources(&paths, "mypackage.module1", MatchSourceStrategy::FullPath),
+            Some(project_dir.as_path())
+        );
+    }
+
+    /// Tests a package with both a module and a directory having the same name:
+    /// ```
+    /// project/
+    /// └── mypackage/
+    ///     ├── __init__.py
+    ///     ├── feature.py      # Module with same name as directory
+    ///     └── feature/        # Directory with same name as module
+    ///         ├── __init__.py
+    ///         └── submodule.py
+    /// ```
+    #[test]
+    fn test_same_name_module_and_directory() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        // Create package with module and directory of the same name
+        create_dir(project_dir.join("mypackage/feature"));
+        create_file(project_dir.join("mypackage/__init__.py"));
+        create_file(project_dir.join("mypackage/feature.py")); // Module with same name as directory
+        create_file(project_dir.join("mypackage/feature/__init__.py"));
+        create_file(project_dir.join("mypackage/feature/submodule.py"));
+
+        // Test with Root strategy
+        let paths = vec![project_dir.clone()];
+
+        // Module "mypackage.feature" should match project_dir (matches the file first)
+        assert_eq!(
+            match_sources(&paths, "mypackage.feature", MatchSourceStrategy::Root),
+            Some(project_dir.as_path())
+        );
+
+        // Test with FullPath strategy
+
+        // Module "mypackage.feature" should match project_dir
+        assert_eq!(
+            match_sources(&paths, "mypackage.feature", MatchSourceStrategy::FullPath),
+            Some(project_dir.as_path())
+        );
+
+        // Module "mypackage.feature.submodule" should match project_dir
+        assert_eq!(
+            match_sources(
+                &paths,
+                "mypackage.feature.submodule",
+                MatchSourceStrategy::FullPath
+            ),
+            Some(project_dir.as_path())
+        );
+    }
+
+    /// Tests multiple source directories with different packages:
+    /// ```
+    /// project1/
+    /// └── package1/
+    ///     ├── __init__.py
+    ///     └── module1.py
+    ///
+    /// project2/
+    /// └── package2/
+    ///     ├── __init__.py
+    ///     └── module2.py
+    /// ```
+    #[test]
+    fn test_multiple_source_paths() {
+        let temp_dir = tempdir().unwrap();
+        let project1_dir = temp_dir.path().join("project1");
+        let project2_dir = temp_dir.path().join("project2");
+
+        // Create files in project1
+        create_dir(project1_dir.join("package1"));
+        create_file(project1_dir.join("package1/__init__.py"));
+        create_file(project1_dir.join("package1/module1.py"));
+
+        // Create files in project2
+        create_dir(project2_dir.join("package2"));
+        create_file(project2_dir.join("package2/__init__.py"));
+        create_file(project2_dir.join("package2/module2.py"));
+
+        // Test with multiple paths in search order
+        let paths = vec![project1_dir.clone(), project2_dir.clone()];
+
+        // Module "package1" should match project1_dir
+        assert_eq!(
+            match_sources(&paths, "package1", MatchSourceStrategy::Root),
+            Some(project1_dir.as_path())
+        );
+
+        // Module "package2" should match project2_dir
+        assert_eq!(
+            match_sources(&paths, "package2", MatchSourceStrategy::Root),
+            Some(project2_dir.as_path())
+        );
+
+        // Try with reversed order to check search order
+        let paths_reversed = vec![project2_dir, project1_dir.clone()];
+
+        // Module "package1" should still match project1_dir
+        assert_eq!(
+            match_sources(&paths_reversed, "package1", MatchSourceStrategy::Root),
+            Some(project1_dir.as_path())
+        );
+    }
+
+    /// Tests behavior with an empty module name
+    /// ```
+    /// project/
+    /// └── mypackage/
+    /// ```
+    ///
+    /// In theory this should never happen since we expect
+    /// module names to have been normalized by the time we
+    /// call `match_sources`. But it is worth noting that the
+    /// behavior is different depending on the [`MatchSourceStrategy`]
+    #[test]
+    fn test_empty_module_name() {
+        let temp_dir = tempdir().unwrap();
+        let project_dir = temp_dir.path().join("project");
+
+        create_dir(project_dir.join("mypackage"));
+
+        let paths = vec![project_dir.clone()];
+
+        assert_eq!(
+            match_sources(&paths, "", MatchSourceStrategy::Root),
+            Some(project_dir.as_path())
+        );
+        assert_eq!(
+            match_sources(&paths, "", MatchSourceStrategy::FullPath),
+            None
+        );
+    }
+
+    /// Tests behavior with an empty list of source paths
+    #[test]
+    fn test_empty_paths() {
+        let paths: Vec<PathBuf> = vec![];
+
+        // Empty paths should return None
+        assert_eq!(
+            match_sources(&paths, "mypackage", MatchSourceStrategy::Root),
+            None
+        );
+        assert_eq!(
+            match_sources(&paths, "mypackage", MatchSourceStrategy::FullPath),
+            None
+        );
+    }
+}

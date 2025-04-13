@@ -76,6 +76,7 @@ insta = { workspace = true, features = ["filters", "json", "redactions"] }
 test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
+tempfile.workspace = true
 
 [features]
 default = []
