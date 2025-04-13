@@ -55,6 +55,7 @@ impl<'db> Bindings<'db> {
     /// verify that each argument type is assignable to the corresponding parameter type.
     pub(crate) fn match_parameters(
         signatures: Signatures<'db>,
+        inferred_return_ty: impl Fn() -> Type<'db> + Copy,
         arguments: &mut CallArguments<'_>,
     ) -> Self {
         let mut argument_forms = vec![None; arguments.len()];
@@ -64,6 +65,7 @@ impl<'db> Bindings<'db> {
             .map(|signature| {
                 CallableBinding::match_parameters(
                     signature,
+                    inferred_return_ty,
                     arguments,
                     &mut argument_forms,
                     &mut conflicting_forms,
@@ -664,6 +666,7 @@ pub(crate) struct CallableBinding<'db> {
 impl<'db> CallableBinding<'db> {
     fn match_parameters(
         signature: &CallableSignature<'db>,
+        inferred_return_ty: impl Fn() -> Type<'db> + Copy,
         arguments: &mut CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
@@ -682,6 +685,7 @@ impl<'db> CallableBinding<'db> {
                 .map(|signature| {
                     Binding::match_parameters(
                         signature,
+                        inferred_return_ty,
                         arguments,
                         argument_forms,
                         conflicting_forms,
@@ -847,6 +851,7 @@ pub(crate) struct Binding<'db> {
 impl<'db> Binding<'db> {
     fn match_parameters(
         signature: &Signature<'db>,
+        inferred_return_ty: impl Fn() -> Type<'db>,
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
@@ -966,7 +971,7 @@ impl<'db> Binding<'db> {
         }
 
         Self {
-            return_ty: signature.return_ty.unwrap_or(Type::unknown()),
+            return_ty: signature.return_ty.unwrap_or_else(inferred_return_ty),
             argument_parameters: argument_parameters.into_boxed_slice(),
             parameter_tys: vec![None; parameters.len()].into_boxed_slice(),
             errors,

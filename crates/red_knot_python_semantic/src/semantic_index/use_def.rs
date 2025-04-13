@@ -417,7 +417,6 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations)
     }
 
-    /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
         !self
             .visibility_constraints
