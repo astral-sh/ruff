@@ -17,6 +17,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix;
 use crate::registry::Rule;
+use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 
 /// ## What it does
@@ -222,6 +223,11 @@ enum UnusedImportContext {
 
 fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
     let source_name = import.source_name().join(".");
+    let match_source_strategy = if checker.settings.preview.is_enabled() {
+        MatchSourceStrategy::FullPath
+    } else {
+        MatchSourceStrategy::Root
+    };
     let category = isort::categorize(
         &source_name,
         import.qualified_name().is_unresolved_import(),
@@ -233,6 +239,7 @@ fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
         checker.settings.isort.no_sections,
         &checker.settings.isort.section_order,
         &checker.settings.isort.default_section,
+        match_source_strategy,
     );
     matches! {
         category,
