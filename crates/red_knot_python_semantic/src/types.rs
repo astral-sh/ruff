@@ -2099,6 +2099,8 @@ impl<'db> Type<'db> {
                 subclass_of_ty.find_name_in_mro_with_policy(db, name, policy)
             }
 
+            // Note: `super(pivot, owner).__class__` is `builtins.super`, not the owner's class.
+            // `BoundSuper` should look up the name in the MRO of `builtins.super`.
             Type::BoundSuper(_) => KnownClass::Super
                 .to_class_literal(db)
                 .find_name_in_mro_with_policy(db, name, policy),
@@ -2242,9 +2244,11 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .instance_member(db, name),
 
-            // Note: This only looks up instance members of `builtins.super()` itself.
+            // Note: `super(pivot, owner).__dict__` refers to the `__dict__` of the `builtins.super` instance,
+            // not that of the owner.
+            // This means we should only look up instance members defined on the `builtins.super()` instance itself.
             // If you want to look up a member in the MRO of the `super`'s owner,
-            // refer to `Type::member_lookup_with_policy` instead.
+            // refer to [`Type::member`] instead.
             Type::BoundSuper(_) => KnownClass::Super.to_instance(db).instance_member(db, name),
 
             // TODO: we currently don't model the fact that class literals and subclass-of types have
