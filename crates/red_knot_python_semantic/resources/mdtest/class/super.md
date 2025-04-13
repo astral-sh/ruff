@@ -10,8 +10,6 @@ A **bound super object** is created either by calling `super(pivot_class, owner)
 implicit form `super()`, where both the pivot class and the owner are inferred. This is the most
 common usage.
 
-In this test, we will only handle bound super objects.
-
 ## Basic Usage
 
 ### Explicit Super Object
@@ -86,6 +84,41 @@ class B(A):
 
 super(B, B(42)).__init__(42)
 super(B, B).f()
+```
+
+### Unbound Super Object
+
+Calling `super(cls)` without a second argument returns an *unbound super object*. This is treated as
+a plain `super` instance and does not support name lookup via the MRO.
+
+```py
+class A:
+    a: int = 42
+
+class B(A): ...
+
+reveal_type(super(B))  # revealed: super
+
+# error: [unresolved-attribute] "Type `super` has no attribute `a`"
+super(B).a
+```
+
+## Attribute Assignment
+
+`super()` objects do not allow attribute assignment — even if the attribute is resolved
+successfully.
+
+```py
+class A:
+    a: int = 3
+
+class B(A): ...
+
+reveal_type(super(B, B()).a)  # revealed: int
+# error: [invalid-assignment] "Cannot assign to attribute `a` on type `<super: Literal[B], B>`"
+super(B, B()).a = 3
+# error: [invalid-assignment] "Cannot assign to attribute `a` on type `super`"
+super(B).a = 5
 ```
 
 ## Dynamic Types

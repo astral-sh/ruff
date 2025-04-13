@@ -2415,9 +2415,33 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            // super type doesn't allow attribute assignment
-            Type::Instance(instance) if instance.class.is_known(db, KnownClass::Super) => false,
-            Type::BoundSuper(..) => false,
+            // super instances doesn't allow attribute assignment
+            Type::Instance(instance) if instance.class.is_known(db, KnownClass::Super) => {
+                if emit_diagnostics {
+                    self.context.report_lint_old(
+                        &INVALID_ASSIGNMENT,
+                        target,
+                        format_args!(
+                            "Cannot assign to attribute `{attribute}` on type `{}`",
+                            object_ty.display(self.db()),
+                        ),
+                    );
+                }
+                false
+            }
+            Type::BoundSuper(_) => {
+                if emit_diagnostics {
+                    self.context.report_lint_old(
+                        &INVALID_ASSIGNMENT,
+                        target,
+                        format_args!(
+                            "Cannot assign to attribute `{attribute}` on type `{}`",
+                            object_ty.display(self.db()),
+                        ),
+                    );
+                }
+                false
+            }
 
             Type::Dynamic(..) | Type::Never => true,
 
