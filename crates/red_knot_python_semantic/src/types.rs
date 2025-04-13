@@ -3473,7 +3473,7 @@ impl<'db> Type<'db> {
                                 Some(KnownClass::Super.to_instance(db)),
                             ),
                             Signature::new(
-                                Parameters::new([]),
+                                Parameters::empty(),
                                 Some(KnownClass::Super.to_instance(db)),
                             ),
                         ],
