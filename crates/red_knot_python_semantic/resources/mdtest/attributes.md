@@ -1584,7 +1584,7 @@ Some attributes are special-cased, however:
 
 ```py
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
-reveal_type(f.__call__)  # revealed: bound method def f() -> Unknown.__call__(*args: Any, **kwargs: Any) -> Any
+reveal_type(f.__call__)  # revealed: <method-wrapper `__call__` of `f`>
 ```
 
 ### Int-literal attributes

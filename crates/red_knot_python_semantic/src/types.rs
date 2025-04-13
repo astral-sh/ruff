@@ -2520,6 +2520,10 @@ impl<'db> Type<'db> {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)),
             )
             .into(),
+            Type::FunctionLiteral(function) if name == "__call__" => Symbol::bound(
+                Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)),
+            )
+            .into(),
             Type::PropertyInstance(property) if name == "__get__" => Symbol::bound(
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)),
             )
@@ -4236,6 +4240,12 @@ impl<'db> Type<'db> {
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
+                    function.apply_specialization(db, specialization),
+                ))
+            }
+
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
+                Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(
                     function.apply_specialization(db, specialization),
                 ))
             }
@@ -6208,6 +6218,8 @@ impl<'db> CallableType<'db> {
 pub enum MethodWrapperKind<'db> {
     /// Method wrapper for `some_function.__get__`
     FunctionTypeDunderGet(FunctionType<'db>),
+    /// Method wrapper for `some_function.__call__`
+    FunctionTypeDunderCall(FunctionType<'db>),
     /// Method wrapper for `some_property.__get__`
     PropertyDunderGet(PropertyInstanceType<'db>),
     /// Method wrapper for `some_property.__set__`

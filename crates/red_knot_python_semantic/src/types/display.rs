@@ -135,6 +135,19 @@ impl Display for DisplayRepresentation<'_> {
                     },
                 )
             }
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
+                write!(
+                    f,
+                    "<method-wrapper `__call__` of `{function}{specialization}`>",
+                    function = function.name(self.db),
+                    specialization = if let Some(specialization) = function.specialization(self.db)
+                    {
+                        specialization.display_short(self.db).to_string()
+                    } else {
+                        String::new()
+                    },
+                )
+            }
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
                 write!(f, "<method-wrapper `__get__` of `property` object>",)
             }
