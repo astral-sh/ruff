@@ -6959,7 +6959,7 @@ impl BoundSuperError<'_> {
                     &UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
                     node,
                     format_args!(
-                        "Implicit arguments for `super()` are not available in this context",
+                        "Cannot determine implicit arguments for 'super()' in this context",
                     ),
                 );
             }
@@ -7006,7 +7006,6 @@ impl<'db> SuperOwnerKind<'db> {
         match ty {
             Type::Dynamic(dynamic) => Some(SuperOwnerKind::Dynamic(dynamic)),
             Type::ClassLiteral(class_literal) => Some(SuperOwnerKind::Class(
-                // Note that a non-generic class never needs to be specialized.
                 class_literal.apply_optional_specialization(db, None),
             )),
             Type::Instance(instance) => Some(SuperOwnerKind::Instance(instance)),
@@ -7049,7 +7048,7 @@ impl<'db> BoundSuperType<'db> {
     /// - `super(pivot, owner_class)` is valid only if `issubclass(owner_class, pivot)`
     /// - `super(pivot, owner_instance)` is valid only if `isinstance(owner_instance, pivot)`
     ///
-    /// return TODO
+    /// However, the checking is skipped when any of the arguments is a dynamic type.
     fn build(
         db: &'db dyn Db,
         pivot_class_type: Type<'db>,
@@ -7089,15 +7088,16 @@ impl<'db> BoundSuperType<'db> {
         )))
     }
 
-    // Skips elements in MRO until (and including) the pivot class.
-    // If no pivot class is defined, returns the MRO iterator as-is.
+    /// Skips elements in the MRO up to and including the pivot class.
+    ///
+    /// If the pivot class is a dynamic type, its MRO can't be determined,
+    /// so we fall back to using the MRO of `DynamicType::Unknown`.
     fn skip_until_after_pivot(
         self,
         db: &'db dyn Db,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
-            // If the pivot class is a dynamic type, we can't determine the MRO
             return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db));
         };
 
@@ -7128,7 +7128,7 @@ impl<'db> BoundSuperType<'db> {
 
         match owner {
             // If the owner is a dynamic type, we can't tell whether it's a class or an instance.
-            // Also, invoking a descriptor on a dynamic type is meaningless, so we return `None`.
+            // Also, invoking a descriptor on a dynamic attribute is meaningless, so we don't handle this.
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(_) => Some(
                 Type::try_call_dunder_get_on_attribute(
@@ -7164,11 +7164,11 @@ impl<'db> BoundSuperType<'db> {
             SuperOwnerKind::Dynamic(_) => owner
                 .into_type()
                 .find_name_in_mro_with_policy(db, name, policy)
-                .expect("Dynamic type should return `Some(symbol)`"),
+                .expect("Calling `find_name_in_mro` on dynamic type should return `Some`"),
             SuperOwnerKind::Class(class) | SuperOwnerKind::Instance(InstanceType { class }) => {
                 // We assume that `class` is non-generic, as it should have been specialized earlier.
+                debug_assert!(matches!(class, ClassType::NonGeneric(_)));
                 let (class_literal, _) = class.class_literal(db);
-                debug_assert!(matches!(class_literal, ClassLiteralType::NonGeneric(_)));
 
                 class_literal.class_member_from_mro(
                     db,

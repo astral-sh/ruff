@@ -74,24 +74,24 @@ class A:
 
 class B(A):
     def __init__(self, a: int):
+        # TODO: Once `Self` is supported, this should be `<super: Literal[B], B>`
         reveal_type(super())  # revealed: <super: Literal[B], Unknown>
-        # TODO: Once `Self` is supported, this should be `<bound method `__init__` of `B`>`
-        reveal_type(super().__init__)  # revealed: Unknown
         super().__init__(a)
 
     @classmethod
     def f(cls):
+        # TODO: Once `Self` is supported, this should be `<super: Literal[B], Literal[B]>`
         reveal_type(super())  # revealed: <super: Literal[B], Unknown>
-        # TODO: Once `Self` is supported, this should be `<bound method `f` of `Literal[B]`>`
-        reveal_type(super().f)  # revealed: Unknown
         super().f()
+
+super(B, B(42)).__init__(42)
+super(B, B).f()
 ```
 
 ## Dynamic Types
 
-If any of the arguments is dynamic, we cannot determine the MRO to traverse and we may not even be
-able to construct the super object successfully. In such cases, super() should effectively be
-treated as Unknown.
+If any of the arguments is dynamic, we cannot determine the MRO to traverse. When accessing a
+member, it should effectively behave like a dynamic type.
 
 ```py
 class A:
@@ -101,15 +101,15 @@ def f(x):
     reveal_type(x)  # revealed: Unknown
 
     reveal_type(super(x, x))  # revealed: <super: Unknown, Unknown>
-    reveal_type(super(int, x))  # revealed: <super: Literal[int], Unknown>
-    reveal_type(super(x, int()))  # revealed: <super: Unknown, int>
+    reveal_type(super(A, x))  # revealed: <super: Literal[A], Unknown>
+    reveal_type(super(x, A()))  # revealed: <super: Unknown, A>
 
     reveal_type(super(x, x).a)  # revealed: Unknown
     reveal_type(super(A, x).a)  # revealed: Unknown
     reveal_type(super(x, A()).a)  # revealed: Unknown
 ```
 
-## Implicit Bound Super in Complex Structure
+## Implicit `super()` in Complex Structure
 
 ```py
 from __future__ import annotations
@@ -137,6 +137,8 @@ class A:
 reveal_type(super(bool, True))  # revealed: <super: Literal[bool], bool>
 reveal_type(super(bool, bool()))  # revealed: <super: Literal[bool], bool>
 reveal_type(super(int, bool()))  # revealed: <super: Literal[int], bool>
+reveal_type(super(int, 3))  # revealed: <super: Literal[int], int>
+reveal_type(super(str, ""))  # revealed: <super: Literal[str], str>
 ```
 
 ## Descriptor Behavior with Super
@@ -166,22 +168,23 @@ reveal_type(super(B, B).a2)  # revealed: <bound method `a2` of `Literal[B]`>
 ## Union of Supers
 
 ```py
-class A:
-    x = 1
-    y: int = 1
-
-    a: str = "a only"
-
-class B(A): ...
-
-class C:
-    x = 2
-    y: int | str = "test"
-
-class D(C): ...
-
 def f(flag: bool):
-    s = super(B, B()) if flag else super(D, D())
+    if flag:
+        class A:
+            x = 1
+            y: int = 1
+
+            a: str = "hello"
+
+        class B(A): ...
+        s = super(B, B())
+    else:
+        class C:
+            x = 2
+            y: int | str = "test"
+
+        class D(C): ...
+        s = super(D, D())
 
     reveal_type(s)  # revealed: <super: Literal[B], B> | <super: Literal[D], D>
 
@@ -215,35 +218,38 @@ If an appropriate class and argument cannot be found, a runtime error will occur
 ```py
 from __future__ import annotations
 
-# error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+# error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
 reveal_type(super())  # revealed: Unknown
 
 def f():
-    # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+    # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
     super()
 
 # No first argument in its scope
 class A:
-    # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+    # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
     s = super()
 
     def f(self):
         def g():
-            # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+            # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
             super()
-        # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+        # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
         lambda: super()
 
-        # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+        # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
         (super() for _ in range(10))
 
     @staticmethod
     def h():
-        # error: [unavailable-implicit-super-arguments] "Implicit arguments for `super()` are not available in this context"
+        # error: [unavailable-implicit-super-arguments] "Cannot determine implicit arguments for 'super()' in this context"
         super()
 ```
 
 ### Failing Condition Checks
+
+`super()` performs an `isinstance` or `issubclass` check at runtime, depending on the argument
+types, and raises an error if the check fails.
 
 ```py
 # error: [invalid-super-argument] "`Literal[""]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[""])` call"
@@ -272,6 +278,8 @@ reveal_type(super(B, A))
 # error: [invalid-super-argument] "`Literal[object]` is not an instance or subclass of `Literal[B]` in `super(Literal[B], Literal[object])` call"
 # revealed: Unknown
 reveal_type(super(B, object))
+
+super(object, object()).__class__
 ```
 
 ### Instance Member Access via `super`
@@ -291,8 +299,8 @@ class B(A):
         # TODO: Once `Self` is supported, this should raise `unresolved-attribute` error
         super().a
 
-        # error: [unresolved-attribute] "Type `<super: Literal[B], B>` has no attribute `a`"
-        super(B, B(a)).a
+# error: [unresolved-attribute] "Type `<super: Literal[B], B>` has no attribute `a`"
+super(B, B(42)).a
 ```
 
 ### Dunder Method Resolution
