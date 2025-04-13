@@ -721,23 +721,25 @@ impl<'db> UseDefMapBuilder<'db> {
     ) {
         let predicate_id = self.add_predicate(star_import.into());
         let visibility_id = self.visibility_constraints.add_atom(predicate_id);
-        self.symbol_states[symbol]
-            .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
-
-        let post_definition = self.snapshot();
-
-        self.symbol_states[symbol] = SymbolState::undefined(self.scope_start_visibility);
-
-        let negated_constraint = self
+        let negated_visibility_id = self
             .visibility_constraints
             .add_not_constraint(visibility_id);
-        self.symbol_states[symbol]
-            .record_visibility_constraint(&mut self.visibility_constraints, negated_constraint);
-        self.scope_start_visibility = self
-            .visibility_constraints
-            .add_and_constraint(self.scope_start_visibility, negated_constraint);
 
-        self.merge(post_definition);
+        let mut post_definition_state = std::mem::replace(
+            &mut self.symbol_states[symbol],
+            SymbolState::undefined(self.scope_start_visibility),
+        );
+        post_definition_state
+            .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
+
+        self.symbol_states[symbol]
+            .record_visibility_constraint(&mut self.visibility_constraints, negated_visibility_id);
+
+        self.symbol_states[symbol].merge(
+            post_definition_state,
+            &mut self.narrowing_constraints,
+            &mut self.visibility_constraints,
+        );
     }
 
     /// This method resets the visibility constraints for all symbols to a previous state
