@@ -2,18 +2,19 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 
-use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::{Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple, Operator};
+use ruff_python_ast::name::Name;
+use ruff_python_ast::{
+    Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple, Operator, PythonVersion,
+};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 
 /// ## What it does
 /// Checks for duplicate union members.
@@ -181,11 +182,8 @@ fn generate_union_fix(
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
 
     // Request `typing.Union`
-    let (import_edit, binding) = checker.importer().get_or_import_symbol(
-        &ImportRequest::import_from("typing", "Union"),
-        annotation.start(),
-        checker.semantic(),
-    )?;
+    let (import_edit, binding) =
+        checker.import_from_typing("Union", annotation.start(), PythonVersion::lowest())?;
 
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {
