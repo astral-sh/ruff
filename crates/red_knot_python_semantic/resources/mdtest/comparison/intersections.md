@@ -50,12 +50,16 @@ reveal_type(x)  # revealed: LiteralString
 if x != "abc":
     reveal_type(x)  # revealed: LiteralString & ~Literal["abc"]
 
+    # TODO: This should be `Literal[True]`
     reveal_type(x == "abc")  # revealed: bool
+    # TODO: This should be `Literal[True]`
     reveal_type("abc" == x)  # revealed: bool
     reveal_type(x == "something else")  # revealed: bool
     reveal_type("something else" == x)  # revealed: bool
 
+    # TODO: This should be `Literal[True]`
     reveal_type(x != "abc")  # revealed: bool
+    # TODO: This should be `Literal[True]`
     reveal_type("abc" != x)  # revealed: bool
     reveal_type(x != "something else")  # revealed: bool
     reveal_type("something else" != x)  # revealed: bool

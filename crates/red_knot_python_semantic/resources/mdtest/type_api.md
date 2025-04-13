@@ -25,6 +25,19 @@ def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
 
 # error: "Special form `knot_extensions.Not` expected exactly one type parameter"
 n: Not[int, str]
+
+def static_truthiness(not_one: Not[Literal[1]]) -> None:
+    # these are both boolean-literal types,
+    # since all possible runtime objects that are created by the literal syntax `1`
+    # are members of the type `Literal[1]`
+    reveal_type(not_one is not 1)  # revealed: Literal[True]
+    reveal_type(not_one is 1)  # revealed: Literal[False]
+
+    # But these are both `bool`, rather than `Literal[True]` or `Literal[False]`
+    # as there are many runtime objects that inhabit the type `~Literal[1]`
+    # but still compare equal to `1`. Two examples are `1.0` and `True`.
+    reveal_type(not_one != 1)  # revealed: bool
+    reveal_type(not_one == 1)  # revealed: bool
 ```
 
 ### Intersection
