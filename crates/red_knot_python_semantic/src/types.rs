@@ -3468,7 +3468,10 @@ impl<'db> Type<'db> {
                                 .with_annotated_type(Type::any())]),
                                 Some(KnownClass::Super.to_instance(db)),
                             ),
-                            Signature::new(Parameters::new([]), None),
+                            Signature::new(
+                                Parameters::new([]),
+                                Some(KnownClass::Super.to_instance(db)),
+                            ),
                         ],
                     );
                     Signatures::single(signature)
