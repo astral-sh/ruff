@@ -2415,7 +2415,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            // super instances doesn't allow attribute assignment
+            // Super instances do not allow attribute assignment
             Type::Instance(instance) if instance.class.is_known(db, KnownClass::Super) => {
                 if emit_diagnostics {
                     self.context.report_lint_old(
