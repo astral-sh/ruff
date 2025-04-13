@@ -1558,10 +1558,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d699bc6dfc879fb1bf9bdff0d4c56f0884fc6f0d0eb0fba397a6d00cd9a6b85e"
 dependencies = [
  "jiff-static",
+ "jiff-tzdb-platform",
  "log",
  "portable-atomic",
  "portable-atomic-util",
  "serde",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1573,6 +1575,21 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.100",
+]
+
+[[package]]
+name = "jiff-tzdb"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1283705eb0a21404d2bfd6eef2a7593d240bc42a0bdb39db0ad6fa2ec026524"
+
+[[package]]
+name = "jiff-tzdb-platform"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "875a5a69ac2bab1a891711cf5eccbec1ce0341ea805560dcd90b7a2e925132e8"
+dependencies = [
+ "jiff-tzdb",
 ]
 
 [[package]]
@@ -2476,7 +2493,6 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "argfile",
- "chrono",
  "clap",
  "colored 3.0.0",
  "countme",
@@ -2485,6 +2501,7 @@ dependencies = [
  "filetime",
  "insta",
  "insta-cmd",
+ "jiff",
  "rayon",
  "red_knot_project",
  "red_knot_python_semantic",
@@ -2764,7 +2781,6 @@ dependencies = [
  "bincode",
  "bitflags 2.9.0",
  "cachedir",
- "chrono",
  "clap",
  "clap_complete_command",
  "clearscreen",
@@ -2777,6 +2793,7 @@ dependencies = [
  "insta-cmd",
  "is-macro",
  "itertools 0.14.0",
+ "jiff",
  "log",
  "mimalloc",
  "notify",
@@ -2996,7 +3013,6 @@ dependencies = [
  "aho-corasick",
  "anyhow",
  "bitflags 2.9.0",
- "chrono",
  "clap",
  "colored 3.0.0",
  "fern",
@@ -3007,6 +3023,7 @@ dependencies = [
  "is-macro",
  "is-wsl",
  "itertools 0.14.0",
+ "jiff",
  "libcst",
  "log",
  "memchr",
