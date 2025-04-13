@@ -57,6 +57,7 @@ impl<'db> Bindings<'db> {
     /// verify that each argument type is assignable to the corresponding parameter type.
     pub(crate) fn match_parameters(
         signatures: Signatures<'db>,
+        inferred_return_ty: impl Fn() -> Type<'db> + Copy,
         arguments: &CallArguments<'_>,
     ) -> Self {
         let mut argument_forms = vec![None; arguments.len()];
@@ -69,6 +70,7 @@ impl<'db> Bindings<'db> {
                     arguments,
                     &mut argument_forms,
                     &mut conflicting_forms,
+                    inferred_return_ty,
                 )
             })
             .collect();
@@ -946,6 +948,7 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
+        inferred_return_ty: impl Fn() -> Type<'db> + Copy,
     ) -> Self {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
@@ -965,6 +968,7 @@ impl<'db> CallableBinding<'db> {
                     arguments.as_ref(),
                     argument_forms,
                     conflicting_forms,
+                    inferred_return_ty,
                 )
             })
             .collect();
@@ -1148,6 +1152,7 @@ impl<'db> Binding<'db> {
         arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
+        inferred_return_ty: impl Fn() -> Type<'db>,
     ) -> Self {
         let parameters = signature.parameters();
         // The parameter that each argument is matched with.
@@ -1264,7 +1269,7 @@ impl<'db> Binding<'db> {
         }
 
         Self {
-            return_ty: signature.return_ty.unwrap_or(Type::unknown()),
+            return_ty: signature.return_ty.unwrap_or_else(inferred_return_ty),
             specialization: None,
             inherited_specialization: None,
             argument_parameters: argument_parameters.into_boxed_slice(),

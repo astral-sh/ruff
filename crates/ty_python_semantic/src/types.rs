@@ -4208,6 +4208,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the inferred return type of `self` if it is a function literal.
+    fn inferred_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::FunctionLiteral(function_type) => Some(function_type.inferred_return_type(db)),
+            _ => None,
+        }
+    }
+
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
     /// the arguments are not compatible with the formal parameters.
     ///
@@ -4220,7 +4228,9 @@ impl<'db> Type<'db> {
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, argument_types).check_types(db, argument_types)
+        let inferred_return_ty = || self.inferred_return_type(db).unwrap_or(Type::unknown());
+        Bindings::match_parameters(signatures, inferred_return_ty, argument_types)
+            .check_types(db, argument_types)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -4258,8 +4268,14 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, argument_types)
-                    .check_types(db, argument_types)?;
+                let inferred_return_ty = || {
+                    dunder_callable
+                        .inferred_return_type(db)
+                        .unwrap_or(Type::unknown())
+                };
+                let bindings =
+                    Bindings::match_parameters(signatures, inferred_return_ty, argument_types)
+                        .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -6783,6 +6799,13 @@ impl<'db> FunctionType<'db> {
             signature = signature.apply_specialization(db, specialization);
         }
         signature
+    }
+
+    /// Infers this function scope's types and returns the inferred return type.
+    fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.inferred_return_type(db)
     }
 
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
