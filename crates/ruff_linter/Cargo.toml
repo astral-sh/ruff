@@ -32,7 +32,6 @@ ruff_text_size = { workspace = true }
 aho-corasick = { workspace = true }
 anyhow = { workspace = true }
 bitflags = { workspace = true }
-chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 colored = { workspace = true }
 fern = { workspace = true }
@@ -43,6 +42,7 @@ is-macro = { workspace = true }
 is-wsl = { workspace = true }
 itertools = { workspace = true }
 libcst = { workspace = true }
+jiff = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
 natord = { workspace = true }
