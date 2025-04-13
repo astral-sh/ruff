@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt;
+use std::fs;
 use std::iter;
 use std::path::{Path, PathBuf};
 
@@ -100,6 +101,7 @@ pub(crate) fn categorize<'a>(
     no_sections: bool,
     section_order: &'a [ImportSection],
     default_section: &'a ImportSection,
+    match_source_strategy: MatchSourceStrategy,
 ) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
     let (mut import_type, mut reason) = {
@@ -127,7 +129,7 @@ pub(crate) fn categorize<'a>(
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SamePackage,
             )
-        } else if let Some(src) = match_sources(src, module_name) {
+        } else if let Some(src) = match_sources(src, module_name, match_source_strategy) {
             (
                 &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
@@ -156,22 +158,64 @@ fn same_package(package: Option<PackageRoot<'_>>, module_base: &str) -> bool {
         .is_some_and(|package| package.ends_with(module_base))
 }
 
-fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
-    let relative_path: PathBuf = base.split('.').collect();
-    relative_path.components().next()?;
-    for root in paths {
-        let candidate = root.join(&relative_path);
-        if candidate.is_dir() {
-            return Some(root);
+/// Returns the source path with respect to which the module `name`
+/// should be considered first party, or `None` if no path is found.
+///
+/// The [`MatchSourceStrategy`] is the criterion used to decide whether
+/// the module path matches a given source directory.
+///
+/// # Examples
+///
+/// - The module named `foo` will match `[SRC]` if `[SRC]/foo` is a directory,
+///   no matter the strategy.
+///
+/// - With `match_source_strategy == MatchSourceStrategy::Root`, the module
+///   named `foo.baz` will match `[SRC]` if `[SRC]/foo` is a
+///   directory or `[SRC]/foo.py` exists.
+///
+/// - With `match_source_stratgy == MatchSourceStrategy::FullPath`, the module
+///   named `foo.baz` will match `[SRC]` only if `[SRC]/foo/baz` is a directory,
+///   or `[SRC]/foo/baz.py` exists or `[SRC]/foo/baz.pyi` exists.
+fn match_sources<'a>(
+    paths: &'a [PathBuf],
+    name: &str,
+    match_source_strategy: MatchSourceStrategy,
+) -> Option<&'a Path> {
+    match match_source_strategy {
+        MatchSourceStrategy::Root => {
+            let base = name.split('.').next()?;
+            for path in paths {
+                if let Ok(metadata) = fs::metadata(path.join(base)) {
+                    if metadata.is_dir() {
+                        return Some(path);
+                    }
+                }
+                if let Ok(metadata) = fs::metadata(path.join(format!("{base}.py"))) {
+                    if metadata.is_file() {
+                        return Some(path);
+                    }
+                }
+            }
+            None
         }
-        if ["py", "pyi"]
-            .into_iter()
-            .any(|extension| candidate.with_extension(extension).is_file())
-        {
-            return Some(root);
+        MatchSourceStrategy::FullPath => {
+            let relative_path: PathBuf = name.split('.').collect();
+            relative_path.components().next()?;
+            for root in paths {
+                let candidate = root.join(&relative_path);
+                if candidate.is_dir() {
+                    return Some(root);
+                }
+                if ["py", "pyi"]
+                    .into_iter()
+                    .any(|extension| candidate.with_extension(extension).is_file())
+                {
+                    return Some(root);
+                }
+            }
+            None
         }
     }
-    None
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -185,6 +229,7 @@ pub(crate) fn categorize_imports<'a>(
     no_sections: bool,
     section_order: &'a [ImportSection],
     default_section: &'a ImportSection,
+    match_source_strategy: MatchSourceStrategy,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
     // Categorize `Stmt::Import`.
@@ -200,6 +245,7 @@ pub(crate) fn categorize_imports<'a>(
             no_sections,
             section_order,
             default_section,
+            match_source_strategy,
         );
         block_by_type
             .entry(import_type)
@@ -220,6 +266,7 @@ pub(crate) fn categorize_imports<'a>(
             no_sections,
             section_order,
             default_section,
+            match_source_strategy,
         );
         block_by_type
             .entry(classification)
@@ -240,6 +287,7 @@ pub(crate) fn categorize_imports<'a>(
             no_sections,
             section_order,
             default_section,
+            match_source_strategy,
         );
         block_by_type
             .entry(classification)
@@ -260,6 +308,7 @@ pub(crate) fn categorize_imports<'a>(
             no_sections,
             section_order,
             default_section,
+            match_source_strategy,
         );
         block_by_type
             .entry(classification)
@@ -410,4 +459,20 @@ impl fmt::Display for KnownModules {
         }
         Ok(())
     }
+}
+
+/// Rule to determine whether a module path matches
+/// a relative path from a source directory.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum MatchSourceStrategy {
+    /// Matches if first term in module path is found in file system
+    ///
+    /// # Example
+    /// Module is `foo.bar.baz` and `[SRC]/foo` exists
+    Root,
+    /// Matches only if full module path is reflected in file system
+    ///
+    /// # Example
+    /// Module is `foo.bar.baz` and `[SRC]/foo/bar/baz` exists
+    FullPath,
 }

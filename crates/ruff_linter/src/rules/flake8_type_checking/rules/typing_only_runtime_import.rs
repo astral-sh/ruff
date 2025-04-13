@@ -16,6 +16,7 @@ use crate::rules::flake8_type_checking::helpers::{
     filter_contained, is_typing_reference, quote_annotation,
 };
 use crate::rules::flake8_type_checking::imports::ImportBinding;
+use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::isort::{categorize, ImportSection, ImportType};
 
 /// ## What it does
@@ -302,6 +303,12 @@ pub(crate) fn typing_only_runtime_import(
             let source_name = import.source_name().join(".");
 
             // Categorize the import, using coarse-grained categorization.
+            let match_source_strategy = if checker.settings.preview.is_enabled() {
+                MatchSourceStrategy::FullPath
+            } else {
+                MatchSourceStrategy::Root
+            };
+
             let import_type = match categorize(
                 &source_name,
                 qualified_name.is_unresolved_import(),
@@ -313,6 +320,7 @@ pub(crate) fn typing_only_runtime_import(
                 checker.settings.isort.no_sections,
                 &checker.settings.isort.section_order,
                 &checker.settings.isort.default_section,
+                match_source_strategy,
             ) {
                 ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
                     ImportType::FirstParty
