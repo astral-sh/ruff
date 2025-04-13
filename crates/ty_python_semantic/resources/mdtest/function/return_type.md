@@ -182,6 +182,43 @@ def f(cond: bool) -> int:
         return 2
 ```
 
+## Inferred return type
+
+If a function's return type is not annotated, it is inferred. The inferred type is the union of all
+possible return types.
+
+```py
+def f():
+    return 1
+
+reveal_type(f())  # revealed: Literal[1]
+
+def g(cond: bool):
+    if cond:
+        return 1
+    else:
+        return "a"
+
+reveal_type(g(True))  # revealed: Literal[1, "a"]
+
+# This function implicitly returns `None`.
+def h(x: int, y: str):
+    if x > 10:
+        return x
+    elif x > 5:
+        return y
+
+reveal_type(h(1, "a"))  # revealed: int | str | None
+
+def generator():
+    yield 1
+    yield 2
+    return None
+
+# TODO: Should be `Generator[Literal[1, 2], Any, None]`
+reveal_type(generator())  # revealed: None
+```
+
 ## Invalid return type
 
 <!-- snapshot-diagnostics -->
