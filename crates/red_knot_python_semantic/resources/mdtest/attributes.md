@@ -1285,7 +1285,7 @@ from typing import Any
 class Foo(Any): ...
 
 reveal_type(Foo.bar)  # revealed: Any
-reveal_type(Foo.__repr__)  # revealed: def __repr__(self) -> str & Any
+reveal_type(Foo.__repr__)  # revealed: (def __repr__(self) -> str) & Any
 ```
 
 Similar principles apply if `Any` appears in the middle of an inheritance hierarchy:

@@ -95,14 +95,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => {
                 let signature = function.signature(self.db);
-                // TODO: use the specialization from the function when it gives
-                // a specialization of the function itself. As of time of writing
-                // it would be non-empty only for class methods and will have the class
-                // specialization instead.
-                // let specialization = function
-                //     .specialization(self.db)
-                //     .map(|s| s.display_short(self.db).to_string())
-                //     .unwrap_or_default();
+                // TODO: when generic function types are supported, we should add
+                // the generic type parameters to the signature, i.e.
+                // show `def foo[T](x: T) -> T`.
 
                 write!(
                     f,
@@ -464,7 +459,6 @@ impl Display for DisplayLiteralGroup<'_> {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum CondensedDisplayTypeKind {
     Class,
-    Function,
     LiteralExpression,
 }
 
@@ -474,7 +468,6 @@ impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
     fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
         match value {
             Type::ClassLiteral(_) => Ok(Self::Class),
-            Type::FunctionLiteral(_) => Ok(Self::Function),
             Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
@@ -552,7 +545,11 @@ struct DisplayMaybeParenthesizedType<'db> {
 
 impl Display for DisplayMaybeParenthesizedType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Type::Callable(_) | Type::MethodWrapper(_) = self.ty {
+        if let Type::Callable(_)
+        | Type::MethodWrapper(_)
+        | Type::FunctionLiteral(_)
+        | Type::BoundMethod(_) = self.ty
+        {
             write!(f, "({})", self.ty.display(self.db))
         } else {
             self.ty.display(self.db).fmt(f)

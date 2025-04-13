@@ -313,10 +313,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r###"
-        Literal[def foo(a, b) -> Unknown, def bar(a, b) -> Unknown]
+        (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ---------------------------------------------
         ```text
-        Literal[def foo(a, b) -> Unknown, def bar(a, b) -> Unknown]
+        (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is

@@ -63,7 +63,7 @@ def bar(world: str, *args, **kwargs) -> float:
 x = foo if flag() else bar
 
 if x:
-    reveal_type(x)  # revealed: Literal[def foo(hello: int) -> bytes, def bar(world: str, *args, **kwargs) -> int | float]
+    reveal_type(x)  # revealed: (def foo(hello: int) -> bytes) | (def bar(world: str, *args, **kwargs) -> int | float)
 else:
     reveal_type(x)  # revealed: Never
 ```

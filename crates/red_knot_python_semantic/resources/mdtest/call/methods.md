@@ -181,10 +181,10 @@ class B:
         return "a"
 
 def f(a_or_b: A | B, any_or_a: Any | A):
-    reveal_type(a_or_b.f)  # revealed: bound method A.f() -> int | bound method B.f() -> str
+    reveal_type(a_or_b.f)  # revealed: (bound method A.f() -> int) | (bound method B.f() -> str)
     reveal_type(a_or_b.f())  # revealed: int | str
 
-    reveal_type(any_or_a.f)  # revealed: Any | bound method A.f() -> int
+    reveal_type(any_or_a.f)  # revealed: Any | (bound method A.f() -> int)
     reveal_type(any_or_a.f())  # revealed: Any | int
 ```
 
