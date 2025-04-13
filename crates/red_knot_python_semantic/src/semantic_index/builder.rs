@@ -1235,32 +1235,21 @@ where
                                 symbol_id,
                                 referenced_module,
                             );
-                            let pre_definition = self.flow_snapshot();
-                            self.push_additional_definition(symbol_id, node_ref);
 
                             // Fast path for if there were no previous definitions
                             // of the symbol defined through the `*` import:
                             // we can apply the visibility constraint to *only* the added definition,
                             // rather than all definitions
                             if newly_added {
-                                let constraint_id = self
-                                    .current_use_def_map_mut()
-                                    .record_star_import_visibility_constraint(
+                                self.push_additional_definition(symbol_id, node_ref);
+                                self.current_use_def_map_mut()
+                                    .record_and_negate_star_import_visibility_constraint(
                                         star_import,
                                         symbol_id,
                                     );
-
-                                let post_definition = self.flow_snapshot();
-                                self.flow_restore(pre_definition);
-
-                                self.current_use_def_map_mut()
-                                    .negate_star_import_visibility_constraint(
-                                        symbol_id,
-                                        constraint_id,
-                                    );
-
-                                self.flow_merge(post_definition);
                             } else {
+                                let pre_definition = self.flow_snapshot();
+                                self.push_additional_definition(symbol_id, node_ref);
                                 let constraint_id =
                                     self.record_visibility_constraint(star_import.into());
                                 let post_definition = self.flow_snapshot();

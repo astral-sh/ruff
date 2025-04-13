@@ -714,32 +714,30 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_and_constraint(self.scope_start_visibility, constraint);
     }
 
-    #[must_use = "A `*`-import visibility constraint must always be negated after it is added"]
-    pub(super) fn record_star_import_visibility_constraint(
+    pub(super) fn record_and_negate_star_import_visibility_constraint(
         &mut self,
         star_import: StarImportPlaceholderPredicate<'db>,
         symbol: ScopedSymbolId,
-    ) -> StarImportVisibilityConstraintId {
+    ) {
         let predicate_id = self.add_predicate(star_import.into());
         let visibility_id = self.visibility_constraints.add_atom(predicate_id);
         self.symbol_states[symbol]
             .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
-        StarImportVisibilityConstraintId(visibility_id)
-    }
 
-    pub(super) fn negate_star_import_visibility_constraint(
-        &mut self,
-        symbol_id: ScopedSymbolId,
-        constraint: StarImportVisibilityConstraintId,
-    ) {
+        let post_definition = self.snapshot();
+
+        self.symbol_states[symbol] = SymbolState::undefined(self.scope_start_visibility);
+
         let negated_constraint = self
             .visibility_constraints
-            .add_not_constraint(constraint.into_scoped_constraint_id());
-        self.symbol_states[symbol_id]
+            .add_not_constraint(visibility_id);
+        self.symbol_states[symbol]
             .record_visibility_constraint(&mut self.visibility_constraints, negated_constraint);
         self.scope_start_visibility = self
             .visibility_constraints
             .add_and_constraint(self.scope_start_visibility, negated_constraint);
+
+        self.merge(post_definition);
     }
 
     /// This method resets the visibility constraints for all symbols to a previous state
@@ -949,26 +947,5 @@ impl<'db> UseDefMapBuilder<'db> {
             eager_bindings: self.eager_bindings,
             scope_start_visibility: self.scope_start_visibility,
         }
-    }
-}
-
-/// Newtype wrapper over [`ScopedVisibilityConstraintId`] to improve type safety.
-///
-/// By returning this type from [`UseDefMapBuilder::record_star_import_visibility_constraint`]
-/// rather than [`ScopedVisibilityConstraintId`] directly, we ensure that
-/// [`UseDefMapBuilder::negate_star_import_visibility_constraint`] must be called after the
-/// visibility constraint has been added, and we ensure that
-/// [`super::SemanticIndexBuilder::record_negated_visibility_constraint`] *cannot* be called with
-/// the narrowing constraint (which would lead to incorrect behaviour).
-///
-/// This type is defined here rather than in the [`super::visibility_constraints`] module
-/// because it should only ever be constructed and deconstructed from methods in the
-/// [`UseDefMapBuilder`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct StarImportVisibilityConstraintId(ScopedVisibilityConstraintId);
-
-impl StarImportVisibilityConstraintId {
-    fn into_scoped_constraint_id(self) -> ScopedVisibilityConstraintId {
-        self.0
     }
 }
