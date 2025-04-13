@@ -50,13 +50,13 @@ reveal_type(x)  # revealed: LiteralString
 if x != "abc":
     reveal_type(x)  # revealed: LiteralString & ~Literal["abc"]
 
-    reveal_type(x == "abc")  # revealed: Literal[False]
-    reveal_type("abc" == x)  # revealed: Literal[False]
+    reveal_type(x == "abc")  # revealed: bool
+    reveal_type("abc" == x)  # revealed: bool
     reveal_type(x == "something else")  # revealed: bool
     reveal_type("something else" == x)  # revealed: bool
 
-    reveal_type(x != "abc")  # revealed: Literal[True]
-    reveal_type("abc" != x)  # revealed: Literal[True]
+    reveal_type(x != "abc")  # revealed: bool
+    reveal_type("abc" != x)  # revealed: bool
     reveal_type(x != "something else")  # revealed: bool
     reveal_type("something else" != x)  # revealed: bool
 
@@ -79,10 +79,10 @@ def _(x: int):
     if x != 1:
         reveal_type(x)  # revealed: int & ~Literal[1]
 
-        reveal_type(x != 1)  # revealed: Literal[True]
+        reveal_type(x != 1)  # revealed: bool
         reveal_type(x != 2)  # revealed: bool
 
-        reveal_type(x == 1)  # revealed: Literal[False]
+        reveal_type(x == 1)  # revealed: bool
         reveal_type(x == 2)  # revealed: bool
 ```
 
