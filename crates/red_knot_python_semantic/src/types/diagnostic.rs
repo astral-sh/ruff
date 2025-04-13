@@ -791,7 +791,6 @@ declare_lint! {
     ///
     /// ## References
     /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
-
     pub(crate) static UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS = {
         summary: "detects invalid `super()` calls where implicit arguments are unavailable.",
         status: LintStatus::preview("1.0.0"),
