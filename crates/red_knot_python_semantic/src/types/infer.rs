@@ -3086,7 +3086,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let iterable_type = self.infer_standalone_expression(iterable);
 
         let loop_var_value_type = if for_stmt.is_async() {
-            todo_type!("async iterables/iterators")
+            panic!("async iterables/iterators") // Test to see if mypy_primer run fails
         } else {
             match for_stmt.target_kind() {
                 TargetKind::Sequence(unpack_position, unpack) => {
