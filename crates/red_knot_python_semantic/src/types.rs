@@ -886,6 +886,27 @@ impl<'db> Type<'db> {
                 target.is_equivalent_to(db, Type::object(db))
             }
 
+            // No literal type is a subtype of any other literal type, unless they are the same
+            // type (which is handled above). This case is not necessary from a correctness
+            // perspective (the fallback cases below will handle it correctly), but it is important
+            // for performance of simplifying large unions of literal types.
+            (
+                Type::StringLiteral(_)
+                | Type::IntLiteral(_)
+                | Type::BytesLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::SliceLiteral(_),
+                Type::StringLiteral(_)
+                | Type::IntLiteral(_)
+                | Type::BytesLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::SliceLiteral(_),
+            ) => false,
+
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => true,
 
