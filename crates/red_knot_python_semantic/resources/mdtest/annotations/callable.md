@@ -289,7 +289,7 @@ def _(c: Callable[[int, Unpack[Ts]], int]):
 from typing import Callable
 
 def _(c: Callable[[int], int]):
-    reveal_type(c.__init__)  # revealed: Literal[__init__]
+    reveal_type(c.__init__)  # revealed: def __init__(self) -> None
     reveal_type(c.__class__)  # revealed: type
 
     # TODO: The member lookup for `Callable` uses `object` which does not have a `__call__`
