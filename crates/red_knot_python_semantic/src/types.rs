@@ -29,12 +29,14 @@ pub(crate) use self::signatures::{CallableSignature, Signature, Signatures};
 pub(crate) use self::subclass_of::SubclassOfType;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
-use crate::semantic_index::ast_ids::HasScopedExpressionId;
+use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
-use crate::symbol::{imported_symbol, Boundness, Symbol, SymbolAndQualifiers};
+use crate::symbol::{
+    imported_symbol, symbol_from_bindings, Boundness, Symbol, SymbolAndQualifiers,
+};
 use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
@@ -508,11 +510,13 @@ impl<'db> Type<'db> {
 
             Self::Callable(callable) => {
                 let signature = callable.signature(db);
-                signature.parameters().iter().any(|param| {
-                    param
-                        .annotated_type()
-                        .is_some_and(|ty| ty.contains_todo(db))
-                }) || signature.return_ty.is_some_and(|ty| ty.contains_todo(db))
+                signature.iter().any(|signature| {
+                    signature.parameters().iter().any(|param| {
+                        param
+                            .annotated_type()
+                            .is_some_and(|ty| ty.contains_todo(db))
+                    }) || signature.return_ty.is_some_and(|ty| ty.contains_todo(db))
+                })
             }
 
             Self::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
@@ -1029,9 +1033,9 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .is_subtype_of(db, target),
 
-            (Type::Callable(self_callable), Type::Callable(other_callable)) => self_callable
-                .signature(db)
-                .is_subtype_of(db, other_callable.signature(db)),
+            (Type::Callable(self_callable), Type::Callable(other_callable)) => {
+                self_callable.is_subtype_of(db, other_callable)
+            }
 
             (Type::DataclassDecorator(_), _) => {
                 // TODO: Implement subtyping using an equivalent `Callable` type.
@@ -1358,9 +1362,9 @@ impl<'db> Type<'db> {
                 )
             }
 
-            (Type::Callable(self_callable), Type::Callable(target_callable)) => self_callable
-                .signature(db)
-                .is_assignable_to(db, target_callable.signature(db)),
+            (Type::Callable(self_callable), Type::Callable(target_callable)) => {
+                self_callable.is_assignable_to(db, target_callable)
+            }
 
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
@@ -1391,9 +1395,7 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to(db, right)
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
-            (Type::Callable(left), Type::Callable(right)) => {
-                left.signature(db).is_equivalent_to(db, right.signature(db))
-            }
+            (Type::Callable(left), Type::Callable(right)) => left.is_equivalent_to(db, right),
             _ => self == other && self.is_fully_static(db) && other.is_fully_static(db),
         }
     }
@@ -1454,9 +1456,9 @@ impl<'db> Type<'db> {
                 first.is_gradual_equivalent_to(db, second)
             }
 
-            (Type::Callable(first), Type::Callable(second)) => first
-                .signature(db)
-                .is_gradual_equivalent_to(db, second.signature(db)),
+            (Type::Callable(first), Type::Callable(second)) => {
+                first.is_gradual_equivalent_to(db, second)
+            }
 
             _ => false,
         }
@@ -1904,7 +1906,7 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .all(|elem| elem.is_fully_static(db)),
-            Type::Callable(callable) => callable.signature(db).is_fully_static(db),
+            Type::Callable(callable) => callable.is_fully_static(db),
         }
     }
 
@@ -3141,16 +3143,23 @@ impl<'db> Type<'db> {
     /// [`CallErrorKind::NotCallable`].
     fn signatures(self, db: &'db dyn Db) -> Signatures<'db> {
         match self {
-            Type::Callable(callable) => Signatures::single(CallableSignature::single(
-                self,
-                callable.signature(db).clone(),
-            )),
+            Type::Callable(callable) => Signatures::single(match callable.signature(db).as_ref() {
+                [signature] => CallableSignature::single(self, signature.clone()),
+                signatures => CallableSignature::from_overloads(self, signatures.iter().cloned()),
+            }),
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
-                let signature = CallableSignature::single(self, signature.clone())
-                    .with_bound_type(bound_method.self_instance(db));
-                Signatures::single(signature)
+                Signatures::single(match signature {
+                    FunctionSignature::Single(signature) => {
+                        CallableSignature::single(self, signature.clone())
+                            .with_bound_type(bound_method.self_instance(db))
+                    }
+                    FunctionSignature::Overloaded(signatures, _) => {
+                        CallableSignature::from_overloads(self, signatures.iter().cloned())
+                            .with_bound_type(bound_method.self_instance(db))
+                    }
+                })
             }
 
             Type::MethodWrapper(
@@ -3497,10 +3506,14 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
 
-                _ => Signatures::single(CallableSignature::single(
-                    self,
-                    function_type.signature(db).clone(),
-                )),
+                _ => Signatures::single(match function_type.signature(db) {
+                    FunctionSignature::Single(signature) => {
+                        CallableSignature::single(self, signature.clone())
+                    }
+                    FunctionSignature::Overloaded(signatures, _) => {
+                        CallableSignature::from_overloads(self, signatures.iter().cloned())
+                    }
+                }),
             },
 
             Type::ClassLiteral(class) => match class.known(db) {
@@ -3692,7 +3705,10 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            Type::Callable(CallableType::new(db, getter_signature)),
+                                            Type::Callable(CallableType::single(
+                                                db,
+                                                getter_signature,
+                                            )),
                                             Type::none(db),
                                         ],
                                     ))
@@ -3701,7 +3717,10 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            Type::Callable(CallableType::new(db, setter_signature)),
+                                            Type::Callable(CallableType::single(
+                                                db,
+                                                setter_signature,
+                                            )),
                                             Type::none(db),
                                         ],
                                     ))
@@ -3710,7 +3729,7 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(UnionType::from_elements(
                                         db,
                                         [
-                                            Type::Callable(CallableType::new(
+                                            Type::Callable(CallableType::single(
                                                 db,
                                                 deleter_signature,
                                             )),
@@ -5738,6 +5757,34 @@ bitflags! {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) enum FunctionSignature<'db> {
+    Single(Signature<'db>),
+    Overloaded(Vec<Signature<'db>>, Option<Signature<'db>>),
+}
+
+impl<'db> FunctionSignature<'db> {
+    pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
+        match self {
+            Self::Single(signature) => std::slice::from_ref(signature),
+            Self::Overloaded(signatures, _) => signatures,
+        }
+    }
+
+    pub(crate) fn iter(&self) -> Iter<Signature<'db>> {
+        self.as_slice().iter()
+    }
+}
+
+impl<'db> IntoIterator for &'db FunctionSignature<'db> {
+    type Item = &'db Signature<'db>;
+    type IntoIter = Iter<'db, Signature<'db>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 #[salsa::interned(debug)]
 pub struct FunctionType<'db> {
     /// name of the function at definition
@@ -5747,6 +5794,10 @@ pub struct FunctionType<'db> {
     /// Is this a function that we special-case somehow? If so, which one?
     known: Option<KnownFunction>,
 
+    /// The scope in which the function is defined.
+    scope: ScopeId<'db>,
+
+    /// The scope that's created by the function body.
     body_scope: ScopeId<'db>,
 
     /// A set of special decorators that were applied to this function
@@ -5768,10 +5819,11 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Convert the `FunctionType` into a [`Type::Callable`].
-    ///
-    /// This powers the `CallableTypeOf` special form from the `knot_extensions` module.
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(db, self.signature(db).clone()))
+        Type::Callable(CallableType::from_overloads(
+            db,
+            self.signature(db).iter().cloned(),
+        ))
     }
 
     /// Returns the [`FileRange`] of the function's name.
@@ -5795,6 +5847,18 @@ impl<'db> FunctionType<'db> {
         index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
+    fn previous_symbol(self, db: &'db dyn Db) -> Symbol<'db> {
+        let scope = self.scope(db);
+        let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+        let use_id = self
+            .body_scope(db)
+            .node(db)
+            .expect_function()
+            .name
+            .scoped_use_id(db, scope);
+        symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+    }
+
     /// Typed externally-visible signature for this function.
     ///
     /// This is the signature as seen by external callers, possibly modified by decorators and/or
@@ -5808,18 +5872,54 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
-    pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
+    pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
         let mut internal_signature = self.internal_signature(db);
 
-        if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-            return Signature::todo("return type of overloaded function");
-        }
-
         if let Some(specialization) = self.specialization(db) {
-            internal_signature.apply_specialization(db, specialization);
+            internal_signature = internal_signature.apply_specialization(db, specialization);
         }
 
-        internal_signature
+        match self.previous_symbol(db) {
+            Symbol::Type(Type::FunctionLiteral(function_literal), Boundness::Bound) => {
+                match function_literal.signature(db) {
+                    FunctionSignature::Single(_) => {
+                        debug_assert!(
+                            !function_literal.has_known_decorator(db, FunctionDecorators::OVERLOAD),
+                            "Expected `FunctionSignature::Overloaded` if the previous function was an overload"
+                        );
+                        FunctionSignature::Single(internal_signature)
+                    }
+                    FunctionSignature::Overloaded(_, Some(_)) => {
+                        // If the previous overloaded function already has an implementation,
+                        // then this new signature completely replaces it.
+                        if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+                            FunctionSignature::Overloaded(vec![internal_signature], None)
+                        } else {
+                            FunctionSignature::Single(internal_signature)
+                        }
+                    }
+                    FunctionSignature::Overloaded(signatures, None) => {
+                        if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+                            let mut signatures = signatures.clone();
+                            signatures.push(internal_signature);
+                            FunctionSignature::Overloaded(signatures, None)
+                        } else {
+                            FunctionSignature::Overloaded(
+                                signatures.clone(),
+                                Some(internal_signature),
+                            )
+                        }
+                    }
+                }
+            }
+            _ => {
+                if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+                    FunctionSignature::Overloaded(vec![internal_signature.clone()], None)
+                } else {
+                    FunctionSignature::Single(internal_signature)
+                }
+            }
+        }
     }
 
     /// Typed internally-visible signature for this function.
@@ -5848,6 +5948,7 @@ impl<'db> FunctionType<'db> {
             db,
             self.name(db).clone(),
             self.known(db),
+            self.scope(db),
             self.body_scope(db),
             self.decorators(db),
             Some(generic_context),
@@ -5864,6 +5965,7 @@ impl<'db> FunctionType<'db> {
             db,
             self.name(db).clone(),
             self.known(db),
+            self.scope(db),
             self.body_scope(db),
             self.decorators(db),
             self.generic_context(db),
@@ -6013,27 +6115,48 @@ pub struct BoundMethodType<'db> {
 
 impl<'db> BoundMethodType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::new(
+        Type::Callable(CallableType::from_overloads(
             db,
-            self.function(db).signature(db).bind_self(),
+            self.function(db)
+                .signature(db)
+                .iter()
+                .map(signatures::Signature::bind_self),
         ))
     }
 }
 
-/// This type represents the set of all callable objects with a certain signature.
-/// It can be written in type expressions using `typing.Callable`.
-/// `lambda` expressions are inferred directly as `CallableType`s; all function-literal types
-/// are subtypes of a `CallableType`.
+/// This type represents the set of all callable objects with a certain, possibly overloaded,
+/// signature.
+///
+/// It can be written in type expressions using `typing.Callable`. `lambda` expressions are
+/// inferred directly as `CallableType`s; all function-literal types are subtypes of a
+/// `CallableType`.
 #[salsa::interned(debug)]
 pub struct CallableType<'db> {
     #[return_ref]
-    signature: Signature<'db>,
+    signature: Box<[Signature<'db>]>,
 }
 
 impl<'db> CallableType<'db> {
+    pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Self {
+        CallableType::new(db, vec![signature].into_boxed_slice())
+    }
+
+    pub(crate) fn from_overloads<I>(db: &'db dyn Db, overloads: I) -> Self
+    where
+        I: IntoIterator<Item = Signature<'db>>,
+    {
+        let overloads = overloads.into_iter().collect::<Vec<_>>().into_boxed_slice();
+        assert!(
+            !overloads.is_empty(),
+            "CallableType must have at least one overload"
+        );
+        CallableType::new(db, overloads)
+    }
+
     /// Create a callable type which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown(db: &'db dyn Db) -> Self {
-        CallableType::new(
+        CallableType::single(
             db,
             Signature::new(Parameters::unknown(), Some(Type::unknown())),
         )
@@ -6043,22 +6166,108 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     fn normalized(self, db: &'db dyn Db) -> Self {
-        let signature = self.signature(db);
-        let parameters = signature
-            .parameters()
-            .iter()
-            .map(|param| param.normalized(db))
-            .collect();
-        let return_ty = signature
-            .return_ty
-            .map(|return_ty| return_ty.normalized(db));
-        CallableType::new(db, Signature::new(parameters, return_ty))
+        CallableType::from_overloads(
+            db,
+            self.signature(db)
+                .iter()
+                .map(|signature| signature.normalized(db)),
+        )
     }
 
     fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let mut signature = self.signature(db).clone();
-        signature.apply_specialization(db, specialization);
-        Self::new(db, signature)
+        CallableType::from_overloads(
+            db,
+            self.signature(db)
+                .iter()
+                .map(|signature| signature.apply_specialization(db, specialization)),
+        )
+    }
+
+    fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        self.signature(db)
+            .iter()
+            .all(|signature| signature.is_fully_static(db))
+    }
+
+    fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_assignable_to_impl(
+            db,
+            other,
+            |self_ty, other_ty| self_ty.is_subtype_of(db, other_ty),
+            |self_signature, other_signature| self_signature.is_subtype_of(db, other_signature),
+        )
+    }
+
+    fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_assignable_to_impl(
+            db,
+            other,
+            |self_ty, other_ty| self_ty.is_assignable_to(db, other_ty),
+            |self_signature, other_signature| self_signature.is_assignable_to(db, other_signature),
+        )
+    }
+
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_assignable_to_impl(
+            db,
+            other,
+            |self_ty, other_ty| self_ty.is_equivalent_to(db, other_ty),
+            |self_signature, other_signature| self_signature.is_equivalent_to(db, other_signature),
+        )
+    }
+
+    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_assignable_to_impl(
+            db,
+            other,
+            |self_ty, other_ty| self_ty.is_gradual_equivalent_to(db, other_ty),
+            |self_signature, other_signature| {
+                self_signature.is_gradual_equivalent_to(db, other_signature)
+            },
+        )
+    }
+
+    fn is_assignable_to_impl<FT, FS>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        check_types: FT,
+        check_signature: FS,
+    ) -> bool
+    where
+        FT: Fn(Type<'db>, Type<'db>) -> bool,
+        FS: Fn(&Signature<'db>, &Signature<'db>) -> bool,
+    {
+        match (&**self.signature(db), &**other.signature(db)) {
+            ([self_signature], [other_signature]) => {
+                // Base case: both callable types contain a single signature.
+                check_signature(self_signature, other_signature)
+            }
+            (self_signatures, [other_signature]) => {
+                let other_ty = other_signature.to_callable_type(db);
+                self_signatures
+                    .iter()
+                    .map(|self_signature| self_signature.to_callable_type(db))
+                    .any(|self_ty| check_types(self_ty, other_ty))
+            }
+            ([self_signature], other_signatures) => {
+                let self_ty = self_signature.to_callable_type(db);
+                other_signatures
+                    .iter()
+                    .map(|other_signature| other_signature.to_callable_type(db))
+                    .all(|other_ty| check_types(self_ty, other_ty))
+            }
+            (self_signatures, other_signatures) => {
+                let other_ty = Type::Callable(CallableType::from_overloads(
+                    db,
+                    other_signatures.iter().cloned(),
+                ));
+                self_signatures
+                    .iter()
+                    .map(|self_signature| self_signature.to_callable_type(db))
+                    .any(|self_ty| check_types(self_ty, other_ty))
+            }
+        }
     }
 }
 

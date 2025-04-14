@@ -895,6 +895,28 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    // fn check_overloaded_signatures(&self) {
+    //     // Raise diagnostics if
+    //     // 1. number of overloads < 2
+    //     // 2. in a runtime file, the implementation exists except for protocol, abstract methods in
+    //     //    abstract class
+    //     // 3. consistency between the overloads and implementation signature
+    //     let function_definitions = self
+    //         .types
+    //         .declarations
+    //         .iter()
+    //         .filter_map(|(definition, ty)| {
+    //             // Filter out function literals that result from imports
+    //             if let DefinitionKind::Function(function) = definition.kind(self.db()) {
+    //                 ty.inner_type()
+    //                     .into_function_literal()
+    //                     .map(|ty| (ty, function.node()))
+    //             } else {
+    //                 None
+    //             }
+    //         });
+    // }
+
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
         match definition.kind(self.db()) {
             DefinitionKind::Function(function) => {
@@ -1496,6 +1518,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.db(),
             &name.id,
             function_kind,
+            self.scope(),
             body_scope,
             function_decorators,
             generic_context,
@@ -4133,7 +4156,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        Type::Callable(CallableType::new(
+        Type::Callable(CallableType::single(
             self.db(),
             Signature::new(parameters, Some(Type::unknown())),
         ))
@@ -7305,7 +7328,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let callable_type = if let (Some(parameters), Some(return_type), true) =
                     (parameters, return_type, correct_argument_number)
                 {
-                    CallableType::new(db, Signature::new(parameters, Some(return_type)))
+                    CallableType::single(db, Signature::new(parameters, Some(return_type)))
                 } else {
                     CallableType::unknown(db)
                 };
@@ -7386,8 +7409,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let argument_type = self.infer_expression(arguments_slice);
                     let signatures = argument_type.signatures(db);
 
-                    // TODO overloads
-                    let Some(signature) = signatures.iter().flatten().next() else {
+                    // TODO callable unions
+                    let Some(callable_signature) = signatures.iter().next() else {
                         self.context.report_lint_old(
                             &INVALID_TYPE_FORM,
                             arguments_slice,
@@ -7400,13 +7423,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Type::unknown();
                     };
 
-                    let revealed_signature = if argument_type.is_bound_method() {
-                        signature.bind_self()
-                    } else {
-                        signature.clone()
-                    };
-
-                    Type::Callable(CallableType::new(db, revealed_signature))
+                    Type::Callable(CallableType::from_overloads(
+                        db,
+                        callable_signature.iter().map(|signature| {
+                            if argument_type.is_bound_method() {
+                                signature.bind_self()
+                            } else {
+                                signature.clone()
+                            }
+                        }),
+                    ))
                 }
             },
 

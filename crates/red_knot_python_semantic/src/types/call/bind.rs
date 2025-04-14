@@ -19,7 +19,7 @@ use crate::types::diagnostic::{
 use crate::types::generics::{Specialization, SpecializationBuilder};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    todo_type, BoundMethodType, DataclassMetadata, FunctionDecorators, KnownClass, KnownFunction,
+    BoundMethodType, DataclassMetadata, FunctionDecorators, KnownClass, KnownFunction,
     KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Severity, Span, SubDiagnostic};
@@ -536,7 +536,9 @@ impl<'db> Bindings<'db> {
                     }
 
                     Some(KnownFunction::Overload) => {
-                        overload.set_return_type(todo_type!("overload[..] return type"));
+                        if let [Some(ty)] = overload.parameter_types() {
+                            overload.set_return_type(*ty);
+                        }
                     }
 
                     Some(KnownFunction::GetattrStatic) => {
