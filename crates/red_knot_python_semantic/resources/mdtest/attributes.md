@@ -583,20 +583,6 @@ reveal_type(C(True).d)  # revealed: Unknown | Literal[5]
 reveal_type(C(True).e)  # revealed: Unknown
 ```
 
-```py
-class C:
-    def f(self, cond: bool):
-        if cond:
-            self.x = 1
-            self.y = 2
-        else:
-            self.y = 3
-
-# error: [possibly-unbound-attribute]
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
-reveal_type(C().y)  # revealed: Unknown | Literal[2, 3]
-```
-
 #### Attributes considered always bound
 
 ```py
@@ -1143,12 +1129,18 @@ def _(flag: bool):
         def __init(self):
             if flag:
                 self.x = 1
+                self.y = "a"
+            else:
+                self.y = "b"
 
     # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 
     # error: [possibly-unbound-attribute]
     Foo().x = 2
+
+    reveal_type(Foo().y)  # revealed: Unknown | Literal["a", "b"]
+    Foo().y = "c"
 ```
 
 ### Unions with all paths unbound
