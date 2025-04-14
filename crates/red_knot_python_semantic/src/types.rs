@@ -6580,10 +6580,20 @@ impl<'db> IntersectionType<'db> {
             elements
         }
 
+        let normalised_negative = normalized_set(db, self.negative(db));
+
+        if self.positive(db).is_empty() {
+            return IntersectionType::new(
+                db,
+                FxOrderSet::from_iter([Type::object(db)]),
+                normalised_negative,
+            );
+        }
+
         IntersectionType::new(
             db,
             normalized_set(db, self.positive(db)),
-            normalized_set(db, self.negative(db)),
+            normalised_negative,
         )
     }
 

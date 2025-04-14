@@ -5237,6 +5237,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If a comparison yields a definitive true/false answer on a (positive) part
         // of an intersection type, it will also yield a definitive answer on the full
         // intersection type, which is even more specific.
+        let mut builder = IntersectionBuilder::new(self.db());
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
                 IntersectionOn::Left => {
@@ -5249,6 +5250,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Type::BooleanLiteral(b) = result {
                 return Ok(Type::BooleanLiteral(b));
             }
+            builder = builder.add_positive(result);
         }
 
         // For negative contributions to the intersection type, there are only a few
@@ -5318,19 +5320,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         //
         // we would get a result type `Literal[True]` which is too narrow.
         //
-        let mut builder = IntersectionBuilder::new(self.db());
-        for pos in intersection.positive(self.db()) {
-            let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range)?
-                }
-                IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range)?
-                }
-            };
-            builder = builder.add_positive(result);
-        }
-
         Ok(builder.build())
     }
 

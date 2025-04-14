@@ -586,6 +586,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 self.positive.shrink_to_fit();
                 self.negative.shrink_to_fit();
+                if self.positive.is_empty() {
+                    self.positive.insert(Type::object(db));
+                }
                 Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
             }
         }
