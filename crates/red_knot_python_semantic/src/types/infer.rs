@@ -5390,6 +5390,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::CmpOp::LtE => Ok(Type::BooleanLiteral(n <= m)),
                 ast::CmpOp::Gt => Ok(Type::BooleanLiteral(n > m)),
                 ast::CmpOp::GtE => Ok(Type::BooleanLiteral(n >= m)),
+                // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
+                // Even if they are the same value, they may not be the same object.
                 ast::CmpOp::Is => {
                     if n == m {
                         Ok(KnownClass::Bool.to_instance(self.db()))
