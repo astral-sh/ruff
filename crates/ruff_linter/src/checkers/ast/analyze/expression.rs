@@ -1203,30 +1203,16 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
         }
         Expr::Yield(_) => {
-            if checker.enabled(Rule::YieldOutsideFunction) {
-                pyflakes::rules::yield_outside_function(checker, expr);
-            }
             if checker.enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
             }
         }
         Expr::YieldFrom(yield_from) => {
-            if checker.enabled(Rule::YieldOutsideFunction) {
-                pyflakes::rules::yield_outside_function(checker, expr);
-            }
             if checker.enabled(Rule::YieldInInit) {
                 pylint::rules::yield_in_init(checker, expr);
             }
             if checker.enabled(Rule::YieldFromInAsyncFunction) {
                 pylint::rules::yield_from_in_async_function(checker, yield_from);
-            }
-        }
-        Expr::Await(_) => {
-            if checker.enabled(Rule::YieldOutsideFunction) {
-                pyflakes::rules::yield_outside_function(checker, expr);
-            }
-            if checker.enabled(Rule::AwaitOutsideAsync) {
-                pylint::rules::await_outside_async(checker, expr);
             }
         }
         Expr::FString(f_string_expr @ ast::ExprFString { value, .. }) => {

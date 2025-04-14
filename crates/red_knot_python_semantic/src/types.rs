@@ -886,6 +886,27 @@ impl<'db> Type<'db> {
                 target.is_equivalent_to(db, Type::object(db))
             }
 
+            // No literal type is a subtype of any other literal type, unless they are the same
+            // type (which is handled above). This case is not necessary from a correctness
+            // perspective (the fallback cases below will handle it correctly), but it is important
+            // for performance of simplifying large unions of literal types.
+            (
+                Type::StringLiteral(_)
+                | Type::IntLiteral(_)
+                | Type::BytesLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::SliceLiteral(_),
+                Type::StringLiteral(_)
+                | Type::IntLiteral(_)
+                | Type::BytesLiteral(_)
+                | Type::ClassLiteral(_)
+                | Type::FunctionLiteral(_)
+                | Type::ModuleLiteral(_)
+                | Type::SliceLiteral(_),
+            ) => false,
+
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => true,
 
@@ -2508,6 +2529,10 @@ impl<'db> Type<'db> {
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)),
             )
             .into(),
+            Type::StringLiteral(literal) if name == "startswith" => Symbol::bound(
+                Type::MethodWrapper(MethodWrapperKind::StrStartswith(literal)),
+            )
+            .into(),
 
             Type::ClassLiteral(class)
                 if name == "__get__" && class.is_known(db, KnownClass::FunctionType) =>
@@ -3108,6 +3133,38 @@ impl<'db> Type<'db> {
                                 .with_annotated_type(Type::object(db)),
                         ]),
                         None,
+                    ),
+                ))
+            }
+
+            Type::MethodWrapper(MethodWrapperKind::StrStartswith(_)) => {
+                Signatures::single(CallableSignature::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("prefix")))
+                                .with_annotated_type(UnionType::from_elements(
+                                    db,
+                                    [
+                                        KnownClass::Str.to_instance(db),
+                                        // TODO: tuple[str, ...]
+                                        KnownClass::Tuple.to_instance(db),
+                                    ],
+                                )),
+                            Parameter::positional_only(Some(Name::new_static("start")))
+                                .with_annotated_type(UnionType::from_elements(
+                                    db,
+                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                                ))
+                                .with_default_type(Type::none(db)),
+                            Parameter::positional_only(Some(Name::new_static("end")))
+                                .with_annotated_type(UnionType::from_elements(
+                                    db,
+                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                                ))
+                                .with_default_type(Type::none(db)),
+                        ]),
+                        Some(KnownClass::Bool.to_instance(db)),
                     ),
                 ))
             }
@@ -4238,6 +4295,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::WrapperDescriptor(_)
+            | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
             | Type::ModuleLiteral(_)
             // A non-generic class never needs to be specialized. A generic class is specialized
             // explicitly (via a subscript expression) or implicitly (via a call), and not because
@@ -5299,6 +5357,14 @@ impl Truthiness {
         }
     }
 
+    pub(crate) fn and(self, other: Self) -> Self {
+        match (self, other) {
+            (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => Truthiness::AlwaysTrue,
+            (Truthiness::AlwaysFalse, _) | (_, Truthiness::AlwaysFalse) => Truthiness::AlwaysFalse,
+            _ => Truthiness::Ambiguous,
+        }
+    }
+
     fn into_type(self, db: &dyn Db) -> Type {
         match self {
             Self::AlwaysTrue => Type::BooleanLiteral(true),
@@ -6155,6 +6221,12 @@ pub enum MethodWrapperKind<'db> {
     PropertyDunderGet(PropertyInstanceType<'db>),
     /// Method wrapper for `some_property.__set__`
     PropertyDunderSet(PropertyInstanceType<'db>),
+    /// Method wrapper for `str.startswith`.
+    /// We treat this method specially because we want to be able to infer precise Boolean
+    /// literal return types if the instance and the prefix are both string literals, and
+    /// this allows us to understand statically known branches for common tests such as
+    /// `if sys.platform.startswith("freebsd")`.
+    StrStartswith(StringLiteralType<'db>),
 }
 
 /// Represents a specific instance of `types.WrapperDescriptorType`

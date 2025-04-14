@@ -31,7 +31,7 @@ use ruff_python_parser::semantic_errors::{
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_diagnostics::{Diagnostic, IsolationLevel};
+use ruff_diagnostics::{Diagnostic, Edit, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
@@ -62,12 +62,14 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::annotation::AnnotationContext;
 use crate::docstrings::extraction::ExtractionTarget;
-use crate::importer::Importer;
+use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::registry::Rule;
-use crate::rules::pyflakes::rules::LateFutureImport;
-use crate::rules::pylint::rules::LoadBeforeGlobalDeclaration;
+use crate::rules::pyflakes::rules::{
+    LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
+};
+use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::{flags, LinterSettings};
 use crate::{docstrings, noqa, Locator};
@@ -530,6 +532,28 @@ impl<'a> Checker<'a> {
         f(&mut checker, self);
         self.semantic_checker = checker;
     }
+
+    /// Attempt to create an [`Edit`] that imports `member`.
+    ///
+    /// On Python <`version_added_to_typing`, `member` is imported from `typing_extensions`, while
+    /// on Python >=`version_added_to_typing`, it is imported from `typing`.
+    ///
+    /// See [`Importer::get_or_import_symbol`] for more details on the returned values.
+    pub(crate) fn import_from_typing(
+        &self,
+        member: &str,
+        position: TextSize,
+        version_added_to_typing: PythonVersion,
+    ) -> Result<(Edit, String), ResolutionError> {
+        let source_module = if self.target_version() >= version_added_to_typing {
+            "typing"
+        } else {
+            "typing_extensions"
+        };
+        let request = ImportRequest::import_from(source_module, member);
+        self.importer()
+            .get_or_import_symbol(&request, position, self.semantic())
+    }
 }
 
 impl SemanticSyntaxContext for Checker<'_> {
@@ -567,6 +591,24 @@ impl SemanticSyntaxContext for Checker<'_> {
                     ));
                 }
             }
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
+                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
+                    self.report_diagnostic(Diagnostic::new(
+                        YieldOutsideFunction::new(kind),
+                        error.range,
+                    ));
+                }
+            }
+            SemanticSyntaxErrorKind::ReturnOutsideFunction => {
+                if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
+                    self.report_diagnostic(Diagnostic::new(ReturnOutsideFunction, error.range));
+                }
+            }
+            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
+                if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
+                    self.report_diagnostic(Diagnostic::new(AwaitOutsideAsync, error.range));
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
@@ -594,7 +636,25 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn in_async_context(&self) -> bool {
-        self.semantic.in_async_context()
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+            }
+        }
+        false
+    }
+
+    fn in_await_allowed_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            match scope.kind {
+                ScopeKind::Class(_) => return false,
+                ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Generator { .. } | ScopeKind::Module | ScopeKind::Type => {}
+            }
+        }
+        false
     }
 
     fn in_sync_comprehension(&self) -> bool {
@@ -617,8 +677,23 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.current_scope().kind.is_module()
     }
 
+    fn in_function_scope(&self) -> bool {
+        let kind = &self.semantic.current_scope().kind;
+        matches!(kind, ScopeKind::Function(_) | ScopeKind::Lambda(_))
+    }
+
     fn in_notebook(&self) -> bool {
         self.source_type.is_ipynb()
+    }
+
+    fn in_generator_scope(&self) -> bool {
+        matches!(
+            &self.semantic.current_scope().kind,
+            ScopeKind::Generator {
+                kind: GeneratorKind::Generator,
+                ..
+            }
+        )
     }
 }
 

@@ -6,7 +6,6 @@ use ruff_python_semantic::Modules;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
 use crate::rules::fastapi::rules::is_fastapi_route;
 use ruff_python_ast::PythonVersion;
 
@@ -232,15 +231,10 @@ fn create_diagnostic(
     );
 
     let try_generate_fix = || {
-        let module = if checker.target_version() >= PythonVersion::PY39 {
-            "typing"
-        } else {
-            "typing_extensions"
-        };
-        let (import_edit, binding) = checker.importer().get_or_import_symbol(
-            &ImportRequest::import_from(module, "Annotated"),
+        let (import_edit, binding) = checker.import_from_typing(
+            "Annotated",
             parameter.range.start(),
-            checker.semantic(),
+            PythonVersion::PY39,
         )?;
 
         // Each of these classes takes a single, optional default

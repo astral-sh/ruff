@@ -6,12 +6,12 @@ use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Vi
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     name::Name, AnyParameterRef, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple,
-    Operator, Parameters,
+    Operator, Parameters, PythonVersion,
 };
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{checkers::ast::Checker, importer::ImportRequest};
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for parameter annotations that contain redundant unions between
@@ -268,11 +268,8 @@ fn generate_union_fix(
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
 
     // Request `typing.Union`
-    let (import_edit, binding) = checker.importer().get_or_import_symbol(
-        &ImportRequest::import_from("typing", "Union"),
-        annotation.start(),
-        checker.semantic(),
-    )?;
+    let (import_edit, binding) =
+        checker.import_from_typing("Optional", annotation.start(), PythonVersion::lowest())?;
 
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {

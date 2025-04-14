@@ -31,6 +31,8 @@ const PRODUCTION_HEADERS = {
   "Access-Control-Allow-Origin": "https://play.ruff.rs",
 };
 
+const ALLOWED_DOMAINS = ["https://playknot.ruff.rs", "https://types.ruff.rs"];
+
 export default {
   async fetch(
     request: Request,
@@ -40,8 +42,12 @@ export default {
     const { DEV, PLAYGROUND } = env;
 
     const headers = DEV ? DEVELOPMENT_HEADERS : PRODUCTION_HEADERS;
-    if (!DEV && request.headers.get("origin") === "https://playknot.ruff.rs") {
-      headers["Access-Control-Allow-Origin"] = "https://playknot.ruff.rs";
+
+    if (!DEV) {
+      const origin = request.headers.get("origin");
+      if (origin && ALLOWED_DOMAINS.includes(origin)) {
+        headers["Access-Control-Allow-Origin"] = origin;
+      }
     }
 
     switch (request.method) {

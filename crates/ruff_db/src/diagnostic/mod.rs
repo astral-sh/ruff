@@ -45,16 +45,21 @@ impl Diagnostic {
     /// describes. Stated differently, if only one thing from a diagnostic can
     /// be shown to an end user in a particular context, it is the primary
     /// message.
+    ///
+    /// # Types implementing `IntoDiagnosticMessage`
+    ///
+    /// Callers can pass anything that implements `std::fmt::Display`
+    /// directly. If callers want or need to avoid cloning the diagnostic
+    /// message, then they can also pass a `DiagnosticMessage` directly.
     pub fn new<'a>(
         id: DiagnosticId,
         severity: Severity,
-        message: impl std::fmt::Display + 'a,
+        message: impl IntoDiagnosticMessage + 'a,
     ) -> Diagnostic {
-        let message = message.to_string().into_boxed_str();
         let inner = Arc::new(DiagnosticInner {
             id,
             severity,
-            message,
+            message: message.into_diagnostic_message(),
             annotations: vec![],
             subs: vec![],
         });
@@ -83,7 +88,13 @@ impl Diagnostic {
     /// message is about a function call being invalid, a useful "info"
     /// sub-diagnostic could show the function definition (or only the relevant
     /// parts of it).
-    pub fn info<'a>(&mut self, message: impl std::fmt::Display + 'a) {
+    ///
+    /// # Types implementing `IntoDiagnosticMessage`
+    ///
+    /// Callers can pass anything that implements `std::fmt::Display`
+    /// directly. If callers want or need to avoid cloning the diagnostic
+    /// message, then they can also pass a `DiagnosticMessage` directly.
+    pub fn info<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
         self.sub(SubDiagnostic::new(Severity::Info, message));
     }
 
@@ -126,8 +137,8 @@ impl Diagnostic {
     /// didn't distinguish between messages on the entire diagnostic and
     /// messages attached to a particular span.)
     pub fn primary_message(&self) -> &str {
-        if !self.inner.message.is_empty() {
-            return &self.inner.message;
+        if !self.inner.message.as_str().is_empty() {
+            return self.inner.message.as_str();
         }
         // FIXME: As a special case, while we're migrating Red Knot
         // to the new diagnostic data model, we'll look for a primary
@@ -167,7 +178,7 @@ impl Diagnostic {
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
     pub fn concise_message(&self) -> ConciseMessage {
-        let main = &self.inner.message;
+        let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
             .and_then(|ann| ann.get_message())
@@ -187,12 +198,25 @@ impl Diagnostic {
         self.inner.severity
     }
 
-    /// Returns the "primary" annotation of this diagnostic if one exists.
+    /// Returns a shared borrow of the "primary" annotation of this diagnostic
+    /// if one exists.
     ///
-    /// When there are multiple primary annotation, then the first one that was
-    /// added to this diagnostic is returned.
+    /// When there are multiple primary annotations, then the first one that
+    /// was added to this diagnostic is returned.
     pub fn primary_annotation(&self) -> Option<&Annotation> {
         self.inner.annotations.iter().find(|ann| ann.is_primary)
+    }
+
+    /// Returns a mutable borrow of the "primary" annotation of this diagnostic
+    /// if one exists.
+    ///
+    /// When there are multiple primary annotations, then the first one that
+    /// was added to this diagnostic is returned.
+    pub fn primary_annotation_mut(&mut self) -> Option<&mut Annotation> {
+        Arc::make_mut(&mut self.inner)
+            .annotations
+            .iter_mut()
+            .find(|ann| ann.is_primary)
     }
 
     /// Returns the "primary" span of this diagnostic if one exists.
@@ -208,7 +232,7 @@ impl Diagnostic {
 struct DiagnosticInner {
     id: DiagnosticId,
     severity: Severity,
-    message: Box<str>,
+    message: DiagnosticMessage,
     annotations: Vec<Annotation>,
     subs: Vec<SubDiagnostic>,
 }
@@ -241,11 +265,16 @@ impl SubDiagnostic {
     /// describes. Stated differently, if only one thing from a diagnostic can
     /// be shown to an end user in a particular context, it is the primary
     /// message.
-    pub fn new<'a>(severity: Severity, message: impl std::fmt::Display + 'a) -> SubDiagnostic {
-        let message = message.to_string().into_boxed_str();
+    ///
+    /// # Types implementing `IntoDiagnosticMessage`
+    ///
+    /// Callers can pass anything that implements `std::fmt::Display`
+    /// directly. If callers want or need to avoid cloning the diagnostic
+    /// message, then they can also pass a `DiagnosticMessage` directly.
+    pub fn new<'a>(severity: Severity, message: impl IntoDiagnosticMessage + 'a) -> SubDiagnostic {
         let inner = Box::new(SubDiagnosticInner {
             severity,
-            message,
+            message: message.into_diagnostic_message(),
             annotations: vec![],
         });
         SubDiagnostic { inner }
@@ -270,7 +299,7 @@ impl SubDiagnostic {
 #[derive(Debug, Clone, Eq, PartialEq)]
 struct SubDiagnosticInner {
     severity: Severity,
-    message: Box<str>,
+    message: DiagnosticMessage,
     annotations: Vec<Annotation>,
 }
 
@@ -304,7 +333,7 @@ pub struct Annotation {
     ///
     /// When present, rendering will include this message in the output and
     /// draw a line between the highlighted span and the message.
-    message: Option<Box<str>>,
+    message: Option<DiagnosticMessage>,
     /// Whether this annotation is "primary" or not. When it isn't primary, an
     /// annotation is said to be "secondary."
     is_primary: bool,
@@ -351,14 +380,36 @@ impl Annotation {
     ///
     /// When a message is attached to an annotation, then it will be associated
     /// with the highlighted span in some way during rendering.
-    pub fn message<'a>(self, message: impl std::fmt::Display + 'a) -> Annotation {
-        let message = Some(message.to_string().into_boxed_str());
+    ///
+    /// # Types implementing `IntoDiagnosticMessage`
+    ///
+    /// Callers can pass anything that implements `std::fmt::Display`
+    /// directly. If callers want or need to avoid cloning the diagnostic
+    /// message, then they can also pass a `DiagnosticMessage` directly.
+    pub fn message<'a>(self, message: impl IntoDiagnosticMessage + 'a) -> Annotation {
+        let message = Some(message.into_diagnostic_message());
         Annotation { message, ..self }
+    }
+
+    /// Sets the message on this annotation.
+    ///
+    /// If one was already set, then this overwrites it.
+    ///
+    /// This is useful if one needs to set the message on an annotation,
+    /// and all one has is a `&mut Annotation`. For example, via
+    /// `Diagnostic::primary_annotation_mut`.
+    pub fn set_message<'a>(&mut self, message: impl IntoDiagnosticMessage + 'a) {
+        self.message = Some(message.into_diagnostic_message());
     }
 
     /// Returns the message attached to this annotation, if one exists.
     pub fn get_message(&self) -> Option<&str> {
-        self.message.as_deref()
+        self.message.as_ref().map(|m| m.as_str())
+    }
+
+    /// Returns the `Span` associated with this annotation.
+    pub fn get_span(&self) -> &Span {
+        &self.span
     }
 }
 
@@ -695,6 +746,77 @@ impl std::fmt::Display for ConciseMessage<'_> {
             }
             ConciseMessage::Empty => Ok(()),
         }
+    }
+}
+
+/// A diagnostic message string.
+///
+/// This is, for all intents and purposes, equivalent to a `Box<str>`.
+/// But it does not implement `std::fmt::Display`. Indeed, that it its
+/// entire reason for existence. It provides a way to pass a string
+/// directly into diagnostic methods that accept messages without copying
+/// that string. This works via the `IntoDiagnosticMessage` trait.
+///
+/// In most cases, callers shouldn't need to use this. Instead, there is
+/// a blanket trait implementation for `IntoDiagnosticMessage` for
+/// anything that implements `std::fmt::Display`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DiagnosticMessage(Box<str>);
+
+impl DiagnosticMessage {
+    /// Returns this message as a borrowed string.
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl From<&str> for DiagnosticMessage {
+    fn from(s: &str) -> DiagnosticMessage {
+        DiagnosticMessage(s.into())
+    }
+}
+
+impl From<String> for DiagnosticMessage {
+    fn from(s: String) -> DiagnosticMessage {
+        DiagnosticMessage(s.into())
+    }
+}
+
+impl From<Box<str>> for DiagnosticMessage {
+    fn from(s: Box<str>) -> DiagnosticMessage {
+        DiagnosticMessage(s)
+    }
+}
+
+impl IntoDiagnosticMessage for DiagnosticMessage {
+    fn into_diagnostic_message(self) -> DiagnosticMessage {
+        self
+    }
+}
+
+/// A trait for values that can be converted into a diagnostic message.
+///
+/// Users of the diagnostic API can largely think of this trait as effectively
+/// equivalent to `std::fmt::Display`. Indeed, everything that implements
+/// `Display` also implements this trait. That means wherever this trait is
+/// accepted, you can use things like `format_args!`.
+///
+/// The purpose of this trait is to provide a means to give arguments _other_
+/// than `std::fmt::Display` trait implementations. Or rather, to permit
+/// the diagnostic API to treat them differently. For example, this lets
+/// callers wrap a string in a `DiagnosticMessage` and provide it directly
+/// to any of the diagnostic APIs that accept a message. This will move the
+/// string and avoid any unnecessary copies. (If we instead required only
+/// `std::fmt::Display`, then this would potentially result in a copy via the
+/// `ToString` trait implementation.)
+pub trait IntoDiagnosticMessage {
+    fn into_diagnostic_message(self) -> DiagnosticMessage;
+}
+
+/// Every `IntoDiagnosticMessage` is accepted, so to is `std::fmt::Display`.
+impl<T: std::fmt::Display> IntoDiagnosticMessage for T {
+    fn into_diagnostic_message(self) -> DiagnosticMessage {
+        DiagnosticMessage::from(self.to_string())
     }
 }
 

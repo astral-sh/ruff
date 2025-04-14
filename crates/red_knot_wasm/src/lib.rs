@@ -322,7 +322,7 @@ impl Diagnostic {
 
     #[wasm_bindgen]
     pub fn message(&self) -> JsString {
-        JsString::from(self.inner.primary_message())
+        JsString::from(self.inner.concise_message().to_string())
     }
 
     #[wasm_bindgen]
