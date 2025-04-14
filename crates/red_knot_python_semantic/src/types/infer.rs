@@ -5319,13 +5319,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         // we would get a result type `Literal[True]` which is too narrow.
         //
         let mut builder = IntersectionBuilder::new(self.db());
-        for pos in intersection.positive(self.db()) {
+        let non_empty_intersection_positive = if intersection.positive(self.db()).is_empty() {
+            vec![Type::object(self.db())]
+        } else {
+            intersection.iter_positive(self.db()).collect()
+        };
+        for pos in non_empty_intersection_positive {
             let result = match intersection_on {
-                IntersectionOn::Left => {
-                    self.infer_binary_type_comparison(*pos, op, other, range)?
-                }
+                IntersectionOn::Left => self.infer_binary_type_comparison(pos, op, other, range)?,
                 IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, *pos, range)?
+                    self.infer_binary_type_comparison(other, op, pos, range)?
                 }
             };
             builder = builder.add_positive(result);
@@ -5393,20 +5396,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::CmpOp::LtE => Ok(Type::BooleanLiteral(n <= m)),
                 ast::CmpOp::Gt => Ok(Type::BooleanLiteral(n > m)),
                 ast::CmpOp::GtE => Ok(Type::BooleanLiteral(n >= m)),
-                ast::CmpOp::Is => {
-                    if n == m {
-                        Ok(KnownClass::Bool.to_instance(self.db()))
-                    } else {
-                        Ok(Type::BooleanLiteral(false))
-                    }
-                }
-                ast::CmpOp::IsNot => {
-                    if n == m {
-                        Ok(KnownClass::Bool.to_instance(self.db()))
-                    } else {
-                        Ok(Type::BooleanLiteral(true))
-                    }
-                }
+                ast::CmpOp::Is => Ok(Type::BooleanLiteral(n == m)),
+                ast::CmpOp::IsNot => Ok(Type::BooleanLiteral(n != m)),
                 // Undefined for (int, int)
                 ast::CmpOp::In | ast::CmpOp::NotIn => Err(CompareUnsupportedError {
                     op,

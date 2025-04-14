@@ -8,8 +8,8 @@ reveal_type(1 == 1 == 2 == 4)  # revealed: Literal[False]
 reveal_type(False < True <= 2 < 3 != 6)  # revealed: Literal[True]
 reveal_type(1 < 1)  # revealed: Literal[False]
 reveal_type(1 > 1)  # revealed: Literal[False]
-reveal_type(1 is 1)  # revealed: bool
-reveal_type(1 is not 1)  # revealed: bool
+reveal_type(1 is 1)  # revealed: Literal[True]
+reveal_type(1 is not 1)  # revealed: Literal[False]
 reveal_type(1 is 2)  # revealed: Literal[False]
 reveal_type(1 is not 7)  # revealed: Literal[True]
 # error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `str`, in comparing `Literal[1]` with `Literal[""]`"
