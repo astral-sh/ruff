@@ -5390,8 +5390,20 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::CmpOp::LtE => Ok(Type::BooleanLiteral(n <= m)),
                 ast::CmpOp::Gt => Ok(Type::BooleanLiteral(n > m)),
                 ast::CmpOp::GtE => Ok(Type::BooleanLiteral(n >= m)),
-                ast::CmpOp::Is => Ok(Type::BooleanLiteral(n == m)),
-                ast::CmpOp::IsNot => Ok(Type::BooleanLiteral(n != m)),
+                ast::CmpOp::Is => {
+                    if n == m {
+                        Ok(KnownClass::Bool.to_instance(self.db()))
+                    } else {
+                        Ok(Type::BooleanLiteral(false))
+                    }
+                }
+                ast::CmpOp::IsNot => {
+                    if n == m {
+                        Ok(KnownClass::Bool.to_instance(self.db()))
+                    } else {
+                        Ok(Type::BooleanLiteral(true))
+                    }
+                }
                 // Undefined for (int, int)
                 ast::CmpOp::In | ast::CmpOp::NotIn => Err(CompareUnsupportedError {
                     op,
