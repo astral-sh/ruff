@@ -41,8 +41,7 @@ reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
-# We probably don't want to emit a diagnostic for this being possibly undeclared/unbound.
-# mypy and pyright do not show an error here.
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
@@ -339,8 +338,10 @@ class C:
         for self.z in NonIterable():
             pass
 
+# Iterable might be empty
+# error: [possibly-unbound-attribute]
 reveal_type(C().x)  # revealed: Unknown | int
-
+# error: [possibly-unbound-attribute]
 reveal_type(C().y)  # revealed: Unknown | str
 ```
 
@@ -409,8 +410,8 @@ reveal_type(c_instance.a)  # revealed: Unknown
 
 #### Conditionally declared / bound attributes
 
-We currently do not raise a diagnostic or change behavior if an attribute is only conditionally
-defined. This is consistent with what mypy and pyright do.
+Attributes are possibly unbound if they, or the method to which they are added are conditionally
+declared / bound.
 
 ```py
 def flag() -> bool:
@@ -428,9 +429,13 @@ class C:
 
 c_instance = C()
 
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a1)  # revealed: str | None
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a2)  # revealed: str | None
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b1)  # revealed: Unknown | Literal[1]
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b2)  # revealed: Unknown | Literal[1]
 ```
 
@@ -539,10 +544,88 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# TODO: Ideally, this would result in a `unresolved-attribute` error. But mypy and pyright
-# do not support this either (for conditions that can only be resolved to `False` in type
-# inference), so it does not seem to be particularly important.
-reveal_type(C().x)  # revealed: str
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
+```
+
+```py
+class C:
+    def __init__(self, cond: bool) -> None:
+        if True:
+            self.a = 1
+        else:
+            self.a = "a"
+
+        if False:
+            self.b = 2
+
+        if cond:
+            return
+
+        self.c = 3
+
+        self.d = 4
+        self.d = 5
+
+    def set_c(self, c: str) -> None:
+        self.c = c
+    if False:
+        def set_e(self, e: str) -> None:
+            self.e = e
+
+reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C(True).b)  # revealed: Unknown
+reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
+# TODO: this attribute is possibly unbound
+reveal_type(C(True).d)  # revealed: Unknown | Literal[5]
+# error: [unresolved-attribute]
+reveal_type(C(True).e)  # revealed: Unknown
+```
+
+#### Attributes considered always bound
+
+```py
+class C:
+    def __init__(self, cond: bool):
+        self.x = 1
+        if cond:
+            raise ValueError("Something went wrong")
+
+        # We consider this attribute is always bound.
+        # This is because, it is not possible to access a partially-initialized object by normal means.
+        self.y = 2
+
+reveal_type(C(False).x)  # revealed: Unknown | Literal[1]
+reveal_type(C(False).y)  # revealed: Unknown | Literal[2]
+
+class C:
+    def __init__(self, b: bytes) -> None:
+        self.b = b
+
+        try:
+            s = b.decode()
+        except UnicodeDecodeError:
+            raise ValueError("Invalid UTF-8 sequence")
+
+        self.s = s
+
+reveal_type(C(b"abc").b)  # revealed: Unknown | bytes
+reveal_type(C(b"abc").s)  # revealed: Unknown | str
+
+class C:
+    def __init__(self, iter) -> None:
+        self.x = 1
+
+        for _ in iter:
+            pass
+
+        # The for-loop may not stop,
+        # but we consider the subsequent attributes to be definitely-bound.
+        self.y = 2
+
+reveal_type(C([]).x)  # revealed: Unknown | Literal[1]
+reveal_type(C([]).y)  # revealed: Unknown | Literal[2]
 ```
 
 #### Diagnostics are reported for the right-hand side of attribute assignments
@@ -1046,13 +1129,18 @@ def _(flag: bool):
         def __init(self):
             if flag:
                 self.x = 1
+                self.y = "a"
+            else:
+                self.y = "b"
 
-    # Emitting a diagnostic in a case like this is not something we support, and it's unclear
-    # if we ever will (or want to)
+    # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 
-    # Same here
+    # error: [possibly-unbound-attribute]
     Foo().x = 2
+
+    reveal_type(Foo().y)  # revealed: Unknown | Literal["a", "b"]
+    Foo().y = "c"
 ```
 
 ### Unions with all paths unbound
