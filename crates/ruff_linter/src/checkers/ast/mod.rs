@@ -604,7 +604,7 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(Diagnostic::new(ReturnOutsideFunction, error.range));
                 }
             }
-            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction => {
+            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(_) => {
                 if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
                     self.report_diagnostic(Diagnostic::new(AwaitOutsideAsync, error.range));
                 }

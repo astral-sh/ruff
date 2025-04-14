@@ -115,11 +115,19 @@ impl SemanticSyntaxChecker {
                 Self::invalid_star_expression(target, ctx);
                 Self::invalid_star_expression(iter, ctx);
                 if *is_async {
-                    Self::await_outside_async_function(ctx, stmt);
+                    Self::await_outside_async_function(
+                        ctx,
+                        stmt,
+                        AwaitOutsideAsyncFunctionKind::AsyncFor,
+                    );
                 }
             }
             Stmt::With(ast::StmtWith { is_async: true, .. }) => {
-                Self::await_outside_async_function(ctx, stmt);
+                Self::await_outside_async_function(
+                    ctx,
+                    stmt,
+                    AwaitOutsideAsyncFunctionKind::AsyncWith,
+                );
             }
             _ => {}
         }
@@ -526,15 +534,12 @@ impl SemanticSyntaxChecker {
                 Self::check_generator_expr(elt, generators, ctx);
                 Self::async_comprehension_outside_async_function(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
-                    Self::await_outside_async_function(ctx, generator);
+                    Self::await_outside_async_function(
+                        ctx,
+                        generator,
+                        AwaitOutsideAsyncFunctionKind::AsyncComprehension,
+                    );
                 }
-            }
-            Expr::Generator(ast::ExprGenerator {
-                elt, generators, ..
-            }) => {
-                Self::check_generator_expr(elt, generators, ctx);
-                // Note that `await_outside_async_function` is not called here because generators
-                // are evaluated lazily. See the note in the function for more details.
             }
             Expr::DictComp(ast::ExprDictComp {
                 key,
@@ -545,6 +550,20 @@ impl SemanticSyntaxChecker {
                 Self::check_generator_expr(key, generators, ctx);
                 Self::check_generator_expr(value, generators, ctx);
                 Self::async_comprehension_outside_async_function(ctx, generators);
+                for generator in generators.iter().filter(|g| g.is_async) {
+                    Self::await_outside_async_function(
+                        ctx,
+                        generator,
+                        AwaitOutsideAsyncFunctionKind::AsyncComprehension,
+                    );
+                }
+            }
+            Expr::Generator(ast::ExprGenerator {
+                elt, generators, ..
+            }) => {
+                Self::check_generator_expr(elt, generators, ctx);
+                // Note that `await_outside_async_function` is not called here because generators
+                // are evaluated lazily. See the note in the function for more details.
             }
             Expr::Name(ast::ExprName {
                 range,
@@ -619,7 +638,7 @@ impl SemanticSyntaxChecker {
             }
             Expr::Await(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
-                Self::await_outside_async_function(ctx, expr);
+                Self::await_outside_async_function(ctx, expr, AwaitOutsideAsyncFunctionKind::Await);
             }
             _ => {}
         }
@@ -629,6 +648,7 @@ impl SemanticSyntaxChecker {
     fn await_outside_async_function<Ctx: SemanticSyntaxContext, Node: Ranged>(
         ctx: &Ctx,
         node: Node,
+        kind: AwaitOutsideAsyncFunctionKind,
     ) {
         if ctx.in_async_context() {
             return;
@@ -660,7 +680,7 @@ impl SemanticSyntaxChecker {
         }
         Self::add_error(
             ctx,
-            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction,
+            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(kind),
             node.range(),
         );
     }
@@ -860,8 +880,8 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::ReturnOutsideFunction => {
                 f.write_str("`return` statement outside of a function")
             }
-            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction => {
-                f.write_str("`await` statement outside of an asynchronous function")
+            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(kind) => {
+                write!(f, "`{kind}` outside of an asynchronous function")
             }
         }
     }
@@ -1173,7 +1193,26 @@ pub enum SemanticSyntaxErrorKind {
     ///     async for x in y: ...  # error
     ///     async with x: ...      # error
     /// ```
-    AwaitOutsideAsyncFunction,
+    AwaitOutsideAsyncFunction(AwaitOutsideAsyncFunctionKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AwaitOutsideAsyncFunctionKind {
+    Await,
+    AsyncFor,
+    AsyncWith,
+    AsyncComprehension,
+}
+
+impl Display for AwaitOutsideAsyncFunctionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            AwaitOutsideAsyncFunctionKind::Await => "await",
+            AwaitOutsideAsyncFunctionKind::AsyncFor => "async for",
+            AwaitOutsideAsyncFunctionKind::AsyncWith => "async with",
+            AwaitOutsideAsyncFunctionKind::AsyncComprehension => "asynchronous comprehension",
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
