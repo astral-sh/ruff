@@ -548,16 +548,15 @@ Log levels:
                  detecting diagnostics)
 
 Global options:
-  --config <CONFIG_OPTION>  Either a path to a TOML configuration file
-                            (`pyproject.toml` or `ruff.toml`), or a TOML `<KEY>
-                            = <VALUE>` pair (such as you might find in a
-                            `ruff.toml` configuration file) overriding a
-                            specific configuration option. Overrides of
-                            individual settings using this option always take
-                            precedence over all configuration files, including
-                            configuration files that were also specified using
-                            `--config`
-  --isolated                Ignore all configuration files
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -629,39 +628,39 @@ Options:
           Print help
 
 Rule selection:
-  --select <RULE_CODE>
+      --select <RULE_CODE>
           Comma-separated list of rule codes to enable (or ALL, to enable all
           rules)
-  --ignore <RULE_CODE>
+      --ignore <RULE_CODE>
           Comma-separated list of rule codes to disable
-  --extend-select <RULE_CODE>
+      --extend-select <RULE_CODE>
           Like --select, but adds additional rule codes on top of those already
           specified
-  --per-file-ignores <PER_FILE_IGNORES>
+      --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
-  --extend-per-file-ignores <EXTEND_PER_FILE_IGNORES>
+      --extend-per-file-ignores <EXTEND_PER_FILE_IGNORES>
           Like `--per-file-ignores`, but adds additional ignores on top of
           those already specified
-  --fixable <RULE_CODE>
+      --fixable <RULE_CODE>
           List of rule codes to treat as eligible for fix. Only applicable when
           fix itself is enabled (e.g., via `--fix`)
-  --unfixable <RULE_CODE>
+      --unfixable <RULE_CODE>
           List of rule codes to treat as ineligible for fix. Only applicable
           when fix itself is enabled (e.g., via `--fix`)
-  --extend-fixable <RULE_CODE>
+      --extend-fixable <RULE_CODE>
           Like --fixable, but adds additional rule codes on top of those
           already specified
 
 File selection:
-  --exclude <FILE_PATTERN>
+      --exclude <FILE_PATTERN>
           List of paths, used to omit files and/or directories from analysis
-  --extend-exclude <FILE_PATTERN>
+      --extend-exclude <FILE_PATTERN>
           Like --exclude, but adds additional files and directories on top of
           those already excluded
-  --respect-gitignore
+      --respect-gitignore
           Respect file exclusions via `.gitignore` and other standard ignore
           files. Use `--no-respect-gitignore` to disable
-  --force-exclude
+      --force-exclude
           Enforce exclusions, even for paths passed to Ruff directly on the
           command-line. Use `--no-force-exclude` to disable
 
@@ -685,16 +684,15 @@ Log levels:
                  detecting diagnostics)
 
 Global options:
-  --config <CONFIG_OPTION>  Either a path to a TOML configuration file
-                            (`pyproject.toml` or `ruff.toml`), or a TOML `<KEY>
-                            = <VALUE>` pair (such as you might find in a
-                            `ruff.toml` configuration file) overriding a
-                            specific configuration option. Overrides of
-                            individual settings using this option always take
-                            precedence over all configuration files, including
-                            configuration files that were also specified using
-                            `--config`
-  --isolated                Ignore all configuration files
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 ```
 
 <!-- End auto-generated check help. -->
@@ -744,25 +742,25 @@ Miscellaneous:
           format, even if all files were formatted successfully
 
 File selection:
-  --respect-gitignore       Respect file exclusions via `.gitignore` and other
-                            standard ignore files. Use `--no-respect-gitignore`
-                            to disable
-  --exclude <FILE_PATTERN>  List of paths, used to omit files and/or
-                            directories from analysis
-  --force-exclude           Enforce exclusions, even for paths passed to Ruff
-                            directly on the command-line. Use
-                            `--no-force-exclude` to disable
+      --respect-gitignore
+          Respect file exclusions via `.gitignore` and other standard ignore
+          files. Use `--no-respect-gitignore` to disable
+      --exclude <FILE_PATTERN>
+          List of paths, used to omit files and/or directories from analysis
+      --force-exclude
+          Enforce exclusions, even for paths passed to Ruff directly on the
+          command-line. Use `--no-force-exclude` to disable
 
 Format configuration:
-  --line-length <LINE_LENGTH>  Set the line-length
+      --line-length <LINE_LENGTH>  Set the line-length
 
 Editor options:
-  --range <RANGE>  When specified, Ruff will try to only format the code in the
-                   given range.
-                   It might be necessary to extend the start backwards or the
-                   end forwards, to fully enclose a logical line.
-                   The `<RANGE>` uses the format
-                   `<start_line>:<start_column>-<end_line>:<end_column>`.
+      --range <RANGE>  When specified, Ruff will try to only format the code in
+                       the given range.
+                       It might be necessary to extend the start backwards or
+                       the end forwards, to fully enclose a logical line.
+                       The `<RANGE>` uses the format
+                       `<start_line>:<start_column>-<end_line>:<end_column>`.
 
 Log levels:
   -v, --verbose  Enable verbose logging
@@ -771,16 +769,15 @@ Log levels:
                  detecting diagnostics)
 
 Global options:
-  --config <CONFIG_OPTION>  Either a path to a TOML configuration file
-                            (`pyproject.toml` or `ruff.toml`), or a TOML `<KEY>
-                            = <VALUE>` pair (such as you might find in a
-                            `ruff.toml` configuration file) overriding a
-                            specific configuration option. Overrides of
-                            individual settings using this option always take
-                            precedence over all configuration files, including
-                            configuration files that were also specified using
-                            `--config`
-  --isolated                Ignore all configuration files
+      --config <CONFIG_OPTION>
+          Either a path to a TOML configuration file (`pyproject.toml` or
+          `ruff.toml`), or a TOML `<KEY> = <VALUE>` pair (such as you might
+          find in a `ruff.toml` configuration file) overriding a specific
+          configuration option. Overrides of individual settings using this
+          option always take precedence over all configuration files, including
+          configuration files that were also specified using `--config`
+      --isolated
+          Ignore all configuration files
 ```
 
 <!-- End auto-generated format help. -->
