@@ -2637,24 +2637,27 @@ impl<'db> Type<'db> {
                 _ => {
                     KnownClass::MethodType
                         .to_instance(db)
-                        .member(db, &name)
+                        .member_lookup_with_policy(db, name.clone(), policy)
                         .or_fall_back_to(db, || {
                             // If an attribute is not available on the bound method object,
                             // it will be looked up on the underlying function object:
-                            Type::FunctionLiteral(bound_method.function(db)).member(db, &name)
+                            Type::FunctionLiteral(bound_method.function(db))
+                                .member_lookup_with_policy(db, name, policy)
                         })
                 }
             },
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType
                 .to_instance(db)
-                .member(db, &name),
+                .member_lookup_with_policy(db, name, policy),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
-                .member(db, &name),
-            Type::DataclassDecorator(_) => {
-                KnownClass::FunctionType.to_instance(db).member(db, &name)
-            }
-            Type::Callable(_) => KnownClass::Object.to_instance(db).member(db, &name),
+                .member_lookup_with_policy(db, name, policy),
+            Type::DataclassDecorator(_) => KnownClass::FunctionType
+                .to_instance(db)
+                .member_lookup_with_policy(db, name, policy),
+            Type::Callable(_) => KnownClass::Object
+                .to_instance(db)
+                .member_lookup_with_policy(db, name, policy),
 
             Type::Instance(InstanceType { class })
                 if matches!(name.as_str(), "major" | "minor")
