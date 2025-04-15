@@ -1698,9 +1698,9 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bools are instances of that class:
 
 ```py
-# revealed: bound method Literal[True].__and__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
+# revealed: Overload((value: bool, /) -> bool, (value: int, /) -> int)
 reveal_type(True.__and__)
-# revealed: bound method Literal[False].__or__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
+# revealed: Overload((value: bool, /) -> bool, (value: int, /) -> int)
 reveal_type(False.__or__)
 ```
 

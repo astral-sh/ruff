@@ -310,9 +310,7 @@ reveal_type(A() + 1)  # revealed: A
 reveal_type(1 + A())  # revealed: A
 
 reveal_type(A() + "foo")  # revealed: A
-# TODO should be `A` since `str.__add__` doesn't support `A` instances
-# TODO overloads
-reveal_type("foo" + A())  # revealed: @Todo(return type of overloaded function)
+reveal_type("foo" + A())  # revealed: A
 
 reveal_type(A() + b"foo")  # revealed: A
 # TODO should be `A` since `bytes.__add__` doesn't support `A` instances
@@ -320,16 +318,14 @@ reveal_type(b"foo" + A())  # revealed: bytes
 
 reveal_type(A() + ())  # revealed: A
 # TODO this should be `A`, since `tuple.__add__` doesn't support `A` instances
-reveal_type(() + A())  # revealed: @Todo(return type of overloaded function)
+reveal_type(() + A())  # revealed: @Todo(full tuple[...] support)
 
 literal_string_instance = "foo" * 1_000_000_000
 # the test is not testing what it's meant to be testing if this isn't a `LiteralString`:
 reveal_type(literal_string_instance)  # revealed: LiteralString
 
 reveal_type(A() + literal_string_instance)  # revealed: A
-# TODO should be `A` since `str.__add__` doesn't support `A` instances
-# TODO overloads
-reveal_type(literal_string_instance + A())  # revealed: @Todo(return type of overloaded function)
+reveal_type(literal_string_instance + A())  # revealed: A
 ```
 
 ## Operations involving instances of classes inheriting from `Any`

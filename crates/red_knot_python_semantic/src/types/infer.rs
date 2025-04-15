@@ -7409,8 +7409,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let argument_type = self.infer_expression(arguments_slice);
                     let signatures = argument_type.signatures(db);
 
-                    // TODO callable unions
-                    let Some(callable_signature) = signatures.iter().next() else {
+                    // This is enforced by the constructor methods on `Signatures`.
+                    let callable_signature = signatures
+                        .iter()
+                        .next()
+                        .expect("Signatures to have at least one CallableSignature");
+
+                    let mut signature_iter = callable_signature.iter().map(|signature| {
+                        if argument_type.is_bound_method() {
+                            signature.bind_self()
+                        } else {
+                            signature.clone()
+                        }
+                    });
+
+                    let Some(signature) = signature_iter.next() else {
                         self.context.report_lint_old(
                             &INVALID_TYPE_FORM,
                             arguments_slice,
@@ -7425,13 +7438,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     Type::Callable(CallableType::from_overloads(
                         db,
-                        callable_signature.iter().map(|signature| {
-                            if argument_type.is_bound_method() {
-                                signature.bind_self()
-                            } else {
-                                signature.clone()
-                            }
-                        }),
+                        std::iter::once(signature).chain(signature_iter),
                     ))
                 }
             },
