@@ -380,7 +380,8 @@ pub enum Type<'db> {
     /// is specialized, we will replace this typevar with its specialization.
     TypeVar(TypeVarInstance<'db>),
     // A bound super object like `super()` or `super(A, A())`
-    // This type doesn't handle a unbound super object like `super(A)`.
+    // This type doesn't handle an unbound super object like `super(A)`; for that we just use
+    // a `Type::Instance` of `builtins.super`.
     BoundSuper(BoundSuperType<'db>),
     // TODO protocols, overloads, generics
 }
@@ -995,11 +996,6 @@ impl<'db> Type<'db> {
             (Type::Tuple(_), _) => KnownClass::Tuple.to_instance(db).is_subtype_of(db, target),
 
             (Type::BoundSuper(_), Type::BoundSuper(_)) => self.is_equivalent_to(db, target),
-            (Type::BoundSuper(_), Type::Instance(InstanceType { class })) => {
-                // `BoundSuper` is a special kind of `super` instance.
-                // Therefore, `BoundSuper` is always subtype of `super` instances.
-                class.is_known(db, KnownClass::Super)
-            }
             (Type::BoundSuper(_), _) => KnownClass::Super.to_instance(db).is_subtype_of(db, target),
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
@@ -1748,12 +1744,6 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .is_disjoint_from(db, other),
 
-            (Type::BoundSuper(_), Type::Instance(InstanceType { class }))
-            | (Type::Instance(InstanceType { class }), Type::BoundSuper(_)) => {
-                // `BoundSuper` is a special kind of `super` instance.
-                // Therefore, `super` instances and `BoundSuper` are always not disjoint.
-                !class.is_known(db, KnownClass::Super)
-            }
             (Type::BoundSuper(_), Type::BoundSuper(_)) => !self.is_equivalent_to(db, other),
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => KnownClass::Super
                 .to_instance(db)
@@ -7039,10 +7029,7 @@ pub enum SuperOwnerKind<'db> {
 }
 
 impl<'db> SuperOwnerKind<'db> {
-    fn iter_mro(
-        self,
-        db: &'db dyn Db,
-    ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
+    fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => Either::Left(ClassBase::Dynamic(dynamic).mro(db)),
             SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
@@ -7137,13 +7124,12 @@ impl<'db> BoundSuperType<'db> {
 
         let owner = SuperOwnerKind::try_from_type(db, owner_type)
             .and_then(|owner| {
-                // subclass checks are only valid for fully static types
-                if !pivot_class_type.is_fully_static(db) || !owner_type.is_fully_static(db) {
+                let Some(pivot_class) = pivot_class.into_class() else {
                     return Some(owner);
-                }
-
-                let pivot_class = pivot_class.into_class()?;
-                let owner_class = owner.into_class()?;
+                };
+                let Some(owner_class) = owner.into_class() else {
+                    return Some(owner);
+                };
                 if owner_class.is_subclass_of(db, pivot_class) {
                     Some(owner)
                 } else {
@@ -7170,7 +7156,7 @@ impl<'db> BoundSuperType<'db> {
         self,
         db: &'db dyn Db,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
-    ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
+    ) -> impl Iterator<Item = ClassBase<'db>> {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
             return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db));
         };

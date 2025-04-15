@@ -177,7 +177,7 @@ reveal_type(super(str, ""))  # revealed: <super: Literal[str], str>
 ## Descriptor Behavior with Super
 
 Accessing attributes through `super` still invokes descriptor protocol. However, the behavior can
-differ depending on whether the to super is a class or an instance.
+differ depending on whether the second argument to `super` is a class or an instance.
 
 ```py
 class A:
