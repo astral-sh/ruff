@@ -246,15 +246,16 @@ impl<'src> Lexer<'src> {
                     self.cursor.bump();
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
-                    } else if self.cursor.is_eof() {
-                        return Some(self.push_error(LexicalError::new(
-                            LexicalErrorType::Eof,
-                            self.token_range(),
-                        )));
                     } else if !self.cursor.eat_char('\n') {
                         return Some(self.push_error(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
                             TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
+                        )));
+                    }
+                    if self.cursor.is_eof() {
+                        return Some(self.push_error(LexicalError::new(
+                            LexicalErrorType::Eof,
+                            self.token_range(),
                         )));
                     }
                     indentation = Indentation::root();
@@ -341,13 +342,14 @@ impl<'src> Lexer<'src> {
                     self.cursor.bump();
                     if self.cursor.eat_char('\r') {
                         self.cursor.eat_char('\n');
-                    } else if self.cursor.is_eof() {
-                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
                     } else if !self.cursor.eat_char('\n') {
                         return Err(LexicalError::new(
                             LexicalErrorType::LineContinuationError,
                             TextRange::at(self.offset() - '\\'.text_len(), '\\'.text_len()),
                         ));
+                    }
+                    if self.cursor.is_eof() {
+                        return Err(LexicalError::new(LexicalErrorType::Eof, self.token_range()));
                     }
                 }
                 // Form feed
