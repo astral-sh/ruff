@@ -5879,46 +5879,36 @@ impl<'db> FunctionType<'db> {
             internal_signature = internal_signature.apply_specialization(db, specialization);
         }
 
-        match self.previous_symbol(db) {
-            Symbol::Type(Type::FunctionLiteral(function_literal), Boundness::Bound) => {
-                match function_literal.signature(db) {
-                    FunctionSignature::Single(_) => {
-                        debug_assert!(
-                            !function_literal.has_known_decorator(db, FunctionDecorators::OVERLOAD),
-                            "Expected `FunctionSignature::Overloaded` if the previous function was an overload"
-                        );
-                        FunctionSignature::Single(internal_signature)
-                    }
-                    FunctionSignature::Overloaded(_, Some(_)) => {
-                        // If the previous overloaded function already has an implementation,
-                        // then this new signature completely replaces it.
-                        if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-                            FunctionSignature::Overloaded(vec![internal_signature], None)
-                        } else {
-                            FunctionSignature::Single(internal_signature)
-                        }
-                    }
-                    FunctionSignature::Overloaded(signatures, None) => {
-                        if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-                            let mut signatures = signatures.clone();
-                            signatures.push(internal_signature);
-                            FunctionSignature::Overloaded(signatures, None)
-                        } else {
-                            FunctionSignature::Overloaded(
-                                signatures.clone(),
-                                Some(internal_signature),
-                            )
-                        }
-                    }
+        if let Symbol::Type(Type::FunctionLiteral(function_literal), Boundness::Bound) =
+            self.previous_symbol(db)
+        {
+            match function_literal.signature(db) {
+                FunctionSignature::Single(_) => {
+                    debug_assert!(
+                        !function_literal.has_known_decorator(db, FunctionDecorators::OVERLOAD),
+                        "Expected `FunctionSignature::Overloaded` if the previous function was an overload"
+                    );
+                }
+                FunctionSignature::Overloaded(_, Some(_)) => {
+                    // If the previous overloaded function already has an implementation,
+                    // then this new signature completely replaces it.
+                }
+                FunctionSignature::Overloaded(signatures, None) => {
+                    return if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+                        let mut signatures = signatures.clone();
+                        signatures.push(internal_signature);
+                        FunctionSignature::Overloaded(signatures, None)
+                    } else {
+                        FunctionSignature::Overloaded(signatures.clone(), Some(internal_signature))
+                    };
                 }
             }
-            _ => {
-                if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-                    FunctionSignature::Overloaded(vec![internal_signature.clone()], None)
-                } else {
-                    FunctionSignature::Single(internal_signature)
-                }
-            }
+        }
+
+        if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+            FunctionSignature::Overloaded(vec![internal_signature], None)
+        } else {
+            FunctionSignature::Single(internal_signature)
         }
     }
 
@@ -6138,10 +6128,16 @@ pub struct CallableType<'db> {
 }
 
 impl<'db> CallableType<'db> {
+    /// Create a non-overloaded callable type with a single signature.
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> Self {
         CallableType::new(db, vec![signature].into_boxed_slice())
     }
 
+    /// Create an overloaded callable type with multiple signatures.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `overloads` is empty.
     pub(crate) fn from_overloads<I>(db: &'db dyn Db, overloads: I) -> Self
     where
         I: IntoIterator<Item = Signature<'db>>,
@@ -6149,7 +6145,7 @@ impl<'db> CallableType<'db> {
         let overloads = overloads.into_iter().collect::<Vec<_>>().into_boxed_slice();
         assert!(
             !overloads.is_empty(),
-            "CallableType must have at least one overload"
+            "CallableType must have at least one signature"
         );
         CallableType::new(db, overloads)
     }

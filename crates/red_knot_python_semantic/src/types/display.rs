@@ -115,12 +115,12 @@ impl Display for DisplayRepresentation<'_> {
                     }
                     FunctionSignature::Overloaded(signatures, _) => {
                         // TODO: How to display overloads?
-                        f.write_str("Overload(")?;
+                        f.write_str("Overload[")?;
                         let mut join = f.join(", ");
                         for signature in signatures {
                             join.entry(&signature.display(self.db));
                         }
-                        f.write_str(")")
+                        f.write_str("]")
                     }
                 }
             }

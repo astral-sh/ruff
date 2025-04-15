@@ -7409,11 +7409,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let argument_type = self.infer_expression(arguments_slice);
                     let signatures = argument_type.signatures(db);
 
-                    // This is enforced by the constructor methods on `Signatures`.
+                    // SAFETY: This is enforced by the constructor methods on `Signatures` even in
+                    // the case of a non-callable union.
                     let callable_signature = signatures
                         .iter()
                         .next()
-                        .expect("Signatures to have at least one CallableSignature");
+                        .expect("`Signatures` should have at least one `CallableSignature`");
 
                     let mut signature_iter = callable_signature.iter().map(|signature| {
                         if argument_type.is_bound_method() {
