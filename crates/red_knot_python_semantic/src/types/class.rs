@@ -707,26 +707,6 @@ impl<'db> ClassLiteralType<'db> {
             return Symbol::bound(TupleType::from_elements(db, tuple_elements)).into();
         }
 
-        if let Some(metadata) = self.dataclass_metadata(db) {
-            if name == "__init__" {
-                if metadata.contains(DataclassMetadata::INIT) {
-                    // TODO: Generate the signature from the attributes on the class
-                    let init_signature = Signature::new(
-                        Parameters::new([
-                            Parameter::variadic(Name::new_static("args"))
-                                .with_annotated_type(Type::any()),
-                            Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(Type::none(db)),
-                    );
-
-                    return Symbol::bound(Type::Callable(CallableType::new(db, init_signature)))
-                        .into();
-                }
-            }
-        }
-
         // If we encounter a dynamic type in this class's MRO, we'll save that dynamic type
         // in this variable. After we've traversed the MRO, we'll either:
         // (1) Use that dynamic type as the type for this attribute,
@@ -811,6 +791,26 @@ impl<'db> ClassLiteralType<'db> {
     /// directly. Use [`ClassLiteralType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        if let Some(metadata) = self.dataclass_metadata(db) {
+            if name == "__init__" {
+                if metadata.contains(DataclassMetadata::INIT) {
+                    // TODO: Generate the signature from the attributes on the class
+                    let init_signature = Signature::new(
+                        Parameters::new([
+                            Parameter::variadic(Name::new_static("args"))
+                                .with_annotated_type(Type::any()),
+                            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(Type::none(db)),
+                    );
+
+                    return Symbol::bound(Type::Callable(CallableType::new(db, init_signature)))
+                        .into();
+                }
+            }
+        }
+
         let body_scope = self.body_scope(db);
         class_symbol(db, body_scope, name)
     }

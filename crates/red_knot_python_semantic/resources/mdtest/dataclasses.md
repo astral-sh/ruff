@@ -93,7 +93,60 @@ C() == C()
 
 ## Inheritance
 
-To do
+### Normal class inheriting from a dataclass
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Base:
+    x: int
+
+class Derived(Base): ...
+
+d = Derived(1)  # OK
+reveal_type(d.x)  # revealed: int
+```
+
+### Dataclass inheriting from normal class
+
+```py
+from dataclasses import dataclass
+
+class Base:
+    x: int = 1
+
+@dataclass
+class Derived(Base):
+    y: str
+
+d = Derived("a")
+
+# TODO: should be an error:
+Derived(1, "a")
+```
+
+### Dataclass inheriting from another dataclass
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Base:
+    x: int
+
+@dataclass
+class Derived(Base):
+    y: str
+
+d = Derived(1, "a")  # OK
+
+reveal_type(d.x)  # revealed: int
+reveal_type(d.y)  # revealed: str
+
+# TODO: should be an error:
+Derived("a")
+```
 
 ## Generic dataclasses
 
