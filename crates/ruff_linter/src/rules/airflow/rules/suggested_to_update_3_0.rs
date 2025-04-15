@@ -56,14 +56,16 @@ impl Violation for Airflow3SuggestedUpdate {
             | Replacement::Name(_)
             | Replacement::AutoImport { module: _, name: _ }
             | Replacement::SourceModuleMoved { module: _, name: _ } => {
-                format!("`{deprecated}` is removed in Airflow 3.0; \
-                         It still works in Airflow 3.0 but is expected to be removed in a future version."
+                format!(
+                    "`{deprecated}` is removed in Airflow 3.0; \
+                    It still works in Airflow 3.0 but is expected to be removed in a future version."
                 )
             }
             Replacement::Message(message) => {
-                format!("`{deprecated}` is removed in Airflow 3.0; \
-                         It still works in Airflow 3.0 but is expected to be removed in a future version.;
-                         {message}"
+                format!(
+                    "`{deprecated}` is removed in Airflow 3.0; \
+                     It still works in Airflow 3.0 but is expected to be removed in a future version.; \
+                    {message}"
                 )
             }
         }
