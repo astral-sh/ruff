@@ -165,7 +165,9 @@ impl Display for DisplayRepresentation<'_> {
                 };
                 write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
             }
-            Type::DataclassDecorator(_) => f.write_str("<function dataclasses.dataclass>"),
+            Type::DataclassDecorator(_) => {
+                f.write_str("<decorator produced by dataclasses.dataclass>")
+            }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
             Type::IntLiteral(n) => n.fmt(f),
