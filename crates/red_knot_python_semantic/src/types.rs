@@ -890,23 +890,18 @@ impl<'db> Type<'db> {
                 .iter()
                 .any(|&elem_ty| self.is_subtype_of(db, elem_ty)),
 
-            (_, Type::TypeVar(typevar)) => match typevar.bound_or_constraints(db) {
-                // No types are a subtype of a bounded typevar, or of an unbounded unconstrained
-                // typevar, since there's no guarantee what type the typevar will be specialized
-                // to. If the typevar is bounded, it might be specialized to a smaller type than
-                // the bound. (This is true even if the bound is a final class, since the typevar
-                // can still be specialized to `Never`.)
-                None => false,
-                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
-                // If the typevar is constrained, there must be multiple constraints, and the
-                // typevar might be specialized to any one of them. However, the constraints do not
-                // have to be disjoint, which means an lhs type might be a subtype of all of the
-                // constraints.
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .elements(db)
-                    .iter()
-                    .all(|constraint| self.is_subtype_of(db, *constraint)),
-            },
+            // If the typevar is constrained, there must be multiple constraints, and the typevar
+            // might be specialized to any one of them. However, the constraints do not have to be
+            // disjoint, which means an lhs type might be a subtype of all of the constraints.
+            (_, Type::TypeVar(typevar))
+                if typevar.constraints(db).is_some_and(|constraints| {
+                    constraints
+                        .iter()
+                        .all(|constraint| self.is_subtype_of(db, *constraint))
+                }) =>
+            {
+                true
+            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
@@ -926,6 +921,13 @@ impl<'db> Type<'db> {
                 .positive(db)
                 .iter()
                 .any(|&elem_ty| elem_ty.is_subtype_of(db, target)),
+
+            // Other than the special cases checked above, no other types are a subtype of a
+            // typevar, since there's no guarantee what type the typevar will be specialized to.
+            // (If the typevar is bounded, it might be specialized to a smaller type than the
+            // bound. This is true even if the bound is a final class, since the typevar can still
+            // be specialized to `Never`.)
+            (_, Type::TypeVar(_)) => false,
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
@@ -1186,23 +1188,18 @@ impl<'db> Type<'db> {
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
 
-            (_, Type::TypeVar(typevar)) => match typevar.bound_or_constraints(db) {
-                // No types are assignable to a bounded typevar, or to an unbounded unconstrained
-                // typevar, since there's no guarantee what type the typevar will be specialized
-                // to. If the typevar is bounded, it might be specialized to a smaller type than
-                // the bound. (This is true even if the bound is a final class, since the typevar
-                // can still be specialized to `Never`.)
-                None => false,
-                Some(TypeVarBoundOrConstraints::UpperBound(_)) => false,
-                // If the typevar is constrained, there must be multiple constraints, and the
-                // typevar might be specialized to any one of them. However, the constraints do not
-                // have to be disjoint, which means an lhs type might be assignable to all of the
-                // constraints.
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                    .elements(db)
-                    .iter()
-                    .all(|constraint| self.is_assignable_to(db, *constraint)),
-            },
+            // If the typevar is constrained, there must be multiple constraints, and the typevar
+            // might be specialized to any one of them. However, the constraints do not have to be
+            // disjoint, which means an lhs type might be assignable to all of the constraints.
+            (_, Type::TypeVar(typevar))
+                if typevar.constraints(db).is_some_and(|constraints| {
+                    constraints
+                        .iter()
+                        .all(|constraint| self.is_assignable_to(db, *constraint))
+                }) =>
+            {
+                true
+            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is assignable to (A & B) because the left is assignable to both A and B,
@@ -1229,6 +1226,13 @@ impl<'db> Type<'db> {
                 .positive(db)
                 .iter()
                 .any(|&elem_ty| elem_ty.is_assignable_to(db, ty)),
+
+            // Other than the special cases checked above, no other types are assignable to a
+            // typevar, since there's no guarantee what type the typevar will be specialized to.
+            // (If the typevar is bounded, it might be specialized to a smaller type than the
+            // bound. This is true even if the bound is a final class, since the typevar can still
+            // be specialized to `Never`.)
+            (_, Type::TypeVar(_)) => false,
 
             // A tuple type S is assignable to a tuple type T if their lengths are the same, and
             // each element of S is assignable to the corresponding element of T.
