@@ -201,6 +201,14 @@ def h(x: int, y: str):
         return y
 
 reveal_type(h(1, "a"))  # revealed: int | str | None
+
+def generator():
+    yield 1
+    yield 2
+    return None
+
+# TODO: Should be `Generator[Literal[1, 2], Any, None]`
+reveal_type(generator())  # revealed: None
 ```
 
 ## Invalid return type
