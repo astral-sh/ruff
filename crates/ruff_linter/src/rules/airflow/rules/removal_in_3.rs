@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::rules::airflow::helpers::{
-    is_airflow_builtin_or_provider, is_airflow_operator, is_guarded_by_try_except, Replacement,
+    is_airflow_builtin_or_provider, is_guarded_by_try_except, Replacement,
 };
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -229,7 +229,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                     "filename_template",
                     None,
                 ));
-            } else if is_airflow_operator(qualified_name.segments()) {
+            } else if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
                 checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "task_concurrency",

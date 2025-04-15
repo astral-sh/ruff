@@ -1,7 +1,8 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::Replacement;
-use crate::rules::airflow::helpers::{is_airflow_operator, is_guarded_by_try_except};
+use crate::rules::airflow::helpers::{
+    is_airflow_builtin_or_provider, is_guarded_by_try_except, Replacement,
+};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{name::QualifiedName, Arguments, Expr, ExprAttribute, ExprCall, ExprName};
@@ -160,7 +161,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
             ));
         }
         _ => {
-            if is_airflow_operator(qualified_name.segments()) {
+            if is_airflow_builtin_or_provider(qualified_name.segments(), "operators", "Operator") {
                 checker.report_diagnostics(diagnostic_for_argument(arguments, "sla", None));
             }
         }

@@ -82,12 +82,6 @@ fn try_block_contains_undeprecated_import(try_node: &StmtTry, replacement: &Repl
     import_searcher.found_import
 }
 
-/// Check whether the symbol is coming from the `operators` builtin or provider module which ends
-/// with `Operator`.
-pub(crate) fn is_airflow_operator(segments: &[&str]) -> bool {
-    is_airflow_builtin_or_provider(segments, "operators", "Operator")
-}
-
 /// Check whether the segments corresponding to the fully qualified name points to a symbol that's
 /// either a builtin or coming from one of the providers in Airflow.
 ///
