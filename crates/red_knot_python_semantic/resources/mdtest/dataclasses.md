@@ -40,17 +40,189 @@ The signature of the `__init__` method is generated based on the classes attribu
 calls are not valid:
 
 ```py
-# TODO: should be an error: too few arguments
+# error: [missing-argument]
 Person()
 
-# TODO: should be an error: too many arguments
+# error: [too-many-positional-arguments]
 Person("Eve", 20, "too many arguments")
 
-# TODO: should be an error: wrong argument type
+# error: [invalid-argument-type]
 Person("Eve", "string instead of int")
 
-# TODO: should be an error: wrong argument types
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
 Person(20, "Eve")
+```
+
+## Signature of `__init__`
+
+TODO: All of the following tests are missing the `self` argument in the `__init__` signature.
+
+Declarations in the class body are used to generate the signature of the `__init__` method. If the
+attributes are not just declarations, but also bindings, the type inferred from bindings is used as
+the default value.
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class D:
+    x: int
+    y: str = "default"
+    z: int | None = 1 + 2
+
+reveal_type(D.__init__)  # revealed: (x: int, y: str = Literal["default"], z: int | None = Literal[3]) -> None
+```
+
+This also works if the declaration and binding are split:
+
+```py
+@dataclass
+class D:
+    x: int | None
+    x = None
+
+reveal_type(D.__init__)  # revealed: (x: int | None = None) -> None
+```
+
+Non-fully static types are handled correctly:
+
+```py
+from typing import Any
+
+@dataclass
+class C:
+    x: Any
+    y: int | Any
+    z: tuple[int, Any]
+
+reveal_type(C.__init__)  # revealed: (x: Any, y: int | Any, z: tuple[int, Any]) -> None
+```
+
+Variables without annotations are ignored:
+
+```py
+@dataclass
+class D:
+    x: int
+    y = 1
+
+reveal_type(D.__init__)  # revealed: (x: int) -> None
+```
+
+If attributes without default values are declared after attributes with default values, a
+`TypeError` will be raised at runtime. Ideally, we would emit a diagnostic in that case:
+
+```py
+@dataclass
+class D:
+    x: int = 1
+    # TODO: this should be an error: field without default defined after field with default
+    y: str
+```
+
+Pure class attributes (`ClassVar`) are not included in the signature of `__init__`:
+
+```py
+from typing import ClassVar
+
+@dataclass
+class D:
+    x: int
+    y: ClassVar[str] = "default"
+    z: bool
+
+reveal_type(D.__init__)  # revealed: (x: int, z: bool) -> None
+
+d = D(1, True)
+reveal_type(d.x)  # revealed: int
+reveal_type(d.y)  # revealed: str
+reveal_type(d.z)  # revealed: bool
+```
+
+Function declarations do not affect the signature of `__init__`:
+
+```py
+@dataclass
+class D:
+    x: int
+
+    def y(self) -> str:
+        return ""
+
+reveal_type(D.__init__)  # revealed: (x: int) -> None
+```
+
+And neither do nested class declarations:
+
+```py
+@dataclass
+class D:
+    x: int
+
+    class Nested:
+        y: str
+
+reveal_type(D.__init__)  # revealed: (x: int) -> None
+```
+
+But if there is a variable annotation with a function or class literal type, the signature of
+`__init__` will include this field:
+
+```py
+from knot_extensions import TypeOf
+
+class SomeClass: ...
+
+def some_function() -> None: ...
+@dataclass
+class D:
+    function_literal: TypeOf[some_function]
+    class_literal: TypeOf[SomeClass]
+    class_subtype_of: type[SomeClass]
+
+# revealed: (function_literal: def some_function() -> None, class_literal: Literal[SomeClass], class_subtype_of: type[SomeClass]) -> None
+reveal_type(D.__init__)
+```
+
+More realistically, dataclasses can have `Callable` attributes:
+
+```py
+from typing import Callable
+
+@dataclass
+class D:
+    c: Callable[[int], str]
+
+reveal_type(D.__init__)  # revealed: (c: (int, /) -> str) -> None
+```
+
+Implicit instance attributes do not affect the signature of `__init__`:
+
+```py
+@dataclass
+class D:
+    x: int
+
+    def f(self, y: str) -> None:
+        self.y: str = y
+
+reveal_type(D(1).y)  # revealed: str
+
+reveal_type(D.__init__)  # revealed: (x: int) -> None
+```
+
+Annotating expressions does not lead to an entry in `__annotations__` at runtime, and so it wouldn't
+be included in the signature of `__init__`. This is a case that we currently don't detect:
+
+```py
+@dataclass
+class D:
+    # (x) is an expression, not a "simple name"
+    (x): int = 1
+
+# TODO: should ideally not include a `x` parameter
+reveal_type(D.__init__)  # revealed: (x: int = Literal[1]) -> None
 ```
 
 ## `@dataclass` calls with arguments
@@ -241,7 +413,8 @@ class Derived(Base):
 
 d = Derived("a")
 
-# TODO: should be an error:
+# error: [too-many-positional-arguments]
+# error: [invalid-argument-type]
 Derived(1, "a")
 ```
 
@@ -253,18 +426,47 @@ from dataclasses import dataclass
 @dataclass
 class Base:
     x: int
+    y: str
 
 @dataclass
 class Derived(Base):
-    y: str
+    z: bool
 
-d = Derived(1, "a")  # OK
+d = Derived(1, "a", True)  # OK
 
 reveal_type(d.x)  # revealed: int
 reveal_type(d.y)  # revealed: str
+reveal_type(d.z)  # revealed: bool
 
-# TODO: should be an error:
-Derived("a")
+# error: [missing-argument]
+Derived(1, "a")
+
+# error: [missing-argument]
+Derived(True)
+```
+
+### Overwriting attributes from base class
+
+The following example comes from the
+[Python documentation](https://docs.python.org/3/library/dataclasses.html#inheritance). The `x`
+attribute appears just once in the `__init__` signature, and the default value is taken from the
+derived class
+
+```py
+from dataclasses import dataclass
+from typing import Any
+
+@dataclass
+class Base:
+    x: Any = 15.0
+    y: int = 0
+
+@dataclass
+class C(Base):
+    z: int = 10
+    x: int = 15
+
+reveal_type(C.__init__)  # revealed: (x: int = Literal[15], y: int = Literal[0], z: int = Literal[10]) -> None
 ```
 
 ## Generic dataclasses
@@ -283,33 +485,124 @@ d_int = DataWithDescription[int](1, "description")  # OK
 reveal_type(d_int.data)  # revealed: int
 reveal_type(d_int.description)  # revealed: str
 
-# TODO: should be an error: wrong argument type
+# error: [invalid-argument-type]
 DataWithDescription[int](None, "description")
 ```
 
 ## Descriptor-typed fields
 
+### Same type in `__get__` and `__set__`
+
+For the following descriptor, the return type of `__get__` and the type of the `value` parameter in
+`__set__` are the same. The generated `__init__` method takes an argument of this type (instead of
+the type of the descriptor), and the default value is also of this type:
+
 ```py
+from typing import overload
 from dataclasses import dataclass
 
-class Descriptor:
-    _value: int = 0
+class UppercaseString:
+    _value: str = ""
 
-    def __get__(self, instance, owner) -> str:
-        return str(self._value)
+    def __get__(self, instance: object, owner: None | type) -> str:
+        return self._value
 
-    def __set__(self, instance, value: int) -> None:
-        self._value = value
+    def __set__(self, instance: object, value: str) -> None:
+        self._value = value.upper()
 
 @dataclass
 class C:
-    d: Descriptor = Descriptor()
+    upper: UppercaseString = UppercaseString()
 
-c = C(1)
-reveal_type(c.d)  # revealed: str
+reveal_type(C.__init__)  # revealed: (upper: str = str) -> None
 
-# TODO: should be an error
-C("a")
+c = C("abc")
+reveal_type(c.upper)  # revealed: str
+
+# This is also okay:
+C()
+
+# error: [invalid-argument-type]
+C(1)
+
+# error: [too-many-positional-arguments]
+C("a", "b")
+```
+
+### Different types in `__get__` and `__set__`
+
+In general, the type of the `__init__` parameter is determined by the `value` parameter type of the
+`__set__` method (`str` in the example below). However, the default value is generated by calling
+the descriptor's `__get__` method as if it had been called on the class itself, i.e. passing `None`
+for the `instance` argument.
+
+```py
+from typing import overload
+from dataclasses import dataclass
+
+class ConvertToLength:
+    _len: int = 0
+
+    @overload
+    def __get__(self, instance: None, owner: type) -> str: ...
+    @overload
+    def __get__(self, instance: object, owner: type | None) -> int: ...
+    def __get__(self, instance: object | None, owner: type | None) -> str | int:
+        if instance is None:
+            return ""
+
+        return self._len
+
+    def __set__(self, instance, value: str) -> None:
+        self._len = len(value)
+
+@dataclass
+class C:
+    converter: ConvertToLength = ConvertToLength()
+
+# TODO: Should be `(converter: str = Literal[""]) -> None` once we understand overloads
+reveal_type(C.__init__)  # revealed: (converter: str = str | int) -> None
+
+c = C("abc")
+# TODO: Should be `int` once we understand overloads
+reveal_type(c.converter)  # revealed: str | int
+
+# This is also okay:
+C()
+
+# error: [invalid-argument-type]
+C(1)
+
+# error: [too-many-positional-arguments]
+C("a", "b")
+```
+
+### With overloaded `__set__` method
+
+If the `__set__` method is overloaded, we determine the type for the `__init__` parameter as the
+union of all possible `value` parameter types:
+
+```py
+from typing import overload
+from dataclasses import dataclass
+
+class AcceptsStrAndInt:
+    def __get__(self, instance, owner) -> int:
+        return 0
+
+    @overload
+    def __set__(self, instance: object, value: str) -> None: ...
+    @overload
+    def __set__(self, instance: object, value: int) -> None: ...
+    def __set__(self, instance: object, value) -> None:
+        pass
+
+@dataclass
+class C:
+    field: AcceptsStrAndInt = AcceptsStrAndInt()
+
+# TODO: Should be `field: str | int = int` once we understand overloads
+reveal_type(C.__init__)  # revealed: (field: Unknown = int) -> None
 ```
 
 ## `dataclasses.field`
@@ -329,8 +622,7 @@ import dataclasses
 class C:
     x: str
 
-# TODO: should show the proper signature
-reveal_type(C.__init__)  # revealed: (*args: Any, **kwargs: Any) -> None
+reveal_type(C.__init__)  # revealed: (x: str) -> None
 ```
 
 ### Dataclass with custom `__init__` method
@@ -349,7 +641,7 @@ class C:
 
 C(1)  # OK
 
-# TODO: should be an error
+# error: [invalid-argument-type]
 C("a")
 ```
 
@@ -365,9 +657,20 @@ D(1)  # OK
 D()  # error: [missing-argument]
 ```
 
-### Dataclass with `ClassVar`s
+### Accessing instance attributes on the class itself
 
-To do
+Just like for normal classes, accessing instance attributes on the class itself is not allowed:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    x: int
+
+# error: [unresolved-attribute] "Attribute `x` can only be accessed on instances, not on the class object `Literal[C]` itself."
+C.x
+```
 
 ### Return type of `dataclass(...)`
 
@@ -412,8 +715,8 @@ reveal_type(Person.__mro__)  # revealed: tuple[Literal[Person], Literal[object]]
 The generated methods have the following signatures:
 
 ```py
-# TODO: proper signature
-reveal_type(Person.__init__)  # revealed: (*args: Any, **kwargs: Any) -> None
+# TODO: `self` is missing here
+reveal_type(Person.__init__)  # revealed: (name: str, age: int | None = None) -> None
 
 reveal_type(Person.__repr__)  # revealed: def __repr__(self) -> str
 
