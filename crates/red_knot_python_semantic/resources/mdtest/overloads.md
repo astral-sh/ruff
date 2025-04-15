@@ -16,7 +16,6 @@ def add(x: int, y: int) -> int: ...
 def add(x: int | None = None, y: int | None = None) -> int | None:
     return (x or 0) + (y or 0)
 
-
 reveal_type(add)  # revealed: Overload[() -> None, (x: int) -> int, (x: int, y: int) -> int]
 reveal_type(add())  # revealed: None
 reveal_type(add(1))  # revealed: int
@@ -61,7 +60,6 @@ A non-overloaded function is overridding an overloaded function:
 ```py
 def foo(x: int) -> int:
     return x
-
 
 reveal_type(foo)  # revealed: def foo(x: int) -> int
 ```
@@ -155,6 +153,7 @@ from typing import overload
 if sys.version_info < (3, 10):
     def func(x: int) -> int:
         return x
+
 elif sys.version_info <= (3, 12):
     @overload
     def func() -> None: ...
@@ -162,7 +161,6 @@ elif sys.version_info <= (3, 12):
     def func(x: int) -> int: ...
     def func(x: int | None = None) -> int | None:
         return x
-
 
 reveal_type(func)  # revealed: def func(x: int) -> int
 func()  # error: [missing-argument]
@@ -182,6 +180,7 @@ from typing import overload
 if sys.version_info < (3, 10):
     def func(x: int) -> int:
         return x
+
 elif sys.version_info <= (3, 12):
     @overload
     def func() -> None: ...
@@ -189,7 +188,6 @@ elif sys.version_info <= (3, 12):
     def func(x: int) -> int: ...
     def func(x: int | None = None) -> int | None:
         return x
-
 
 reveal_type(func)  # revealed: Overload[() -> None, (x: int) -> int]
 reveal_type(func())  # revealed: None
