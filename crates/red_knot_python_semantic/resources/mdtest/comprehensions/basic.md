@@ -47,6 +47,23 @@ class IntIterable:
 [[reveal_type((x, y)) for x in IntIterable()] for y in IntIterable()]
 ```
 
+## Unpacking in comprehension
+
+```py
+class TupleIterator:
+    def __next__(self) -> tuple[int, int]:
+        return (42, 42)
+
+class TupleIterable:
+    def __iter__(self) -> TupleIterator:
+        return TupleIterator()
+
+# revealed: tuple[int, int]
+[(reveal_type((x, y)) for x, y in TupleIterable())]
+# revealed: tuple[int, int]
+[(reveal_type((x, y)) for [x, y] in TupleIterable())]
+```
+
 ## Comprehension referencing outer comprehension
 
 ```py

@@ -50,7 +50,9 @@ pub(crate) struct Unpack<'db> {
 
 impl<'db> Unpack<'db> {
     /// Returns the scope where the unpacked value is appeared.
-    /// In comprehension, the scope of the value and the target may be different.
+    /// The value scope and the target scope are not always the same;
+    /// the first generator in a generator expression or list/dict/set comprehension is evaluated in the outer scope, while all subsequent
+    /// nodes are evaluated in the inner scope.
     pub(crate) fn value_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.value_file_scope(db).to_scope_id(db, self.file(db))
     }
