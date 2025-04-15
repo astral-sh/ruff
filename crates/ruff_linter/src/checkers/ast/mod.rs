@@ -1971,10 +1971,6 @@ impl<'a> Visitor<'a> for Checker<'a> {
         // Step 4: Analysis
         analyze::suite(body, self);
 
-        if let Some(globals) = Globals::from_body(body) {
-            self.semantic.set_globals(globals);
-        }
-
         // Step 2: Traversal
         for stmt in body {
             self.visit_stmt(stmt);
@@ -2063,6 +2059,10 @@ impl<'a> Visitor<'a> for Checker<'a> {
 impl<'a> Checker<'a> {
     /// Visit a [`Module`]. Returns `true` if the module contains a module-level docstring.
     fn visit_module(&mut self, python_ast: &'a Suite) {
+        // Extract any global bindings from the module body.
+        if let Some(globals) = Globals::from_body(python_ast) {
+            self.semantic.set_globals(globals);
+        }
         analyze::module(python_ast, self);
     }
 

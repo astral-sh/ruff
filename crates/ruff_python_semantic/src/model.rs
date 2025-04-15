@@ -1504,8 +1504,8 @@ impl<'a> SemanticModel<'a> {
     /// Set the [`Globals`] for the current [`Scope`].
     pub fn set_globals(&mut self, globals: Globals<'a>) {
         // If any global bindings don't already exist in the global scope, add them, unless we are
-        // also in the global scope, in which case avoid adding them to flag
-        // `load-before-global-declaration` (PLE0118).
+        // also in the global scope, where we don't want these to count as definitions for rules
+        // like `undefined-name` (F821)
         if !self.at_top_level() {
             for (name, range) in globals.iter() {
                 if self
