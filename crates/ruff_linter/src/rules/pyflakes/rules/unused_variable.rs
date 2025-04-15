@@ -38,6 +38,14 @@ use crate::fix::edits::delete_stmt;
 ///     return x
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing an unused variable assignment may:
+/// - Delete comments that are attached to the assignment.
+/// - Remove code with side effects (for example, if the right-hand side of the assignment is a function call).
+///
+/// Please review changes carefully when applying automatic fixes.
+///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
