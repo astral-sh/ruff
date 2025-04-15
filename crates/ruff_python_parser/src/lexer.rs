@@ -2214,6 +2214,46 @@ if first:
         assert_snapshot!(triple_quoted_eol(WINDOWS_EOL));
     }
 
+    fn line_continuation_at_eof_after_newline(eol: &str) -> LexerOutput {
+        let source = format!(r"\{eol}");
+        lex_invalid(&source, Mode::Module)
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_after_newline_unix_eol() {
+        assert_snapshot!(line_continuation_at_eof_after_newline(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_after_newline_mac_eol() {
+        assert_snapshot!(line_continuation_at_eof_after_newline(MAC_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_after_newline_windows_eol() {
+        assert_snapshot!(line_continuation_at_eof_after_newline(WINDOWS_EOL));
+    }
+
+    fn line_continuation_at_eof(eol: &str) -> LexerOutput {
+        let source = format!(r"1, \{eol}");
+        lex_invalid(&source, Mode::Module)
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_unix_eol() {
+        assert_snapshot!(line_continuation_at_eof(UNIX_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_mac_eol() {
+        assert_snapshot!(line_continuation_at_eof(MAC_EOL));
+    }
+
+    #[test]
+    fn test_line_continuation_at_eof_windows_eol() {
+        assert_snapshot!(line_continuation_at_eof(WINDOWS_EOL));
+    }
+
     // This test case is to just make sure that the lexer doesn't go into
     // infinite loop on invalid input.
     #[test]
