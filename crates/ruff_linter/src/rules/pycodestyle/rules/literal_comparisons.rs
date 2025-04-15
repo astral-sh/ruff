@@ -368,19 +368,15 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                     let needs_wrap = compare.left.range().start() != compare.range().start();
                     maybe_wrap(result, needs_wrap)
                 } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
-                    let left_range = parenthesized_range(
-                        ExprRef::from(compare.left.as_ref()),
-                        compare.into(),
+                    let needs_wrap = comparator.range().end() != compare.range().end();
+                    generate_redundant_comparison(
+                        compare,
                         comment_ranges,
                         source,
+                        &compare.left,
+                        kind,
+                        needs_wrap,
                     )
-                    .unwrap_or(compare.left.range());
-
-                    let left_str = &source[left_range];
-                    let result = build_conditional_string(left_str, kind);
-
-                    let needs_wrap = comparator.range().end() != compare.range().end();
-                    maybe_wrap(result, needs_wrap)
                 } else {
                     generate_comparison(
                         &compare.left,
