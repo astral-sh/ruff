@@ -1698,9 +1698,9 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bools are instances of that class:
 
 ```py
-# revealed: Overload((value: bool, /) -> bool, (value: int, /) -> int)
+# revealed: Overload[(value: bool, /) -> bool, (value: int, /) -> int]
 reveal_type(True.__and__)
-# revealed: Overload((value: bool, /) -> bool, (value: int, /) -> int)
+# revealed: Overload[(value: bool, /) -> bool, (value: int, /) -> int]
 reveal_type(False.__or__)
 ```
 

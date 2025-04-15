@@ -2,6 +2,294 @@
 
 Reference: <https://typing.python.org/en/latest/spec/overload.html>
 
+## Functions
+
+```py
+from typing import overload
+
+@overload
+def add() -> None: ...
+@overload
+def add(x: int) -> int: ...
+@overload
+def add(x: int, y: int) -> int: ...
+def add(x: int | None = None, y: int | None = None) -> int | None:
+    return (x or 0) + (y or 0)
+
+
+reveal_type(add)  # revealed: Overload[() -> None, (x: int) -> int, (x: int, y: int) -> int]
+reveal_type(add())  # revealed: None
+reveal_type(add(1))  # revealed: int
+reveal_type(add(1, 2))  # revealed: int
+```
+
+## Overriding
+
+These scenarios are to verify that the overloaded and non-overloaded definitions are correctly
+overriden by each other.
+
+An overloaded function is overridding another overloaded function:
+
+```py
+from typing import overload
+
+@overload
+def foo() -> None: ...
+@overload
+def foo(x: int) -> int: ...
+def foo(x: int | None = None) -> int | None:
+    return x
+
+reveal_type(foo)  # revealed: Overload[() -> None, (x: int) -> int]
+reveal_type(foo())  # revealed: None
+reveal_type(foo(1))  # revealed: int
+
+@overload
+def foo() -> None: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: str | None = None) -> str | None:
+    return x
+
+reveal_type(foo)  # revealed: Overload[() -> None, (x: str) -> str]
+reveal_type(foo())  # revealed: None
+reveal_type(foo(""))  # revealed: str
+```
+
+A non-overloaded function is overridding an overloaded function:
+
+```py
+def foo(x: int) -> int:
+    return x
+
+
+reveal_type(foo)  # revealed: def foo(x: int) -> int
+```
+
+An overloaded function is overridding a non-overloaded function:
+
+```py
+@overload
+def foo() -> None: ...
+@overload
+def foo(x: bytes) -> bytes: ...
+def foo(x: bytes | None = None) -> bytes | None:
+    return x
+
+reveal_type(foo)  # revealed: Overload[() -> None, (x: bytes) -> bytes]
+reveal_type(foo())  # revealed: None
+reveal_type(foo(b""))  # revealed: bytes
+```
+
+## Methods
+
+```py
+from typing import overload
+
+class Foo1:
+    @overload
+    def method(self) -> None: ...
+    @overload
+    def method(self, x: int) -> int: ...
+    def method(self, x: int | None = None) -> int | None:
+        return x
+
+foo1 = Foo1()
+reveal_type(foo1.method)  # revealed: Overload[() -> None, (x: int) -> int]
+reveal_type(foo1.method())  # revealed: None
+reveal_type(foo1.method(1))  # revealed: int
+
+class Foo2:
+    @overload
+    def method(self) -> None: ...
+    @overload
+    def method(self, x: str) -> str: ...
+    def method(self, x: str | None = None) -> str | None:
+        return x
+
+foo2 = Foo2()
+reveal_type(foo2.method)  # revealed: Overload[() -> None, (x: str) -> str]
+reveal_type(foo2.method())  # revealed: None
+reveal_type(foo2.method(""))  # revealed: str
+```
+
+## Constructor
+
+```py
+from typing import overload
+
+class Foo:
+    @overload
+    def __init__(self) -> None: ...
+    @overload
+    def __init__(self, x: int) -> None: ...
+    def __init__(self, x: int | None = None) -> None:
+        self.x = x
+
+foo = Foo()
+reveal_type(foo)  # revealed: Foo
+reveal_type(foo.x)  # revealed: Unknown | int | None
+
+foo1 = Foo(1)
+reveal_type(foo1)  # revealed: Foo
+reveal_type(foo1.x)  # revealed: Unknown | int | None
+```
+
+## Version specific
+
+Function definitions can vary between multiple Python versions.
+
+### Overload and non-overload (3.9)
+
+Here, the same function is overloaded in one version and not in another.
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+import sys
+from typing import overload
+
+if sys.version_info < (3, 10):
+    def func(x: int) -> int:
+        return x
+elif sys.version_info <= (3, 12):
+    @overload
+    def func() -> None: ...
+    @overload
+    def func(x: int) -> int: ...
+    def func(x: int | None = None) -> int | None:
+        return x
+
+
+reveal_type(func)  # revealed: def func(x: int) -> int
+func()  # error: [missing-argument]
+```
+
+### Overload and non-overload (3.10)
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+from typing import overload
+
+if sys.version_info < (3, 10):
+    def func(x: int) -> int:
+        return x
+elif sys.version_info <= (3, 12):
+    @overload
+    def func() -> None: ...
+    @overload
+    def func(x: int) -> int: ...
+    def func(x: int | None = None) -> int | None:
+        return x
+
+
+reveal_type(func)  # revealed: Overload[() -> None, (x: int) -> int]
+reveal_type(func())  # revealed: None
+reveal_type(func(1))  # revealed: int
+```
+
+### Some overloads are version specific (3.9)
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+`overloaded.pyi`:
+
+```pyi
+import sys
+from typing import overload
+
+if sys.version_info >= (3, 10):
+    @overload
+    def func() -> None: ...
+
+@overload
+def func(x: int) -> int: ...
+@overload
+def func(x: str) -> str: ...
+```
+
+`main.py`:
+
+```py
+from overloaded import func
+
+reveal_type(func)  # revealed: Overload[(x: int) -> int, (x: str) -> str]
+func()  # error: [no-matching-overload]
+reveal_type(func(1))  # revealed: int
+reveal_type(func(""))  # revealed: str
+```
+
+### Some overloads are version specific (3.10)
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+`overloaded.pyi`:
+
+```pyi
+import sys
+from typing import overload
+
+@overload
+def func() -> None: ...
+
+if sys.version_info >= (3, 10):
+    @overload
+    def func(x: int) -> int: ...
+
+@overload
+def func(x: str) -> str: ...
+```
+
+`main.py`:
+
+```py
+from overloaded import func
+
+reveal_type(func)  # revealed: Overload[() -> None, (x: int) -> int, (x: str) -> str]
+reveal_type(func())  # revealed: None
+reveal_type(func(1))  # revealed: int
+reveal_type(func(""))  # revealed: str
+```
+
+## Generic
+
+For an overloaded generic function, it's not necessary for all overloads to be generic.
+
+```py
+from typing import overload
+
+@overload
+def func() -> None: ...
+@overload
+def func[T](x: T) -> T: ...
+def func[T](x: T | None = None) -> T | None:
+    return x
+
+reveal_type(func)  # revealed: Overload[() -> None, (x: T) -> T]
+# TODO: requires generics; should be `int`
+# TODO: requires generics; should not error
+# error: [no-matching-overload]
+reveal_type(func(1))  # revealed: Unknown
+# TODO: requires generics; should be `str`
+# TODO: requires generics; should not error
+# error: [no-matching-overload]
+reveal_type(func(""))  # revealed: Unknown
+```
+
 ## Invalid
 
 ### At least two overloads
