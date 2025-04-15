@@ -1503,24 +1503,28 @@ impl<'a> SemanticModel<'a> {
 
     /// Set the [`Globals`] for the current [`Scope`].
     pub fn set_globals(&mut self, globals: Globals<'a>) {
-        // If any global bindings don't already exist in the global scope, add them.
-        for (name, range) in globals.iter() {
-            if self
-                .global_scope()
-                .get(name)
-                .is_none_or(|binding_id| self.bindings[binding_id].is_unbound())
-            {
-                let id = self.bindings.push(Binding {
-                    kind: BindingKind::Assignment,
-                    range: *range,
-                    references: Vec::new(),
-                    scope: ScopeId::global(),
-                    source: self.node_id,
-                    context: self.execution_context(),
-                    exceptions: self.exceptions(),
-                    flags: BindingFlags::empty(),
-                });
-                self.global_scope_mut().add(name, id);
+        // If any global bindings don't already exist in the global scope, add them, unless we are
+        // also in the global scope, in which case avoid adding them to flag
+        // `load-before-global-declaration` (PLE0118).
+        if !self.at_top_level() {
+            for (name, range) in globals.iter() {
+                if self
+                    .global_scope()
+                    .get(name)
+                    .is_none_or(|binding_id| self.bindings[binding_id].is_unbound())
+                {
+                    let id = self.bindings.push(Binding {
+                        kind: BindingKind::Assignment,
+                        range: *range,
+                        references: Vec::new(),
+                        scope: ScopeId::global(),
+                        source: self.node_id,
+                        context: self.execution_context(),
+                        exceptions: self.exceptions(),
+                        flags: BindingFlags::empty(),
+                    });
+                    self.global_scope_mut().add(name, id);
+                }
             }
         }
 
