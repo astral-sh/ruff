@@ -1,3 +1,5 @@
+# Metaclasses
+
 ```toml
 [environment]
 python-version = "3.12"
