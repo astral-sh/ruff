@@ -150,9 +150,10 @@ When one of the parameters is a union, we attempt to find the smallest specializ
 all of the constraints.
 
 ```py
-# TODO: make this return list[T], so that we can write a correct body
-# error: [invalid-return-type]
-def union_param[T](x: T | None) -> T: ...
+def union_param[T](x: T | None) -> T:
+    if x is None:
+        raise ValueError
+    return x
 
 reveal_type(union_param("a"))  # revealed: Literal["a"]
 reveal_type(union_param(1))  # revealed: Literal[1]
