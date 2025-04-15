@@ -1,7 +1,7 @@
 import queue
-import sys
 from collections.abc import Callable, Iterable, Mapping, Set as AbstractSet
 from threading import Lock, Semaphore, Thread
+from types import GenericAlias
 from typing import Any, Generic, TypeVar, overload
 from typing_extensions import TypeVarTuple, Unpack
 from weakref import ref
@@ -16,9 +16,6 @@ _global_shutdown_lock: Lock
 
 def _python_exit() -> None: ...
 
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
-
 _S = TypeVar("_S")
 
 class _WorkItem(Generic[_S]):
@@ -28,8 +25,7 @@ class _WorkItem(Generic[_S]):
     kwargs: Mapping[str, Any]
     def __init__(self, future: Future[_S], fn: Callable[..., _S], args: Iterable[Any], kwargs: Mapping[str, Any]) -> None: ...
     def run(self) -> None: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 def _worker(
     executor_reference: ref[Any],

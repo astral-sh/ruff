@@ -10,6 +10,9 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
+use std::{collections::HashMap, slice::Iter};
+
+use itertools::EitherOrBoth;
 use smallvec::{smallvec, SmallVec};
 
 use super::{definition_expression_type, DynamicType, Type};
@@ -283,6 +286,519 @@ impl<'db> Signature<'db> {
             parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
             return_ty: self.return_ty,
         }
+    }
+
+    /// Returns `true` if this is a fully static signature.
+    ///
+    /// A signature is fully static if all of its parameters and return type are fully static and
+    /// if it does not use gradual form (`...`) for its parameters.
+    pub(crate) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
+        if self.parameters.is_gradual() {
+            return false;
+        }
+
+        if self.parameters.iter().any(|parameter| {
+            parameter
+                .annotated_type()
+                .is_none_or(|annotated_type| !annotated_type.is_fully_static(db))
+        }) {
+            return false;
+        }
+
+        self.return_ty
+            .is_some_and(|return_type| return_type.is_fully_static(db))
+    }
+
+    /// Return `true` if `self` has exactly the same set of possible static materializations as
+    /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
+    /// `other`).
+    pub(crate) fn is_gradual_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
+        self.is_equivalent_to_impl(other, |self_type, other_type| {
+            self_type
+                .unwrap_or(Type::unknown())
+                .is_gradual_equivalent_to(db, other_type.unwrap_or(Type::unknown()))
+        })
+    }
+
+    /// Return `true` if `self` represents the exact same set of possible runtime objects as `other`.
+    pub(crate) fn is_equivalent_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
+        self.is_equivalent_to_impl(other, |self_type, other_type| {
+            match (self_type, other_type) {
+                (Some(self_type), Some(other_type)) => self_type.is_equivalent_to(db, other_type),
+                // We need the catch-all case here because it's not guaranteed that this is a fully
+                // static type.
+                _ => false,
+            }
+        })
+    }
+
+    /// Implementation for the [`is_equivalent_to`] and [`is_gradual_equivalent_to`] for signature.
+    ///
+    /// [`is_equivalent_to`]: Self::is_equivalent_to
+    /// [`is_gradual_equivalent_to`]: Self::is_gradual_equivalent_to
+    fn is_equivalent_to_impl<F>(&self, other: &Signature<'db>, check_types: F) -> bool
+    where
+        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
+    {
+        // N.B. We don't need to explicitly check for the use of gradual form (`...`) in the
+        // parameters because it is internally represented by adding `*Any` and `**Any` to the
+        // parameter list.
+
+        if self.parameters.len() != other.parameters.len() {
+            return false;
+        }
+
+        if !check_types(self.return_ty, other.return_ty) {
+            return false;
+        }
+
+        for (self_parameter, other_parameter) in self.parameters.iter().zip(&other.parameters) {
+            match (self_parameter.kind(), other_parameter.kind()) {
+                (
+                    ParameterKind::PositionalOnly {
+                        default_type: self_default,
+                        ..
+                    },
+                    ParameterKind::PositionalOnly {
+                        default_type: other_default,
+                        ..
+                    },
+                ) if self_default.is_some() == other_default.is_some() => {}
+
+                (
+                    ParameterKind::PositionalOrKeyword {
+                        name: self_name,
+                        default_type: self_default,
+                    },
+                    ParameterKind::PositionalOrKeyword {
+                        name: other_name,
+                        default_type: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {}
+
+                (
+                    ParameterKind::KeywordOnly {
+                        name: self_name,
+                        default_type: self_default,
+                    },
+                    ParameterKind::KeywordOnly {
+                        name: other_name,
+                        default_type: other_default,
+                    },
+                ) if self_default.is_some() == other_default.is_some()
+                    && self_name == other_name => {}
+
+                (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
+
+                _ => return false,
+            }
+
+            if !check_types(
+                self_parameter.annotated_type(),
+                other_parameter.annotated_type(),
+            ) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// Return `true` if a callable with signature `self` is assignable to a callable with
+    /// signature `other`.
+    pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
+        self.is_assignable_to_impl(other, |type1, type2| {
+            // In the context of a callable type, the `None` variant represents an `Unknown` type.
+            type1
+                .unwrap_or(Type::unknown())
+                .is_assignable_to(db, type2.unwrap_or(Type::unknown()))
+        })
+    }
+
+    /// Return `true` if a callable with signature `self` is a subtype of a callable with signature
+    /// `other`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `self` or `other` is not a fully static signature.
+    pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
+        self.is_assignable_to_impl(other, |type1, type2| {
+            // SAFETY: Subtype relation is only checked for fully static types.
+            type1.unwrap().is_subtype_of(db, type2.unwrap())
+        })
+    }
+
+    /// Implementation for the [`is_assignable_to`] and [`is_subtype_of`] for signature.
+    ///
+    /// [`is_assignable_to`]: Self::is_assignable_to
+    /// [`is_subtype_of`]: Self::is_subtype_of
+    fn is_assignable_to_impl<F>(&self, other: &Signature<'db>, check_types: F) -> bool
+    where
+        F: Fn(Option<Type<'db>>, Option<Type<'db>>) -> bool,
+    {
+        /// A helper struct to zip two slices of parameters together that provides control over the
+        /// two iterators individually. It also keeps track of the current parameter in each
+        /// iterator.
+        struct ParametersZip<'a, 'db> {
+            current_self: Option<&'a Parameter<'db>>,
+            current_other: Option<&'a Parameter<'db>>,
+            iter_self: Iter<'a, Parameter<'db>>,
+            iter_other: Iter<'a, Parameter<'db>>,
+        }
+
+        impl<'a, 'db> ParametersZip<'a, 'db> {
+            /// Move to the next parameter in both the `self` and `other` parameter iterators,
+            /// [`None`] if both iterators are exhausted.
+            fn next(&mut self) -> Option<EitherOrBoth<&'a Parameter<'db>, &'a Parameter<'db>>> {
+                match (self.next_self(), self.next_other()) {
+                    (Some(self_param), Some(other_param)) => {
+                        Some(EitherOrBoth::Both(self_param, other_param))
+                    }
+                    (Some(self_param), None) => Some(EitherOrBoth::Left(self_param)),
+                    (None, Some(other_param)) => Some(EitherOrBoth::Right(other_param)),
+                    (None, None) => None,
+                }
+            }
+
+            /// Move to the next parameter in the `self` parameter iterator, [`None`] if the
+            /// iterator is exhausted.
+            fn next_self(&mut self) -> Option<&'a Parameter<'db>> {
+                self.current_self = self.iter_self.next();
+                self.current_self
+            }
+
+            /// Move to the next parameter in the `other` parameter iterator, [`None`] if the
+            /// iterator is exhausted.
+            fn next_other(&mut self) -> Option<&'a Parameter<'db>> {
+                self.current_other = self.iter_other.next();
+                self.current_other
+            }
+
+            /// Peek at the next parameter in the `other` parameter iterator without consuming it.
+            fn peek_other(&mut self) -> Option<&'a Parameter<'db>> {
+                self.iter_other.clone().next()
+            }
+
+            /// Consumes the `ParametersZip` and returns a two-element tuple containing the
+            /// remaining parameters in the `self` and `other` iterators respectively.
+            ///
+            /// The returned iterators starts with the current parameter, if any, followed by the
+            /// remaining parameters in the respective iterators.
+            fn into_remaining(
+                self,
+            ) -> (
+                impl Iterator<Item = &'a Parameter<'db>>,
+                impl Iterator<Item = &'a Parameter<'db>>,
+            ) {
+                (
+                    self.current_self.into_iter().chain(self.iter_self),
+                    self.current_other.into_iter().chain(self.iter_other),
+                )
+            }
+        }
+
+        // Return types are covariant.
+        if !check_types(self.return_ty, other.return_ty) {
+            return false;
+        }
+
+        if self.parameters.is_gradual() || other.parameters.is_gradual() {
+            // If either of the parameter lists contains a gradual form (`...`), then it is
+            // assignable / subtype to and from any other callable type.
+            return true;
+        }
+
+        let mut parameters = ParametersZip {
+            current_self: None,
+            current_other: None,
+            iter_self: self.parameters.iter(),
+            iter_other: other.parameters.iter(),
+        };
+
+        // Collect all the standard parameters that have only been matched against a variadic
+        // parameter which means that the keyword variant is still unmatched.
+        let mut other_keywords = Vec::new();
+
+        loop {
+            let Some(next_parameter) = parameters.next() else {
+                // All parameters have been checked or both the parameter lists were empty. In
+                // either case, `self` is a subtype of `other`.
+                return true;
+            };
+
+            match next_parameter {
+                EitherOrBoth::Left(self_parameter) => match self_parameter.kind() {
+                    ParameterKind::KeywordOnly { .. } | ParameterKind::KeywordVariadic { .. }
+                        if !other_keywords.is_empty() =>
+                    {
+                        // If there are any unmatched keyword parameters in `other`, they need to
+                        // be checked against the keyword-only / keyword-variadic parameters that
+                        // will be done after this loop.
+                        break;
+                    }
+                    ParameterKind::PositionalOnly { default_type, .. }
+                    | ParameterKind::PositionalOrKeyword { default_type, .. }
+                    | ParameterKind::KeywordOnly { default_type, .. } => {
+                        // For `self <: other` to be valid, if there are no more parameters in
+                        // `other`, then the non-variadic parameters in `self` must have a default
+                        // value.
+                        if default_type.is_none() {
+                            return false;
+                        }
+                    }
+                    ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
+                        // Variadic parameters don't have any restrictions in this context, so
+                        // we'll just continue to the next parameter set.
+                    }
+                },
+
+                EitherOrBoth::Right(_) => {
+                    // If there are more parameters in `other` than in `self`, then `self` is not a
+                    // subtype of `other`.
+                    return false;
+                }
+
+                EitherOrBoth::Both(self_parameter, other_parameter) => {
+                    match (self_parameter.kind(), other_parameter.kind()) {
+                        (
+                            ParameterKind::PositionalOnly {
+                                default_type: self_default,
+                                ..
+                            }
+                            | ParameterKind::PositionalOrKeyword {
+                                default_type: self_default,
+                                ..
+                            },
+                            ParameterKind::PositionalOnly {
+                                default_type: other_default,
+                                ..
+                            },
+                        ) => {
+                            if self_default.is_none() && other_default.is_some() {
+                                return false;
+                            }
+                            if !check_types(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (
+                            ParameterKind::PositionalOrKeyword {
+                                name: self_name,
+                                default_type: self_default,
+                            },
+                            ParameterKind::PositionalOrKeyword {
+                                name: other_name,
+                                default_type: other_default,
+                            },
+                        ) => {
+                            if self_name != other_name {
+                                return false;
+                            }
+                            // The following checks are the same as positional-only parameters.
+                            if self_default.is_none() && other_default.is_some() {
+                                return false;
+                            }
+                            if !check_types(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (
+                            ParameterKind::Variadic { .. },
+                            ParameterKind::PositionalOnly { .. }
+                            | ParameterKind::PositionalOrKeyword { .. },
+                        ) => {
+                            if !check_types(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+
+                            if matches!(
+                                other_parameter.kind(),
+                                ParameterKind::PositionalOrKeyword { .. }
+                            ) {
+                                other_keywords.push(other_parameter);
+                            }
+
+                            // We've reached a variadic parameter in `self` which means there can
+                            // be no more positional parameters after this in a valid AST. But, the
+                            // current parameter in `other` is a positional-only which means there
+                            // can be more positional parameters after this which could be either
+                            // more positional-only parameters, standard parameters or a variadic
+                            // parameter.
+                            //
+                            // So, any remaining positional parameters in `other` would need to be
+                            // checked against the variadic parameter in `self`. This loop does
+                            // that by only moving the `other` iterator forward.
+                            loop {
+                                let Some(other_parameter) = parameters.peek_other() else {
+                                    break;
+                                };
+                                match other_parameter.kind() {
+                                    ParameterKind::PositionalOrKeyword { .. } => {
+                                        other_keywords.push(other_parameter);
+                                    }
+                                    ParameterKind::PositionalOnly { .. }
+                                    | ParameterKind::Variadic { .. } => {}
+                                    _ => {
+                                        // Any other parameter kind cannot be checked against a
+                                        // variadic parameter and is deferred to the next iteration.
+                                        break;
+                                    }
+                                }
+                                if !check_types(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                ) {
+                                    return false;
+                                }
+                                parameters.next_other();
+                            }
+                        }
+
+                        (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
+                            if !check_types(
+                                other_parameter.annotated_type(),
+                                self_parameter.annotated_type(),
+                            ) {
+                                return false;
+                            }
+                        }
+
+                        (
+                            _,
+                            ParameterKind::KeywordOnly { .. }
+                            | ParameterKind::KeywordVariadic { .. },
+                        ) => {
+                            // Keyword parameters are not considered in this loop as the order of
+                            // parameters is not important for them and so they are checked by
+                            // doing name-based lookups.
+                            break;
+                        }
+
+                        _ => return false,
+                    }
+                }
+            }
+        }
+
+        // At this point, the remaining parameters in `other` are keyword-only or keyword variadic.
+        // But, `self` could contain any unmatched positional parameters.
+        let (self_parameters, other_parameters) = parameters.into_remaining();
+
+        // Collect all the keyword-only parameters and the unmatched standard parameters.
+        let mut self_keywords = HashMap::new();
+
+        // Type of the variadic keyword parameter in `self`.
+        //
+        // This is a nested option where the outer option represents the presence of a keyword
+        // variadic parameter in `self` and the inner option represents the annotated type of the
+        // keyword variadic parameter.
+        let mut self_keyword_variadic: Option<Option<Type<'db>>> = None;
+
+        for self_parameter in self_parameters {
+            match self_parameter.kind() {
+                ParameterKind::KeywordOnly { name, .. }
+                | ParameterKind::PositionalOrKeyword { name, .. } => {
+                    self_keywords.insert(name.clone(), self_parameter);
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    self_keyword_variadic = Some(self_parameter.annotated_type());
+                }
+                ParameterKind::PositionalOnly { .. } => {
+                    // These are the unmatched positional-only parameters in `self` from the
+                    // previous loop. They cannot be matched against any parameter in `other` which
+                    // only contains keyword-only and keyword-variadic parameters so the subtype
+                    // relation is invalid.
+                    return false;
+                }
+                ParameterKind::Variadic { .. } => {}
+            }
+        }
+
+        for other_parameter in other_keywords.into_iter().chain(other_parameters) {
+            match other_parameter.kind() {
+                ParameterKind::KeywordOnly {
+                    name: other_name,
+                    default_type: other_default,
+                }
+                | ParameterKind::PositionalOrKeyword {
+                    name: other_name,
+                    default_type: other_default,
+                } => {
+                    if let Some(self_parameter) = self_keywords.remove(other_name) {
+                        match self_parameter.kind() {
+                            ParameterKind::PositionalOrKeyword {
+                                default_type: self_default,
+                                ..
+                            }
+                            | ParameterKind::KeywordOnly {
+                                default_type: self_default,
+                                ..
+                            } => {
+                                if self_default.is_none() && other_default.is_some() {
+                                    return false;
+                                }
+                                if !check_types(
+                                    other_parameter.annotated_type(),
+                                    self_parameter.annotated_type(),
+                                ) {
+                                    return false;
+                                }
+                            }
+                            _ => unreachable!(
+                                "`self_keywords` should only contain keyword-only or standard parameters"
+                            ),
+                        }
+                    } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
+                        if !check_types(
+                            other_parameter.annotated_type(),
+                            self_keyword_variadic_type,
+                        ) {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                ParameterKind::KeywordVariadic { .. } => {
+                    let Some(self_keyword_variadic_type) = self_keyword_variadic else {
+                        // For a `self <: other` relationship, if `other` has a keyword variadic
+                        // parameter, `self` must also have a keyword variadic parameter.
+                        return false;
+                    };
+                    if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
+                        return false;
+                    }
+                }
+                _ => {
+                    // This can only occur in case of a syntax error.
+                    return false;
+                }
+            }
+        }
+
+        // If there are still unmatched keyword parameters from `self`, then they should be
+        // optional otherwise the subtype relation is invalid.
+        for (_, self_parameter) in self_keywords {
+            if self_parameter.default_type().is_none() {
+                return false;
+            }
+        }
+
+        true
     }
 }
 

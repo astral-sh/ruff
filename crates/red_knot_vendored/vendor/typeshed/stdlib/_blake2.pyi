@@ -1,4 +1,3 @@
-import sys
 from _typeshed import ReadableBuffer
 from typing import ClassVar, final
 from typing_extensions import Self
@@ -21,44 +20,24 @@ class blake2b:
     block_size: int
     digest_size: int
     name: str
-    if sys.version_info >= (3, 9):
-        def __new__(
-            cls,
-            data: ReadableBuffer = b"",
-            /,
-            *,
-            digest_size: int = 64,
-            key: ReadableBuffer = b"",
-            salt: ReadableBuffer = b"",
-            person: ReadableBuffer = b"",
-            fanout: int = 1,
-            depth: int = 1,
-            leaf_size: int = 0,
-            node_offset: int = 0,
-            node_depth: int = 0,
-            inner_size: int = 0,
-            last_node: bool = False,
-            usedforsecurity: bool = True,
-        ) -> Self: ...
-    else:
-        def __new__(
-            cls,
-            data: ReadableBuffer = b"",
-            /,
-            *,
-            digest_size: int = 64,
-            key: ReadableBuffer = b"",
-            salt: ReadableBuffer = b"",
-            person: ReadableBuffer = b"",
-            fanout: int = 1,
-            depth: int = 1,
-            leaf_size: int = 0,
-            node_offset: int = 0,
-            node_depth: int = 0,
-            inner_size: int = 0,
-            last_node: bool = False,
-        ) -> Self: ...
-
+    def __new__(
+        cls,
+        data: ReadableBuffer = b"",
+        /,
+        *,
+        digest_size: int = 64,
+        key: ReadableBuffer = b"",
+        salt: ReadableBuffer = b"",
+        person: ReadableBuffer = b"",
+        fanout: int = 1,
+        depth: int = 1,
+        leaf_size: int = 0,
+        node_offset: int = 0,
+        node_depth: int = 0,
+        inner_size: int = 0,
+        last_node: bool = False,
+        usedforsecurity: bool = True,
+    ) -> Self: ...
     def copy(self) -> Self: ...
     def digest(self) -> bytes: ...
     def hexdigest(self) -> str: ...
@@ -73,44 +52,24 @@ class blake2s:
     block_size: int
     digest_size: int
     name: str
-    if sys.version_info >= (3, 9):
-        def __new__(
-            cls,
-            data: ReadableBuffer = b"",
-            /,
-            *,
-            digest_size: int = 32,
-            key: ReadableBuffer = b"",
-            salt: ReadableBuffer = b"",
-            person: ReadableBuffer = b"",
-            fanout: int = 1,
-            depth: int = 1,
-            leaf_size: int = 0,
-            node_offset: int = 0,
-            node_depth: int = 0,
-            inner_size: int = 0,
-            last_node: bool = False,
-            usedforsecurity: bool = True,
-        ) -> Self: ...
-    else:
-        def __new__(
-            cls,
-            data: ReadableBuffer = b"",
-            /,
-            *,
-            digest_size: int = 32,
-            key: ReadableBuffer = b"",
-            salt: ReadableBuffer = b"",
-            person: ReadableBuffer = b"",
-            fanout: int = 1,
-            depth: int = 1,
-            leaf_size: int = 0,
-            node_offset: int = 0,
-            node_depth: int = 0,
-            inner_size: int = 0,
-            last_node: bool = False,
-        ) -> Self: ...
-
+    def __new__(
+        cls,
+        data: ReadableBuffer = b"",
+        /,
+        *,
+        digest_size: int = 32,
+        key: ReadableBuffer = b"",
+        salt: ReadableBuffer = b"",
+        person: ReadableBuffer = b"",
+        fanout: int = 1,
+        depth: int = 1,
+        leaf_size: int = 0,
+        node_offset: int = 0,
+        node_depth: int = 0,
+        inner_size: int = 0,
+        last_node: bool = False,
+        usedforsecurity: bool = True,
+    ) -> Self: ...
     def copy(self) -> Self: ...
     def digest(self) -> bytes: ...
     def hexdigest(self) -> str: ...

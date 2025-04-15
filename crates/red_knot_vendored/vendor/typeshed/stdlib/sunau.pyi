@@ -1,4 +1,3 @@
-import sys
 from _typeshed import Unused
 from typing import IO, Any, Literal, NamedTuple, NoReturn, overload
 from typing_extensions import Self, TypeAlias
@@ -81,6 +80,3 @@ def open(f: _File, mode: Literal["r", "rb"]) -> Au_read: ...
 def open(f: _File, mode: Literal["w", "wb"]) -> Au_write: ...
 @overload
 def open(f: _File, mode: str | None = None) -> Any: ...
-
-if sys.version_info < (3, 9):
-    openfp = open

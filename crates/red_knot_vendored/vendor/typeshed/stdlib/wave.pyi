@@ -1,12 +1,8 @@
-import sys
 from _typeshed import ReadableBuffer, Unused
 from typing import IO, Any, BinaryIO, Final, Literal, NamedTuple, NoReturn, overload
 from typing_extensions import Self, TypeAlias, deprecated
 
-if sys.version_info >= (3, 9):
-    __all__ = ["open", "Error", "Wave_read", "Wave_write"]
-else:
-    __all__ = ["open", "openfp", "Error", "Wave_read", "Wave_write"]
+__all__ = ["open", "Error", "Wave_read", "Wave_write"]
 
 _File: TypeAlias = str | IO[bytes]
 
@@ -80,6 +76,3 @@ def open(f: _File, mode: Literal["r", "rb"]) -> Wave_read: ...
 def open(f: _File, mode: Literal["w", "wb"]) -> Wave_write: ...
 @overload
 def open(f: _File, mode: str | None = None) -> Any: ...
-
-if sys.version_info < (3, 9):
-    openfp = open

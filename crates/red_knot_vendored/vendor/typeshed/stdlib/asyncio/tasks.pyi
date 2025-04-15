@@ -407,10 +407,8 @@ else:
 
 if sys.version_info >= (3, 12):
     _TaskCompatibleCoro: TypeAlias = Coroutine[Any, Any, _T_co]
-elif sys.version_info >= (3, 9):
-    _TaskCompatibleCoro: TypeAlias = Generator[_TaskYieldType, None, _T_co] | Coroutine[Any, Any, _T_co]
 else:
-    _TaskCompatibleCoro: TypeAlias = Generator[_TaskYieldType, None, _T_co] | Awaitable[_T_co]
+    _TaskCompatibleCoro: TypeAlias = Generator[_TaskYieldType, None, _T_co] | Coroutine[Any, Any, _T_co]
 
 def all_tasks(loop: AbstractEventLoop | None = None) -> set[Task[Any]]: ...
 

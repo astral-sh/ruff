@@ -1373,7 +1373,7 @@ from typing import Any
 class Foo(Any): ...
 
 reveal_type(Foo.bar)  # revealed: Any
-reveal_type(Foo.__repr__)  # revealed: Literal[__repr__] & Any
+reveal_type(Foo.__repr__)  # revealed: (def __repr__(self) -> str) & Any
 ```
 
 Similar principles apply if `Any` appears in the middle of an inheritance hierarchy:
@@ -1672,7 +1672,7 @@ Some attributes are special-cased, however:
 
 ```py
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
-reveal_type(f.__call__)  # revealed: <bound method `__call__` of `Literal[f]`>
+reveal_type(f.__call__)  # revealed: <method-wrapper `__call__` of `f`>
 ```
 
 ### Int-literal attributes
@@ -1681,7 +1681,7 @@ Most attribute accesses on int-literal types are delegated to `builtins.int`, si
 integers are instances of that class:
 
 ```py
-reveal_type((2).bit_length)  # revealed: <bound method `bit_length` of `Literal[2]`>
+reveal_type((2).bit_length)  # revealed: bound method Literal[2].bit_length() -> int
 reveal_type((2).denominator)  # revealed: Literal[1]
 ```
 
@@ -1698,8 +1698,10 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bools are instances of that class:
 
 ```py
-reveal_type(True.__and__)  # revealed: <bound method `__and__` of `Literal[True]`>
-reveal_type(False.__or__)  # revealed: <bound method `__or__` of `Literal[False]`>
+# revealed: bound method Literal[True].__and__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
+reveal_type(True.__and__)
+# revealed: bound method Literal[False].__or__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
+reveal_type(False.__or__)
 ```
 
 Some attributes are special-cased, however:
@@ -1714,8 +1716,9 @@ reveal_type(False.real)  # revealed: Literal[0]
 All attribute access on literal `bytes` types is currently delegated to `builtins.bytes`:
 
 ```py
-reveal_type(b"foo".join)  # revealed: <bound method `join` of `Literal[b"foo"]`>
-reveal_type(b"foo".endswith)  # revealed: <bound method `endswith` of `Literal[b"foo"]`>
+reveal_type(b"foo".join)  # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: @Todo(generics), /) -> bytes
+# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`), start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+reveal_type(b"foo".endswith)
 ```
 
 ## Instance attribute edge cases

@@ -1,12 +1,8 @@
-import sys
 from types import TracebackType
 from typing import IO, Any, Literal, NamedTuple, overload
 from typing_extensions import Self, TypeAlias
 
-if sys.version_info >= (3, 9):
-    __all__ = ["Error", "open"]
-else:
-    __all__ = ["Error", "open", "openfp"]
+__all__ = ["Error", "open"]
 
 class Error(Exception): ...
 
@@ -81,11 +77,3 @@ def open(f: _File, mode: Literal["r", "rb"]) -> Aifc_read: ...
 def open(f: _File, mode: Literal["w", "wb"]) -> Aifc_write: ...
 @overload
 def open(f: _File, mode: str | None = None) -> Any: ...
-
-if sys.version_info < (3, 9):
-    @overload
-    def openfp(f: _File, mode: Literal["r", "rb"]) -> Aifc_read: ...
-    @overload
-    def openfp(f: _File, mode: Literal["w", "wb"]) -> Aifc_write: ...
-    @overload
-    def openfp(f: _File, mode: str | None = None) -> Any: ...

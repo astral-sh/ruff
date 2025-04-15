@@ -1,4 +1,3 @@
-import sys
 import xml.dom
 from _collections_abc import dict_keys, dict_values
 from _typeshed import Incomplete, ReadableBuffer, SupportsRead, SupportsWrite
@@ -88,71 +87,39 @@ class Node(xml.dom.Node):
     @property
     def localName(self) -> str | None: ...  # non-null only for Element and Attr
     def __bool__(self) -> Literal[True]: ...
-    if sys.version_info >= (3, 9):
-        @overload
-        def toxml(self, encoding: str, standalone: bool | None = None) -> bytes: ...
-        @overload
-        def toxml(self, encoding: None = None, standalone: bool | None = None) -> str: ...
-        @overload
-        def toprettyxml(
-            self,
-            indent: str = "\t",
-            newl: str = "\n",
-            # Handle any case where encoding is not provided or where it is passed with None
-            encoding: None = None,
-            standalone: bool | None = None,
-        ) -> str: ...
-        @overload
-        def toprettyxml(
-            self,
-            indent: str,
-            newl: str,
-            # Handle cases where encoding is passed as str *positionally*
-            encoding: str,
-            standalone: bool | None = None,
-        ) -> bytes: ...
-        @overload
-        def toprettyxml(
-            self,
-            indent: str = "\t",
-            newl: str = "\n",
-            # Handle all cases where encoding is passed as a keyword argument; because standalone
-            # comes after, it will also have to be a keyword arg if encoding is
-            *,
-            encoding: str,
-            standalone: bool | None = None,
-        ) -> bytes: ...
-    else:
-        @overload
-        def toxml(self, encoding: str) -> bytes: ...
-        @overload
-        def toxml(self, encoding: None = None) -> str: ...
-        @overload
-        def toprettyxml(
-            self,
-            indent: str = "\t",
-            newl: str = "\n",
-            # Handle any case where encoding is not provided or where it is passed with None
-            encoding: None = None,
-        ) -> str: ...
-        @overload
-        def toprettyxml(
-            self,
-            indent: str,
-            newl: str,
-            # Handle cases where encoding is passed as str *positionally*
-            encoding: str,
-        ) -> bytes: ...
-        @overload
-        def toprettyxml(
-            self,
-            indent: str = "\t",
-            newl: str = "\n",
-            # Handle all cases where encoding is passed as a keyword argument
-            *,
-            encoding: str,
-        ) -> bytes: ...
-
+    @overload
+    def toxml(self, encoding: str, standalone: bool | None = None) -> bytes: ...
+    @overload
+    def toxml(self, encoding: None = None, standalone: bool | None = None) -> str: ...
+    @overload
+    def toprettyxml(
+        self,
+        indent: str = "\t",
+        newl: str = "\n",
+        # Handle any case where encoding is not provided or where it is passed with None
+        encoding: None = None,
+        standalone: bool | None = None,
+    ) -> str: ...
+    @overload
+    def toprettyxml(
+        self,
+        indent: str,
+        newl: str,
+        # Handle cases where encoding is passed as str *positionally*
+        encoding: str,
+        standalone: bool | None = None,
+    ) -> bytes: ...
+    @overload
+    def toprettyxml(
+        self,
+        indent: str = "\t",
+        newl: str = "\n",
+        # Handle all cases where encoding is passed as a keyword argument; because standalone
+        # comes after, it will also have to be a keyword arg if encoding is
+        *,
+        encoding: str,
+        standalone: bool | None = None,
+    ) -> bytes: ...
     def hasChildNodes(self) -> bool: ...
     def insertBefore(  # type: ignore[misc]
         self: _NodesWithChildren,  # pyright: ignore[reportGeneralTypeIssues]
@@ -657,26 +624,15 @@ class Document(Node, DocumentLS):
     def getElementsByTagNameNS(self, namespaceURI: str | None, localName: str) -> NodeList[Element]: ...
     def isSupported(self, feature: str, version: str | None) -> bool: ...
     def importNode(self, node: _ImportableNodeVar, deep: bool) -> _ImportableNodeVar: ...
-    if sys.version_info >= (3, 9):
-        def writexml(
-            self,
-            writer: SupportsWrite[str],
-            indent: str = "",
-            addindent: str = "",
-            newl: str = "",
-            encoding: str | None = None,
-            standalone: bool | None = None,
-        ) -> None: ...
-    else:
-        def writexml(
-            self,
-            writer: SupportsWrite[str],
-            indent: str = "",
-            addindent: str = "",
-            newl: str = "",
-            encoding: Incomplete | None = None,
-        ) -> None: ...
-
+    def writexml(
+        self,
+        writer: SupportsWrite[str],
+        indent: str = "",
+        addindent: str = "",
+        newl: str = "",
+        encoding: str | None = None,
+        standalone: bool | None = None,
+    ) -> None: ...
     @overload
     def renameNode(self, n: Element, namespaceURI: str, name: str) -> Element: ...
     @overload

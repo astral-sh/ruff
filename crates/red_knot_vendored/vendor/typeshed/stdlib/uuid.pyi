@@ -1,6 +1,5 @@
 import builtins
 import sys
-from _typeshed import Unused
 from enum import Enum
 from typing_extensions import TypeAlias
 
@@ -65,12 +64,7 @@ class UUID:
     def __ge__(self, other: UUID) -> bool: ...
     def __hash__(self) -> builtins.int: ...
 
-if sys.version_info >= (3, 9):
-    def getnode() -> int: ...
-
-else:
-    def getnode(*, getters: Unused = None) -> int: ...  # undocumented
-
+def getnode() -> int: ...
 def uuid1(node: int | None = None, clock_seq: int | None = None) -> UUID: ...
 
 if sys.version_info >= (3, 12):

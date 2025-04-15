@@ -7,6 +7,8 @@ use super::{
 };
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization};
+use crate::types::signatures::{Parameter, Parameters};
+use crate::types::{CallableType, DataclassMetadata, Signature};
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
@@ -30,6 +32,7 @@ use crate::{
 use indexmap::IndexSet;
 use itertools::Itertools as _;
 use ruff_db::files::File;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use rustc_hash::FxHashSet;
 
@@ -98,6 +101,8 @@ pub struct Class<'db> {
     pub(crate) body_scope: ScopeId<'db>,
 
     pub(crate) known: Option<KnownClass>,
+
+    pub(crate) dataclass_metadata: Option<DataclassMetadata>,
 }
 
 impl<'db> Class<'db> {
@@ -362,6 +367,10 @@ impl<'db> ClassLiteralType<'db> {
 
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
         self.class(db).known
+    }
+
+    pub(crate) fn dataclass_metadata(self, db: &'db dyn Db) -> Option<DataclassMetadata> {
+        self.class(db).dataclass_metadata
     }
 
     /// Return `true` if this class represents `known_class`
@@ -782,6 +791,26 @@ impl<'db> ClassLiteralType<'db> {
     /// directly. Use [`ClassLiteralType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        if let Some(metadata) = self.dataclass_metadata(db) {
+            if name == "__init__" {
+                if metadata.contains(DataclassMetadata::INIT) {
+                    // TODO: Generate the signature from the attributes on the class
+                    let init_signature = Signature::new(
+                        Parameters::new([
+                            Parameter::variadic(Name::new_static("args"))
+                                .with_annotated_type(Type::any()),
+                            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        Some(Type::none(db)),
+                    );
+
+                    return Symbol::bound(Type::Callable(CallableType::new(db, init_signature)))
+                        .into();
+                }
+            }
+        }
+
         let body_scope = self.body_scope(db);
         class_symbol(db, body_scope, name)
     }

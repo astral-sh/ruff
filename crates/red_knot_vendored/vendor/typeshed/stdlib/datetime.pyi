@@ -6,7 +6,7 @@ from typing_extensions import CapsuleType, Self, TypeAlias, deprecated
 
 if sys.version_info >= (3, 11):
     __all__ = ("date", "datetime", "time", "timedelta", "timezone", "tzinfo", "MINYEAR", "MAXYEAR", "UTC")
-elif sys.version_info >= (3, 9):
+else:
     __all__ = ("date", "datetime", "time", "timedelta", "timezone", "tzinfo", "MINYEAR", "MAXYEAR")
 
 MINYEAR: Final = 1
@@ -39,18 +39,17 @@ class timezone(tzinfo):
 if sys.version_info >= (3, 11):
     UTC: timezone
 
-if sys.version_info >= (3, 9):
-    # This class calls itself datetime.IsoCalendarDate. It's neither
-    # NamedTuple nor structseq.
-    @final
-    @type_check_only
-    class _IsoCalendarDate(tuple[int, int, int]):
-        @property
-        def year(self) -> int: ...
-        @property
-        def week(self) -> int: ...
-        @property
-        def weekday(self) -> int: ...
+# This class calls itself datetime.IsoCalendarDate. It's neither
+# NamedTuple nor structseq.
+@final
+@type_check_only
+class _IsoCalendarDate(tuple[int, int, int]):
+    @property
+    def year(self) -> int: ...
+    @property
+    def week(self) -> int: ...
+    @property
+    def weekday(self) -> int: ...
 
 class date:
     min: ClassVar[date]
@@ -106,10 +105,7 @@ class date:
     def __hash__(self) -> int: ...
     def weekday(self) -> int: ...
     def isoweekday(self) -> int: ...
-    if sys.version_info >= (3, 9):
-        def isocalendar(self) -> _IsoCalendarDate: ...
-    else:
-        def isocalendar(self) -> tuple[int, int, int]: ...
+    def isocalendar(self) -> _IsoCalendarDate: ...
 
 class time:
     min: ClassVar[time]
