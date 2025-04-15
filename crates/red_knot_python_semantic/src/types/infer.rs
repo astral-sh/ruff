@@ -895,28 +895,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    // fn check_overloaded_signatures(&self) {
-    //     // Raise diagnostics if
-    //     // 1. number of overloads < 2
-    //     // 2. in a runtime file, the implementation exists except for protocol, abstract methods in
-    //     //    abstract class
-    //     // 3. consistency between the overloads and implementation signature
-    //     let function_definitions = self
-    //         .types
-    //         .declarations
-    //         .iter()
-    //         .filter_map(|(definition, ty)| {
-    //             // Filter out function literals that result from imports
-    //             if let DefinitionKind::Function(function) = definition.kind(self.db()) {
-    //                 ty.inner_type()
-    //                     .into_function_literal()
-    //                     .map(|ty| (ty, function.node()))
-    //             } else {
-    //                 None
-    //             }
-    //         });
-    // }
-
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
         match definition.kind(self.db()) {
             DefinitionKind::Function(function) => {
