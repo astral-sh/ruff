@@ -5313,16 +5313,16 @@ impl<'db> TypeInferenceBuilder<'db> {
         // we would get a result type `Literal[True]` which is too narrow.
         //
         let mut builder = IntersectionBuilder::new(self.db());
-        let non_empty_intersection_positive = if intersection.positive(self.db()).is_empty() {
-            vec![Type::object(self.db())]
-        } else {
-            intersection.iter_positive(self.db()).collect()
-        };
-        for pos in non_empty_intersection_positive {
+
+        builder = builder.add_positive(KnownClass::Bool.to_instance(self.db()));
+
+        for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
-                IntersectionOn::Left => self.infer_binary_type_comparison(pos, op, other, range)?,
+                IntersectionOn::Left => {
+                    self.infer_binary_type_comparison(*pos, op, other, range)?
+                }
                 IntersectionOn::Right => {
-                    self.infer_binary_type_comparison(other, op, pos, range)?
+                    self.infer_binary_type_comparison(other, op, *pos, range)?
                 }
             };
             builder = builder.add_positive(result);
