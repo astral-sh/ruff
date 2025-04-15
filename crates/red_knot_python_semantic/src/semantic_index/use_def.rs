@@ -714,6 +714,42 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_and_constraint(self.scope_start_visibility, constraint);
     }
 
+    /// This method exists solely as a fast path for handling `*`-import visibility constraints.
+    ///
+    /// The reason why we add visibility constraints for [`Definition`]s created by `*` imports
+    /// is laid out in the doc-comment for [`StarImportPlaceholderPredicate`]. But treating these
+    /// visibility constraints in the use-def map the same way as all other visibility constraints
+    /// was shown to lead to [significant regressions] for small codebases where typeshed
+    /// dominates. (Although `*` imports are not common generally, they are used in several
+    /// important places by typeshed.)
+    ///
+    /// To solve these regressions, it was observed that we could add a fast path for `*`-import
+    /// definitions which added a new symbol to the global scope (as opposed to `*`-import definitions
+    /// that provided redefinitions for *pre-existing* global-scope symbols). The fast path does a
+    /// number of things differently to our normal handling of visibility constraints:
+    ///
+    /// - It only applies and negates the visibility constraints to a single symbol, rather than to
+    ///   all symbols. This is possible here because, unlike most definitions, we know in advance that
+    ///   exactly one definition occurs inside the "if-true" predicate branch, and we know exactly
+    ///   which definition it is.
+    ///
+    ///   Doing things this way is cheaper in and of itself. However, it also allows us to avoid
+    ///   calling [`Self::simplify_visibility_constraints`] after the constraint has been applied to
+    ///   the "if-predicate-true" branch and negated for the "if-predicate-false" branch. Simplifying
+    ///   the visibility constraints is only important for symbols that did not have any new
+    ///   definitions inside either the "if-predicate-true" branch or the "if-predicate-false" branch.
+    ///
+    /// - It avoids multiple expensive calls to [`Self::snapshot`]. This is possible because we know
+    ///   the symbol is newly added, so we know the prior state of the symbol was
+    ///   [`SymbolState::undefined`].
+    ///
+    /// - Normally we take care to check whether an "if-predicate-true" branch or an
+    ///   "if-predicate-false" branch contains a terminal statement: these can affect the visibility
+    ///   of symbols defined inside either branch. However, in the case of `*`-import definitions,
+    ///   this is unnecessary (and therefore not done in this method), since we know that a `*`-import
+    ///   predicate cannot create a terminal statement inside either branch.
+    ///
+    /// [significant regressions]: https://github.com/astral-sh/ruff/pull/17286#issuecomment-2786755746
     pub(super) fn record_and_negate_star_import_visibility_constraint(
         &mut self,
         star_import: StarImportPlaceholderPredicate<'db>,
