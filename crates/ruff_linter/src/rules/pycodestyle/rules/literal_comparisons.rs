@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::{self, generate_comparison, is_redundant_boolean_comparison};
-use ruff_python_ast::{self as ast, CmpOp, Expr, ExprRef};
+use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -170,20 +170,30 @@ impl AlwaysFixableViolation for TrueFalseComparison {
     }
 }
 
-fn build_conditional_string(source_slice: &str, kind: bool) -> String {
-    if kind {
-        source_slice.to_string()
-    } else {
-        format!("not {source_slice}")
-    }
-}
+fn generate_redundant_comparison(
+    compare: &ast::ExprCompare,
+    comment_ranges: &ruff_python_trivia::CommentRanges,
+    source: &str,
+    comparator: &Expr,
+    kind: bool,
+    needs_wrap: bool,
+) -> String {
+    let comparator_range =
+        parenthesized_range(comparator.into(), compare.into(), comment_ranges, source)
+            .unwrap_or(comparator.range());
 
-// NOTE: Adding parenthesis if comparator is boolean and enclosed in parentheses
-fn maybe_wrap(content: String, needs_wrap: bool) -> String {
-    if needs_wrap {
-        format!("({content})")
+    let comparator_str = &source[comparator_range];
+
+    let result = if kind {
+        comparator_str.to_string()
     } else {
-        content
+        format!("not {comparator_str}")
+    };
+
+    if needs_wrap {
+        format!("({result})")
+    } else {
+        result
     }
 }
 
@@ -354,19 +364,15 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
         let content = match (&*compare.ops, &*compare.comparators) {
             ([op], [comparator]) => {
                 if let Some(kind) = is_redundant_boolean_comparison(*op, &compare.left) {
-                    let comparator_range = parenthesized_range(
-                        comparator.into(),
-                        compare.into(),
+                    let needs_wrap = compare.left.range().start() != compare.range().start();
+                    generate_redundant_comparison(
+                        compare,
                         comment_ranges,
                         source,
+                        comparator,
+                        kind,
+                        needs_wrap,
                     )
-                    .unwrap_or(comparator.range());
-
-                    let comparator_str = &source[comparator_range];
-                    let result = build_conditional_string(comparator_str, kind);
-
-                    let needs_wrap = compare.left.range().start() != compare.range().start();
-                    maybe_wrap(result, needs_wrap)
                 } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
                     let needs_wrap = comparator.range().end() != compare.range().end();
                     generate_redundant_comparison(
