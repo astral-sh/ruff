@@ -823,21 +823,31 @@ impl<'db> ClassLiteralType<'db> {
         name: &str,
     ) -> SymbolAndQualifiers<'db> {
         if let Some(metadata) = self.dataclass_metadata(db) {
-            if name == "__init__" {
-                if metadata.contains(DataclassMetadata::INIT) {
-                    // TODO: Generate the signature from the attributes on the class
-                    let init_signature = Signature::new(
-                        Parameters::new([
-                            Parameter::variadic(Name::new_static("args"))
-                                .with_annotated_type(Type::any()),
-                            Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(Type::none(db)),
-                    );
+            if name == "__init__" && metadata.contains(DataclassMetadata::INIT) {
+                // TODO: Generate the signature from the attributes on the class
+                let init_signature = Signature::new(
+                    Parameters::new([
+                        Parameter::variadic(Name::new_static("args"))
+                            .with_annotated_type(Type::any()),
+                        Parameter::keyword_variadic(Name::new_static("kwargs"))
+                            .with_annotated_type(Type::any()),
+                    ]),
+                    Some(Type::none(db)),
+                );
 
-                    return Symbol::bound(Type::Callable(CallableType::new(db, init_signature)))
-                        .into();
+                return Symbol::bound(Type::Callable(CallableType::new(db, init_signature))).into();
+            } else if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__") {
+                if metadata.contains(DataclassMetadata::ORDER) {
+                    let signature = Signature::new(
+                        Parameters::new([Parameter::positional_or_keyword(Name::new_static(
+                            "other",
+                        ))
+                        .with_annotated_type(Type::instance(
+                            self.apply_optional_specialization(db, specialization),
+                        ))]),
+                        Some(KnownClass::Bool.to_instance(db)),
+                    );
+                    return Symbol::bound(Type::Callable(CallableType::new(db, signature))).into();
                 }
             }
         }
