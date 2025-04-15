@@ -17,7 +17,7 @@ reveal_type(x[0])  # revealed: Unknown | @Todo(Support for `typing.TypeVar` inst
 # TODO reveal list
 reveal_type(x[0:1])  # revealed: @Todo(generics)
 
-# error: [call-non-callable] "Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> Unknown | @Todo(Support for `typing.TypeVar` instances in type expressions), (s: slice, /) -> @Todo(generics)]` is not callable on object of type `list`"
+# error: [call-non-callable]
 reveal_type(x["a"])  # revealed: Unknown
 ```
 

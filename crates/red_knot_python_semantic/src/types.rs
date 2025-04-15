@@ -6170,6 +6170,9 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    /// Apply a specialization to this callable type.
+    ///
+    /// See [`Type::apply_specialization`] for more details.
     fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         CallableType::from_overloads(
             db,
@@ -6179,14 +6182,20 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    /// Check whether this callable type is fully static.
+    ///
+    /// See [Type::is_fully_static] for more details.
     fn is_fully_static(self, db: &'db dyn Db) -> bool {
         self.signature(db)
             .iter()
             .all(|signature| signature.is_fully_static(db))
     }
 
+    /// Check whether this callable type is a subtype of another callable type.
+    ///
+    /// See [Type::is_subtype_of] for more details.
     fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_assignable_to_impl(
+        self.check_relation_impl(
             db,
             other,
             |self_ty, other_ty| self_ty.is_subtype_of(db, other_ty),
@@ -6194,8 +6203,11 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    /// Check whether this callable type is assignable to another callable type.
+    ///
+    /// See [Type::is_assignable_to] for more details.
     fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_assignable_to_impl(
+        self.check_relation_impl(
             db,
             other,
             |self_ty, other_ty| self_ty.is_assignable_to(db, other_ty),
@@ -6203,8 +6215,11 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    /// Check whether this callable type is equivalent to another callable type.
+    ///
+    /// See [Type::is_equivalent_to] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_assignable_to_impl(
+        self.check_relation_impl(
             db,
             other,
             |self_ty, other_ty| self_ty.is_equivalent_to(db, other_ty),
@@ -6212,8 +6227,11 @@ impl<'db> CallableType<'db> {
         )
     }
 
+    /// Check whether this callable type is gradual equivalent to another callable type.
+    ///
+    /// See [Type::is_gradual_equivalent_to] for more details.
     fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_assignable_to_impl(
+        self.check_relation_impl(
             db,
             other,
             |self_ty, other_ty| self_ty.is_gradual_equivalent_to(db, other_ty),
@@ -6223,7 +6241,12 @@ impl<'db> CallableType<'db> {
         )
     }
 
-    fn is_assignable_to_impl<FT, FS>(
+    /// Implementation for the various relation checks between two callable types.
+    ///
+    /// The `check_types` closure is used to check the relation between two [`Type`]s while the
+    /// `check_signature` closure is used to check the relation between two [`Signature`]s. This is
+    /// mainly to accommodate a possibly overloaded callable type.
+    fn check_relation_impl<FT, FS>(
         self,
         db: &'db dyn Db,
         other: Self,
