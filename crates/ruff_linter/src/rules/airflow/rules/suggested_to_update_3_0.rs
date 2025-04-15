@@ -85,6 +85,7 @@ impl Violation for Airflow3SuggestedUpdate {
         }
     }
 }
+
 /// AIR311
 pub(crate) fn airflow_3_0_suggested_update_expr(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
