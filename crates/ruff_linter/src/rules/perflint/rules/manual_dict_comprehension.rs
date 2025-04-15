@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
@@ -140,7 +141,10 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             .bindings
             .iter()
             .find(|binding| target.range() == binding.range);
-        debug_assert!(target_binding.is_some());
+        debug_assert!(
+            target_binding.is_some(),
+            "for-loop target binding must exist"
+        );
 
         let Some(target_binding) = target_binding else {
             // All uses of this function will early-return if this returns true, so this must early-return the rule
@@ -288,22 +292,24 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
             DictComprehensionType::Update
         };
 
-        let diagnostic = Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             ManualDictComprehension {
                 fix_type,
                 is_async: for_stmt.is_async,
             },
             *range,
-        )
-        .with_fix(convert_to_dict_comprehension(
-            fix_type,
-            binding,
-            for_stmt,
-            if_test.map(std::convert::AsRef::as_ref),
-            key.as_ref(),
-            value.as_ref(),
-            checker,
-        ));
+        );
+        diagnostic.try_set_optional_fix(|| {
+            Ok(convert_to_dict_comprehension(
+                fix_type,
+                binding,
+                for_stmt,
+                if_test.map(std::convert::AsRef::as_ref),
+                key.as_ref(),
+                value.as_ref(),
+                checker,
+            ))
+        });
 
         checker.report_diagnostic(diagnostic);
     } else {
@@ -325,7 +331,7 @@ fn convert_to_dict_comprehension(
     key: &Expr,
     value: &Expr,
     checker: &Checker,
-) -> Fix {
+) -> Option<Fix> {
     let locator = checker.locator();
 
     let if_str = match if_test {
@@ -407,12 +413,19 @@ fn convert_to_dict_comprehension(
                 for_loop_inline_comments.join(&indentation)
             );
 
-            Fix::unsafe_edit(Edit::range_replacement(text_to_replace, for_stmt.range))
+            Some(Fix::unsafe_edit(Edit::range_replacement(
+                text_to_replace,
+                for_stmt.range,
+            )))
         }
         DictComprehensionType::Comprehension => {
-            let binding_stmt = binding
-                .statement(checker.semantic())
-                .expect("must be passed a binding with a statement");
+            let binding_stmt = binding.statement(checker.semantic());
+            debug_assert!(
+                binding_stmt.is_some(),
+                "must be passed a binding with a statement"
+            );
+            let binding_stmt = binding_stmt?;
+
             let binding_stmt_range = binding_stmt.range();
 
             let annotations = match binding_stmt.as_ann_assign_stmt() {
@@ -443,10 +456,10 @@ fn convert_to_dict_comprehension(
 
             let comprehension_body =
                 format!("{leading_comments}{variable_name}{annotations} = {comprehension_str}");
-            Fix::unsafe_edits(
+            Some(Fix::unsafe_edits(
                 Edit::range_deletion(binding_stmt_deletion_range),
                 [Edit::range_replacement(comprehension_body, for_stmt.range)],
-            )
+            ))
         }
     }
 }
