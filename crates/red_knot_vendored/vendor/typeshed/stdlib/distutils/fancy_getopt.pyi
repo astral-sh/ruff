@@ -13,7 +13,7 @@ longopt_xlate: Final[dict[int, int]]
 
 class FancyGetopt:
     def __init__(self, option_table: list[_Option] | None = None) -> None: ...
-    # TODO kinda wrong, `getopt(object=object())` is invalid
+    # TODO: kinda wrong, `getopt(object=object())` is invalid
     @overload
     def getopt(
         self, args: _SliceableT[_StrSequenceT_co] | None = None, object: None = None

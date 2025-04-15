@@ -1,4 +1,3 @@
-import sys
 import tempfile
 from _typeshed import ReadableBuffer
 from collections.abc import Callable, Iterable
@@ -34,10 +33,8 @@ class addinfo(addbase):
 class addinfourl(addinfo):
     url: str
     code: int | None
-    if sys.version_info >= (3, 9):
-        @property
-        def status(self) -> int | None: ...
-
+    @property
+    def status(self) -> int | None: ...
     def __init__(self, fp: IO[bytes], headers: Message, url: str, code: int | None = None) -> None: ...
     def geturl(self) -> str: ...
     def getcode(self) -> int | None: ...

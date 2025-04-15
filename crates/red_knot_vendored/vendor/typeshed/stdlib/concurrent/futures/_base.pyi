@@ -1,14 +1,11 @@
 import sys
 import threading
 from _typeshed import Unused
-from collections.abc import Callable, Collection, Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from logging import Logger
-from types import TracebackType
+from types import GenericAlias, TracebackType
 from typing import Any, Final, Generic, NamedTuple, Protocol, TypeVar
 from typing_extensions import ParamSpec, Self
-
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
 
 FIRST_COMPLETED: Final = "FIRST_COMPLETED"
 FIRST_EXCEPTION: Final = "FIRST_EXCEPTION"
@@ -53,23 +50,14 @@ class Future(Generic[_T]):
     def set_result(self, result: _T) -> None: ...
     def exception(self, timeout: float | None = None) -> BaseException | None: ...
     def set_exception(self, exception: BaseException | None) -> None: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 class Executor:
-    if sys.version_info >= (3, 9):
-        def submit(self, fn: Callable[_P, _T], /, *args: _P.args, **kwargs: _P.kwargs) -> Future[_T]: ...
-    else:
-        def submit(self, fn: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> Future[_T]: ...
-
+    def submit(self, fn: Callable[_P, _T], /, *args: _P.args, **kwargs: _P.kwargs) -> Future[_T]: ...
     def map(
         self, fn: Callable[..., _T], *iterables: Iterable[Any], timeout: float | None = None, chunksize: int = 1
     ) -> Iterator[_T]: ...
-    if sys.version_info >= (3, 9):
-        def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None: ...
-    else:
-        def shutdown(self, wait: bool = True) -> None: ...
-
+    def shutdown(self, wait: bool = True, *, cancel_futures: bool = False) -> None: ...
     def __enter__(self) -> Self: ...
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
@@ -91,15 +79,9 @@ class DoneAndNotDoneFutures(NamedTuple, Generic[_T]):
     done: set[Future[_T]]
     not_done: set[Future[_T]]
 
-if sys.version_info >= (3, 9):
-    def wait(
-        fs: Iterable[Future[_T]], timeout: float | None = None, return_when: str = "ALL_COMPLETED"
-    ) -> DoneAndNotDoneFutures[_T]: ...
-
-else:
-    def wait(
-        fs: Collection[Future[_T]], timeout: float | None = None, return_when: str = "ALL_COMPLETED"
-    ) -> DoneAndNotDoneFutures[_T]: ...
+def wait(
+    fs: Iterable[Future[_T]], timeout: float | None = None, return_when: str = "ALL_COMPLETED"
+) -> DoneAndNotDoneFutures[_T]: ...
 
 class _Waiter:
     event: threading.Event

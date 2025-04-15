@@ -15,10 +15,7 @@ from typing import IO, Any, Literal, TypeVar, overload
 from typing_extensions import TypeAlias, TypeVarTuple, Unpack
 
 # Keep asyncio.__all__ updated with any changes to __all__ here
-if sys.version_info >= (3, 9):
-    __all__ = ("BaseEventLoop", "Server")
-else:
-    __all__ = ("BaseEventLoop",)
+__all__ = ("BaseEventLoop", "Server")
 
 _T = TypeVar("_T")
 _Ts = TypeVarTuple("_Ts")
@@ -485,7 +482,7 @@ class BaseEventLoop(AbstractEventLoop):
     def set_debug(self, enabled: bool) -> None: ...
     if sys.version_info >= (3, 12):
         async def shutdown_default_executor(self, timeout: float | None = None) -> None: ...
-    elif sys.version_info >= (3, 9):
+    else:
         async def shutdown_default_executor(self) -> None: ...
 
     def __del__(self) -> None: ...

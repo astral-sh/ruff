@@ -175,7 +175,7 @@ class HTTPCookieProcessor(BaseHandler):
 class ProxyHandler(BaseHandler):
     def __init__(self, proxies: dict[str, str] | None = None) -> None: ...
     def proxy_open(self, req: Request, proxy: str, type: str) -> _UrlopenRet | None: ...  # undocumented
-    # TODO add a method for every (common) proxy protocol
+    # TODO: add a method for every (common) proxy protocol
 
 class HTTPPasswordMgr:
     def add_password(self, realm: str, uri: str | Sequence[str], user: str, passwd: str) -> None: ...

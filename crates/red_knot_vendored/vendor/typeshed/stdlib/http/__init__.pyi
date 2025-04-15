@@ -19,8 +19,7 @@ class HTTPStatus(IntEnum):
     CONTINUE = 100
     SWITCHING_PROTOCOLS = 101
     PROCESSING = 102
-    if sys.version_info >= (3, 9):
-        EARLY_HINTS = 103
+    EARLY_HINTS = 103
 
     OK = 200
     CREATED = 201
@@ -66,16 +65,14 @@ class HTTPStatus(IntEnum):
         RANGE_NOT_SATISFIABLE = 416
     REQUESTED_RANGE_NOT_SATISFIABLE = 416
     EXPECTATION_FAILED = 417
-    if sys.version_info >= (3, 9):
-        IM_A_TEAPOT = 418
+    IM_A_TEAPOT = 418
     MISDIRECTED_REQUEST = 421
     if sys.version_info >= (3, 13):
         UNPROCESSABLE_CONTENT = 422
     UNPROCESSABLE_ENTITY = 422
     LOCKED = 423
     FAILED_DEPENDENCY = 424
-    if sys.version_info >= (3, 9):
-        TOO_EARLY = 425
+    TOO_EARLY = 425
     UPGRADE_REQUIRED = 426
     PRECONDITION_REQUIRED = 428
     TOO_MANY_REQUESTS = 429

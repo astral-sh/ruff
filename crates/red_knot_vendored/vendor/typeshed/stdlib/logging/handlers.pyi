@@ -22,54 +22,34 @@ SYSLOG_TCP_PORT: Final[int]
 class WatchedFileHandler(FileHandler):
     dev: int  # undocumented
     ino: int  # undocumented
-    if sys.version_info >= (3, 9):
-        def __init__(
-            self, filename: StrPath, mode: str = "a", encoding: str | None = None, delay: bool = False, errors: str | None = None
-        ) -> None: ...
-    else:
-        def __init__(self, filename: StrPath, mode: str = "a", encoding: str | None = None, delay: bool = False) -> None: ...
-
+    def __init__(
+        self, filename: StrPath, mode: str = "a", encoding: str | None = None, delay: bool = False, errors: str | None = None
+    ) -> None: ...
     def _statstream(self) -> None: ...  # undocumented
     def reopenIfNeeded(self) -> None: ...
 
 class BaseRotatingHandler(FileHandler):
     namer: Callable[[str], str] | None
     rotator: Callable[[str, str], None] | None
-    if sys.version_info >= (3, 9):
-        def __init__(
-            self, filename: StrPath, mode: str, encoding: str | None = None, delay: bool = False, errors: str | None = None
-        ) -> None: ...
-    else:
-        def __init__(self, filename: StrPath, mode: str, encoding: str | None = None, delay: bool = False) -> None: ...
-
+    def __init__(
+        self, filename: StrPath, mode: str, encoding: str | None = None, delay: bool = False, errors: str | None = None
+    ) -> None: ...
     def rotation_filename(self, default_name: str) -> str: ...
     def rotate(self, source: str, dest: str) -> None: ...
 
 class RotatingFileHandler(BaseRotatingHandler):
     maxBytes: int  # undocumented
     backupCount: int  # undocumented
-    if sys.version_info >= (3, 9):
-        def __init__(
-            self,
-            filename: StrPath,
-            mode: str = "a",
-            maxBytes: int = 0,
-            backupCount: int = 0,
-            encoding: str | None = None,
-            delay: bool = False,
-            errors: str | None = None,
-        ) -> None: ...
-    else:
-        def __init__(
-            self,
-            filename: StrPath,
-            mode: str = "a",
-            maxBytes: int = 0,
-            backupCount: int = 0,
-            encoding: str | None = None,
-            delay: bool = False,
-        ) -> None: ...
-
+    def __init__(
+        self,
+        filename: StrPath,
+        mode: str = "a",
+        maxBytes: int = 0,
+        backupCount: int = 0,
+        encoding: str | None = None,
+        delay: bool = False,
+        errors: str | None = None,
+    ) -> None: ...
     def doRollover(self) -> None: ...
     def shouldRollover(self, record: LogRecord) -> int: ...  # undocumented
 
@@ -83,32 +63,18 @@ class TimedRotatingFileHandler(BaseRotatingHandler):
     dayOfWeek: int  # undocumented
     rolloverAt: int  # undocumented
     extMatch: Pattern[str]  # undocumented
-    if sys.version_info >= (3, 9):
-        def __init__(
-            self,
-            filename: StrPath,
-            when: str = "h",
-            interval: int = 1,
-            backupCount: int = 0,
-            encoding: str | None = None,
-            delay: bool = False,
-            utc: bool = False,
-            atTime: datetime.time | None = None,
-            errors: str | None = None,
-        ) -> None: ...
-    else:
-        def __init__(
-            self,
-            filename: StrPath,
-            when: str = "h",
-            interval: int = 1,
-            backupCount: int = 0,
-            encoding: str | None = None,
-            delay: bool = False,
-            utc: bool = False,
-            atTime: datetime.time | None = None,
-        ) -> None: ...
-
+    def __init__(
+        self,
+        filename: StrPath,
+        when: str = "h",
+        interval: int = 1,
+        backupCount: int = 0,
+        encoding: str | None = None,
+        delay: bool = False,
+        utc: bool = False,
+        atTime: datetime.time | None = None,
+        errors: str | None = None,
+    ) -> None: ...
     def doRollover(self) -> None: ...
     def shouldRollover(self, record: LogRecord) -> int: ...  # undocumented
     def computeRollover(self, currentTime: int) -> int: ...  # undocumented
@@ -155,13 +121,10 @@ class SysLogHandler(Handler):
     LOG_CRON: int
     LOG_AUTHPRIV: int
     LOG_FTP: int
-
-    if sys.version_info >= (3, 9):
-        LOG_NTP: int
-        LOG_SECURITY: int
-        LOG_CONSOLE: int
-        LOG_SOLCRON: int
-
+    LOG_NTP: int
+    LOG_SECURITY: int
+    LOG_CONSOLE: int
+    LOG_SOLCRON: int
     LOG_LOCAL0: int
     LOG_LOCAL1: int
     LOG_LOCAL2: int
@@ -191,7 +154,7 @@ class SysLogHandler(Handler):
 class NTEventLogHandler(Handler):
     def __init__(self, appname: str, dllname: str | None = None, logtype: str = "Application") -> None: ...
     def getEventCategory(self, record: LogRecord) -> int: ...
-    # TODO correct return value?
+    # TODO: correct return value?
     def getEventType(self, record: LogRecord) -> int: ...
     def getMessageID(self, record: LogRecord) -> int: ...
 
@@ -248,8 +211,7 @@ class HTTPHandler(Handler):
         context: ssl.SSLContext | None = None,
     ) -> None: ...
     def mapLogRecord(self, record: LogRecord) -> dict[str, Any]: ...
-    if sys.version_info >= (3, 9):
-        def getConnection(self, host: str, secure: bool) -> http.client.HTTPConnection: ...  # undocumented
+    def getConnection(self, host: str, secure: bool) -> http.client.HTTPConnection: ...  # undocumented
 
 class _QueueLike(Protocol[_T]):
     def get(self) -> _T: ...

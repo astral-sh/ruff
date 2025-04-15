@@ -1,10 +1,8 @@
 import sys
 from collections.abc import Iterable
+from types import GenericAlias
 from typing import Any, Generic, TypeVar, overload
 from typing_extensions import Self
-
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
 
 __all__ = ["SharedMemory", "ShareableList"]
 
@@ -40,5 +38,4 @@ class ShareableList(Generic[_SLT]):
     def format(self) -> str: ...
     def count(self, value: _SLT) -> int: ...
     def index(self, value: _SLT) -> int: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...

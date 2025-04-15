@@ -26,11 +26,9 @@ else:
 
 from _typeshed import SupportsWrite
 from collections.abc import Collection, Iterable, Mapping, Sequence
+from types import GenericAlias
 from typing import Any, Generic, Literal, TypeVar, overload
 from typing_extensions import Self
-
-if sys.version_info >= (3, 12):
-    from types import GenericAlias
 
 __all__ = [
     "QUOTE_MINIMAL",

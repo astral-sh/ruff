@@ -36,8 +36,6 @@ _curses: 3.0-
 _curses_panel: 3.0-
 _dbm: 3.0-
 _decimal: 3.3-
-_dummy_thread: 3.0-3.8
-_dummy_threading: 3.0-3.8
 _frozen_importlib: 3.0-
 _frozen_importlib_external: 3.5-
 _gdbm: 3.0-
@@ -140,7 +138,6 @@ distutils: 3.0-3.11
 distutils.command.bdist_msi: 3.0-3.10
 distutils.command.bdist_wininst: 3.0-3.9
 doctest: 3.0-
-dummy_threading: 3.0-3.8
 email: 3.0-
 encodings: 3.0-
 encodings.cp1125: 3.4-
@@ -148,7 +145,6 @@ encodings.cp273: 3.4-
 encodings.cp858: 3.2-
 encodings.koi8_t: 3.5-
 encodings.kz1048: 3.5-
-encodings.mac_centeuro: 3.0-3.8
 ensurepip: 3.0-
 enum: 3.4-
 errno: 3.0-

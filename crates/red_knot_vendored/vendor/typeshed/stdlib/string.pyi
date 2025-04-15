@@ -3,7 +3,7 @@ from _typeshed import StrOrLiteralStr
 from collections.abc import Iterable, Mapping, Sequence
 from re import Pattern, RegexFlag
 from typing import Any, ClassVar, overload
-from typing_extensions import LiteralString, TypeAlias
+from typing_extensions import LiteralString
 
 __all__ = [
     "ascii_letters",
@@ -32,14 +32,7 @@ whitespace: LiteralString
 
 def capwords(s: StrOrLiteralStr, sep: StrOrLiteralStr | None = None) -> StrOrLiteralStr: ...
 
-if sys.version_info >= (3, 9):
-    _TemplateMetaclass: TypeAlias = type
-else:
-    class _TemplateMetaclass(type):
-        pattern: ClassVar[str]
-        def __init__(cls, name: str, bases: tuple[type, ...], dct: dict[str, Any]) -> None: ...
-
-class Template(metaclass=_TemplateMetaclass):
+class Template(metaclass=type):
     template: str
     delimiter: ClassVar[str]
     idpattern: ClassVar[str]
