@@ -766,32 +766,68 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_and_constraint(self.scope_start_visibility, constraint);
     }
 
-    #[must_use = "A `*`-import visibility constraint must always be negated after it is added"]
-    pub(super) fn record_star_import_visibility_constraint(
+    /// This method exists solely as a fast path for handling `*`-import visibility constraints.
+    ///
+    /// The reason why we add visibility constraints for [`Definition`]s created by `*` imports
+    /// is laid out in the doc-comment for [`StarImportPlaceholderPredicate`]. But treating these
+    /// visibility constraints in the use-def map the same way as all other visibility constraints
+    /// was shown to lead to [significant regressions] for small codebases where typeshed
+    /// dominates. (Although `*` imports are not common generally, they are used in several
+    /// important places by typeshed.)
+    ///
+    /// To solve these regressions, it was observed that we could add a fast path for `*`-import
+    /// definitions which added a new symbol to the global scope (as opposed to `*`-import definitions
+    /// that provided redefinitions for *pre-existing* global-scope symbols). The fast path does a
+    /// number of things differently to our normal handling of visibility constraints:
+    ///
+    /// - It only applies and negates the visibility constraints to a single symbol, rather than to
+    ///   all symbols. This is possible here because, unlike most definitions, we know in advance that
+    ///   exactly one definition occurs inside the "if-true" predicate branch, and we know exactly
+    ///   which definition it is.
+    ///
+    ///   Doing things this way is cheaper in and of itself. However, it also allows us to avoid
+    ///   calling [`Self::simplify_visibility_constraints`] after the constraint has been applied to
+    ///   the "if-predicate-true" branch and negated for the "if-predicate-false" branch. Simplifying
+    ///   the visibility constraints is only important for symbols that did not have any new
+    ///   definitions inside either the "if-predicate-true" branch or the "if-predicate-false" branch.
+    ///
+    /// - It avoids multiple expensive calls to [`Self::snapshot`]. This is possible because we know
+    ///   the symbol is newly added, so we know the prior state of the symbol was
+    ///   [`SymbolState::undefined`].
+    ///
+    /// - Normally we take care to check whether an "if-predicate-true" branch or an
+    ///   "if-predicate-false" branch contains a terminal statement: these can affect the visibility
+    ///   of symbols defined inside either branch. However, in the case of `*`-import definitions,
+    ///   this is unnecessary (and therefore not done in this method), since we know that a `*`-import
+    ///   predicate cannot create a terminal statement inside either branch.
+    ///
+    /// [significant regressions]: https://github.com/astral-sh/ruff/pull/17286#issuecomment-2786755746
+    pub(super) fn record_and_negate_star_import_visibility_constraint(
         &mut self,
         star_import: StarImportPlaceholderPredicate<'db>,
         symbol: ScopedSymbolId,
-    ) -> StarImportVisibilityConstraintId {
+    ) {
         let predicate_id = self.add_predicate(star_import.into());
         let visibility_id = self.visibility_constraints.add_atom(predicate_id);
-        self.symbol_states[symbol]
-            .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
-        StarImportVisibilityConstraintId(visibility_id)
-    }
+        let negated_visibility_id = self
+            .visibility_constraints
+            .add_not_constraint(visibility_id);
 
-    pub(super) fn negate_star_import_visibility_constraint(
-        &mut self,
-        symbol_id: ScopedSymbolId,
-        constraint: StarImportVisibilityConstraintId,
-    ) {
-        let negated_constraint = self
-            .visibility_constraints
-            .add_not_constraint(constraint.into_scoped_constraint_id());
-        self.symbol_states[symbol_id]
-            .record_visibility_constraint(&mut self.visibility_constraints, negated_constraint);
-        self.scope_start_visibility = self
-            .visibility_constraints
-            .add_and_constraint(self.scope_start_visibility, negated_constraint);
+        let mut post_definition_state = std::mem::replace(
+            &mut self.symbol_states[symbol],
+            SymbolState::undefined(self.scope_start_visibility),
+        );
+        post_definition_state
+            .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
+
+        self.symbol_states[symbol]
+            .record_visibility_constraint(&mut self.visibility_constraints, negated_visibility_id);
+
+        self.symbol_states[symbol].merge(
+            post_definition_state,
+            &mut self.narrowing_constraints,
+            &mut self.visibility_constraints,
+        );
     }
 
     /// This method resets the visibility constraints for all symbols to a previous state
@@ -1040,26 +1076,5 @@ impl<'db> UseDefMapBuilder<'db> {
             eager_bindings: self.eager_bindings,
             scope_start_visibility: self.scope_start_visibility,
         }
-    }
-}
-
-/// Newtype wrapper over [`ScopedVisibilityConstraintId`] to improve type safety.
-///
-/// By returning this type from [`UseDefMapBuilder::record_star_import_visibility_constraint`]
-/// rather than [`ScopedVisibilityConstraintId`] directly, we ensure that
-/// [`UseDefMapBuilder::negate_star_import_visibility_constraint`] must be called after the
-/// visibility constraint has been added, and we ensure that
-/// [`super::SemanticIndexBuilder::record_negated_visibility_constraint`] *cannot* be called with
-/// the narrowing constraint (which would lead to incorrect behaviour).
-///
-/// This type is defined here rather than in the [`super::visibility_constraints`] module
-/// because it should only ever be constructed and deconstructed from methods in the
-/// [`UseDefMapBuilder`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct StarImportVisibilityConstraintId(ScopedVisibilityConstraintId);
-
-impl StarImportVisibilityConstraintId {
-    fn into_scoped_constraint_id(self) -> ScopedVisibilityConstraintId {
-        self.0
     }
 }
