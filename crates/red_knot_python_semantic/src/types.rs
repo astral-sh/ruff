@@ -1733,8 +1733,6 @@ impl<'db> Type<'db> {
                     .is_disjoint_from(db, other)
             }
 
-            (Type::DataclassDecorator(_), _) | (_, Type::DataclassDecorator(_)) => false,
-
             (Type::Callable(_) | Type::FunctionLiteral(_), Type::Callable(_))
             | (Type::Callable(_), Type::FunctionLiteral(_)) => {
                 // No two callable types are ever disjoint because
@@ -1757,7 +1755,8 @@ impl<'db> Type<'db> {
                 true
             }
 
-            (Type::Callable(_), _) | (_, Type::Callable(_)) => {
+            (Type::Callable(_) | Type::DataclassDecorator(_), _)
+            | (_, Type::Callable(_) | Type::DataclassDecorator(_)) => {
                 // TODO: Implement disjointness for general callable type with other types
                 false
             }
