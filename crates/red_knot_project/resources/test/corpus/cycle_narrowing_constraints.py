@@ -1,5 +1,5 @@
 # Regression test for https://github.com/astral-sh/ruff/issues/17215
-# panicked on commit 1a6a10b30
+# panicked in commit 1a6a10b30
 # error message:
 # dependency graph cycle querying all_narrowing_constraints_for_expression(Id(8591))
 
