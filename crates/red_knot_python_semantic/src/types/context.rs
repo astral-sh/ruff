@@ -65,6 +65,14 @@ impl<'db> InferContext<'db> {
         Span::from(self.file()).with_range(ranged.range())
     }
 
+    /// Create a secondary annotation attached to the range of the given value in
+    /// the file currently being type checked.
+    ///
+    /// The annotation returned has no message attached to it.
+    pub(crate) fn secondary<T: Ranged>(&self, ranged: T) -> Annotation {
+        Annotation::secondary(self.span(ranged))
+    }
+
     pub(crate) fn db(&self) -> &'db dyn Db {
         self.db
     }
