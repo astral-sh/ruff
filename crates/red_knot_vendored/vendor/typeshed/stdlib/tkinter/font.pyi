@@ -5,8 +5,7 @@ import tkinter
 from typing import Any, ClassVar, Final, Literal, TypedDict, overload
 from typing_extensions import TypeAlias, Unpack
 
-if sys.version_info >= (3, 9):
-    __all__ = ["NORMAL", "ROMAN", "BOLD", "ITALIC", "nametofont", "Font", "families", "names"]
+__all__ = ["NORMAL", "ROMAN", "BOLD", "ITALIC", "nametofont", "Font", "families", "names"]
 
 NORMAL: Final = "normal"
 ROMAN: Final = "roman"

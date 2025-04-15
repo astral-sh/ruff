@@ -185,20 +185,11 @@ class SMTP_SSL(SMTP):
 LMTP_PORT: int
 
 class LMTP(SMTP):
-    if sys.version_info >= (3, 9):
-        def __init__(
-            self,
-            host: str = "",
-            port: int = 2003,
-            local_hostname: str | None = None,
-            source_address: _SourceAddress | None = None,
-            timeout: float = ...,
-        ) -> None: ...
-    else:
-        def __init__(
-            self,
-            host: str = "",
-            port: int = 2003,
-            local_hostname: str | None = None,
-            source_address: _SourceAddress | None = None,
-        ) -> None: ...
+    def __init__(
+        self,
+        host: str = "",
+        port: int = 2003,
+        local_hostname: str | None = None,
+        source_address: _SourceAddress | None = None,
+        timeout: float = ...,
+    ) -> None: ...

@@ -1,8 +1,5 @@
-import sys
+from types import GenericAlias
 from typing import Any, Generic, TypeVar
-
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
 
 _T = TypeVar("_T")
 
@@ -16,5 +13,4 @@ class SimpleQueue(Generic[_T]):
     def put(self, item: _T, block: bool = True, timeout: float | None = None) -> None: ...
     def put_nowait(self, item: _T) -> None: ...
     def qsize(self) -> int: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...

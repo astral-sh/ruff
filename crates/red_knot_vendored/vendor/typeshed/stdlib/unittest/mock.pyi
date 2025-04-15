@@ -51,9 +51,6 @@ else:
         "seal",
     )
 
-if sys.version_info < (3, 9):
-    __version__: Final[str]
-
 FILTER_DIR: Any
 
 class _SentinelObject:

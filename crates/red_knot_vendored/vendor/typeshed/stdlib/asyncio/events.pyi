@@ -138,27 +138,19 @@ class AbstractEventLoop:
     @abstractmethod
     async def shutdown_asyncgens(self) -> None: ...
     # Methods scheduling callbacks.  All these return Handles.
-    if sys.version_info >= (3, 9):  # "context" added in 3.9.10/3.10.2
-        @abstractmethod
-        def call_soon(
-            self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
-        ) -> Handle: ...
-        @abstractmethod
-        def call_later(
-            self, delay: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
-        ) -> TimerHandle: ...
-        @abstractmethod
-        def call_at(
-            self, when: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
-        ) -> TimerHandle: ...
-    else:
-        @abstractmethod
-        def call_soon(self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> Handle: ...
-        @abstractmethod
-        def call_later(self, delay: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> TimerHandle: ...
-        @abstractmethod
-        def call_at(self, when: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> TimerHandle: ...
-
+    # "context" added in 3.9.10/3.10.2 for call_*
+    @abstractmethod
+    def call_soon(
+        self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
+    ) -> Handle: ...
+    @abstractmethod
+    def call_later(
+        self, delay: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
+    ) -> TimerHandle: ...
+    @abstractmethod
+    def call_at(
+        self, when: float, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
+    ) -> TimerHandle: ...
     @abstractmethod
     def time(self) -> float: ...
     # Future methods
@@ -179,15 +171,11 @@ class AbstractEventLoop:
     @abstractmethod
     def get_task_factory(self) -> _TaskFactory | None: ...
     # Methods for interacting with threads
-    if sys.version_info >= (3, 9):  # "context" added in 3.9.10/3.10.2
-        @abstractmethod
-        def call_soon_threadsafe(
-            self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
-        ) -> Handle: ...
-    else:
-        @abstractmethod
-        def call_soon_threadsafe(self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts]) -> Handle: ...
-
+    # "context" added in 3.9.10/3.10.2
+    @abstractmethod
+    def call_soon_threadsafe(
+        self, callback: Callable[[Unpack[_Ts]], object], *args: Unpack[_Ts], context: Context | None = None
+    ) -> Handle: ...
     @abstractmethod
     def run_in_executor(self, executor: Executor | None, func: Callable[[Unpack[_Ts]], _T], *args: Unpack[_Ts]) -> Future[_T]: ...
     @abstractmethod
@@ -607,9 +595,8 @@ class AbstractEventLoop:
     def get_debug(self) -> bool: ...
     @abstractmethod
     def set_debug(self, enabled: bool) -> None: ...
-    if sys.version_info >= (3, 9):
-        @abstractmethod
-        async def shutdown_default_executor(self) -> None: ...
+    @abstractmethod
+    async def shutdown_default_executor(self) -> None: ...
 
 class AbstractEventLoopPolicy:
     @abstractmethod
