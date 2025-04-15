@@ -162,8 +162,8 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                 None,
             ));
         }
-        _ => {
-            if is_airflow_builtin_or_provider(qualified_name.segments(), "operators", "Operator") {
+        segments => {
+            if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
                 checker.report_diagnostics(diagnostic_for_argument(arguments, "sla", None));
             }
         }
