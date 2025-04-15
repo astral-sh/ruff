@@ -1,5 +1,10 @@
 # Type API (`knot_extensions`)
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 This document describes the internal `knot_extensions` API for creating and manipulating types as
 well as testing various type system properties.
 

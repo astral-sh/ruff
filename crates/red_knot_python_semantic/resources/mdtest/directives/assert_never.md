@@ -1,5 +1,10 @@
 # `assert_never`
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 ## Basic functionality
 
 `assert_never` makes sure that the type of the argument is `Never`. If it is not, a

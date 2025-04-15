@@ -1,5 +1,10 @@
 # Callable
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 References:
 
 - <https://typing.python.org/en/latest/spec/callables.html#callable>

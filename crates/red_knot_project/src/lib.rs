@@ -7,8 +7,8 @@ use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
 use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
+use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{register_lints, Program};
 use ruff_db::diagnostic::{
     create_parse_diagnostic, Annotation, Diagnostic, DiagnosticId, Severity, Span,
 };
@@ -416,7 +416,7 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
         return diagnostics;
     }
 
-    let parsed = parsed_module(db.upcast(), file, Program::get(db).python_version(db));
+    let parsed = parsed_module(db.upcast(), file);
     diagnostics.extend(
         parsed
             .errors()

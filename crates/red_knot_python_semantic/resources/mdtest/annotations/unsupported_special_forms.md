@@ -1,5 +1,10 @@
 # Unsupported special forms
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ## Not yet supported
 
 Several special forms are unsupported by red-knot currently. However, we also don't emit

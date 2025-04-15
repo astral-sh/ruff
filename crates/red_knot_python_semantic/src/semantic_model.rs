@@ -176,7 +176,6 @@ impl HasType for ast::Alias {
 mod tests {
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
-    use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDbBuilder;
     use crate::{HasType, SemanticModel};
@@ -189,7 +188,7 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo, PythonVersion::default());
+        let ast = parsed_module(&db, foo);
 
         let function = ast.suite()[0].as_function_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
@@ -208,7 +207,7 @@ mod tests {
 
         let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
 
-        let ast = parsed_module(&db, foo, PythonVersion::default());
+        let ast = parsed_module(&db, foo);
 
         let class = ast.suite()[0].as_class_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
@@ -228,7 +227,7 @@ mod tests {
 
         let bar = system_path_to_file(&db, "/src/bar.py").unwrap();
 
-        let ast = parsed_module(&db, bar, PythonVersion::default());
+        let ast = parsed_module(&db, bar);
 
         let import = ast.suite()[0].as_import_from_stmt().unwrap();
         let alias = &import.names[0];

@@ -92,7 +92,7 @@ use crate::types::{
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::{Db, Program};
+use crate::Db;
 
 use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext};
@@ -671,11 +671,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let node = scope.node(self.db());
         match node {
             NodeWithScopeKind::Module => {
-                let parsed = parsed_module(
-                    self.db().upcast(),
-                    self.file(),
-                    Program::get(self.db()).python_version(self.db()),
-                );
+                let parsed = parsed_module(self.db().upcast(), self.file());
                 self.infer_module(parsed.syntax());
             }
             NodeWithScopeKind::Function(function) => self.infer_function_body(function.node()),
@@ -7745,7 +7741,6 @@ mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
-    use ruff_python_ast::PythonVersion;
 
     use super::*;
 
@@ -8121,7 +8116,7 @@ mod tests {
     fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
         fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-            let ast = parsed_module(db, file_main, PythonVersion::default());
+            let ast = parsed_module(db, file_main);
             // Get the second statement in `main.py` (x = …) and extract the expression
             // node on the right-hand side:
             let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
@@ -8204,7 +8199,7 @@ mod tests {
     fn dependency_own_instance_member() -> anyhow::Result<()> {
         fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
-            let ast = parsed_module(db, file_main, PythonVersion::default());
+            let ast = parsed_module(db, file_main);
             // Get the second statement in `main.py` (x = …) and extract the expression
             // node on the right-hand side:
             let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;

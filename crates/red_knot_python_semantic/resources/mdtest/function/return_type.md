@@ -56,6 +56,11 @@ def f() -> int:
 
 ### In Protocol
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import Protocol, TypeVar
 
@@ -84,6 +89,11 @@ class Lorem(t[0]):
 ```
 
 ### In abstract method
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from abc import ABC, abstractmethod

@@ -1,5 +1,10 @@
 # Narrowing for checks involving `type(x)`
 
+```toml
+[environment]
+python-version = "3.13"
+```
+
 ## `type(x) is C`
 
 ```py

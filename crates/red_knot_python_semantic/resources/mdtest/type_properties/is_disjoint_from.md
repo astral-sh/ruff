@@ -1,5 +1,10 @@
 # Disjointness relation
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Two types `S` and `T` are disjoint if their intersection `S & T` is empty (equivalent to `Never`).
 This means that it is known that no possible runtime object inhabits both types simultaneously.
 

@@ -1,5 +1,10 @@
 # Wildcard (`*`) imports
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 See the [Python language reference for import statements].
 
 ## Basic functionality

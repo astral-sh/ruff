@@ -1,5 +1,10 @@
 # Deferred annotations
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ## Deferred annotations in stubs always resolve
 
 `mod.pyi`:

@@ -20,7 +20,7 @@ use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
 };
 use crate::semantic_index::use_def::{EagerBindingsKey, ScopedEagerBindingsId, UseDefMap};
-use crate::{Db, Program};
+use crate::Db;
 
 pub mod ast_ids;
 mod builder;
@@ -47,7 +47,7 @@ type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
 pub(crate) fn semantic_index(db: &dyn Db, file: File) -> SemanticIndex<'_> {
     let _span = tracing::trace_span!("semantic_index", ?file).entered();
 
-    let parsed = parsed_module(db.upcast(), file, Program::get(db).python_version(db));
+    let parsed = parsed_module(db.upcast(), file);
 
     SemanticIndexBuilder::new(db, file, parsed).build()
 }
@@ -497,7 +497,7 @@ impl FusedIterator for ChildrenIter<'_> {}
 mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_python_ast::{self as ast, PythonVersion};
+    use ruff_python_ast::{self as ast};
     use ruff_text_size::{Ranged, TextRange};
 
     use crate::db::tests::{TestDb, TestDbBuilder};
@@ -922,7 +922,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
 
         let use_def = index.use_def_map(comprehension_scope_id);
 
-        let module = parsed_module(&db, file, PythonVersion::default()).syntax();
+        let module = parsed_module(&db, file).syntax();
         let element = module.body[0]
             .as_expr_stmt()
             .unwrap()
@@ -1171,7 +1171,7 @@ class C[T]:
     #[test]
     fn reachability_trivial() {
         let TestCase { db, file } = test_case("x = 1; x");
-        let parsed = parsed_module(&db, file, PythonVersion::default());
+        let parsed = parsed_module(&db, file);
         let scope = global_scope(&db, file);
         let ast = parsed.syntax();
         let ast::Stmt::Expr(ast::StmtExpr {
@@ -1204,7 +1204,7 @@ class C[T]:
         let TestCase { db, file } = test_case("x = 1;\ndef test():\n  y = 4");
 
         let index = semantic_index(&db, file);
-        let parsed = parsed_module(&db, file, PythonVersion::default());
+        let parsed = parsed_module(&db, file);
         let ast = parsed.syntax();
 
         let x_stmt = ast.body[0].as_assign_stmt().unwrap();

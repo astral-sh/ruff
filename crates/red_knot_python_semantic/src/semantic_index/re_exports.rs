@@ -28,7 +28,7 @@ use ruff_python_ast::{
 };
 use rustc_hash::FxHashMap;
 
-use crate::{module_name::ModuleName, resolve_module, Db, Program};
+use crate::{module_name::ModuleName, resolve_module, Db};
 
 fn exports_cycle_recover(
     _db: &dyn Db,
@@ -45,8 +45,7 @@ fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
 
 #[salsa::tracked(return_ref, cycle_fn=exports_cycle_recover, cycle_initial=exports_cycle_initial)]
 pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
-    let python_version = Program::get(db).python_version(db);
-    let module = parsed_module(db.upcast(), file, python_version);
+    let module = parsed_module(db.upcast(), file);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
     finder.resolve_exports()

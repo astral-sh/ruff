@@ -1,5 +1,10 @@
 # Methods
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ## Background: Functions as descriptors
 
 > Note: See also this related section in the descriptor guide: [Functions and methods].

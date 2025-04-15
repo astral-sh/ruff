@@ -1,5 +1,10 @@
 # Assignment with annotations
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ## Annotation only transparent to local inference
 
 ```py

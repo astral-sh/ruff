@@ -159,7 +159,7 @@ where
 pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatModuleError> {
     let options = db.format_options(file);
 
-    let parsed = parsed_module(db.upcast(), file, options.target_version());
+    let parsed = parsed_module(db.upcast(), file);
 
     if let Some(first) = parsed.errors().first() {
         return Err(FormatModuleError::ParseError(first.clone()));

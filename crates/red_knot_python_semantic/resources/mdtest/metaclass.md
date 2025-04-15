@@ -1,3 +1,8 @@
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ## Default
 
 ```py
