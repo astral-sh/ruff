@@ -509,8 +509,8 @@ impl<'db> Type<'db> {
                 .any(|ty| ty.contains_todo(db)),
 
             Self::Callable(callable) => {
-                let signature = callable.signature(db);
-                signature.iter().any(|signature| {
+                let signatures = callable.signatures(db);
+                signatures.iter().any(|signature| {
                     signature.parameters().iter().any(|param| {
                         param
                             .annotated_type()
@@ -3143,10 +3143,14 @@ impl<'db> Type<'db> {
     /// [`CallErrorKind::NotCallable`].
     fn signatures(self, db: &'db dyn Db) -> Signatures<'db> {
         match self {
-            Type::Callable(callable) => Signatures::single(match callable.signature(db).as_ref() {
-                [signature] => CallableSignature::single(self, signature.clone()),
-                signatures => CallableSignature::from_overloads(self, signatures.iter().cloned()),
-            }),
+            Type::Callable(callable) => {
+                Signatures::single(match callable.signatures(db).as_ref() {
+                    [signature] => CallableSignature::single(self, signature.clone()),
+                    signatures => {
+                        CallableSignature::from_overloads(self, signatures.iter().cloned())
+                    }
+                })
+            }
 
             Type::BoundMethod(bound_method) => {
                 let signature = bound_method.function(db).signature(db);
@@ -5757,13 +5761,22 @@ bitflags! {
     }
 }
 
+/// A function signature, which can be either a single signature or an overloaded signature.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum FunctionSignature<'db> {
+    /// A single function signature.
     Single(Signature<'db>),
+
+    /// An overloaded function signature containing the `@overload`-ed signatures and an optional
+    /// implementation signature.
     Overloaded(Vec<Signature<'db>>, Option<Signature<'db>>),
 }
 
 impl<'db> FunctionSignature<'db> {
+    /// Returns a slice of all signatures.
+    ///
+    /// For an overloaded function, this only includes the `@overload`-ed signatures and not the
+    /// implementation signature.
     pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
         match self {
             Self::Single(signature) => std::slice::from_ref(signature),
@@ -5771,6 +5784,7 @@ impl<'db> FunctionSignature<'db> {
         }
     }
 
+    /// Returns an iterator over the signatures.
     pub(crate) fn iter(&self) -> Iter<Signature<'db>> {
         self.as_slice().iter()
     }
@@ -5787,7 +5801,7 @@ impl<'db> IntoIterator for &'db FunctionSignature<'db> {
 
 #[salsa::interned(debug)]
 pub struct FunctionType<'db> {
-    /// name of the function at definition
+    /// Name of the function at definition.
     #[return_ref]
     pub name: ast::name::Name,
 
@@ -5797,7 +5811,7 @@ pub struct FunctionType<'db> {
     /// The scope in which the function is defined.
     scope: ScopeId<'db>,
 
-    /// The scope that's created by the function body.
+    /// The scope that's created by the function, in which the function body is evaluated.
     body_scope: ScopeId<'db>,
 
     /// A set of special decorators that were applied to this function
@@ -5847,18 +5861,6 @@ impl<'db> FunctionType<'db> {
         index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
-    fn previous_symbol(self, db: &'db dyn Db) -> Symbol<'db> {
-        let scope = self.scope(db);
-        let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
-        let use_id = self
-            .body_scope(db)
-            .node(db)
-            .expect_function()
-            .name
-            .scoped_use_id(db, scope);
-        symbol_from_bindings(db, use_def.bindings_at_use(use_id))
-    }
-
     /// Typed externally-visible signature for this function.
     ///
     /// This is the signature as seen by external callers, possibly modified by decorators and/or
@@ -5879,8 +5881,19 @@ impl<'db> FunctionType<'db> {
             internal_signature = internal_signature.apply_specialization(db, specialization);
         }
 
+        // The semantic model records a use for each function on the name node. This is used here
+        // to get the previous function definition with the same name.
+        let scope = self.scope(db);
+        let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+        let use_id = self
+            .body_scope(db)
+            .node(db)
+            .expect_function()
+            .name
+            .scoped_use_id(db, scope);
+
         if let Symbol::Type(Type::FunctionLiteral(function_literal), Boundness::Bound) =
-            self.previous_symbol(db)
+            symbol_from_bindings(db, use_def.bindings_at_use(use_id))
         {
             match function_literal.signature(db) {
                 FunctionSignature::Single(_) => {
@@ -5890,8 +5903,8 @@ impl<'db> FunctionType<'db> {
                     );
                 }
                 FunctionSignature::Overloaded(_, Some(_)) => {
-                    // If the previous overloaded function already has an implementation,
-                    // then this new signature completely replaces it.
+                    // If the previous overloaded function already has an implementation, then this
+                    // new signature completely replaces it.
                 }
                 FunctionSignature::Overloaded(signatures, None) => {
                     return if self.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
@@ -6124,7 +6137,7 @@ impl<'db> BoundMethodType<'db> {
 #[salsa::interned(debug)]
 pub struct CallableType<'db> {
     #[return_ref]
-    signature: Box<[Signature<'db>]>,
+    signatures: Box<[Signature<'db>]>,
 }
 
 impl<'db> CallableType<'db> {
@@ -6164,7 +6177,7 @@ impl<'db> CallableType<'db> {
     fn normalized(self, db: &'db dyn Db) -> Self {
         CallableType::from_overloads(
             db,
-            self.signature(db)
+            self.signatures(db)
                 .iter()
                 .map(|signature| signature.normalized(db)),
         )
@@ -6176,7 +6189,7 @@ impl<'db> CallableType<'db> {
     fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         CallableType::from_overloads(
             db,
-            self.signature(db)
+            self.signatures(db)
                 .iter()
                 .map(|signature| signature.apply_specialization(db, specialization)),
         )
@@ -6184,16 +6197,16 @@ impl<'db> CallableType<'db> {
 
     /// Check whether this callable type is fully static.
     ///
-    /// See [Type::is_fully_static] for more details.
+    /// See [`Type::is_fully_static`] for more details.
     fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        self.signature(db)
+        self.signatures(db)
             .iter()
             .all(|signature| signature.is_fully_static(db))
     }
 
     /// Check whether this callable type is a subtype of another callable type.
     ///
-    /// See [Type::is_subtype_of] for more details.
+    /// See [`Type::is_subtype_of`] for more details.
     fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         self.check_relation_impl(
             db,
@@ -6205,7 +6218,7 @@ impl<'db> CallableType<'db> {
 
     /// Check whether this callable type is assignable to another callable type.
     ///
-    /// See [Type::is_assignable_to] for more details.
+    /// See [`Type::is_assignable_to`] for more details.
     fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.check_relation_impl(
             db,
@@ -6217,7 +6230,7 @@ impl<'db> CallableType<'db> {
 
     /// Check whether this callable type is equivalent to another callable type.
     ///
-    /// See [Type::is_equivalent_to] for more details.
+    /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.check_relation_impl(
             db,
@@ -6229,7 +6242,7 @@ impl<'db> CallableType<'db> {
 
     /// Check whether this callable type is gradual equivalent to another callable type.
     ///
-    /// See [Type::is_gradual_equivalent_to] for more details.
+    /// See [`Type::is_gradual_equivalent_to`] for more details.
     fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.check_relation_impl(
             db,

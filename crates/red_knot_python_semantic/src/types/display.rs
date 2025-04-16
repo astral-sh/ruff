@@ -388,7 +388,7 @@ impl Display for DisplaySpecialization<'_> {
 impl<'db> CallableType<'db> {
     pub(crate) fn display(&'db self, db: &'db dyn Db) -> DisplayCallableType<'db> {
         DisplayCallableType {
-            signatures: self.signature(db),
+            signatures: self.signatures(db),
             db,
         }
     }

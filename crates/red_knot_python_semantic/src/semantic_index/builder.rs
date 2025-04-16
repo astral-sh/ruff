@@ -1116,6 +1116,15 @@ where
                 // and return-type annotations.
                 let (symbol, _) = self.add_symbol(name.id.clone());
 
+                // Record a use of the function name in the scope that it is defined in, so that it
+                // can be used to find previously defined functions with the same name. This is
+                // used to collect all the overloaded definitions of a function. This needs to be
+                // done on the `Identifier` node as oppose to `ExprName` because that's what the
+                // AST uses.
+                //
+                // This could possibly be done only if there are decorators to avoid the extra
+                // work for non-overloaded functions, but that wouldn't work because the
+                // implementation function is not decorated with `@overload`.
                 self.mark_symbol_used(symbol);
                 let use_id = self.current_ast_ids().record_use(name);
                 self.current_use_def_map_mut()
