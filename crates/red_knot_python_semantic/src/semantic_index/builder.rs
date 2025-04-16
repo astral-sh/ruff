@@ -37,8 +37,8 @@ use crate::semantic_index::predicate::{
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
-    SymbolTableBuilder,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
+    ScopedSymbolId, SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
     EagerBindingsKey, FlowSnapshot, ScopedEagerBindingsId, UseDefMapBuilder,
@@ -2277,9 +2277,23 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         None
     }
 
-    // TODO(brent) track async scopes
     fn in_async_context(&self) -> bool {
-        true
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            match scope.kind() {
+                ScopeKind::Class | ScopeKind::Lambda => return false,
+                ScopeKind::Function => {
+                    if let Some(f) = scope.node().as_function() {
+                        return f.is_async;
+                    }
+                }
+                ScopeKind::Comprehension
+                | ScopeKind::Module
+                | ScopeKind::TypeAlias
+                | ScopeKind::Annotation => {}
+            }
+        }
+        false
     }
 
     fn in_await_allowed_context(&self) -> bool {
@@ -2322,9 +2336,11 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         matches!(kind, ScopeKind::Function | ScopeKind::Lambda)
     }
 
-    // TODO(brent) track generator kind, not just general comprehension
     fn in_generator_scope(&self) -> bool {
-        false
+        matches!(
+            self.scopes[self.current_scope()].node(),
+            NodeWithScopeKind::GeneratorExpression(_)
+        )
     }
 
     fn in_notebook(&self) -> bool {
