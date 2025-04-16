@@ -221,6 +221,32 @@ reveal_type(D(1))  # revealed: D[Literal[1]]
 wrong_innards: D[int] = D("five")
 ```
 
+## `__init__` is itself generic
+
+TODO: These do not currently work yet, because we don't correctly model the nested generic contexts.
+
+```py
+class C[T]:
+    def __init__[S](self, x: T, y: S) -> None: ...
+
+# TODO: no error
+# TODO: revealed: C[Literal[1]]
+# error: [invalid-argument-type]
+reveal_type(C(1, 1))  # revealed: C[Unknown]
+# TODO: no error
+# TODO: revealed: C[Literal[1]]
+# error: [invalid-argument-type]
+reveal_type(C(1, "string"))  # revealed: C[Unknown]
+# TODO: no error
+# TODO: revealed: C[Literal[1]]
+# error: [invalid-argument-type]
+reveal_type(C(1, True))  # revealed: C[Unknown]
+
+# TODO: error for the correct reason
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `S`, found `Literal[1]`"
+wrong_innards: C[int] = C("five", 1)
+```
+
 ## Generic subclass
 
 When a generic subclass fills its superclass's type parameter with one of its own, the actual types
