@@ -331,6 +331,25 @@ static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], No
 static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
 ```
 
+## Generics
+
+### Inheriting from a specialized generic class
+
+```py
+from knot_extensions import is_assignable_to, static_assert
+from typing import Any
+
+class A[T]:
+    pass
+
+class B(A[int]):
+    pass
+
+static_assert(is_assignable_to(B, A[int]))
+static_assert(not is_assignable_to(B, A[bool]))
+static_assert(not is_assignable_to(B, A[Any]))
+```
+
 ## General properties
 
 See also: our property tests in `property_tests.rs`.

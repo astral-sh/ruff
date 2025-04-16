@@ -253,6 +253,25 @@ static_assert(not is_subtype_of(int, Not[Literal[3]]))
 static_assert(not is_subtype_of(Literal[1], Intersection[int, Not[Literal[1]]]))
 ```
 
+## Generics
+
+### Inheriting from a specialized generic class
+
+```py
+from knot_extensions import is_subtype_of, static_assert
+from typing import Any
+
+class A[T]:
+    pass
+
+class B(A[int]):
+    pass
+
+static_assert(is_subtype_of(B, A[int]))
+static_assert(not is_subtype_of(B, A[bool]))
+static_assert(not is_subtype_of(B, A[Any]))
+```
+
 ## Special types
 
 ### `Never`
