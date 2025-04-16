@@ -1,29 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/airflow/mod.rs
 ---
-AIR301_class_attribute.py:24:21: AIR301 [*] `airflow.Dataset` is removed in Airflow 3.0
-   |
-23 | # airflow.Dataset
-24 | dataset_from_root = DatasetFromRoot()
-   |                     ^^^^^^^^^^^^^^^ AIR301
-25 | dataset_from_root.iter_datasets()
-26 | dataset_from_root.iter_dataset_aliases()
-   |
-   = help: Use `airflow.sdk.Asset` instead
-
-ℹ Safe fix
-19 19 | from airflow.providers_manager import ProvidersManager
-20 20 | from airflow.secrets.base_secrets import BaseSecretsBackend
-21 21 | from airflow.secrets.local_filesystem import LocalFilesystemBackend
-   22 |+from airflow.sdk import Asset
-22 23 | 
-23 24 | # airflow.Dataset
-24    |-dataset_from_root = DatasetFromRoot()
-   25 |+dataset_from_root = Asset()
-25 26 | dataset_from_root.iter_datasets()
-26 27 | dataset_from_root.iter_dataset_aliases()
-27 28 | 
-
 AIR301_class_attribute.py:25:19: AIR301 [*] `iter_datasets` is removed in Airflow 3.0
    |
 23 | # airflow.Dataset
@@ -64,34 +41,6 @@ AIR301_class_attribute.py:26:19: AIR301 [*] `iter_dataset_aliases` is removed in
 27 27 | 
 28 28 | # airflow.datasets
 29 29 | dataset_to_test_method_call = Dataset()
-
-AIR301_class_attribute.py:29:31: AIR301 [*] `airflow.datasets.Dataset` is removed in Airflow 3.0
-   |
-28 | # airflow.datasets
-29 | dataset_to_test_method_call = Dataset()
-   |                               ^^^^^^^ AIR301
-30 | dataset_to_test_method_call.iter_datasets()
-31 | dataset_to_test_method_call.iter_dataset_aliases()
-   |
-   = help: Use `airflow.sdk.Asset` instead
-
-ℹ Safe fix
-19 19 | from airflow.providers_manager import ProvidersManager
-20 20 | from airflow.secrets.base_secrets import BaseSecretsBackend
-21 21 | from airflow.secrets.local_filesystem import LocalFilesystemBackend
-   22 |+from airflow.sdk import Asset
-22 23 | 
-23 24 | # airflow.Dataset
-24 25 | dataset_from_root = DatasetFromRoot()
---------------------------------------------------------------------------------
-26 27 | dataset_from_root.iter_dataset_aliases()
-27 28 | 
-28 29 | # airflow.datasets
-29    |-dataset_to_test_method_call = Dataset()
-   30 |+dataset_to_test_method_call = Asset()
-30 31 | dataset_to_test_method_call.iter_datasets()
-31 32 | dataset_to_test_method_call.iter_dataset_aliases()
-32 33 | 
 
 AIR301_class_attribute.py:30:29: AIR301 [*] `iter_datasets` is removed in Airflow 3.0
    |
@@ -134,17 +83,6 @@ AIR301_class_attribute.py:31:29: AIR301 [*] `iter_dataset_aliases` is removed in
 33 33 | alias_to_test_method_call = DatasetAlias()
 34 34 | alias_to_test_method_call.iter_datasets()
 
-AIR301_class_attribute.py:33:29: AIR301 `airflow.datasets.DatasetAlias` is removed in Airflow 3.0
-   |
-31 | dataset_to_test_method_call.iter_dataset_aliases()
-32 |
-33 | alias_to_test_method_call = DatasetAlias()
-   |                             ^^^^^^^^^^^^ AIR301
-34 | alias_to_test_method_call.iter_datasets()
-35 | alias_to_test_method_call.iter_dataset_aliases()
-   |
-   = help: Use `airflow.sdk.AssetAlias` instead
-
 AIR301_class_attribute.py:34:27: AIR301 [*] `iter_datasets` is removed in Airflow 3.0
    |
 33 | alias_to_test_method_call = DatasetAlias()
@@ -184,17 +122,6 @@ AIR301_class_attribute.py:35:27: AIR301 [*] `iter_dataset_aliases` is removed in
 36 36 | 
 37 37 | any_to_test_method_call = DatasetAny()
 38 38 | any_to_test_method_call.iter_datasets()
-
-AIR301_class_attribute.py:37:27: AIR301 `airflow.datasets.DatasetAny` is removed in Airflow 3.0
-   |
-35 | alias_to_test_method_call.iter_dataset_aliases()
-36 |
-37 | any_to_test_method_call = DatasetAny()
-   |                           ^^^^^^^^^^ AIR301
-38 | any_to_test_method_call.iter_datasets()
-39 | any_to_test_method_call.iter_dataset_aliases()
-   |
-   = help: Use `airflow.sdk.AssetAny` instead
 
 AIR301_class_attribute.py:38:25: AIR301 [*] `iter_datasets` is removed in Airflow 3.0
    |
@@ -236,7 +163,7 @@ AIR301_class_attribute.py:39:25: AIR301 [*] `iter_dataset_aliases` is removed in
 41 41 | # airflow.datasets.manager
 42 42 | dm = DatasetManager()
 
-AIR301_class_attribute.py:42:6: AIR301 `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+AIR301_class_attribute.py:42:6: AIR301 [*] `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
    |
 41 | # airflow.datasets.manager
 42 | dm = DatasetManager()
@@ -245,6 +172,24 @@ AIR301_class_attribute.py:42:6: AIR301 `airflow.datasets.manager.DatasetManager`
 44 | dm.create_datasets()
    |
    = help: Use `airflow.assets.manager.AssetManager` instead
+
+ℹ Safe fix
+19 19 | from airflow.providers_manager import ProvidersManager
+20 20 | from airflow.secrets.base_secrets import BaseSecretsBackend
+21 21 | from airflow.secrets.local_filesystem import LocalFilesystemBackend
+   22 |+from airflow.assets.manager import AssetManager
+22 23 | 
+23 24 | # airflow.Dataset
+24 25 | dataset_from_root = DatasetFromRoot()
+--------------------------------------------------------------------------------
+39 40 | any_to_test_method_call.iter_dataset_aliases()
+40 41 | 
+41 42 | # airflow.datasets.manager
+42    |-dm = DatasetManager()
+   43 |+dm = AssetManager()
+43 44 | dm.register_dataset_change()
+44 45 | dm.create_datasets()
+45 46 | dm.notify_dataset_created()
 
 AIR301_class_attribute.py:43:4: AIR301 [*] `register_dataset_change` is removed in Airflow 3.0
    |
@@ -350,7 +295,7 @@ AIR301_class_attribute.py:47:4: AIR301 [*] `notify_dataset_alias_created` is rem
 49 49 | # airflow.lineage.hook
 50 50 | dl_info = DatasetLineageInfo()
 
-AIR301_class_attribute.py:50:11: AIR301 `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
+AIR301_class_attribute.py:50:11: AIR301 [*] `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
    |
 49 | # airflow.lineage.hook
 50 | dl_info = DatasetLineageInfo()
@@ -358,6 +303,25 @@ AIR301_class_attribute.py:50:11: AIR301 `airflow.lineage.hook.DatasetLineageInfo
 51 | dl_info.dataset
    |
    = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
+
+ℹ Safe fix
+9  9  |     DatasetAny,
+10 10 | )
+11 11 | from airflow.datasets.manager import DatasetManager
+12    |-from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector
+   12 |+from airflow.lineage.hook import DatasetLineageInfo, HookLineageCollector, AssetLineageInfo
+13 13 | from airflow.providers.amazon.auth_manager.aws_auth_manager import AwsAuthManager
+14 14 | from airflow.providers.apache.beam.hooks import BeamHook, NotAir302HookError
+15 15 | from airflow.providers.google.cloud.secrets.secret_manager import (
+--------------------------------------------------------------------------------
+47 47 | dm.notify_dataset_alias_created()
+48 48 | 
+49 49 | # airflow.lineage.hook
+50    |-dl_info = DatasetLineageInfo()
+   50 |+dl_info = AssetLineageInfo()
+51 51 | dl_info.dataset
+52 52 | 
+53 53 | hlc = HookLineageCollector()
 
 AIR301_class_attribute.py:51:9: AIR301 [*] `dataset` is removed in Airflow 3.0
    |

@@ -1,0 +1,271 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301_names_fix.py:15:1: AIR301 [*] `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
+   |
+14 | # airflow.datasets.manager
+15 | DatasetManager()
+   | ^^^^^^^^^^^^^^ AIR301
+16 | dataset_manager
+17 | resolve_dataset_manager
+   |
+   = help: Use `airflow.assets.manager.AssetManager` instead
+
+ℹ Safe fix
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11 11 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+12 12 | from airflow.secrets.local_filesystem import load_connections
+   13 |+from airflow.assets.manager import AssetManager
+13 14 | 
+14 15 | # airflow.datasets.manager
+15    |-DatasetManager()
+   16 |+AssetManager()
+16 17 | dataset_manager
+17 18 | resolve_dataset_manager
+18 19 | 
+
+AIR301_names_fix.py:16:1: AIR301 [*] `airflow.datasets.manager.dataset_manager` is removed in Airflow 3.0
+   |
+14 | # airflow.datasets.manager
+15 | DatasetManager()
+16 | dataset_manager
+   | ^^^^^^^^^^^^^^^ AIR301
+17 | resolve_dataset_manager
+   |
+   = help: Use `airflow.assets.manager.asset_manager` instead
+
+ℹ Safe fix
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11 11 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+12 12 | from airflow.secrets.local_filesystem import load_connections
+   13 |+from airflow.assets.manager import asset_manager
+13 14 | 
+14 15 | # airflow.datasets.manager
+15 16 | DatasetManager()
+16    |-dataset_manager
+   17 |+asset_manager
+17 18 | resolve_dataset_manager
+18 19 | 
+19 20 | # airflow.auth.managers
+
+AIR301_names_fix.py:17:1: AIR301 [*] `airflow.datasets.manager.resolve_dataset_manager` is removed in Airflow 3.0
+   |
+15 | DatasetManager()
+16 | dataset_manager
+17 | resolve_dataset_manager
+   | ^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+18 |
+19 | # airflow.auth.managers
+   |
+   = help: Use `airflow.assets.manager.resolve_asset_manager` instead
+
+ℹ Safe fix
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11 11 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+12 12 | from airflow.secrets.local_filesystem import load_connections
+   13 |+from airflow.assets.manager import resolve_asset_manager
+13 14 | 
+14 15 | # airflow.datasets.manager
+15 16 | DatasetManager()
+16 17 | dataset_manager
+17    |-resolve_dataset_manager
+   18 |+resolve_asset_manager
+18 19 | 
+19 20 | # airflow.auth.managers
+20 21 | is_authorized_dataset
+
+AIR301_names_fix.py:20:1: AIR301 [*] `airflow.auth.managers.base_auth_manager.is_authorized_dataset` is removed in Airflow 3.0
+   |
+19 | # airflow.auth.managers
+20 | is_authorized_dataset
+   | ^^^^^^^^^^^^^^^^^^^^^ AIR301
+21 | DatasetDetails()
+   |
+   = help: Use `airflow.api_fastapi.auth.managers.base_auth_manager.is_authorized_asset` instead
+
+ℹ Safe fix
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11 11 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+12 12 | from airflow.secrets.local_filesystem import load_connections
+   13 |+from airflow.api_fastapi.auth.managers.base_auth_manager import is_authorized_asset
+13 14 | 
+14 15 | # airflow.datasets.manager
+15 16 | DatasetManager()
+--------------------------------------------------------------------------------
+17 18 | resolve_dataset_manager
+18 19 | 
+19 20 | # airflow.auth.managers
+20    |-is_authorized_dataset
+   21 |+is_authorized_asset
+21 22 | DatasetDetails()
+22 23 | 
+23 24 | # airflow.lineage.hook
+
+AIR301_names_fix.py:24:1: AIR301 [*] `airflow.lineage.hook.DatasetLineageInfo` is removed in Airflow 3.0
+   |
+23 | # airflow.lineage.hook
+24 | DatasetLineageInfo()
+   | ^^^^^^^^^^^^^^^^^^ AIR301
+25 |
+26 | # airflow.listeners.spec.dataset
+   |
+   = help: Use `airflow.lineage.hook.AssetLineageInfo` instead
+
+ℹ Safe fix
+6  6  |     dataset_manager,
+7  7  |     resolve_dataset_manager,
+8  8  | )
+9     |-from airflow.lineage.hook import DatasetLineageInfo
+   9  |+from airflow.lineage.hook import DatasetLineageInfo, AssetLineageInfo
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11 11 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+12 12 | from airflow.secrets.local_filesystem import load_connections
+--------------------------------------------------------------------------------
+21 21 | DatasetDetails()
+22 22 | 
+23 23 | # airflow.lineage.hook
+24    |-DatasetLineageInfo()
+   24 |+AssetLineageInfo()
+25 25 | 
+26 26 | # airflow.listeners.spec.dataset
+27 27 | on_dataset_changed
+
+AIR301_names_fix.py:27:1: AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_changed` is removed in Airflow 3.0
+   |
+26 | # airflow.listeners.spec.dataset
+27 | on_dataset_changed
+   | ^^^^^^^^^^^^^^^^^^ AIR301
+28 | on_dataset_created
+29 | # airflow.metrics.validators
+   |
+   = help: Use `airflow.listeners.spec.asset.on_asset_changed` instead
+
+ℹ Safe fix
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11 11 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+12 12 | from airflow.secrets.local_filesystem import load_connections
+   13 |+from airflow.listeners.spec.asset import on_asset_changed
+13 14 | 
+14 15 | # airflow.datasets.manager
+15 16 | DatasetManager()
+--------------------------------------------------------------------------------
+24 25 | DatasetLineageInfo()
+25 26 | 
+26 27 | # airflow.listeners.spec.dataset
+27    |-on_dataset_changed
+   28 |+on_asset_changed
+28 29 | on_dataset_created
+29 30 | # airflow.metrics.validators
+30 31 | AllowListValidator()
+
+AIR301_names_fix.py:28:1: AIR301 [*] `airflow.listeners.spec.dataset.on_dataset_created` is removed in Airflow 3.0
+   |
+26 | # airflow.listeners.spec.dataset
+27 | on_dataset_changed
+28 | on_dataset_created
+   | ^^^^^^^^^^^^^^^^^^ AIR301
+29 | # airflow.metrics.validators
+30 | AllowListValidator()
+   |
+   = help: Use `airflow.listeners.spec.asset.on_asset_created` instead
+
+ℹ Safe fix
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11 11 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+12 12 | from airflow.secrets.local_filesystem import load_connections
+   13 |+from airflow.listeners.spec.asset import on_asset_created
+13 14 | 
+14 15 | # airflow.datasets.manager
+15 16 | DatasetManager()
+--------------------------------------------------------------------------------
+25 26 | 
+26 27 | # airflow.listeners.spec.dataset
+27 28 | on_dataset_changed
+28    |-on_dataset_created
+   29 |+on_asset_created
+29 30 | # airflow.metrics.validators
+30 31 | AllowListValidator()
+31 32 | BlockListValidator()
+
+AIR301_names_fix.py:30:1: AIR301 [*] `airflow.metrics.validators.AllowListValidator` is removed in Airflow 3.0
+   |
+28 | on_dataset_created
+29 | # airflow.metrics.validators
+30 | AllowListValidator()
+   | ^^^^^^^^^^^^^^^^^^ AIR301
+31 | BlockListValidator()
+   |
+   = help: Use `airflow.metrics.validators.PatternAllowListValidator` instead
+
+ℹ Safe fix
+8  8  | )
+9  9  | from airflow.lineage.hook import DatasetLineageInfo
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11    |-from airflow.metrics.validators import AllowListValidator, BlockListValidator
+   11 |+from airflow.metrics.validators import AllowListValidator, BlockListValidator, PatternAllowListValidator
+12 12 | from airflow.secrets.local_filesystem import load_connections
+13 13 | 
+14 14 | # airflow.datasets.manager
+--------------------------------------------------------------------------------
+27 27 | on_dataset_changed
+28 28 | on_dataset_created
+29 29 | # airflow.metrics.validators
+30    |-AllowListValidator()
+   30 |+PatternAllowListValidator()
+31 31 | BlockListValidator()
+32 32 | 
+33 33 | # airflow.secrets.local_filesystem
+
+AIR301_names_fix.py:31:1: AIR301 [*] `airflow.metrics.validators.BlockListValidator` is removed in Airflow 3.0
+   |
+29 | # airflow.metrics.validators
+30 | AllowListValidator()
+31 | BlockListValidator()
+   | ^^^^^^^^^^^^^^^^^^ AIR301
+32 |
+33 | # airflow.secrets.local_filesystem
+   |
+   = help: Use `airflow.metrics.validators.PatternBlockListValidator` instead
+
+ℹ Safe fix
+8  8  | )
+9  9  | from airflow.lineage.hook import DatasetLineageInfo
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11    |-from airflow.metrics.validators import AllowListValidator, BlockListValidator
+   11 |+from airflow.metrics.validators import AllowListValidator, BlockListValidator, PatternBlockListValidator
+12 12 | from airflow.secrets.local_filesystem import load_connections
+13 13 | 
+14 14 | # airflow.datasets.manager
+--------------------------------------------------------------------------------
+28 28 | on_dataset_created
+29 29 | # airflow.metrics.validators
+30 30 | AllowListValidator()
+31    |-BlockListValidator()
+   31 |+PatternBlockListValidator()
+32 32 | 
+33 33 | # airflow.secrets.local_filesystem
+34 34 | load_connections
+
+AIR301_names_fix.py:34:1: AIR301 [*] `airflow.secrets.local_filesystem.load_connections` is removed in Airflow 3.0
+   |
+33 | # airflow.secrets.local_filesystem
+34 | load_connections
+   | ^^^^^^^^^^^^^^^^ AIR301
+   |
+   = help: Use `airflow.secrets.local_filesystem.load_connections_dict` instead
+
+ℹ Safe fix
+9  9  | from airflow.lineage.hook import DatasetLineageInfo
+10 10 | from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
+11 11 | from airflow.metrics.validators import AllowListValidator, BlockListValidator
+12    |-from airflow.secrets.local_filesystem import load_connections
+   12 |+from airflow.secrets.local_filesystem import load_connections, load_connections_dict
+13 13 | 
+14 14 | # airflow.datasets.manager
+15 15 | DatasetManager()
+--------------------------------------------------------------------------------
+31 31 | BlockListValidator()
+32 32 | 
+33 33 | # airflow.secrets.local_filesystem
+34    |-load_connections
+   34 |+load_connections_dict
