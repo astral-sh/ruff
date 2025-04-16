@@ -838,6 +838,13 @@ impl<'db> ClassLiteralType<'db> {
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of
             // the class from the arguments that are passed in.
+            //
+            // We might decide to handle other class methods the same way, having them inherit the
+            // class's generic context, and performing type inference on calls to them to determine
+            // the specialization of the class. If we do that, we would update this to also apply
+            // to any method with a `@classmethod` decorator. (`__init__` would remain a special
+            // case, since it's an _instance_ method where we don't yet know the generic class's
+            // specialization.)
             match (self, ty, specialization, name) {
                 (
                     ClassLiteralType::Generic(origin),

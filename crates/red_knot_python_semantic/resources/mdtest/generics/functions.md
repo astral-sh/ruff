@@ -43,10 +43,6 @@ def absurd[T]() -> T:
 If the type of a generic function parameter is a typevar, then we can infer what type that typevar
 is bound to at each call site.
 
-TODO: Note that some of the TODO revealed types have two options, since we haven't decided yet
-whether we want to infer a more specific `Literal` type where possible, or use heuristics to weaken
-the inferred type to e.g. `int`.
-
 ```py
 def f[T](x: T) -> T:
     return x
@@ -78,7 +74,6 @@ in the function.
 
 ```py
 def good_param[T: int](x: T) -> None:
-    # TODO: revealed: T & int
     reveal_type(x)  # revealed: T
 ```
 
@@ -147,10 +142,7 @@ parameters simultaneously.
 def two_params[T](x: T, y: T) -> T:
     return x
 
-# TODO: revealed: str
 reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
-
-# TODO: revealed: str | int
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
@@ -158,9 +150,10 @@ When one of the parameters is a union, we attempt to find the smallest specializ
 all of the constraints.
 
 ```py
-# TODO: make this return list[T], so that we can write a correct body
-# error: [invalid-return-type]
-def union_param[T](x: T | None) -> T: ...
+def union_param[T](x: T | None) -> T:
+    if x is None:
+        raise ValueError
+    return x
 
 reveal_type(union_param("a"))  # revealed: Literal["a"]
 reveal_type(union_param(1))  # revealed: Literal[1]
@@ -182,10 +175,7 @@ reveal_type(union_and_nonunion_params("a", 1))  # revealed: Literal["a", 1]
 def tuple_param[T, S](x: T | S, y: tuple[T, S]) -> tuple[T, S]:
     return y
 
-# TODO: revealed: tuple[str, int]
 reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
-
-# TODO: revealed: tuple[str, int]
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
 
@@ -201,9 +191,6 @@ def f[T](x: T) -> tuple[T, int]:
 def g[T](x: T) -> T | None:
     return x
 
-# TODO: revealed: tuple[str | None, int]
 reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
-
-# TODO: revealed: tuple[str, int] | None
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```

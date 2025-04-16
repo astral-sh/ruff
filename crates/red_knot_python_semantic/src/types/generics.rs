@@ -10,6 +10,9 @@ use crate::types::{
 use crate::Db;
 
 /// A list of formal type variables for a generic function, class, or type alias.
+///
+/// TODO: Handle nested generic contexts better, with actual parent links to the lexically
+/// containing context.
 #[salsa::tracked(debug)]
 pub struct GenericContext<'db> {
     #[return_ref]
@@ -110,6 +113,9 @@ impl<'db> GenericContext<'db> {
 }
 
 /// An assignment of a specific type to each type variable in a generic scope.
+///
+/// TODO: Handle nested specializations better, with actual parent links to the specialization of
+/// the lexically containing context.
 #[salsa::tracked(debug)]
 pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
