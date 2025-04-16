@@ -173,6 +173,19 @@ GenericWithOrder[int](1) < GenericWithOrder[int](1)
 GenericWithOrder[int](1) < GenericWithOrder[str]("a")  # error: [unsupported-operator]
 ```
 
+If a class already defines one of the comparison methods, a `TypeError` is raised at runtime.
+Ideally, we would emit a diagnostic in that case:
+
+```py
+@dataclass(order=True)
+class AlreadyHasCustomDunderLt:
+    x: int
+
+    # TODO: Ideally, we would emit a diagnostic here
+    def __lt__(self, other: object) -> bool:
+        return False
+```
+
 ### `unsafe_hash`
 
 To do
