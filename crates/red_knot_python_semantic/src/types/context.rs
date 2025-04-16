@@ -404,7 +404,6 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     ///
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
-    #[must_use]
     pub(super) fn into_diagnostic(
         self,
         message: impl std::fmt::Display,
@@ -541,7 +540,6 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
     ///
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
-    #[must_use]
     pub(super) fn into_diagnostic(
         self,
         message: impl std::fmt::Display,
