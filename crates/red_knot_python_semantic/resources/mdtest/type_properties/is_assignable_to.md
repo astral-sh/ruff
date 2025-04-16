@@ -504,4 +504,22 @@ c: Callable[[Any], str] = f
 c: Callable[[Any], str] = g
 ```
 
+### Method types
+
+```py
+from typing import Any, Callable
+
+class A:
+    def f(self, x: Any) -> str:
+        return ""
+
+    def g(self, x: Any) -> int:
+        return 1
+
+c: Callable[[Any], str] = A().f
+
+# error: [invalid-assignment] "Object of type `bound method A.g(x: Any) -> int` is not assignable to `(Any, /) -> str`"
+c: Callable[[Any], str] = A().g
+```
+
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
