@@ -2442,13 +2442,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                     true
                 } else {
                     // TODO: This is not a very helpful error message, as it does not include the underlying reason
-                    // why the assignment is invalid. This would be a good use case for nested diagnostics.
+                    // why the assignment is invalid. This would be a good use case for sub-diagnostics.
                     if emit_diagnostics {
-                        self.context.report_lint_old(&INVALID_ASSIGNMENT, target, format_args!(
-                            "Object of type `{}` is not assignable to attribute `{attribute}` on type `{}`",
-                            value_ty.display(self.db()),
-                            object_ty.display(self.db()),
-                        ));
+                        if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Object of type `{}` is not assignable \
+                                 to attribute `{attribute}` on type `{}`",
+                                value_ty.display(self.db()),
+                                object_ty.display(self.db()),
+                            ));
+                        }
                     }
 
                     false
@@ -2463,12 +2467,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                     true
                 } else {
                     if emit_diagnostics {
-                        // TODO: same here, see above
-                        self.context.report_lint_old(&INVALID_ASSIGNMENT, target, format_args!(
-                            "Object of type `{}` is not assignable to attribute `{attribute}` on type `{}`",
-                            value_ty.display(self.db()),
-                            object_ty.display(self.db()),
-                        ));
+                        if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                        {
+                            // TODO: same here, see above
+                            builder.into_diagnostic(format_args!(
+                                "Object of type `{}` is not assignable \
+                                 to attribute `{attribute}` on type `{}`",
+                                value_ty.display(self.db()),
+                                object_ty.display(self.db()),
+                            ));
+                        }
                     }
                     false
                 }
@@ -2557,15 +2565,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .is_ok();
 
                             if !successful_call && emit_diagnostics {
-                                // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                                self.context.report_lint_old(
-                                &INVALID_ASSIGNMENT,
-                                target,
-                                format_args!(
-                                    "Invalid assignment to data descriptor attribute `{attribute}` on type `{}` with custom `__set__` method",
-                                    object_ty.display(db)
-                                ),
-                            );
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                {
+                                    // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
+                                    builder.into_diagnostic(format_args!(
+                                        "Invalid assignment to data descriptor attribute \
+                                         `{attribute}` on type `{}` with custom `__set__` method",
+                                        object_ty.display(db)
+                                    ));
+                                }
                             }
 
                             successful_call
@@ -2695,15 +2704,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 .is_ok();
 
                             if !successful_call && emit_diagnostics {
-                                // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
-                                self.context.report_lint_old(
-                                    &INVALID_ASSIGNMENT,
-                                    target,
-                                    format_args!(
-                                        "Invalid assignment to data descriptor attribute `{attribute}` on type `{}` with custom `__set__` method",
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                {
+                                    // TODO: Here, it would be nice to emit an additional diagnostic that explains why the call failed
+                                    builder.into_diagnostic(format_args!(
+                                        "Invalid assignment to data descriptor attribute \
+                                         `{attribute}` on type `{}` with custom `__set__` method",
                                         object_ty.display(db)
-                                    ),
-                                );
+                                    ));
+                                }
                             }
 
                             successful_call
