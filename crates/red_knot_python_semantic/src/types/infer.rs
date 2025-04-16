@@ -3906,13 +3906,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Name(name) => {
                 self.infer_definition(name);
             }
-            ast::Expr::Tuple(tuple) => {
-                for elt in &tuple.elts {
-                    self.infer_comprehension_target(elt);
-                }
-            }
-            ast::Expr::List(list) => {
-                for elt in &list.elts {
+            ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+            | ast::Expr::List(ast::ExprList { elts, .. }) => {
+                for elt in elts {
                     self.infer_comprehension_target(elt);
                 }
             }
