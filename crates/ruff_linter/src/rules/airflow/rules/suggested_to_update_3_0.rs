@@ -210,6 +210,25 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "expand_alias_to_datasets" => Replacement::Name("airflow.sdk.expand_alias_to_assets"),
             _ => return,
         },
+
+        // airflow.decorators
+        ["airflow", "decorators", rest @ ("dag" | "task" | "task_group" | "setup" | "teardown")] => {
+            Replacement::SourceModuleMoved {
+                module: "airflow.sdk",
+                name: (*rest).to_string(),
+            }
+        }
+
+        // airflow.io
+        ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk",
+            name: "ObjectStoragePath".to_string(),
+        },
+        ["airflow", "io", "storage", "attach"] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk.io",
+            name: "attach".to_string(),
+        },
+
         // airflow.models.baseoperator
         ["airflow", "models", "baseoperator", rest] => match *rest {
             "chain" | "chain_linear" | "cross_downstream" => Replacement::SourceModuleMoved {
@@ -220,6 +239,11 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
             }
             _ => return,
+        },
+        // airflow.model..DAG
+        ["airflow", "models", .., "DAG"] => Replacement::SourceModuleMoved {
+            module: "airflow.sdk",
+            name: "DAG".to_string(),
         },
         // airflow.timetables
         ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => {
