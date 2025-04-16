@@ -6911,13 +6911,27 @@ impl<'db> BoundSuperType<'db> {
                 .expect("Calling `find_name_in_mro` on dynamic type should return `Some`"),
             SuperOwnerKind::Class(class) | SuperOwnerKind::Instance(InstanceType { class }) => {
                 let (class_literal, _) = class.class_literal(db);
-
-                class_literal.class_member_from_mro(
-                    db,
-                    name,
-                    policy,
-                    self.skip_until_after_pivot(db, owner.iter_mro(db)),
-                )
+                // TODO properly support super() with generic types
+                // * requires a fix for https://github.com/astral-sh/ruff/issues/17432
+                // * also requires understanding how we should handle cases like this:
+                //  ```python
+                //  b_int: B[int]
+                //  b_unknown: B
+                //
+                //  super(B, b_int)
+                //  super(B[int], b_unknown)
+                //  ```
+                match class_literal {
+                    ClassLiteralType::Generic(_) => {
+                        Symbol::bound(todo_type!("super in generic class")).into()
+                    }
+                    ClassLiteralType::NonGeneric(_) => class_literal.class_member_from_mro(
+                        db,
+                        name,
+                        policy,
+                        self.skip_until_after_pivot(db, owner.iter_mro(db)),
+                    ),
+                }
             }
         }
     }
