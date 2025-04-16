@@ -1,0 +1,38 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+missing_maxsplit_arg.py:4:10: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+  |
+3 | # Errors
+4 | prefix = url.split(".")[0]  # [missing-maxsplit-arg]
+  |          ^^^^^^^^^^^^^^^^^ PLC0207
+5 | suffix = url.split(".")[-1]  # [missing-maxsplit-arg]
+  |
+
+missing_maxsplit_arg.py:5:10: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+  |
+3 | # Errors
+4 | prefix = url.split(".")[0]  # [missing-maxsplit-arg]
+5 | suffix = url.split(".")[-1]  # [missing-maxsplit-arg]
+  |          ^^^^^^^^^^^^^^^^^^ PLC0207
+6 |
+7 | prefix = "www.example.com".split(".")[0]  # [missing-maxsplit-arg]
+  |
+
+missing_maxsplit_arg.py:7:10: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+  |
+5 | suffix = url.split(".")[-1]  # [missing-maxsplit-arg]
+6 |
+7 | prefix = "www.example.com".split(".")[0]  # [missing-maxsplit-arg]
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+8 | suffix = "www.example.com".split(".")[-1]  # [missing-maxsplit-arg]
+  |
+
+missing_maxsplit_arg.py:8:10: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+   |
+ 7 | prefix = "www.example.com".split(".")[0]  # [missing-maxsplit-arg]
+ 8 | suffix = "www.example.com".split(".")[-1]  # [missing-maxsplit-arg]
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+ 9 |
+10 | # OK
+   |
