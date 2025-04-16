@@ -832,3 +832,16 @@ pub fn create_parse_diagnostic(file: File, err: &ruff_python_parser::ParseError)
     diag.annotate(Annotation::primary(span).message(&err.error));
     diag
 }
+
+/// Creates a `Diagnostic` from an unsupported syntax error.
+///
+/// See [`create_parse_diagnostic`] for more details.
+pub fn create_unsupported_syntax_diagnostic(
+    file: File,
+    err: &ruff_python_parser::UnsupportedSyntaxError,
+) -> Diagnostic {
+    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+    let span = Span::from(file).with_range(err.range);
+    diag.annotate(Annotation::primary(span).message(err.to_string()));
+    diag
+}

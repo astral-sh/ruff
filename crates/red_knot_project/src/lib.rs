@@ -10,7 +10,8 @@ use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSele
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
 use ruff_db::diagnostic::{
-    create_parse_diagnostic, Annotation, Diagnostic, DiagnosticId, Severity, Span,
+    create_parse_diagnostic, create_unsupported_syntax_diagnostic, Annotation, Diagnostic,
+    DiagnosticId, Severity, Span,
 };
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -424,16 +425,12 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
             .map(|error| create_parse_diagnostic(file, error)),
     );
 
-    diagnostics.extend(parsed.unsupported_syntax_errors().iter().map(|error| {
-        let mut diag = Diagnostic::new(
-            ruff_db::diagnostic::DiagnosticId::InvalidSyntax,
-            ruff_db::diagnostic::Severity::Error,
-            "",
-        );
-        let span = Span::from(file).with_range(error.range);
-        diag.annotate(Annotation::primary(span).message(error.to_string()));
-        diag
-    }));
+    diagnostics.extend(
+        parsed
+            .unsupported_syntax_errors()
+            .iter()
+            .map(|error| create_unsupported_syntax_diagnostic(file, error)),
+    );
 
     diagnostics.extend(check_types(db.upcast(), file).into_iter().cloned());
 
