@@ -50,8 +50,8 @@ super(A, C()).b
 # error: [unresolved-attribute] "Type `<super: Literal[A], C>` has no attribute `c`"
 super(A, C()).c
 
-reveal_type(super(C, C()).a)  # revealed: <bound method `a` of `C`>
-reveal_type(super(C, C()).b)  # revealed: <bound method `b` of `C`>
+reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
+reveal_type(super(C, C()).b)  # revealed: bound method C.b() -> Unknown
 reveal_type(super(C, C()).aa)  # revealed: int
 reveal_type(super(C, C()).bb)  # revealed: int
 ```
@@ -188,14 +188,14 @@ class A:
 class B(A): ...
 
 # A.__dict__["a1"].__get__(B(), B)
-reveal_type(super(B, B()).a1)  # revealed: <bound method `a1` of `B`>
+reveal_type(super(B, B()).a1)  # revealed: bound method B.a1() -> Unknown
 # A.__dict__["a2"].__get__(B(), B)
-reveal_type(super(B, B()).a2)  # revealed: <bound method `a2` of `type[B]`>
+reveal_type(super(B, B()).a2)  # revealed: bound method type[B].a2() -> Unknown
 
 # A.__dict__["a1"].__get__(None, B)
-reveal_type(super(B, B).a1)  # revealed: Literal[a1]
+reveal_type(super(B, B).a1)  # revealed: def a1(self) -> Unknown
 # A.__dict__["a2"].__get__(None, B)
-reveal_type(super(B, B).a2)  # revealed: <bound method `a2` of `Literal[B]`>
+reveal_type(super(B, B).a2)  # revealed: bound method Literal[B].a2() -> Unknown
 ```
 
 ## Union of Supers
@@ -394,7 +394,7 @@ class A:
 class B(A): ...
 
 reveal_type(A()[0])  # revealed: int
-reveal_type(super(B, B()).__getitem__)  # revealed: <bound method `__getitem__` of `B`>
+reveal_type(super(B, B()).__getitem__)  # revealed: bound method B.__getitem__(key: int) -> int
 # error: [non-subscriptable] "Cannot subscript object of type `<super: Literal[B], B>` with no `__getitem__` method"
 super(B, B())[0]
 ```
