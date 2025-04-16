@@ -108,9 +108,10 @@ impl<'db> UnionBuilder<'db> {
                     }
                 }
                 if !found {
-                    let mut literals = FxOrderSet::default();
-                    literals.insert(literal);
-                    self.elements.push(UnionElement::StringLiterals(literals));
+                    self.elements
+                        .push(UnionElement::StringLiterals(FxOrderSet::from_iter([
+                            literal,
+                        ])));
                 }
             }
             // Same for bytes literals as for string literals, above.
@@ -130,9 +131,10 @@ impl<'db> UnionBuilder<'db> {
                     }
                 }
                 if !found {
-                    let mut literals = FxOrderSet::default();
-                    literals.insert(literal);
-                    self.elements.push(UnionElement::BytesLiterals(literals));
+                    self.elements
+                        .push(UnionElement::BytesLiterals(FxOrderSet::from_iter([
+                            literal,
+                        ])));
                 }
             }
             // And same for int literals as well.
@@ -152,9 +154,10 @@ impl<'db> UnionBuilder<'db> {
                     }
                 }
                 if !found {
-                    let mut literals = FxOrderSet::default();
-                    literals.insert(literal);
-                    self.elements.push(UnionElement::IntLiterals(literals));
+                    self.elements
+                        .push(UnionElement::IntLiterals(FxOrderSet::from_iter([
+                            literal,
+                        ])));
                 }
             }
             // Adding `object` to a union results in `object`.
@@ -180,14 +183,12 @@ impl<'db> UnionBuilder<'db> {
                         // since they all have the same super-types. SAFETY: a `UnionElement` of
                         // literal kind must always have at least one element in it.
                         match element {
-                            UnionElement::IntLiterals(literals) => {
-                                Type::IntLiteral(*literals.iter().next().unwrap())
-                            }
+                            UnionElement::IntLiterals(literals) => Type::IntLiteral(literals[0]),
                             UnionElement::StringLiterals(literals) => {
-                                Type::StringLiteral(*literals.iter().next().unwrap())
+                                Type::StringLiteral(literals[0])
                             }
                             UnionElement::BytesLiterals(literals) => {
-                                Type::BytesLiteral(*literals.iter().next().unwrap())
+                                Type::BytesLiteral(literals[0])
                             }
                             UnionElement::Type(ty) => *ty,
                         }
