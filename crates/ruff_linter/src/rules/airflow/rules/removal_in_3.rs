@@ -210,8 +210,8 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
             checker.report_diagnostics(diagnostic_for_argument(arguments, "default_view", None));
             checker.report_diagnostics(diagnostic_for_argument(arguments, "orientation", None));
         }
-        _ => {
-            if is_airflow_auth_manager(qualified_name.segments()) {
+        segments => {
+            if is_airflow_auth_manager(segments) {
                 if !arguments.is_empty() {
                     checker.report_diagnostic(Diagnostic::new(
                         Airflow3Removal {
@@ -223,7 +223,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         arguments.range(),
                     ));
                 }
-            } else if is_airflow_task_handler(qualified_name.segments()) {
+            } else if is_airflow_task_handler(segments) {
                 checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "filename_template",
@@ -235,7 +235,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
                 ));
-                match qualified_name.segments() {
+                match segments {
                     ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
                         checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
