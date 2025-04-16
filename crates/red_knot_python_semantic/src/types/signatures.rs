@@ -15,7 +15,7 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{smallvec, SmallVec};
 
-use super::{definition_expression_type, CallableType, DynamicType, Type};
+use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::todo_type;
@@ -274,10 +274,6 @@ impl<'db> Signature<'db> {
             ),
             return_ty,
         }
-    }
-
-    pub(crate) fn to_callable_type(&self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::single(db, self.clone()))
     }
 
     pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {

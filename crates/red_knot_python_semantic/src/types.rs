@@ -6208,97 +6208,81 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_subtype_of`] for more details.
     fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.check_relation_impl(
-            db,
-            other,
-            |self_ty, other_ty| self_ty.is_subtype_of(db, other_ty),
-            |self_signature, other_signature| self_signature.is_subtype_of(db, other_signature),
-        )
+        self.check_relation_impl(db, other, &|self_signature, other_signature| {
+            self_signature.is_subtype_of(db, other_signature)
+        })
     }
 
     /// Check whether this callable type is assignable to another callable type.
     ///
     /// See [`Type::is_assignable_to`] for more details.
     fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.check_relation_impl(
-            db,
-            other,
-            |self_ty, other_ty| self_ty.is_assignable_to(db, other_ty),
-            |self_signature, other_signature| self_signature.is_assignable_to(db, other_signature),
-        )
+        self.check_relation_impl(db, other, &|self_signature, other_signature| {
+            self_signature.is_assignable_to(db, other_signature)
+        })
     }
 
     /// Check whether this callable type is equivalent to another callable type.
     ///
     /// See [`Type::is_equivalent_to`] for more details.
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.check_relation_impl(
-            db,
-            other,
-            |self_ty, other_ty| self_ty.is_equivalent_to(db, other_ty),
-            |self_signature, other_signature| self_signature.is_equivalent_to(db, other_signature),
-        )
+        self.check_relation_impl(db, other, &|self_signature, other_signature| {
+            self_signature.is_equivalent_to(db, other_signature)
+        })
     }
 
     /// Check whether this callable type is gradual equivalent to another callable type.
     ///
     /// See [`Type::is_gradual_equivalent_to`] for more details.
     fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.check_relation_impl(
-            db,
-            other,
-            |self_ty, other_ty| self_ty.is_gradual_equivalent_to(db, other_ty),
-            |self_signature, other_signature| {
-                self_signature.is_gradual_equivalent_to(db, other_signature)
-            },
-        )
+        self.check_relation_impl(db, other, &|self_signature, other_signature| {
+            self_signature.is_gradual_equivalent_to(db, other_signature)
+        })
     }
 
-    /// Implementation for the various relation checks between two callable types.
+    /// Implementation for the various relation checks between two, possible overloaded, callable
+    /// types.
     ///
-    /// The `check_types` closure is used to check the relation between two [`Type`]s while the
-    /// `check_signature` closure is used to check the relation between two [`Signature`]s. This is
-    /// mainly to accommodate a possibly overloaded callable type.
-    fn check_relation_impl<FT, FS>(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        check_types: FT,
-        check_signature: FS,
-    ) -> bool
+    /// The `check_signature` closure is used to check the relation between two [`Signature`]s.
+    fn check_relation_impl<F>(self, db: &'db dyn Db, other: Self, check_signature: &F) -> bool
     where
-        FT: Fn(Type<'db>, Type<'db>) -> bool,
-        FS: Fn(&Signature<'db>, &Signature<'db>) -> bool,
+        F: Fn(&Signature<'db>, &Signature<'db>) -> bool,
     {
-        match (&**self.signature(db), &**other.signature(db)) {
+        match (&**self.signatures(db), &**other.signatures(db)) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
                 check_signature(self_signature, other_signature)
             }
+
+            // `self` is possibly overloaded while `other` is definitely not overloaded.
             (self_signatures, [other_signature]) => {
-                let other_ty = other_signature.to_callable_type(db);
+                let other_callable = CallableType::single(db, other_signature.clone());
                 self_signatures
                     .iter()
-                    .map(|self_signature| self_signature.to_callable_type(db))
-                    .any(|self_ty| check_types(self_ty, other_ty))
+                    .map(|self_signature| CallableType::single(db, self_signature.clone()))
+                    .any(|self_callable| {
+                        self_callable.check_relation_impl(db, other_callable, check_signature)
+                    })
             }
+
+            // `self` is definitely not overloaded while `other` is possibly overloaded.
             ([self_signature], other_signatures) => {
-                let self_ty = self_signature.to_callable_type(db);
+                let self_callable = CallableType::single(db, self_signature.clone());
                 other_signatures
                     .iter()
-                    .map(|other_signature| other_signature.to_callable_type(db))
-                    .all(|other_ty| check_types(self_ty, other_ty))
+                    .map(|other_signature| CallableType::single(db, other_signature.clone()))
+                    .all(|other_callable| {
+                        self_callable.check_relation_impl(db, other_callable, check_signature)
+                    })
             }
-            (self_signatures, other_signatures) => {
-                let other_ty = Type::Callable(CallableType::from_overloads(
-                    db,
-                    other_signatures.iter().cloned(),
-                ));
-                self_signatures
-                    .iter()
-                    .map(|self_signature| self_signature.to_callable_type(db))
-                    .any(|self_ty| check_types(self_ty, other_ty))
-            }
+
+            // `self` is definitely overloaded while `other` is possibly overloaded.
+            (_, other_signatures) => other_signatures
+                .iter()
+                .map(|other_signature| CallableType::single(db, other_signature.clone()))
+                .all(|other_callable| {
+                    self.check_relation_impl(db, other_callable, check_signature)
+                }),
         }
     }
 }
