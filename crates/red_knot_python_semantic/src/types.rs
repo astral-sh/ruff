@@ -1368,6 +1368,10 @@ impl<'db> Type<'db> {
                     .is_assignable_to(db, target)
             }
 
+            (Type::BoundMethod(self_bound_method), Type::Callable(_)) => self_bound_method
+                .into_callable_type(db)
+                .is_assignable_to(db, target),
+
             // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
             _ => self.is_subtype_of(db, target),
         }
