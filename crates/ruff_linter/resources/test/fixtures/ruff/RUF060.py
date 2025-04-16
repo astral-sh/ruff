@@ -155,25 +155,121 @@ def while_loop():
 
 # (19) Valid: Multiple yield in control flow path guarded by return
 @contextlib.contextmanager
-def valid_yield_with_unreachable_return():
-    def helper():
-        return True
+def valid_yield_with_unreachable_return(value):
     print("Setting up")
-    if helper():
+    if value:
         yield "value"
         return
     yield "never reached"
 
 # (20) Valid: Return in finally guards second yield
 @contextlib.contextmanager
-def valid_try_yield_finally_return():
-    def is_true():
-        return True
+def valid_try_yield_finally_return(value):
     print("Setting up")
-    if is_true():
+    if value:
         try:
             yield "try value"
         finally:
             print("Cleaning up")
             return
     yield "later yield"
+
+# (21) Valid: Return in finally guards second yield
+@contextlib.contextmanager
+def valid_try_except_yield_finally_return():
+    def is_true():
+        # Need this to avoid unreachable last yield
+        return True
+    print("Setting up")
+    if is_true():
+        try:
+            raise
+        except:
+            yield
+        finally:
+            print("Cleaning up")
+            return
+    yield "later yield"
+
+
+# (22) Valid: Return in try guards second yield
+@contextlib.contextmanager
+def valid_try_except_with_return():
+    try:
+        yield "in try"
+        return
+    except Exception:
+        pass
+    yield
+
+# (23) Valid: Return in finally guards second yield
+@contextlib.contextmanager
+def valid_try_multi_except_yield(value):
+    if value:
+        try:
+            pass
+        except ValueError:
+            yield "value error"
+            return
+        except TypeError:
+            yield "type error"
+            return
+        except Exception:
+            pass
+        else:
+            yield
+            return
+    yield
+
+# (24) Valid: Try-except-else with returns
+@contextlib.contextmanager
+def valid_try_except_else_with_returns(value):
+    if value:
+        try:
+            pass
+        except Exception:
+            yield "in except"
+            return
+        else:
+            yield "in else"
+            return
+    yield
+
+# (25) Valid: Nested ifs with returns
+@contextlib.contextmanager
+def valid_nested_ifs_with_returns(value, another_value):
+    if value:
+        if not another_value:
+            yield
+            return
+        else:
+            yield
+            return
+    elif value and 2 == 1 :
+        if 1 == 1:
+            yield
+        else:
+            yield
+        return
+    else:
+        if 1 == 1:
+            yield
+            return
+        else:
+            pass
+
+    yield
+
+# (26) Valid: Returns guard from last yield in match
+@contextlib.contextmanager
+def valid_match_with_returns(value):
+    match value:
+        case 2:
+            yield
+            return
+        case 3:
+            yield
+            return
+        case _:
+            pass
+    yield
