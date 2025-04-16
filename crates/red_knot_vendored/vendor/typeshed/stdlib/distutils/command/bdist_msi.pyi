@@ -21,8 +21,7 @@ if sys.platform == "win32":
         boolean_options: ClassVar[list[str]]
         all_versions: Incomplete
         other_version: str
-        if sys.version_info >= (3, 9):
-            def __init__(self, *args, **kw) -> None: ...
+        def __init__(self, *args, **kw) -> None: ...
         bdist_dir: Incomplete
         plat_name: Incomplete
         keep_temp: int

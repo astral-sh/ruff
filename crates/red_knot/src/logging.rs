@@ -190,8 +190,8 @@ where
         let ansi = writer.has_ansi_escapes();
 
         if self.display_timestamp {
-            let timestamp = chrono::Local::now()
-                .format("%Y-%m-%d %H:%M:%S.%f")
+            let timestamp = jiff::Zoned::now()
+                .strftime("%Y-%m-%d %H:%M:%S.%f")
                 .to_string();
             if ansi {
                 write!(writer, "{} ", timestamp.dimmed())?;
@@ -199,7 +199,7 @@ where
                 write!(
                     writer,
                     "{} ",
-                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S.%f")
+                    jiff::Zoned::now().strftime("%Y-%m-%d %H:%M:%S.%f")
                 )?;
             }
         }

@@ -53,12 +53,18 @@ from _socket import (
     IPPROTO_TCP as IPPROTO_TCP,
     IPPROTO_UDP as IPPROTO_UDP,
     IPV6_CHECKSUM as IPV6_CHECKSUM,
+    IPV6_DONTFRAG as IPV6_DONTFRAG,
+    IPV6_HOPLIMIT as IPV6_HOPLIMIT,
+    IPV6_HOPOPTS as IPV6_HOPOPTS,
     IPV6_JOIN_GROUP as IPV6_JOIN_GROUP,
     IPV6_LEAVE_GROUP as IPV6_LEAVE_GROUP,
     IPV6_MULTICAST_HOPS as IPV6_MULTICAST_HOPS,
     IPV6_MULTICAST_IF as IPV6_MULTICAST_IF,
     IPV6_MULTICAST_LOOP as IPV6_MULTICAST_LOOP,
+    IPV6_PKTINFO as IPV6_PKTINFO,
+    IPV6_RECVRTHDR as IPV6_RECVRTHDR,
     IPV6_RECVTCLASS as IPV6_RECVTCLASS,
+    IPV6_RTHDR as IPV6_RTHDR,
     IPV6_TCLASS as IPV6_TCLASS,
     IPV6_UNICAST_HOPS as IPV6_UNICAST_HOPS,
     IPV6_V6ONLY as IPV6_V6ONLY,
@@ -195,12 +201,18 @@ __all__ = [
     "IPPROTO_TCP",
     "IPPROTO_UDP",
     "IPV6_CHECKSUM",
+    "IPV6_DONTFRAG",
+    "IPV6_HOPLIMIT",
+    "IPV6_HOPOPTS",
     "IPV6_JOIN_GROUP",
     "IPV6_LEAVE_GROUP",
     "IPV6_MULTICAST_HOPS",
     "IPV6_MULTICAST_IF",
     "IPV6_MULTICAST_LOOP",
+    "IPV6_PKTINFO",
+    "IPV6_RECVRTHDR",
     "IPV6_RECVTCLASS",
+    "IPV6_RTHDR",
     "IPV6_TCLASS",
     "IPV6_UNICAST_HOPS",
     "IPV6_V6ONLY",
@@ -334,18 +346,6 @@ if sys.platform == "win32":
         "MSG_BCAST",
         "MSG_MCAST",
     ]
-
-if sys.platform != "darwin" or sys.version_info >= (3, 9):
-    from _socket import (
-        IPV6_DONTFRAG as IPV6_DONTFRAG,
-        IPV6_HOPLIMIT as IPV6_HOPLIMIT,
-        IPV6_HOPOPTS as IPV6_HOPOPTS,
-        IPV6_PKTINFO as IPV6_PKTINFO,
-        IPV6_RECVRTHDR as IPV6_RECVRTHDR,
-        IPV6_RTHDR as IPV6_RTHDR,
-    )
-
-    __all__ += ["IPV6_DONTFRAG", "IPV6_HOPLIMIT", "IPV6_HOPOPTS", "IPV6_PKTINFO", "IPV6_RECVRTHDR", "IPV6_RTHDR"]
 
 if sys.platform == "darwin":
     from _socket import PF_SYSTEM as PF_SYSTEM, SYSPROTO_CONTROL as SYSPROTO_CONTROL
@@ -490,41 +490,39 @@ if sys.platform != "win32":
         "MSG_NOSIGNAL",
     ]
 
-    if sys.platform != "darwin" or sys.version_info >= (3, 9):
-        from _socket import (
-            IPV6_DSTOPTS as IPV6_DSTOPTS,
-            IPV6_NEXTHOP as IPV6_NEXTHOP,
-            IPV6_PATHMTU as IPV6_PATHMTU,
-            IPV6_RECVDSTOPTS as IPV6_RECVDSTOPTS,
-            IPV6_RECVHOPLIMIT as IPV6_RECVHOPLIMIT,
-            IPV6_RECVHOPOPTS as IPV6_RECVHOPOPTS,
-            IPV6_RECVPATHMTU as IPV6_RECVPATHMTU,
-            IPV6_RECVPKTINFO as IPV6_RECVPKTINFO,
-            IPV6_RTHDRDSTOPTS as IPV6_RTHDRDSTOPTS,
-        )
+    from _socket import (
+        IPV6_DSTOPTS as IPV6_DSTOPTS,
+        IPV6_NEXTHOP as IPV6_NEXTHOP,
+        IPV6_PATHMTU as IPV6_PATHMTU,
+        IPV6_RECVDSTOPTS as IPV6_RECVDSTOPTS,
+        IPV6_RECVHOPLIMIT as IPV6_RECVHOPLIMIT,
+        IPV6_RECVHOPOPTS as IPV6_RECVHOPOPTS,
+        IPV6_RECVPATHMTU as IPV6_RECVPATHMTU,
+        IPV6_RECVPKTINFO as IPV6_RECVPKTINFO,
+        IPV6_RTHDRDSTOPTS as IPV6_RTHDRDSTOPTS,
+    )
 
-        __all__ += [
-            "IPV6_DSTOPTS",
-            "IPV6_NEXTHOP",
-            "IPV6_PATHMTU",
-            "IPV6_RECVDSTOPTS",
-            "IPV6_RECVHOPLIMIT",
-            "IPV6_RECVHOPOPTS",
-            "IPV6_RECVPATHMTU",
-            "IPV6_RECVPKTINFO",
-            "IPV6_RTHDRDSTOPTS",
-        ]
+    __all__ += [
+        "IPV6_DSTOPTS",
+        "IPV6_NEXTHOP",
+        "IPV6_PATHMTU",
+        "IPV6_RECVDSTOPTS",
+        "IPV6_RECVHOPLIMIT",
+        "IPV6_RECVHOPOPTS",
+        "IPV6_RECVPATHMTU",
+        "IPV6_RECVPKTINFO",
+        "IPV6_RTHDRDSTOPTS",
+    ]
 
-    if sys.platform != "darwin":
+    if sys.platform != "darwin" or sys.version_info >= (3, 13):
         from _socket import SO_BINDTODEVICE as SO_BINDTODEVICE
 
         __all__ += ["SO_BINDTODEVICE"]
 
 if sys.platform != "darwin" and sys.platform != "linux":
-    if sys.platform != "win32" or sys.version_info >= (3, 9):
-        from _socket import BDADDR_ANY as BDADDR_ANY, BDADDR_LOCAL as BDADDR_LOCAL, BTPROTO_RFCOMM as BTPROTO_RFCOMM
+    from _socket import BDADDR_ANY as BDADDR_ANY, BDADDR_LOCAL as BDADDR_LOCAL, BTPROTO_RFCOMM as BTPROTO_RFCOMM
 
-        __all__ += ["BDADDR_ANY", "BDADDR_LOCAL", "BTPROTO_RFCOMM"]
+    __all__ += ["BDADDR_ANY", "BDADDR_LOCAL", "BTPROTO_RFCOMM"]
 
 if sys.platform == "darwin" and sys.version_info >= (3, 10):
     from _socket import TCP_KEEPALIVE as TCP_KEEPALIVE
@@ -777,7 +775,7 @@ if sys.platform == "linux":
 
         __all__ += ["CAN_RAW_ERR_FILTER"]
 
-if sys.platform == "linux" and sys.version_info >= (3, 9):
+if sys.platform == "linux":
     from _socket import (
         CAN_J1939 as CAN_J1939,
         CAN_RAW_JOIN_FILTERS as CAN_RAW_JOIN_FILTERS,
@@ -959,14 +957,13 @@ if sys.version_info >= (3, 12):
 
         __all__ += ["PF_DIVERT", "AF_DIVERT"]
 
-if sys.platform != "win32" and sys.version_info >= (3, 9):
+if sys.platform != "win32":
     __all__ += ["send_fds", "recv_fds"]
 
-if sys.platform != "win32" or sys.version_info >= (3, 9):
-    if sys.platform != "linux":
-        __all__ += ["AF_LINK"]
-    if sys.platform != "darwin" and sys.platform != "linux":
-        __all__ += ["AF_BLUETOOTH"]
+if sys.platform != "linux":
+    __all__ += ["AF_LINK"]
+if sys.platform != "darwin" and sys.platform != "linux":
+    __all__ += ["AF_BLUETOOTH"]
 
 if sys.platform == "win32" and sys.version_info >= (3, 12):
     __all__ += ["AF_HYPERV"]
@@ -980,6 +977,7 @@ if sys.platform != "win32" and sys.platform != "linux":
         IPPROTO_HELLO as IPPROTO_HELLO,
         IPPROTO_IPCOMP as IPPROTO_IPCOMP,
         IPPROTO_XTP as IPPROTO_XTP,
+        IPV6_USE_MIN_MTU as IPV6_USE_MIN_MTU,
         LOCAL_PEERCRED as LOCAL_PEERCRED,
         SCM_CREDS as SCM_CREDS,
     )
@@ -992,6 +990,7 @@ if sys.platform != "win32" and sys.platform != "linux":
         "IPPROTO_HELLO",
         "IPPROTO_IPCOMP",
         "IPPROTO_XTP",
+        "IPV6_USE_MIN_MTU",
         "LOCAL_PEERCRED",
         "SCM_CREDS",
         "AI_DEFAULT",
@@ -999,10 +998,6 @@ if sys.platform != "win32" and sys.platform != "linux":
         "AI_V4MAPPED_CFG",
         "MSG_EOF",
     ]
-    if sys.platform != "darwin" or sys.version_info >= (3, 9):
-        from _socket import IPV6_USE_MIN_MTU as IPV6_USE_MIN_MTU
-
-        __all__ += ["IPV6_USE_MIN_MTU"]
 
 if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
     from _socket import (
@@ -1084,11 +1079,10 @@ class AddressFamily(IntEnum):
         AF_NETLINK = 16
         AF_VSOCK = 40
         AF_QIPCRTR = 42
-    if sys.platform != "win32" or sys.version_info >= (3, 9):
-        if sys.platform != "linux":
-            AF_LINK = 33
-        if sys.platform != "darwin" and sys.platform != "linux":
-            AF_BLUETOOTH = 32
+    if sys.platform != "linux":
+        AF_LINK = 33
+    if sys.platform != "darwin" and sys.platform != "linux":
+        AF_BLUETOOTH = 32
     if sys.platform == "win32" and sys.version_info >= (3, 12):
         AF_HYPERV = 34
     if sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darwin" and sys.version_info >= (3, 12):
@@ -1140,12 +1134,10 @@ if sys.platform == "linux":
     AF_VSOCK = AddressFamily.AF_VSOCK
     AF_QIPCRTR = AddressFamily.AF_QIPCRTR
 
-if sys.platform != "win32" or sys.version_info >= (3, 9):
-    if sys.platform != "linux":
-        AF_LINK = AddressFamily.AF_LINK
-    if sys.platform != "darwin" and sys.platform != "linux":
-        AF_BLUETOOTH = AddressFamily.AF_BLUETOOTH
-
+if sys.platform != "linux":
+    AF_LINK = AddressFamily.AF_LINK
+if sys.platform != "darwin" and sys.platform != "linux":
+    AF_BLUETOOTH = AddressFamily.AF_BLUETOOTH
 if sys.platform == "win32" and sys.version_info >= (3, 12):
     AF_HYPERV = AddressFamily.AF_HYPERV
 if sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darwin" and sys.version_info >= (3, 12):
@@ -1352,11 +1344,10 @@ class socket(_socket.socket):
 def fromfd(fd: SupportsIndex, family: AddressFamily | int, type: SocketKind | int, proto: int = 0) -> socket: ...
 
 if sys.platform != "win32":
-    if sys.version_info >= (3, 9):
-        def send_fds(
-            sock: socket, buffers: Iterable[ReadableBuffer], fds: Iterable[int], flags: Unused = 0, address: Unused = None
-        ) -> int: ...
-        def recv_fds(sock: socket, bufsize: int, maxfds: int, flags: int = 0) -> tuple[bytes, list[int], int, Any]: ...
+    def send_fds(
+        sock: socket, buffers: Iterable[ReadableBuffer], fds: Iterable[int], flags: Unused = 0, address: Unused = None
+    ) -> int: ...
+    def recv_fds(sock: socket, bufsize: int, maxfds: int, flags: int = 0) -> tuple[bytes, list[int], int, Any]: ...
 
 if sys.platform == "win32":
     def fromshare(info: bytes) -> socket: ...

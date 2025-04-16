@@ -79,7 +79,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.4
+    rev: v0.11.5
     hooks:
       - id: ruff-format
       - id: ruff
@@ -102,7 +102,7 @@ repos:
       - id: zizmor
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.32.1
+    rev: 0.33.0
     hooks:
       - id: check-github-workflows
 

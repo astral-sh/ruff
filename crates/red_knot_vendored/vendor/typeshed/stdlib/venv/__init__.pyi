@@ -6,8 +6,7 @@ from types import SimpleNamespace
 
 logger: logging.Logger
 
-if sys.version_info >= (3, 9):
-    CORE_VENV_DEPS: tuple[str, ...]
+CORE_VENV_DEPS: tuple[str, ...]
 
 class EnvBuilder:
     system_site_packages: bool
@@ -30,17 +29,6 @@ class EnvBuilder:
             *,
             scm_ignore_files: Iterable[str] = ...,
         ) -> None: ...
-    elif sys.version_info >= (3, 9):
-        def __init__(
-            self,
-            system_site_packages: bool = False,
-            clear: bool = False,
-            symlinks: bool = False,
-            upgrade: bool = False,
-            with_pip: bool = False,
-            prompt: str | None = None,
-            upgrade_deps: bool = False,
-        ) -> None: ...
     else:
         def __init__(
             self,
@@ -50,6 +38,7 @@ class EnvBuilder:
             upgrade: bool = False,
             with_pip: bool = False,
             prompt: str | None = None,
+            upgrade_deps: bool = False,
         ) -> None: ...
 
     def create(self, env_dir: StrOrBytesPath) -> None: ...
@@ -65,8 +54,7 @@ class EnvBuilder:
     def post_setup(self, context: SimpleNamespace) -> None: ...
     def replace_variables(self, text: str, context: SimpleNamespace) -> str: ...  # undocumented
     def install_scripts(self, context: SimpleNamespace, path: str) -> None: ...
-    if sys.version_info >= (3, 9):
-        def upgrade_dependencies(self, context: SimpleNamespace) -> None: ...
+    def upgrade_dependencies(self, context: SimpleNamespace) -> None: ...
     if sys.version_info >= (3, 13):
         def create_git_ignore_file(self, context: SimpleNamespace) -> None: ...
 
@@ -83,17 +71,6 @@ if sys.version_info >= (3, 13):
         scm_ignore_files: Iterable[str] = ...,
     ) -> None: ...
 
-elif sys.version_info >= (3, 9):
-    def create(
-        env_dir: StrOrBytesPath,
-        system_site_packages: bool = False,
-        clear: bool = False,
-        symlinks: bool = False,
-        with_pip: bool = False,
-        prompt: str | None = None,
-        upgrade_deps: bool = False,
-    ) -> None: ...
-
 else:
     def create(
         env_dir: StrOrBytesPath,
@@ -102,6 +79,7 @@ else:
         symlinks: bool = False,
         with_pip: bool = False,
         prompt: str | None = None,
+        upgrade_deps: bool = False,
     ) -> None: ...
 
 def main(args: Sequence[str] | None = None) -> None: ...

@@ -44,8 +44,7 @@ HTTPS_PORT: int
 CONTINUE: Literal[100]
 SWITCHING_PROTOCOLS: Literal[101]
 PROCESSING: Literal[102]
-if sys.version_info >= (3, 9):
-    EARLY_HINTS: Literal[103]
+EARLY_HINTS: Literal[103]
 
 OK: Literal[200]
 CREATED: Literal[201]
@@ -91,16 +90,14 @@ if sys.version_info >= (3, 13):
     RANGE_NOT_SATISFIABLE: Literal[416]
 REQUESTED_RANGE_NOT_SATISFIABLE: Literal[416]
 EXPECTATION_FAILED: Literal[417]
-if sys.version_info >= (3, 9):
-    IM_A_TEAPOT: Literal[418]
+IM_A_TEAPOT: Literal[418]
 MISDIRECTED_REQUEST: Literal[421]
 if sys.version_info >= (3, 13):
     UNPROCESSABLE_CONTENT: Literal[422]
 UNPROCESSABLE_ENTITY: Literal[422]
 LOCKED: Literal[423]
 FAILED_DEPENDENCY: Literal[424]
-if sys.version_info >= (3, 9):
-    TOO_EARLY: Literal[425]
+TOO_EARLY: Literal[425]
 UPGRADE_REQUIRED: Literal[426]
 PRECONDITION_REQUIRED: Literal[428]
 TOO_MANY_REQUESTS: Literal[429]

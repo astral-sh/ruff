@@ -41,8 +41,7 @@ reveal_type(c_instance.declared_only)  # revealed: bytes
 
 reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
-# We probably don't want to emit a diagnostic for this being possibly undeclared/unbound.
-# mypy and pyright do not show an error here.
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.possibly_undeclared_unbound)  # revealed: str
 
 # This assignment is fine, as we infer `Unknown | Literal[1, "a"]` for `inferred_from_value`.
@@ -339,8 +338,10 @@ class C:
         for self.z in NonIterable():
             pass
 
+# Iterable might be empty
+# error: [possibly-unbound-attribute]
 reveal_type(C().x)  # revealed: Unknown | int
-
+# error: [possibly-unbound-attribute]
 reveal_type(C().y)  # revealed: Unknown | str
 ```
 
@@ -409,8 +410,8 @@ reveal_type(c_instance.a)  # revealed: Unknown
 
 #### Conditionally declared / bound attributes
 
-We currently do not raise a diagnostic or change behavior if an attribute is only conditionally
-defined. This is consistent with what mypy and pyright do.
+Attributes are possibly unbound if they, or the method to which they are added are conditionally
+declared / bound.
 
 ```py
 def flag() -> bool:
@@ -428,9 +429,13 @@ class C:
 
 c_instance = C()
 
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a1)  # revealed: str | None
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.a2)  # revealed: str | None
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b1)  # revealed: Unknown | Literal[1]
+# error: [possibly-unbound-attribute]
 reveal_type(c_instance.b2)  # revealed: Unknown | Literal[1]
 ```
 
@@ -539,10 +544,88 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# TODO: Ideally, this would result in a `unresolved-attribute` error. But mypy and pyright
-# do not support this either (for conditions that can only be resolved to `False` in type
-# inference), so it does not seem to be particularly important.
-reveal_type(C().x)  # revealed: str
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
+```
+
+```py
+class C:
+    def __init__(self, cond: bool) -> None:
+        if True:
+            self.a = 1
+        else:
+            self.a = "a"
+
+        if False:
+            self.b = 2
+
+        if cond:
+            return
+
+        self.c = 3
+
+        self.d = 4
+        self.d = 5
+
+    def set_c(self, c: str) -> None:
+        self.c = c
+    if False:
+        def set_e(self, e: str) -> None:
+            self.e = e
+
+reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C(True).b)  # revealed: Unknown
+reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
+# TODO: this attribute is possibly unbound
+reveal_type(C(True).d)  # revealed: Unknown | Literal[5]
+# error: [unresolved-attribute]
+reveal_type(C(True).e)  # revealed: Unknown
+```
+
+#### Attributes considered always bound
+
+```py
+class C:
+    def __init__(self, cond: bool):
+        self.x = 1
+        if cond:
+            raise ValueError("Something went wrong")
+
+        # We consider this attribute is always bound.
+        # This is because, it is not possible to access a partially-initialized object by normal means.
+        self.y = 2
+
+reveal_type(C(False).x)  # revealed: Unknown | Literal[1]
+reveal_type(C(False).y)  # revealed: Unknown | Literal[2]
+
+class C:
+    def __init__(self, b: bytes) -> None:
+        self.b = b
+
+        try:
+            s = b.decode()
+        except UnicodeDecodeError:
+            raise ValueError("Invalid UTF-8 sequence")
+
+        self.s = s
+
+reveal_type(C(b"abc").b)  # revealed: Unknown | bytes
+reveal_type(C(b"abc").s)  # revealed: Unknown | str
+
+class C:
+    def __init__(self, iter) -> None:
+        self.x = 1
+
+        for _ in iter:
+            pass
+
+        # The for-loop may not stop,
+        # but we consider the subsequent attributes to be definitely-bound.
+        self.y = 2
+
+reveal_type(C([]).x)  # revealed: Unknown | Literal[1]
+reveal_type(C([]).y)  # revealed: Unknown | Literal[2]
 ```
 
 #### Diagnostics are reported for the right-hand side of attribute assignments
@@ -1046,13 +1129,18 @@ def _(flag: bool):
         def __init(self):
             if flag:
                 self.x = 1
+                self.y = "a"
+            else:
+                self.y = "b"
 
-    # Emitting a diagnostic in a case like this is not something we support, and it's unclear
-    # if we ever will (or want to)
+    # error: [possibly-unbound-attribute]
     reveal_type(Foo().x)  # revealed: Unknown | Literal[1]
 
-    # Same here
+    # error: [possibly-unbound-attribute]
     Foo().x = 2
+
+    reveal_type(Foo().y)  # revealed: Unknown | Literal["a", "b"]
+    Foo().y = "c"
 ```
 
 ### Unions with all paths unbound
@@ -1285,7 +1373,7 @@ from typing import Any
 class Foo(Any): ...
 
 reveal_type(Foo.bar)  # revealed: Any
-reveal_type(Foo.__repr__)  # revealed: Literal[__repr__] & Any
+reveal_type(Foo.__repr__)  # revealed: (def __repr__(self) -> str) & Any
 ```
 
 Similar principles apply if `Any` appears in the middle of an inheritance hierarchy:
@@ -1584,7 +1672,7 @@ Some attributes are special-cased, however:
 
 ```py
 reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
-reveal_type(f.__call__)  # revealed: <bound method `__call__` of `Literal[f]`>
+reveal_type(f.__call__)  # revealed: <method-wrapper `__call__` of `f`>
 ```
 
 ### Int-literal attributes
@@ -1593,7 +1681,7 @@ Most attribute accesses on int-literal types are delegated to `builtins.int`, si
 integers are instances of that class:
 
 ```py
-reveal_type((2).bit_length)  # revealed: <bound method `bit_length` of `Literal[2]`>
+reveal_type((2).bit_length)  # revealed: bound method Literal[2].bit_length() -> int
 reveal_type((2).denominator)  # revealed: Literal[1]
 ```
 
@@ -1610,8 +1698,10 @@ Most attribute accesses on bool-literal types are delegated to `builtins.bool`, 
 bools are instances of that class:
 
 ```py
-reveal_type(True.__and__)  # revealed: <bound method `__and__` of `Literal[True]`>
-reveal_type(False.__or__)  # revealed: <bound method `__or__` of `Literal[False]`>
+# revealed: bound method Literal[True].__and__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
+reveal_type(True.__and__)
+# revealed: bound method Literal[False].__or__(**kwargs: @Todo(todo signature **kwargs)) -> @Todo(return type of overloaded function)
+reveal_type(False.__or__)
 ```
 
 Some attributes are special-cased, however:
@@ -1626,8 +1716,9 @@ reveal_type(False.real)  # revealed: Literal[0]
 All attribute access on literal `bytes` types is currently delegated to `builtins.bytes`:
 
 ```py
-reveal_type(b"foo".join)  # revealed: <bound method `join` of `Literal[b"foo"]`>
-reveal_type(b"foo".endswith)  # revealed: <bound method `endswith` of `Literal[b"foo"]`>
+reveal_type(b"foo".join)  # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: @Todo(generics), /) -> bytes
+# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`), start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+reveal_type(b"foo".endswith)
 ```
 
 ## Instance attribute edge cases

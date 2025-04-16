@@ -26,8 +26,7 @@ if sys.platform != "win32":
     if sys.platform == "darwin":
         F_FULLFSYNC: int
         F_NOCACHE: int
-        if sys.version_info >= (3, 9):
-            F_GETPATH: int
+        F_GETPATH: int
     if sys.platform == "linux":
         F_SETLKW64: int
         F_SETSIG: int
@@ -43,10 +42,9 @@ if sys.platform != "win32":
         F_SEAL_SEAL: int
         F_SEAL_SHRINK: int
         F_SEAL_WRITE: int
-        if sys.version_info >= (3, 9):
-            F_OFD_GETLK: Final[int]
-            F_OFD_SETLK: Final[int]
-            F_OFD_SETLKW: Final[int]
+        F_OFD_GETLK: Final[int]
+        F_OFD_SETLK: Final[int]
+        F_OFD_SETLKW: Final[int]
 
         if sys.version_info >= (3, 10):
             F_GETPIPE_SZ: int

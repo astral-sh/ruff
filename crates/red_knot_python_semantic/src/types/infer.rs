@@ -49,8 +49,9 @@ use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    AssignmentDefinitionKind, Definition, DefinitionKind, DefinitionNodeKey,
-    ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
+    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, Definition, DefinitionKind,
+    DefinitionNodeKey, ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
+    WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::symbol::{
@@ -81,12 +82,13 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     todo_type, CallDunderError, CallableSignature, CallableType, Class, ClassLiteralType,
-    DynamicType, FunctionDecorators, FunctionType, GenericAlias, GenericClass, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownFunction, KnownInstanceType, MemberLookupPolicy,
-    MetaclassCandidate, NonGenericClass, Parameter, ParameterForm, Parameters, Signature,
-    Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
-    Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    DataclassMetadata, DynamicType, FunctionDecorators, FunctionType, GenericAlias, GenericClass,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MemberLookupPolicy, MetaclassCandidate, NonGenericClass, Parameter, ParameterForm, Parameters,
+    Signature, Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol,
+    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
+    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
+    UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -919,7 +921,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_assignment_definition(assignment, definition);
             }
             DefinitionKind::AnnotatedAssignment(annotated_assignment) => {
-                self.infer_annotated_assignment_definition(annotated_assignment.node(), definition);
+                self.infer_annotated_assignment_definition(annotated_assignment, definition);
             }
             DefinitionKind::AugmentedAssignment(augmented_assignment) => {
                 self.infer_augment_assignment_definition(augmented_assignment.node(), definition);
@@ -1725,8 +1727,21 @@ impl<'db> TypeInferenceBuilder<'db> {
             body: _,
         } = class_node;
 
+        let mut dataclass_metadata = None;
         for decorator in decorator_list {
-            self.infer_decorator(decorator);
+            let decorator_ty = self.infer_decorator(decorator);
+            if decorator_ty
+                .into_function_literal()
+                .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
+            {
+                dataclass_metadata = Some(DataclassMetadata::default());
+                continue;
+            }
+
+            if let Type::DataclassDecorator(metadata) = decorator_ty {
+                dataclass_metadata = Some(metadata);
+                continue;
+            }
         }
 
         let generic_context = type_params.as_ref().map(|type_params| {
@@ -1744,6 +1759,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             name: name.id.clone(),
             body_scope,
             known: maybe_known_class,
+            dataclass_metadata,
         };
         let class_literal = match generic_context {
             Some(generic_context) => {
@@ -1929,23 +1945,23 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         let context_expr = with_item.context_expr();
-        let name = with_item.name();
+        let target = with_item.target();
 
         let context_expr_ty = self.infer_standalone_expression(context_expr);
 
         let target_ty = if with_item.is_async() {
             todo_type!("async `with` statement")
         } else {
-            match with_item.target() {
+            match with_item.target_kind() {
                 TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
-                    let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
+                    let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
                     if unpack_position == UnpackPosition::First {
                         self.context.extend(unpacked.diagnostics());
                     }
-                    unpacked.expression_type(name_ast_id)
+                    unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::Name => self.infer_context_expression(
+                TargetKind::NameOrAttribute => self.infer_context_expression(
                     context_expr,
                     context_expr_ty,
                     with_item.is_async(),
@@ -1953,8 +1969,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         };
 
-        self.store_expression_type(name, target_ty);
-        self.add_binding(name.into(), definition, target_ty);
+        self.store_expression_type(target, target_ty);
+        self.add_binding(target.into(), definition, target_ty);
     }
 
     /// Infers the type of a context expression (`with expr`) and returns the target's type
@@ -2460,6 +2476,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::BoundMethod(_)
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
@@ -2820,11 +2837,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         let value = assignment.value();
-        let name = assignment.name();
+        let target = assignment.target();
 
         let value_ty = self.infer_standalone_expression(value);
 
-        let mut target_ty = match assignment.target() {
+        let mut target_ty = match assignment.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
                 let unpacked = infer_unpack_types(self.db(), unpack);
                 // Only copy the diagnostics if this is the first assignment to avoid duplicating the
@@ -2833,22 +2850,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                     self.context.extend(unpacked.diagnostics());
                 }
 
-                let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
-                unpacked.expression_type(name_ast_id)
+                let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
+                unpacked.expression_type(target_ast_id)
             }
-            TargetKind::Name => {
+            TargetKind::NameOrAttribute => {
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
-                if &name.id == "TYPE_CHECKING" {
+                if target.as_name_expr().map(|name| name.id.as_str()) == Some("TYPE_CHECKING") {
                     if !matches!(
                         value.as_boolean_literal_expr(),
                         Some(ast::ExprBooleanLiteral { value: false, .. })
                     ) {
-                        report_invalid_type_checking_constant(
-                            &self.context,
-                            assignment.name().into(),
-                        );
+                        report_invalid_type_checking_constant(&self.context, target.into());
                     }
                     Type::BooleanLiteral(true)
                 } else if self.in_stub() && value.is_ellipsis_literal_expr() {
@@ -2859,14 +2873,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         };
 
-        if let Some(known_instance) =
+        if let Some(known_instance) = target.as_name_expr().and_then(|name| {
             KnownInstanceType::try_from_file_and_name(self.db(), self.file(), &name.id)
-        {
+        }) {
             target_ty = Type::KnownInstance(known_instance);
         }
 
-        self.store_expression_type(name, target_ty);
-        self.add_binding(name.into(), definition, target_ty);
+        self.store_expression_type(target, target_ty);
+        self.add_binding(target.into(), definition, target_ty);
     }
 
     fn infer_annotated_assignment_statement(&mut self, assignment: &ast::StmtAnnAssign) {
@@ -2890,16 +2904,12 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Infer the types in an annotated assignment definition.
     fn infer_annotated_assignment_definition(
         &mut self,
-        assignment: &ast::StmtAnnAssign,
+        assignment: &'db AnnotatedAssignmentDefinitionKind,
         definition: Definition<'db>,
     ) {
-        let ast::StmtAnnAssign {
-            range: _,
-            target,
-            annotation,
-            value,
-            simple: _,
-        } = assignment;
+        let annotation = assignment.annotation();
+        let target = assignment.target();
+        let value = assignment.value();
 
         let mut declared_ty = self.infer_annotation_expression(
             annotation,
@@ -2915,7 +2925,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .is_assignable_to(self.db(), declared_ty.inner_type())
             {
                 // annotation not assignable from `bool` is an error
-                report_invalid_type_checking_constant(&self.context, assignment.into());
+                report_invalid_type_checking_constant(&self.context, target.into());
             } else if self.in_stub()
                 && value
                     .as_ref()
@@ -2929,7 +2939,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Some(ast::ExprBooleanLiteral { value: false, .. })
             ) {
                 // otherwise, assigning something other than `False` is an error
-                report_invalid_type_checking_constant(&self.context, assignment.into());
+                report_invalid_type_checking_constant(&self.context, target.into());
             }
             declared_ty.inner = Type::BooleanLiteral(true);
         }
@@ -2949,7 +2959,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        if let Some(value) = value.as_deref() {
+        if let Some(value) = value {
             let inferred_ty = self.infer_expression(value);
             let inferred_ty = if target
                 .as_name_expr()
@@ -2962,7 +2972,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 inferred_ty
             };
             self.add_declaration_with_binding(
-                assignment.into(),
+                target.into(),
                 definition,
                 &DeclaredAndInferredType::MightBeDifferent {
                     declared_ty,
@@ -2972,12 +2982,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         } else {
             if self.in_stub() {
                 self.add_declaration_with_binding(
-                    assignment.into(),
+                    target.into(),
                     definition,
                     &DeclaredAndInferredType::AreTheSame(declared_ty.inner_type()),
                 );
             } else {
-                self.add_declaration(assignment.into(), definition, declared_ty);
+                self.add_declaration(target.into(), definition, declared_ty);
             }
         }
 
@@ -3116,31 +3126,33 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         let iterable = for_stmt.iterable();
-        let name = for_stmt.name();
+        let target = for_stmt.target();
 
         let iterable_type = self.infer_standalone_expression(iterable);
 
         let loop_var_value_type = if for_stmt.is_async() {
             todo_type!("async iterables/iterators")
         } else {
-            match for_stmt.target() {
+            match for_stmt.target_kind() {
                 TargetKind::Sequence(unpack_position, unpack) => {
                     let unpacked = infer_unpack_types(self.db(), unpack);
                     if unpack_position == UnpackPosition::First {
                         self.context.extend(unpacked.diagnostics());
                     }
-                    let name_ast_id = name.scoped_expression_id(self.db(), self.scope());
-                    unpacked.expression_type(name_ast_id)
+                    let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
+                    unpacked.expression_type(target_ast_id)
                 }
-                TargetKind::Name => iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                    err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                    err.fallback_element_type(self.db())
-                }),
+                TargetKind::NameOrAttribute => {
+                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                        err.fallback_element_type(self.db())
+                    })
+                }
             }
         };
 
-        self.store_expression_type(name, loop_var_value_type);
-        self.add_binding(name.into(), definition, loop_var_value_type);
+        self.store_expression_type(target, loop_var_value_type);
+        self.add_binding(target.into(), definition, loop_var_value_type);
     }
 
     fn infer_while_statement(&mut self, while_statement: &ast::StmtWhile) {
@@ -4827,6 +4839,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::Callable(..)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
+                | Type::DataclassDecorator(_)
                 | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
@@ -5106,6 +5119,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::BoundMethod(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
+                | Type::DataclassDecorator(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
@@ -5129,6 +5143,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::BoundMethod(_)
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
+                | Type::DataclassDecorator(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)

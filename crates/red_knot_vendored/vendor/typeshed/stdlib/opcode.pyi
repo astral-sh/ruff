@@ -23,23 +23,7 @@ else:
 if sys.version_info >= (3, 13):
     __all__ += ["hasjump"]
 
-if sys.version_info >= (3, 9):
-    cmp_op: tuple[Literal["<"], Literal["<="], Literal["=="], Literal["!="], Literal[">"], Literal[">="]]
-else:
-    cmp_op: tuple[
-        Literal["<"],
-        Literal["<="],
-        Literal["=="],
-        Literal["!="],
-        Literal[">"],
-        Literal[">="],
-        Literal["in"],
-        Literal["not in"],
-        Literal["is"],
-        Literal["is not"],
-        Literal["exception match"],
-        Literal["BAD"],
-    ]
+cmp_op: tuple[Literal["<"], Literal["<="], Literal["=="], Literal["!="], Literal[">"], Literal[">="]]
 hasconst: list[int]
 hasname: list[int]
 hasjrel: list[int]

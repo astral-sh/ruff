@@ -1,10 +1,8 @@
-import sys
 from _typeshed import Incomplete
 from collections.abc import Mapping
 from typing import ClassVar
 
-if sys.version_info >= (3, 9):
-    __all__ = ["Dialog"]
+__all__ = ["Dialog"]
 
 class Dialog:
     command: ClassVar[str | None]

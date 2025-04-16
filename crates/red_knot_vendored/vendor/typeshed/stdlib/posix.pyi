@@ -6,6 +6,8 @@ if sys.platform != "win32":
         CLD_CONTINUED as CLD_CONTINUED,
         CLD_DUMPED as CLD_DUMPED,
         CLD_EXITED as CLD_EXITED,
+        CLD_KILLED as CLD_KILLED,
+        CLD_STOPPED as CLD_STOPPED,
         CLD_TRAPPED as CLD_TRAPPED,
         EX_CANTCREAT as EX_CANTCREAT,
         EX_CONFIG as EX_CONFIG,
@@ -220,12 +222,10 @@ if sys.platform != "win32":
         wait3 as wait3,
         wait4 as wait4,
         waitpid as waitpid,
+        waitstatus_to_exitcode as waitstatus_to_exitcode,
         write as write,
         writev as writev,
     )
-
-    if sys.version_info >= (3, 9):
-        from os import CLD_KILLED as CLD_KILLED, CLD_STOPPED as CLD_STOPPED, waitstatus_to_exitcode as waitstatus_to_exitcode
 
     if sys.version_info >= (3, 10):
         from os import O_FSYNC as O_FSYNC
@@ -330,6 +330,7 @@ if sys.platform != "win32":
             O_PATH as O_PATH,
             O_RSYNC as O_RSYNC,
             O_TMPFILE as O_TMPFILE,
+            P_PIDFD as P_PIDFD,
             RTLD_DEEPBIND as RTLD_DEEPBIND,
             SCHED_BATCH as SCHED_BATCH,
             SCHED_IDLE as SCHED_IDLE,
@@ -342,12 +343,10 @@ if sys.platform != "win32":
             getxattr as getxattr,
             listxattr as listxattr,
             memfd_create as memfd_create,
+            pidfd_open as pidfd_open,
             removexattr as removexattr,
             setxattr as setxattr,
         )
-
-        if sys.version_info >= (3, 9):
-            from os import P_PIDFD as P_PIDFD, pidfd_open as pidfd_open
 
         if sys.version_info >= (3, 10):
             from os import (

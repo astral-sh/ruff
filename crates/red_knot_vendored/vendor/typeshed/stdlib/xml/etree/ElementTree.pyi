@@ -15,6 +15,7 @@ __all__ = [
     "canonicalize",
     "fromstring",
     "fromstringlist",
+    "indent",
     "iselement",
     "iterparse",
     "parse",
@@ -33,9 +34,6 @@ __all__ = [
     "XMLPullParser",
     "register_namespace",
 ]
-
-if sys.version_info >= (3, 9):
-    __all__ += ["indent"]
 
 _T = TypeVar("_T")
 _FileRead: TypeAlias = FileDescriptorOrPath | SupportsRead[bytes] | SupportsRead[str]
@@ -138,9 +136,6 @@ class Element(Generic[_Tag]):
     # Doesn't really exist in earlier versions, where __len__ is called implicitly instead
     @deprecated("Testing an element's truth value is deprecated.")
     def __bool__(self) -> bool: ...
-    if sys.version_info < (3, 9):
-        def getchildren(self) -> list[Element]: ...
-        def getiterator(self, tag: str | None = None) -> list[Element]: ...
 
 def SubElement(parent: Element, tag: str, attrib: dict[str, str] = ..., **extra: str) -> Element: ...
 def Comment(text: str | None = None) -> _CallableElement: ...
@@ -165,9 +160,6 @@ class ElementTree(Generic[_Root]):
     def getroot(self) -> _Root: ...
     def parse(self, source: _FileRead, parser: XMLParser | None = None) -> Element: ...
     def iter(self, tag: str | None = None) -> Generator[Element, None, None]: ...
-    if sys.version_info < (3, 9):
-        def getiterator(self, tag: str | None = None) -> list[Element]: ...
-
     def find(self, path: str, namespaces: dict[str, str] | None = None) -> Element | None: ...
     @overload
     def findtext(self, path: str, default: None = None, namespaces: dict[str, str] | None = None) -> str | None: ...
@@ -254,10 +246,7 @@ def tostringlist(
     short_empty_elements: bool = True,
 ) -> list[Any]: ...
 def dump(elem: Element | ElementTree[Any]) -> None: ...
-
-if sys.version_info >= (3, 9):
-    def indent(tree: Element | ElementTree[Any], space: str = "  ", level: int = 0) -> None: ...
-
+def indent(tree: Element | ElementTree[Any], space: str = "  ", level: int = 0) -> None: ...
 def parse(source: _FileRead, parser: XMLParser[Any] | None = None) -> ElementTree[Element]: ...
 
 # This class is defined inside the body of iterparse
@@ -366,7 +355,7 @@ _E = TypeVar("_E", default=Element)
 class XMLParser(Generic[_E]):
     parser: XMLParserType
     target: _Target
-    # TODO-what is entity used for???
+    # TODO: what is entity used for???
     entity: dict[str, str]
     version: str
     def __init__(self, *, target: _Target | None = None, encoding: str | None = None) -> None: ...

@@ -85,8 +85,8 @@ macro_rules! notify_user {
     ($($arg:tt)*) => {
         println!(
             "[{}] {}",
-            chrono::Local::now()
-                .format("%H:%M:%S %p")
+            jiff::Zoned::now()
+                .strftime("%H:%M:%S %p")
                 .to_string()
                 .dimmed(),
             format_args!($($arg)*)
@@ -142,7 +142,7 @@ pub fn set_up_logging(level: LogLevel) -> Result<()> {
             Level::Info | Level::Debug | Level::Trace => {
                 out.finish(format_args!(
                     "{}[{}][{}] {}",
-                    chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
+                    jiff::Zoned::now().strftime("[%Y-%m-%d][%H:%M:%S]"),
                     record.target(),
                     record.level(),
                     message

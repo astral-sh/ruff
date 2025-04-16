@@ -30,7 +30,7 @@ if sys.platform != "win32":
             "DefaultEventLoopPolicy",
             "EventLoop",
         )
-    elif sys.version_info >= (3, 9):
+    else:
         # adds PidfdChildWatcher
         __all__ = (
             "SelectorEventLoop",
@@ -38,16 +38,6 @@ if sys.platform != "win32":
             "SafeChildWatcher",
             "FastChildWatcher",
             "PidfdChildWatcher",
-            "MultiLoopChildWatcher",
-            "ThreadedChildWatcher",
-            "DefaultEventLoopPolicy",
-        )
-    else:
-        __all__ = (
-            "SelectorEventLoop",
-            "AbstractChildWatcher",
-            "SafeChildWatcher",
-            "FastChildWatcher",
             "MultiLoopChildWatcher",
             "ThreadedChildWatcher",
             "DefaultEventLoopPolicy",
@@ -239,16 +229,15 @@ if sys.platform != "win32":
             def remove_child_handler(self, pid: int) -> bool: ...
             def attach_loop(self, loop: AbstractEventLoop | None) -> None: ...
 
-        if sys.version_info >= (3, 9):
-            class PidfdChildWatcher(AbstractChildWatcher):
-                def __enter__(self) -> Self: ...
-                def __exit__(
-                    self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
-                ) -> None: ...
-                def is_active(self) -> bool: ...
-                def close(self) -> None: ...
-                def attach_loop(self, loop: AbstractEventLoop | None) -> None: ...
-                def add_child_handler(
-                    self, pid: int, callback: Callable[[int, int, Unpack[_Ts]], object], *args: Unpack[_Ts]
-                ) -> None: ...
-                def remove_child_handler(self, pid: int) -> bool: ...
+        class PidfdChildWatcher(AbstractChildWatcher):
+            def __enter__(self) -> Self: ...
+            def __exit__(
+                self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: types.TracebackType | None
+            ) -> None: ...
+            def is_active(self) -> bool: ...
+            def close(self) -> None: ...
+            def attach_loop(self, loop: AbstractEventLoop | None) -> None: ...
+            def add_child_handler(
+                self, pid: int, callback: Callable[[int, int, Unpack[_Ts]], object], *args: Unpack[_Ts]
+            ) -> None: ...
+            def remove_child_handler(self, pid: int) -> bool: ...

@@ -474,3 +474,79 @@ def f():
 
     1 / 0  # error: [division-by-zero]
 ```
+
+## Limitations of the current approach
+
+The current approach of silencing only a subset of diagnostics in unreachable code leads to some
+problems, and we may want to re-evaluate this decision in the future. To illustrate, consider the
+following example:
+
+```py
+if False:
+    x: int = 1
+else:
+    x: str = "a"
+
+if False:
+    # TODO We currently emit a false positive here:
+    # error: [invalid-assignment] "Object of type `Literal["a"]` is not assignable to `int`"
+    other: int = x
+else:
+    other: str = x
+```
+
+The problem here originates from the fact that the type of `x` in the `False` branch conflicts with
+the visible type of `x` in the `True` branch. When we type-check the lower `False` branch, we only
+see the visible definition of `x`, which has a type of `str`.
+
+In principle, this means that all diagnostics that depend on type information from "outside" the
+unreachable section should be silenced. Similar problems to the one above can occur for other rule
+types as well:
+
+```py
+from typing import Literal
+
+if False:
+    def f(x: int): ...
+    def g(*, a: int, b: int): ...
+
+    class C:
+        x: int = 1
+
+    class D:
+        def __call__(self):
+            pass
+
+    number: Literal[1] = 1
+else:
+    def f(x: str): ...
+    def g(*, a: int): ...
+
+    class C:
+        x: str = "a"
+
+    class D: ...
+    number: Literal[0] = 0
+
+if False:
+    # TODO
+    # error: [invalid-argument-type]
+    f(2)
+
+    # TODO
+    # error: [unknown-argument]
+    g(a=2, b=3)
+
+    # TODO
+    # error: [invalid-assignment]
+    C.x = 2
+
+    d: D = D()
+    # TODO
+    # error: [call-non-callable]
+    d()
+
+    # TODO
+    # error: [division-by-zero]
+    1 / number
+```
