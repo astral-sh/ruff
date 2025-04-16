@@ -6910,8 +6910,6 @@ impl<'db> BoundSuperType<'db> {
                 .find_name_in_mro_with_policy(db, name, policy)
                 .expect("Calling `find_name_in_mro` on dynamic type should return `Some`"),
             SuperOwnerKind::Class(class) | SuperOwnerKind::Instance(InstanceType { class }) => {
-                // We assume that `class` is non-generic, as it should have been specialized earlier.
-                debug_assert!(matches!(class, ClassType::NonGeneric(_)));
                 let (class_literal, _) = class.class_literal(db);
 
                 class_literal.class_member_from_mro(
