@@ -37,3 +37,24 @@ DatasetOrTimeSchedule()
 
 # airflow.utils.dag_parsing_context
 get_parsing_context()
+
+
+from airflow.decorators import dag, task, task_group, setup, teardown
+
+dag()
+task()
+task_group()
+setup()
+teardown()
+
+from airflow.models.dag import DAG as DAGFromDag
+from airflow.models import DAG as DAGFromModel
+
+DAGFromDag()
+DAGFromModel()
+
+from airflow.io.path import ObjectStoragePath
+from airflow.io.storage import attach
+
+ObjectStoragePath()
+attach()

@@ -151,3 +151,94 @@ AIR311_names.py:39:1: AIR311 `airflow.utils.dag_parsing_context.get_parsing_cont
    | ^^^^^^^^^^^^^^^^^^^ AIR311
    |
    = help: Use `airflow.sdk.get_parsing_context` instead
+
+AIR311_names.py:44:1: AIR311 `airflow.decorators.dag` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+42 | from airflow.decorators import dag, task, task_group, setup, teardown
+43 |
+44 | dag()
+   | ^^^ AIR311
+45 | task()
+46 | task_group()
+   |
+   = help: Use `airflow.sdk.dag` instead
+
+AIR311_names.py:45:1: AIR311 `airflow.decorators.task` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+44 | dag()
+45 | task()
+   | ^^^^ AIR311
+46 | task_group()
+47 | setup()
+   |
+   = help: Use `airflow.sdk.task` instead
+
+AIR311_names.py:46:1: AIR311 `airflow.decorators.task_group` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+44 | dag()
+45 | task()
+46 | task_group()
+   | ^^^^^^^^^^ AIR311
+47 | setup()
+48 | teardown()
+   |
+   = help: Use `airflow.sdk.task_group` instead
+
+AIR311_names.py:47:1: AIR311 `airflow.decorators.setup` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+45 | task()
+46 | task_group()
+47 | setup()
+   | ^^^^^ AIR311
+48 | teardown()
+   |
+   = help: Use `airflow.sdk.setup` instead
+
+AIR311_names.py:48:1: AIR311 `airflow.decorators.teardown` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+46 | task_group()
+47 | setup()
+48 | teardown()
+   | ^^^^^^^^ AIR311
+49 |
+50 | from airflow.models.dag import DAG as DAGFromDag
+   |
+   = help: Use `airflow.sdk.teardown` instead
+
+AIR311_names.py:53:1: AIR311 `airflow.models.dag.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+51 | from airflow.models import DAG as DAGFromModel
+52 |
+53 | DAGFromDag()
+   | ^^^^^^^^^^ AIR311
+54 | DAGFromModel()
+   |
+   = help: Use `airflow.sdk.DAG` instead
+
+AIR311_names.py:54:1: AIR311 `airflow.models.DAG` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+53 | DAGFromDag()
+54 | DAGFromModel()
+   | ^^^^^^^^^^^^ AIR311
+55 |
+56 | from airflow.io.path import ObjectStoragePath
+   |
+   = help: Use `airflow.sdk.DAG` instead
+
+AIR311_names.py:59:1: AIR311 `airflow.io.path.ObjectStoragePath` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+57 | from airflow.io.storage import attach
+58 |
+59 | ObjectStoragePath()
+   | ^^^^^^^^^^^^^^^^^ AIR311
+60 | attach()
+   |
+   = help: Use `airflow.sdk.ObjectStoragePath` instead
+
+AIR311_names.py:60:1: AIR311 `airflow.io.storage.attach` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+59 | ObjectStoragePath()
+60 | attach()
+   | ^^^^^^ AIR311
+   |
+   = help: Use `airflow.sdk.io.attach` instead
