@@ -3751,10 +3751,22 @@ impl<'db> Type<'db> {
         ));
 
         // If we are trying to construct a non-specialized generic class, we should use the
-        // constructor parameters to try to infer the class specialization.
-        let generic_origin = match self {
-            Type::ClassLiteral(ClassLiteralType::Generic(generic)) => Some(generic),
-            _ => None,
+        // constructor parameters to try to infer the class specialization. To do this, we need to
+        // tweak our member lookup logic a bit. Normally, when looking up a class or instance
+        // member, we first apply the class's default specialization, and apply that specialization
+        // to the type of the member. To infer a specialization from the argument types, we need to
+        // have the class's typevars still in the method signature when we attempt to call it. To
+        // do this, we instead use the _identity_ specialization, which maps each of the class's
+        // generic typevars to itself.
+        let (generic_origin, self_type) = match self {
+            Type::ClassLiteral(ClassLiteralType::Generic(generic)) => {
+                let specialization = generic.generic_context(db).identity_specialization(db);
+                (
+                    Some(generic),
+                    Type::GenericAlias(GenericAlias::new(db, generic, specialization)),
+                )
+            }
+            _ => (None, self),
         };
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
@@ -3781,8 +3793,8 @@ impl<'db> Type<'db> {
         // An alternative might be to not skip `object.__new__` but instead mark it such that it's
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
-        let new_call_outcome = argument_types.with_self(Some(self), |argument_types| {
-            let result = self.try_call_dunder_with_policy(
+        let new_call_outcome = argument_types.with_self(Some(self_type), |argument_types| {
+            let result = self_type.try_call_dunder_with_policy(
                 db,
                 "__new__",
                 argument_types,
@@ -3798,26 +3810,9 @@ impl<'db> Type<'db> {
         // Construct an instance type that we can use to look up the `__init__` instance method.
         // This performs the same logic as `Type::to_instance`, except for generic class literals.
         // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let init_ty = match self {
-            // This is the only match arm that is different from `Type::to_instance`. Instead of
-            // using the _default_ specialization, we use the _identity_ specialization, which maps
-            // each of the class's generic typevars to itself. The end result is a generic alias
-            // that still has the typevars in it, which we need to be able to infer a
-            // specialization when we call the `__init__` method. This is how we simulate a
-            // "partially initialized" object, where we don't yet know the actual specialization
-            // (so we simulate that with the identity specialization), while still being able to do
-            // an _instance_ lookup of `__init__` (which would apply the default specialization if
-            // we were to perform it directly on the non-specialized generic class literal).
-            Type::ClassLiteral(generic @ ClassLiteralType::Generic(_)) => {
-                Type::instance(generic.identity_specialization(db))
-            }
-            Type::ClassLiteral(ClassLiteralType::NonGeneric(non_generic)) => {
-                Type::instance(ClassType::NonGeneric(non_generic))
-            }
-            Type::GenericAlias(generic) => Type::instance(ClassType::Generic(generic)),
-            Type::SubclassOf(subclass_of) => subclass_of.to_instance(),
-            _ => panic!("type should be constructible"),
-        };
+        let init_ty = self_type
+            .to_instance(db)
+            .expect("type should be convertible to instance type");
 
         let init_call_outcome = if new_call_outcome.is_none()
             || !init_ty
@@ -3834,9 +3829,11 @@ impl<'db> Type<'db> {
             None
         };
 
+        // Note that we use `self` here, not `self_type`, so that if constructor argument inference
+        // fails, we fail back to the default specialization.
         let instance_ty = self
             .to_instance(db)
-            .expect("Class literal, generic alias, and subclass-of types should always be convertible to instance type");
+            .expect("type should be convertible to instance type");
 
         match (generic_origin, new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
@@ -3857,7 +3854,16 @@ impl<'db> Type<'db> {
                     .and_then(Bindings::single_element)
                     .and_then(CallableBinding::matching_overload)
                     .and_then(|(_, binding)| binding.specialization());
-                let specialized = (new_specialization.or(init_specialization))
+                let specialization = match (new_specialization, init_specialization) {
+                    (None, None) => None,
+                    (Some(specialization), None) | (None, Some(specialization)) => {
+                        Some(specialization)
+                    }
+                    (Some(new_specialization), Some(init_specialization)) => {
+                        Some(new_specialization.combine(db, init_specialization))
+                    }
+                };
+                let specialized = specialization
                     .map(|specialization| {
                         Type::instance(ClassType::Generic(GenericAlias::new(
                             db,

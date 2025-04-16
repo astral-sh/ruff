@@ -149,22 +149,76 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Inferring generic class parameters from constructors
+
 If the type of a constructor parameter is a class typevar, we can use that to infer the type
-parameter:
+parameter. The types inferred from a type context and from a constructor parameter must be
+consistent with each other.
+
+## `__new__` only
 
 ```py
-class E[T]:
-    def __init__(self, x: T) -> None: ...
+class C[T]:
+    def __new__(cls, x: T) -> "C"[T]:
+        return object.__new__(cls)
 
-reveal_type(E(1))  # revealed: E[Literal[1]]
+reveal_type(C(1))  # revealed: C[Literal[1]]
+
+# TODO: error: [invalid-argument-type]
+wrong_innards: C[int] = C("five")
 ```
 
-The types inferred from a type context and from a constructor parameter must be consistent with each
-other:
+## `__init__` only
 
 ```py
+class C[T]:
+    def __init__(self, x: T) -> None: ...
+
+reveal_type(C(1))  # revealed: C[Literal[1]]
+
 # TODO: error: [invalid-argument-type]
-wrong_innards: E[int] = E("five")
+wrong_innards: C[int] = C("five")
+```
+
+## Identical `__new__` and `__init__` signatures
+
+```py
+class C[T]:
+    def __new__(cls, x: T) -> "C"[T]:
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+reveal_type(C(1))  # revealed: C[Literal[1]]
+
+# TODO: error: [invalid-argument-type]
+wrong_innards: C[int] = C("five")
+```
+
+## Compatible `__new__` and `__init__` signatures
+
+```py
+class C[T]:
+    def __new__(cls, *args, **kwargs) -> "C"[T]:
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+reveal_type(C(1))  # revealed: C[Literal[1]]
+
+# TODO: error: [invalid-argument-type]
+wrong_innards: C[int] = C("five")
+
+class D[T]:
+    def __new__(cls, x: T) -> "D"[T]:
+        return object.__new__(cls)
+
+    def __init__(self, *args, **kwargs) -> None: ...
+
+reveal_type(D(1))  # revealed: D[Literal[1]]
+
+# TODO: error: [invalid-argument-type]
+wrong_innards: D[int] = D("five")
 ```
 
 ## Generic subclass

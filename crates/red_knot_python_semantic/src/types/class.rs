@@ -415,19 +415,6 @@ impl<'db> ClassLiteralType<'db> {
         }
     }
 
-    /// Returns the identity specialization of this class. For non-generic classes, the class is
-    /// returned unchanged. For a non-specialized generic class, we return a generic alias that
-    /// applies the identity specialization to the class's typevars.
-    pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> ClassType<'db> {
-        match self {
-            Self::NonGeneric(non_generic) => ClassType::NonGeneric(non_generic),
-            Self::Generic(generic) => {
-                let specialization = generic.generic_context(db).identity_specialization(db);
-                ClassType::Generic(GenericAlias::new(db, generic, specialization))
-            }
-        }
-    }
-
     /// Returns the unknown specialization of this class. For non-generic classes, the class is
     /// returned unchanged. For a non-specialized generic class, we return a generic alias that
     /// maps each of the class's typevars to `Unknown`.

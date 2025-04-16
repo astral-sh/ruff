@@ -140,6 +140,26 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types)
     }
 
+    /// Combines two specializations of the same generic context. If either specialization maps a
+    /// typevar to `Type::Unknown`, the other specialization's mapping is used. If both map the
+    /// typevar to a known type, those types are unioned together.
+    ///
+    /// Panics if the two specializations are not for the same generic context.
+    pub(crate) fn combine(self, db: &'db dyn Db, other: Self) -> Self {
+        let generic_context = self.generic_context(db);
+        assert!(other.generic_context(db) == generic_context);
+        let types = self
+            .types(db)
+            .into_iter()
+            .zip(other.types(db))
+            .map(|(self_type, other_type)| match (self_type, other_type) {
+                (unknown, known) | (known, unknown) if unknown.is_unknown() => *known,
+                _ => UnionType::from_elements(db, [self_type, other_type]),
+            })
+            .collect();
+        Specialization::new(db, self.generic_context(db), types)
+    }
+
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         let types = self.types(db).iter().map(|ty| ty.normalized(db)).collect();
         Self::new(db, self.generic_context(db), types)
