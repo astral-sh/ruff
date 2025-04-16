@@ -73,21 +73,26 @@ impl<'db> UnionBuilder<'db> {
     }
 
     /// Collapse the union to a single type: `object`.
-    fn collapse_to_object(mut self) -> Self {
+    fn collapse_to_object(&mut self) {
         self.elements.clear();
         self.elements
             .push(UnionElement::Type(Type::object(self.db)));
-        self
     }
 
     /// Adds a type to this union.
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
+        self.add_in_place(ty);
+        self
+    }
+
+    /// Adds a type to this union.
+    pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
         match ty {
             Type::Union(union) => {
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
                 for element in new_elements {
-                    self = self.add(*element);
+                    self.add_in_place(*element);
                 }
             }
             // Adding `Never` to a union is a no-op.
@@ -103,14 +108,15 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::StringLiterals(literals) => {
                             if literals.len() >= MAX_UNION_LITERALS {
                                 let replace_with = KnownClass::Str.to_instance(self.db);
-                                return self.add(replace_with);
+                                self.add_in_place(replace_with);
+                                return;
                             }
                             literals.insert(literal);
                             found = true;
                             break;
                         }
                         UnionElement::Type(existing) if ty.is_subtype_of(self.db, *existing) => {
-                            return self;
+                            return;
                         }
                         _ => {}
                     }
@@ -130,14 +136,15 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::BytesLiterals(literals) => {
                             if literals.len() >= MAX_UNION_LITERALS {
                                 let replace_with = KnownClass::Bytes.to_instance(self.db);
-                                return self.add(replace_with);
+                                self.add_in_place(replace_with);
+                                return;
                             }
                             literals.insert(literal);
                             found = true;
                             break;
                         }
                         UnionElement::Type(existing) if ty.is_subtype_of(self.db, *existing) => {
-                            return self;
+                            return;
                         }
                         _ => {}
                     }
@@ -157,14 +164,15 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::IntLiterals(literals) => {
                             if literals.len() >= MAX_UNION_LITERALS {
                                 let replace_with = KnownClass::Int.to_instance(self.db);
-                                return self.add(replace_with);
+                                self.add_in_place(replace_with);
+                                return;
                             }
                             literals.insert(literal);
                             found = true;
                             break;
                         }
                         UnionElement::Type(existing) if ty.is_subtype_of(self.db, *existing) => {
-                            return self;
+                            return;
                         }
                         _ => {}
                     }
@@ -176,7 +184,7 @@ impl<'db> UnionBuilder<'db> {
             }
             // Adding `object` to a union results in `object`.
             ty if ty.is_object(self.db) => {
-                return self.collapse_to_object();
+                self.collapse_to_object();
             }
             _ => {
                 let bool_pair = if let Type::BooleanLiteral(b) = ty {
@@ -223,7 +231,7 @@ impl<'db> UnionBuilder<'db> {
                         || ty.is_subtype_of(self.db, element)
                         || element.is_object(self.db)
                     {
-                        return self;
+                        return;
                     } else if element.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
                     } else if ty_negated.is_subtype_of(self.db, element) {
@@ -234,7 +242,8 @@ impl<'db> UnionBuilder<'db> {
                         // `element | ty` must be `object` (object has no other supertypes). This means we can simplify
                         // the whole union to just `object`, since all other potential elements would also be subtypes of
                         // `object`.
-                        return self.collapse_to_object();
+                        self.collapse_to_object();
+                        return;
                     }
                 }
                 if let Some((&first, rest)) = to_remove.split_first() {
@@ -248,7 +257,6 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
         }
-        self
     }
 
     pub(crate) fn build(self) -> Type<'db> {

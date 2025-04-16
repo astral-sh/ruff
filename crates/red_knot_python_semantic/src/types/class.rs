@@ -287,7 +287,7 @@ impl<'db> ClassType<'db> {
     ) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
-            .class_member(db, specialization, name, policy)
+            .class_member_inner(db, specialization, name, policy)
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
@@ -298,9 +298,9 @@ impl<'db> ClassType<'db> {
     /// directly. Use [`ClassType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        let (class_literal, _) = self.class_literal(db);
+        let (class_literal, specialization) = self.class_literal(db);
         class_literal
-            .own_class_member(db, name)
+            .own_class_member(db, specialization, name)
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
@@ -376,6 +376,13 @@ impl<'db> ClassLiteralType<'db> {
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.class(db).known == Some(known_class)
+    }
+
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        match self {
+            Self::NonGeneric(_) => None,
+            Self::Generic(generic) => Some(generic.generic_context(db)),
+        }
     }
 
     /// Return `true` if this class represents the builtin class `object`
@@ -698,6 +705,15 @@ impl<'db> ClassLiteralType<'db> {
     pub(super) fn class_member(
         self,
         db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
+        self.class_member_inner(db, None, name, policy)
+    }
+
+    fn class_member_inner(
+        self,
+        db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
@@ -800,7 +816,12 @@ impl<'db> ClassLiteralType<'db> {
     /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`ClassLiteralType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> SymbolAndQualifiers<'db> {
         if let Some(metadata) = self.dataclass_metadata(db) {
             if name == "__init__" {
                 if metadata.contains(DataclassMetadata::INIT) {
@@ -822,7 +843,30 @@ impl<'db> ClassLiteralType<'db> {
         }
 
         let body_scope = self.body_scope(db);
-        class_symbol(db, body_scope, name)
+        class_symbol(db, body_scope, name).map_type(|ty| {
+            // The `__new__` and `__init__` members of a non-specialized generic class are handled
+            // specially: they inherit the generic context of their class. That lets us treat them
+            // as generic functions when constructing the class, and infer the specialization of
+            // the class from the arguments that are passed in.
+            //
+            // We might decide to handle other class methods the same way, having them inherit the
+            // class's generic context, and performing type inference on calls to them to determine
+            // the specialization of the class. If we do that, we would update this to also apply
+            // to any method with a `@classmethod` decorator. (`__init__` would remain a special
+            // case, since it's an _instance_ method where we don't yet know the generic class's
+            // specialization.)
+            match (self, ty, specialization, name) {
+                (
+                    ClassLiteralType::Generic(origin),
+                    Type::FunctionLiteral(function),
+                    Some(_),
+                    "__new__" | "__init__",
+                ) => Type::FunctionLiteral(
+                    function.with_generic_context(db, origin.generic_context(db)),
+                ),
+                _ => ty,
+            }
+        })
     }
 
     /// Returns the `name` attribute of an instance of this class.
