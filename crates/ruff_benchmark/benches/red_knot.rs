@@ -280,6 +280,12 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
                             s += "attr7"
                         if x.attr8:
                             s += "attr8"
+                        if x.attr9:
+                            s += "attr9"
+                        if x.attr10:
+                            s += "attr10"
+                        if x.attr11:
+                            s += "attr11"
                         return s
                     "#,
                 )
