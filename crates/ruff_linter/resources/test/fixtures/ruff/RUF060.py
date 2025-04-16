@@ -152,3 +152,28 @@ def while_loop():
         x += 1
     else:
         yield
+
+# (19) Valid: Multiple yield in control flow path guarded by return
+@contextlib.contextmanager
+def valid_yield_with_unreachable_return():
+    def helper():
+        return True
+    print("Setting up")
+    if helper():
+        yield "value"
+        return
+    yield "never reached"
+
+# (20) Valid: Return in finally guards second yield
+@contextlib.contextmanager
+def valid_try_yield_finally_return():
+    def is_true():
+        return True
+    print("Setting up")
+    if is_true():
+        try:
+            yield "try value"
+        finally:
+            print("Cleaning up")
+            return
+    yield "later yield"
