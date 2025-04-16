@@ -155,9 +155,7 @@ impl<'db> UnionBuilder<'db> {
                 }
                 if !found {
                     self.elements
-                        .push(UnionElement::IntLiterals(FxOrderSet::from_iter([
-                            literal,
-                        ])));
+                        .push(UnionElement::IntLiterals(FxOrderSet::from_iter([literal])));
                 }
             }
             // Adding `object` to a union results in `object`.
