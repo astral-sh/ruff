@@ -260,10 +260,14 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
     criterion.bench_function("red_knot_micro[many_string_assignments]", |b| {
         b.iter_batched_ref(
             || {
+                // This is a micro benchmark, but it is effectively identical to a code sample
+                // observed "in the wild":
                 setup_micro_case(
                     r#"
                     def f(x) -> str:
                         s = ""
+                        # Each conditional doubles the size of the union of string literal types,
+                        # so if we go up to attr10, we have 2**10 = 1024 string literal types
                         if x.attr1:
                             s += "attr1"
                         if x.attr2:
@@ -284,8 +288,11 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
                             s += "attr9"
                         if x.attr10:
                             s += "attr10"
-                        if x.attr11:
-                            s += "attr11"
+                        # The above checked how fast we are in building the union; this checks how
+                        # we manage it once it is built. If implemented naively, this has to check
+                        # each member of the union for compatibility with the Sized protocol.
+                        if len(s) > 0:
+                            s = s[:-3]
                         return s
                     "#,
                 )
