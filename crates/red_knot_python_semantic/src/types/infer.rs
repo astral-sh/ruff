@@ -1496,7 +1496,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.db(),
             &name.id,
             function_kind,
-            self.scope(),
             body_scope,
             function_decorators,
             generic_context,

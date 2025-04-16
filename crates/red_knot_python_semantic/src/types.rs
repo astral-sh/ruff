@@ -5808,9 +5808,6 @@ pub struct FunctionType<'db> {
     /// Is this a function that we special-case somehow? If so, which one?
     known: Option<KnownFunction>,
 
-    /// The scope in which the function is defined.
-    scope: ScopeId<'db>,
-
     /// The scope that's created by the function, in which the function body is evaluated.
     body_scope: ScopeId<'db>,
 
@@ -5883,7 +5880,7 @@ impl<'db> FunctionType<'db> {
 
         // The semantic model records a use for each function on the name node. This is used here
         // to get the previous function definition with the same name.
-        let scope = self.scope(db);
+        let scope = self.definition(db).scope(db);
         let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
@@ -5951,7 +5948,6 @@ impl<'db> FunctionType<'db> {
             db,
             self.name(db).clone(),
             self.known(db),
-            self.scope(db),
             self.body_scope(db),
             self.decorators(db),
             Some(generic_context),
@@ -5968,7 +5964,6 @@ impl<'db> FunctionType<'db> {
             db,
             self.name(db).clone(),
             self.known(db),
-            self.scope(db),
             self.body_scope(db),
             self.decorators(db),
             self.generic_context(db),

@@ -278,14 +278,8 @@ def func[T](x: T | None = None) -> T | None:
     return x
 
 reveal_type(func)  # revealed: Overload[() -> None, (x: T) -> T]
-# TODO: requires generics; should be `int`
-# TODO: requires generics; should not error
-# error: [no-matching-overload]
-reveal_type(func(1))  # revealed: Unknown
-# TODO: requires generics; should be `str`
-# TODO: requires generics; should not error
-# error: [no-matching-overload]
-reveal_type(func(""))  # revealed: Unknown
+reveal_type(func(1))  # revealed: Literal[1]
+reveal_type(func(""))  # revealed: Literal[""]
 ```
 
 ## Invalid
