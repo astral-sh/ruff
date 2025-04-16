@@ -107,6 +107,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
+use super::{BoundSuperError, BoundSuperType};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -2430,6 +2431,34 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
+            // Super instances do not allow attribute assignment
+            Type::Instance(instance) if instance.class.is_known(db, KnownClass::Super) => {
+                if emit_diagnostics {
+                    self.context.report_lint_old(
+                        &INVALID_ASSIGNMENT,
+                        target,
+                        format_args!(
+                            "Cannot assign to attribute `{attribute}` on type `{}`",
+                            object_ty.display(self.db()),
+                        ),
+                    );
+                }
+                false
+            }
+            Type::BoundSuper(_) => {
+                if emit_diagnostics {
+                    self.context.report_lint_old(
+                        &INVALID_ASSIGNMENT,
+                        target,
+                        format_args!(
+                            "Cannot assign to attribute `{attribute}` on type `{}`",
+                            object_ty.display(self.db()),
+                        ),
+                    );
+                }
+                false
+            }
+
             Type::Dynamic(..) | Type::Never => true,
 
             Type::Instance(..)
@@ -4104,6 +4133,41 @@ impl<'db> TypeInferenceBuilder<'db> {
         ))
     }
 
+    /// Returns the type of the first parameter if the given scope is function-like (i.e. function or lambda).
+    /// Returns `None` if the scope is not function-like, or has no parameters.
+    fn first_param_type_in_scope(&self, scope: ScopeId) -> Option<Type<'db>> {
+        let first_param = match scope.node(self.db()) {
+            NodeWithScopeKind::Function(f) => f.parameters.iter().next(),
+            NodeWithScopeKind::Lambda(l) => l.parameters.as_ref()?.iter().next(),
+            _ => None,
+        }?;
+
+        let definition = self.index.expect_single_definition(first_param);
+
+        Some(infer_definition_types(self.db(), definition).binding_type(definition))
+    }
+
+    /// Returns the type of the nearest enclosing class for the given scope.
+    ///
+    /// This function walks up the ancestor scopes starting from the given scope,
+    /// and finds the closest class definition.
+    ///
+    /// Returns `None` if no enclosing class is found.a
+    fn enclosing_class_symbol(&self, scope: ScopeId) -> Option<Type<'db>> {
+        self.index
+            .ancestor_scopes(scope.file_scope_id(self.db()))
+            .find_map(|(_, ancestor_scope)| {
+                if let NodeWithScopeKind::Class(class) = ancestor_scope.node() {
+                    let definition = self.index.expect_single_definition(class.node());
+                    let result = infer_definition_types(self.db(), definition);
+
+                    Some(result.declaration_type(definition).inner_type())
+                } else {
+                    None
+                }
+            })
+    }
+
     fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
         let ast::ExprCall {
             range: _,
@@ -4144,6 +4208,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         | KnownClass::Type
                         | KnownClass::Object
                         | KnownClass::Property
+                        | KnownClass::Super
                 )
             })
         }) {
@@ -4165,148 +4230,229 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
         match bindings.check_types(self.db(), &mut call_argument_types) {
-            Ok(bindings) => {
-                for binding in &bindings {
-                    let Some(known_function) = binding
-                        .callable_type
-                        .into_function_literal()
-                        .and_then(|function_type| function_type.known(self.db()))
-                    else {
+            Ok(mut bindings) => {
+                for binding in &mut bindings {
+                    let binding_type = binding.callable_type;
+                    let Some((_, overload)) = binding.matching_overload_mut() else {
                         continue;
                     };
 
-                    let Some((_, overload)) = binding.matching_overload() else {
-                        continue;
-                    };
+                    match binding_type {
+                        Type::FunctionLiteral(function_literal) => {
+                            let Some(known_function) = function_literal.known(self.db()) else {
+                                continue;
+                            };
 
-                    match known_function {
-                        KnownFunction::RevealType => {
-                            if let [Some(revealed_type)] = overload.parameter_types() {
-                                if let Some(builder) = self
-                                    .context
-                                    .report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
-                                {
-                                    let mut diag = builder.into_diagnostic("Revealed type");
-                                    let span = self.context.span(call_expression);
-                                    diag.annotate(Annotation::primary(span).message(format_args!(
-                                        "`{}`",
-                                        revealed_type.display(self.db())
-                                    )));
-                                }
-                            }
-                        }
-                        KnownFunction::AssertType => {
-                            if let [Some(actual_ty), Some(asserted_ty)] = overload.parameter_types()
-                            {
-                                if !actual_ty.is_gradual_equivalent_to(self.db(), *asserted_ty) {
-                                    self.context.report_lint_old(
-                                            &TYPE_ASSERTION_FAILURE,
-                                            call_expression,
-                                            format_args!(
-                                                "Actual type `{}` is not the same as asserted type `{}`",
-                                                actual_ty.display(self.db()),
-                                                asserted_ty.display(self.db()),
-                                            ),
-                                        );
-                                }
-                            }
-                        }
-                        KnownFunction::AssertNever => {
-                            if let [Some(actual_ty)] = overload.parameter_types() {
-                                if !actual_ty.is_equivalent_to(self.db(), Type::Never) {
-                                    self.context.report_lint_old(
-                                        &TYPE_ASSERTION_FAILURE,
-                                        call_expression,
-                                        format_args!(
-                                            "Expected type `Never`, got `{}` instead",
-                                            actual_ty.display(self.db()),
-                                        ),
-                                    );
-                                }
-                            }
-                        }
-                        KnownFunction::StaticAssert => {
-                            if let [Some(parameter_ty), message] = overload.parameter_types() {
-                                let truthiness = match parameter_ty.try_bool(self.db()) {
-                                    Ok(truthiness) => truthiness,
-                                    Err(err) => {
-                                        let condition = arguments
-                                            .find_argument("condition", 0)
-                                            .map(|argument| match argument {
-                                                ruff_python_ast::ArgOrKeyword::Arg(expr) => {
-                                                    ast::AnyNodeRef::from(expr)
-                                                }
-                                                ruff_python_ast::ArgOrKeyword::Keyword(keyword) => {
-                                                    ast::AnyNodeRef::from(keyword)
-                                                }
-                                            })
-                                            .unwrap_or(ast::AnyNodeRef::from(call_expression));
-
-                                        err.report_diagnostic(&self.context, condition);
-
-                                        continue;
+                            match known_function {
+                                KnownFunction::RevealType => {
+                                    if let [Some(revealed_type)] = overload.parameter_types() {
+                                        if let Some(builder) = self.context.report_diagnostic(
+                                            DiagnosticId::RevealedType,
+                                            Severity::Info,
+                                        ) {
+                                            let mut diag = builder.into_diagnostic("Revealed type");
+                                            let span = self.context.span(call_expression);
+                                            diag.annotate(Annotation::primary(span).message(
+                                                format_args!(
+                                                    "`{}`",
+                                                    revealed_type.display(self.db())
+                                                ),
+                                            ));
+                                        }
                                     }
-                                };
-
-                                if !truthiness.is_always_true() {
-                                    if let Some(message) = message
-                                        .and_then(Type::into_string_literal)
-                                        .map(|s| &**s.value(self.db()))
+                                }
+                                KnownFunction::AssertType => {
+                                    if let [Some(actual_ty), Some(asserted_ty)] =
+                                        overload.parameter_types()
                                     {
-                                        self.context.report_lint_old(
-                                            &STATIC_ASSERT_ERROR,
-                                            call_expression,
-                                            format_args!("Static assertion error: {message}"),
-                                        );
-                                    } else if *parameter_ty == Type::BooleanLiteral(false) {
-                                        self.context.report_lint_old(
-                                            &STATIC_ASSERT_ERROR,
-                                            call_expression,
-                                            format_args!("Static assertion error: argument evaluates to `False`"),
-                                        );
-                                    } else if truthiness.is_always_false() {
-                                        self.context.report_lint_old(
-                                            &STATIC_ASSERT_ERROR,
-                                            call_expression,
-                                            format_args!(
-                                                "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
-                                                parameter_ty=parameter_ty.display(self.db())
-                                            ),
-                                        );
-                                    } else {
-                                        self.context.report_lint_old(
-                                            &STATIC_ASSERT_ERROR,
-                                            call_expression,
-                                            format_args!(
-                                                "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
-                                                parameter_ty=parameter_ty.display(self.db())
-                                            ),
-                                        );
+                                        if !actual_ty
+                                            .is_gradual_equivalent_to(self.db(), *asserted_ty)
+                                        {
+                                            self.context.report_lint_old(
+                                                    &TYPE_ASSERTION_FAILURE,
+                                                    call_expression,
+                                                    format_args!(
+                                                        "Actual type `{}` is not the same as asserted type `{}`",
+                                                        actual_ty.display(self.db()),
+                                                        asserted_ty.display(self.db()),
+                                                    ),
+                                                );
+                                        }
                                     }
                                 }
-                            }
-                        }
-                        KnownFunction::Cast => {
-                            if let [Some(casted_type), Some(source_type)] =
-                                overload.parameter_types()
-                            {
-                                let db = self.db();
-                                if (source_type.is_equivalent_to(db, *casted_type)
-                                    || source_type.normalized(db) == casted_type.normalized(db))
-                                    && !source_type.contains_todo(db)
-                                {
-                                    self.context.report_lint_old(
-                                        &REDUNDANT_CAST,
-                                        call_expression,
-                                        format_args!(
-                                            "Value is already of type `{}`",
-                                            casted_type.display(db),
-                                        ),
-                                    );
+                                KnownFunction::AssertNever => {
+                                    if let [Some(actual_ty)] = overload.parameter_types() {
+                                        if !actual_ty.is_equivalent_to(self.db(), Type::Never) {
+                                            self.context.report_lint_old(
+                                                &TYPE_ASSERTION_FAILURE,
+                                                call_expression,
+                                                format_args!(
+                                                    "Expected type `Never`, got `{}` instead",
+                                                    actual_ty.display(self.db()),
+                                                ),
+                                            );
+                                        }
+                                    }
                                 }
+                                KnownFunction::StaticAssert => {
+                                    if let [Some(parameter_ty), message] =
+                                        overload.parameter_types()
+                                    {
+                                        let truthiness = match parameter_ty.try_bool(self.db()) {
+                                            Ok(truthiness) => truthiness,
+                                            Err(err) => {
+                                                let condition = arguments
+                                                    .find_argument("condition", 0)
+                                                    .map(|argument| match argument {
+                                                        ruff_python_ast::ArgOrKeyword::Arg(
+                                                            expr,
+                                                        ) => ast::AnyNodeRef::from(expr),
+                                                        ruff_python_ast::ArgOrKeyword::Keyword(
+                                                            keyword,
+                                                        ) => ast::AnyNodeRef::from(keyword),
+                                                    })
+                                                    .unwrap_or(ast::AnyNodeRef::from(
+                                                        call_expression,
+                                                    ));
+
+                                                err.report_diagnostic(&self.context, condition);
+
+                                                continue;
+                                            }
+                                        };
+
+                                        if !truthiness.is_always_true() {
+                                            if let Some(message) = message
+                                                .and_then(Type::into_string_literal)
+                                                .map(|s| &**s.value(self.db()))
+                                            {
+                                                self.context.report_lint_old(
+                                                    &STATIC_ASSERT_ERROR,
+                                                    call_expression,
+                                                    format_args!(
+                                                        "Static assertion error: {message}"
+                                                    ),
+                                                );
+                                            } else if *parameter_ty == Type::BooleanLiteral(false) {
+                                                self.context.report_lint_old(
+                                                    &STATIC_ASSERT_ERROR,
+                                                    call_expression,
+                                                    format_args!("Static assertion error: argument evaluates to `False`"),
+                                                );
+                                            } else if truthiness.is_always_false() {
+                                                self.context.report_lint_old(
+                                                    &STATIC_ASSERT_ERROR,
+                                                    call_expression,
+                                                    format_args!(
+                                                        "Static assertion error: argument of type `{parameter_ty}` is statically known to be falsy",
+                                                        parameter_ty=parameter_ty.display(self.db())
+                                                    ),
+                                                );
+                                            } else {
+                                                self.context.report_lint_old(
+                                                    &STATIC_ASSERT_ERROR,
+                                                    call_expression,
+                                                    format_args!(
+                                                        "Static assertion error: argument of type `{parameter_ty}` has an ambiguous static truthiness",
+                                                        parameter_ty=parameter_ty.display(self.db())
+                                                    ),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                                KnownFunction::Cast => {
+                                    if let [Some(casted_type), Some(source_type)] =
+                                        overload.parameter_types()
+                                    {
+                                        let db = self.db();
+                                        if (source_type.is_equivalent_to(db, *casted_type)
+                                            || source_type.normalized(db)
+                                                == casted_type.normalized(db))
+                                            && !source_type.contains_todo(db)
+                                        {
+                                            self.context.report_lint_old(
+                                                &REDUNDANT_CAST,
+                                                call_expression,
+                                                format_args!(
+                                                    "Value is already of type `{}`",
+                                                    casted_type.display(db),
+                                                ),
+                                            );
+                                        }
+                                    }
+                                }
+                                _ => {}
                             }
                         }
-                        _ => {}
+                        Type::ClassLiteral(class)
+                            if class.is_known(self.db(), KnownClass::Super) =>
+                        {
+                            // Handle the case where `super()` is called with no arguments.
+                            // In this case, we need to infer the two arguments:
+                            //   1. The nearest enclosing class
+                            //   2. The first parameter of the current function (typically `self` or `cls`)
+                            match overload.parameter_types() {
+                                [] => {
+                                    let scope = self.scope();
+
+                                    let Some(enclosing_class) = self.enclosing_class_symbol(scope)
+                                    else {
+                                        overload.set_return_type(Type::unknown());
+                                        BoundSuperError::UnavailableImplicitArguments
+                                            .report_diagnostic(
+                                                &self.context,
+                                                call_expression.into(),
+                                            );
+                                        continue;
+                                    };
+
+                                    let Some(first_param) = self.first_param_type_in_scope(scope)
+                                    else {
+                                        overload.set_return_type(Type::unknown());
+                                        BoundSuperError::UnavailableImplicitArguments
+                                            .report_diagnostic(
+                                                &self.context,
+                                                call_expression.into(),
+                                            );
+                                        continue;
+                                    };
+
+                                    let bound_super = BoundSuperType::build(
+                                        self.db(),
+                                        enclosing_class,
+                                        first_param,
+                                    )
+                                    .unwrap_or_else(|err| {
+                                        err.report_diagnostic(
+                                            &self.context,
+                                            call_expression.into(),
+                                        );
+                                        Type::unknown()
+                                    });
+
+                                    overload.set_return_type(bound_super);
+                                }
+                                [Some(pivot_class_type), Some(owner_type)] => {
+                                    let bound_super = BoundSuperType::build(
+                                        self.db(),
+                                        *pivot_class_type,
+                                        *owner_type,
+                                    )
+                                    .unwrap_or_else(|err| {
+                                        err.report_diagnostic(
+                                            &self.context,
+                                            call_expression.into(),
+                                        );
+                                        Type::unknown()
+                                    });
+
+                                    overload.set_return_type(bound_super);
+                                }
+                                _ => (),
+                            }
+                        }
+                        _ => (),
                     }
                 }
                 bindings.return_type(self.db())
@@ -4711,6 +4857,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
                 | Type::Tuple(_)
+                | Type::BoundSuper(_)
                 | Type::TypeVar(_),
             ) => {
                 let unary_dunder_method = match op {
@@ -4989,6 +5136,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
                 | Type::Tuple(_)
+                | Type::BoundSuper(_)
                 | Type::TypeVar(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
@@ -5012,6 +5160,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::BytesLiteral(_)
                 | Type::SliceLiteral(_)
                 | Type::Tuple(_)
+                | Type::BoundSuper(_)
                 | Type::TypeVar(_),
                 op,
             ) => {

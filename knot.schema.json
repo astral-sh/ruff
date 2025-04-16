@@ -480,6 +480,16 @@
             }
           ]
         },
+        "invalid-super-argument": {
+          "title": "detects invalid arguments for `super()`",
+          "description": "## What it does\nDetects `super()` calls where:\n- the first argument is not a valid class literal, or\n- the second argument is not an instance or subclass of the first argument.\n\n## Why is this bad?\n`super(type, obj)` expects:\n- the first argument to be a class,\n- and the second argument to satisfy one of the following:\n  - `isinstance(obj, type)` is `True`\n  - `issubclass(obj, type)` is `True`\n\nViolating this relationship will raise a `TypeError` at runtime.\n\n## Examples\n```python\nclass A:\n    ...\nclass B(A):\n    ...\n\nsuper(A, B())  # it's okay! `A` satisfies `isinstance(B(), A)`\n\nsuper(A(), B()) # error: `A()` is not a class\n\nsuper(B, A())  # error: `A()` does not satisfy `isinstance(A(), B)`\nsuper(B, A)  # error: `A` does not satisfy `issubclass(A, B)`\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-syntax-in-forward-annotation": {
           "title": "detects invalid syntax in forward annotations",
           "description": "TODO #14889",
@@ -653,6 +663,16 @@
         "type-assertion-failure": {
           "title": "detects failed type assertions",
           "description": "## What it does\nChecks for `assert_type()` and `assert_never()` calls where the actual type\nis not the same as the asserted type.\n\n## Why is this bad?\n`assert_type()` allows confirming the inferred type of a certain value.\n\n## Example\n\n```python\ndef _(x: int):\n    assert_type(x, int)  # fine\n    assert_type(x, str)  # error: Actual type does not match asserted type\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "unavailable-implicit-super-arguments": {
+          "title": "detects invalid `super()` calls where implicit arguments are unavailable.",
+          "description": "## What it does\nDetects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.\n\n## Why is this bad?\nWhen `super()` is used without arguments, Python tries to find two things:\nthe nearest enclosing class and the first argument of the immediately enclosing function (typically self or cls).\nIf either of these is missing, the call will fail at runtime with a `RuntimeError`.\n\n## Examples\n```python\nsuper()  # error: no enclosing class or function found\n\ndef func():\n    super()  # error: no enclosing class or first argument exists\n\nclass A:\n    f = super()  # error: no enclosing function to provide the first argument\n\n    def method(self):\n        def nested():\n            super()  # error: first argument does not exist in this nested function\n\n        lambda: super()  # error: first argument does not exist in this lambda\n\n        (super() for _ in range(10))  # error: argument is not available in generator expression\n\n        super()  # okay! both enclosing class and first argument are available\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
           "default": "error",
           "oneOf": [
             {
