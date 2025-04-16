@@ -1,11 +1,5 @@
 # Statically-known branches
 
-```toml
-[environment]
-# require 3.10 for `match`
-python-version = "3.10"
-```
-
 ## Introduction
 
 We have the ability to infer precise types and boundness information for symbols that are defined in
@@ -1001,6 +995,11 @@ reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## `match` statements
+
+```toml
+[environment]
+python-version = "3.10"
+```
 
 ### Single-valued types, always true
 

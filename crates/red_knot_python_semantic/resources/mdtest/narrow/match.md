@@ -2,7 +2,6 @@
 
 ```toml
 [environment]
-# require 3.10 for `match`
 python-version = "3.10"
 ```
 
