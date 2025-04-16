@@ -27,8 +27,8 @@ def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
 n: Not[int, str]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
-    # these are both boolean-literal types,
-    # since all possible runtime objects that are created by the literal syntax `1`
+    # TODO: `bool` is not incorrect, but these would ideally be `Literal[True]` and `Literal[False]`
+    # respectively, since all possible runtime objects that are created by the literal syntax `1`
     # are members of the type `Literal[1]`
     reveal_type(not_one is not 1)  # revealed: bool
     reveal_type(not_one is 1)  # revealed: bool
