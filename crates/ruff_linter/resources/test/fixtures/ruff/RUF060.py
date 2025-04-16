@@ -273,3 +273,78 @@ def valid_match_with_returns(value):
         case _:
             pass
     yield
+
+# (27) Valid: Complex nesting with returns in some branches
+@contextlib.contextmanager
+def valid_complex_nesting_with_returns(value):
+    if value:
+        try:
+            if 1 + 1:
+                yield
+                return
+            else:
+                try:
+                    yield
+                except Exception:
+                    yield
+                    return
+        finally:
+            if 1 == 2:
+                return
+            print("Cleanup without c")
+    else:
+        yield "path 4"
+
+# (28) Valid: Yields in exclusive branches of try/except
+# Rule assumes failure in try before `yield`
+@contextlib.contextmanager
+def valid_try_except_yields():
+    print("Setting up")
+    try:
+        yield "try yield"
+    except Exception:
+        yield "except yield"
+    print("Cleaning up")
+
+# (29) Valid: Multiple yields in nested
+# Rule assumes failure in try before `yield`
+@contextlib.contextmanager
+def nested_try_except():
+    try:
+        try:
+            yield "outer try, inner try"
+        except ValueError:
+            yield "outer try, inner except"  # RUF060
+    except Exception:
+        yield "outer except"  # RUF060
+
+# (30) Valid: Multiple yields in nested try/excepts
+# Rule assumes failure in try before `yield`
+@contextlib.contextmanager
+def if_with_try_except(condition):
+    if condition:
+        try:
+            yield "in if try"
+        except Exception:
+            yield "in if except"  # RUF060
+    else:
+        try:
+            yield "in else try"
+        except Exception:
+            yield "in else except"  # RUF060
+
+# (31) Valid: Multiple yields possible in try/except nested in match
+# Rule assumes failure in try before `yield`
+@contextlib.contextmanager
+def match_with_try_except(value):
+    match value:
+        case "a":
+            try:
+                yield "case a try"
+            except Exception:
+                yield "case a except"  # RUF060
+        case _:
+            try:
+                yield "default try"
+            except Exception:
+                yield "default except"  # RUF060
