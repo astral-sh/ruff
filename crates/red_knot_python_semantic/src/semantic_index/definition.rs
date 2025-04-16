@@ -755,30 +755,14 @@ impl MatchPatternDefinitionKind {
 
 #[derive(Clone, Debug)]
 pub struct ComprehensionDefinitionKind<'db> {
-    target_kind: TargetKind<'db>,
-    iterable: AstNodeRef<ast::Expr>,
-    target: AstNodeRef<ast::Expr>,
-    first: bool,
-    is_async: bool,
+    pub(super) target_kind: TargetKind<'db>,
+    pub(super) iterable: AstNodeRef<ast::Expr>,
+    pub(super) target: AstNodeRef<ast::Expr>,
+    pub(super) first: bool,
+    pub(super) is_async: bool,
 }
 
 impl<'db> ComprehensionDefinitionKind<'db> {
-    pub(crate) fn new(
-        target_kind: TargetKind<'db>,
-        iterable: AstNodeRef<ast::Expr>,
-        target: AstNodeRef<ast::Expr>,
-        is_first: bool,
-        is_async: bool,
-    ) -> Self {
-        Self {
-            target_kind,
-            iterable,
-            target,
-            first: is_first,
-            is_async,
-        }
-    }
-
     pub(crate) fn iterable(&self) -> &ast::Expr {
         self.iterable.node()
     }

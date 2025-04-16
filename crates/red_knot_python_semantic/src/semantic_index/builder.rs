@@ -939,11 +939,23 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+                if matches!(unpackable, Unpackable::Comprehension { .. }) {
+                    debug_assert_eq!(
+                        self.scopes[self.current_scope()].node().scope_kind(),
+                        ScopeKind::Comprehension
+                    );
+                }
                 // The first iterator of the comprehension is evaluated in the outer scope, while all subsequent
                 // nodes are evaluated in the inner scope.
+                // SAFETY: The current scope is the comprehension, and the comprehension scope must have a parent scope.
                 let value_file_scope =
                     if let Unpackable::Comprehension { first: true, .. } = unpackable {
-                        self.scope_stack.iter().rev().nth(1).unwrap().file_scope_id
+                        self.scope_stack
+                            .iter()
+                            .rev()
+                            .nth(1)
+                            .expect("The comprehension scope must have a parent scope")
+                            .file_scope_id
                     } else {
                         self.current_scope()
                     };
@@ -2137,15 +2149,18 @@ where
                         }) => {
                             // SAFETY: `iter` and `expr` belong to the `self.module` tree
                             #[allow(unsafe_code)]
-                            let assignment = ComprehensionDefinitionKind::new(
-                                TargetKind::from(unpack),
-                                unsafe { AstNodeRef::new(self.module.clone(), &node.iter) },
-                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                            let assignment = ComprehensionDefinitionKind {
+                                target_kind: TargetKind::from(unpack),
+                                iterable: unsafe {
+                                    AstNodeRef::new(self.module.clone(), &node.iter)
+                                },
+                                target: unsafe { AstNodeRef::new(self.module.clone(), expr) },
                                 first,
-                                node.is_async,
-                            );
-                            // Temporarily move to the scope of the method to which the instance attribute is defined
-                            let scope = self.scope_stack.pop().unwrap();
+                                is_async: node.is_async,
+                            };
+                            // Temporarily move to the scope of the method to which the instance attribute is defined.
+                            // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
+                            let scope = self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope");
                             self.register_attribute_assignment(
                                 object,
                                 attr,
