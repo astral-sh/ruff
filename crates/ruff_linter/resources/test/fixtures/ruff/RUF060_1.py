@@ -127,3 +127,36 @@ def yield_in_while():
     while x < 3:
         yield f"in loop {x}"  # RUF060 - multiple yields in loop
         x += 1
+
+# (15) Invalid: Unguarded yield in finally
+@contextlib.contextmanager
+def yield_in_finally():
+    try:
+        yield
+    except:
+        pass
+    else:
+        return
+    finally:
+        yield
+
+# (16) Invalid: No returning except accumulates yields
+@contextlib.contextmanager
+def yield_in_no_return_except():
+    try:
+        pass
+    except:
+        yield
+    else:
+        yield
+        return
+    yield
+
+#(17) Invalid: Return only in exception
+@contextlib.contextmanager
+def no_return_guarding_yield():
+    try:
+        yield
+    except:
+        return
+    yield

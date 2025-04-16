@@ -137,3 +137,33 @@ RUF060_1.py:125:5: RUF060 Function decorated with `contextlib.contextmanager` ma
 126 |     x = 1
 127 |     while x < 3:
     |
+
+RUF060_1.py:133:5: RUF060 Function decorated with `contextlib.contextmanager` may yield more than once
+    |
+131 | # (15) Invalid: Unguarded yield in finally
+132 | @contextlib.contextmanager
+133 | def yield_in_finally():
+    |     ^^^^^^^^^^^^^^^^ RUF060
+134 |     try:
+135 |         yield
+    |
+
+RUF060_1.py:145:5: RUF060 Function decorated with `contextlib.contextmanager` may yield more than once
+    |
+143 | # (16) Invalid: No returning except accumulates yields
+144 | @contextlib.contextmanager
+145 | def yield_in_no_return_except():
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ RUF060
+146 |     try:
+147 |         pass
+    |
+
+RUF060_1.py:157:5: RUF060 Function decorated with `contextlib.contextmanager` may yield more than once
+    |
+155 | #(17) Invalid: Return only in exception
+156 | @contextlib.contextmanager
+157 | def no_return_guarding_yield():
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^ RUF060
+158 |     try:
+159 |         yield
+    |
