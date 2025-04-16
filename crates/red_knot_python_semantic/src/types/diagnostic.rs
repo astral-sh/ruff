@@ -1116,19 +1116,26 @@ fn report_invalid_assignment_with_message(
     target_ty: Type,
     message: std::fmt::Arguments,
 ) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, node) else {
+        return;
+    };
     match target_ty {
         Type::ClassLiteral(class) => {
-            context.report_lint_old(&INVALID_ASSIGNMENT, node, format_args!(
-                    "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
-                    class.name(context.db())));
+            let mut diag = builder.into_diagnostic(format_args!(
+                "Implicit shadowing of class `{}`",
+                class.name(context.db()),
+            ));
+            diag.info("Annotate to make it explicit if this is intentional");
         }
         Type::FunctionLiteral(function) => {
-            context.report_lint_old(&INVALID_ASSIGNMENT, node, format_args!(
-                    "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
-                    function.name(context.db())));
+            let mut diag = builder.into_diagnostic(format_args!(
+                "Implicit shadowing of function `{}`",
+                function.name(context.db()),
+            ));
+            diag.info("Annotate to make it explicit if this is intentional");
         }
         _ => {
-            context.report_lint_old(&INVALID_ASSIGNMENT, node, message);
+            builder.into_diagnostic(message);
         }
     }
 }
