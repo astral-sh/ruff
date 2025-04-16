@@ -51,6 +51,10 @@ enum UnionElement<'db> {
     Type(Type<'db>),
 }
 
+// TODO increase this once we extend `UnionElement` throughout all union/intersection
+// representations, so that we can make large unions of literals fast in all operations.
+const MAX_UNION_LITERALS: usize = 200;
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -93,10 +97,15 @@ impl<'db> UnionBuilder<'db> {
             // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
             // containing it.
             Type::StringLiteral(literal) => {
+                let mut too_large = false;
                 let mut found = false;
                 for element in &mut self.elements {
                     match element {
                         UnionElement::StringLiterals(literals) => {
+                            if literals.len() >= MAX_UNION_LITERALS {
+                                too_large = true;
+                                break;
+                            }
                             literals.insert(literal);
                             found = true;
                             break;
@@ -106,6 +115,10 @@ impl<'db> UnionBuilder<'db> {
                         }
                         _ => {}
                     }
+                }
+                if too_large {
+                    let replace_with = KnownClass::Str.to_instance(self.db);
+                    return self.add(replace_with);
                 }
                 if !found {
                     self.elements
@@ -117,9 +130,14 @@ impl<'db> UnionBuilder<'db> {
             // Same for bytes literals as for string literals, above.
             Type::BytesLiteral(literal) => {
                 let mut found = false;
+                let mut too_large = false;
                 for element in &mut self.elements {
                     match element {
                         UnionElement::BytesLiterals(literals) => {
+                            if literals.len() >= MAX_UNION_LITERALS {
+                                too_large = true;
+                                break;
+                            }
                             literals.insert(literal);
                             found = true;
                             break;
@@ -129,6 +147,10 @@ impl<'db> UnionBuilder<'db> {
                         }
                         _ => {}
                     }
+                }
+                if too_large {
+                    let replace_with = KnownClass::Bytes.to_instance(self.db);
+                    return self.add(replace_with);
                 }
                 if !found {
                     self.elements
@@ -140,9 +162,14 @@ impl<'db> UnionBuilder<'db> {
             // And same for int literals as well.
             Type::IntLiteral(literal) => {
                 let mut found = false;
+                let mut too_large = false;
                 for element in &mut self.elements {
                     match element {
                         UnionElement::IntLiterals(literals) => {
+                            if literals.len() >= MAX_UNION_LITERALS {
+                                too_large = true;
+                                break;
+                            }
                             literals.insert(literal);
                             found = true;
                             break;
@@ -152,6 +179,10 @@ impl<'db> UnionBuilder<'db> {
                         }
                         _ => {}
                     }
+                }
+                if too_large {
+                    let replace_with = KnownClass::Int.to_instance(self.db);
+                    return self.add(replace_with);
                 }
                 if !found {
                     self.elements
