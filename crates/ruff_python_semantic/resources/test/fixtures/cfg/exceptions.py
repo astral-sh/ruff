@@ -148,6 +148,11 @@ def func():
     finally:
         print("finally")
 
+def func():
+    try:
+        return 1/0
+    except:
+        print("whoops!")
 # def func():
 #     try:
 #         print("try")

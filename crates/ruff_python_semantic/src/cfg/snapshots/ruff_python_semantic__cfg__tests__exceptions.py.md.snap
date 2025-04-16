@@ -509,3 +509,26 @@ flowchart TD
 	node7-->node3
 	node8-->node3
 ```
+
+## Function 17
+### Source
+```python
+def func():
+    try:
+        return 1/0
+    except:
+        print("whoops!")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["return 1/0"]
+	node1((("EXIT")))
+	node2["EXCEPTION DISPATCH"]
+	node3["print(#quot;whoops!#quot;)"]
+	node0-->|"exception"|node2
+	node0-->|"else"|node1
+	node2-->|"except any exception"|node3
+	node3==>node1
+```

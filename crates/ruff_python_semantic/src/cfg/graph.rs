@@ -174,6 +174,7 @@ pub enum Condition<'stmt> {
     UncaughtException,
     /// Deferred
     Deferred(&'stmt Stmt),
+    MaybeException,
 }
 
 struct CFGBuilder<'stmt> {
@@ -706,7 +707,18 @@ impl<'stmt> CFGBuilder<'stmt> {
                 // Jumps
                 Stmt::Return(_) => {
                     self.defer_jump(stmt).unwrap_or_else(|| {
-                        let edges = Edges::always(self.cfg.terminal());
+                        let edges = if let Some(ctxt) = self.try_contexts.last() {
+                            if (ctxt.state == TryState::Try) && !ctxt.has_finally() {
+                                Edges {
+                                    conditions: vec![Condition::MaybeException, Condition::Else],
+                                    targets: vec![self.exit(), self.cfg.terminal()],
+                                }
+                            } else {
+                                Edges::always(self.cfg.terminal())
+                            }
+                        } else {
+                            Edges::always(self.cfg.terminal())
+                        };
                         self.set_current_block_stmts(&stmts[start..=end]);
                         self.set_current_block_edges(edges);
                         start = end + 1;
@@ -719,10 +731,30 @@ impl<'stmt> CFGBuilder<'stmt> {
                 }
                 Stmt::Break(_) => {
                     self.defer_jump(stmt).unwrap_or_else(|| {
-                        let edges = Edges::always(
-                            self.loop_exit()
-                                .expect("`break` should only occur inside loop context"),
-                        );
+                        let edges = if let Some(ctxt) = self.try_contexts.last() {
+                            if (ctxt.state == TryState::Try) && !ctxt.has_finally() {
+                                Edges {
+                                    conditions: vec![Condition::MaybeException, Condition::Else],
+                                    targets: vec![
+                                        self.exit(),
+                                        self.loop_exit().expect(
+                                            "`break` should only occur inside loop context",
+                                        ),
+                                    ],
+                                }
+                            } else {
+                                Edges::always(
+                                    self.loop_exit()
+                                        .expect("`break` should only occur inside loop context"),
+                                )
+                            }
+                        } else {
+                            Edges::always(
+                                self.loop_exit()
+                                    .expect("`break` should only occur inside loop context"),
+                            )
+                        };
+
                         self.set_current_block_stmts(&stmts[start..=end]);
                         self.set_current_block_edges(edges);
                         start = end + 1;
@@ -735,10 +767,29 @@ impl<'stmt> CFGBuilder<'stmt> {
                 }
                 Stmt::Continue(_) => {
                     self.defer_jump(stmt).unwrap_or_else(|| {
-                        let edges = Edges::always(
-                            self.loop_guard()
-                                .expect("`continue` should only occur inside loop context"),
-                        );
+                        let edges = if let Some(ctxt) = self.try_contexts.last() {
+                            if (ctxt.state == TryState::Try) && !ctxt.has_finally() {
+                                Edges {
+                                    conditions: vec![Condition::MaybeException, Condition::Else],
+                                    targets: vec![
+                                        self.exit(),
+                                        self.loop_guard().expect(
+                                            "`continue` should only occur inside loop context",
+                                        ),
+                                    ],
+                                }
+                            } else {
+                                Edges::always(
+                                    self.loop_guard()
+                                        .expect("`continue` should only occur inside loop context"),
+                                )
+                            }
+                        } else {
+                            Edges::always(
+                                self.loop_guard()
+                                    .expect("`continue` should only occur inside loop context"),
+                            )
+                        };
                         self.set_current_block_stmts(&stmts[start..=end]);
                         self.set_current_block_edges(edges);
                         start = end + 1;
@@ -945,13 +996,10 @@ impl<'stmt> CFGBuilder<'stmt> {
     }
 
     fn should_defer_jumps(&self) -> bool {
-        self.try_contexts
-            .iter()
-            .any(|try_ctxt| match try_ctxt.state {
-                TryState::Try => true,
-                TryState::Except | TryState::Else if try_ctxt.has_finally() => true,
-                _ => false,
-            })
+        self.try_contexts.iter().any(|try_ctxt| {
+            matches!(try_ctxt.state,
+                TryState::Try | TryState::Except | TryState::Else if try_ctxt.has_finally())
+        })
     }
 
     fn extend_deferred_jumps(&mut self, jumps: Vec<&'stmt Stmt>) {
@@ -1036,7 +1084,7 @@ pub enum TryKind {
     TryExceptElseFinally,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TryState {
     Try,
     Dispatch,

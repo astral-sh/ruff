@@ -295,6 +295,10 @@ impl MermaidGraph for CFGWithSource<'_, '_> {
                             }
                         }
                     }
+                    Condition::MaybeException => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: "exception".to_string(),
+                    },
                 };
                 (target, edge)
             })
