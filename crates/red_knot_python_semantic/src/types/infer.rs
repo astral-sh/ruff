@@ -82,13 +82,13 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     todo_type, CallDunderError, CallableSignature, CallableType, Class, ClassLiteralType,
-    DataclassMetadata, DynamicType, FunctionDecorators, FunctionType, GenericAlias, GenericClass,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
-    MemberLookupPolicy, MetaclassCandidate, NonGenericClass, Parameter, ParameterForm, Parameters,
-    Signature, Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol,
-    SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
-    UnionType,
+    ClassType, DataclassMetadata, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
+    GenericClass, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
+    KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, NonGenericClass, Parameter,
+    ParameterForm, Parameters, Signature, Signatures, SliceLiteralType, StringLiteralType,
+    SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
+    TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarInstance, UnionBuilder, UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -4188,35 +4188,36 @@ impl<'db> TypeInferenceBuilder<'db> {
         let callable_type = self.infer_expression(func);
 
         // For class literals we model the entire class instantiation logic, so it is handled
-        // in a separate function.
-        let class = match callable_type {
-            Type::ClassLiteral(_) | Type::GenericAlias(_) => Some(callable_type),
-            Type::SubclassOf(subclass) if matches!(subclass.subclass_of(), ClassBase::Class(_)) => {
-                Some(callable_type)
-            }
-            _ => None,
+        // in a separate function. For some known classes we have manual signatures defined and use
+        // the `try_call` path below.
+        // TODO: it should be possible to move these special cases into the `try_call_constructor`
+        // path instead, or even remove some entirely once we support overloads fully.
+        let (call_constructor, known_class) = match callable_type {
+            Type::ClassLiteral(class) => (true, class.known(self.db())),
+            Type::GenericAlias(generic) => (true, ClassType::Generic(generic).known(self.db())),
+            Type::SubclassOf(subclass) => (
+                true,
+                subclass
+                    .subclass_of()
+                    .into_class()
+                    .and_then(|class| class.known(self.db())),
+            ),
+            _ => (false, None),
         };
 
-        if class.is_some_and(|class| {
-            // For some known classes we have manual signatures defined and use the `try_call` path
-            // below. TODO: it should be possible to move these special cases into the
-            // `try_call_constructor` path instead, or even remove some entirely once we support
-            // overloads fully.
-            match class {
-                Type::ClassLiteral(class) => class.known(self.db()).is_none_or(|class| {
-                    !matches!(
-                        class,
-                        KnownClass::Bool
-                            | KnownClass::Str
-                            | KnownClass::Type
-                            | KnownClass::Object
-                            | KnownClass::Property
-                            | KnownClass::Super
-                    )
-                }),
-                _ => true,
-            }
-        }) {
+        if call_constructor
+            && !matches!(
+                known_class,
+                Some(
+                    KnownClass::Bool
+                        | KnownClass::Str
+                        | KnownClass::Type
+                        | KnownClass::Object
+                        | KnownClass::Property
+                        | KnownClass::Super
+                )
+            )
+        {
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
             let call_argument_types =
                 self.infer_argument_types(arguments, call_arguments, &argument_forms);
