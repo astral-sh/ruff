@@ -1153,7 +1153,7 @@ static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 
-### Overload
+### Overloads
 
 #### Subtype overloaded
 

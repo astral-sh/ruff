@@ -6203,7 +6203,7 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_subtype_of`] for more details.
     fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.check_relation_impl(db, other, &|self_signature, other_signature| {
+        self.is_assignable_to_impl(db, other, &|self_signature, other_signature| {
             self_signature.is_subtype_of(db, other_signature)
         })
     }
@@ -6212,26 +6212,8 @@ impl<'db> CallableType<'db> {
     ///
     /// See [`Type::is_assignable_to`] for more details.
     fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.check_relation_impl(db, other, &|self_signature, other_signature| {
+        self.is_assignable_to_impl(db, other, &|self_signature, other_signature| {
             self_signature.is_assignable_to(db, other_signature)
-        })
-    }
-
-    /// Check whether this callable type is equivalent to another callable type.
-    ///
-    /// See [`Type::is_equivalent_to`] for more details.
-    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.check_relation_impl(db, other, &|self_signature, other_signature| {
-            self_signature.is_equivalent_to(db, other_signature)
-        })
-    }
-
-    /// Check whether this callable type is gradual equivalent to another callable type.
-    ///
-    /// See [`Type::is_gradual_equivalent_to`] for more details.
-    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.check_relation_impl(db, other, &|self_signature, other_signature| {
-            self_signature.is_gradual_equivalent_to(db, other_signature)
         })
     }
 
@@ -6239,7 +6221,7 @@ impl<'db> CallableType<'db> {
     /// types.
     ///
     /// The `check_signature` closure is used to check the relation between two [`Signature`]s.
-    fn check_relation_impl<F>(self, db: &'db dyn Db, other: Self, check_signature: &F) -> bool
+    fn is_assignable_to_impl<F>(self, db: &'db dyn Db, other: Self, check_signature: &F) -> bool
     where
         F: Fn(&Signature<'db>, &Signature<'db>) -> bool,
     {
@@ -6256,7 +6238,7 @@ impl<'db> CallableType<'db> {
                     .iter()
                     .map(|self_signature| CallableType::single(db, self_signature.clone()))
                     .any(|self_callable| {
-                        self_callable.check_relation_impl(db, other_callable, check_signature)
+                        self_callable.is_assignable_to_impl(db, other_callable, check_signature)
                     })
             }
 
@@ -6267,7 +6249,7 @@ impl<'db> CallableType<'db> {
                     .iter()
                     .map(|other_signature| CallableType::single(db, other_signature.clone()))
                     .all(|other_callable| {
-                        self_callable.check_relation_impl(db, other_callable, check_signature)
+                        self_callable.is_assignable_to_impl(db, other_callable, check_signature)
                     })
             }
 
@@ -6276,8 +6258,38 @@ impl<'db> CallableType<'db> {
                 .iter()
                 .map(|other_signature| CallableType::single(db, other_signature.clone()))
                 .all(|other_callable| {
-                    self.check_relation_impl(db, other_callable, check_signature)
+                    self.is_assignable_to_impl(db, other_callable, check_signature)
                 }),
+        }
+    }
+
+    /// Check whether this callable type is equivalent to another callable type.
+    ///
+    /// See [`Type::is_equivalent_to`] for more details.
+    fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (&**self.signatures(db), &**other.signatures(db)) {
+            ([self_signature], [other_signature]) => {
+                self_signature.is_equivalent_to(db, other_signature)
+            }
+            _ => {
+                // TODO: overloads
+                false
+            }
+        }
+    }
+
+    /// Check whether this callable type is gradual equivalent to another callable type.
+    ///
+    /// See [`Type::is_gradual_equivalent_to`] for more details.
+    fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        match (&**self.signatures(db), &**other.signatures(db)) {
+            ([self_signature], [other_signature]) => {
+                self_signature.is_gradual_equivalent_to(db, other_signature)
+            }
+            _ => {
+                // TODO: overloads
+                false
+            }
         }
     }
 }
