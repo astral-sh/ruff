@@ -237,45 +237,33 @@ impl<'a> source_order::SourceOrderVisitor<'a> for YieldPathTracker {
                     self.would_increment_check_yield_stack_top(max_path_yields);
                     self.check_then_null_yield_counts_top();
                 } else {
-                    // If finally doesn't return handle different cases
-                    // try else return finally
-                    // try else finally
-                    let max_path_yields_return_except =
-                        try_yields + max_except_yields_with_return + finally_yields;
-                    let max_path_yields_no_return_except =
-                        try_yields + max_except_yields_no_return + finally_yields;
+                    // Since the code preceding yields is most likely to fail, we assume either
+                    // valid try-else-finally or erroneous except-finally execution.
+                    // Distinguish returning and non-returning except for propagation.
 
-                    // Return in try
+                    let exception_return = max_except_yields_with_return + finally_yields;
+                    let exception_no_return = max_except_yields_no_return + finally_yields;
+                    let valid_try_else_finally = try_yields + else_yields + finally_yields;
+
+                    // Probe exceptions with returns for all possibilities
+                    self.would_increment_check_yield_stack_top(exception_return);
+
                     if try_returns {
-                        // Check except cases and propagate non-returning
-                        // except branch yield counts
-                        self.would_increment_check_yield_stack_top(max_path_yields_return_except);
-                        self.apply_increment_check_yield_stack_top(
-                            max_path_yields_no_return_except,
-                        );
-                    } else if else_returns {
-                        // No exception
-                        self.would_increment_check_yield_stack_top(else_yields);
-
-                        // With exceptions, else is not executed
-                        // Check except branches and propagate
-                        // non-returning
-                        self.would_increment_check_yield_stack_top(max_path_yields_return_except);
-                        self.apply_increment_check_yield_stack_top(
-                            max_path_yields_no_return_except,
-                        );
+                        let valid_try_return = try_yields + finally_yields;
+                        self.would_increment_check_yield_stack_top(valid_try_return);
+                        // Propagate the non-returning exception
+                        self.apply_increment_check_yield_stack_top(exception_no_return);
                     } else {
-                        // No return in try-else-finally
-                        // Check except branches and propagate
-                        // non-returning
-                        let max_path_yields_except_returns =
-                            try_yields + max_except_yields_with_return + finally_yields;
-                        self.would_increment_check_yield_stack_top(max_path_yields_except_returns);
-
-                        let max_no_return_path_yields = try_yields
-                            + max_path_yields_no_return_except.max(else_yields)
-                            + finally_yields;
-                        self.apply_increment_check_yield_stack_top(max_no_return_path_yields);
+                        // Finally is executed even if else returns
+                        self.would_increment_check_yield_stack_top(valid_try_else_finally);
+                        if else_returns {
+                            // Propagate the non-returning exception
+                            self.apply_increment_check_yield_stack_top(exception_no_return);
+                        } else {
+                            self.apply_increment_check_yield_stack_top(
+                                valid_try_else_finally.max(exception_no_return),
+                            );
+                        }
                     }
                 }
             }
