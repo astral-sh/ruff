@@ -5283,12 +5283,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             };
 
             match (op, result) {
-                (ast::CmpOp::Eq, Some(Type::BooleanLiteral(true))) => {
-                    return Ok(Type::BooleanLiteral(false));
-                }
-                (ast::CmpOp::NotEq, Some(Type::BooleanLiteral(false))) => {
-                    return Ok(Type::BooleanLiteral(true));
-                }
                 (ast::CmpOp::Is, Some(Type::BooleanLiteral(true))) => {
                     return Ok(Type::BooleanLiteral(false));
                 }
@@ -5338,6 +5332,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         // we would get a result type `Literal[True]` which is too narrow.
         //
         let mut builder = IntersectionBuilder::new(self.db());
+
+        builder = builder.add_positive(KnownClass::Bool.to_instance(self.db()));
+
         for pos in intersection.positive(self.db()) {
             let result = match intersection_on {
                 IntersectionOn::Left => {
@@ -5412,6 +5409,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 ast::CmpOp::LtE => Ok(Type::BooleanLiteral(n <= m)),
                 ast::CmpOp::Gt => Ok(Type::BooleanLiteral(n > m)),
                 ast::CmpOp::GtE => Ok(Type::BooleanLiteral(n >= m)),
+                // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
+                // Even if they are the same value, they may not be the same object.
                 ast::CmpOp::Is => {
                     if n == m {
                         Ok(KnownClass::Bool.to_instance(self.db()))
