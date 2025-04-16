@@ -21,6 +21,7 @@ flowchart TD
 	node3["print(#quot;except#quot;)"]
 	node0-->node2
 	node2-->|"except any exception"|node3
+	node2-->|"else"|node1
 	node3==>node1
 ```
 
@@ -47,6 +48,7 @@ flowchart TD
 	node0-->node3
 	node2==>node1
 	node3-->|"except any exception"|node4
+	node3-->|"else"|node2
 	node4-->node2
 ```
 
@@ -73,6 +75,7 @@ flowchart TD
 	node0-->node2
 	node2-->|"except ValueError"|node3
 	node2-->|"except TypeError"|node4
+	node2-->|"else"|node1
 	node3==>node1
 	node4==>node1
 ```
@@ -99,6 +102,7 @@ flowchart TD
 	node5["print(#quot;whoops#quot;)"]
 	node0-->node3
 	node2-->|"except any exception"|node5
+	node2-->|"else"|node1
 	node3-->|"[1,2,3]"|node4
 	node3-->|"else"|node2
 	node4-->node3
@@ -530,5 +534,43 @@ flowchart TD
 	node0-->|"exception"|node2
 	node0-->|"else"|node1
 	node2-->|"except any exception"|node3
+	node2-->|"else"|node1
 	node3==>node1
+```
+
+## Function 18
+### Source
+```python
+def func():
+    try:
+        x = 1
+    except:
+        try:
+            x = 2
+        except:
+            x = 3
+        raise
+    return 5
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["x = 1"]
+	node1((("EXIT")))
+	node2["return 5"]
+	node3["EXCEPTION DISPATCH"]
+	node4["x = 2"]
+	node5["raise"]
+	node6["EXCEPTION DISPATCH"]
+	node7["x = 3"]
+	node0-->node3
+	node2==>node1
+	node3-->|"except any exception"|node4
+	node3-->|"else"|node2
+	node4-->node6
+	node5==>node1
+	node6-->|"except any exception"|node7
+	node6-->|"else"|node5
+	node7-->node5
 ```

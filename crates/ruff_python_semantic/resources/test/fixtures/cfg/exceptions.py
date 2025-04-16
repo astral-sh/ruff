@@ -153,6 +153,17 @@ def func():
         return 1/0
     except:
         print("whoops!")
+
+def func():
+    try:
+        x = 1
+    except:
+        try:
+            x = 2
+        except:
+            x = 3
+        raise
+    return 5
 # def func():
 #     try:
 #         print("try")

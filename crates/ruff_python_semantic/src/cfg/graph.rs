@@ -518,8 +518,8 @@ impl<'stmt> CFGBuilder<'stmt> {
                             self.update_exit(cache_exit);
 
                             // Create a vec of conditions and their target blocks
-                            let mut conditions = Vec::with_capacity(stmt_try.handlers.len());
-                            let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len());
+                            let mut conditions = Vec::with_capacity(stmt_try.handlers.len() + 1);
+                            let mut except_blocks = Vec::with_capacity(stmt_try.handlers.len() + 1);
 
                             for ExceptHandler::ExceptHandler(handler) in &stmt_try.handlers {
                                 except_blocks.push(self.new_block());
@@ -527,8 +527,8 @@ impl<'stmt> CFGBuilder<'stmt> {
                             }
 
                             let edges = Edges {
-                                conditions,
-                                targets: except_blocks.clone(),
+                                conditions: [conditions.as_slice(), &[Condition::Else]].concat(),
+                                targets: [except_blocks.as_slice(), &[next_block]].concat(),
                             };
 
                             self.set_current_block_edges(edges);
