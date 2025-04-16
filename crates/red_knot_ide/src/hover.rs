@@ -214,11 +214,11 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
-        Literal[foo]
+        assert_snapshot!(test.hover(), @r###"
+        def foo(a, b) -> Unknown
         ---------------------------------------------
         ```text
-        Literal[foo]
+        def foo(a, b) -> Unknown
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
@@ -231,7 +231,7 @@ mod tests {
           |             |
           |             source
           |
-        ");
+        "###);
     }
 
     #[test]
@@ -312,11 +312,11 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
-        Literal[foo, bar]
+        assert_snapshot!(test.hover(), @r###"
+        (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ---------------------------------------------
         ```text
-        Literal[foo, bar]
+        (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
@@ -329,7 +329,7 @@ mod tests {
            |             |
            |             source
            |
-        ");
+        "###);
     }
 
     #[test]

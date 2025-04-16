@@ -1,12 +1,8 @@
-import sys
 from collections.abc import Callable
 from typing import Any
 from typing_extensions import TypeAlias
 
-if sys.version_info >= (3, 9):
-    __all__ = ["getline", "clearcache", "checkcache", "lazycache"]
-else:
-    __all__ = ["getline", "clearcache", "checkcache"]
+__all__ = ["getline", "clearcache", "checkcache", "lazycache"]
 
 _ModuleGlobals: TypeAlias = dict[str, Any]
 _ModuleMetadata: TypeAlias = tuple[int, float | None, list[str], str]

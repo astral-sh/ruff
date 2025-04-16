@@ -81,3 +81,45 @@ fn try_block_contains_undeprecated_import(try_node: &StmtTry, replacement: &Repl
     import_searcher.visit_body(&try_node.body);
     import_searcher.found_import
 }
+
+/// Check whether the segments corresponding to the fully qualified name points to a symbol that's
+/// either a builtin or coming from one of the providers in Airflow.
+///
+/// The pattern it looks for are:
+/// - `airflow.providers.**.<module>.**.*<symbol_suffix>` for providers
+/// - `airflow.<module>.**.*<symbol_suffix>` for builtins
+///
+/// where `**` is one or more segments separated by a dot, and `*` is one or more characters.
+///
+/// Examples for the above patterns:
+/// - `airflow.providers.google.cloud.secrets.secret_manager.CloudSecretManagerBackend` (provider)
+/// - `airflow.secrets.base_secrets.BaseSecretsBackend` (builtin)
+pub(crate) fn is_airflow_builtin_or_provider(
+    segments: &[&str],
+    module: &str,
+    symbol_suffix: &str,
+) -> bool {
+    match segments {
+        ["airflow", "providers", rest @ ..] => {
+            if let (Some(pos), Some(last_element)) =
+                (rest.iter().position(|&s| s == module), rest.last())
+            {
+                // Check that the module is not the last element i.e., there's a symbol that's
+                // being used from the `module` that ends with `symbol_suffix`.
+                pos + 1 < rest.len() && last_element.ends_with(symbol_suffix)
+            } else {
+                false
+            }
+        }
+
+        ["airflow", first, rest @ ..] => {
+            if let Some(last) = rest.last() {
+                *first == module && last.ends_with(symbol_suffix)
+            } else {
+                false
+            }
+        }
+
+        _ => false,
+    }
+}

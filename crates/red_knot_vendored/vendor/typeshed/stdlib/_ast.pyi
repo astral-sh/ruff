@@ -130,17 +130,6 @@ if sys.version_info >= (3, 10):
         pattern as pattern,
     )
 
-if sys.version_info < (3, 9):
-    from ast import (
-        AugLoad as AugLoad,
-        AugStore as AugStore,
-        ExtSlice as ExtSlice,
-        Index as Index,
-        Param as Param,
-        Suite as Suite,
-        slice as slice,
-    )
-
 PyCF_ALLOW_TOP_LEVEL_AWAIT: Literal[8192]
 PyCF_ONLY_AST: Literal[1024]
 PyCF_TYPE_COMMENTS: Literal[4096]

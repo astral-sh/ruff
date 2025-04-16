@@ -1,24 +1,13 @@
 import sys
 from collections.abc import Callable
 from decimal import Decimal
-from numbers import Integral, Rational, Real
+from numbers import Rational, Real
 from typing import Any, Literal, Protocol, SupportsIndex, overload
 from typing_extensions import Self, TypeAlias
 
 _ComparableNum: TypeAlias = int | float | Decimal | Real
 
-if sys.version_info >= (3, 9):
-    __all__ = ["Fraction"]
-else:
-    __all__ = ["Fraction", "gcd"]
-    @overload
-    def gcd(a: int, b: int) -> int: ...
-    @overload
-    def gcd(a: Integral, b: int) -> Integral: ...
-    @overload
-    def gcd(a: int, b: Integral) -> Integral: ...
-    @overload
-    def gcd(a: Integral, b: Integral) -> Integral: ...
+__all__ = ["Fraction"]
 
 class _ConvertibleToIntegerRatio(Protocol):
     def as_integer_ratio(self) -> tuple[int | Rational, int | Rational]: ...

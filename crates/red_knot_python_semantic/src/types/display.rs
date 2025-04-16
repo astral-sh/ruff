@@ -44,8 +44,7 @@ impl Display for DisplayType<'_> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::ClassLiteral(_)
-            | Type::GenericAlias(_)
-            | Type::FunctionLiteral(_) => {
+            | Type::GenericAlias(_) => {
                 write!(f, "Literal[{representation}]")
             }
             _ => representation.fmt(f),
@@ -95,41 +94,51 @@ impl Display for DisplayRepresentation<'_> {
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => {
-                f.write_str(function.name(self.db))?;
-                if let Some(specialization) = function.specialization(self.db) {
-                    specialization.display_short(self.db).fmt(f)?;
-                }
-                Ok(())
+                let signature = function.signature(self.db);
+                // TODO: when generic function types are supported, we should add
+                // the generic type parameters to the signature, i.e.
+                // show `def foo[T](x: T) -> T`.
+
+                write!(
+                    f,
+                    // "def {name}{specialization}{signature}",
+                    "def {name}{signature}",
+                    name = function.name(self.db),
+                    signature = signature.display(self.db)
+                )
             }
             Type::Callable(callable) => callable.signature(self.db).display(self.db).fmt(f),
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
-                let self_instance = bound_method.self_instance(self.db);
-                let self_instance_specialization = match self_instance {
-                    Type::Instance(InstanceType {
-                        class: ClassType::Generic(alias),
-                    }) => Some(alias.specialization(self.db)),
-                    _ => None,
-                };
-                let specialization = match function.specialization(self.db) {
-                    Some(specialization)
-                        if self_instance_specialization.is_none_or(|sis| specialization == sis) =>
-                    {
-                        specialization.display_short(self.db).to_string()
-                    }
-                    _ => String::new(),
-                };
+
+                // TODO: use the specialization from the method. Similar to the comment above
+                // about the function specialization,
+
                 write!(
                     f,
-                    "<bound method `{method}{specialization}` of `{instance}`>",
+                    "bound method {instance}.{method}{signature}",
                     method = function.name(self.db),
                     instance = bound_method.self_instance(self.db).display(self.db),
+                    signature = function.signature(self.db).bind_self().display(self.db)
                 )
             }
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 write!(
                     f,
                     "<method-wrapper `__get__` of `{function}{specialization}`>",
+                    function = function.name(self.db),
+                    specialization = if let Some(specialization) = function.specialization(self.db)
+                    {
+                        specialization.display_short(self.db).to_string()
+                    } else {
+                        String::new()
+                    },
+                )
+            }
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
+                write!(
+                    f,
+                    "<method-wrapper `__call__` of `{function}{specialization}`>",
                     function = function.name(self.db),
                     specialization = if let Some(specialization) = function.specialization(self.db)
                     {
@@ -155,6 +164,9 @@ impl Display for DisplayRepresentation<'_> {
                     WrapperDescriptorKind::PropertyDunderSet => ("__set__", "property"),
                 };
                 write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
+            }
+            Type::DataclassDecorator(_) => {
+                f.write_str("<decorator produced by dataclasses.dataclass>")
             }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
@@ -509,7 +521,6 @@ impl Display for DisplayLiteralGroup<'_> {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum CondensedDisplayTypeKind {
     Class,
-    Function,
     LiteralExpression,
 }
 
@@ -519,7 +530,6 @@ impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
     fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
         match value {
             Type::ClassLiteral(_) => Ok(Self::Class),
-            Type::FunctionLiteral(_) => Ok(Self::Function),
             Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
@@ -597,7 +607,11 @@ struct DisplayMaybeParenthesizedType<'db> {
 
 impl Display for DisplayMaybeParenthesizedType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Type::Callable(_) | Type::MethodWrapper(_) = self.ty {
+        if let Type::Callable(_)
+        | Type::MethodWrapper(_)
+        | Type::FunctionLiteral(_)
+        | Type::BoundMethod(_) = self.ty
+        {
             write!(f, "({})", self.ty.display(self.db))
         } else {
             self.ty.display(self.db).fmt(f)

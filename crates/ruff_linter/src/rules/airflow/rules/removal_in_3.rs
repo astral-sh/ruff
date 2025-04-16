@@ -1,6 +1,8 @@
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::{is_guarded_by_try_except, Replacement};
+use crate::rules::airflow::helpers::{
+    is_airflow_builtin_or_provider, is_guarded_by_try_except, Replacement,
+};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::map_callable;
@@ -207,14 +209,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
             // without replacement
             checker.report_diagnostics(diagnostic_for_argument(arguments, "default_view", None));
             checker.report_diagnostics(diagnostic_for_argument(arguments, "orientation", None));
-            checker.report_diagnostics(diagnostic_for_argument(
-                arguments,
-                "sla_miss_callback",
-                None,
-            ));
         }
-        _ => {
-            if is_airflow_auth_manager(qualified_name.segments()) {
+        segments => {
+            if is_airflow_auth_manager(segments) {
                 if !arguments.is_empty() {
                     checker.report_diagnostic(Diagnostic::new(
                         Airflow3Removal {
@@ -226,20 +223,19 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                         arguments.range(),
                     ));
                 }
-            } else if is_airflow_task_handler(qualified_name.segments()) {
+            } else if is_airflow_task_handler(segments) {
                 checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "filename_template",
                     None,
                 ));
-            } else if is_airflow_operator(qualified_name.segments()) {
-                checker.report_diagnostics(diagnostic_for_argument(arguments, "sla", None));
+            } else if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
                 checker.report_diagnostics(diagnostic_for_argument(
                     arguments,
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
                 ));
-                match qualified_name.segments() {
+                match segments {
                     ["airflow", .., "operators", "trigger_dagrun", "TriggerDagRunOperator"] => {
                         checker.report_diagnostics(diagnostic_for_argument(
                             arguments,
@@ -615,22 +611,8 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "resolve_dataset_manager" => Replacement::Name("airflow.assets.resolve_asset_manager"),
             _ => return,
         },
-        ["airflow", "datasets", "metadata", "Metadata"] => {
-            Replacement::Name("airflow.sdk.Metadata")
-        }
         // airflow.datasets
-        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::AutoImport {
-            module: "airflow.sdk",
-            name: "Asset",
-        },
-        ["airflow", "datasets", rest] => match *rest {
-            "DatasetAliasEvent" => Replacement::None,
-            "DatasetAlias" => Replacement::Name("airflow.sdk.AssetAlias"),
-            "DatasetAll" => Replacement::Name("airflow.sdk.AssetAll"),
-            "DatasetAny" => Replacement::Name("airflow.sdk.AssetAny"),
-            "expand_alias_to_datasets" => Replacement::Name("airflow.sdk.expand_alias_to_assets"),
-            _ => return,
-        },
+        ["airflow", "datasets", "DatasetAliasEvent"] => Replacement::None,
 
         // airflow.hooks
         ["airflow", "hooks", "base_hook", "BaseHook"] => {
@@ -665,18 +647,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             _ => return,
         },
 
-        // airflow.models.baseoperator
-        ["airflow", "models", "baseoperator", rest] => match *rest {
-            "chain" | "chain_linear" | "cross_downstream" => Replacement::SourceModuleMoved {
-                module: "airflow.sdk",
-                name: (*rest).to_string(),
-            },
-            "BaseOperatorLink" => {
-                Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
-            }
-            _ => return,
-        },
-
         // airflow.notifications
         ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
             Replacement::Name("airflow.sdk.BaseNotifier")
@@ -703,15 +673,9 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         }
 
         // airflow.timetables
-        ["airflow", "timetables", rest @ ..] => match &rest {
-            ["datasets", "DatasetOrTimeSchedule"] => {
-                Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule")
-            }
-            ["simple", "DatasetTriggeredTimetable"] => {
-                Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
-            }
-            _ => return,
-        },
+        ["airflow", "timetables", "simple", "DatasetTriggeredTimetable"] => {
+            Replacement::Name("airflow.timetables.simple.AssetTriggeredTimetable")
+        }
 
         // airflow.triggers
         ["airflow", "triggers", "external_task", "TaskStateTrigger"] => Replacement::None,
@@ -980,12 +944,6 @@ fn is_airflow_hook(segments: &[&str]) -> bool {
     is_airflow_builtin_or_provider(segments, "hooks", "Hook")
 }
 
-/// Check whether the symbol is coming from the `operators` builtin or provider module which ends
-/// with `Operator`.
-fn is_airflow_operator(segments: &[&str]) -> bool {
-    is_airflow_builtin_or_provider(segments, "operators", "Operator")
-}
-
 /// Check whether the symbol is coming from the `log` builtin or provider module which ends
 /// with `TaskHandler`.
 fn is_airflow_task_handler(segments: &[&str]) -> bool {
@@ -1009,44 +967,6 @@ fn is_airflow_auth_manager(segments: &[&str]) -> bool {
                 (rest.iter().position(|&s| s == "auth_manager"), rest.last())
             {
                 pos + 1 < rest.len() && last_element.ends_with("AuthManager")
-            } else {
-                false
-            }
-        }
-
-        _ => false,
-    }
-}
-
-/// Check whether the segments corresponding to the fully qualified name points to a symbol that's
-/// either a builtin or coming from one of the providers in Airflow.
-///
-/// The pattern it looks for are:
-/// - `airflow.providers.**.<module>.**.*<symbol_suffix>` for providers
-/// - `airflow.<module>.**.*<symbol_suffix>` for builtins
-///
-/// where `**` is one or more segments separated by a dot, and `*` is one or more characters.
-///
-/// Examples for the above patterns:
-/// - `airflow.providers.google.cloud.secrets.secret_manager.CloudSecretManagerBackend` (provider)
-/// - `airflow.secrets.base_secrets.BaseSecretsBackend` (builtin)
-fn is_airflow_builtin_or_provider(segments: &[&str], module: &str, symbol_suffix: &str) -> bool {
-    match segments {
-        ["airflow", "providers", rest @ ..] => {
-            if let (Some(pos), Some(last_element)) =
-                (rest.iter().position(|&s| s == module), rest.last())
-            {
-                // Check that the module is not the last element i.e., there's a symbol that's
-                // being used from the `module` that ends with `symbol_suffix`.
-                pos + 1 < rest.len() && last_element.ends_with(symbol_suffix)
-            } else {
-                false
-            }
-        }
-
-        ["airflow", first, rest @ ..] => {
-            if let Some(last) = rest.last() {
-                *first == module && last.ends_with(symbol_suffix)
             } else {
                 false
             }

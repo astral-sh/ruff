@@ -462,7 +462,7 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
 
 enum Scope {
     Module,
-    Function { is_async: bool },
+    Function,
     Comprehension { is_async: bool },
     Class,
 }
@@ -529,12 +529,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_async_context(&self) -> bool {
-        for scope in &self.scopes {
-            if let Scope::Function { is_async } = scope {
-                return *is_async;
-            }
-        }
-        false
+        true
     }
 
     fn in_sync_comprehension(&self) -> bool {
@@ -559,6 +554,10 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_await_allowed_context(&self) -> bool {
+        true
+    }
+
+    fn in_generator_scope(&self) -> bool {
         true
     }
 }
@@ -587,10 +586,8 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
                 self.visit_body(body);
                 self.scopes.pop().unwrap();
             }
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef { is_async, .. }) => {
-                self.scopes.push(Scope::Function {
-                    is_async: *is_async,
-                });
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef { .. }) => {
+                self.scopes.push(Scope::Function);
                 ast::visitor::walk_stmt(self, stmt);
                 self.scopes.pop().unwrap();
             }
@@ -604,7 +601,7 @@ impl Visitor<'_> for SemanticSyntaxCheckerVisitor<'_> {
         self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
         match expr {
             ast::Expr::Lambda(_) => {
-                self.scopes.push(Scope::Function { is_async: false });
+                self.scopes.push(Scope::Function);
                 ast::visitor::walk_expr(self, expr);
                 self.scopes.pop().unwrap();
             }

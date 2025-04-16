@@ -1,11 +1,9 @@
 import sys
 from _typeshed import MaybeNone
 from collections.abc import Callable, Iterable, Iterator
+from types import GenericAlias
 from typing import Any, Generic, Literal, SupportsComplex, SupportsFloat, SupportsIndex, SupportsInt, TypeVar, overload
 from typing_extensions import Self, TypeAlias
-
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
 
 _T = TypeVar("_T")
 _S = TypeVar("_S")
@@ -68,8 +66,7 @@ class chain(Generic[_T]):
     @classmethod
     # We use type[Any] and not type[_S] to not lose the type inference from __iterable
     def from_iterable(cls: type[Any], iterable: Iterable[Iterable[_S]], /) -> chain[_S]: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 class compress(Generic[_T]):
     def __new__(cls, data: Iterable[_T], selectors: Iterable[Any]) -> Self: ...

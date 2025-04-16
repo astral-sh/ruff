@@ -1,10 +1,8 @@
 import sys
 from _typeshed import GenericPath, StrOrBytesPath
 from collections.abc import Callable, Iterable, Sequence
+from types import GenericAlias
 from typing import Any, AnyStr, Final, Generic, Literal
-
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
 
 __all__ = ["clear_cache", "cmp", "dircmp", "cmpfiles", "DEFAULT_IGNORES"]
 
@@ -62,7 +60,6 @@ class dircmp(Generic[AnyStr]):
     def phase3(self) -> None: ...
     def phase4(self) -> None: ...
     def phase4_closure(self) -> None: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 def clear_cache() -> None: ...

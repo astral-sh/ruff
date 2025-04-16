@@ -2,7 +2,7 @@ import enum
 import sys
 from _typeshed import Unused
 from collections import deque
-from collections.abc import Callable, Generator
+from collections.abc import Callable
 from types import TracebackType
 from typing import Any, Literal, TypeVar
 from typing_extensions import Self
@@ -23,29 +23,11 @@ else:
 
 _T = TypeVar("_T")
 
-if sys.version_info >= (3, 9):
-    class _ContextManagerMixin:
-        async def __aenter__(self) -> None: ...
-        async def __aexit__(
-            self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
-        ) -> None: ...
-
-else:
-    class _ContextManager:
-        def __init__(self, lock: Lock | Semaphore) -> None: ...
-        def __enter__(self) -> None: ...
-        def __exit__(self, *args: Unused) -> None: ...
-
-    class _ContextManagerMixin:
-        # Apparently this exists to *prohibit* use as a context manager.
-        # def __enter__(self) -> NoReturn: ... see: https://github.com/python/typing/issues/1043
-        # def __exit__(self, *args: Any) -> None: ...
-        def __iter__(self) -> Generator[Any, None, _ContextManager]: ...
-        def __await__(self) -> Generator[Any, None, _ContextManager]: ...
-        async def __aenter__(self) -> None: ...
-        async def __aexit__(
-            self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
-        ) -> None: ...
+class _ContextManagerMixin:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
+    ) -> None: ...
 
 class Lock(_ContextManagerMixin, _LoopBoundMixin):
     _waiters: deque[Future[Any]] | None

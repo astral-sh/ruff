@@ -239,11 +239,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@d4635f2de61c8b8104d59cd4aede2060638378cc # v2
+        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@d4635f2de61c8b8104d59cd4aede2060638378cc # v2
+        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
         with:
           tool: cargo-insta
       - name: Red-knot mdtests (GitHub annotations)
@@ -293,11 +293,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@d4635f2de61c8b8104d59cd4aede2060638378cc # v2
+        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@d4635f2de61c8b8104d59cd4aede2060638378cc # v2
+        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -320,7 +320,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@d4635f2de61c8b8104d59cd4aede2060638378cc # v2
+        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
         with:
           tool: cargo-nextest
       - name: "Run tests"
@@ -403,11 +403,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@d4635f2de61c8b8104d59cd4aede2060638378cc # v2
+        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@d4635f2de61c8b8104d59cd4aede2060638378cc # v2
+        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -662,7 +662,7 @@ jobs:
       - name: "Prep README.md"
         run: python scripts/transform_readme.py --target pypi
       - name: "Build wheels"
-        uses: PyO3/maturin-action@44479ae1b6b1a57f561e03add8832e62c185eb17 # v1.48.1
+        uses: PyO3/maturin-action@aef21716ff3dcae8a1c301d23ec3e4446972a6e3 # v1.49.1
         with:
           args: --out dist
       - name: "Test wheel"
@@ -857,7 +857,7 @@ jobs:
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@d4635f2de61c8b8104d59cd4aede2060638378cc # v2
+        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
         with:
           tool: cargo-codspeed
 

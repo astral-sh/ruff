@@ -1,3 +1,4 @@
+import sys
 from _typeshed import FileDescriptorOrPath
 from collections.abc import Sized
 
@@ -8,6 +9,8 @@ class ResourceTracker:
     def ensure_running(self) -> None: ...
     def register(self, name: Sized, rtype: str) -> None: ...
     def unregister(self, name: Sized, rtype: str) -> None: ...
+    if sys.version_info >= (3, 12):
+        def __del__(self) -> None: ...
 
 _resource_tracker: ResourceTracker
 ensure_running = _resource_tracker.ensure_running

@@ -86,6 +86,7 @@ impl<'db> ClassBase<'db> {
             | Type::BoundMethod(_)
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
+            | Type::DataclassDecorator(_)
             | Type::BytesLiteral(_)
             | Type::IntLiteral(_)
             | Type::StringLiteral(_)

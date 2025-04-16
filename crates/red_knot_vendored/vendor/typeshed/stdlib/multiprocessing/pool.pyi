@@ -1,12 +1,8 @@
-import sys
 from collections.abc import Callable, Iterable, Mapping
 from multiprocessing.context import DefaultContext, Process
-from types import TracebackType
+from types import GenericAlias, TracebackType
 from typing import Any, Final, Generic, TypeVar
 from typing_extensions import Self
-
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
 
 __all__ = ["Pool", "ThreadPool"]
 
@@ -21,8 +17,7 @@ class ApplyResult(Generic[_T]):
     def wait(self, timeout: float | None = None) -> None: ...
     def ready(self) -> bool: ...
     def successful(self) -> bool: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 # alias created during issue #17805
 AsyncResult = ApplyResult
