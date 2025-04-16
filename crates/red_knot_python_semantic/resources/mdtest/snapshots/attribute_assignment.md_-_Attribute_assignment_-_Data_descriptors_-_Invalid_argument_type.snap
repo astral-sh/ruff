@@ -29,12 +29,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attrib
 # Diagnostics
 
 ```
-error: lint:invalid-assignment
+error: lint:invalid-assignment: Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
   --> /src/mdtest_snippet.py:12:1
    |
 11 | # TODO: ideally, we would mention why this is an invalid assignment (wrong argument type for `value` parameter)
 12 | instance.attr = "wrong"  # error: [invalid-assignment]
-   | ^^^^^^^^^^^^^ Invalid assignment to data descriptor attribute `attr` on type `C` with custom `__set__` method
+   | ^^^^^^^^^^^^^
    |
 
 ```
