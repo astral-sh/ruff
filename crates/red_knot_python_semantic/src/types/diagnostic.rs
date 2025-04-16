@@ -37,6 +37,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_RAISE);
+    registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
@@ -52,6 +53,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
+    registry.register_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS);
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
@@ -444,6 +446,45 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Detects `super()` calls where:
+    /// - the first argument is not a valid class literal, or
+    /// - the second argument is not an instance or subclass of the first argument.
+    ///
+    /// ## Why is this bad?
+    /// `super(type, obj)` expects:
+    /// - the first argument to be a class,
+    /// - and the second argument to satisfy one of the following:
+    ///   - `isinstance(obj, type)` is `True`
+    ///   - `issubclass(obj, type)` is `True`
+    ///
+    /// Violating this relationship will raise a `TypeError` at runtime.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class A:
+    ///     ...
+    /// class B(A):
+    ///     ...
+    ///
+    /// super(A, B())  # it's okay! `A` satisfies `isinstance(B(), A)`
+    ///
+    /// super(A(), B()) # error: `A()` is not a class
+    ///
+    /// super(B, A())  # error: `A()` does not satisfy `isinstance(A(), B)`
+    /// super(B, A)  # error: `A` does not satisfy `issubclass(A, B)`
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+    pub(crate) static INVALID_SUPER_ARGUMENT = {
+        summary: "detects invalid arguments for `super()`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for a value other than `False` assigned to the `TYPE_CHECKING` variable, or an
     /// annotation not assignable from `bool`.
     ///
@@ -718,6 +759,45 @@ declare_lint! {
     /// ```
     pub(crate) static TOO_MANY_POSITIONAL_ARGUMENTS = {
         summary: "detects calls passing too many positional arguments",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects invalid `super()` calls where implicit arguments like the enclosing class or first method argument are unavailable.
+    ///
+    /// ## Why is this bad?
+    /// When `super()` is used without arguments, Python tries to find two things:
+    /// the nearest enclosing class and the first argument of the immediately enclosing function (typically self or cls).
+    /// If either of these is missing, the call will fail at runtime with a `RuntimeError`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// super()  # error: no enclosing class or function found
+    ///
+    /// def func():
+    ///     super()  # error: no enclosing class or first argument exists
+    ///
+    /// class A:
+    ///     f = super()  # error: no enclosing function to provide the first argument
+    ///
+    ///     def method(self):
+    ///         def nested():
+    ///             super()  # error: first argument does not exist in this nested function
+    ///
+    ///         lambda: super()  # error: first argument does not exist in this lambda
+    ///
+    ///         (super() for _ in range(10))  # error: argument is not available in generator expression
+    ///
+    ///         super()  # okay! both enclosing class and first argument are available
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
+    pub(crate) static UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS = {
+        summary: "detects invalid `super()` calls where implicit arguments are unavailable.",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

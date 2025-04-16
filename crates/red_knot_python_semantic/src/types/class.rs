@@ -723,6 +723,16 @@ impl<'db> ClassLiteralType<'db> {
             return Symbol::bound(TupleType::from_elements(db, tuple_elements)).into();
         }
 
+        self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
+    }
+
+    pub(super) fn class_member_from_mro(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+        mro_iter: impl Iterator<Item = ClassBase<'db>>,
+    ) -> SymbolAndQualifiers<'db> {
         // If we encounter a dynamic type in this class's MRO, we'll save that dynamic type
         // in this variable. After we've traversed the MRO, we'll either:
         // (1) Use that dynamic type as the type for this attribute,
@@ -734,7 +744,7 @@ impl<'db> ClassLiteralType<'db> {
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Unbound(TypeQualifiers::empty()));
 
-        for superclass in self.iter_mro(db, specialization) {
+        for superclass in mro_iter {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
@@ -1443,6 +1453,7 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Super
             | Self::WrapperDescriptorType
             | Self::UnionType
             | Self::MethodWrapperType => Truthiness::AlwaysTrue,
@@ -1481,7 +1492,6 @@ impl<'db> KnownClass {
             | Self::Float
             | Self::Sized
             | Self::Enum
-            | Self::Super
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
