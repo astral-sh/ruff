@@ -3803,6 +3803,14 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Returns the inferred return type of `self` if it is a function literal.
+    fn inferred_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::FunctionLiteral(function_type) => Some(function_type.inferred_return_type(db)),
+            _ => None,
+        }
+    }
+
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
     /// the arguments are not compatible with the formal parameters.
     ///
@@ -3815,7 +3823,8 @@ impl<'db> Type<'db> {
         mut argument_types: CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, &mut argument_types)
+        let inferred_return_ty = || self.inferred_return_type(db).unwrap_or(Type::unknown());
+        Bindings::match_parameters(signatures, inferred_return_ty, &mut argument_types)
             .check_types(db, &mut argument_types)
     }
 
@@ -3853,8 +3862,14 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, &mut argument_types)
-                    .check_types(db, &mut argument_types)?;
+                let inferred_return_ty = || {
+                    dunder_callable
+                        .inferred_return_type(db)
+                        .unwrap_or(Type::unknown())
+                };
+                let bindings =
+                    Bindings::match_parameters(signatures, inferred_return_ty, &mut argument_types)
+                        .check_types(db, &mut argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -4063,12 +4078,21 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
+                let inferred_return_ty = || {
+                    dunder_callable
+                        .inferred_return_type(db)
+                        .unwrap_or(Type::unknown())
+                };
                 // `__new__` is a static method, so we must inject the `cls` argument.
                 let mut argument_types = argument_types.prepend_synthetic(self);
 
                 Some(
-                    match Bindings::match_parameters(signatures, &mut argument_types)
-                        .check_types(db, &mut argument_types)
+                    match Bindings::match_parameters(
+                        signatures,
+                        inferred_return_ty,
+                        &mut argument_types,
+                    )
+                    .check_types(db, &mut argument_types)
                     {
                         Ok(bindings) => {
                             if boundness == Boundness::PossiblyUnbound {
@@ -5770,6 +5794,13 @@ impl<'db> FunctionType<'db> {
         let function_stmt_node = scope.node(db).expect_function();
         let definition = self.definition(db);
         Signature::from_function(db, definition, function_stmt_node)
+    }
+
+    /// Infers this function scope's types and returns the inferred return type.
+    fn inferred_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.inferred_return_type(db)
     }
 
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
