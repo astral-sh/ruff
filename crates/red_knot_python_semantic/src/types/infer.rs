@@ -3894,14 +3894,31 @@ impl<'db> TypeInferenceBuilder<'db> {
         if !is_first {
             self.infer_standalone_expression(iter);
         }
-        // TODO more complex assignment targets
-        if let ast::Expr::Name(name) = target {
-            self.infer_definition(name);
-        } else {
-            self.infer_expression(target);
-        }
+        self.infer_comprehension_target(target);
         for expr in ifs {
             self.infer_expression(expr);
+        }
+    }
+
+    // TODO: support attribute, subscription
+    fn infer_comprehension_target(&mut self, target: &ast::Expr) {
+        match target {
+            ast::Expr::Name(name) => {
+                self.infer_definition(name);
+            }
+            ast::Expr::Tuple(tuple) => {
+                for elt in &tuple.elts {
+                    self.infer_comprehension_target(elt);
+                }
+            }
+            ast::Expr::List(list) => {
+                for elt in &list.elts {
+                    self.infer_comprehension_target(elt);
+                }
+            }
+            _ => {
+                self.infer_expression(target);
+            }
         }
     }
 
