@@ -1304,5 +1304,34 @@ static_assert(is_subtype_of(CallableTypeOf[empty_go], CallableTypeOf[empty_cp]))
 static_assert(not is_subtype_of(CallableTypeOf[empty_cp], CallableTypeOf[empty_go]))
 ```
 
+#### Order of overloads
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+
+@overload
+def overload_ab(x: A) -> None: ...
+@overload
+def overload_ab(x: B) -> None: ...
+
+@overload
+def overload_ba(x: B) -> None: ...
+@overload
+def overload_ba(x: A) -> None: ...
+```
+
+```py
+from overloaded import overload_ab, overload_ba
+from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+
+static_assert(is_subtype_of(CallableTypeOf[overload_ab], CallableTypeOf[overload_ba]))
+static_assert(is_subtype_of(CallableTypeOf[overload_ba], CallableTypeOf[overload_ab]))
+```
+
 [special case for float and complex]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
