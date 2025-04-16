@@ -284,8 +284,8 @@ fn benchmark_many_string_assignments(criterion: &mut Criterion) {
                             s += "attr9"
                         if x.attr10:
                             s += "attr10"
-                        if x.attr11:
-                            s += "attr11"
+                        if len(s) > 0:
+                            s = s[:-3]
                         return s
                     "#,
                 )
