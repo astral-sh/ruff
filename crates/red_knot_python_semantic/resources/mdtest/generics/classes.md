@@ -122,16 +122,16 @@ We can infer the type parameter from a type context:
 class C[T]:
     x: T
 
+# TODO: no error
+# error: [invalid-assignment]
 c: C[int] = C()
-# TODO: revealed: C[int]
-reveal_type(c)  # revealed: C[Unknown]
+reveal_type(c)  # revealed: C[int]
 ```
 
 The typevars of a fully specialized generic class should no longer be visible:
 
 ```py
-# TODO: revealed: int
-reveal_type(c.x)  # revealed: Unknown
+reveal_type(c.x)  # revealed: int
 ```
 
 If the type parameter is not specified explicitly, and there are no constraints that let us infer a
@@ -164,7 +164,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -176,7 +176,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -191,7 +191,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -206,7 +206,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
 class D[T]:
@@ -217,7 +217,7 @@ class D[T]:
 
 reveal_type(D(1))  # revealed: D[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `D[Literal["five"]]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -242,8 +242,9 @@ reveal_type(C(1, "string"))  # revealed: C[Unknown]
 # error: [invalid-argument-type]
 reveal_type(C(1, True))  # revealed: C[Unknown]
 
-# TODO: error for the correct reason
+# TODO: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `S`, found `Literal[1]`"
+# error: [invalid-assignment] "Object of type `C[Unknown]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 

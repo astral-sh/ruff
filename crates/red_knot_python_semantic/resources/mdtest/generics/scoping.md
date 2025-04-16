@@ -150,6 +150,8 @@ class C[T]:
     def m[S](self, x: T, y: S) -> S:
         return y
 
+# TODO: no error
+# error: [invalid-assignment] "Object of type `C[Unknown]` is not assignable to `C[int]`"
 c: C[int] = C()
 reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
