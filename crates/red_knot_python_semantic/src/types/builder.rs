@@ -51,6 +51,10 @@ enum UnionElement<'db> {
     Type(Type<'db>),
 }
 
+// TODO increase this once we extend `UnionElement` throughout all union/intersection
+// representations, so that we can make large unions of literals fast in all operations.
+const MAX_UNION_LITERALS: usize = 200;
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
@@ -97,6 +101,10 @@ impl<'db> UnionBuilder<'db> {
                 for element in &mut self.elements {
                     match element {
                         UnionElement::StringLiterals(literals) => {
+                            if literals.len() >= MAX_UNION_LITERALS {
+                                *element = UnionElement::Type(KnownClass::Str.to_instance(self.db));
+                                return self;
+                            }
                             literals.insert(literal);
                             found = true;
                             break;
@@ -120,6 +128,11 @@ impl<'db> UnionBuilder<'db> {
                 for element in &mut self.elements {
                     match element {
                         UnionElement::BytesLiterals(literals) => {
+                            if literals.len() >= MAX_UNION_LITERALS {
+                                *element =
+                                    UnionElement::Type(KnownClass::Bytes.to_instance(self.db));
+                                return self;
+                            }
                             literals.insert(literal);
                             found = true;
                             break;
@@ -143,6 +156,10 @@ impl<'db> UnionBuilder<'db> {
                 for element in &mut self.elements {
                     match element {
                         UnionElement::IntLiterals(literals) => {
+                            if literals.len() >= MAX_UNION_LITERALS {
+                                *element = UnionElement::Type(KnownClass::Int.to_instance(self.db));
+                                return self;
+                            }
                             literals.insert(literal);
                             found = true;
                             break;
