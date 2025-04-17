@@ -5896,6 +5896,12 @@ pub enum KnownFunction {
     Cast,
     /// `typing(_extensions).overload`
     Overload,
+    /// `typing(_extensions).is_protocol`
+    IsProtocol,
+    /// `typing(_extensions).get_protocol_members`
+    GetProtocolMembers,
+    /// `typing(_extensions).runtime_checkable`
+    RuntimeCheckable,
 
     /// `abc.abstractmethod`
     #[strum(serialize = "abstractmethod")]
@@ -5957,6 +5963,9 @@ impl KnownFunction {
             | Self::Overload
             | Self::RevealType
             | Self::Final
+            | Self::IsProtocol
+            | Self::GetProtocolMembers
+            | Self::RuntimeCheckable
             | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -7195,6 +7204,9 @@ pub(crate) mod tests {
                 | KnownFunction::RevealType
                 | KnownFunction::AssertType
                 | KnownFunction::AssertNever
+                | KnownFunction::IsProtocol
+                | KnownFunction::GetProtocolMembers
+                | KnownFunction::RuntimeCheckable
                 | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
 
                 KnownFunction::IsSingleton
