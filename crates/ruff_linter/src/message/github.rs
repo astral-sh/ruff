@@ -83,7 +83,17 @@ mod tests {
 
     #[test]
     fn output() {
-        let mut emitter = GithubEmitter::default();
+        let mut emitter = GithubEmitter {
+            project_dir: Some(String::from("/projects/project")),
+        };
+        let content = capture_emitter_output(&mut emitter, &create_messages());
+
+        assert_snapshot!(content);
+    }
+
+    #[test]
+    fn output_absolute_path() {
+        let mut emitter = GithubEmitter { project_dir: None };
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);
@@ -91,7 +101,9 @@ mod tests {
 
     #[test]
     fn syntax_errors() {
-        let mut emitter = GithubEmitter::default();
+        let mut emitter = GithubEmitter {
+            project_dir: Some(String::from("/projects/project")),
+        };
         let content = capture_emitter_output(&mut emitter, &create_syntax_error_messages());
 
         assert_snapshot!(content);

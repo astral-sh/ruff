@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_linter/src/message/json.rs
 expression: content
-snapshot_kind: text
 ---
 [
   {
@@ -11,7 +10,7 @@ snapshot_kind: text
       "column": 1,
       "row": 2
     },
-    "filename": "syntax_errors.py",
+    "filename": "/projects/project/syntax_errors.py",
     "fix": null,
     "location": {
       "column": 15,
@@ -28,7 +27,7 @@ snapshot_kind: text
       "column": 1,
       "row": 4
     },
-    "filename": "syntax_errors.py",
+    "filename": "/projects/project/syntax_errors.py",
     "fix": null,
     "location": {
       "column": 12,

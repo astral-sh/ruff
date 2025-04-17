@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_linter/src/message/json.rs
 expression: content
-snapshot_kind: text
 ---
 [
   {
@@ -11,7 +10,7 @@ snapshot_kind: text
       "column": 10,
       "row": 1
     },
-    "filename": "fib.py",
+    "filename": "/projects/project/fib.py",
     "fix": {
       "applicability": "unsafe",
       "edits": [
@@ -44,7 +43,7 @@ snapshot_kind: text
       "column": 6,
       "row": 6
     },
-    "filename": "fib.py",
+    "filename": "/projects/project/fib.py",
     "fix": {
       "applicability": "unsafe",
       "edits": [
@@ -77,7 +76,7 @@ snapshot_kind: text
       "column": 5,
       "row": 1
     },
-    "filename": "undef.py",
+    "filename": "/projects/project/undef.py",
     "fix": null,
     "location": {
       "column": 4,
