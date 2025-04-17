@@ -134,10 +134,11 @@ from other import Literal
 # ?
 #
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "Invalid subscript expression in type expression"
 a1: Literal[26]
 
 def f():
-    reveal_type(a1)  # revealed: @Todo(generics)
+    reveal_type(a1)  # revealed: Unknown
 ```
 
 ## Detecting typing_extensions.Literal

@@ -143,6 +143,8 @@ class Legacy(Generic[T]):
     def m(self, x: T, y: S) -> S:
         return y
 
+# TODO: no error
+# error: [invalid-type-form] "Cannot specialize a non-generic class"
 legacy: Legacy[int] = Legacy()
 # TODO: revealed: str
 reveal_type(legacy.m(1, "string"))  # revealed: @Todo(Support for `typing.TypeVar` instances in type expressions)
@@ -175,14 +177,18 @@ T = TypeVar("T")
 S = TypeVar("S")
 
 def f(x: T) -> None:
+    # TODO: no error
+    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     x: list[T] = []
-    # TODO: error
+    # TODO: invalid-assignment error
+    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     y: list[S] = []
 
 # TODO: no error
 # error: [invalid-base]
 class C(Generic[T]):
-    # TODO: error
+    # TODO: error: cannot use S if it's not in the current generic context
+    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     x: list[S] = []
 
     # This is not an error, as shown in the previous test
@@ -201,12 +207,16 @@ from typing import TypeVar
 S = TypeVar("S")
 
 def f[T](x: T) -> None:
+    # TODO: no error
+    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     x: list[T] = []
-    # TODO: error
+    # TODO: invalid assignment error
+    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     y: list[S] = []
 
 class C[T]:
-    # TODO: error
+    # TODO: error: cannot use S if it's not in the current generic context
+    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     x: list[S] = []
 
     def m1(self, x: S) -> S:
@@ -287,10 +297,13 @@ and are not available in nested scopes.
 
 ```py
 class C[T]:
+    # TODO: no error
+    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     ok1: list[T] = []
 
     class Bad:
-        # TODO: error
+        # TODO: error: cannot refer to T in nested scope
+        # error: [invalid-type-form] "Cannot specialize a non-generic class"
         bad: list[T] = []
 
     class Inner[S]: ...

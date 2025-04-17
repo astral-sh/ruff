@@ -42,6 +42,9 @@ d: tuple[tuple[str, str], tuple[int, int]] = (("foo", "foo"), (42, 42))
 e: tuple[str, ...] = ()
 f: tuple[str, *tuple[int, ...], bytes] = ("42", b"42")
 g: tuple[str, Unpack[tuple[int, ...]], bytes] = ("42", b"42")
+# TODO: no error
+# error: [invalid-type-form] "Cannot specialize a non-generic class"
+# error: [invalid-type-form] "Cannot specialize a non-generic class"
 h: tuple[list[int], list[int]] = ([], [])
 i: tuple[str | int, str | int] = (42, 42)
 j: tuple[str | int] = (42,)
@@ -61,7 +64,7 @@ reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 reveal_type(e)  # revealed: @Todo(full tuple[...] support)
 reveal_type(f)  # revealed: @Todo(full tuple[...] support)
 reveal_type(g)  # revealed: @Todo(full tuple[...] support)
-reveal_type(h)  # revealed: tuple[@Todo(generics), @Todo(generics)]
+reveal_type(h)  # revealed: tuple[Unknown, Unknown]
 
 reveal_type(i)  # revealed: tuple[str | int, str | int]
 reveal_type(j)  # revealed: tuple[str | int]

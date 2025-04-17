@@ -64,6 +64,8 @@ The matching up of call arguments and discovery of constraints on typevars can b
 process for arbitrarily-nested generic types in parameters.
 
 ```py
+# TODO: no error
+# error: [invalid-type-form] "Cannot specialize a non-generic class"
 def f[T](x: list[T]) -> T:
     return x[0]
 

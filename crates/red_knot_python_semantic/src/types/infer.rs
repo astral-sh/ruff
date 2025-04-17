@@ -7187,9 +7187,29 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .in_type_expression(self.db())
                     .unwrap_or(Type::unknown())
             }
-            _ => {
+            Type::ClassLiteral(ClassLiteralType::NonGeneric(_)) => {
                 self.infer_type_expression(slice);
-                todo_type!("unsupported subscript form")
+                self.context.report_lint_old(
+                    &INVALID_TYPE_FORM,
+                    subscript,
+                    format_args!("Cannot specialize a non-generic class"),
+                );
+                Type::unknown()
+            }
+            Type::StringLiteral(_) => {
+                // No diagnostic yet, since we haven't determined the type of the deferred string
+                // annotation yet.
+                Type::unknown()
+            }
+            _ => {
+                eprintln!("==> {:?}", value_ty);
+                self.infer_type_expression(slice);
+                self.context.report_lint_old(
+                    &INVALID_TYPE_FORM,
+                    subscript,
+                    format_args!("Invalid subscript expression in type expression"),
+                );
+                Type::unknown()
             }
         }
     }

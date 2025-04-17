@@ -67,6 +67,9 @@ y: MyIntOrStr = None
 ## Generic type aliases
 
 ```py
+# TODO: no error
+# error: [invalid-type-form] "Cannot specialize a non-generic class"
+# error: [invalid-type-form] "Cannot specialize a non-generic class"
 type ListOrSet[T] = list[T] | set[T]
 
 # TODO: Should be `tuple[typing.TypeVar | typing.ParamSpec | typing.TypeVarTuple, ...]`,
