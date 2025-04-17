@@ -331,11 +331,13 @@ class HasX(Protocol):
 class Foo:
     x: int
 
+# TODO: these should pass
 static_assert(is_subtype_of(Foo, HasX))  # error: [static-assert-error]
 static_assert(is_assignable_to(Foo, HasX))  # error: [static-assert-error]
 
 class FooSub(Foo): ...
 
+# TODO: these should pass
 static_assert(is_subtype_of(FooSub, HasX))  # error: [static-assert-error]
 static_assert(is_assignable_to(FooSub, HasX))  # error: [static-assert-error]
 
@@ -397,6 +399,7 @@ from typing import NamedTuple
 class MutableDataclass:
     x: int
 
+# TODO: these should pass
 static_assert(is_subtype_of(MutableDataclass, HasX))  # error: [static-assert-error]
 static_assert(is_assignable_to(MutableDataclass, HasX))  # error: [static-assert-error]
 
@@ -430,6 +433,7 @@ class XProperty:
     def x(self, x: int) -> None:
         self._x = x**2
 
+# TODO: these should pass
 static_assert(is_subtype_of(XProperty, HasX))  # error: [static-assert-error]
 static_assert(is_assignable_to(XProperty, HasX))  # error: [static-assert-error]
 ```
@@ -481,6 +485,7 @@ from typing import Protocol
 
 class UniversalSet(Protocol): ...
 
+# TODO: these should pass
 static_assert(is_assignable_to(object, UniversalSet))  # error: [static-assert-error]
 static_assert(is_subtype_of(object, UniversalSet))  # error: [static-assert-error]
 ```
@@ -490,6 +495,7 @@ Which means that `UniversalSet` here is in fact an equivalent type to `object`:
 ```py
 from knot_extensions import is_equivalent_to
 
+# TODO: this should pass
 static_assert(is_equivalent_to(UniversalSet, object))  # error: [static-assert-error]
 ```
 
@@ -501,12 +507,14 @@ are also equivalent to `UniversalSet` and `object`:
 class SupportsStr(Protocol):
     def __str__(self) -> str: ...
 
+# TODO: these should pass
 static_assert(is_equivalent_to(SupportsStr, UniversalSet))  # error: [static-assert-error]
 static_assert(is_equivalent_to(SupportsStr, object))  # error: [static-assert-error]
 
 class SupportsClass(Protocol):
     __class__: type
 
+# TODO: these should pass
 static_assert(is_equivalent_to(SupportsClass, UniversalSet))  # error: [static-assert-error]
 static_assert(is_equivalent_to(SupportsClass, SupportsStr))  # error: [static-assert-error]
 static_assert(is_equivalent_to(SupportsClass, object))  # error: [static-assert-error]
@@ -537,6 +545,7 @@ class HasX(Protocol):
 class AlsoHasX(Protocol):
     x: int
 
+# TODO: this should pass
 static_assert(is_equivalent_to(HasX, AlsoHasX))  # error: [static-assert-error]
 ```
 
@@ -553,6 +562,7 @@ class AlsoHasY(Protocol):
 class A: ...
 class B: ...
 
+# TODO: this should pass
 static_assert(is_equivalent_to(A | HasX | B | HasY, B | AlsoHasY | AlsoHasX | A))  # error: [static-assert-error]
 ```
 
@@ -572,6 +582,7 @@ class HasY(Protocol):
 
 class HasXAndYProto(HasX, HasY, Protocol): ...
 
+# TODO: this should pass
 static_assert(is_equivalent_to(HasXAndYProto, Intersection[HasX, HasY]))  # error: [static-assert-error]
 ```
 
@@ -627,6 +638,7 @@ from knot_extensions import is_subtype_of, is_assignable_to, static_assert, Type
 class HasX(Protocol):
     x: int
 
+# TODO: these should pass
 static_assert(is_subtype_of(TypeOf[module], HasX))  # error: [static-assert-error]
 static_assert(is_assignable_to(TypeOf[module], HasX))  # error: [static-assert-error]
 
@@ -640,6 +652,7 @@ class ImplicitProtocolSubtype(Protocol):
     x: int
     y: str
 
+# TODO: these should pass
 static_assert(is_subtype_of(ImplicitProtocolSubtype, HasX))  # error: [static-assert-error]
 static_assert(is_assignable_to(ImplicitProtocolSubtype, HasX))  # error: [static-assert-error]
 
@@ -648,6 +661,7 @@ class Meta(type):
 
 class UsesMeta(metaclass=Meta): ...
 
+# TODO: these should pass
 static_assert(is_subtype_of(UsesMeta, HasX))  # error: [static-assert-error]
 static_assert(is_assignable_to(UsesMeta, HasX))  # error: [static-assert-error]
 ```
@@ -689,6 +703,7 @@ static_assert(not is_subtype_of(PropertyX, ClassVarXProto))
 class ClassVarX:
     x: ClassVar[int] = 42
 
+# TODO: these should pass
 static_assert(is_assignable_to(ClassVarX, ClassVarXProto))  # error: [static-assert-error]
 static_assert(is_subtype_of(ClassVarX, ClassVarXProto))  # error: [static-assert-error]
 ```
@@ -715,6 +730,7 @@ class HasXProperty(Protocol):
 class XAttr:
     x: int
 
+# TODO: these should pass
 static_assert(is_subtype_of(XAttr, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XAttr, HasXProperty))  # error: [static-assert-error]
 
@@ -723,6 +739,7 @@ class XReadProperty:
     def x(self) -> int:
         return 42
 
+# TODO: these should pass
 static_assert(is_subtype_of(XReadProperty, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XReadProperty, HasXProperty))  # error: [static-assert-error]
 
@@ -734,6 +751,7 @@ class XReadWriteProperty:
     @x.setter
     def x(self, val: int) -> None: ...
 
+# TODO: these should pass
 static_assert(is_subtype_of(XReadWriteProperty, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XReadWriteProperty, HasXProperty))  # error: [static-assert-error]
 
@@ -746,6 +764,7 @@ static_assert(is_assignable_to(XClassVar, HasXProperty))  # error: [static-asser
 class XFinal:
     x: Final = 42
 
+# TODO: these should pass
 static_assert(is_subtype_of(XFinal, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XFinal, HasXProperty))  # error: [static-assert-error]
 ```
@@ -760,6 +779,7 @@ class MyInt(int): ...
 class XSub:
     x: MyInt
 
+# TODO: these should pass
 static_assert(is_subtype_of(XSub, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XSub, HasXProperty))  # error: [static-assert-error]
 ```
@@ -778,6 +798,7 @@ class HasMutableXProperty(Protocol):
 class XAttr:
     x: int
 
+# TODO: these should pass
 static_assert(is_subtype_of(XAttr, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XAttr, HasXProperty))  # error: [static-assert-error]
 
@@ -797,6 +818,7 @@ class XReadWriteProperty:
     @x.setter
     def x(self, val: int) -> None: ...
 
+# TODO: these should pass
 static_assert(is_subtype_of(XReadWriteProperty, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XReadWriteProperty, HasXProperty))  # error: [static-assert-error]
 
@@ -816,11 +838,14 @@ from knot_extensions import is_equivalent_to
 class HasMutableXAttr(Protocol):
     x: int
 
+# TODO: this should pass
 static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))  # error: [static-assert-error]
 
+# TODO: these should pass
 static_assert(is_subtype_of(HasMutableXAttr, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(HasMutableXAttr, HasXProperty))  # error: [static-assert-error]
 
+# TODO: these should pass
 static_assert(is_subtype_of(HasMutableXProperty, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(HasMutableXProperty, HasXProperty))  # error: [static-assert-error]
 ```
@@ -851,6 +876,7 @@ class HasAsymmetricXProperty(Protocol):
 class XAttr:
     x: int
 
+# TODO: these should pass
 static_assert(is_subtype_of(XAttr, HasAsymmetricXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XAttr, HasAsymmetricXProperty))  # error: [static-assert-error]
 ```
@@ -864,6 +890,7 @@ and setter-accepted types are the same.
 class XAttrSub:
     x: MyInt
 
+# TODO: these should pass
 static_assert(is_subtype_of(XAttrSub, HasAsymmetricXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XAttrSub, HasAsymmetricXProperty))  # error: [static-assert-error]
 
@@ -889,6 +916,7 @@ class XAsymmetricProperty:
     @x.setter
     def x(self, x: int) -> None: ...
 
+# TODO: these should pass
 static_assert(is_subtype_of(XAsymmetricProperty, HasAsymmetricXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XAsymmetricProperty, HasAsymmetricXProperty))  # error: [static-assert-error]
 ```
@@ -905,6 +933,7 @@ class Descriptor:
 class XCustomDescriptor:
     x: Descriptor = Descriptor()
 
+# TODO: these should pass
 static_assert(is_subtype_of(XCustomDescriptor, HasAsymmetricXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(XCustomDescriptor, HasAsymmetricXProperty))  # error: [static-assert-error]
 ```
@@ -919,8 +948,10 @@ class HasGetAttr:
     def __getattr__(self, attr: str) -> int:
         return 42
 
+# TODO: these should pass
 static_assert(is_subtype_of(HasGetAttr, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(HasGetAttr, HasXProperty))  # error: [static-assert-error]
+
 static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
 static_assert(not is_subtype_of(HasGetAttr, HasMutableXAttr))
 
@@ -937,6 +968,7 @@ class HasGetAttrAndSetAttr:
 
     def __setattr__(self, attr: str, value: int) -> None: ...
 
+# TODO: these should pass
 static_assert(is_subtype_of(HasGetAttrAndSetAttr, HasXProperty))  # error: [static-assert-error]
 static_assert(is_assignable_to(HasGetAttrAndSetAttr, HasXProperty))  # error: [static-assert-error]
 static_assert(is_subtype_of(HasGetAttrAndSetAttr, XAsymmetricProperty))  # error: [static-assert-error]
