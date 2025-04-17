@@ -40,8 +40,8 @@ use crate::fix::edits::delete_stmt;
 ///
 /// ## Fix safety
 ///
-/// This rule's fix is marked as unsafe because removing an unused variable assignment may:
-/// - Delete comments that are attached to the assignment.
+/// This rule's fix is marked as unsafe because removing an unused variable assignment may
+/// delete comments that are attached to the assignment.
 ///
 /// ## Options
 /// - `lint.dummy-variable-rgx`
