@@ -42,7 +42,6 @@ d: tuple[tuple[str, str], tuple[int, int]] = (("foo", "foo"), (42, 42))
 e: tuple[str, ...] = ()
 f: tuple[str, *tuple[int, ...], bytes] = ("42", b"42")
 g: tuple[str, Unpack[tuple[int, ...]], bytes] = ("42", b"42")
-# TODO: no error
 h: tuple[list[int], list[int]] = ([], [])
 i: tuple[str | int, str | int] = (42, 42)
 j: tuple[str | int] = (42,)

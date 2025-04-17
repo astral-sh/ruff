@@ -74,8 +74,7 @@ def _(
     o: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
     p: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
     q: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
-    # error: [invalid-type-form] "Slices are not allowed in type expressions"
-    r: [1, 2, 3][1:2],
+    r: [1, 2, 3][1:2],  # error: [invalid-type-form] "Slices are not allowed in type expressions"
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
