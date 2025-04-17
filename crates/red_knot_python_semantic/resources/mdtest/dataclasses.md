@@ -689,7 +689,7 @@ from dataclasses import dataclass
 
 dataclass_with_order = dataclass(order=True)
 
-reveal_type(dataclass_with_order)  # revealed: <decorator produced by dataclasses.dataclass>
+reveal_type(dataclass_with_order)  # revealed: <decorator produced by dataclass-like function>
 
 @dataclass_with_order
 class C:
