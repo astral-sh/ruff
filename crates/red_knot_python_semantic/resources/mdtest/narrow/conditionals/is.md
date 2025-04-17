@@ -100,3 +100,16 @@ def _(flag: bool):
     else:
         reveal_type(x)  # revealed: Literal[42]
 ```
+
+## Assignment expressions
+
+```py
+from typing import Literal
+
+def f() -> Literal[1, 2] | None: ...
+
+if (x := f()) is None:
+    reveal_type(x)  # revealed: None
+else:
+    reveal_type(x)  # revealed: Literal[1, 2]
+```

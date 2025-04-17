@@ -47,3 +47,16 @@ def _(flag1: bool, flag2: bool):
         # TODO should be Never
         reveal_type(x)  # revealed: Literal[1, 2]
 ```
+
+## Assignment expressions
+
+```py
+def f() -> int | str | None: ...
+
+if isinstance(x := f(), int):
+    reveal_type(x)  # revealed: int
+elif isinstance(x, str):
+    reveal_type(x)  # revealed: str & ~int
+else:
+    reveal_type(x)  # revealed: None
+```
