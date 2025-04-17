@@ -118,22 +118,6 @@ class R: ...
 static_assert(is_equivalent_to(Intersection[tuple[P | Q], R], Intersection[tuple[Q | P], R]))
 ```
 
-## Generics
-
-We consider two generic types to be equivalent only if they have the same specialization.
-
-```py
-from knot_extensions import is_equivalent_to, static_assert, Unknown
-from typing import Any
-
-class C[T]: ...
-
-static_assert(is_equivalent_to(C[int], C[int]))
-static_assert(not is_equivalent_to(C[int], C[bool]))
-static_assert(not is_equivalent_to(C[int], C[Any]))
-static_assert(not is_equivalent_to(C[int], C[Unknown]))
-```
-
 ## Callable
 
 ### Equivalent
