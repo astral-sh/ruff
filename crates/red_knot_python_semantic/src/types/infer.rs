@@ -7199,6 +7199,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::StringLiteral(_) => {
                 // No diagnostic yet, since we haven't determined the type of the deferred string
                 // annotation yet.
+                self.infer_type_expression(slice);
                 Type::unknown()
             }
             _ => {
