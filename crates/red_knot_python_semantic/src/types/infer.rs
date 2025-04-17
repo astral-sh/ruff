@@ -763,12 +763,25 @@ impl<'db> TypeInferenceBuilder<'db> {
                 continue;
             }
 
-            // (2) Check for classes that inherit from `@final` classes
+            // (2) Check for inheritance from plain `Generic`,
+            //     and from classes that inherit from `@final` classes
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
-                // dynamic/unknown bases are never `@final`
-                let Some(base_class) = base_class.into_class_literal() else {
-                    continue;
+                let base_class = match base_class {
+                    Type::KnownInstance(KnownInstanceType::Generic) => {
+                        // `Generic` can appear in the MRO of many classes,
+                        // but it is never valid as an explicit base class in user code.
+                        self.context.report_lint_old(
+                            &INVALID_BASE,
+                            &class_node.bases()[i],
+                            format_args!("Cannot inherit from plain `Generic`",),
+                        );
+                        continue;
+                    }
+                    // dynamic/unknown bases are never `@final`
+                    Type::ClassLiteral(class) => class,
+                    _ => continue,
                 };
+
                 if !base_class.is_final(self.db()) {
                     continue;
                 }

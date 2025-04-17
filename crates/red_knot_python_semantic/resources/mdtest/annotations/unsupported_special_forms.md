@@ -74,7 +74,7 @@ class C(TypeGuard): ...  # error: [invalid-base]
 class D(TypeIs): ...  # error: [invalid-base]
 class E(Concatenate): ...  # error: [invalid-base]
 class F(Callable): ...
-class G(Generic): ...  # TODO should emit an error here
+class G(Generic): ...  # error: [invalid-base] "Cannot inherit from plain `Generic`"
 
 reveal_type(F.__mro__)  # revealed: tuple[Literal[F], @Todo(Support for Callable as a base class), Literal[object]]
 ```
