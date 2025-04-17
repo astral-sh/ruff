@@ -6,7 +6,7 @@ python-version = "3.12"
 ```
 
 Type variables have a property called _variance_ that affects the subtyping and assignability
-relations. Much more detail can be found in the [spec][]. To summarize, each typevar is either
+relations. Much more detail can be found in the [spec]. To summarize, each typevar is either
 **covariant**, **contravariant**, **invariant**, or **bivariant**. (Note that bivariance is not
 currently mentioned in the typing spec, but is a fourth case that we must consider.)
 
@@ -154,7 +154,6 @@ class B(A): ...
 
 class C[T]:
     def send(self, value: T): ...
-
     def receive(self) -> T:
         raise ValueError
 
