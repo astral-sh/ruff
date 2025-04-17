@@ -7202,7 +7202,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::unknown()
             }
             _ => {
-                eprintln!("==> {:?}", value_ty);
                 self.infer_type_expression(slice);
                 self.context.report_lint_old(
                     &INVALID_TYPE_FORM,
