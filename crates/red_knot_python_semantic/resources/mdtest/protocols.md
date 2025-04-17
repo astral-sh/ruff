@@ -222,7 +222,10 @@ reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```py
 import typing
 import typing_extensions
-from knot_extensions import static_assert, is_equivalent_to
+from knot_extensions import static_assert, is_equivalent_to, TypeOf
+
+static_assert(is_equivalent_to(TypeOf[typing.Protocol], TypeOf[typing_extensions.Protocol]))
+static_assert(is_equivalent_to(int | str | TypeOf[typing.Protocol], TypeOf[typing_extensions.Protocol] | str | int))
 
 class Foo(typing.Protocol):
     x: int
@@ -257,10 +260,13 @@ isinstance(object(), RuntimeCheckableFoo)
 isinstance(object(), RuntimeCheckableBar)
 ```
 
-However, we understand that they are distinct symbols:
+However, we understand that they are not necessarily the same symbol at the same memory address at
+runtime -- these reveal `bool` rather than `Literal[True]` or `Literal[False]`, which would be
+incorrect:
 
 ```py
-static_assert(typing.Protocol is not typing_extensions.Protocol)
+reveal_type(typing.Protocol is typing_extensions.Protocol)  # revealed: bool
+reveal_type(typing.Protocol is not typing_extensions.Protocol)  # revealed: bool
 ```
 
 ## Calls to protocol classes

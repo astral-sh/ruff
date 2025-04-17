@@ -1949,8 +1949,16 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
             | Type::GenericAlias(..)
-            | Type::ModuleLiteral(..)
-            | Type::KnownInstance(..) => true,
+            | Type::ModuleLiteral(..) => true,
+            Type::KnownInstance(known_instance) => {
+                // Nearly all `KnownInstance` types are singletons, but if a symbol could validly
+                // originate from either `typing` or `typing_extensions` then this is not guaranteed.
+                // E.g. `typing.Protocol` is equivalent to `typing_extensions.Protocol`, so both are treated
+                // as inhabiting the type `KnownInstanceType::Protocol` in our model, but they are actually
+                // distinct symbols at different memory addresses at runtime.
+                !(known_instance.check_module(KnownModule::Typing)
+                    && known_instance.check_module(KnownModule::TypingExtensions))
+            }
             Type::Callable(_) => {
                 // A callable type is never a singleton because for any given signature,
                 // there could be any number of distinct objects that are all callable with that
@@ -4316,7 +4324,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypingSelf => Ok(todo_type!("Support for `typing.Self`")),
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
 
-                KnownInstanceType::Protocol(_) => Err(InvalidTypeExpressionError {
+                KnownInstanceType::Protocol => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
                 }),
