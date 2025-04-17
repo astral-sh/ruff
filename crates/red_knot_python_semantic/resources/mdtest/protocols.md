@@ -227,13 +227,15 @@ reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```py
 import typing
 import typing_extensions
-from knot_extensions import static_assert, is_equivalent_to
+from knot_extensions import static_assert, is_equivalent_to, TypeOf
+
+static_assert(is_equivalent_to(TypeOf[typing.Protocol], TypeOf[typing_extensions.Protocol]))
+static_assert(is_equivalent_to(int | str | TypeOf[typing.Protocol], TypeOf[typing_extensions.Protocol] | str | int))
 
 class Foo(typing.Protocol):
     x: int
 
-# TODO: should not error
-class Bar(typing_extensions.Protocol):  # error: [invalid-base]
+class Bar(typing_extensions.Protocol):
     x: int
 
 # TODO: these should pass
@@ -249,9 +251,8 @@ The same goes for `typing.runtime_checkable` and `typing_extensions.runtime_chec
 class RuntimeCheckableFoo(typing.Protocol):
     x: int
 
-# TODO: should not error
 @typing.runtime_checkable
-class RuntimeCheckableBar(typing_extensions.Protocol):  # error: [invalid-base]
+class RuntimeCheckableBar(typing_extensions.Protocol):
     x: int
 
 # TODO: these should pass
@@ -262,6 +263,15 @@ static_assert(is_equivalent_to(RuntimeCheckableFoo, RuntimeCheckableBar))  # err
 # These should not error because the protocols are decorated with `@runtime_checkable`
 isinstance(object(), RuntimeCheckableFoo)
 isinstance(object(), RuntimeCheckableBar)
+```
+
+However, we understand that they are not necessarily the same symbol at the same memory address at
+runtime -- these reveal `bool` rather than `Literal[True]` or `Literal[False]`, which would be
+incorrect:
+
+```py
+reveal_type(typing.Protocol is typing_extensions.Protocol)  # revealed: bool
+reveal_type(typing.Protocol is not typing_extensions.Protocol)  # revealed: bool
 ```
 
 ## Calls to protocol classes
@@ -309,8 +319,7 @@ via `typing_extensions`.
 ```py
 from typing_extensions import Protocol, get_protocol_members
 
-# TODO: should not error
-class Foo(Protocol):  # error: [invalid-base]
+class Foo(Protocol):
     x: int
 
     @property
@@ -351,8 +360,7 @@ Certain special attributes and methods are not considered protocol members at ru
 not be considered protocol members by type checkers either:
 
 ```py
-# TODO: should not error
-class Lumberjack(Protocol):  # error: [invalid-base]
+class Lumberjack(Protocol):
     __slots__ = ()
     __match_args__ = ()
     x: int

@@ -2532,7 +2532,7 @@ impl<'db> KnownInstanceType<'db> {
     ///
     /// Most variants can only exist in one module, which is the same as `self.class().canonical_module()`.
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    fn check_module(self, module: KnownModule) -> bool {
+    pub(super) fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::Any
             | Self::ClassVar
@@ -2545,7 +2545,6 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Counter
             | Self::ChainMap
             | Self::OrderedDict
-            | Self::Protocol
             | Self::Optional
             | Self::Union
             | Self::NoReturn
@@ -2553,6 +2552,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Type
             | Self::Callable => module.is_typing(),
             Self::Annotated
+            | Self::Protocol
             | Self::Literal
             | Self::LiteralString
             | Self::Never
