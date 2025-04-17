@@ -570,12 +570,10 @@ class ConvertToLength:
 class C:
     converter: ConvertToLength = ConvertToLength()
 
-# TODO: Should be `(converter: str = Literal[""]) -> None` once we understand overloads
-reveal_type(C.__init__)  # revealed: (converter: str = str | int) -> None
+reveal_type(C.__init__)  # revealed: (converter: str = str) -> None
 
 c = C("abc")
-# TODO: Should be `int` once we understand overloads
-reveal_type(c.converter)  # revealed: str | int
+reveal_type(c.converter)  # revealed: int
 
 # This is also okay:
 C()
@@ -611,8 +609,7 @@ class AcceptsStrAndInt:
 class C:
     field: AcceptsStrAndInt = AcceptsStrAndInt()
 
-# TODO: Should be `field: str | int = int` once we understand overloads
-reveal_type(C.__init__)  # revealed: (field: Unknown = int) -> None
+reveal_type(C.__init__)  # revealed: (field: str | int = int) -> None
 ```
 
 ## `dataclasses.field`
