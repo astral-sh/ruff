@@ -59,13 +59,64 @@ type KeyDiagnosticFields = (
     Severity,
 );
 
-static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[(
-    DiagnosticId::lint("unused-ignore-comment"),
-    Some("/src/tomllib/_parser.py"),
-    Some(22299..22333),
-    "Unused blanket `type: ignore` directive",
-    Severity::Warning,
-)];
+static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
+    (
+        DiagnosticId::lint("invalid-type-form"),
+        Some("/src/tomllib/_parser.py"),
+        Some(1716..1730),
+        "Cannot specialize a non-generic class",
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-type-form"),
+        Some("/src/tomllib/_parser.py"),
+        Some(2093..2107),
+        "Cannot specialize a non-generic class",
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-type-form"),
+        Some("/src/tomllib/_parser.py"),
+        Some(4513..4528),
+        "Cannot specialize a non-generic class",
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-type-form"),
+        Some("/src/tomllib/_parser.py"),
+        Some(4563..4583),
+        "Cannot specialize a non-generic class",
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-type-form"),
+        Some("/src/tomllib/_parser.py"),
+        Some(6321..6335),
+        "Cannot specialize a non-generic class",
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-type-form"),
+        Some("/src/tomllib/_parser.py"),
+        Some(7326..7339),
+        "Cannot specialize a non-generic class",
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("invalid-type-form"),
+        Some("/src/tomllib/_parser.py"),
+        Some(7547..7561),
+        "Cannot specialize a non-generic class",
+        Severity::Error,
+    ),
+    (
+        DiagnosticId::lint("unused-ignore-comment"),
+        Some("/src/tomllib/_parser.py"),
+        Some(22299..22333),
+        "Unused blanket `type: ignore` directive",
+        Severity::Warning,
+    ),
+];
 
 fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
