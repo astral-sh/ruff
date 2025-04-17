@@ -996,6 +996,11 @@ reveal_type(x)  # revealed: Literal[1]
 
 ## `match` statements
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 ### Single-valued types, always true
 
 ```py
@@ -1118,6 +1123,7 @@ def _(s: str):
 ```toml
 [environment]
 python-platform = "darwin"
+python-version = "3.10"
 ```
 
 ```py

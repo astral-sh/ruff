@@ -1,5 +1,10 @@
 # Subtype relation
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 The `is_subtype_of(S, T)` relation below checks if type `S` is a subtype of type `T`.
 
 A fully static type `S` is a subtype of another fully static type `T` iff the set of values

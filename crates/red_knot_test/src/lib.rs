@@ -8,7 +8,10 @@ use red_knot_python_semantic::types::check_types;
 use red_knot_python_semantic::{
     Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings, SysPrefixPathOrigin,
 };
-use ruff_db::diagnostic::{create_parse_diagnostic, Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{
+    create_parse_diagnostic, create_unsupported_syntax_diagnostic, Diagnostic,
+    DisplayDiagnosticConfig,
+};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::panic::catch_unwind;
 use ruff_db::parsed::parsed_module;
@@ -304,6 +307,13 @@ fn run_test(
                 .iter()
                 .map(|error| create_parse_diagnostic(test_file.file, error))
                 .collect();
+
+            diagnostics.extend(
+                parsed
+                    .unsupported_syntax_errors()
+                    .iter()
+                    .map(|error| create_unsupported_syntax_diagnostic(test_file.file, error)),
+            );
 
             let type_diagnostics = match catch_unwind(|| check_types(db, test_file.file)) {
                 Ok(type_diagnostics) => type_diagnostics,

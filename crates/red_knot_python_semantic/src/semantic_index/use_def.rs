@@ -429,6 +429,14 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations)
     }
 
+    pub(crate) fn all_public_declarations<'map>(
+        &'map self,
+    ) -> impl Iterator<Item = (ScopedSymbolId, DeclarationsIterator<'map, 'db>)> + 'map {
+        (0..self.public_symbols.len())
+            .map(ScopedSymbolId::from_usize)
+            .map(|symbol_id| (symbol_id, self.public_declarations(symbol_id)))
+    }
+
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
         !self
@@ -551,6 +559,7 @@ impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
 
 impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
 
+#[derive(Clone)]
 pub(crate) struct DeclarationsIterator<'map, 'db> {
     all_definitions: &'map IndexVec<ScopedDefinitionId, Option<Definition<'db>>>,
     pub(crate) predicates: &'map Predicates<'db>,

@@ -1,5 +1,10 @@
 # Narrowing for `match` statements
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 ## Single `match` pattern
 
 ```py

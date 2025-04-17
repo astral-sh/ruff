@@ -111,6 +111,11 @@ def _(x: A | B):
 
 ## Narrowing for generic classes
 
+```toml
+[environment]
+python-version = "3.13"
+```
+
 Note that `type` returns the runtime class of an object, which does _not_ include specializations in
 the case of a generic class. (The typevars are erased.) That means we cannot narrow the type to the
 specialization that we compare with; we must narrow to an unknown specialization of the generic

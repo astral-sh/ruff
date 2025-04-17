@@ -1,6 +1,6 @@
 use camino::{Utf8Component, Utf8PathBuf};
 use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-use red_knot_python_semantic::{default_lint_registry, Db as SemanticDb};
+use red_knot_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
     CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
@@ -63,6 +63,10 @@ impl SourceDb for Db {
 
     fn files(&self) -> &Files {
         &self.files
+    }
+
+    fn python_version(&self) -> ruff_python_ast::PythonVersion {
+        Program::get(self).python_version(self)
     }
 }
 
