@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.11.6
+
+### Preview features
+
+- Avoid adding whitespace to the end of a docstring after an escaped quote ([#17216](https://github.com/astral-sh/ruff/pull/17216))
+- \[`airflow`\] Extract `AIR311` from `AIR301` rules (`AIR301`, `AIR311`) ([#17310](https://github.com/astral-sh/ruff/pull/17310), [#17422](https://github.com/astral-sh/ruff/pull/17422))
+
+### Bug fixes
+
+- Raise syntax error when `\` is at end of file ([#17409](https://github.com/astral-sh/ruff/pull/17409))
+
 ## 0.11.5
 
 ### Preview features
