@@ -107,7 +107,7 @@ use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
 use super::subclass_of::SubclassOfInner;
-use super::{BoundSuperError, BoundSuperType};
+use super::{BoundSuperError, BoundSuperType, ClassBase};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -6356,12 +6356,25 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    report_non_subscriptable(
-                        &self.context,
-                        value_node.into(),
-                        value_ty,
-                        "__class_getitem__",
-                    );
+                    // TODO: properly handle old-style generics; get rid of this temporary hack
+                    if !value_ty.into_class_literal().is_some_and(|class| {
+                        class.iter_mro(self.db(), None).any(|base| {
+                            matches!(
+                                base,
+                                ClassBase::Dynamic(
+                                    DynamicType::SubscriptedGeneric
+                                        | DynamicType::SubscriptedProtocol,
+                                )
+                            )
+                        })
+                    }) {
+                        report_non_subscriptable(
+                            &self.context,
+                            value_node.into(),
+                            value_ty,
+                            "__class_getitem__",
+                        );
+                    }
                 } else {
                     report_non_subscriptable(
                         &self.context,

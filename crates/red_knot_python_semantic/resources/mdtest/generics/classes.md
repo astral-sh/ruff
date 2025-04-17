@@ -51,8 +51,7 @@ class C(Generic[T]): ...
 A class that inherits from a generic class, and fills its type parameters with typevars, is generic.
 
 ```py
-# TODO: no error
-class D(C[T]): ...  # error: [non-subscriptable]
+class D(C[T]): ...
 ```
 
 (Examples `E` and `F` from above do not have analogues in the legacy syntax.)
