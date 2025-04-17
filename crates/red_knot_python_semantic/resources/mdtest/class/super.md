@@ -265,6 +265,11 @@ def f(flag: bool):
 
 ## Supers with Generic Classes
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from knot_extensions import TypeOf, static_assert, is_subtype_of
 
@@ -315,6 +320,11 @@ class A:
 ```
 
 ### Failing Condition Checks
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 `super()` requires its first argument to be a valid class, and its second argument to be either an
 instance or a subclass of the first. If either condition is violated, a `TypeError` is raised at

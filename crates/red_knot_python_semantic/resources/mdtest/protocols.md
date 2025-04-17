@@ -15,6 +15,11 @@ types, on the other hand: a type which is defined by its properties and behaviou
 
 ## Defining a protocol
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 A protocol is defined by inheriting from the `Protocol` class, which is annotated as an instance of
 `_SpecialForm` in typeshed's stubs.
 
