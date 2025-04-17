@@ -213,6 +213,51 @@ Nonetheless, `Protocol` can still be used as the second argument to `issubclass(
 reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```
 
+## `typing.Protocol` versus `typing_extensions.Protocol`
+
+`typing.Protocol` and its backport in `typing_extensions` should be treated as exactly
+equivalent.
+
+```py
+import typing
+import typing_extensions
+from knot_extensions import static_assert, is_equivalent_to
+
+class Foo(typing.Protocol):
+    x: int
+
+# TODO: should not error
+class Bar(typing_extensions.Protocol):  # error: [invalid-base]
+    x: int
+
+# TODO: these should pass
+static_assert(typing_extensions.is_protocol(Foo))  # error: [static-assert-error]
+static_assert(typing_extensions.is_protocol(Bar))  # error: [static-assert-error]
+static_assert(is_equivalent_to(Foo, Bar))  # error: [static-assert-error]
+```
+
+The same goes for `typing.runtime_checkable` and `typing_extensions.runtime_checkable`:
+
+```py
+@typing_extensions.runtime_checkable
+class RuntimeCheckableFoo(typing.Protocol):
+    x: int
+
+# TODO: should not error
+@typing.runtime_checkable
+class RuntimeCheckableBar(typing_extensions.Protocol):  # error: [invalid-base]
+    x: int
+
+# TODO: these should pass
+static_assert(typing_extensions.is_protocol(RuntimeCheckableFoo))  # error: [static-assert-error]
+static_assert(typing_extensions.is_protocol(RuntimeCheckableBar))  # error: [static-assert-error]
+static_assert(is_equivalent_to(RuntimeCheckableFoo, RuntimeCheckableBar))  # error: [static-assert-error]
+
+# These should not error because the protocols are decorated with `@runtime_checkable`
+isinstance(object(), RuntimeCheckableFoo)
+isinstance(object(), RuntimeCheckableBar)
+```
+
 ## Calls to protocol classes
 
 Neither `Protocol`, nor any protocol class, can be directly instantiated:
