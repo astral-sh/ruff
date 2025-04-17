@@ -270,15 +270,6 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         list_binding_value.is_some_and(|binding_value| match binding_value {
             // `value = []`
             Expr::List(list_expr) => list_expr.is_empty(),
-            // `value = list()`
-            // This is probably be linted against, but turning it into a list comprehension will also remove it
-            Expr::Call(call) => {
-                checker
-                    .semantic()
-                    .resolve_builtin_symbol(&call.func)
-                    .is_some_and(|name| name == "list")
-                    && call.arguments.is_empty()
-            }
             _ => false,
         });
 
