@@ -51,7 +51,7 @@ impl<'db> SubclassOfType<'db> {
         })
     }
 
-    /// Return the inner [`ClassBase`] value wrapped by this `SubclassOfType`.
+    /// Return the inner [`SubclassOfInner`] value wrapped by this `SubclassOfType`.
     pub(crate) const fn subclass_of(self) -> SubclassOfInner<'db> {
         self.subclass_of
     }
@@ -77,7 +77,7 @@ impl<'db> SubclassOfType<'db> {
 
     /// Return `true` if `self` is a subtype of `other`.
     ///
-    /// This can only return `true` if `self.subclass_of` is a [`ClassBase::Class`] variant;
+    /// This can only return `true` if `self.subclass_of` is a [`SubclassOfInner::Class`] variant;
     /// only fully static types participate in subtyping.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
         match (self.subclass_of, other.subclass_of) {
