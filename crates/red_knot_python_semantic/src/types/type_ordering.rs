@@ -3,8 +3,7 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    class_base::ClassBase, DynamicType, InstanceType, KnownInstanceType, SuperOwnerKind, TodoType,
-    Type,
+    class_base::ClassBase, subclass_of::SubclassOfInner, DynamicType, InstanceType, KnownInstanceType, SuperOwnerKind, TodoType, Type
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -109,10 +108,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::SubclassOf(left), Type::SubclassOf(right)) => {
             match (left.subclass_of(), right.subclass_of()) {
-                (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(&right),
-                (ClassBase::Class(_), _) => Ordering::Less,
-                (_, ClassBase::Class(_)) => Ordering::Greater,
-                (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
+                (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => left.cmp(&right),
+                (SubclassOfInner::Class(_), _) => Ordering::Less,
+                (_, SubclassOfInner::Class(_)) => Ordering::Greater,
+                (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
             }

@@ -94,7 +94,6 @@ use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
@@ -107,6 +106,7 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
+use super::subclass_of::SubclassOfInner;
 use super::{BoundSuperError, BoundSuperType};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -4738,10 +4738,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                             Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                                 match subclass_of.subclass_of() {
-                                    ClassBase::Class(class) => {
+                                    SubclassOfInner::Class(class) => {
                                         !class.instance_member(db, attr).symbol.is_unbound()
                                     }
-                                    ClassBase::Dynamic(_) => unreachable!(
+                                    SubclassOfInner::Dynamic(_) => unreachable!(
                                         "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
                                     ),
                                 }

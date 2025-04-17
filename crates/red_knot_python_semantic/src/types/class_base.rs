@@ -25,13 +25,6 @@ impl<'db> ClassBase<'db> {
         Self::Dynamic(DynamicType::Unknown)
     }
 
-    pub(crate) const fn is_dynamic(self) -> bool {
-        match self {
-            ClassBase::Dynamic(_) => true,
-            ClassBase::Class(_) => false,
-        }
-    }
-
     pub(crate) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct Display<'db> {
             base: ClassBase<'db>,
