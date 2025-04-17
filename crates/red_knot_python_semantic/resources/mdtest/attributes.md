@@ -1716,7 +1716,8 @@ reveal_type(False.real)  # revealed: Literal[0]
 All attribute access on literal `bytes` types is currently delegated to `builtins.bytes`:
 
 ```py
-reveal_type(b"foo".join)  # revealed: bound method Literal[b"foo"].join(iterable_of_bytes: @Todo(specialized non-generic class), /) -> bytes
+# revealed: bound method Literal[b"foo"].join(iterable_of_bytes: @Todo(specialized non-generic class), /) -> bytes
+reveal_type(b"foo".join)
 # revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`), start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
 reveal_type(b"foo".endswith)
 ```
