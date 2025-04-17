@@ -77,6 +77,9 @@ test-case = { workspace = true }
 # Used via macro expansion.
 ignored = ["jiff"]
 
+[package.metadata.dist]
+dist = true
+
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = { workspace = true }
 
