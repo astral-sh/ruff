@@ -1039,6 +1039,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             eager_bindings: self.eager_bindings,
+            semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
         }
     }
 
