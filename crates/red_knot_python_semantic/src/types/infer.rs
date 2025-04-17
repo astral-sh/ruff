@@ -1249,7 +1249,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         node_ref.bases().iter().any(|base| {
             matches!(
                 self.file_expression_type(base),
-                Type::KnownInstance(KnownInstanceType::Protocol)
+                Type::KnownInstance(KnownInstanceType::Protocol(_))
             )
         })
     }
@@ -6230,7 +6230,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 value_ty,
                 Type::IntLiteral(i64::from(bool)),
             ),
-            (Type::KnownInstance(KnownInstanceType::Protocol), _) => {
+            (Type::KnownInstance(KnownInstanceType::Protocol(_)), _) => {
                 Type::Dynamic(DynamicType::TodoProtocol)
             }
             (Type::KnownInstance(known_instance), _)
@@ -7487,7 +7487,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(arguments_slice);
                 todo_type!("`Unpack[]` special form")
             }
-            KnownInstanceType::Protocol => {
+            KnownInstanceType::Protocol(_) => {
                 self.infer_type_expression(arguments_slice);
                 Type::Dynamic(DynamicType::TodoProtocol)
             }

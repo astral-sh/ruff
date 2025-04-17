@@ -4316,7 +4316,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypingSelf => Ok(todo_type!("Support for `typing.Self`")),
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
 
-                KnownInstanceType::Protocol => Err(InvalidTypeExpressionError {
+                KnownInstanceType::Protocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
                 }),

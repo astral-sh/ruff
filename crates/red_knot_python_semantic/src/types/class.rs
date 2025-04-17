@@ -2280,7 +2280,7 @@ pub enum KnownInstanceType<'db> {
     /// The symbol `typing.OrderedDict` (which can also be found as `typing_extensions.OrderedDict`)
     OrderedDict,
     /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
-    Protocol,
+    Protocol(ProtocolOrigin),
     /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
     Type,
     /// A single instance of `typing.TypeVar`
@@ -2354,7 +2354,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Deque
             | Self::ChainMap
             | Self::OrderedDict
-            | Self::Protocol
+            | Self::Protocol(_)
             | Self::ReadOnly
             | Self::TypeAliasType(_)
             | Self::Unknown
@@ -2400,7 +2400,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deque => "typing.Deque",
             Self::ChainMap => "typing.ChainMap",
             Self::OrderedDict => "typing.OrderedDict",
-            Self::Protocol => "typing.Protocol",
+            Self::Protocol(ProtocolOrigin::Typing) => "typing.Protocol",
+            Self::Protocol(ProtocolOrigin::TypingExtensions) => "typing_extensions.Protocol",
             Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
@@ -2448,7 +2449,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deque => KnownClass::StdlibAlias,
             Self::ChainMap => KnownClass::StdlibAlias,
             Self::OrderedDict => KnownClass::StdlibAlias,
-            Self::Protocol => KnownClass::SpecialForm,
+            Self::Protocol(_) => KnownClass::SpecialForm,
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::TypeOf => KnownClass::SpecialForm,
@@ -2492,7 +2493,6 @@ impl<'db> KnownInstanceType<'db> {
             "Counter" => Self::Counter,
             "ChainMap" => Self::ChainMap,
             "OrderedDict" => Self::OrderedDict,
-            "Protocol" => Self::Protocol,
             "Optional" => Self::Optional,
             "Union" => Self::Union,
             "NoReturn" => Self::NoReturn,
@@ -2520,6 +2520,15 @@ impl<'db> KnownInstanceType<'db> {
             "Intersection" => Self::Intersection,
             "TypeOf" => Self::TypeOf,
             "CallableTypeOf" => Self::CallableTypeOf,
+            "Protocol" => {
+                return match file_to_module(db, file)?.known()? {
+                    KnownModule::Typing => Some(Self::Protocol(ProtocolOrigin::Typing)),
+                    KnownModule::TypingExtensions => {
+                        Some(Self::Protocol(ProtocolOrigin::TypingExtensions))
+                    }
+                    _ => None,
+                }
+            }
             _ => return None,
         };
 
@@ -2545,13 +2554,14 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Counter
             | Self::ChainMap
             | Self::OrderedDict
-            | Self::Protocol
+            | Self::Protocol(ProtocolOrigin::Typing)
             | Self::Optional
             | Self::Union
             | Self::NoReturn
             | Self::Tuple
             | Self::Type
             | Self::Callable => module.is_typing(),
+            Self::Protocol(ProtocolOrigin::TypingExtensions) => module.is_typing_extensions(),
             Self::Annotated
             | Self::Literal
             | Self::LiteralString
@@ -2579,6 +2589,12 @@ impl<'db> KnownInstanceType<'db> {
             | Self::CallableTypeOf => module.is_knot_extensions(),
         }
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update)]
+pub enum ProtocolOrigin {
+    Typing,
+    TypingExtensions,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]

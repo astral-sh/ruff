@@ -164,6 +164,10 @@ impl KnownModule {
         matches!(self, Self::Typing)
     }
 
+    pub const fn is_typing_extensions(self) -> bool {
+        matches!(self, Self::TypingExtensions)
+    }
+
     pub const fn is_knot_extensions(self) -> bool {
         matches!(self, Self::KnotExtensions)
     }

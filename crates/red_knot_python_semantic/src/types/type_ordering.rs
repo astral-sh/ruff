@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    class_base::ClassBase, DynamicType, InstanceType, KnownInstanceType, SuperOwnerKind, TodoType,
-    Type,
+    class::ProtocolOrigin, class_base::ClassBase, DynamicType, InstanceType, KnownInstanceType,
+    SuperOwnerKind, TodoType, Type,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -230,8 +230,15 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (KnownInstanceType::OrderedDict, _) => Ordering::Less,
                 (_, KnownInstanceType::OrderedDict) => Ordering::Greater,
 
-                (KnownInstanceType::Protocol, _) => Ordering::Less,
-                (_, KnownInstanceType::Protocol) => Ordering::Greater,
+                (KnownInstanceType::Protocol(ProtocolOrigin::Typing), _) => Ordering::Less,
+                (_, KnownInstanceType::Protocol(ProtocolOrigin::Typing)) => Ordering::Greater,
+
+                (KnownInstanceType::Protocol(ProtocolOrigin::TypingExtensions), _) => {
+                    Ordering::Less
+                }
+                (_, KnownInstanceType::Protocol(ProtocolOrigin::TypingExtensions)) => {
+                    Ordering::Greater
+                }
 
                 (KnownInstanceType::NoReturn, _) => Ordering::Less,
                 (_, KnownInstanceType::NoReturn) => Ordering::Greater,
