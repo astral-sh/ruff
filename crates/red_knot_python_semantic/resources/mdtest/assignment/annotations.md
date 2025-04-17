@@ -61,7 +61,7 @@ reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 reveal_type(e)  # revealed: @Todo(full tuple[...] support)
 reveal_type(f)  # revealed: @Todo(full tuple[...] support)
 reveal_type(g)  # revealed: @Todo(full tuple[...] support)
-reveal_type(h)  # revealed: tuple[Unknown, Unknown]
+reveal_type(h)  # revealed: tuple[@Todo(specialized non-generic class), @Todo(specialized non-generic class)]
 
 reveal_type(i)  # revealed: tuple[str | int, str | int]
 reveal_type(j)  # revealed: tuple[str | int]

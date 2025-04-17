@@ -46,11 +46,7 @@ diagnostics.
 from typing import Callable
 
 def f(x: Callable[[dict[str, int]], None], y: tuple[dict[str, int]]):
-    # TODO: no error
-    # error: [redundant-cast]
     a = cast(Callable[[list[bytes]], None], x)
-    # TODO: no error
-    # error: [redundant-cast]
     b = cast(tuple[list[bytes]], y)
 ```
 
@@ -65,7 +61,7 @@ from knot_extensions import Unknown
 
 def f(x: Any, y: Unknown, z: Any | str | int):
     a = cast(dict[str, Any], x)
-    reveal_type(a)  # revealed: Unknown
+    reveal_type(a)  # revealed: @Todo(specialized non-generic class)
 
     b = cast(Any, y)
     reveal_type(b)  # revealed: Any

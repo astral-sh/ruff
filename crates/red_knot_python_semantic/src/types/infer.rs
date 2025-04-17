@@ -7191,7 +7191,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
                 // specialize a non-generic class.
                 self.infer_type_expression(slice);
-                Type::unknown()
+                todo_type!("specialized non-generic class")
             }
             Type::StringLiteral(_) => {
                 // Don't emit a diagnostic, since we haven't determined the type of the deferred
