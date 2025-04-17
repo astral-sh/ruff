@@ -4983,8 +4983,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
             (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
-            (todo @ Type::Dynamic(DynamicType::TodoProtocol), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::TodoProtocol), _) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -6231,7 +6233,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::IntLiteral(i64::from(bool)),
             ),
             (Type::KnownInstance(KnownInstanceType::Protocol), _) => {
-                Type::Dynamic(DynamicType::TodoProtocol)
+                Type::Dynamic(DynamicType::SubscriptedProtocol)
+            }
+            (Type::KnownInstance(KnownInstanceType::Generic), _) => {
+                Type::Dynamic(DynamicType::SubscriptedGeneric)
             }
             (Type::KnownInstance(known_instance), _)
                 if known_instance.class().is_special_form() =>
@@ -7489,7 +7494,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::Protocol => {
                 self.infer_type_expression(arguments_slice);
-                Type::Dynamic(DynamicType::TodoProtocol)
+                Type::Dynamic(DynamicType::SubscriptedProtocol)
+            }
+            KnownInstanceType::Generic => {
+                self.infer_type_expression(arguments_slice);
+                Type::Dynamic(DynamicType::SubscriptedGeneric)
             }
             KnownInstanceType::NoReturn
             | KnownInstanceType::Never

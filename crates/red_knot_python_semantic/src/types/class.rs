@@ -750,7 +750,11 @@ impl<'db> ClassLiteralType<'db> {
 
         for superclass in mro_iter {
             match superclass {
-                ClassBase::Dynamic(DynamicType::TodoProtocol) => {
+                ClassBase::Dynamic(
+                    DynamicType::SubscriptedGeneric | DynamicType::SubscriptedProtocol,
+                )
+                | ClassBase::Generic
+                | ClassBase::Protocol => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
                     // result from looking up attributes on builtin types like `str`, `list`, `tuple`
@@ -1062,8 +1066,12 @@ impl<'db> ClassLiteralType<'db> {
 
         for superclass in self.iter_mro(db, specialization) {
             match superclass {
-                ClassBase::Dynamic(DynamicType::TodoProtocol) => {
-                    // TODO: We currently skip `Protocol` when looking up instance members, in order to
+                ClassBase::Dynamic(
+                    DynamicType::SubscriptedProtocol | DynamicType::SubscriptedGeneric,
+                )
+                | ClassBase::Generic
+                | ClassBase::Protocol => {
+                    // TODO: We currently skip these when looking up instance members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
                     // result from looking up attributes on builtin types like `str`, `list`, `tuple`
                 }
@@ -2281,6 +2289,8 @@ pub enum KnownInstanceType<'db> {
     OrderedDict,
     /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
     Protocol,
+    /// The symbol `typing.Generic` (which can also be found as `typing_extensions.Generic`)
+    Generic,
     /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
     Type,
     /// A single instance of `typing.TypeVar`
@@ -2355,6 +2365,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::ChainMap
             | Self::OrderedDict
             | Self::Protocol
+            | Self::Generic
             | Self::ReadOnly
             | Self::TypeAliasType(_)
             | Self::Unknown
@@ -2401,6 +2412,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => "typing.ChainMap",
             Self::OrderedDict => "typing.OrderedDict",
             Self::Protocol => "typing.Protocol",
+            Self::Generic => "typing.Generic",
             Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
@@ -2448,7 +2460,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deque => KnownClass::StdlibAlias,
             Self::ChainMap => KnownClass::StdlibAlias,
             Self::OrderedDict => KnownClass::StdlibAlias,
-            Self::Protocol => KnownClass::SpecialForm,
+            Self::Protocol => KnownClass::SpecialForm, // actually `_ProtocolMeta` at runtime but this is what typeshed says
+            Self::Generic => KnownClass::SpecialForm, // actually `type` at runtime but this is what typeshed says
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::TypeOf => KnownClass::SpecialForm,
@@ -2550,6 +2563,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::NoReturn
             | Self::Tuple
             | Self::Type
+            | Self::Generic
             | Self::Callable => module.is_typing(),
             Self::Annotated
             | Self::Protocol

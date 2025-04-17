@@ -3,7 +3,8 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    class_base::ClassBase, subclass_of::SubclassOfInner, DynamicType, InstanceType, KnownInstanceType, SuperOwnerKind, TodoType, Type
+    class_base::ClassBase, subclass_of::SubclassOfInner, DynamicType, InstanceType,
+    KnownInstanceType, SuperOwnerKind, TodoType, Type,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -142,6 +143,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(right),
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
+                (ClassBase::Protocol, _) => Ordering::Less,
+                (_, ClassBase::Protocol) => Ordering::Greater,
+                (ClassBase::Generic, _) => Ordering::Less,
+                (_, ClassBase::Generic) => Ordering::Greater,
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     dynamic_elements_ordering(*left, *right)
                 }
@@ -228,6 +233,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
                 (KnownInstanceType::OrderedDict, _) => Ordering::Less,
                 (_, KnownInstanceType::OrderedDict) => Ordering::Greater,
+
+                (KnownInstanceType::Generic, _) => Ordering::Less,
+                (_, KnownInstanceType::Generic) => Ordering::Greater,
 
                 (KnownInstanceType::Protocol, _) => Ordering::Less,
                 (_, KnownInstanceType::Protocol) => Ordering::Greater,
@@ -363,7 +371,10 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
 
-        (DynamicType::TodoProtocol, _) => Ordering::Less,
-        (_, DynamicType::TodoProtocol) => Ordering::Greater,
+        (DynamicType::SubscriptedGeneric, _) => Ordering::Less,
+        (_, DynamicType::SubscriptedGeneric) => Ordering::Greater,
+
+        (DynamicType::SubscriptedProtocol, _) => Ordering::Less,
+        (_, DynamicType::SubscriptedProtocol) => Ordering::Greater,
     }
 }

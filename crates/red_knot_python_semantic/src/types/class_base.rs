@@ -14,6 +14,8 @@ use itertools::Either;
 pub enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(ClassType<'db>),
+    Protocol,
+    Generic,
 }
 
 impl<'db> ClassBase<'db> {
@@ -41,6 +43,8 @@ impl<'db> ClassBase<'db> {
                     ClassBase::Class(ClassType::Generic(alias)) => {
                         write!(f, "<class '{}'>", alias.display(self.db))
                     }
+                    ClassBase::Protocol => f.write_str("typing.Protocol"),
+                    ClassBase::Generic => f.write_str("typing.Generic"),
                 }
             }
         }
@@ -158,7 +162,8 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
-                KnownInstanceType::Protocol => Some(ClassBase::Dynamic(DynamicType::TodoProtocol)),
+                KnownInstanceType::Protocol => Some(ClassBase::Protocol),
+                KnownInstanceType::Generic => Some(ClassBase::Generic),
             },
         }
     }
@@ -166,17 +171,19 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::Dynamic(_) => None,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol => None,
         }
     }
 
     /// Iterate over the MRO of this base
-    pub(super) fn mro(
-        self,
-        db: &'db dyn Db,
-    ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
+    pub(super) fn mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            ClassBase::Dynamic(_) => Either::Left([self, ClassBase::object(db)].into_iter()),
+            ClassBase::Dynamic(_) | ClassBase::Generic => {
+                Either::Left(Either::Left([self, ClassBase::object(db)].into_iter()))
+            }
+            ClassBase::Protocol => Either::Left(Either::Right(
+                [self, ClassBase::Generic, ClassBase::object(db)].into_iter(),
+            )),
             ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
         }
     }
@@ -193,6 +200,8 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Class(class) => class.into(),
+            ClassBase::Protocol => Type::KnownInstance(KnownInstanceType::Protocol),
+            ClassBase::Generic => Type::KnownInstance(KnownInstanceType::Generic),
         }
     }
 }

@@ -478,7 +478,11 @@ impl<'db> Type<'db> {
 
     pub fn contains_todo(&self, db: &'db dyn Db) -> bool {
         match self {
-            Self::Dynamic(DynamicType::Todo(_) | DynamicType::TodoProtocol) => true,
+            Self::Dynamic(
+                DynamicType::Todo(_)
+                | DynamicType::SubscriptedProtocol
+                | DynamicType::SubscriptedGeneric,
+            ) => true,
 
             Self::AlwaysFalsy
             | Self::AlwaysTruthy
@@ -517,7 +521,11 @@ impl<'db> Type<'db> {
             }
 
             Self::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
-                SubclassOfInner::Dynamic(DynamicType::Todo(_) | DynamicType::TodoProtocol) => true,
+                SubclassOfInner::Dynamic(
+                    DynamicType::Todo(_)
+                    | DynamicType::SubscriptedProtocol
+                    | DynamicType::SubscriptedGeneric,
+                ) => true,
                 SubclassOfInner::Dynamic(DynamicType::Unknown | DynamicType::Any) => false,
                 SubclassOfInner::Class(_) => false,
             },
@@ -534,10 +542,18 @@ impl<'db> Type<'db> {
             Self::BoundSuper(bound_super) => {
                 matches!(
                     bound_super.pivot_class(db),
-                    ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoProtocol)
+                    ClassBase::Dynamic(
+                        DynamicType::Todo(_)
+                            | DynamicType::SubscriptedGeneric
+                            | DynamicType::SubscriptedProtocol
+                    )
                 ) || matches!(
                     bound_super.owner(db),
-                    SuperOwnerKind::Dynamic(DynamicType::Todo(_) | DynamicType::TodoProtocol)
+                    SuperOwnerKind::Dynamic(
+                        DynamicType::Todo(_)
+                            | DynamicType::SubscriptedGeneric
+                            | DynamicType::SubscriptedProtocol
+                    )
                 )
             }
 
@@ -3761,7 +3777,9 @@ impl<'db> Type<'db> {
             }
 
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).signatures(db),
+                SubclassOfInner::Dynamic(dynamic_type) => {
+                    Type::Dynamic(dynamic_type).signatures(db)
+                }
                 // Most type[] constructor calls are handled by `try_call_constructor` and not via
                 // getting the signature here. This signature can still be used in some cases (e.g.
                 // evaluating callable subtyping). TODO improve this definition (intersection of
@@ -4329,6 +4347,10 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
                 }),
+                KnownInstanceType::Generic => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
+                    fallback_type: Type::unknown(),
+                }),
 
                 KnownInstanceType::Literal
                 | KnownInstanceType::Union
@@ -4782,9 +4804,12 @@ pub enum DynamicType {
     ///
     /// This variant should be created with the `todo_type!` macro.
     Todo(TodoType),
-    /// Temporary type until we support protocols. We use a separate variant (instead of `Todo(…)`)
-    /// in order to be able to match on them explicitly.
-    TodoProtocol,
+    /// Temporary type until we support generic protocols.
+    /// We use a separate variant (instead of `Todo(…)`) in order to be able to match on them explicitly.
+    SubscriptedProtocol,
+    /// Temporary type until we support old-style generics.
+    /// We use a separate variant (instead of `Todo(…)`) in order to be able to match on them explicitly.
+    SubscriptedGeneric,
 }
 
 impl std::fmt::Display for DynamicType {
@@ -4795,8 +4820,13 @@ impl std::fmt::Display for DynamicType {
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
-            DynamicType::TodoProtocol => f.write_str(if cfg!(debug_assertions) {
-                "@Todo(protocol)"
+            DynamicType::SubscriptedProtocol => f.write_str(if cfg!(debug_assertions) {
+                "@Todo(`Protocol[]` subscript)"
+            } else {
+                "@Todo"
+            }),
+            DynamicType::SubscriptedGeneric => f.write_str(if cfg!(debug_assertions) {
+                "@Todo(`Generic[]` subscript)"
             } else {
                 "@Todo"
             }),
@@ -4908,8 +4938,10 @@ enum InvalidTypeExpression<'db> {
     RequiresArguments(Type<'db>),
     /// Some types always require at least two arguments when used in a type expression
     RequiresTwoArguments(Type<'db>),
-    /// The `Protocol` type is invalid in type expressions
+    /// The `Protocol` class is invalid in type expressions
     Protocol,
+    /// Same for `Generic`
+    Generic,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
     TypeQualifier(KnownInstanceType<'db>),
@@ -4947,6 +4979,9 @@ impl<'db> InvalidTypeExpression<'db> {
                     ),
                     InvalidTypeExpression::Protocol => f.write_str(
                         "`typing.Protocol` is not allowed in type expressions"
+                    ),
+                    InvalidTypeExpression::Generic => f.write_str(
+                        "`typing.Generic` is not allowed in type expressions"
                     ),
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
