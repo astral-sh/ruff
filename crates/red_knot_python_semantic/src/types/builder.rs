@@ -51,6 +51,67 @@ enum UnionElement<'db> {
     Type(Type<'db>),
 }
 
+impl<'db> UnionElement<'db> {
+    /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
+    ///
+    /// If this `UnionElement` is a group of literals, filter the literals present if needed and
+    /// return `ReduceResult::KeepIf` with a boolean value indicating whether the remaining group
+    /// of literals should be kept in the union
+    ///
+    /// If this `UnionElement` is some other type, return `ReduceResult::Type` so `UnionBuilder`
+    /// can perform more complex checks on it.
+    fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
+        // `AlwaysTruthy` and `AlwaysFalsy` are the only types which can be a supertype of only
+        // _some_ literals of the same kind, so we need to walk the full set in this case.
+        let needs_filter = matches!(other_type, Type::AlwaysTruthy | Type::AlwaysFalsy);
+        match self {
+            UnionElement::IntLiterals(literals) => {
+                ReduceResult::KeepIf(if needs_filter {
+                    literals.retain(|literal| {
+                        !Type::IntLiteral(*literal).is_subtype_of(db, other_type)
+                    });
+                    !literals.is_empty()
+                } else {
+                    // SAFETY: All `UnionElement` literal kinds must always be non-empty
+                    !Type::IntLiteral(literals[0]).is_subtype_of(db, other_type)
+                })
+            }
+            UnionElement::StringLiterals(literals) => {
+                ReduceResult::KeepIf(if needs_filter {
+                    literals.retain(|literal| {
+                        !Type::StringLiteral(*literal).is_subtype_of(db, other_type)
+                    });
+                    !literals.is_empty()
+                } else {
+                    // SAFETY: All `UnionElement` literal kinds must always be non-empty
+                    !Type::StringLiteral(literals[0]).is_subtype_of(db, other_type)
+                })
+            }
+            UnionElement::BytesLiterals(literals) => {
+                ReduceResult::KeepIf(if needs_filter {
+                    literals.retain(|literal| {
+                        !Type::BytesLiteral(*literal).is_subtype_of(db, other_type)
+                    });
+                    !literals.is_empty()
+                } else {
+                    // SAFETY: All `UnionElement` literal kinds must always be non-empty
+                    !Type::BytesLiteral(literals[0]).is_subtype_of(db, other_type)
+                })
+            }
+            UnionElement::Type(existing) => ReduceResult::Type(*existing),
+        }
+    }
+}
+
+enum ReduceResult<'db> {
+    /// Reduction of this `UnionElement` is complete; keep it in the union if the nested
+    /// boolean is true, eliminate it from the union if false.
+    KeepIf(bool),
+    /// The given `Type` can stand-in for the entire `UnionElement` for further union
+    /// simplification checks.
+    Type(Type<'db>),
+}
+
 // TODO increase this once we extend `UnionElement` throughout all union/intersection
 // representations, so that we can make large unions of literals fast in all operations.
 const MAX_UNION_LITERALS: usize = 200;
@@ -197,27 +258,17 @@ impl<'db> UnionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 let ty_negated = ty.negate(self.db);
 
-                for (index, element) in self
-                    .elements
-                    .iter()
-                    .map(|element| {
-                        // For literals, the first element in the set can stand in for all the rest,
-                        // since they all have the same super-types. SAFETY: a `UnionElement` of
-                        // literal kind must always have at least one element in it.
-                        match element {
-                            UnionElement::IntLiterals(literals) => Type::IntLiteral(literals[0]),
-                            UnionElement::StringLiterals(literals) => {
-                                Type::StringLiteral(literals[0])
+                for (index, element) in self.elements.iter_mut().enumerate() {
+                    let element_type = match element.try_reduce(self.db, ty) {
+                        ReduceResult::KeepIf(keep) => {
+                            if !keep {
+                                to_remove.push(index);
                             }
-                            UnionElement::BytesLiterals(literals) => {
-                                Type::BytesLiteral(literals[0])
-                            }
-                            UnionElement::Type(ty) => *ty,
+                            continue;
                         }
-                    })
-                    .enumerate()
-                {
-                    if Some(element) == bool_pair {
+                        ReduceResult::Type(ty) => ty,
+                    };
+                    if Some(element_type) == bool_pair {
                         to_add = KnownClass::Bool.to_instance(self.db);
                         to_remove.push(index);
                         // The type we are adding is a BooleanLiteral, which doesn't have any
@@ -227,14 +278,14 @@ impl<'db> UnionBuilder<'db> {
                         break;
                     }
 
-                    if ty.is_same_gradual_form(element)
-                        || ty.is_subtype_of(self.db, element)
-                        || element.is_object(self.db)
+                    if ty.is_same_gradual_form(element_type)
+                        || ty.is_subtype_of(self.db, element_type)
+                        || element_type.is_object(self.db)
                     {
                         return;
-                    } else if element.is_subtype_of(self.db, ty) {
+                    } else if element_type.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
-                    } else if ty_negated.is_subtype_of(self.db, element) {
+                    } else if ty_negated.is_subtype_of(self.db, element_type) {
                         // We add `ty` to the union. We just checked that `~ty` is a subtype of an existing `element`.
                         // This also means that `~ty | ty` is a subtype of `element | ty`, because both elements in the
                         // first union are subtypes of the corresponding elements in the second union. But `~ty | ty` is
