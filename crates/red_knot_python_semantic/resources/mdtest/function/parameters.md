@@ -1,10 +1,5 @@
 # Function parameter types
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 Within a function scope, the declared type of each parameter is its annotated type (or Unknown if
 not annotated). The initial inferred type is the union of the declared type with the type of the
 default value expression (if any). If both are fully static types, this union should simplify to the
@@ -80,6 +75,11 @@ def g(x: Any = "foo"):
 ```
 
 ## Stub functions
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ### In Protocol
 

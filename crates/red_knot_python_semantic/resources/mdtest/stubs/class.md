@@ -1,11 +1,11 @@
 # Class definitions in stubs
 
+## Cyclical class definition
+
 ```toml
 [environment]
 python-version = "3.12"
 ```
-
-## Cyclical class definition
 
 In type stubs, classes can reference themselves in their base class definitions. For example, in
 `typeshed`, we have `class str(Sequence[str]): ...`.

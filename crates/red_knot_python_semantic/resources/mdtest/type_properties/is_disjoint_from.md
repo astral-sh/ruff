@@ -1,10 +1,5 @@
 # Disjointness relation
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 Two types `S` and `T` are disjoint if their intersection `S & T` is empty (equivalent to `Never`).
 This means that it is known that no possible runtime object inhabits both types simultaneously.
 
@@ -250,6 +245,11 @@ static_assert(is_disjoint_from(Intersection[LiteralString, Not[AlwaysFalsy]], No
 ```
 
 ### Class, module and function literals
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from types import ModuleType, FunctionType

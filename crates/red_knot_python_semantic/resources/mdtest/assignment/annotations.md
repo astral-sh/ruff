@@ -1,10 +1,5 @@
 # Assignment with annotations
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ## Annotation only transparent to local inference
 
 ```py
@@ -29,6 +24,11 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not
 ```
 
 ## Tuple annotations are understood
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 `module.py`:
 

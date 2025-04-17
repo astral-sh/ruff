@@ -1,10 +1,5 @@
 # Narrowing for checks involving `type(x)`
 
-```toml
-[environment]
-python-version = "3.13"
-```
-
 ## `type(x) is C`
 
 ```py
@@ -115,6 +110,11 @@ def _(x: A | B):
 ```
 
 ## Narrowing for generic classes
+
+```toml
+[environment]
+python-version = "3.13"
+```
 
 Note that `type` returns the runtime class of an object, which does _not_ include specializations in
 the case of a generic class. (The typevars are erased.) That means we cannot narrow the type to the

@@ -1,10 +1,5 @@
 # Dataclasses
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ## Basic
 
 Decorating a class with `@dataclass` is a convenient way to add special methods such as `__init__`,
@@ -154,6 +149,11 @@ Derived("a")
 ```
 
 ## Generic dataclasses
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from dataclasses import dataclass

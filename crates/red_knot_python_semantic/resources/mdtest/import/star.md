@@ -1,10 +1,5 @@
 # Wildcard (`*`) imports
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 See the [Python language reference for import statements].
 
 ## Basic functionality
@@ -126,6 +121,11 @@ from c import Y  # error: [unresolved-import]
 ```
 
 ## Esoteric definitions and redefinintions
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 We understand all public symbols defined in an external module as being imported by a `*` import,
 not just those that are defined in `StmtAssign` nodes and `StmtAnnAssign` nodes. This section

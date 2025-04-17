@@ -1,10 +1,5 @@
 # Metaclasses
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ## Default
 
 ```py
@@ -222,6 +217,11 @@ reveal_type(A.__class__)  # revealed: type[Unknown]
 ```
 
 ## PEP 695 generic
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 class M(type): ...
