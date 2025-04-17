@@ -1,5 +1,3 @@
-# Metaclasses
-
 ## Default
 
 ```py
