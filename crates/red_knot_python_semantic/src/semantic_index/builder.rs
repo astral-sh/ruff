@@ -568,16 +568,23 @@ impl<'db> SemanticIndexBuilder<'db> {
         id
     }
 
+    /// Constructs a visibility constraint id without recording it
+    fn visibility_constraint_id(
+        &mut self,
+        predicate: Predicate<'db>,
+    ) -> ScopedVisibilityConstraintId {
+        let predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
+        self.current_visibility_constraints_mut()
+            .add_atom(predicate_id)
+    }
+
     /// Records a visibility constraint by applying it to all live bindings and declarations.
     #[must_use = "A visibility constraint must always be negated after it is added"]
     fn record_visibility_constraint(
         &mut self,
         predicate: Predicate<'db>,
     ) -> ScopedVisibilityConstraintId {
-        let predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-        let id = self
-            .current_visibility_constraints_mut()
-            .add_atom(predicate_id);
+        let id = self.visibility_constraint_id(predicate);
         self.record_visibility_constraint_id(id);
         id
     }
@@ -1595,28 +1602,26 @@ where
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-                    self.record_reachability_constraint(match_predicate);
+                    let vis_constraint_id = self.record_reachability_constraint(match_predicate);
 
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
                         let guard_expr = self.add_standalone_expression(guard);
                         self.visit_expr(guard);
-                        let post_match_success = self.flow_snapshot();
+                        let post_guard_eval = self.flow_snapshot();
                         let predicate = Predicate {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
                         };
                         self.record_negated_narrowing_constraint(predicate);
                         let match_success_guard_failure = self.flow_snapshot();
-                        self.flow_restore(post_match_success);
+                        self.flow_restore(post_guard_eval);
                         self.record_narrowing_constraint(predicate);
                         match_success_guard_failure
                     });
 
+                    self.record_visibility_constraint_id(vis_constraint_id);
+
                     self.visit_body(&case.body);
-                    for id in &vis_constraints {
-                        self.record_negated_visibility_constraint(*id);
-                    }
-                    let vis_constraint_id = self.record_visibility_constraint(match_predicate);
                     vis_constraints.push(vis_constraint_id);
 
                     post_case_snapshots.push(self.flow_snapshot());
@@ -1624,23 +1629,23 @@ where
                     if i != cases.len() - 1 || !has_catchall {
                         // We need to restore the state after each case, but not after the last
                         // one. The last one will just become the state that we merge the other
-                        // snapshots into. (If there's no catch-all, we'll add an implied one
-                        // below, so this can't be the last case.)
+                        // snapshots into.
                         self.flow_restore(no_case_matched.clone());
                         self.record_negated_narrowing_constraint(match_predicate);
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
+                        } else {
+                            assert!(case.guard.is_none());
                         }
-                        no_case_matched = self.flow_snapshot();
+                    } else {
+                        debug_assert!(match_success_guard_failure.is_none());
+                        debug_assert!(case.guard.is_none());
                     }
-                }
 
-                // If there is no final wildcard match case, pretend there is one. This is similar to how
-                // we add an implicit `else` block in if-elif chains, in case it's not present.
-                if !has_catchall {
                     for id in &vis_constraints {
                         self.record_negated_visibility_constraint(*id);
                     }
+                    no_case_matched = self.flow_snapshot();
                 }
 
                 for post_clause_state in post_case_snapshots {
