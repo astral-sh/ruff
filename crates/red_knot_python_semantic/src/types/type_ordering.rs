@@ -79,6 +79,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::DataclassDecorator(_), _) => Ordering::Less,
         (_, Type::DataclassDecorator(_)) => Ordering::Greater,
 
+        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => {
+            left.bits().cmp(&right.bits())
+        }
+        (Type::DataclassTransformer(_), _) => Ordering::Less,
+        (_, Type::DataclassTransformer(_)) => Ordering::Greater,
+
         (Type::Callable(left), Type::Callable(right)) => {
             debug_assert_eq!(*left, left.normalized(db));
             debug_assert_eq!(*right, right.normalized(db));

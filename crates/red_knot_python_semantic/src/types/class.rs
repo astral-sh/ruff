@@ -10,7 +10,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters};
-use crate::types::{CallableType, DataclassMetadata, Signature};
+use crate::types::{CallableType, DataclassParams, DataclassTransformerParams, Signature};
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
@@ -106,7 +106,8 @@ pub struct Class<'db> {
 
     pub(crate) known: Option<KnownClass>,
 
-    pub(crate) dataclass_metadata: Option<DataclassMetadata>,
+    pub(crate) dataclass_params: Option<DataclassParams>,
+    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
 }
 
 impl<'db> Class<'db> {
@@ -469,8 +470,8 @@ impl<'db> ClassLiteralType<'db> {
         self.class(db).known
     }
 
-    pub(crate) fn dataclass_metadata(self, db: &'db dyn Db) -> Option<DataclassMetadata> {
-        self.class(db).dataclass_metadata
+    pub(crate) fn dataclass_params(self, db: &'db dyn Db) -> Option<DataclassParams> {
+        self.class(db).dataclass_params
     }
 
     /// Return `true` if this class represents `known_class`
@@ -699,6 +700,7 @@ impl<'db> ClassLiteralType<'db> {
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         self.try_metaclass(db)
+            .map(|(ty, _)| ty)
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
@@ -712,7 +714,10 @@ impl<'db> ClassLiteralType<'db> {
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     #[salsa::tracked]
-    pub(super) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
+    pub(super) fn try_metaclass(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
         let class = self.class(db);
         tracing::trace!("ClassLiteralType::try_metaclass: {}", class.name);
 
@@ -723,7 +728,7 @@ impl<'db> ClassLiteralType<'db> {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
-            return Ok(SubclassOfType::subclass_of_unknown());
+            return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
         let explicit_metaclass = self.explicit_metaclass(db);
@@ -768,7 +773,7 @@ impl<'db> ClassLiteralType<'db> {
                 }),
             };
 
-            return return_ty_result.map(|ty| ty.to_meta_type(db));
+            return return_ty_result.map(|ty| (ty.to_meta_type(db), None));
         };
 
         // Reconcile all base classes' metaclasses with the candidate metaclass.
@@ -805,7 +810,10 @@ impl<'db> ClassLiteralType<'db> {
             });
         }
 
-        Ok(candidate.metaclass.into())
+        Ok((
+            candidate.metaclass.into(),
+            candidate.metaclass.class(db).dataclass_transformer_params,
+        ))
     }
 
     /// Returns the class member of this class named `name`.
@@ -969,12 +977,8 @@ impl<'db> ClassLiteralType<'db> {
         });
 
         if symbol.symbol.is_unbound() {
-            if let Some(metadata) = self.dataclass_metadata(db) {
-                if let Some(dataclass_member) =
-                    self.own_dataclass_member(db, specialization, metadata, name)
-                {
-                    return Symbol::bound(dataclass_member).into();
-                }
+            if let Some(dataclass_member) = self.own_dataclass_member(db, specialization, name) {
+                return Symbol::bound(dataclass_member).into();
             }
         }
 
@@ -986,70 +990,97 @@ impl<'db> ClassLiteralType<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-        metadata: DataclassMetadata,
         name: &str,
     ) -> Option<Type<'db>> {
-        if name == "__init__" && metadata.contains(DataclassMetadata::INIT) {
-            let mut parameters = vec![];
+        let params = self.dataclass_params(db);
+        let has_dataclass_param = |param| params.is_some_and(|params| params.contains(param));
 
-            for (name, (mut attr_ty, mut default_ty)) in self.dataclass_fields(db, specialization) {
-                // The descriptor handling below is guarded by this fully-static check, because dynamic
-                // types like `Any` are valid (data) descriptors: since they have all possible attributes,
-                // they also have a (callable) `__set__` method. The problem is that we can't determine
-                // the type of the value parameter this way. Instead, we want to use the dynamic type
-                // itself in this case, so we skip the special descriptor handling.
-                if attr_ty.is_fully_static(db) {
-                    let dunder_set = attr_ty.class_member(db, "__set__".into());
-                    if let Some(dunder_set) = dunder_set.symbol.ignore_possibly_unbound() {
-                        // This type of this attribute is a data descriptor. Instead of overwriting the
-                        // descriptor attribute, data-classes will (implicitly) call the `__set__` method
-                        // of the descriptor. This means that the synthesized `__init__` parameter for
-                        // this attribute is determined by possible `value` parameter types with which
-                        // the `__set__` method can be called. We build a union of all possible options
-                        // to account for possible overloads.
-                        let mut value_types = UnionBuilder::new(db);
-                        for signature in &dunder_set.signatures(db) {
-                            for overload in signature {
-                                if let Some(value_param) = overload.parameters().get_positional(2) {
-                                    value_types = value_types.add(
-                                        value_param.annotated_type().unwrap_or_else(Type::unknown),
-                                    );
-                                } else if overload.parameters().is_gradual() {
-                                    value_types = value_types.add(Type::unknown());
+        match name {
+            "__init__" => {
+                let has_synthesized_dunder_init = has_dataclass_param(DataclassParams::INIT)
+                    || self
+                        .try_metaclass(db)
+                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some());
+
+                if !has_synthesized_dunder_init {
+                    return None;
+                }
+
+                let mut parameters = vec![];
+
+                for (name, (mut attr_ty, mut default_ty)) in
+                    self.dataclass_fields(db, specialization)
+                {
+                    // The descriptor handling below is guarded by this fully-static check, because dynamic
+                    // types like `Any` are valid (data) descriptors: since they have all possible attributes,
+                    // they also have a (callable) `__set__` method. The problem is that we can't determine
+                    // the type of the value parameter this way. Instead, we want to use the dynamic type
+                    // itself in this case, so we skip the special descriptor handling.
+                    if attr_ty.is_fully_static(db) {
+                        let dunder_set = attr_ty.class_member(db, "__set__".into());
+                        if let Some(dunder_set) = dunder_set.symbol.ignore_possibly_unbound() {
+                            // This type of this attribute is a data descriptor. Instead of overwriting the
+                            // descriptor attribute, data-classes will (implicitly) call the `__set__` method
+                            // of the descriptor. This means that the synthesized `__init__` parameter for
+                            // this attribute is determined by possible `value` parameter types with which
+                            // the `__set__` method can be called. We build a union of all possible options
+                            // to account for possible overloads.
+                            let mut value_types = UnionBuilder::new(db);
+                            for signature in &dunder_set.signatures(db) {
+                                for overload in signature {
+                                    if let Some(value_param) =
+                                        overload.parameters().get_positional(2)
+                                    {
+                                        value_types = value_types.add(
+                                            value_param
+                                                .annotated_type()
+                                                .unwrap_or_else(Type::unknown),
+                                        );
+                                    } else if overload.parameters().is_gradual() {
+                                        value_types = value_types.add(Type::unknown());
+                                    }
                                 }
                             }
-                        }
-                        attr_ty = value_types.build();
+                            attr_ty = value_types.build();
 
-                        // The default value of the attribute is *not* determined by the right hand side
-                        // of the class-body assignment. Instead, the runtime invokes `__get__` on the
-                        // descriptor, as if it had been called on the class itself, i.e. it passes `None`
-                        // for the `instance` argument.
+                            // The default value of the attribute is *not* determined by the right hand side
+                            // of the class-body assignment. Instead, the runtime invokes `__get__` on the
+                            // descriptor, as if it had been called on the class itself, i.e. it passes `None`
+                            // for the `instance` argument.
 
-                        if let Some(ref mut default_ty) = default_ty {
-                            *default_ty = default_ty
-                                .try_call_dunder_get(db, Type::none(db), Type::ClassLiteral(self))
-                                .map(|(return_ty, _)| return_ty)
-                                .unwrap_or_else(Type::unknown);
+                            if let Some(ref mut default_ty) = default_ty {
+                                *default_ty = default_ty
+                                    .try_call_dunder_get(
+                                        db,
+                                        Type::none(db),
+                                        Type::ClassLiteral(self),
+                                    )
+                                    .map(|(return_ty, _)| return_ty)
+                                    .unwrap_or_else(Type::unknown);
+                            }
                         }
                     }
+
+                    let mut parameter =
+                        Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
+
+                    if let Some(default_ty) = default_ty {
+                        parameter = parameter.with_default_type(default_ty);
+                    }
+
+                    parameters.push(parameter);
                 }
 
-                let mut parameter =
-                    Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
+                let init_signature =
+                    Signature::new(Parameters::new(parameters), Some(Type::none(db)));
 
-                if let Some(default_ty) = default_ty {
-                    parameter = parameter.with_default_type(default_ty);
-                }
-
-                parameters.push(parameter);
+                Some(Type::Callable(CallableType::single(db, init_signature)))
             }
+            "__lt__" | "__le__" | "__gt__" | "__ge__" => {
+                if !has_dataclass_param(DataclassParams::ORDER) {
+                    return None;
+                }
 
-            let init_signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
-
-            return Some(Type::Callable(CallableType::single(db, init_signature)));
-        } else if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__") {
-            if metadata.contains(DataclassMetadata::ORDER) {
                 let signature = Signature::new(
                     Parameters::new([Parameter::positional_or_keyword(Name::new_static("other"))
                         // TODO: could be `Self`.
@@ -1059,11 +1090,17 @@ impl<'db> ClassLiteralType<'db> {
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
-                return Some(Type::Callable(CallableType::single(db, signature)));
+                Some(Type::Callable(CallableType::single(db, signature)))
             }
+            _ => None,
         }
+    }
 
-        None
+    fn is_dataclass(self, db: &'db dyn Db) -> bool {
+        self.dataclass_params(db).is_some()
+            || self
+                .try_metaclass(db)
+                .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
     }
 
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
@@ -1079,7 +1116,7 @@ impl<'db> ClassLiteralType<'db> {
             .filter_map(|superclass| {
                 if let Some(class) = superclass.into_class() {
                     let class_literal = class.class_literal(db).0;
-                    if class_literal.dataclass_metadata(db).is_some() {
+                    if class_literal.is_dataclass(db) {
                         Some(class_literal)
                     } else {
                         None
