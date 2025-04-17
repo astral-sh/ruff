@@ -137,8 +137,6 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 S = TypeVar("S")
 
-# TODO: no error
-# error: [invalid-base]
 class Legacy(Generic[T]):
     def m(self, x: T, y: S) -> S:
         return y
@@ -177,8 +175,6 @@ def f(x: T) -> None:
     # TODO: error
     y: list[S] = []
 
-# TODO: no error
-# error: [invalid-base]
 class C(Generic[T]):
     # TODO: error
     x: list[S] = []

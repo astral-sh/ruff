@@ -132,8 +132,7 @@ class Fine(Protocol, object): ...
 
 reveal_type(Fine.__mro__)  # revealed: tuple[Literal[Fine], typing.Protocol, typing.Generic, Literal[object]]
 
-# TODO: should not error
-class StillFine(Protocol, Generic[T], object): ...  # error: [invalid-base]
+class StillFine(Protocol, Generic[T], object): ...
 class EvenThis[T](Protocol, object): ...
 ```
 

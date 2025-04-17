@@ -75,8 +75,8 @@ reveal_type(ListSubclass.__mro__)
 
 class DictSubclass(typing.Dict): ...
 
-# TODO: should have `Generic`, should not have `Unknown`
-# revealed: tuple[Literal[DictSubclass], Literal[dict], Unknown, Literal[object]]
+# TODO
+# revealed: tuple[Literal[DictSubclass], Literal[dict], Literal[MutableMapping], Literal[Mapping], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), @Todo(`Generic[]` subscript), Literal[object]]
 reveal_type(DictSubclass.__mro__)
 
 class SetSubclass(typing.Set): ...
@@ -95,8 +95,8 @@ reveal_type(FrozenSetSubclass.__mro__)
 
 class ChainMapSubclass(typing.ChainMap): ...
 
-# TODO: Should be (ChainMapSubclass, ChainMap, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[ChainMapSubclass], Literal[ChainMap], Unknown, Literal[object]]
+# TODO
+# revealed: tuple[Literal[ChainMapSubclass], Literal[ChainMap], Literal[MutableMapping], Literal[Mapping], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), @Todo(`Generic[]` subscript), Literal[object]]
 reveal_type(ChainMapSubclass.__mro__)
 
 class CounterSubclass(typing.Counter): ...

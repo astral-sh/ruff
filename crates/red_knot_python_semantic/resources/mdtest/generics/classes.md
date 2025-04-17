@@ -45,15 +45,14 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
-# TODO: no error
-# error: [invalid-base]
 class C(Generic[T]): ...
 ```
 
 A class that inherits from a generic class, and fills its type parameters with typevars, is generic.
 
 ```py
-class D(C[T]): ...
+# TODO: no error
+class D(C[T]): ...  # error: [non-subscriptable]
 ```
 
 (Examples `E` and `F` from above do not have analogues in the legacy syntax.)

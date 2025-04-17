@@ -2505,6 +2505,7 @@ impl<'db> KnownInstanceType<'db> {
             "Counter" => Self::Counter,
             "ChainMap" => Self::ChainMap,
             "OrderedDict" => Self::OrderedDict,
+            "Generic" => Self::Generic,
             "Protocol" => Self::Protocol,
             "Optional" => Self::Optional,
             "Union" => Self::Union,

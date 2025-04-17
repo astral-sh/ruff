@@ -1,5 +1,4 @@
 use itertools::Either;
-use subclass_of::SubclassOfInner;
 
 use std::slice::Iter;
 use std::str::FromStr;
@@ -27,7 +26,7 @@ pub(crate) use self::infer::{
 };
 pub(crate) use self::narrow::KnownConstraintFunction;
 pub(crate) use self::signatures::{CallableSignature, Signature, Signatures};
-pub(crate) use self::subclass_of::SubclassOfType;
+pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 use crate::module_name::ModuleName;
 use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
