@@ -520,14 +520,23 @@ static_assert(is_equivalent_to(SupportsClass, SupportsStr))  # error: [static-as
 static_assert(is_equivalent_to(SupportsClass, object))  # error: [static-assert-error]
 ```
 
-A protocol can never be assignable to (or a subtype of) any nominal type other than `object`, however:
+If a protocol contains members that are not defined on `object`, then that protocol will (like all
+types in Python) still be assignable to `object`, but `object` will not be assignable to that
+protocol:
 
 ```py
-static_assert(is_assignable_to(UniversalSet, object))
-static_assert(is_subtype_of(UniversalSet, object))
-
 static_assert(is_assignable_to(HasX, object))
 static_assert(is_subtype_of(HasX, object))
+static_assert(not is_assignable_to(object, HasX))
+static_assert(not is_subtype_of(object, HasX))
+```
+
+But `object` is the *only* fully static nominal type that a protocol type can ever be assignable
+to or a subtype of:
+
+```py
+static_assert(not is_assignable_to(HasX, Foo))
+static_assert(not is_subtype_of(HasX, Foo))
 ```
 
 ## Equivalence of protocols
@@ -602,16 +611,16 @@ could always provide additional methods or attributes that would lead to it sati
 from typing import final
 from knot_extensions import is_disjoint_from
 
-class NotFinal: ...
+class NotFinalNominal: ...
 
 @final
-class Final: ...
+class FinalNominal: ...
 
-static_assert(not is_disjoint_from(NotFinal, HasX))
-static_assert(is_disjoint_from(Final, HasX))
+static_assert(not is_disjoint_from(NotFinalNominal, HasX))
+static_assert(is_disjoint_from(FinalNominal, HasX))
 
-def _(arg1: Intersection[HasX, NotFinal], arg2: Intersection[HasX, Final]):
-    reveal_type(arg1)  # revealed: HasX & NotFinal
+def _(arg1: Intersection[HasX, NotFinalNominal], arg2: Intersection[HasX, FinalNominal]):
+    reveal_type(arg1)  # revealed: HasX & NotFinalNominal
     reveal_type(arg2)  # revealed: Never
 ```
 
