@@ -7188,28 +7188,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .unwrap_or(Type::unknown())
             }
             Type::ClassLiteral(ClassLiteralType::NonGeneric(_)) => {
+                // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
+                // specialize a non-generic class.
                 self.infer_type_expression(slice);
-                self.context.report_lint_old(
-                    &INVALID_TYPE_FORM,
-                    subscript,
-                    format_args!("Cannot specialize a non-generic class"),
-                );
                 Type::unknown()
             }
             Type::StringLiteral(_) => {
-                // No diagnostic yet, since we haven't determined the type of the deferred string
-                // annotation yet.
+                // Don't emit a diagnostic, since we haven't determined the type of the deferred
+                // string annotation yet.
                 self.infer_type_expression(slice);
                 Type::unknown()
             }
             _ => {
+                // TODO: Emit a diagnostic once we've implemented all valid subscript type
+                // expressions.
                 self.infer_type_expression(slice);
-                self.context.report_lint_old(
-                    &INVALID_TYPE_FORM,
-                    subscript,
-                    format_args!("Invalid subscript expression in type expression"),
-                );
-                Type::unknown()
+                todo_type!("unknown type subscript")
             }
         }
     }

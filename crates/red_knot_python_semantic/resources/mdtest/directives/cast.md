@@ -45,17 +45,12 @@ diagnostics.
 ```py
 from typing import Callable
 
-# TODO: no error
-# error: [invalid-type-form] "Cannot specialize a non-generic class"
-# error: [invalid-type-form] "Cannot specialize a non-generic class"
 def f(x: Callable[[dict[str, int]], None], y: tuple[dict[str, int]]):
     # TODO: no error
     # error: [redundant-cast]
-    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     a = cast(Callable[[list[bytes]], None], x)
     # TODO: no error
     # error: [redundant-cast]
-    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     b = cast(tuple[list[bytes]], y)
 ```
 
@@ -69,8 +64,6 @@ an invalid annotation, missing annotation or missing type argument somewhere.
 from knot_extensions import Unknown
 
 def f(x: Any, y: Unknown, z: Any | str | int):
-    # TODO: no error
-    # error: [invalid-type-form] "Cannot specialize a non-generic class"
     a = cast(dict[str, Any], x)
     reveal_type(a)  # revealed: Unknown
 

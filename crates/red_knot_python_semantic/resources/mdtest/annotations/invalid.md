@@ -74,7 +74,6 @@ def _(
     o: 1 < 2,  # error: [invalid-type-form] "Comparison expressions are not allowed in type expressions"
     p: bar(),  # error: [invalid-type-form] "Function calls are not allowed in type expressions"
     q: int | f"foo",  # error: [invalid-type-form] "F-strings are not allowed in type expressions"
-    # error: [invalid-type-form] "Invalid subscript expression in type expression"
     # error: [invalid-type-form] "Slices are not allowed in type expressions"
     r: [1, 2, 3][1:2],
 ):
@@ -91,7 +90,7 @@ def _(
     reveal_type(k)  # revealed: Unknown
     reveal_type(p)  # revealed: Unknown
     reveal_type(q)  # revealed: int | Unknown
-    reveal_type(r)  # revealed: Unknown
+    reveal_type(r)  # revealed: @Todo(unknown type subscript)
 ```
 
 ## Invalid Collection based AST nodes
