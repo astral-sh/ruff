@@ -37,6 +37,10 @@
 # derives:
 # List of derives to add to the syntax node struct. Clone, Debug, PartialEq are added by default.
 #
+# custom_source_order:
+# A boolean that specifies if this node has a custom source order visitor implementation.
+# generation of visit_source_order will be skipped for this node.
+#
 # fields:
 # List of fields in the syntax node struct. Each field is a table with the
 # following keys:
@@ -48,6 +52,10 @@
 #    * `Expr*` - A vector of Expr.
 #    * `&Expr*` - A boxed slice of Expr.
 #    These properties cannot be nested, for example we cannot create a vector of option types.
+# * is_annotation - If this field is a type annotation.
+#
+# source_order:
+# Defines in what order the fields appear in source
 #
 # variant:
 #   The name of the enum variant for this syntax node.  Defaults to the node
@@ -57,9 +65,13 @@
 anynode_is_label = "module"
 doc = "See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)"
 
-[Mod.nodes]
-ModModule = {}
-ModExpression = {}
+[Mod.nodes.ModModule]
+doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
+fields = [{ name = "body", type = "Stmt*" }]
+
+[Mod.nodes.ModExpression]
+doc = "See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)"
+fields = [{ name = "body", type = "Box<Expr>" }]
 
 [Stmt]
 add_suffix_to_is_methods = true
@@ -77,8 +89,7 @@ fields = [
   { name = "name", type = "Identifier" },
   { name = "type_params", type = "Box<crate::TypeParams>?" },
   { name = "parameters", type = "Box<crate::Parameters>" },
-
-  { name = "returns", type = "Expr?" },
+  { name = "returns", type = "Expr?", is_annotation = true },
   { name = "body", type = "Stmt*" },
 ]
 
@@ -127,7 +138,7 @@ fields = [
 doc = "See also [AnnAssign](https://docs.python.org/3/library/ast.html#ast.AnnAssign)"
 fields = [
   { name = "target", type = "Expr" },
-  { name = "annotation", type = "Expr" },
+  { name = "annotation", type = "Expr", is_annotation = true },
   { name = "value", type = "Expr?" },
   { name = "simple", type = "bool" },
 ]
@@ -305,6 +316,7 @@ doc = "See also [expr](https://docs.python.org/3/library/ast.html#ast.expr)"
 [Expr.nodes.ExprBoolOp]
 doc = "See also [BoolOp](https://docs.python.org/3/library/ast.html#ast.BoolOp)"
 fields = [{ name = "op", type = "BoolOp" }, { name = "values", type = "Expr*" }]
+custom_source_order = true
 
 [Expr.nodes.ExprNamed]
 doc = "See also [NamedExpr](https://docs.python.org/3/library/ast.html#ast.NamedExpr)"
@@ -339,10 +351,12 @@ fields = [
   { name = "body", type = "Expr" },
   { name = "orelse", type = "Expr" },
 ]
+source_order = ["body", "test", "orelse"]
 
 [Expr.nodes.ExprDict]
 doc = "See also [Dict](https://docs.python.org/3/library/ast.html#ast.Dict)"
 fields = [{ name = "items", type = "DictItem*" }]
+custom_source_order = true
 
 [Expr.nodes.ExprSet]
 doc = "See also [Set](https://docs.python.org/3/library/ast.html#ast.Set)"
@@ -397,6 +411,8 @@ fields = [
   { name = "ops", type = "&CmpOp*" },
   { name = "comparators", type = "&Expr*" },
 ]
+# The fields must be visited simultaneously
+custom_source_order = true
 
 [Expr.nodes.ExprCall]
 doc = "See also [Call](https://docs.python.org/3/library/ast.html#ast.Call)"
@@ -415,16 +431,21 @@ it keeps them separate and provide various methods to access the parts.
 
 See also [JoinedStr](https://docs.python.org/3/library/ast.html#ast.JoinedStr)"""
 fields = [{ name = "value", type = "FStringValue" }]
+custom_source_order = true
 
 [Expr.nodes.ExprStringLiteral]
 doc = """An AST node that represents either a single-part string literal
 or an implicitly concatenated string literal."""
 fields = [{ name = "value", type = "StringLiteralValue" }]
+# Because StringLiteralValue type is an iterator and it's not clear from the type
+custom_source_order = true
 
 [Expr.nodes.ExprBytesLiteral]
 doc = """An AST node that represents either a single-part bytestring literal
 or an implicitly concatenated bytestring literal."""
 fields = [{ name = "value", type = "BytesLiteralValue" }]
+# Because BytesLiteralValue type is an iterator and it's not clear from the type
+custom_source_order = true
 
 [Expr.nodes.ExprNumberLiteral]
 fields = [{ name = "value", type = "Number" }]

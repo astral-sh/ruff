@@ -1,3 +1,4 @@
+use std::hash::BuildHasherDefault;
 use std::sync::{LazyLock, Mutex};
 
 use super::{
@@ -6,6 +7,7 @@ use super::{
     Type, TypeAliasType, TypeQualifiers, TypeVarInstance,
 };
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::DeclarationWithConstraint;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{CallableType, DataclassMetadata, Signature};
@@ -34,7 +36,9 @@ use itertools::Itertools as _;
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashSet, FxHasher};
+
+type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
 
 fn explicit_bases_cycle_recover<'db>(
     _db: &'db dyn Db,
@@ -287,7 +291,7 @@ impl<'db> ClassType<'db> {
     ) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
-            .class_member(db, specialization, name, policy)
+            .class_member_inner(db, specialization, name, policy)
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
@@ -298,9 +302,9 @@ impl<'db> ClassType<'db> {
     /// directly. Use [`ClassType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
     pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        let (class_literal, _) = self.class_literal(db);
+        let (class_literal, specialization) = self.class_literal(db);
         class_literal
-            .own_class_member(db, name)
+            .own_class_member(db, specialization, name)
             .map_type(|ty| self.specialize_type(db, ty))
     }
 
@@ -376,6 +380,13 @@ impl<'db> ClassLiteralType<'db> {
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.class(db).known == Some(known_class)
+    }
+
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        match self {
+            Self::NonGeneric(_) => None,
+            Self::Generic(generic) => Some(generic.generic_context(db)),
+        }
     }
 
     /// Return `true` if this class represents the builtin class `object`
@@ -698,6 +709,15 @@ impl<'db> ClassLiteralType<'db> {
     pub(super) fn class_member(
         self,
         db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> SymbolAndQualifiers<'db> {
+        self.class_member_inner(db, None, name, policy)
+    }
+
+    fn class_member_inner(
+        self,
+        db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
         policy: MemberLookupPolicy,
@@ -707,6 +727,16 @@ impl<'db> ClassLiteralType<'db> {
             return Symbol::bound(TupleType::from_elements(db, tuple_elements)).into();
         }
 
+        self.class_member_from_mro(db, name, policy, self.iter_mro(db, specialization))
+    }
+
+    pub(super) fn class_member_from_mro(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+        mro_iter: impl Iterator<Item = ClassBase<'db>>,
+    ) -> SymbolAndQualifiers<'db> {
         // If we encounter a dynamic type in this class's MRO, we'll save that dynamic type
         // in this variable. After we've traversed the MRO, we'll either:
         // (1) Use that dynamic type as the type for this attribute,
@@ -718,7 +748,7 @@ impl<'db> ClassLiteralType<'db> {
         let mut lookup_result: LookupResult<'db> =
             Err(LookupError::Unbound(TypeQualifiers::empty()));
 
-        for superclass in self.iter_mro(db, specialization) {
+        for superclass in mro_iter {
             match superclass {
                 ClassBase::Dynamic(DynamicType::TodoProtocol) => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
@@ -790,29 +820,229 @@ impl<'db> ClassLiteralType<'db> {
     /// Returns [`Symbol::Unbound`] if `name` cannot be found in this class's scope
     /// directly. Use [`ClassLiteralType::class_member`] if you require a method that will
     /// traverse through the MRO until it finds the member.
-    pub(super) fn own_class_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        if let Some(metadata) = self.dataclass_metadata(db) {
-            if name == "__init__" {
-                if metadata.contains(DataclassMetadata::INIT) {
-                    // TODO: Generate the signature from the attributes on the class
-                    let init_signature = Signature::new(
-                        Parameters::new([
-                            Parameter::variadic(Name::new_static("args"))
-                                .with_annotated_type(Type::any()),
-                            Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                .with_annotated_type(Type::any()),
-                        ]),
-                        Some(Type::none(db)),
-                    );
+    pub(super) fn own_class_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+    ) -> SymbolAndQualifiers<'db> {
+        let body_scope = self.body_scope(db);
+        let symbol = class_symbol(db, body_scope, name).map_type(|ty| {
+            // The `__new__` and `__init__` members of a non-specialized generic class are handled
+            // specially: they inherit the generic context of their class. That lets us treat them
+            // as generic functions when constructing the class, and infer the specialization of
+            // the class from the arguments that are passed in.
+            //
+            // We might decide to handle other class methods the same way, having them inherit the
+            // class's generic context, and performing type inference on calls to them to determine
+            // the specialization of the class. If we do that, we would update this to also apply
+            // to any method with a `@classmethod` decorator. (`__init__` would remain a special
+            // case, since it's an _instance_ method where we don't yet know the generic class's
+            // specialization.)
+            match (self, ty, specialization, name) {
+                (
+                    ClassLiteralType::Generic(origin),
+                    Type::FunctionLiteral(function),
+                    Some(_),
+                    "__new__" | "__init__",
+                ) => Type::FunctionLiteral(
+                    function.with_generic_context(db, origin.generic_context(db)),
+                ),
+                _ => ty,
+            }
+        });
 
-                    return Symbol::bound(Type::Callable(CallableType::new(db, init_signature)))
-                        .into();
+        if symbol.symbol.is_unbound() {
+            if let Some(metadata) = self.dataclass_metadata(db) {
+                if let Some(dataclass_member) =
+                    self.own_dataclass_member(db, specialization, metadata, name)
+                {
+                    return Symbol::bound(dataclass_member).into();
                 }
             }
         }
 
-        let body_scope = self.body_scope(db);
-        class_symbol(db, body_scope, name)
+        symbol
+    }
+
+    /// Returns the type of a synthesized dataclass member like `__init__` or `__lt__`.
+    fn own_dataclass_member(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        metadata: DataclassMetadata,
+        name: &str,
+    ) -> Option<Type<'db>> {
+        if name == "__init__" && metadata.contains(DataclassMetadata::INIT) {
+            let mut parameters = vec![];
+
+            for (name, (mut attr_ty, mut default_ty)) in self.dataclass_fields(db, specialization) {
+                // The descriptor handling below is guarded by this fully-static check, because dynamic
+                // types like `Any` are valid (data) descriptors: since they have all possible attributes,
+                // they also have a (callable) `__set__` method. The problem is that we can't determine
+                // the type of the value parameter this way. Instead, we want to use the dynamic type
+                // itself in this case, so we skip the special descriptor handling.
+                if attr_ty.is_fully_static(db) {
+                    let dunder_set = attr_ty.class_member(db, "__set__".into());
+                    if let Some(dunder_set) = dunder_set.symbol.ignore_possibly_unbound() {
+                        // This type of this attribute is a data descriptor. Instead of overwriting the
+                        // descriptor attribute, data-classes will (implicitly) call the `__set__` method
+                        // of the descriptor. This means that the synthesized `__init__` parameter for
+                        // this attribute is determined by possible `value` parameter types with which
+                        // the `__set__` method can be called. We build a union of all possible options
+                        // to account for possible overloads.
+                        let mut value_types = UnionBuilder::new(db);
+                        for signature in &dunder_set.signatures(db) {
+                            for overload in signature {
+                                if let Some(value_param) = overload.parameters().get_positional(2) {
+                                    value_types = value_types.add(
+                                        value_param.annotated_type().unwrap_or_else(Type::unknown),
+                                    );
+                                } else if overload.parameters().is_gradual() {
+                                    value_types = value_types.add(Type::unknown());
+                                }
+                            }
+                        }
+                        attr_ty = value_types.build();
+
+                        // The default value of the attribute is *not* determined by the right hand side
+                        // of the class-body assignment. Instead, the runtime invokes `__get__` on the
+                        // descriptor, as if it had been called on the class itself, i.e. it passes `None`
+                        // for the `instance` argument.
+
+                        if let Some(ref mut default_ty) = default_ty {
+                            *default_ty = default_ty
+                                .try_call_dunder_get(db, Type::none(db), Type::ClassLiteral(self))
+                                .map(|(return_ty, _)| return_ty)
+                                .unwrap_or_else(Type::unknown);
+                        }
+                    }
+                }
+
+                let mut parameter =
+                    Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
+
+                if let Some(default_ty) = default_ty {
+                    parameter = parameter.with_default_type(default_ty);
+                }
+
+                parameters.push(parameter);
+            }
+
+            let init_signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+
+            return Some(Type::Callable(CallableType::new(db, init_signature)));
+        } else if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__") {
+            if metadata.contains(DataclassMetadata::ORDER) {
+                let signature = Signature::new(
+                    Parameters::new([Parameter::positional_or_keyword(Name::new_static("other"))
+                        // TODO: could be `Self`.
+                        .with_annotated_type(Type::instance(
+                            self.apply_optional_specialization(db, specialization),
+                        ))]),
+                    Some(KnownClass::Bool.to_instance(db)),
+                );
+
+                return Some(Type::Callable(CallableType::new(db, signature)));
+            }
+        }
+
+        None
+    }
+
+    /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
+    ///
+    /// See [`ClassLiteralType::own_dataclass_fields`] for more details.
+    fn dataclass_fields(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> FxOrderMap<Name, (Type<'db>, Option<Type<'db>>)> {
+        let dataclasses_in_mro: Vec<_> = self
+            .iter_mro(db, specialization)
+            .filter_map(|superclass| {
+                if let Some(class) = superclass.into_class() {
+                    let class_literal = class.class_literal(db).0;
+                    if class_literal.dataclass_metadata(db).is_some() {
+                        Some(class_literal)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            // We need to collect into a `Vec` here because we iterate the MRO in reverse order
+            .collect();
+
+        dataclasses_in_mro
+            .into_iter()
+            .rev()
+            .flat_map(|class| class.own_dataclass_fields(db))
+            // We collect into a FxOrderMap here to deduplicate attributes
+            .collect()
+    }
+
+    /// Returns a list of all annotated attributes defined in the body of this class. This is similar
+    /// to the `__annotations__` attribute at runtime, but also contains default values.
+    ///
+    /// For a class body like
+    /// ```py
+    /// @dataclass
+    /// class C:
+    ///     x: int
+    ///     y: str = "a"
+    /// ```
+    /// we return a map `{"x": (int, None), "y": (str, Some(Literal["a"]))}`.
+    fn own_dataclass_fields(
+        self,
+        db: &'db dyn Db,
+    ) -> FxOrderMap<Name, (Type<'db>, Option<Type<'db>>)> {
+        let mut attributes = FxOrderMap::default();
+
+        let class_body_scope = self.body_scope(db);
+        let table = symbol_table(db, class_body_scope);
+
+        let use_def = use_def_map(db, class_body_scope);
+        for (symbol_id, declarations) in use_def.all_public_declarations() {
+            // Here, we exclude all declarations that are not annotated assignments. We need this because
+            // things like function definitions and nested classes would otherwise be considered dataclass
+            // fields. The check is too broad in the sense that it also excludes (weird) constructs where
+            // a symbol would have multiple declarations, one of which is an annotated assignment. If we
+            // want to improve this, we could instead pass a definition-kind filter to the use-def map
+            // query, or to the `symbol_from_declarations` call below. Doing so would potentially require
+            // us to generate a union of `__init__` methods.
+            if !declarations
+                .clone()
+                .all(|DeclarationWithConstraint { declaration, .. }| {
+                    declaration.is_some_and(|declaration| {
+                        matches!(
+                            declaration.kind(db),
+                            DefinitionKind::AnnotatedAssignment(..)
+                        )
+                    })
+                })
+            {
+                continue;
+            }
+
+            let symbol = table.symbol(symbol_id);
+
+            if let Ok(attr) = symbol_from_declarations(db, declarations) {
+                if attr.is_class_var() {
+                    continue;
+                }
+
+                if let Some(attr_ty) = attr.symbol.ignore_possibly_unbound() {
+                    let bindings = use_def.public_bindings(symbol_id);
+                    let default_ty = symbol_from_bindings(db, bindings).ignore_possibly_unbound();
+
+                    attributes.insert(symbol.name().clone(), (attr_ty, default_ty));
+                }
+            }
+        }
+
+        attributes
     }
 
     /// Returns the `name` attribute of an instance of this class.
@@ -1399,6 +1629,7 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::Super
             | Self::WrapperDescriptorType
             | Self::UnionType
             | Self::MethodWrapperType => Truthiness::AlwaysTrue,
@@ -1437,7 +1668,6 @@ impl<'db> KnownClass {
             | Self::Float
             | Self::Sized
             | Self::Enum
-            | Self::Super
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)

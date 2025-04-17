@@ -64,14 +64,8 @@ to a different type each time.
 def f[T](x: T) -> T:
     return x
 
-# TODO: no error
-# TODO: revealed: int or Literal[1]
-# error: [invalid-argument-type]
-reveal_type(f(1))  # revealed: T
-# TODO: no error
-# TODO: revealed: str or Literal["a"]
-# error: [invalid-argument-type]
-reveal_type(f("a"))  # revealed: T
+reveal_type(f(1))  # revealed: Literal[1]
+reveal_type(f("a"))  # revealed: Literal["a"]
 ```
 
 ## Methods can mention class typevars
@@ -162,10 +156,7 @@ class C[T]:
         return y
 
 c: C[int] = C()
-# TODO: no errors
-# TODO: revealed: str
-# error: [invalid-argument-type]
-reveal_type(c.m(1, "string"))  # revealed: S
+reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
 
 ## Unbound typevars

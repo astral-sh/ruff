@@ -1870,20 +1870,6 @@ reveal_type(Foo.BAR.value)  # revealed: @Todo(Attribute access on enum classes)
 reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes)
 ```
 
-## `super()`
-
-`super()` is not supported yet, but we do not emit false positives on `super()` calls.
-
-```py
-class Foo:
-    def bar(self) -> int:
-        return 42
-
-class Bar(Foo):
-    def bar(self) -> int:
-        return super().bar()
-```
-
 ## References
 
 Some of the tests in the *Class and instance variables* section draw inspiration from

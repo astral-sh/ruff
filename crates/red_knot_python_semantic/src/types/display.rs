@@ -8,11 +8,11 @@ use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class::{ClassType, GenericAlias, GenericClass};
 use crate::types::class_base::ClassBase;
-use crate::types::generics::Specialization;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     InstanceType, IntersectionType, KnownClass, MethodWrapperKind, StringLiteralType, Type,
-    TypeVarInstance, UnionType, WrapperDescriptorKind,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionType, WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -217,6 +217,14 @@ impl Display for DisplayRepresentation<'_> {
             }
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
+            Type::BoundSuper(bound_super) => {
+                write!(
+                    f,
+                    "<super: {pivot}, {owner}>",
+                    pivot = Type::from(bound_super.pivot_class(self.db)).display(self.db),
+                    owner = bound_super.owner(self.db).into_type().display(self.db)
+                )
+            }
         }
     }
 }
@@ -245,6 +253,52 @@ impl Display for DisplayGenericAlias<'_> {
             origin = self.origin.class(self.db).name,
             specialization = self.specialization.display_short(self.db),
         )
+    }
+}
+
+impl<'db> GenericContext<'db> {
+    pub fn display(&'db self, db: &'db dyn Db) -> DisplayGenericContext<'db> {
+        DisplayGenericContext {
+            typevars: self.variables(db),
+            db,
+        }
+    }
+}
+
+pub struct DisplayGenericContext<'db> {
+    typevars: &'db [TypeVarInstance<'db>],
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayGenericContext<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.write_char('[')?;
+        for (idx, var) in self.typevars.iter().enumerate() {
+            if idx > 0 {
+                f.write_str(", ")?;
+            }
+            write!(f, "{}", var.name(self.db))?;
+            match var.bound_or_constraints(self.db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    write!(f, ": {}", bound.display(self.db))?;
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    f.write_str(": (")?;
+                    for (idx, constraint) in constraints.iter(self.db).enumerate() {
+                        if idx > 0 {
+                            f.write_str(", ")?;
+                        }
+                        write!(f, "{}", constraint.display(self.db))?;
+                    }
+                    f.write_char(')')?;
+                }
+                None => {}
+            }
+            if let Some(default_type) = var.default_ty(self.db) {
+                write!(f, " = {}", default_type.display(self.db))?;
+            }
+        }
+        f.write_char(']')
     }
 }
 

@@ -154,23 +154,102 @@ If a typevar does not provide a default, we use `Unknown`:
 reveal_type(C())  # revealed: C[Unknown]
 ```
 
+## Inferring generic class parameters from constructors
+
 If the type of a constructor parameter is a class typevar, we can use that to infer the type
-parameter:
+parameter. The types inferred from a type context and from a constructor parameter must be
+consistent with each other.
+
+## `__new__` only
 
 ```py
-class E[T]:
-    def __init__(self, x: T) -> None: ...
+class C[T]:
+    def __new__(cls, x: T) -> "C"[T]:
+        return object.__new__(cls)
 
-# TODO: revealed: E[int] or E[Literal[1]]
-reveal_type(E(1))  # revealed: E[Unknown]
+reveal_type(C(1))  # revealed: C[Literal[1]]
+
+# TODO: error: [invalid-argument-type]
+wrong_innards: C[int] = C("five")
 ```
 
-The types inferred from a type context and from a constructor parameter must be consistent with each
-other:
+## `__init__` only
 
 ```py
+class C[T]:
+    def __init__(self, x: T) -> None: ...
+
+reveal_type(C(1))  # revealed: C[Literal[1]]
+
 # TODO: error: [invalid-argument-type]
-wrong_innards: E[int] = E("five")
+wrong_innards: C[int] = C("five")
+```
+
+## Identical `__new__` and `__init__` signatures
+
+```py
+class C[T]:
+    def __new__(cls, x: T) -> "C"[T]:
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+reveal_type(C(1))  # revealed: C[Literal[1]]
+
+# TODO: error: [invalid-argument-type]
+wrong_innards: C[int] = C("five")
+```
+
+## Compatible `__new__` and `__init__` signatures
+
+```py
+class C[T]:
+    def __new__(cls, *args, **kwargs) -> "C"[T]:
+        return object.__new__(cls)
+
+    def __init__(self, x: T) -> None: ...
+
+reveal_type(C(1))  # revealed: C[Literal[1]]
+
+# TODO: error: [invalid-argument-type]
+wrong_innards: C[int] = C("five")
+
+class D[T]:
+    def __new__(cls, x: T) -> "D"[T]:
+        return object.__new__(cls)
+
+    def __init__(self, *args, **kwargs) -> None: ...
+
+reveal_type(D(1))  # revealed: D[Literal[1]]
+
+# TODO: error: [invalid-argument-type]
+wrong_innards: D[int] = D("five")
+```
+
+## `__init__` is itself generic
+
+TODO: These do not currently work yet, because we don't correctly model the nested generic contexts.
+
+```py
+class C[T]:
+    def __init__[S](self, x: T, y: S) -> None: ...
+
+# TODO: no error
+# TODO: revealed: C[Literal[1]]
+# error: [invalid-argument-type]
+reveal_type(C(1, 1))  # revealed: C[Unknown]
+# TODO: no error
+# TODO: revealed: C[Literal[1]]
+# error: [invalid-argument-type]
+reveal_type(C(1, "string"))  # revealed: C[Unknown]
+# TODO: no error
+# TODO: revealed: C[Literal[1]]
+# error: [invalid-argument-type]
+reveal_type(C(1, True))  # revealed: C[Unknown]
+
+# TODO: error for the correct reason
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `S`, found `Literal[1]`"
+wrong_innards: C[int] = C("five", 1)
 ```
 
 ## Generic subclass
@@ -205,10 +284,7 @@ class C[T]:
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
 c: C[int] = C[int]()
-# TODO: no error
-# TODO: revealed: str or Literal["string"]
-# error: [invalid-argument-type]
-reveal_type(c.method("string"))  # revealed: U
+reveal_type(c.method("string"))  # revealed: Literal["string"]
 ```
 
 ## Cyclic class definition
