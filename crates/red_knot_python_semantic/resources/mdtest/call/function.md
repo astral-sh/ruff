@@ -21,6 +21,11 @@ reveal_type(get_int_async())  # revealed: @Todo(generic types.CoroutineType)
 
 ## Generic
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 def get_int[T]() -> int:
     return 42

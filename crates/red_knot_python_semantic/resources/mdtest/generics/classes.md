@@ -1,5 +1,10 @@
 # Generic classes
 
+```toml
+[environment]
+python-version = "3.13"
+```
+
 ## PEP 695 syntax
 
 TODO: Add a `red_knot_extension` function that asserts whether a function or class is generic.

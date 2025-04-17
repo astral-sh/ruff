@@ -399,6 +399,11 @@ reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: bound metho
 
 ### Classmethods mixed with other decorators
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 When a `@classmethod` is additionally decorated with another decorator, it is still treated as a
 class method:
 

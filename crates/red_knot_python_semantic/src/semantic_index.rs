@@ -497,11 +497,10 @@ impl FusedIterator for ChildrenIter<'_> {}
 mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_python_ast as ast;
+    use ruff_python_ast::{self as ast};
     use ruff_text_size::{Ranged, TextRange};
 
-    use crate::db::tests::TestDb;
+    use crate::db::tests::{TestDb, TestDbBuilder};
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
     use crate::semantic_index::symbol::{
@@ -528,11 +527,15 @@ mod tests {
         file: File,
     }
 
-    fn test_case(content: impl AsRef<str>) -> TestCase {
-        let mut db = TestDb::new();
-        db.write_file("test.py", content).unwrap();
+    fn test_case(content: &str) -> TestCase {
+        const FILENAME: &str = "test.py";
 
-        let file = system_path_to_file(&db, "test.py").unwrap();
+        let db = TestDbBuilder::new()
+            .with_file(FILENAME, content)
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, FILENAME).unwrap();
 
         TestCase { db, file }
     }

@@ -42,6 +42,11 @@ def static_truthiness(not_one: Not[Literal[1]]) -> None:
 
 ### Intersection
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from knot_extensions import Intersection, Not, is_subtype_of, static_assert
 from typing_extensions import Literal, Never

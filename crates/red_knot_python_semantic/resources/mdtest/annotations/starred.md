@@ -1,5 +1,10 @@
 # Starred expression annotations
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 Type annotations for `*args` can be starred expressions themselves:
 
 ```py

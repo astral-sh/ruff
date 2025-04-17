@@ -149,6 +149,10 @@ impl SourceDb for ProjectDatabase {
     fn files(&self) -> &Files {
         &self.files
     }
+
+    fn python_version(&self) -> ruff_python_ast::PythonVersion {
+        Program::get(self).python_version(self)
+    }
 }
 
 #[salsa::db]
@@ -207,7 +211,7 @@ pub(crate) mod tests {
     use salsa::Event;
 
     use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-    use red_knot_python_semantic::Db as SemanticDb;
+    use red_knot_python_semantic::{Db as SemanticDb, Program};
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
@@ -280,6 +284,10 @@ pub(crate) mod tests {
 
         fn files(&self) -> &Files {
             &self.files
+        }
+
+        fn python_version(&self) -> ruff_python_ast::PythonVersion {
+            Program::get(self).python_version(self)
         }
     }
 

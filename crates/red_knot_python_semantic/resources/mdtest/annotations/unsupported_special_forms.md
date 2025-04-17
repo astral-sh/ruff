@@ -79,6 +79,11 @@ reveal_type(F.__mro__)  # revealed: tuple[Literal[F], @Todo(Support for Callable
 
 ## Subscriptability
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Some of these are not subscriptable:
 
 ```py

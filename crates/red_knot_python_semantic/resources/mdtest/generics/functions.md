@@ -1,5 +1,10 @@
 # Generic functions
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ## Typevar must be used at least twice
 
 If you're only using a typevar for a single parameter, you don't need the typevar — just use

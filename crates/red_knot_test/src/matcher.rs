@@ -343,9 +343,11 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
+    use red_knot_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithWritableSystem as _;
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
@@ -385,6 +387,18 @@ mod tests {
         colored::control::set_override(false);
 
         let mut db = crate::db::Db::setup();
+
+        let settings = ProgramSettings {
+            python_version: PythonVersion::default(),
+            python_platform: PythonPlatform::default(),
+            search_paths: SearchPathSettings::new(Vec::new()),
+        };
+        match Program::try_get(&db) {
+            Some(program) => program.update_from_settings(&mut db, settings),
+            None => Program::from_settings(&db, settings).map(|_| ()),
+        }
+        .expect("Failed to update Program settings in TestDb");
+
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
 

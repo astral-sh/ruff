@@ -246,6 +246,11 @@ static_assert(is_disjoint_from(Intersection[LiteralString, Not[AlwaysFalsy]], No
 
 ### Class, module and function literals
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from types import ModuleType, FunctionType
 from knot_extensions import TypeOf, is_disjoint_from, static_assert

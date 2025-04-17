@@ -26,6 +26,11 @@ def _(never: Never, any_: Any, unknown: Unknown, flag: bool):
 
 ## Use case: Type narrowing and exhaustiveness checking
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 `assert_never` can be used in combination with type narrowing as a way to make sure that all cases
 are handled in a series of `isinstance` checks or other narrowing patterns that are supported.
 

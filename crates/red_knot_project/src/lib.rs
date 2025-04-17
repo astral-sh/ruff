@@ -10,7 +10,8 @@ use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSele
 use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
 use ruff_db::diagnostic::{
-    create_parse_diagnostic, Annotation, Diagnostic, DiagnosticId, Severity, Span,
+    create_parse_diagnostic, create_unsupported_syntax_diagnostic, Annotation, Diagnostic,
+    DiagnosticId, Severity, Span,
 };
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -424,6 +425,13 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
             .map(|error| create_parse_diagnostic(file, error)),
     );
 
+    diagnostics.extend(
+        parsed
+            .unsupported_syntax_errors()
+            .iter()
+            .map(|error| create_unsupported_syntax_diagnostic(file, error)),
+    );
+
     diagnostics.extend(check_types(db.upcast(), file).into_iter().cloned());
 
     diagnostics.sort_unstable_by_key(|diagnostic| {
@@ -520,17 +528,29 @@ mod tests {
     use crate::db::tests::TestDb;
     use crate::{check_file_impl, ProjectMetadata};
     use red_knot_python_semantic::types::check_types;
+    use red_knot_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
+    use ruff_python_ast::PythonVersion;
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
         let project = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
         let mut db = TestDb::new(project);
         let path = SystemPath::new("test.py");
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersion::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")]),
+            },
+        )
+        .expect("Failed to configure program settings");
 
         db.write_file(path, "x = 10")?;
         let file = system_path_to_file(&db, path).unwrap();

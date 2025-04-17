@@ -1,5 +1,10 @@
 # Scoping rules for type variables
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Most of these tests come from the [Scoping rules for type variables][scoping] section of the typing
 spec.
 

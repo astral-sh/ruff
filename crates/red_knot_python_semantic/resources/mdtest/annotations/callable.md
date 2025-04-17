@@ -237,6 +237,11 @@ def _(c: Callable[[Concatenate[int, str, ...], int], int]):
 
 ## Using `typing.ParamSpec`
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Using a `ParamSpec` in a `Callable` annotation:
 
 ```py

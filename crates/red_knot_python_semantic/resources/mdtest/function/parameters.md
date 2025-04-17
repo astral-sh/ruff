@@ -76,6 +76,11 @@ def g(x: Any = "foo"):
 
 ## Stub functions
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ### In Protocol
 
 ```py

@@ -297,6 +297,11 @@ reveal_type(WithoutEq(1) == WithoutEq(2))  # revealed: bool
 
 ### `order`
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 `order` is set to `False` by default. If `order=True`, `__lt__`, `__le__`, `__gt__`, and `__ge__`
 methods will be generated:
 
@@ -470,6 +475,11 @@ reveal_type(C.__init__)  # revealed: (x: int = Literal[15], y: int = Literal[0],
 ```
 
 ## Generic dataclasses
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from dataclasses import dataclass
