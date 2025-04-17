@@ -1,10 +1,5 @@
 # Type API (`knot_extensions`)
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 This document describes the internal `knot_extensions` API for creating and manipulating types as
 well as testing various type system properties.
 
@@ -46,6 +41,11 @@ def static_truthiness(not_one: Not[Literal[1]]) -> None:
 ```
 
 ### Intersection
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from knot_extensions import Intersection, Not, is_subtype_of, static_assert

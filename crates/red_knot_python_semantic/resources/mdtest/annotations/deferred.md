@@ -1,10 +1,5 @@
 # Deferred annotations
 
-```toml
-[environment]
-python-version = "3.12"
-```
-
 ## Deferred annotations in stubs always resolve
 
 `mod.pyi`:
@@ -53,6 +48,11 @@ reveal_type(get_foo())  # revealed: Foo
 
 ## Deferred self-reference annotations in a class definition
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from __future__ import annotations
 
@@ -98,6 +98,11 @@ class Foo:
 ```
 
 ## Non-deferred self-reference annotations in a class definition
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 class Foo:
