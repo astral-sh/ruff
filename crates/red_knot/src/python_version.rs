@@ -3,10 +3,6 @@
 /// TODO: unify with the `PythonVersion` enum in the linter/formatter crates?
 #[derive(Copy, Clone, Hash, Debug, PartialEq, Eq, PartialOrd, Ord, Default, clap::ValueEnum)]
 pub enum PythonVersion {
-    #[value(name = "3.7")]
-    Py37,
-    #[value(name = "3.8")]
-    Py38,
     #[default]
     #[value(name = "3.9")]
     Py39,
@@ -23,8 +19,6 @@ pub enum PythonVersion {
 impl PythonVersion {
     const fn as_str(self) -> &'static str {
         match self {
-            Self::Py37 => "3.7",
-            Self::Py38 => "3.8",
             Self::Py39 => "3.9",
             Self::Py310 => "3.10",
             Self::Py311 => "3.11",
@@ -43,8 +37,6 @@ impl std::fmt::Display for PythonVersion {
 impl From<PythonVersion> for ruff_python_ast::PythonVersion {
     fn from(value: PythonVersion) -> Self {
         match value {
-            PythonVersion::Py37 => Self::PY37,
-            PythonVersion::Py38 => Self::PY38,
             PythonVersion::Py39 => Self::PY39,
             PythonVersion::Py310 => Self::PY310,
             PythonVersion::Py311 => Self::PY311,
