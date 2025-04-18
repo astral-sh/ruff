@@ -147,6 +147,12 @@ enum AttributeKind {
     NormalOrNonDataDescriptor,
 }
 
+impl AttributeKind {
+    const fn is_data(self) -> bool {
+        matches!(self, Self::DataDescriptor)
+    }
+}
+
 /// This enum is used to control the behavior of the descriptor protocol implementation.
 /// When invoked on a class object, the fallback type (a class attribute) can shadow a
 /// non-data descriptor of the meta-type (the class's metaclass). However, this is not
@@ -217,10 +223,24 @@ impl Default for MemberLookupPolicy {
     }
 }
 
-impl AttributeKind {
-    const fn is_data(self) -> bool {
-        matches!(self, Self::DataDescriptor)
-    }
+fn member_lookup_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &SymbolAndQualifiers<'db>,
+    _count: u32,
+    _self: Type<'db>,
+    _name: Name,
+    _policy: MemberLookupPolicy,
+) -> salsa::CycleRecoveryAction<SymbolAndQualifiers<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn member_lookup_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: Type<'db>,
+    _name: Name,
+    _policy: MemberLookupPolicy,
+) -> SymbolAndQualifiers<'db> {
+    Symbol::bound(Type::Never).into()
 }
 
 /// Meta data for `Type::Todo`, which represents a known limitation in red-knot.
@@ -2631,7 +2651,7 @@ impl<'db> Type<'db> {
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
     /// when looking up attributes. See [`MemberLookupPolicy`] for more information.
-    #[salsa::tracked]
+    #[salsa::tracked(cycle_fn=member_lookup_cycle_recover, cycle_initial=member_lookup_cycle_initial)]
     fn member_lookup_with_policy(
         self,
         db: &'db dyn Db,

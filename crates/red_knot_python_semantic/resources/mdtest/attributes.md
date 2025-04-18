@@ -1820,6 +1820,21 @@ def f(never: Never):
     never.another_attribute = never
 ```
 
+### Cyclic implicit attributes
+
+Inferring types for undeclared implicit attributes can be cyclic:
+
+```py
+class C:
+    def __init__(self):
+        self.x = 1
+
+    def copy(self, other: "C"):
+        self.x = other.x
+
+reveal_type(C().x)  # revealed: Unknown | Literal[1]
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
