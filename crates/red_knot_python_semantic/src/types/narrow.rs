@@ -275,7 +275,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 self.evaluate_expression_node_predicate(&unary_op.operand, expression, !is_positive)
             }
             ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression, is_positive),
-            _ => None, // TODO other test expression kinds
+            ast::Expr::Named(expr_named) => self.evaluate_expr_named(expr_named, is_positive),
+            _ => None,
         }
     }
 
@@ -343,6 +344,18 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         NarrowingConstraints::from_iter([(symbol, ty)])
     }
 
+    fn evaluate_expr_named(
+        &mut self,
+        expr_named: &ast::ExprNamed,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        if let ast::Expr::Name(expr_name) = expr_named.target.as_ref() {
+            Some(self.evaluate_expr_name(expr_name, is_positive))
+        } else {
+            None
+        }
+    }
+
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             match rhs_ty {
@@ -365,7 +378,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn evaluate_named_expr_compare(
+    fn evaluate_expr_compare_op(
         &mut self,
         lhs_ty: Type<'db>,
         rhs_ty: Type<'db>,
@@ -466,7 +479,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                     let op = if is_positive { *op } else { op.negate() };
 
-                    if let Some(ty) = self.evaluate_named_expr_compare(lhs_ty, rhs_ty, op) {
+                    if let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op) {
                         constraints.insert(symbol, ty);
                     }
                 }
@@ -480,7 +493,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                         let op = if is_positive { *op } else { op.negate() };
 
-                        if let Some(ty) = self.evaluate_named_expr_compare(lhs_ty, rhs_ty, op) {
+                        if let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op) {
                             constraints.insert(symbol, ty);
                         }
                     }
