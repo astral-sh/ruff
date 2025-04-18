@@ -309,7 +309,9 @@ my_project
 
 When Ruff sees an import like `import foo`, it will then iterate over the `src` directories,
 looking for a corresponding Python module (in reality, a directory named `foo` or a file named
-`foo.py`).
+`foo.py`). For module paths with multiple components like `import foo.bar`,
+the default behavior is to search only for a directory named `foo` or a file
+named `foo.py`. However, if `preview` is enabled, Ruff will require that the full relative path `foo/bar` exists as a directory, or that `foo/bar.py` or `foo/bar.pyi` exist as files. Finally, imports of the form `from foo import bar`, Ruff will only use `foo` when determining whether a module is first-party or third-party. 
 
 If the `src` field is omitted, Ruff will default to using the "project root", along with a `"src"`
 subdirectory, as the first-party sources, to support both flat and nested project layouts.
