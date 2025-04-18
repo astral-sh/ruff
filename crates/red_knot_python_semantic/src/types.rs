@@ -5958,11 +5958,11 @@ pub struct FunctionLiteral<'db> {
     /// The scope that's created by the function, in which the function body is evaluated.
     body_scope: ScopeId<'db>,
 
+    /// The scope containing the PEP 695 type parameters in the function definition, if any.
+    type_params_scope: Option<ScopeId<'db>>,
+
     /// A set of special decorators that were applied to this function
     decorators: FunctionDecorators,
-
-    /// The generic context of a generic function.
-    generic_context: Option<GenericContext<'db>>,
 
     /// A specialization that should be applied to the function's parameter and return types,
     /// either because the function is itself generic, or because it appears in the body of a
@@ -5974,6 +5974,19 @@ pub struct FunctionLiteral<'db> {
 impl<'db> FunctionLiteral<'db> {
     fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.decorators(db).contains(decorator)
+    }
+
+    /// Constructs a [`GenericContext`] from this function's PEP 695 type parameters, if any.
+    fn type_params_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        self.type_params_scope(db).map(|scope| {
+            let index = semantic_index(db, scope.file(db));
+            let function_stmt_node = scope.node(db).expect_function();
+            let type_params = function_stmt_node
+                .type_params
+                .as_ref()
+                .expect("type params should be present");
+            GenericContext::from_type_params(db, index, type_params)
+        })
     }
 
     /// Typed externally-visible signature for this function.
@@ -6054,7 +6067,11 @@ impl<'db> FunctionLiteral<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
         let definition = self.definition(db);
-        Signature::from_function(db, self.generic_context(db), definition, function_stmt_node)
+        let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
+            let index = semantic_index(db, scope.file(db));
+            GenericContext::from_type_params(db, index, type_params)
+        });
+        Signature::from_function(db, generic_context, definition, function_stmt_node)
     }
 
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
