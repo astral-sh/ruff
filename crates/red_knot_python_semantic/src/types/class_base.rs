@@ -191,7 +191,7 @@ impl<'db> ClassBase<'db> {
                 ClassBase::Dynamic(DynamicType::SubscriptedGeneric),
             ),
             ClassBase::Dynamic(_) | ClassBase::Generic => ClassBaseMroIterator::length_2(db, self),
-            ClassBase::Class(class) => ClassBaseMroIterator::unknown_length(db, class),
+            ClassBase::Class(class) => ClassBaseMroIterator::from_class(db, class),
         }
     }
 }
@@ -223,7 +223,7 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
 enum ClassBaseMroIterator<'db> {
     Length2(core::array::IntoIter<ClassBase<'db>, 2>),
     Length3(core::array::IntoIter<ClassBase<'db>, 3>),
-    UnknownLength(MroIterator<'db>),
+    FromClass(MroIterator<'db>),
 }
 
 impl<'db> ClassBaseMroIterator<'db> {
@@ -233,19 +233,13 @@ impl<'db> ClassBaseMroIterator<'db> {
     }
 
     /// Iterate over an MRO of length 3 that consists of `first_element`, then `second_element`, then `object`.
-    fn length_3(
-        db: &'db dyn Db,
-        first_element: ClassBase<'db>,
-        second_element: ClassBase<'db>,
-    ) -> Self {
-        ClassBaseMroIterator::Length3(
-            [first_element, second_element, ClassBase::object(db)].into_iter(),
-        )
+    fn length_3(db: &'db dyn Db, element_1: ClassBase<'db>, element_2: ClassBase<'db>) -> Self {
+        ClassBaseMroIterator::Length3([element_1, element_2, ClassBase::object(db)].into_iter())
     }
 
     /// Iterate over the MRO of an arbitrary class. The MRO may be of any length.
-    fn unknown_length(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        ClassBaseMroIterator::UnknownLength(class.iter_mro(db))
+    fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        ClassBaseMroIterator::FromClass(class.iter_mro(db))
     }
 }
 
@@ -256,7 +250,7 @@ impl<'db> Iterator for ClassBaseMroIterator<'db> {
         match self {
             Self::Length2(iter) => iter.next(),
             Self::Length3(iter) => iter.next(),
-            Self::UnknownLength(iter) => iter.next(),
+            Self::FromClass(iter) => iter.next(),
         }
     }
 }
