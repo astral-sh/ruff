@@ -20,7 +20,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 reveal_type(type(T))  # revealed: Literal[TypeVar]
-reveal_type(T)  # revealed: T
+reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 

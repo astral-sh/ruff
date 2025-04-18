@@ -4283,6 +4283,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         | KnownClass::Object
                         | KnownClass::Property
                         | KnownClass::Super
+                        | KnownClass::TypeVar
                 )
             )
         {
