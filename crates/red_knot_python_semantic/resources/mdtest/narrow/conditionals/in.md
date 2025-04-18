@@ -78,3 +78,17 @@ def _(x: Literal[1, "a", "b", "c", "d"]):
     else:
         reveal_type(x)  # revealed: Literal[1, "d"]
 ```
+
+## Assignment expressions
+
+```py
+from typing import Literal
+
+def f() -> Literal[1, 2, 3]:
+    return 1
+
+if (x := f()) in (1,):
+    reveal_type(x)  # revealed: Literal[1]
+else:
+    reveal_type(x)  # revealed: Literal[2, 3]
+```

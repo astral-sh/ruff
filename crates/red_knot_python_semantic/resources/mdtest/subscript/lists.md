@@ -12,13 +12,13 @@ x = [1, 2, 3]
 reveal_type(x)  # revealed: list
 
 # TODO reveal int
-reveal_type(x[0])  # revealed: @Todo(return type of overloaded function)
+reveal_type(x[0])  # revealed: Unknown | @Todo(Support for `typing.TypeVar` instances in type expressions)
 
 # TODO reveal list
-reveal_type(x[0:1])  # revealed: @Todo(return type of overloaded function)
+reveal_type(x[0:1])  # revealed: @Todo(generics)
 
-# TODO error
-reveal_type(x["a"])  # revealed: @Todo(return type of overloaded function)
+# error: [call-non-callable]
+reveal_type(x["a"])  # revealed: Unknown
 ```
 
 ## Assignments within list assignment
@@ -29,9 +29,11 @@ In assignment, we might also have a named assignment. This should also get type 
 x = [1, 2, 3]
 x[0 if (y := 2) else 1] = 5
 
-# TODO error? (indeterminite index type)
+# TODO: better error than "method `__getitem__` not callable on type `list`"
+# error: [call-non-callable]
 x["a" if (y := 2) else 1] = 6
 
-# TODO error (can't index via string)
+# TODO: better error than "method `__getitem__` not callable on type `list`"
+# error: [call-non-callable]
 x["a" if (y := 2) else "b"] = 6
 ```

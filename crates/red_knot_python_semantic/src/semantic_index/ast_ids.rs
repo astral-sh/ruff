@@ -58,6 +58,13 @@ pub trait HasScopedUseId {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId;
 }
 
+impl HasScopedUseId for ast::Identifier {
+    fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
+        let ast_ids = ast_ids(db, scope);
+        ast_ids.use_id(self)
+    }
+}
+
 impl HasScopedUseId for ast::ExprName {
     fn scoped_use_id(&self, db: &dyn Db, scope: ScopeId) -> ScopedUseId {
         let expression_ref = ExprRef::from(self);
@@ -157,7 +164,7 @@ impl AstIdsBuilder {
     }
 
     /// Adds `expr` to the use ids map and returns its id.
-    pub(super) fn record_use(&mut self, expr: &ast::Expr) -> ScopedUseId {
+    pub(super) fn record_use(&mut self, expr: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         let use_id = self.uses_map.len().into();
 
         self.uses_map.insert(expr.into(), use_id);
@@ -193,6 +200,12 @@ pub(crate) mod node_key {
 
     impl From<&ast::Expr> for ExpressionNodeKey {
         fn from(value: &ast::Expr) -> Self {
+            Self(NodeKey::from_node(value))
+        }
+    }
+
+    impl From<&ast::Identifier> for ExpressionNodeKey {
+        fn from(value: &ast::Identifier) -> Self {
             Self(NodeKey::from_node(value))
         }
     }

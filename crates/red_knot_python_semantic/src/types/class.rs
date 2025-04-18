@@ -935,7 +935,7 @@ impl<'db> ClassLiteralType<'db> {
 
             let init_signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
 
-            return Some(Type::Callable(CallableType::new(db, init_signature)));
+            return Some(Type::Callable(CallableType::single(db, init_signature)));
         } else if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__") {
             if metadata.contains(DataclassMetadata::ORDER) {
                 let signature = Signature::new(
@@ -947,7 +947,7 @@ impl<'db> ClassLiteralType<'db> {
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
-                return Some(Type::Callable(CallableType::new(db, signature)));
+                return Some(Type::Callable(CallableType::single(db, signature)));
             }
         }
 

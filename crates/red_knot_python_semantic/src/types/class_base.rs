@@ -19,7 +19,7 @@ pub enum ClassBase<'db> {
     Protocol,
     /// Bare `Generic` cannot be subclassed directly in user code,
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
-    /// `Protocol[T]`, or bare `Protcool`.
+    /// `Protocol[T]`, or bare `Protocol`.
     Generic,
 }
 

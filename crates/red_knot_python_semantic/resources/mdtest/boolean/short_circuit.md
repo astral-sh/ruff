@@ -43,7 +43,7 @@ if True and (x := 1):
 
 ```py
 def _(flag: bool):
-    flag or (x := 1) or reveal_type(x)  # revealed: Literal[1]
+    flag or (x := 1) or reveal_type(x)  # revealed: Never
 
     # error: [unresolved-reference]
     flag or reveal_type(y) or (y := 1)  # revealed: Unknown

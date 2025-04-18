@@ -1115,6 +1115,17 @@ where
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
                 let (symbol, _) = self.add_symbol(name.id.clone());
+
+                // Record a use of the function name in the scope that it is defined in, so that it
+                // can be used to find previously defined functions with the same name. This is
+                // used to collect all the overloaded definitions of a function. This needs to be
+                // done on the `Identifier` node as opposed to `ExprName` because that's what the
+                // AST uses.
+                self.mark_symbol_used(symbol);
+                let use_id = self.current_ast_ids().record_use(name);
+                self.current_use_def_map_mut()
+                    .record_use(symbol, use_id, NodeKey::from_node(name));
+
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {
@@ -1572,54 +1583,76 @@ where
                     return;
                 }
 
-                let after_subject = self.flow_snapshot();
-                let mut vis_constraints = vec![];
-                let mut post_case_snapshots = vec![];
-                for (i, case) in cases.iter().enumerate() {
-                    if i != 0 {
-                        post_case_snapshots.push(self.flow_snapshot());
-                        self.flow_restore(after_subject.clone());
-                    }
+                let mut no_case_matched = self.flow_snapshot();
 
+                let has_catchall = cases
+                    .last()
+                    .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard());
+
+                let mut post_case_snapshots = vec![];
+                let mut match_predicate;
+
+                for (i, case) in cases.iter().enumerate() {
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
-                    let predicate = self.add_pattern_narrowing_constraint(
+                    // unlike in [Stmt::If], we don't reset [no_case_matched]
+                    // here because the effects of visiting a pattern is binding
+                    // symbols, and this doesn't occur unless the pattern
+                    // actually matches
+                    match_predicate = self.add_pattern_narrowing_constraint(
                         subject_expr,
                         &case.pattern,
                         case.guard.as_deref(),
                     );
-                    self.record_reachability_constraint(predicate);
-                    if let Some(expr) = &case.guard {
-                        self.visit_expr(expr);
-                    }
+                    let vis_constraint_id = self.record_reachability_constraint(match_predicate);
+
+                    let match_success_guard_failure = case.guard.as_ref().map(|guard| {
+                        let guard_expr = self.add_standalone_expression(guard);
+                        self.visit_expr(guard);
+                        let post_guard_eval = self.flow_snapshot();
+                        let predicate = Predicate {
+                            node: PredicateNode::Expression(guard_expr),
+                            is_positive: true,
+                        };
+                        self.record_negated_narrowing_constraint(predicate);
+                        let match_success_guard_failure = self.flow_snapshot();
+                        self.flow_restore(post_guard_eval);
+                        self.record_narrowing_constraint(predicate);
+                        match_success_guard_failure
+                    });
+
+                    self.record_visibility_constraint_id(vis_constraint_id);
+
                     self.visit_body(&case.body);
-                    for id in &vis_constraints {
-                        self.record_negated_visibility_constraint(*id);
-                    }
-                    let vis_constraint_id = self.record_visibility_constraint(predicate);
-                    vis_constraints.push(vis_constraint_id);
-                }
 
-                // If there is no final wildcard match case, pretend there is one. This is similar to how
-                // we add an implicit `else` block in if-elif chains, in case it's not present.
-                if !cases
-                    .last()
-                    .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard())
-                {
                     post_case_snapshots.push(self.flow_snapshot());
-                    self.flow_restore(after_subject.clone());
 
-                    for id in &vis_constraints {
-                        self.record_negated_visibility_constraint(*id);
+                    if i != cases.len() - 1 || !has_catchall {
+                        // We need to restore the state after each case, but not after the last
+                        // one. The last one will just become the state that we merge the other
+                        // snapshots into.
+                        self.flow_restore(no_case_matched.clone());
+                        self.record_negated_narrowing_constraint(match_predicate);
+                        if let Some(match_success_guard_failure) = match_success_guard_failure {
+                            self.flow_merge(match_success_guard_failure);
+                        } else {
+                            assert!(case.guard.is_none());
+                        }
+                    } else {
+                        debug_assert!(match_success_guard_failure.is_none());
+                        debug_assert!(case.guard.is_none());
                     }
+
+                    self.record_negated_visibility_constraint(vis_constraint_id);
+                    no_case_matched = self.flow_snapshot();
                 }
 
                 for post_clause_state in post_case_snapshots {
                     self.flow_merge(post_clause_state);
                 }
 
-                self.simplify_visibility_constraints(after_subject);
+                self.simplify_visibility_constraints(no_case_matched);
             }
             ast::Stmt::Try(ast::StmtTry {
                 body,
