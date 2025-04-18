@@ -339,12 +339,12 @@ impl<'db> PropertyInstanceType<'db> {
 }
 
 bitflags! {
-    /// Used as the return type of `dataclass(…)` calls. Keeps track of the arguments
+    /// Used for the return type of `dataclass(…)` calls. Keeps track of the arguments
     /// that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/dataclasses.html
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct DataclassMetadata: u16 {
+    pub struct DataclassParams: u16 {
         const INIT = 0b0000_0000_0001;
         const REPR = 0b0000_0000_0010;
         const EQ = 0b0000_0000_0100;
@@ -358,9 +358,54 @@ bitflags! {
     }
 }
 
-impl Default for DataclassMetadata {
+impl Default for DataclassParams {
     fn default() -> Self {
         Self::INIT | Self::REPR | Self::EQ | Self::MATCH_ARGS
+    }
+}
+
+impl DataclassParams {
+    fn from_transformer_params(params: DataclassTransformerParams) -> Self {
+        let mut result = Self::default();
+
+        result.set(
+            Self::EQ,
+            params.contains(DataclassTransformerParams::EQ_DEFAULT),
+        );
+        result.set(
+            Self::ORDER,
+            params.contains(DataclassTransformerParams::ORDER_DEFAULT),
+        );
+        result.set(
+            Self::KW_ONLY,
+            params.contains(DataclassTransformerParams::KW_ONLY_DEFAULT),
+        );
+        result.set(
+            Self::FROZEN,
+            params.contains(DataclassTransformerParams::FROZEN_DEFAULT),
+        );
+
+        result
+    }
+}
+
+bitflags! {
+    /// Used for the return type of `dataclass_transform(…)` calls. Keeps track of the
+    /// arguments that were passed in. For the precise meaning of the fields, see [1].
+    ///
+    /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+    pub struct DataclassTransformerParams: u8 {
+        const EQ_DEFAULT = 0b0000_0001;
+        const ORDER_DEFAULT = 0b0000_0010;
+        const KW_ONLY_DEFAULT = 0b0000_0100;
+        const FROZEN_DEFAULT = 0b0000_1000;
+    }
+}
+
+impl Default for DataclassTransformerParams {
+    fn default() -> Self {
+        Self::EQ_DEFAULT
     }
 }
 
@@ -404,7 +449,9 @@ pub enum Type<'db> {
     /// A special callable that is returned by a `dataclass(…)` call. It is usually
     /// used as a decorator. Note that this is only used as a return type for actual
     /// `dataclass` calls, not for the argumentless `@dataclass` decorator.
-    DataclassDecorator(DataclassMetadata),
+    DataclassDecorator(DataclassParams),
+    /// A special callable that is returned by a `dataclass_transform(…)` call.
+    DataclassTransformer(DataclassTransformerParams),
     /// The type of an arbitrary callable object with a certain specified signature.
     Callable(CallableType<'db>),
     /// A specific module object
@@ -524,7 +571,8 @@ impl<'db> Type<'db> {
             | Self::BoundMethod(_)
             | Self::WrapperDescriptor(_)
             | Self::MethodWrapper(_)
-            | Self::DataclassDecorator(_) => false,
+            | Self::DataclassDecorator(_)
+            | Self::DataclassTransformer(_) => false,
 
             Self::GenericAlias(generic) => generic
                 .specialization(db)
@@ -837,7 +885,8 @@ impl<'db> Type<'db> {
             | Type::MethodWrapper(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
-            | Self::DataclassDecorator(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::KnownInstance(_)
@@ -1073,7 +1122,7 @@ impl<'db> Type<'db> {
                 self_callable.is_subtype_of(db, other_callable)
             }
 
-            (Type::DataclassDecorator(_), _) => {
+            (Type::DataclassDecorator(_) | Type::DataclassTransformer(_), _) => {
                 // TODO: Implement subtyping using an equivalent `Callable` type.
                 false
             }
@@ -1623,6 +1672,7 @@ impl<'db> Type<'db> {
                 | Type::MethodWrapper(..)
                 | Type::WrapperDescriptor(..)
                 | Type::DataclassDecorator(..)
+                | Type::DataclassTransformer(..)
                 | Type::IntLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::StringLiteral(..)
@@ -1639,6 +1689,7 @@ impl<'db> Type<'db> {
                 | Type::MethodWrapper(..)
                 | Type::WrapperDescriptor(..)
                 | Type::DataclassDecorator(..)
+                | Type::DataclassTransformer(..)
                 | Type::IntLiteral(..)
                 | Type::SliceLiteral(..)
                 | Type::StringLiteral(..)
@@ -1833,8 +1884,14 @@ impl<'db> Type<'db> {
                 true
             }
 
-            (Type::Callable(_) | Type::DataclassDecorator(_), _)
-            | (_, Type::Callable(_) | Type::DataclassDecorator(_)) => {
+            (
+                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+                _,
+            )
+            | (
+                _,
+                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+            ) => {
                 // TODO: Implement disjointness for general callable type with other types
                 false
             }
@@ -1897,6 +1954,7 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
             | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(..)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
@@ -2028,7 +2086,7 @@ impl<'db> Type<'db> {
                 // (this variant represents `f.__get__`, where `f` is any function)
                 false
             }
-            Type::DataclassDecorator(_) => false,
+            Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => false,
             Type::Instance(InstanceType { class }) => {
                 class.known(db).is_some_and(KnownClass::is_singleton)
             }
@@ -2121,7 +2179,8 @@ impl<'db> Type<'db> {
             | Type::AlwaysFalsy
             | Type::Callable(_)
             | Type::PropertyInstance(_)
-            | Type::DataclassDecorator(_) => false,
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_) => false,
         }
     }
 
@@ -2257,6 +2316,7 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
             | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::KnownInstance(_)
             | Type::AlwaysTruthy
@@ -2352,7 +2412,9 @@ impl<'db> Type<'db> {
             Type::DataclassDecorator(_) => KnownClass::FunctionType
                 .to_instance(db)
                 .instance_member(db, name),
-            Type::Callable(_) => KnownClass::Object.to_instance(db).instance_member(db, name),
+            Type::Callable(_) | Type::DataclassTransformer(_) => {
+                KnownClass::Object.to_instance(db).instance_member(db, name)
+            }
 
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 None => KnownClass::Object.to_instance(db).instance_member(db, name),
@@ -2769,7 +2831,7 @@ impl<'db> Type<'db> {
             Type::DataclassDecorator(_) => KnownClass::FunctionType
                 .to_instance(db)
                 .member_lookup_with_policy(db, name, policy),
-            Type::Callable(_) => KnownClass::Object
+            Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Object
                 .to_instance(db)
                 .member_lookup_with_policy(db, name, policy),
 
@@ -3075,6 +3137,7 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
             | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::SliceLiteral(_)
             | Type::AlwaysTruthy => Truthiness::AlwaysTrue,
@@ -3382,6 +3445,15 @@ impl<'db> Type<'db> {
                 ))
             }
 
+            Type::DataclassTransformer(_) => Signatures::single(CallableSignature::single(
+                self,
+                Signature::new(
+                    Parameters::new([Parameter::positional_only(Some(Name::new_static("func")))
+                        .with_annotated_type(Type::object(db))]),
+                    None,
+                ),
+            )),
+
             Type::FunctionLiteral(function_type) => match function_type.known(db) {
                 Some(
                     KnownFunction::IsEquivalentTo
@@ -3495,8 +3567,7 @@ impl<'db> Type<'db> {
                                 Parameters::new([Parameter::positional_only(Some(
                                     Name::new_static("cls"),
                                 ))
-                                // TODO: type[_T]
-                                .with_annotated_type(Type::any())]),
+                                .with_annotated_type(KnownClass::Type.to_instance(db))]),
                                 None,
                             ),
                             // TODO: make this overload Python-version-dependent
@@ -4284,6 +4355,7 @@ impl<'db> Type<'db> {
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
             | Type::Instance(_)
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
@@ -4354,6 +4426,7 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(_)
             | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
             | Type::Never
             | Type::FunctionLiteral(_)
             | Type::BoundSuper(_)
@@ -4569,7 +4642,7 @@ impl<'db> Type<'db> {
             Type::MethodWrapper(_) => KnownClass::MethodWrapperType.to_class_literal(db),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
             Type::DataclassDecorator(_) => KnownClass::FunctionType.to_class_literal(db),
-            Type::Callable(_) => KnownClass::Type.to_instance(db),
+            Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Type.to_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
 
@@ -4709,6 +4782,7 @@ impl<'db> Type<'db> {
             | Type::WrapperDescriptor(_)
             | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
             | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             // A non-generic class never needs to be specialized. A generic class is specialized
             // explicitly (via a subscript expression) or implicitly (via a call), and not because
@@ -4815,6 +4889,7 @@ impl<'db> Type<'db> {
             | Self::MethodWrapper(_)
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
+            | Self::DataclassTransformer(_)
             | Self::PropertyInstance(_)
             | Self::BoundSuper(_)
             | Self::Tuple(_) => self.to_meta_type(db).definition(db),
@@ -5878,6 +5953,10 @@ pub struct FunctionType<'db> {
     /// A set of special decorators that were applied to this function
     decorators: FunctionDecorators,
 
+    /// The arguments to `dataclass_transformer`, if this function was annotated
+    /// with `@dataclass_transformer(...)`.
+    dataclass_transformer_params: Option<DataclassTransformerParams>,
+
     /// The generic context of a generic function.
     generic_context: Option<GenericContext<'db>>,
 
@@ -6014,6 +6093,7 @@ impl<'db> FunctionType<'db> {
             self.known(db),
             self.body_scope(db),
             self.decorators(db),
+            self.dataclass_transformer_params(db),
             Some(generic_context),
             self.specialization(db),
         )
@@ -6030,6 +6110,7 @@ impl<'db> FunctionType<'db> {
             self.known(db),
             self.body_scope(db),
             self.decorators(db),
+            self.dataclass_transformer_params(db),
             self.generic_context(db),
             Some(specialization),
         )
@@ -6074,6 +6155,8 @@ pub enum KnownFunction {
     GetProtocolMembers,
     /// `typing(_extensions).runtime_checkable`
     RuntimeCheckable,
+    /// `typing(_extensions).dataclass_transform`
+    DataclassTransform,
 
     /// `abc.abstractmethod`
     #[strum(serialize = "abstractmethod")]
@@ -6138,6 +6221,7 @@ impl KnownFunction {
             | Self::IsProtocol
             | Self::GetProtocolMembers
             | Self::RuntimeCheckable
+            | Self::DataclassTransform
             | Self::NoTypeCheck => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
@@ -7511,6 +7595,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsProtocol
                 | KnownFunction::GetProtocolMembers
                 | KnownFunction::RuntimeCheckable
+                | KnownFunction::DataclassTransform
                 | KnownFunction::NoTypeCheck => KnownModule::TypingExtensions,
 
                 KnownFunction::IsSingleton

@@ -195,7 +195,10 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
             }
             Type::DataclassDecorator(_) => {
-                f.write_str("<decorator produced by dataclasses.dataclass>")
+                f.write_str("<decorator produced by dataclass-like function>")
+            }
+            Type::DataclassTransformer(_) => {
+                f.write_str("<decorator produced by typing.dataclass_transform>")
             }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
