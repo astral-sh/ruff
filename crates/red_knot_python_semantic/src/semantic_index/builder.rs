@@ -2269,7 +2269,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
     }
 
     fn with_source<T>(&self, f: impl FnOnce(&str) -> T) -> T {
-        let src = source_text(self.db, self.file);
+        let src = source_text(self.db.upcast(), self.file);
         f(src.as_str())
     }
 
@@ -2345,7 +2345,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
     }
 
     fn in_notebook(&self) -> bool {
-        source_text(self.db, self.file).is_notebook()
+        source_text(self.db.upcast(), self.file).is_notebook()
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
