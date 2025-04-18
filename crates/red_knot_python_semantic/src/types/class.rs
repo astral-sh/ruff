@@ -610,7 +610,11 @@ impl<'db> ClassLiteralType<'db> {
         self.decorators(db)
             .iter()
             .filter_map(|deco| deco.into_function_literal())
-            .any(|decorator| decorator.is_known(db, KnownFunction::Final))
+            .any(|decorator| {
+                decorator
+                    .function_literal()
+                    .is_known(db, KnownFunction::Final)
+            })
     }
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
@@ -951,7 +955,9 @@ impl<'db> ClassLiteralType<'db> {
                     Some(_),
                     "__new__" | "__init__",
                 ) => Type::FunctionLiteral(
-                    function.with_generic_context(db, origin.generic_context(db)),
+                    function
+                        .function_literal()
+                        .with_generic_context(db, origin.generic_context(db)),
                 ),
                 _ => ty,
             }

@@ -219,7 +219,8 @@ impl<'db> Bindings<'db> {
 
             match binding_type {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
-                    if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
+                    let function_literal = function.function_literal();
+                    if function_literal.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
                         match overload.parameter_types() {
                             [_, Some(owner)] => {
                                 overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
@@ -250,7 +251,9 @@ impl<'db> Bindings<'db> {
                     if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
                         overload.parameter_types()
                     {
-                        if function.has_known_decorator(db, FunctionDecorators::CLASSMETHOD) {
+                        let function_literal = function.function_literal();
+                        if function_literal.has_known_decorator(db, FunctionDecorators::CLASSMETHOD)
+                        {
                             match overload.parameter_types() {
                                 [_, _, Some(owner)] => {
                                     overload.set_return_type(Type::BoundMethod(
@@ -298,7 +301,7 @@ impl<'db> Bindings<'db> {
                             if property.getter(db).is_some_and(|getter| {
                                 getter
                                     .into_function_literal()
-                                    .is_some_and(|f| f.name(db) == "__name__")
+                                    .is_some_and(|f| f.function_literal().name(db) == "__name__")
                             }) =>
                         {
                             overload.set_return_type(Type::string_literal(db, type_alias.name(db)));
@@ -307,7 +310,7 @@ impl<'db> Bindings<'db> {
                             if property.getter(db).is_some_and(|getter| {
                                 getter
                                     .into_function_literal()
-                                    .is_some_and(|f| f.name(db) == "__name__")
+                                    .is_some_and(|f| f.function_literal().name(db) == "__name__")
                             }) =>
                         {
                             overload.set_return_type(Type::string_literal(db, type_var.name(db)));
@@ -416,7 +419,12 @@ impl<'db> Bindings<'db> {
                 Type::BoundMethod(bound_method)
                     if bound_method.self_instance(db).is_property_instance() =>
                 {
-                    match bound_method.function(db).name(db).as_str() {
+                    match bound_method
+                        .function(db)
+                        .function_literal()
+                        .name(db)
+                        .as_str()
+                    {
                         "setter" => {
                             if let [Some(_), Some(setter)] = overload.parameter_types() {
                                 let mut ty_property = bound_method.self_instance(db);
@@ -456,7 +464,10 @@ impl<'db> Bindings<'db> {
                     }
                 }
 
-                Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                Type::FunctionLiteral(function_type) => match function_type
+                    .function_literal()
+                    .known(db)
+                {
                     Some(KnownFunction::IsEquivalentTo) => {
                         if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                             overload.set_return_type(Type::BooleanLiteral(
@@ -1166,7 +1177,7 @@ impl<'db> CallableDescription<'db> {
         match callable_type {
             Type::FunctionLiteral(function) => Some(CallableDescription {
                 kind: "function",
-                name: function.name(db),
+                name: function.function_literal().name(db),
             }),
             Type::ClassLiteral(class_type) => Some(CallableDescription {
                 kind: "class",
@@ -1174,12 +1185,12 @@ impl<'db> CallableDescription<'db> {
             }),
             Type::BoundMethod(bound_method) => Some(CallableDescription {
                 kind: "bound method",
-                name: bound_method.function(db).name(db),
+                name: bound_method.function(db).function_literal().name(db),
             }),
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Some(CallableDescription {
                     kind: "method wrapper `__get__` of function",
-                    name: function.name(db),
+                    name: function.function_literal().name(db),
                 })
             }
             Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(_)) => {
@@ -1304,7 +1315,7 @@ impl<'db> BindingError<'db> {
     ) -> Option<(Span, Span)> {
         match callable_ty {
             Type::FunctionLiteral(function) => {
-                let function_scope = function.body_scope(db);
+                let function_scope = function.function_literal().body_scope(db);
                 let span = Span::from(function_scope.file(db));
                 let node = function_scope.node(db);
                 if let Some(func_def) = node.as_function() {

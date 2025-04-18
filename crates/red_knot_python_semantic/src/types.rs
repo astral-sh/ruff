@@ -5863,8 +5863,91 @@ impl<'db> IntoIterator for &'db FunctionSignature<'db> {
     }
 }
 
+/// A callable type that represents a single Python function.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update)]
+pub enum FunctionType<'db> {
+    /// A function literal in the Python AST
+    FunctionLiteral(FunctionLiteral<'db>),
+
+    /// A function that has a specialization applied to its signature.
+    ///
+    /// (This does not necessarily mean that the function itself is generic — the methods of a
+    /// generic class, for instance, will have the class's specialization applied so that we
+    /// correctly substitute any class typevars that appear in the signature.)
+    Specialized(SpecializedFunction<'db>),
+
+    /// A function that we treat as generic because it inherits a containing generic context.
+    ///
+    /// This is currently only used for the `__new__` and `__init__` methods of a generic class.
+    /// That lets us pretend those methods are generic, so that we can infer a class specialization
+    /// from the arguments to its constructor.
+    InheritedGenericContext(FunctionWithInheritedGenericContext<'db>),
+}
+
+impl<'db> FunctionType<'db> {
+    fn function_literal(self, db: &'db dyn Db) -> FunctionLiteral<'db> {
+        match self {
+            FunctionType::FunctionLiteral(literal) => literal,
+            FunctionType::InheritedGenericContext(inherited) => inherited.function(db),
+        }
+    }
+
+    pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
+        self.function_literal(db).decorators(db).contains(decorator)
+    }
+
+    /// Convert the `FunctionType` into a [`Type::Callable`].
+    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
+        Type::Callable(CallableType::from_overloads(
+            db,
+            self.signature(db).iter().cloned(),
+        ))
+    }
+
+    /// Returns the [`FileRange`] of the function's name.
+    pub fn focus_range(self, db: &dyn Db) -> FileRange {
+        let body_scope = self.function_literal(db).body_scope(db);
+        FileRange::new(
+            body_scope.file(db),
+            body_scope.node(db).expect_function().name.range,
+        )
+    }
+
+    pub fn full_range(self, db: &dyn Db) -> FileRange {
+        let body_scope = self.function_literal(db).body_scope(db);
+        FileRange::new(
+            body_scope.file(db),
+            body_scope.node(db).expect_function().range,
+        )
+    }
+
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        let body_scope = self.function_literal(db).body_scope(db);
+        let index = semantic_index(db, body_scope.file(db));
+        index.expect_single_definition(body_scope.node(db).expect_function())
+    }
+
+    /// Typed externally-visible signature for this function.
+    ///
+    /// This is the signature as seen by external callers, possibly modified by decorators and/or
+    /// overloaded.
+    ///
+    /// ## Why is this a salsa query?
+    ///
+    /// This is a salsa query to short-circuit the invalidation
+    /// when the function's AST node changes.
+    ///
+    /// Were this not a salsa query, then the calling query
+    /// would depend on the function's AST and rerun for every change in that file.
+    pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
+        match self {
+            FunctionType::FunctionLiteral(literal) => literal.signature(db),
+        }
+    }
+}
+
 #[salsa::interned(debug)]
-pub struct FunctionType<'db> {
+pub struct FunctionLiteral<'db> {
     /// Name of the function at definition.
     #[return_ref]
     pub name: ast::name::Name,
@@ -5888,38 +5971,9 @@ pub struct FunctionType<'db> {
 }
 
 #[salsa::tracked]
-impl<'db> FunctionType<'db> {
-    pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
+impl<'db> FunctionLiteral<'db> {
+    fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.decorators(db).contains(decorator)
-    }
-
-    /// Convert the `FunctionType` into a [`Type::Callable`].
-    pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::from_overloads(
-            db,
-            self.signature(db).iter().cloned(),
-        ))
-    }
-
-    /// Returns the [`FileRange`] of the function's name.
-    pub fn focus_range(self, db: &dyn Db) -> FileRange {
-        FileRange::new(
-            self.body_scope(db).file(db),
-            self.body_scope(db).node(db).expect_function().name.range,
-        )
-    }
-
-    pub fn full_range(self, db: &dyn Db) -> FileRange {
-        FileRange::new(
-            self.body_scope(db).file(db),
-            self.body_scope(db).node(db).expect_function().range,
-        )
-    }
-
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let body_scope = self.body_scope(db);
-        let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
     /// Typed externally-visible signature for this function.
@@ -5934,8 +5988,8 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(return_ref)]
-    pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
+    #[salsa::tracked]
+    fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
         let mut internal_signature = self.internal_signature(db);
 
         if let Some(specialization) = self.specialization(db) {
@@ -6007,16 +6061,16 @@ impl<'db> FunctionType<'db> {
         self.known(db) == Some(known_function)
     }
 
-    fn with_generic_context(self, db: &'db dyn Db, generic_context: GenericContext<'db>) -> Self {
-        Self::new(
+    fn with_generic_context(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> FunctionType<'db> {
+        FunctionType::InheritedGenericContext(FunctionWithInheritedGenericContext::new(
             db,
-            self.name(db).clone(),
-            self.known(db),
-            self.body_scope(db),
-            self.decorators(db),
-            Some(generic_context),
-            self.specialization(db),
-        )
+            self,
+            generic_context,
+        ))
     }
 
     fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
@@ -6034,6 +6088,12 @@ impl<'db> FunctionType<'db> {
             Some(specialization),
         )
     }
+}
+
+#[salsa::interned(debug)]
+pub struct FunctionWithInheritedGenericContext<'db> {
+    function: FunctionLiteral<'db>,
+    generic_context: GenericContext<'db>,
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
