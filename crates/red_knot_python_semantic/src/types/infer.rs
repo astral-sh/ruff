@@ -2332,7 +2332,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         let assigned_ty = match target {
             ast::Expr::Name(_) => None,
             _ => {
-                let value_ty = self.infer_standalone_expression(value);
+                // The scope of the comprehension and the value (= iter) are different.
+                let value_ty =
+                    if self.types.scope.scope(self.db()).kind() == ScopeKind::Comprehension {
+                        let standalone_expression = self.index.expression(value);
+                        infer_same_file_expression_type(self.db(), standalone_expression)
+                    } else {
+                        self.infer_standalone_expression(value)
+                    };
 
                 Some(to_assigned_ty(self.db(), value_ty))
             }
@@ -3894,7 +3901,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         if !is_first {
             self.infer_standalone_expression(iter);
         }
-        self.infer_target_impl(target, None);
+        self.infer_target(target, iter, |db, iter_ty| {
+            // TODO: `infer_comprehension_definition` reports a diagnostic if `iter_ty` isn't iterable
+            //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
+            //  `[... for a.x in not_iterable]
+            iter_ty.iterate(db)
+        });
         for expr in ifs {
             self.infer_expression(expr);
         }
