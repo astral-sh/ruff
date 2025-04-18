@@ -1125,6 +1125,26 @@ def f(fn: Callable[[int], int]) -> None: ...
 f(a)
 ```
 
+### Class literals
+
+```py
+from typing import Callable
+from knot_extensions import TypeOf, static_assert, is_subtype_of
+
+class A:
+    def __new__(cls) -> "A":
+        return object.__new__(cls)
+
+class B: ...
+
+static_assert(is_subtype_of(TypeOf[A], Callable[[], A]))
+static_assert(not is_subtype_of(TypeOf[A], Callable[[object], A]))
+
+# TODO: This assertion should be true once we understand `Self`
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(is_subtype_of(TypeOf[B], Callable[[], B]))
+```
+
 ### Bound methods
 
 ```py

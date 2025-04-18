@@ -1118,6 +1118,17 @@ impl<'db> Type<'db> {
                 self_subclass_ty.is_subtype_of(db, target_subclass_ty)
             }
 
+            (Type::ClassLiteral(class), Type::Callable(_)) => {
+                let new_symbol = class.own_class_member(db, None, "__new__").symbol;
+                match new_symbol {
+                    Symbol::Type(Type::FunctionLiteral(new_function), _) => {
+                        let new_callable = new_function.into_bound_method_type(db, self);
+                        new_callable.is_subtype_of(db, target)
+                    }
+                    _ => false,
+                }
+            }
+
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
@@ -5864,6 +5875,15 @@ impl<'db> FunctionType<'db> {
             db,
             self.signature(db).iter().cloned(),
         ))
+    }
+
+    /// Convert the `FunctionType` into a [`Type::BoundMethod`].
+    pub(crate) fn into_bound_method_type(
+        self,
+        db: &'db dyn Db,
+        self_instance: Type<'db>,
+    ) -> Type<'db> {
+        Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
     }
 
     /// Returns the [`FileRange`] of the function's name.
