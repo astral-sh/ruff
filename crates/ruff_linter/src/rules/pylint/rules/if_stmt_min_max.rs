@@ -182,7 +182,8 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         stmt_if.range(),
     );
 
-    let applicability = if checker.comment_ranges().intersects(stmt_if.range()) {
+    let range_replacement = stmt_if.range();
+    let applicability = if checker.comment_ranges().intersects(range_replacement) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
@@ -190,7 +191,7 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
 
     if checker.semantic().has_builtin_binding(min_max.as_str()) {
         diagnostic.set_fix(Fix::applicable_edit(
-            Edit::range_replacement(replacement, stmt_if.range()),
+            Edit::range_replacement(replacement, range_replacement),
             applicability,
         ));
     }
