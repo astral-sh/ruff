@@ -46,8 +46,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe because it will remove all code,
-/// comments, and annotations within unreachable version blocks—even if
-/// they are never executed at runtime.
+/// comments, and annotations within unreachable version blocks.
 ///
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
