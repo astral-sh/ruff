@@ -94,7 +94,6 @@ use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
@@ -107,7 +106,8 @@ use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{BoundSuperError, BoundSuperType};
+use super::subclass_of::SubclassOfInner;
+use super::{BoundSuperError, BoundSuperType, ClassBase};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -763,12 +763,25 @@ impl<'db> TypeInferenceBuilder<'db> {
                 continue;
             }
 
-            // (2) Check for classes that inherit from `@final` classes
+            // (2) Check for inheritance from plain `Generic`,
+            //     and from classes that inherit from `@final` classes
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
-                // dynamic/unknown bases are never `@final`
-                let Some(base_class) = base_class.into_class_literal() else {
-                    continue;
+                let base_class = match base_class {
+                    Type::KnownInstance(KnownInstanceType::Generic) => {
+                        // `Generic` can appear in the MRO of many classes,
+                        // but it is never valid as an explicit base class in user code.
+                        self.context.report_lint_old(
+                            &INVALID_BASE,
+                            &class_node.bases()[i],
+                            format_args!("Cannot inherit from plain `Generic`",),
+                        );
+                        continue;
+                    }
+                    Type::ClassLiteral(class) => class,
+                    // dynamic/unknown bases are never `@final`
+                    _ => continue,
                 };
+
                 if !base_class.is_final(self.db()) {
                     continue;
                 }
@@ -4736,10 +4749,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                             Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                                 match subclass_of.subclass_of() {
-                                    ClassBase::Class(class) => {
+                                    SubclassOfInner::Class(class) => {
                                         !class.instance_member(db, attr).symbol.is_unbound()
                                     }
-                                    ClassBase::Dynamic(_) => unreachable!(
+                                    SubclassOfInner::Dynamic(_) => unreachable!(
                                         "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
                                     ),
                                 }
@@ -4981,8 +4994,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
             (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
-            (todo @ Type::Dynamic(DynamicType::TodoProtocol), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::TodoProtocol), _) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -6224,7 +6239,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::IntLiteral(i64::from(bool)),
             ),
             (Type::KnownInstance(KnownInstanceType::Protocol), _) => {
-                Type::Dynamic(DynamicType::TodoProtocol)
+                Type::Dynamic(DynamicType::SubscriptedProtocol)
+            }
+            (Type::KnownInstance(KnownInstanceType::Generic), _) => {
+                Type::Dynamic(DynamicType::SubscriptedGeneric)
             }
             (Type::KnownInstance(known_instance), _)
                 if known_instance.class().is_special_form() =>
@@ -6331,12 +6349,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    report_non_subscriptable(
-                        &self.context,
-                        value_node.into(),
-                        value_ty,
-                        "__class_getitem__",
-                    );
+                    // TODO: properly handle old-style generics; get rid of this temporary hack
+                    if !value_ty.into_class_literal().is_some_and(|class| {
+                        class
+                            .iter_mro(self.db(), None)
+                            .contains(&ClassBase::Dynamic(DynamicType::SubscriptedGeneric))
+                    }) {
+                        report_non_subscriptable(
+                            &self.context,
+                            value_node.into(),
+                            value_ty,
+                            "__class_getitem__",
+                        );
+                    }
                 } else {
                     report_non_subscriptable(
                         &self.context,
@@ -7508,7 +7533,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::Protocol => {
                 self.infer_type_expression(arguments_slice);
-                Type::Dynamic(DynamicType::TodoProtocol)
+                Type::Dynamic(DynamicType::SubscriptedProtocol)
+            }
+            KnownInstanceType::Generic => {
+                self.infer_type_expression(arguments_slice);
+                Type::Dynamic(DynamicType::SubscriptedGeneric)
             }
             KnownInstanceType::NoReturn
             | KnownInstanceType::Never

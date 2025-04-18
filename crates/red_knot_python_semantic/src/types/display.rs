@@ -7,13 +7,12 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class::{ClassType, GenericAlias, GenericClass};
-use crate::types::class_base::ClassBase;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     FunctionSignature, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
-    StringLiteralType, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
-    WrapperDescriptorKind,
+    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
+    UnionType, WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -92,8 +91,8 @@ impl Display for DisplayRepresentation<'_> {
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].
-                ClassBase::Class(class) => write!(f, "type[{}]", class.name(self.db)),
-                ClassBase::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
+                SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
+                SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => {

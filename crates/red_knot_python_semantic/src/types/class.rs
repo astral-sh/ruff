@@ -246,7 +246,7 @@ impl<'db> ClassType<'db> {
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    pub(super) fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+    pub(super) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal.iter_mro(db, specialization)
     }
@@ -645,7 +645,7 @@ impl<'db> ClassLiteralType<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> impl Iterator<Item = ClassBase<'db>> {
+    ) -> MroIterator<'db> {
         MroIterator::new(db, self, specialization)
     }
 
@@ -846,7 +846,11 @@ impl<'db> ClassLiteralType<'db> {
 
         for superclass in mro_iter {
             match superclass {
-                ClassBase::Dynamic(DynamicType::TodoProtocol) => {
+                ClassBase::Dynamic(
+                    DynamicType::SubscriptedGeneric | DynamicType::SubscriptedProtocol,
+                )
+                | ClassBase::Generic
+                | ClassBase::Protocol => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
                     // result from looking up attributes on builtin types like `str`, `list`, `tuple`
@@ -865,7 +869,12 @@ impl<'db> ClassLiteralType<'db> {
                         continue;
                     }
 
-                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
+                    // HACK: we should implement some more general logic here that supports arbitrary custom
+                    // metaclasses, not just `type` and `ABCMeta`.
+                    if matches!(
+                        class.known(db),
+                        Some(KnownClass::Type | KnownClass::ABCMeta)
+                    ) && policy.meta_class_no_type_fallback()
                     {
                         continue;
                     }
@@ -1158,8 +1167,12 @@ impl<'db> ClassLiteralType<'db> {
 
         for superclass in self.iter_mro(db, specialization) {
             match superclass {
-                ClassBase::Dynamic(DynamicType::TodoProtocol) => {
-                    // TODO: We currently skip `Protocol` when looking up instance members, in order to
+                ClassBase::Dynamic(
+                    DynamicType::SubscriptedProtocol | DynamicType::SubscriptedGeneric,
+                )
+                | ClassBase::Generic
+                | ClassBase::Protocol => {
+                    // TODO: We currently skip these when looking up instance members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
                     // result from looking up attributes on builtin types like `str`, `list`, `tuple`
                 }
@@ -1671,6 +1684,8 @@ pub(crate) enum KnownClass {
     Super,
     // enum
     Enum,
+    // abc
+    ABCMeta,
     // Types
     GenericAlias,
     ModuleType,
@@ -1780,6 +1795,7 @@ impl<'db> KnownClass {
             | Self::Float
             | Self::Sized
             | Self::Enum
+            | Self::ABCMeta
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -1836,6 +1852,7 @@ impl<'db> KnownClass {
             Self::Sized => "Sized",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
@@ -1992,6 +2009,7 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
+            Self::ABCMeta => KnownModule::Abc,
             Self::Enum => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
@@ -2096,6 +2114,7 @@ impl<'db> KnownClass {
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
+            | Self::ABCMeta
             | Self::Super
             | Self::NewType => false,
         }
@@ -2155,6 +2174,7 @@ impl<'db> KnownClass {
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
+            | Self::ABCMeta
             | Self::Super
             | Self::UnionType
             | Self::NewType => false,
@@ -2216,6 +2236,7 @@ impl<'db> KnownClass {
             "SupportsIndex" => Self::SupportsIndex,
             "Sized" => Self::Sized,
             "Enum" => Self::Enum,
+            "ABCMeta" => Self::ABCMeta,
             "super" => Self::Super,
             "_version_info" => Self::VersionInfo,
             "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
@@ -2271,6 +2292,7 @@ impl<'db> KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
             | Self::UnionType
@@ -2393,6 +2415,8 @@ pub enum KnownInstanceType<'db> {
     OrderedDict,
     /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
     Protocol,
+    /// The symbol `typing.Generic` (which can also be found as `typing_extensions.Generic`)
+    Generic,
     /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
     Type,
     /// A single instance of `typing.TypeVar`
@@ -2467,6 +2491,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::ChainMap
             | Self::OrderedDict
             | Self::Protocol
+            | Self::Generic
             | Self::ReadOnly
             | Self::TypeAliasType(_)
             | Self::Unknown
@@ -2513,6 +2538,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => "typing.ChainMap",
             Self::OrderedDict => "typing.OrderedDict",
             Self::Protocol => "typing.Protocol",
+            Self::Generic => "typing.Generic",
             Self::ReadOnly => "typing.ReadOnly",
             Self::TypeVar(typevar) => typevar.name(db),
             Self::TypeAliasType(_) => "typing.TypeAliasType",
@@ -2560,7 +2586,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deque => KnownClass::StdlibAlias,
             Self::ChainMap => KnownClass::StdlibAlias,
             Self::OrderedDict => KnownClass::StdlibAlias,
-            Self::Protocol => KnownClass::SpecialForm,
+            Self::Protocol => KnownClass::SpecialForm, // actually `_ProtocolMeta` at runtime but this is what typeshed says
+            Self::Generic => KnownClass::SpecialForm, // actually `type` at runtime but this is what typeshed says
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::TypeOf => KnownClass::SpecialForm,
@@ -2604,6 +2631,7 @@ impl<'db> KnownInstanceType<'db> {
             "Counter" => Self::Counter,
             "ChainMap" => Self::ChainMap,
             "OrderedDict" => Self::OrderedDict,
+            "Generic" => Self::Generic,
             "Protocol" => Self::Protocol,
             "Optional" => Self::Optional,
             "Union" => Self::Union,
@@ -2662,6 +2690,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::NoReturn
             | Self::Tuple
             | Self::Type
+            | Self::Generic
             | Self::Callable => module.is_typing(),
             Self::Annotated
             | Self::Protocol

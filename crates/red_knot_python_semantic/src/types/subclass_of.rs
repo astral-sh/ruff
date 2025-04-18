@@ -1,12 +1,12 @@
 use crate::symbol::SymbolAndQualifiers;
 
-use super::{ClassBase, Db, KnownClass, MemberLookupPolicy, Type};
+use super::{ClassType, Db, DynamicType, KnownClass, MemberLookupPolicy, Type};
 
 /// A type that represents `type[C]`, i.e. the class object `C` and class objects that are subclasses of `C`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct SubclassOfType<'db> {
     // Keep this field private, so that the only way of constructing the struct is through the `from` method.
-    subclass_of: ClassBase<'db>,
+    subclass_of: SubclassOfInner<'db>,
 }
 
 impl<'db> SubclassOfType<'db> {
@@ -21,11 +21,11 @@ impl<'db> SubclassOfType<'db> {
     ///
     /// The eager normalization here means that we do not need to worry elsewhere about distinguishing
     /// between `@final` classes and other classes when dealing with [`Type::SubclassOf`] variants.
-    pub(crate) fn from(db: &'db dyn Db, subclass_of: impl Into<ClassBase<'db>>) -> Type<'db> {
+    pub(crate) fn from(db: &'db dyn Db, subclass_of: impl Into<SubclassOfInner<'db>>) -> Type<'db> {
         let subclass_of = subclass_of.into();
         match subclass_of {
-            ClassBase::Dynamic(_) => Type::SubclassOf(Self { subclass_of }),
-            ClassBase::Class(class) => {
+            SubclassOfInner::Dynamic(_) => Type::SubclassOf(Self { subclass_of }),
+            SubclassOfInner::Class(class) => {
                 if class.is_final(db) {
                     Type::from(class)
                 } else if class.is_object(db) {
@@ -40,19 +40,19 @@ impl<'db> SubclassOfType<'db> {
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
     pub(crate) const fn subclass_of_unknown() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
-            subclass_of: ClassBase::unknown(),
+            subclass_of: SubclassOfInner::unknown(),
         })
     }
 
     /// Return a [`Type`] instance representing the type `type[Any]`.
     pub(crate) const fn subclass_of_any() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
-            subclass_of: ClassBase::any(),
+            subclass_of: SubclassOfInner::Dynamic(DynamicType::Any),
         })
     }
 
-    /// Return the inner [`ClassBase`] value wrapped by this `SubclassOfType`.
-    pub(crate) const fn subclass_of(self) -> ClassBase<'db> {
+    /// Return the inner [`SubclassOfInner`] value wrapped by this `SubclassOfType`.
+    pub(crate) const fn subclass_of(self) -> SubclassOfInner<'db> {
         self.subclass_of
     }
 
@@ -77,17 +77,17 @@ impl<'db> SubclassOfType<'db> {
 
     /// Return `true` if `self` is a subtype of `other`.
     ///
-    /// This can only return `true` if `self.subclass_of` is a [`ClassBase::Class`] variant;
+    /// This can only return `true` if `self.subclass_of` is a [`SubclassOfInner::Class`] variant;
     /// only fully static types participate in subtyping.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: SubclassOfType<'db>) -> bool {
         match (self.subclass_of, other.subclass_of) {
             // Non-fully-static types do not participate in subtyping
-            (ClassBase::Dynamic(_), _) | (_, ClassBase::Dynamic(_)) => false,
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => false,
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
             // and `type[int]` describes all possible runtime subclasses of the class `int`.
             // The first set is a subset of the second set, because `bool` is itself a subclass of `int`.
-            (ClassBase::Class(self_class), ClassBase::Class(other_class)) => {
+            (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
                 // N.B. The subclass relation is fully static
                 self_class.is_subclass_of(db, other_class)
             }
@@ -96,8 +96,73 @@ impl<'db> SubclassOfType<'db> {
 
     pub(crate) fn to_instance(self) -> Type<'db> {
         match self.subclass_of {
-            ClassBase::Class(class) => Type::instance(class),
-            ClassBase::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
+            SubclassOfInner::Class(class) => Type::instance(class),
+            SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
+        }
+    }
+}
+
+/// An enumeration of the different kinds of `type[]` types that a [`SubclassOfType`] can represent:
+///
+/// 1. A "subclass of a class": `type[C]` for any class object `C`
+/// 2. A "subclass of a dynamic type": `type[Any]`, `type[Unknown]` and `type[@Todo]`
+///
+/// In the long term, we may want to implement <https://github.com/astral-sh/ruff/issues/15381>.
+/// Doing this would allow us to get rid of this enum,
+/// since `type[Any]` would be represented as `type & Any`
+/// rather than using the [`Type::SubclassOf`] variant at all;
+/// [`SubclassOfType`] would then be a simple wrapper around [`ClassType`].
+///
+/// Note that this enum is similar to the [`super::ClassBase`] enum,
+/// but does not include the `ClassBase::Protocol` and `ClassBase::Generic` variants
+/// (`type[Protocol]` and `type[Generic]` are not valid types).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+pub(crate) enum SubclassOfInner<'db> {
+    Class(ClassType<'db>),
+    Dynamic(DynamicType),
+}
+
+impl<'db> SubclassOfInner<'db> {
+    pub(crate) const fn unknown() -> Self {
+        Self::Dynamic(DynamicType::Unknown)
+    }
+
+    pub(crate) const fn is_dynamic(self) -> bool {
+        matches!(self, Self::Dynamic(_))
+    }
+
+    pub(crate) const fn into_class(self) -> Option<ClassType<'db>> {
+        match self {
+            Self::Class(class) => Some(class),
+            Self::Dynamic(_) => None,
+        }
+    }
+
+    pub(crate) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        match ty {
+            Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
+            Type::ClassLiteral(literal) => Some(if literal.is_known(db, KnownClass::Any) {
+                Self::Dynamic(DynamicType::Any)
+            } else {
+                Self::Class(literal.default_specialization(db))
+            }),
+            Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
+            _ => None,
+        }
+    }
+}
+
+impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
+    fn from(value: ClassType<'db>) -> Self {
+        SubclassOfInner::Class(value)
+    }
+}
+
+impl<'db> From<SubclassOfInner<'db>> for Type<'db> {
+    fn from(value: SubclassOfInner<'db>) -> Self {
+        match value {
+            SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            SubclassOfInner::Class(class) => class.into(),
         }
     }
 }

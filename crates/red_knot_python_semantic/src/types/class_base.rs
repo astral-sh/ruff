@@ -1,11 +1,12 @@
-use crate::types::{todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::types::{
+    todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroIterator, Type,
+};
 use crate::Db;
-use itertools::Either;
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
 /// This is much more limited than the [`Type`] enum: all types that would be invalid to have as a
-/// class base are transformed into [`ClassBase::unknown`]
+/// class base are transformed into [`ClassBase::unknown()`]
 ///
 /// Note that a non-specialized generic class _cannot_ be a class base. When we see a
 /// non-specialized generic class in any type expression (including the list of base classes), we
@@ -14,6 +15,13 @@ use itertools::Either;
 pub enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(ClassType<'db>),
+    /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
+    /// and can appear in the MRO of a class.
+    Protocol,
+    /// Bare `Generic` cannot be subclassed directly in user code,
+    /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
+    /// `Protocol[T]`, or bare `Protocol`.
+    Generic,
 }
 
 impl<'db> ClassBase<'db> {
@@ -23,13 +31,6 @@ impl<'db> ClassBase<'db> {
 
     pub(crate) const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
-    }
-
-    pub(crate) const fn is_dynamic(self) -> bool {
-        match self {
-            ClassBase::Dynamic(_) => true,
-            ClassBase::Class(_) => false,
-        }
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
@@ -48,6 +49,8 @@ impl<'db> ClassBase<'db> {
                     ClassBase::Class(ClassType::Generic(alias)) => {
                         write!(f, "<class '{}'>", alias.display(self.db))
                     }
+                    ClassBase::Protocol => f.write_str("typing.Protocol"),
+                    ClassBase::Generic => f.write_str("typing.Generic"),
                 }
             }
         }
@@ -165,7 +168,8 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
-                KnownInstanceType::Protocol => Some(ClassBase::Dynamic(DynamicType::TodoProtocol)),
+                KnownInstanceType::Protocol => Some(ClassBase::Protocol),
+                KnownInstanceType::Generic => Some(ClassBase::Generic),
             },
         }
     }
@@ -173,18 +177,21 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::Dynamic(_) => None,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol => None,
         }
     }
 
     /// Iterate over the MRO of this base
-    pub(super) fn mro(
-        self,
-        db: &'db dyn Db,
-    ) -> Either<impl Iterator<Item = ClassBase<'db>>, impl Iterator<Item = ClassBase<'db>>> {
+    pub(super) fn mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            ClassBase::Dynamic(_) => Either::Left([self, ClassBase::object(db)].into_iter()),
-            ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
+            ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
+            ClassBase::Dynamic(DynamicType::SubscriptedProtocol) => ClassBaseMroIterator::length_3(
+                db,
+                self,
+                ClassBase::Dynamic(DynamicType::SubscriptedGeneric),
+            ),
+            ClassBase::Dynamic(_) | ClassBase::Generic => ClassBaseMroIterator::length_2(db, self),
+            ClassBase::Class(class) => ClassBaseMroIterator::from_class(db, class),
         }
     }
 }
@@ -200,6 +207,8 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Class(class) => class.into(),
+            ClassBase::Protocol => Type::KnownInstance(KnownInstanceType::Protocol),
+            ClassBase::Generic => Type::KnownInstance(KnownInstanceType::Generic),
         }
     }
 }
@@ -209,3 +218,41 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
         Self::from(*value)
     }
 }
+
+/// An iterator over the MRO of a class base.
+enum ClassBaseMroIterator<'db> {
+    Length2(core::array::IntoIter<ClassBase<'db>, 2>),
+    Length3(core::array::IntoIter<ClassBase<'db>, 3>),
+    FromClass(MroIterator<'db>),
+}
+
+impl<'db> ClassBaseMroIterator<'db> {
+    /// Iterate over an MRO of length 2 that consists of `first_element` and then `object`.
+    fn length_2(db: &'db dyn Db, first_element: ClassBase<'db>) -> Self {
+        ClassBaseMroIterator::Length2([first_element, ClassBase::object(db)].into_iter())
+    }
+
+    /// Iterate over an MRO of length 3 that consists of `first_element`, then `second_element`, then `object`.
+    fn length_3(db: &'db dyn Db, element_1: ClassBase<'db>, element_2: ClassBase<'db>) -> Self {
+        ClassBaseMroIterator::Length3([element_1, element_2, ClassBase::object(db)].into_iter())
+    }
+
+    /// Iterate over the MRO of an arbitrary class. The MRO may be of any length.
+    fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        ClassBaseMroIterator::FromClass(class.iter_mro(db))
+    }
+}
+
+impl<'db> Iterator for ClassBaseMroIterator<'db> {
+    type Item = ClassBase<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Length2(iter) => iter.next(),
+            Self::Length3(iter) => iter.next(),
+            Self::FromClass(iter) => iter.next(),
+        }
+    }
+}
+
+impl std::iter::FusedIterator for ClassBaseMroIterator<'_> {}

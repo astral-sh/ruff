@@ -28,8 +28,7 @@ from typing import Protocol
 
 class MyProtocol(Protocol): ...
 
-# TODO: at runtime this is `(<class '__main__.MyProtocol'>, <class 'typing.Protocol'>, <class 'typing.Generic'>, <class 'object'>)`
-reveal_type(MyProtocol.__mro__)  # revealed: tuple[Literal[MyProtocol], @Todo(protocol), Literal[object]]
+reveal_type(MyProtocol.__mro__)  # revealed: tuple[Literal[MyProtocol], typing.Protocol, typing.Generic, Literal[object]]
 ```
 
 Just like for any other class base, it is an error for `Protocol` to appear multiple times in a
@@ -72,8 +71,7 @@ it is not sufficient for it to have `Protocol` in its MRO.
 ```py
 class SubclassOfMyProtocol(MyProtocol): ...
 
-# TODO
-# revealed: tuple[Literal[SubclassOfMyProtocol], Literal[MyProtocol], @Todo(protocol), Literal[object]]
+# revealed: tuple[Literal[SubclassOfMyProtocol], Literal[MyProtocol], typing.Protocol, typing.Generic, Literal[object]]
 reveal_type(SubclassOfMyProtocol.__mro__)
 
 # TODO: should be `Literal[False]`
@@ -94,8 +92,7 @@ class OtherProtocol(Protocol):
 
 class ComplexInheritance(SubProtocol, OtherProtocol, Protocol): ...
 
-# TODO
-# revealed: tuple[Literal[ComplexInheritance], Literal[SubProtocol], Literal[MyProtocol], Literal[OtherProtocol], @Todo(protocol), Literal[object]]
+# revealed: tuple[Literal[ComplexInheritance], Literal[SubProtocol], Literal[MyProtocol], Literal[OtherProtocol], typing.Protocol, typing.Generic, Literal[object]]
 reveal_type(ComplexInheritance.__mro__)
 
 # TODO: should be `Literal[True]`
@@ -109,15 +106,13 @@ or `TypeError` is raised at runtime when the class is created.
 # TODO: should emit `[invalid-protocol]`
 class Invalid(NotAProtocol, Protocol): ...
 
-# TODO
-# revealed: tuple[Literal[Invalid], Literal[NotAProtocol], @Todo(protocol), Literal[object]]
+# revealed: tuple[Literal[Invalid], Literal[NotAProtocol], typing.Protocol, typing.Generic, Literal[object]]
 reveal_type(Invalid.__mro__)
 
 # TODO: should emit an `[invalid-protocol`] error
 class AlsoInvalid(MyProtocol, OtherProtocol, NotAProtocol, Protocol): ...
 
-# TODO
-# revealed: tuple[Literal[AlsoInvalid], Literal[MyProtocol], Literal[OtherProtocol], Literal[NotAProtocol], @Todo(protocol), Literal[object]]
+# revealed: tuple[Literal[AlsoInvalid], Literal[MyProtocol], Literal[OtherProtocol], Literal[NotAProtocol], typing.Protocol, typing.Generic, Literal[object]]
 reveal_type(AlsoInvalid.__mro__)
 ```
 
@@ -135,11 +130,9 @@ T = TypeVar("T")
 # type checkers.
 class Fine(Protocol, object): ...
 
-# TODO
-reveal_type(Fine.__mro__)  # revealed: tuple[Literal[Fine], @Todo(protocol), Literal[object]]
+reveal_type(Fine.__mro__)  # revealed: tuple[Literal[Fine], typing.Protocol, typing.Generic, Literal[object]]
 
-# TODO: should not error
-class StillFine(Protocol, Generic[T], object): ...  # error: [invalid-base]
+class StillFine(Protocol, Generic[T], object): ...
 class EvenThis[T](Protocol, object): ...
 ```
 
@@ -149,8 +142,7 @@ And multiple inheritance from a mix of protocol and non-protocol classes is fine
 ```py
 class FineAndDandy(MyProtocol, OtherProtocol, NotAProtocol): ...
 
-# TODO
-# revealed: tuple[Literal[FineAndDandy], Literal[MyProtocol], Literal[OtherProtocol], @Todo(protocol), Literal[NotAProtocol], Literal[object]]
+# revealed: tuple[Literal[FineAndDandy], Literal[MyProtocol], Literal[OtherProtocol], typing.Protocol, typing.Generic, Literal[NotAProtocol], Literal[object]]
 reveal_type(FineAndDandy.__mro__)
 ```
 
