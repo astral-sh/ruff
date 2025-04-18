@@ -144,3 +144,13 @@ def _(x: Base):
         # express a constraint like `Base & ~ProperSubtypeOf[Base]`.
         reveal_type(x)  # revealed: Base
 ```
+
+## Assignment expressions
+
+```py
+def _(x: object):
+    if (y := type(x)) is bool:
+        reveal_type(y)  # revealed: Literal[bool]
+    if (type(y := x)) is bool:
+        reveal_type(y)  # revealed: bool
+```
