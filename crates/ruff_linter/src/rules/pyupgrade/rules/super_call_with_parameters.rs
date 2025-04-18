@@ -40,6 +40,11 @@ use crate::checkers::ast::Checker;
 ///         super().foo()
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because removing the arguments from a call
+/// may delete comments that are attached to the arguments.
+///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
 /// - [super/MRO, Python's most misunderstood feature.](https://www.youtube.com/watch?v=X1PQ7zzltz4)
