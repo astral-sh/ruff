@@ -128,6 +128,8 @@ class AsyncIterable:
         return AsyncIterator()
 
 # revealed: @Todo(async iterables/iterators)
+# error: [invalid-syntax] "cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.9 (syntax was added in 3.11)"
+# error: [invalid-syntax] "`asynchronous comprehension` outside of an asynchronous function"
 [reveal_type(x) async for x in AsyncIterable()]
 ```
 
@@ -145,6 +147,8 @@ class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
 
+# error: [invalid-syntax] "cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.9 (syntax was added in 3.11)"
+# error: [invalid-syntax] "`asynchronous comprehension` outside of an asynchronous function"
 # revealed: @Todo(async iterables/iterators)
 [reveal_type(x) async for x in Iterable()]
 ```
