@@ -28,8 +28,8 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe, as the `bit_count()` method can be used when the argument
-/// to the `bin()` is an instance of a type that implements the `__index__` and `bit_count` methods.
+/// This rule's fix is marked as unsafe unless the argument to `bin` can be inferred as
+/// an instance of a type that implements the `__index__` and `bit_count` methods.
 ///
 /// ## Options
 /// - `target-version`
