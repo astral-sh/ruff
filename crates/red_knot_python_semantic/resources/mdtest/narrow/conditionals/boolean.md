@@ -223,3 +223,15 @@ def _(x: str | None, y: str | None):
     if y is not x:
         reveal_type(y)  # revealed: str | None
 ```
+
+## Assignment expressions
+
+```py
+def f() -> bool:
+    return True
+
+if x := f():
+    reveal_type(x)  # revealed: Literal[True]
+else:
+    reveal_type(x)  # revealed: Literal[False]
+```

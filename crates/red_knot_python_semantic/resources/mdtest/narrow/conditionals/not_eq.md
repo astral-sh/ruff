@@ -89,3 +89,18 @@ def _(flag1: bool, flag2: bool, a: int):
     else:
         reveal_type(x)  # revealed: Literal[1, 2]
 ```
+
+## Assignment expressions
+
+```py
+from typing import Literal
+
+def f() -> Literal[1, 2, 3]:
+    return 1
+
+if (x := f()) != 1:
+    reveal_type(x)  # revealed: Literal[2, 3]
+else:
+    # TODO should be Literal[1]
+    reveal_type(x)  # revealed: Literal[1, 2, 3]
+```
