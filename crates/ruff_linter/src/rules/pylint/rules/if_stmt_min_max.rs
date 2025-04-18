@@ -34,7 +34,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// An example to illustrate where comments are preserved and where they are not:
 ///
-/// ```pyi
+/// ```py
 /// a, b = 0, 10
 ///
 /// if a >= b: # deleted comment
