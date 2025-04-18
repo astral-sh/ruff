@@ -127,16 +127,16 @@ We can infer the type parameter from a type context:
 class C[T]:
     x: T
 
-# TODO: no error
-# error: [invalid-assignment]
 c: C[int] = C()
-reveal_type(c)  # revealed: C[int]
+# TODO: revealed: C[int]
+reveal_type(c)  # revealed: C[Unknown]
 ```
 
 The typevars of a fully specialized generic class should no longer be visible:
 
 ```py
-reveal_type(c.x)  # revealed: int
+# TODO: revealed: int
+reveal_type(c.x)  # revealed: Unknown
 ```
 
 If the type parameter is not specified explicitly, and there are no constraints that let us infer a
@@ -249,7 +249,6 @@ reveal_type(C(1, True))  # revealed: C[Unknown]
 
 # TODO: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `S`, found `Literal[1]`"
-# error: [invalid-assignment] "Object of type `C[Unknown]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 
