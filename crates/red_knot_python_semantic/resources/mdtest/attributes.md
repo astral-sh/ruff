@@ -1835,6 +1835,63 @@ class C:
 reveal_type(C().x)  # revealed: Unknown | Literal[1]
 ```
 
+If the only assignment to a name is cyclic, we just infer `Unknown` for that attribute:
+
+```py
+class D:
+    def copy(self, other: "D"):
+        self.x = other.x
+
+reveal_type(D().x)  # revealed: Unknown
+```
+
+If there is an annotation for a name, we don't try to infer any type from the RHS of assignments to
+that name, so these cases don't trigger any cycle:
+
+```py
+class E:
+    def __init__(self):
+        self.x: int = 1
+
+    def copy(self, other: "E"):
+        self.x = other.x
+
+reveal_type(E().x)  # revealed: int
+
+class F:
+    def __init__(self):
+        self.x = 1
+
+    def copy(self, other: "F"):
+        self.x: int = other.x
+
+reveal_type(F().x)  # revealed: int
+
+class G:
+    def copy(self, other: "G"):
+        self.x: int = other.x
+
+reveal_type(G().x)  # revealed: int
+```
+
+We can even handle cycles involving multiple classes:
+
+```py
+class A:
+    def __init__(self):
+        self.x = 1
+
+    def copy(self, other: "B"):
+        self.x = other.x
+
+class B:
+    def copy(self, other: "A"):
+        self.x = other.x
+
+reveal_type(B().x)  # revealed: Unknown | Literal[1]
+reveal_type(A().x)  # revealed: Unknown | Literal[1]
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
