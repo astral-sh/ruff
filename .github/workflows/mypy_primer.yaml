@@ -52,6 +52,8 @@ jobs:
         run: |
           cd ruff
 
+          PRIMER_SELECTOR="$(paste -s -d'|' crates/red_knot_python_semantic/resources/primer/good.txt)"
+
           echo "new commit"
           git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
 
@@ -62,13 +64,14 @@ jobs:
 
           cd ..
 
+          echo "Project selector: $PRIMER_SELECTOR"
           # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
           uvx mypy_primer \
             --repo ruff \
             --type-checker knot \
             --old base_commit \
             --new "$GITHUB_SHA" \
-            --project-selector '/(mypy_primer|black|pyp|git-revise|zipp|arrow|isort|itsdangerous|rich|packaging|pybind11|pyinstrument|typeshed-stats|scrapy|werkzeug|bidict|async-utils|python-chess|dacite|python-htmlgen|paroxython|porcupine|psycopg)$' \
+            --project-selector "/($PRIMER_SELECTOR)\$" \
             --output concise \
             --debug > mypy_primer.diff || [ $? -eq 1 ]
 
