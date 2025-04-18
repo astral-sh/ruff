@@ -766,7 +766,7 @@ impl SemanticSyntaxChecker {
         if ctx.in_notebook() && ctx.in_module_scope() {
             return;
         }
-        if ctx.in_async_context() && !ctx.in_sync_comprehension() {
+        if !ctx.in_sync_comprehension() {
             return;
         }
         for generator in generators.iter().filter(|gen| gen.is_async) {
