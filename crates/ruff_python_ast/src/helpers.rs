@@ -1355,15 +1355,6 @@ fn is_empty_f_string(expr: &ast::ExprFString) -> bool {
     })
 }
 
-pub fn is_redundant_boolean_comparison(op: CmpOp, comparator: &Expr) -> Option<bool> {
-    let value = comparator.as_boolean_literal_expr()?.value;
-    match op {
-        CmpOp::Is | CmpOp::Eq => Some(value),
-        CmpOp::IsNot | CmpOp::NotEq => Some(!value),
-        _ => None,
-    }
-}
-
 pub fn generate_comparison(
     left: &Expr,
     ops: &[CmpOp],

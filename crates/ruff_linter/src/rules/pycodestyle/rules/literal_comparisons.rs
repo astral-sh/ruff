@@ -3,7 +3,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers::{self, generate_comparison, is_redundant_boolean_comparison};
+use ruff_python_ast::helpers::{self, generate_comparison};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
@@ -167,6 +167,15 @@ impl AlwaysFixableViolation for TrueFalseComparison {
             (false, EqCmpOp::Eq) => format!("Replace with `not {cond}`"),
             (false, EqCmpOp::NotEq) => format!("Replace with `{cond}`"),
         }
+    }
+}
+
+fn is_redundant_boolean_comparison(op: CmpOp, comparator: &Expr) -> Option<bool> {
+    let value = comparator.as_boolean_literal_expr()?.value;
+    match op {
+        CmpOp::Is | CmpOp::Eq => Some(value),
+        CmpOp::IsNot | CmpOp::NotEq => Some(!value),
+        _ => None,
     }
 }
 
