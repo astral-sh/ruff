@@ -22,7 +22,7 @@ use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, DataclassMetadata, FunctionDecorators, KnownClass, KnownFunction,
     KnownInstanceType, MethodWrapperKind, PropertyInstanceType, TupleType,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionType, WrapperDescriptorKind,
+    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Severity, Span, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -750,6 +750,7 @@ impl<'db> Bindings<'db> {
                                 containing_assignment,
                                 bound_or_constraint,
                                 *default,
+                                TypeVarKind::Legacy,
                             ),
                         )));
                     }

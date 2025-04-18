@@ -88,7 +88,7 @@ use crate::types::{
     ParameterForm, Parameters, Signature, Signatures, SliceLiteralType, StringLiteralType,
     SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
     TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, UnionBuilder, UnionType,
+    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -2170,6 +2170,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             definition,
             bound_or_constraint,
             default_ty,
+            TypeVarKind::Pep695,
         )));
         self.add_declaration_with_binding(
             node.into(),

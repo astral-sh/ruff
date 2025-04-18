@@ -820,6 +820,7 @@ impl<'db> Type<'db> {
                         typevar.definition(db),
                         Some(TypeVarBoundOrConstraints::UpperBound(bound.normalized(db))),
                         typevar.default_ty(db),
+                        typevar.kind(db),
                     ))
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(union)) => {
@@ -829,6 +830,7 @@ impl<'db> Type<'db> {
                         typevar.definition(db),
                         Some(TypeVarBoundOrConstraints::Constraints(union.normalized(db))),
                         typevar.default_ty(db),
+                        typevar.kind(db),
                     ))
                 }
                 None => self,
@@ -5058,6 +5060,13 @@ impl<'db> InvalidTypeExpression<'db> {
     }
 }
 
+/// Whether this typecar was created via the legacy `TypeVar` constructor, or using PEP 695 syntax.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum TypeVarKind {
+    Legacy,
+    Pep695,
+}
+
 /// Data regarding a single type variable.
 ///
 /// This is referenced by `KnownInstanceType::TypeVar` (to represent the singleton type of the
@@ -5083,6 +5092,8 @@ pub struct TypeVarInstance<'db> {
 
     /// The default type for this TypeVar
     default_ty: Option<Type<'db>>,
+
+    pub kind: TypeVarKind,
 }
 
 impl<'db> TypeVarInstance<'db> {
