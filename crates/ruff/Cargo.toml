@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.11.4"
+version = "0.11.6"
 publish = true
 authors = { workspace = true }
 edition = { workspace = true }
@@ -33,7 +33,6 @@ argfile = { workspace = true }
 bincode = { workspace = true }
 bitflags = { workspace = true }
 cachedir = { workspace = true }
-chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "env", "wrap_help"] }
 clap_complete_command = { workspace = true }
 clearscreen = { workspace = true }
@@ -43,6 +42,7 @@ globwalk = { workspace = true }
 ignore = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
+jiff = { workspace = true }
 log = { workspace = true }
 notify = { workspace = true }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
@@ -75,7 +75,7 @@ test-case = { workspace = true }
 
 [package.metadata.cargo-shear]
 # Used via macro expansion.
-ignored = ["chrono"]
+ignored = ["jiff"]
 
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = { workspace = true }

@@ -21,6 +21,11 @@ reveal_type(get_int_async())  # revealed: @Todo(generic types.CoroutineType)
 
 ## Generic
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 def get_int[T]() -> int:
     return 42
@@ -72,7 +77,7 @@ def _(flag: bool):
 def f(x: int) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter 1 (`x`) of function `f`; expected type `int`"
+# error: 15 [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["foo"]`"
 reveal_type(f("foo"))  # revealed: int
 ```
 
@@ -82,7 +87,7 @@ reveal_type(f("foo"))  # revealed: int
 def f(x: int, /) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter 1 (`x`) of function `f`; expected type `int`"
+# error: 15 [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["foo"]`"
 reveal_type(f("foo"))  # revealed: int
 ```
 
@@ -92,7 +97,7 @@ reveal_type(f("foo"))  # revealed: int
 def f(*args: int) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter `*args` of function `f`; expected type `int`"
+# error: 15 [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["foo"]`"
 reveal_type(f("foo"))  # revealed: int
 ```
 
@@ -102,7 +107,7 @@ reveal_type(f("foo"))  # revealed: int
 def f(x: int) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter `x` of function `f`; expected type `int`"
+# error: 15 [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["foo"]`"
 reveal_type(f(x="foo"))  # revealed: int
 ```
 
@@ -112,7 +117,7 @@ reveal_type(f(x="foo"))  # revealed: int
 def f(*, x: int) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter `x` of function `f`; expected type `int`"
+# error: 15 [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["foo"]`"
 reveal_type(f(x="foo"))  # revealed: int
 ```
 
@@ -122,7 +127,7 @@ reveal_type(f(x="foo"))  # revealed: int
 def f(**kwargs: int) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter `**kwargs` of function `f`; expected type `int`"
+# error: 15 [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["foo"]`"
 reveal_type(f(x="foo"))  # revealed: int
 ```
 
@@ -132,8 +137,8 @@ reveal_type(f(x="foo"))  # revealed: int
 def f(x: int = 1, y: str = "foo") -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal[2]` cannot be assigned to parameter `y` of function `f`; expected type `str`"
-# error: 20 [invalid-argument-type] "Object of type `Literal["bar"]` cannot be assigned to parameter `x` of function `f`; expected type `int`"
+# error: 15 [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[2]`"
+# error: 20 [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["bar"]`"
 reveal_type(f(y=2, x="bar"))  # revealed: int
 ```
 

@@ -118,4 +118,4 @@ from typing import TypeVar
 T = TypeVar("T", int)
 ```
 
-[generics]: https://typing.readthedocs.io/en/latest/spec/generics.html
+[generics]: https://typing.python.org/en/latest/spec/generics.html

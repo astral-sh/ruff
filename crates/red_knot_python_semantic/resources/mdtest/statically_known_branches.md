@@ -996,6 +996,11 @@ reveal_type(x)  # revealed: Literal[1]
 
 ## `match` statements
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 ### Single-valued types, always true
 
 ```py
@@ -1118,6 +1123,7 @@ def _(s: str):
 ```toml
 [environment]
 python-platform = "darwin"
+python-version = "3.10"
 ```
 
 ```py
@@ -1502,13 +1508,14 @@ if True:
 from module import symbol
 ```
 
-## Unsupported features
+## Unreachable code
 
-We do not support full unreachable code analysis yet. We also raise diagnostics from
-statically-known to be false branches:
+A closely related feature is the ability to detect unreachable code. For example, we do not emit a
+diagnostic here:
 
 ```py
 if False:
-    # error: [unresolved-reference]
     x
 ```
+
+See [unreachable.md](unreachable.md) for more tests on this topic.

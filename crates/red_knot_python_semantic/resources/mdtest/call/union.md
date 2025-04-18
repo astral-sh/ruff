@@ -94,7 +94,7 @@ def _(flag: bool):
     else:
         f = f2
 
-    # error: [invalid-argument-type] "Object of type `Literal[3]` cannot be assigned to parameter 1 (`a`) of function `f2`; expected type `str`"
+    # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[3]`"
     x = f(3)
     reveal_type(x)  # revealed: int | str
 ```
@@ -174,4 +174,30 @@ def _(flag: bool):
         f = is_fully_static
     # error: [conflicting-argument-forms] "Argument is used as both a value and a type form in call"
     reveal_type(f(int))  # revealed: str | Literal[True]
+```
+
+## Size limit on unions of literals
+
+Beyond a certain size, large unions of literal types collapse to their nearest super-type (`int`,
+`bytes`, `str`).
+
+```py
+from typing import Literal
+
+def _(literals_2: Literal[0, 1], b: bool, flag: bool):
+    literals_4 = 2 * literals_2 + literals_2  # Literal[0, 1, 2, 3]
+    literals_16 = 4 * literals_4 + literals_4  # Literal[0, 1, .., 15]
+    literals_64 = 4 * literals_16 + literals_4  # Literal[0, 1, .., 63]
+    literals_128 = 2 * literals_64 + literals_2  # Literal[0, 1, .., 127]
+
+    # Going beyond the MAX_UNION_LITERALS limit (currently 200):
+    literals_256 = 16 * literals_16 + literals_16
+    reveal_type(literals_256)  # revealed: int
+
+    # Going beyond the limit when another type is already part of the union
+    bool_and_literals_128 = b if flag else literals_128  # bool | Literal[0, 1, ..., 127]
+    literals_128_shifted = literals_128 + 128  # Literal[128, 129, ..., 255]
+
+    # Now union the two:
+    reveal_type(bool_and_literals_128 if flag else literals_128_shifted)  # revealed: int
 ```

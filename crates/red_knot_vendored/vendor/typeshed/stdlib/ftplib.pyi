@@ -41,29 +41,17 @@ class FTP:
         self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
     ) -> None: ...
     source_address: tuple[str, int] | None
-    if sys.version_info >= (3, 9):
-        def __init__(
-            self,
-            host: str = "",
-            user: str = "",
-            passwd: str = "",
-            acct: str = "",
-            timeout: float | None = ...,
-            source_address: tuple[str, int] | None = None,
-            *,
-            encoding: str = "utf-8",
-        ) -> None: ...
-    else:
-        def __init__(
-            self,
-            host: str = "",
-            user: str = "",
-            passwd: str = "",
-            acct: str = "",
-            timeout: float | None = ...,
-            source_address: tuple[str, int] | None = None,
-        ) -> None: ...
-
+    def __init__(
+        self,
+        host: str = "",
+        user: str = "",
+        passwd: str = "",
+        acct: str = "",
+        timeout: float | None = ...,
+        source_address: tuple[str, int] | None = None,
+        *,
+        encoding: str = "utf-8",
+    ) -> None: ...
     def connect(
         self, host: str = "", port: int = 0, timeout: float = -999, source_address: tuple[str, int] | None = None
     ) -> str: ...
@@ -131,7 +119,7 @@ class FTP_TLS(FTP):
             source_address: tuple[str, int] | None = None,
             encoding: str = "utf-8",
         ) -> None: ...
-    elif sys.version_info >= (3, 9):
+    else:
         def __init__(
             self,
             host: str = "",
@@ -145,19 +133,6 @@ class FTP_TLS(FTP):
             source_address: tuple[str, int] | None = None,
             *,
             encoding: str = "utf-8",
-        ) -> None: ...
-    else:
-        def __init__(
-            self,
-            host: str = "",
-            user: str = "",
-            passwd: str = "",
-            acct: str = "",
-            keyfile: str | None = None,
-            certfile: str | None = None,
-            context: SSLContext | None = None,
-            timeout: float | None = ...,
-            source_address: tuple[str, int] | None = None,
         ) -> None: ...
     ssl_version: int
     keyfile: str | None

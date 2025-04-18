@@ -2,6 +2,7 @@
 // Run `crates/ruff_python_ast/generate.py` to re-generate the file.
 
 use crate::name::Name;
+use crate::visitor::source_order::SourceOrderVisitor;
 
 /// See also [mod](https://docs.python.org/3/library/ast.html#ast.mod)
 #[derive(Clone, Debug, PartialEq)]
@@ -6584,6 +6585,20 @@ impl AnyNodeRef<'_> {
     }
 }
 
+/// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModModule {
+    pub range: ruff_text_size::TextRange,
+    pub body: Vec<Stmt>,
+}
+
+/// See also [Module](https://docs.python.org/3/library/ast.html#ast.Module)
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModExpression {
+    pub range: ruff_text_size::TextRange,
+    pub body: Box<Expr>,
+}
+
 /// See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef)
 /// and [AsyncFunctionDef](https://docs.python.org/3/library/ast.html#ast.AsyncFunctionDef).
 ///
@@ -7122,4 +7137,848 @@ pub struct ExprIpyEscapeCommand {
     pub range: ruff_text_size::TextRange,
     pub kind: crate::IpyEscapeKind,
     pub value: Box<str>,
+}
+
+impl ModModule {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ModModule { body, range: _ } = self;
+        visitor.visit_body(body);
+    }
+}
+
+impl ModExpression {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ModExpression { body, range: _ } = self;
+        visitor.visit_expr(body);
+    }
+}
+
+impl StmtFunctionDef {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtFunctionDef {
+            is_async: _,
+            decorator_list,
+            name,
+            type_params,
+            parameters,
+            returns,
+            body,
+            range: _,
+        } = self;
+
+        for elm in decorator_list {
+            visitor.visit_decorator(elm);
+        }
+        visitor.visit_identifier(name);
+
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+
+        visitor.visit_parameters(parameters);
+
+        if let Some(returns) = returns {
+            visitor.visit_annotation(returns);
+        }
+
+        visitor.visit_body(body);
+    }
+}
+
+impl StmtClassDef {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtClassDef {
+            decorator_list,
+            name,
+            type_params,
+            arguments,
+            body,
+            range: _,
+        } = self;
+
+        for elm in decorator_list {
+            visitor.visit_decorator(elm);
+        }
+        visitor.visit_identifier(name);
+
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+
+        if let Some(arguments) = arguments {
+            visitor.visit_arguments(arguments);
+        }
+
+        visitor.visit_body(body);
+    }
+}
+
+impl StmtReturn {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtReturn { value, range: _ } = self;
+
+        if let Some(value) = value {
+            visitor.visit_expr(value);
+        }
+    }
+}
+
+impl StmtDelete {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtDelete { targets, range: _ } = self;
+
+        for elm in targets {
+            visitor.visit_expr(elm);
+        }
+    }
+}
+
+impl StmtTypeAlias {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtTypeAlias {
+            name,
+            type_params,
+            value,
+            range: _,
+        } = self;
+        visitor.visit_expr(name);
+
+        if let Some(type_params) = type_params {
+            visitor.visit_type_params(type_params);
+        }
+
+        visitor.visit_expr(value);
+    }
+}
+
+impl StmtAssign {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtAssign {
+            targets,
+            value,
+            range: _,
+        } = self;
+
+        for elm in targets {
+            visitor.visit_expr(elm);
+        }
+        visitor.visit_expr(value);
+    }
+}
+
+impl StmtAugAssign {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtAugAssign {
+            target,
+            op,
+            value,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_operator(op);
+        visitor.visit_expr(value);
+    }
+}
+
+impl StmtAnnAssign {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtAnnAssign {
+            target,
+            annotation,
+            value,
+            simple: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_annotation(annotation);
+
+        if let Some(value) = value {
+            visitor.visit_expr(value);
+        }
+    }
+}
+
+impl StmtFor {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtFor {
+            is_async: _,
+            target,
+            iter,
+            body,
+            orelse,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_expr(iter);
+        visitor.visit_body(body);
+        visitor.visit_body(orelse);
+    }
+}
+
+impl StmtWhile {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtWhile {
+            test,
+            body,
+            orelse,
+            range: _,
+        } = self;
+        visitor.visit_expr(test);
+        visitor.visit_body(body);
+        visitor.visit_body(orelse);
+    }
+}
+
+impl StmtIf {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtIf {
+            test,
+            body,
+            elif_else_clauses,
+            range: _,
+        } = self;
+        visitor.visit_expr(test);
+        visitor.visit_body(body);
+
+        for elm in elif_else_clauses {
+            visitor.visit_elif_else_clause(elm);
+        }
+    }
+}
+
+impl StmtWith {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtWith {
+            is_async: _,
+            items,
+            body,
+            range: _,
+        } = self;
+
+        for elm in items {
+            visitor.visit_with_item(elm);
+        }
+        visitor.visit_body(body);
+    }
+}
+
+impl StmtMatch {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtMatch {
+            subject,
+            cases,
+            range: _,
+        } = self;
+        visitor.visit_expr(subject);
+
+        for elm in cases {
+            visitor.visit_match_case(elm);
+        }
+    }
+}
+
+impl StmtRaise {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtRaise {
+            exc,
+            cause,
+            range: _,
+        } = self;
+
+        if let Some(exc) = exc {
+            visitor.visit_expr(exc);
+        }
+
+        if let Some(cause) = cause {
+            visitor.visit_expr(cause);
+        }
+    }
+}
+
+impl StmtTry {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtTry {
+            body,
+            handlers,
+            orelse,
+            finalbody,
+            is_star: _,
+            range: _,
+        } = self;
+        visitor.visit_body(body);
+
+        for elm in handlers {
+            visitor.visit_except_handler(elm);
+        }
+        visitor.visit_body(orelse);
+        visitor.visit_body(finalbody);
+    }
+}
+
+impl StmtAssert {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtAssert {
+            test,
+            msg,
+            range: _,
+        } = self;
+        visitor.visit_expr(test);
+
+        if let Some(msg) = msg {
+            visitor.visit_expr(msg);
+        }
+    }
+}
+
+impl StmtImport {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtImport { names, range: _ } = self;
+
+        for elm in names {
+            visitor.visit_alias(elm);
+        }
+    }
+}
+
+impl StmtImportFrom {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtImportFrom {
+            module,
+            names,
+            level: _,
+            range: _,
+        } = self;
+
+        if let Some(module) = module {
+            visitor.visit_identifier(module);
+        }
+
+        for elm in names {
+            visitor.visit_alias(elm);
+        }
+    }
+}
+
+impl StmtGlobal {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtGlobal { names, range: _ } = self;
+
+        for elm in names {
+            visitor.visit_identifier(elm);
+        }
+    }
+}
+
+impl StmtNonlocal {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtNonlocal { names, range: _ } = self;
+
+        for elm in names {
+            visitor.visit_identifier(elm);
+        }
+    }
+}
+
+impl StmtExpr {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtExpr { value, range: _ } = self;
+        visitor.visit_expr(value);
+    }
+}
+
+impl StmtPass {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtPass { range: _ } = self;
+    }
+}
+
+impl StmtBreak {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtBreak { range: _ } = self;
+    }
+}
+
+impl StmtContinue {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtContinue { range: _ } = self;
+    }
+}
+
+impl StmtIpyEscapeCommand {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let StmtIpyEscapeCommand {
+            kind: _,
+            value: _,
+            range: _,
+        } = self;
+    }
+}
+
+impl ExprNamed {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprNamed {
+            target,
+            value,
+            range: _,
+        } = self;
+        visitor.visit_expr(target);
+        visitor.visit_expr(value);
+    }
+}
+
+impl ExprBinOp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprBinOp {
+            left,
+            op,
+            right,
+            range: _,
+        } = self;
+        visitor.visit_expr(left);
+        visitor.visit_operator(op);
+        visitor.visit_expr(right);
+    }
+}
+
+impl ExprUnaryOp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprUnaryOp {
+            op,
+            operand,
+            range: _,
+        } = self;
+        visitor.visit_unary_op(op);
+        visitor.visit_expr(operand);
+    }
+}
+
+impl ExprLambda {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprLambda {
+            parameters,
+            body,
+            range: _,
+        } = self;
+
+        if let Some(parameters) = parameters {
+            visitor.visit_parameters(parameters);
+        }
+
+        visitor.visit_expr(body);
+    }
+}
+
+impl ExprIf {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprIf {
+            test,
+            body,
+            orelse,
+            range: _,
+        } = self;
+        visitor.visit_expr(body);
+        visitor.visit_expr(test);
+        visitor.visit_expr(orelse);
+    }
+}
+
+impl ExprSet {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprSet { elts, range: _ } = self;
+
+        for elm in elts {
+            visitor.visit_expr(elm);
+        }
+    }
+}
+
+impl ExprListComp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprListComp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+        visitor.visit_expr(elt);
+
+        for elm in generators {
+            visitor.visit_comprehension(elm);
+        }
+    }
+}
+
+impl ExprSetComp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprSetComp {
+            elt,
+            generators,
+            range: _,
+        } = self;
+        visitor.visit_expr(elt);
+
+        for elm in generators {
+            visitor.visit_comprehension(elm);
+        }
+    }
+}
+
+impl ExprDictComp {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprDictComp {
+            key,
+            value,
+            generators,
+            range: _,
+        } = self;
+        visitor.visit_expr(key);
+        visitor.visit_expr(value);
+
+        for elm in generators {
+            visitor.visit_comprehension(elm);
+        }
+    }
+}
+
+impl ExprGenerator {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprGenerator {
+            elt,
+            generators,
+            parenthesized: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(elt);
+
+        for elm in generators {
+            visitor.visit_comprehension(elm);
+        }
+    }
+}
+
+impl ExprAwait {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprAwait { value, range: _ } = self;
+        visitor.visit_expr(value);
+    }
+}
+
+impl ExprYield {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprYield { value, range: _ } = self;
+
+        if let Some(value) = value {
+            visitor.visit_expr(value);
+        }
+    }
+}
+
+impl ExprYieldFrom {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprYieldFrom { value, range: _ } = self;
+        visitor.visit_expr(value);
+    }
+}
+
+impl ExprCall {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprCall {
+            func,
+            arguments,
+            range: _,
+        } = self;
+        visitor.visit_expr(func);
+        visitor.visit_arguments(arguments);
+    }
+}
+
+impl ExprNumberLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprNumberLiteral { value: _, range: _ } = self;
+    }
+}
+
+impl ExprBooleanLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprBooleanLiteral { value: _, range: _ } = self;
+    }
+}
+
+impl ExprNoneLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprNoneLiteral { range: _ } = self;
+    }
+}
+
+impl ExprEllipsisLiteral {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprEllipsisLiteral { range: _ } = self;
+    }
+}
+
+impl ExprAttribute {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprAttribute {
+            value,
+            attr,
+            ctx: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(value);
+        visitor.visit_identifier(attr);
+    }
+}
+
+impl ExprSubscript {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprSubscript {
+            value,
+            slice,
+            ctx: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(value);
+        visitor.visit_expr(slice);
+    }
+}
+
+impl ExprStarred {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprStarred {
+            value,
+            ctx: _,
+            range: _,
+        } = self;
+        visitor.visit_expr(value);
+    }
+}
+
+impl ExprName {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprName {
+            id: _,
+            ctx: _,
+            range: _,
+        } = self;
+    }
+}
+
+impl ExprList {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprList {
+            elts,
+            ctx: _,
+            range: _,
+        } = self;
+
+        for elm in elts {
+            visitor.visit_expr(elm);
+        }
+    }
+}
+
+impl ExprTuple {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprTuple {
+            elts,
+            ctx: _,
+            parenthesized: _,
+            range: _,
+        } = self;
+
+        for elm in elts {
+            visitor.visit_expr(elm);
+        }
+    }
+}
+
+impl ExprSlice {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprSlice {
+            lower,
+            upper,
+            step,
+            range: _,
+        } = self;
+
+        if let Some(lower) = lower {
+            visitor.visit_expr(lower);
+        }
+
+        if let Some(upper) = upper {
+            visitor.visit_expr(upper);
+        }
+
+        if let Some(step) = step {
+            visitor.visit_expr(step);
+        }
+    }
+}
+
+impl ExprIpyEscapeCommand {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, _: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let ExprIpyEscapeCommand {
+            kind: _,
+            value: _,
+            range: _,
+        } = self;
+    }
 }

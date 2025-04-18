@@ -56,8 +56,9 @@ We can access attributes on objects of all kinds:
 ```py
 import sys
 
-reveal_type(inspect.getattr_static(sys, "platform"))  # revealed: LiteralString
-reveal_type(inspect.getattr_static(inspect, "getattr_static"))  # revealed: Literal[getattr_static]
+reveal_type(inspect.getattr_static(sys, "dont_write_bytecode"))  # revealed: bool
+# revealed: def getattr_static(obj: object, attr: str, default: Any | None = ellipsis) -> Any
+reveal_type(inspect.getattr_static(inspect, "getattr_static"))
 
 reveal_type(inspect.getattr_static(1, "real"))  # revealed: property
 ```
@@ -114,7 +115,7 @@ inspect.getattr_static()
 # error: [missing-argument] "No argument provided for required parameter `attr`"
 inspect.getattr_static(C())
 
-# error: [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 2 (`attr`) of function `getattr_static`; expected type `str`"
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[1]`"
 inspect.getattr_static(C(), 1)
 
 # error: [too-many-positional-arguments] "Too many positional arguments to function `getattr_static`: expected 3, got 4"
@@ -143,8 +144,9 @@ from typing import Any
 def _(a: Any, tuple_of_any: tuple[Any]):
     reveal_type(inspect.getattr_static(a, "x", "default"))  # revealed: Any | Literal["default"]
 
-    # TODO: Ideally, this would just be `Literal[index]`
-    reveal_type(inspect.getattr_static(tuple_of_any, "index", "default"))  # revealed: Literal[index] | Literal["default"]
+    # TODO: Ideally, this would just be `def index(self, value: Any, start: SupportsIndex = Literal[0], stop: SupportsIndex = int, /) -> int`
+    # revealed: (def index(self, value: Any, start: SupportsIndex = Literal[0], stop: SupportsIndex = int, /) -> int) | Literal["default"]
+    reveal_type(inspect.getattr_static(tuple_of_any, "index", "default"))
 ```
 
 [official documentation]: https://docs.python.org/3/library/inspect.html#inspect.getattr_static

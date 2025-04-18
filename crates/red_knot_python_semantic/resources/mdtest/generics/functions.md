@@ -1,5 +1,10 @@
 # Generic functions
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ## Typevar must be used at least twice
 
 If you're only using a typevar for a single parameter, you don't need the typevar — just use
@@ -43,25 +48,14 @@ def absurd[T]() -> T:
 If the type of a generic function parameter is a typevar, then we can infer what type that typevar
 is bound to at each call site.
 
-TODO: Note that some of the TODO revealed types have two options, since we haven't decided yet
-whether we want to infer a more specific `Literal` type where possible, or use heuristics to weaken
-the inferred type to e.g. `int`.
-
 ```py
 def f[T](x: T) -> T:
     return x
 
-# TODO: revealed: int or Literal[1]
-reveal_type(f(1))  # revealed: T
-
-# TODO: revealed: float
-reveal_type(f(1.0))  # revealed: T
-
-# TODO: revealed: bool or Literal[true]
-reveal_type(f(True))  # revealed: T
-
-# TODO: revealed: str or Literal["string"]
-reveal_type(f("string"))  # revealed: T
+reveal_type(f(1))  # revealed: Literal[1]
+reveal_type(f(1.0))  # revealed: float
+reveal_type(f(True))  # revealed: Literal[True]
+reveal_type(f("string"))  # revealed: Literal["string"]
 ```
 
 ## Inferring “deep” generic parameter types
@@ -74,7 +68,7 @@ def f[T](x: list[T]) -> T:
     return x[0]
 
 # TODO: revealed: float
-reveal_type(f([1.0, 2.0]))  # revealed: T
+reveal_type(f([1.0, 2.0]))  # revealed: Unknown
 ```
 
 ## Typevar constraints
@@ -85,7 +79,6 @@ in the function.
 
 ```py
 def good_param[T: int](x: T) -> None:
-    # TODO: revealed: T & int
     reveal_type(x)  # revealed: T
 ```
 
@@ -99,7 +92,7 @@ def good_return[T: int](x: T) -> T:
     return x
 
 def bad_return[T: int](x: T) -> T:
-    # error: [invalid-return-type] "Object of type `int` is not assignable to return type `T`"
+    # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `int`"
     return x + 1
 ```
 
@@ -112,7 +105,7 @@ def different_types[T, S](cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
-        # TODO: error: [invalid-return-type] "Object of type `S` is not assignable to return type `T`"
+        # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `S`"
         return s
 
 def same_types[T](cond: bool, t1: T, t2: T) -> T:
@@ -154,39 +147,41 @@ parameters simultaneously.
 def two_params[T](x: T, y: T) -> T:
     return x
 
-# TODO: revealed: str
-reveal_type(two_params("a", "b"))  # revealed: T
+reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
+reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
+```
 
-# TODO: revealed: str | int
-reveal_type(two_params("a", 1))  # revealed: T
+When one of the parameters is a union, we attempt to find the smallest specialization that satisfies
+all of the constraints.
+
+```py
+def union_param[T](x: T | None) -> T:
+    if x is None:
+        raise ValueError
+    return x
+
+reveal_type(union_param("a"))  # revealed: Literal["a"]
+reveal_type(union_param(1))  # revealed: Literal[1]
+reveal_type(union_param(None))  # revealed: Unknown
 ```
 
 ```py
-def param_with_union[T](x: T | int, y: T) -> T:
+def union_and_nonunion_params[T](x: T | int, y: T) -> T:
     return y
 
-# TODO: revealed: str
-reveal_type(param_with_union(1, "a"))  # revealed: T
-
-# TODO: revealed: str
-reveal_type(param_with_union("a", "a"))  # revealed: T
-
-# TODO: revealed: int
-reveal_type(param_with_union(1, 1))  # revealed: T
-
-# TODO: revealed: str | int
-reveal_type(param_with_union("a", 1))  # revealed: T
+reveal_type(union_and_nonunion_params(1, "a"))  # revealed: Literal["a"]
+reveal_type(union_and_nonunion_params("a", "a"))  # revealed: Literal["a"]
+reveal_type(union_and_nonunion_params(1, 1))  # revealed: Literal[1]
+reveal_type(union_and_nonunion_params(3, 1))  # revealed: Literal[1]
+reveal_type(union_and_nonunion_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
 ```py
 def tuple_param[T, S](x: T | S, y: tuple[T, S]) -> tuple[T, S]:
     return y
 
-# TODO: revealed: tuple[str, int]
-reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[T, S]
-
-# TODO: revealed: tuple[str, int]
-reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[T, S]
+reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
+reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
 
 ## Inferring nested generic function calls
@@ -201,9 +196,6 @@ def f[T](x: T) -> tuple[T, int]:
 def g[T](x: T) -> T | None:
     return x
 
-# TODO: revealed: tuple[str | None, int]
-reveal_type(f(g("a")))  # revealed: tuple[T, int]
-
-# TODO: revealed: tuple[str, int] | None
-reveal_type(g(f("a")))  # revealed: T | None
+reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
+reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```

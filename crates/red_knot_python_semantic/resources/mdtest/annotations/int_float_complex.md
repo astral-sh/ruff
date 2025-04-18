@@ -2,7 +2,7 @@
 
 In order to support common use cases, an annotation of `float` actually means `int | float`, and an
 annotation of `complex` actually means `int | float | complex`. See
-[the specification](https://typing.readthedocs.io/en/latest/spec/special-types.html#special-cases-for-float-and-complex)
+[the specification](https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex)
 
 ## float
 

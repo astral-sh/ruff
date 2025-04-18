@@ -100,20 +100,13 @@ class EnumMeta(type):
             _simple: bool = False,
             **kwds: Any,
         ) -> _typeshed.Self: ...
-    elif sys.version_info >= (3, 9):
+    else:
         def __new__(
             metacls: type[_typeshed.Self], cls: str, bases: tuple[type, ...], classdict: _EnumDict, **kwds: Any
         ) -> _typeshed.Self: ...
-    else:
-        def __new__(metacls: type[_typeshed.Self], cls: str, bases: tuple[type, ...], classdict: _EnumDict) -> _typeshed.Self: ...
 
-    if sys.version_info >= (3, 9):
-        @classmethod
-        def __prepare__(metacls, cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict: ...  # type: ignore[override]
-    else:
-        @classmethod
-        def __prepare__(metacls, cls: str, bases: tuple[type, ...]) -> _EnumDict: ...  # type: ignore[override]
-
+    @classmethod
+    def __prepare__(metacls, cls: str, bases: tuple[type, ...], **kwds: Any) -> _EnumDict: ...  # type: ignore[override]
     def __iter__(self: type[_EnumMemberT]) -> Iterator[_EnumMemberT]: ...
     def __reversed__(self: type[_EnumMemberT]) -> Iterator[_EnumMemberT]: ...
     if sys.version_info >= (3, 12):

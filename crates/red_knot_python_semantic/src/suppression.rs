@@ -535,7 +535,7 @@ impl<'a> SuppressionsBuilder<'a> {
         // > imports, or other executable code, silences all errors in the file.
         // > Blank lines and other comments, such as shebang lines and coding cookies,
         // > may precede the # type: ignore comment.
-        // > https://typing.readthedocs.io/en/latest/spec/directives.html#type-ignore-comments
+        // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
         let is_file_suppression = comment.kind.is_type_ignore() && !self.seen_non_trivia_token;
 
         let suppressed_range = if is_file_suppression {

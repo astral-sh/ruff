@@ -56,6 +56,11 @@ def f() -> int:
 
 ### In Protocol
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import Protocol, TypeVar
 
@@ -84,6 +89,11 @@ class Lorem(t[0]):
 ```
 
 ### In abstract method
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from abc import ABC, abstractmethod
@@ -313,7 +323,7 @@ def f(cond: bool) -> str:
     return "hello" if cond else NotImplemented
 
 def f(cond: bool) -> int:
-    # error: [invalid-return-type] "Object of type `Literal["hello"]` is not assignable to return type `int`"
+    # error: [invalid-return-type] "Return type does not match returned value: Expected `int`, found `Literal["hello"]`"
     return "hello" if cond else NotImplemented
 ```
 

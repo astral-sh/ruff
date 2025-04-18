@@ -316,7 +316,7 @@ pub struct Options {
     /// for a complete description of how the `target-version` is determined
     /// when left unspecified.
     ///
-    /// Note that a stub file can [sometimes make use of a typing feature](https://typing.readthedocs.io/en/latest/spec/distributing.html#syntax)
+    /// Note that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)
     /// before it is available at runtime, as long as the stub does not make
     /// use of new *syntax*. For example, a type checker will understand
     /// `int | str` in a stub as being a `Union` type annotation, even if the
@@ -2427,7 +2427,7 @@ pub struct IsortOptions {
     /// Use `-1` for automatic determination.
     ///
     /// Ruff uses at most one blank line after imports in typing stub files (files with `.pyi` extension) in accordance to
-    /// the typing style recommendations ([source](https://typing.readthedocs.io/en/latest/guides/writing_stubs.html#blank-lines)).
+    /// the typing style recommendations ([source](https://typing.python.org/en/latest/guides/writing_stubs.html#blank-lines)).
     ///
     /// When using the formatter, only the values `-1`, `1`, and `2` are compatible because
     /// it enforces at least one empty and at most two empty lines after imports.

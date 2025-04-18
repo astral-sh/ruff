@@ -228,7 +228,7 @@ fn server(args: ServerCommand) -> Result<ExitStatus> {
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
     let worker_threads = std::thread::available_parallelism()
         .unwrap_or(four)
-        .max(four);
+        .min(four);
     commands::server::run_server(worker_threads, args.resolve_preview())
 }
 

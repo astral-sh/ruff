@@ -24,7 +24,7 @@ from builtins import OSError
 from collections.abc import Callable, Iterable, Iterator, Mapping, MutableMapping, Sequence
 from io import BufferedRandom, BufferedReader, BufferedWriter, FileIO, TextIOWrapper
 from subprocess import Popen
-from types import TracebackType
+from types import GenericAlias, TracebackType
 from typing import (
     IO,
     Any,
@@ -43,9 +43,6 @@ from typing import (
 from typing_extensions import Self, TypeAlias, Unpack, deprecated
 
 from . import path as _path
-
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
 
 __all__ = [
     "F_OK",
@@ -155,14 +152,14 @@ __all__ = [
     "umask",
     "uname_result",
     "unlink",
+    "unsetenv",
     "urandom",
     "utime",
     "waitpid",
+    "waitstatus_to_exitcode",
     "walk",
     "write",
 ]
-if sys.version_info >= (3, 9):
-    __all__ += ["waitstatus_to_exitcode"]
 if sys.platform == "darwin" and sys.version_info >= (3, 12):
     __all__ += ["PRIO_DARWIN_BG", "PRIO_DARWIN_NONUI", "PRIO_DARWIN_PROCESS", "PRIO_DARWIN_THREAD"]
 if sys.platform == "darwin" and sys.version_info >= (3, 10):
@@ -194,6 +191,7 @@ if sys.platform == "linux":
         "O_PATH",
         "O_RSYNC",
         "O_TMPFILE",
+        "P_PIDFD",
         "RTLD_DEEPBIND",
         "SCHED_BATCH",
         "SCHED_IDLE",
@@ -206,6 +204,7 @@ if sys.platform == "linux":
         "getxattr",
         "listxattr",
         "memfd_create",
+        "pidfd_open",
         "removexattr",
         "setxattr",
     ]
@@ -256,8 +255,6 @@ if sys.platform == "linux" and sys.version_info >= (3, 10):
         "eventfd_write",
         "splice",
     ]
-if sys.platform == "linux" and sys.version_info >= (3, 9):
-    __all__ += ["P_PIDFD", "pidfd_open"]
 if sys.platform == "win32":
     __all__ += [
         "O_BINARY",
@@ -280,6 +277,8 @@ if sys.platform != "win32":
         "CLD_CONTINUED",
         "CLD_DUMPED",
         "CLD_EXITED",
+        "CLD_KILLED",
+        "CLD_STOPPED",
         "CLD_TRAPPED",
         "EX_CANTCREAT",
         "EX_CONFIG",
@@ -431,8 +430,6 @@ if sys.platform != "win32" and sys.version_info >= (3, 11):
     __all__ += ["login_tty"]
 if sys.platform != "win32" and sys.version_info >= (3, 10):
     __all__ += ["O_FSYNC"]
-if sys.platform != "win32" and sys.version_info >= (3, 9):
-    __all__ += ["CLD_KILLED", "CLD_STOPPED"]
 if sys.platform != "darwin" and sys.platform != "win32":
     __all__ += [
         "POSIX_FADV_DONTNEED",
@@ -486,8 +483,6 @@ if sys.platform != "win32" or sys.version_info >= (3, 12):
     __all__ += ["get_blocking", "set_blocking"]
 if sys.platform != "win32" or sys.version_info >= (3, 11):
     __all__ += ["EX_OK"]
-if sys.platform != "win32" or sys.version_info >= (3, 9):
-    __all__ += ["unsetenv"]
 
 # This unnecessary alias is to work around various errors
 path = _path
@@ -550,7 +545,7 @@ if sys.platform != "win32":
     P_PGID: int
     P_ALL: int
 
-    if sys.platform == "linux" and sys.version_info >= (3, 9):
+    if sys.platform == "linux":
         P_PIDFD: int
 
     WEXITED: int
@@ -561,10 +556,8 @@ if sys.platform != "win32":
     CLD_DUMPED: int
     CLD_TRAPPED: int
     CLD_CONTINUED: int
-
-    if sys.version_info >= (3, 9):
-        CLD_KILLED: int
-        CLD_STOPPED: int
+    CLD_KILLED: int
+    CLD_STOPPED: int
 
     SCHED_OTHER: int
     SCHED_FIFO: int
@@ -698,29 +691,14 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
     decodekey: _EnvironCodeFunc[AnyStr]
     encodevalue: _EnvironCodeFunc[AnyStr]
     decodevalue: _EnvironCodeFunc[AnyStr]
-    if sys.version_info >= (3, 9):
-        def __init__(
-            self,
-            data: MutableMapping[AnyStr, AnyStr],
-            encodekey: _EnvironCodeFunc[AnyStr],
-            decodekey: _EnvironCodeFunc[AnyStr],
-            encodevalue: _EnvironCodeFunc[AnyStr],
-            decodevalue: _EnvironCodeFunc[AnyStr],
-        ) -> None: ...
-    else:
-        putenv: Callable[[AnyStr, AnyStr], object]
-        unsetenv: Callable[[AnyStr, AnyStr], object]
-        def __init__(
-            self,
-            data: MutableMapping[AnyStr, AnyStr],
-            encodekey: _EnvironCodeFunc[AnyStr],
-            decodekey: _EnvironCodeFunc[AnyStr],
-            encodevalue: _EnvironCodeFunc[AnyStr],
-            decodevalue: _EnvironCodeFunc[AnyStr],
-            putenv: Callable[[AnyStr, AnyStr], object],
-            unsetenv: Callable[[AnyStr, AnyStr], object],
-        ) -> None: ...
-
+    def __init__(
+        self,
+        data: MutableMapping[AnyStr, AnyStr],
+        encodekey: _EnvironCodeFunc[AnyStr],
+        decodekey: _EnvironCodeFunc[AnyStr],
+        encodevalue: _EnvironCodeFunc[AnyStr],
+        decodevalue: _EnvironCodeFunc[AnyStr],
+    ) -> None: ...
     def setdefault(self, key: AnyStr, value: AnyStr) -> AnyStr: ...
     def copy(self) -> dict[AnyStr, AnyStr]: ...
     def __delitem__(self, key: AnyStr) -> None: ...
@@ -728,16 +706,15 @@ class _Environ(MutableMapping[AnyStr, AnyStr], Generic[AnyStr]):
     def __setitem__(self, key: AnyStr, value: AnyStr) -> None: ...
     def __iter__(self) -> Iterator[AnyStr]: ...
     def __len__(self) -> int: ...
-    if sys.version_info >= (3, 9):
-        def __or__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]: ...
-        def __ror__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]: ...
-        # We use @overload instead of a Union for reasons similar to those given for
-        # overloading MutableMapping.update in stdlib/typing.pyi
-        # The type: ignore is needed due to incompatible __or__/__ior__ signatures
-        @overload  # type: ignore[misc]
-        def __ior__(self, other: Mapping[AnyStr, AnyStr]) -> Self: ...
-        @overload
-        def __ior__(self, other: Iterable[tuple[AnyStr, AnyStr]]) -> Self: ...
+    def __or__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]: ...
+    def __ror__(self, other: Mapping[_T1, _T2]) -> dict[AnyStr | _T1, AnyStr | _T2]: ...
+    # We use @overload instead of a Union for reasons similar to those given for
+    # overloading MutableMapping.update in stdlib/typing.pyi
+    # The type: ignore is needed due to incompatible __or__/__ior__ signatures
+    @overload  # type: ignore[misc]
+    def __ior__(self, other: Mapping[AnyStr, AnyStr]) -> Self: ...
+    @overload
+    def __ior__(self, other: Iterable[tuple[AnyStr, AnyStr]]) -> Self: ...
 
 environ: _Environ[str]
 if sys.platform != "win32":
@@ -900,8 +877,7 @@ class DirEntry(Generic[AnyStr]):
     def is_symlink(self) -> bool: ...
     def stat(self, *, follow_symlinks: bool = True) -> stat_result: ...
     def __fspath__(self) -> AnyStr: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
     if sys.version_info >= (3, 12):
         def is_junction(self) -> bool: ...
 
@@ -1024,9 +1000,7 @@ if sys.platform != "win32":
 
 else:
     def putenv(name: str, value: str, /) -> None: ...
-
-    if sys.version_info >= (3, 9):
-        def unsetenv(name: str, /) -> None: ...
+    def unsetenv(name: str, /) -> None: ...
 
 _Opener: TypeAlias = Callable[[str, int], int]
 
@@ -1598,11 +1572,10 @@ if sys.platform == "linux":
     def memfd_create(name: str, flags: int = ...) -> int: ...
     def copy_file_range(src: int, dst: int, count: int, offset_src: int | None = ..., offset_dst: int | None = ...) -> int: ...
 
-if sys.version_info >= (3, 9):
-    def waitstatus_to_exitcode(status: int) -> int: ...
+def waitstatus_to_exitcode(status: int) -> int: ...
 
-    if sys.platform == "linux":
-        def pidfd_open(pid: int, flags: int = ...) -> int: ...
+if sys.platform == "linux":
+    def pidfd_open(pid: int, flags: int = ...) -> int: ...
 
 if sys.version_info >= (3, 12) and sys.platform == "linux":
     PIDFD_NONBLOCK: Final = 2048

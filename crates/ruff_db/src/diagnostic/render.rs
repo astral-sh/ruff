@@ -76,7 +76,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 }
                 write!(f, ":")?;
             }
-            return writeln!(f, " {message}", message = self.diag.primary_message());
+            return writeln!(f, " {}", self.diag.concise_message());
         }
 
         let resolved = Resolved::new(&self.resolver, self.diag);
@@ -159,7 +159,7 @@ impl<'a> ResolvedDiagnostic<'a> {
                 ResolvedAnnotation::new(path, &input, ann)
             })
             .collect();
-        let message = if diag.inner.message.is_empty() {
+        let message = if diag.inner.message.as_str().is_empty() {
             diag.inner.id.to_string()
         } else {
             // TODO: See the comment on `Renderable::id` for
@@ -168,7 +168,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             format!(
                 "{id}: {message}",
                 id = diag.inner.id,
-                message = diag.inner.message
+                message = diag.inner.message.as_str(),
             )
         };
         ResolvedDiagnostic {
@@ -195,7 +195,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             .collect();
         ResolvedDiagnostic {
             severity: diag.inner.severity,
-            message: diag.inner.message.to_string(),
+            message: diag.inner.message.as_str().to_string(),
             annotations,
         }
     }
@@ -314,7 +314,7 @@ impl<'a> ResolvedAnnotation<'a> {
             range,
             line_start,
             line_end,
-            message: ann.message.as_deref(),
+            message: ann.get_message(),
             is_primary: ann.is_primary,
         })
     }

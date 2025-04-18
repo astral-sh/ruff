@@ -1,5 +1,10 @@
 # Pattern matching
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 ## With wildcard
 
 ```py

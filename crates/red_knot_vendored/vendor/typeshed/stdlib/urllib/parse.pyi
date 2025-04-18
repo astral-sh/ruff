@@ -1,10 +1,8 @@
 import sys
-from collections.abc import Callable, Iterable, Mapping, Sequence
-from typing import Any, AnyStr, Generic, Literal, NamedTuple, TypeVar, overload
+from collections.abc import Iterable, Mapping, Sequence
+from types import GenericAlias
+from typing import Any, AnyStr, Generic, Literal, NamedTuple, Protocol, overload, type_check_only
 from typing_extensions import TypeAlias
-
-if sys.version_info >= (3, 9):
-    from types import GenericAlias
 
 __all__ = [
     "urlparse",
@@ -55,8 +53,7 @@ class _NetlocResultMixinBase(Generic[AnyStr]):
     def hostname(self) -> AnyStr | None: ...
     @property
     def port(self) -> int | None: ...
-    if sys.version_info >= (3, 9):
-        def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
+    def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
 
 class _NetlocResultMixinStr(_NetlocResultMixinBase[str], _ResultMixinStr): ...
 class _NetlocResultMixinBytes(_NetlocResultMixinBase[bytes], _ResultMixinBytes): ...
@@ -127,13 +124,7 @@ def quote_from_bytes(bs: bytes | bytearray, safe: str | Iterable[int] = "/") -> 
 def quote_plus(string: str, safe: str | Iterable[int] = "", encoding: str | None = None, errors: str | None = None) -> str: ...
 @overload
 def quote_plus(string: bytes | bytearray, safe: str | Iterable[int] = "") -> str: ...
-
-if sys.version_info >= (3, 9):
-    def unquote(string: str | bytes, encoding: str = "utf-8", errors: str = "replace") -> str: ...
-
-else:
-    def unquote(string: str, encoding: str = "utf-8", errors: str = "replace") -> str: ...
-
+def unquote(string: str | bytes, encoding: str = "utf-8", errors: str = "replace") -> str: ...
 def unquote_to_bytes(string: str | bytes | bytearray) -> bytes: ...
 def unquote_plus(string: str, encoding: str = "utf-8", errors: str = "replace") -> str: ...
 @overload
@@ -141,38 +132,32 @@ def urldefrag(url: str) -> DefragResult: ...
 @overload
 def urldefrag(url: bytes | bytearray | None) -> DefragResultBytes: ...
 
-_Q = TypeVar("_Q", bound=str | Iterable[int])
+# The values are passed through `str()` (unless they are bytes), so anything is valid.
 _QueryType: TypeAlias = (
-    Mapping[Any, Any] | Mapping[Any, Sequence[Any]] | Sequence[tuple[Any, Any]] | Sequence[tuple[Any, Sequence[Any]]]
+    Mapping[str, object]
+    | Mapping[bytes, object]
+    | Mapping[str | bytes, object]
+    | Mapping[str, Sequence[object]]
+    | Mapping[bytes, Sequence[object]]
+    | Mapping[str | bytes, Sequence[object]]
+    | Sequence[tuple[str | bytes, object]]
+    | Sequence[tuple[str | bytes, Sequence[object]]]
 )
 
-@overload
+@type_check_only
+class _QuoteVia(Protocol):
+    @overload
+    def __call__(self, string: str, safe: str | bytes, encoding: str, errors: str, /) -> str: ...
+    @overload
+    def __call__(self, string: bytes, safe: str | bytes, /) -> str: ...
+
 def urlencode(
     query: _QueryType,
     doseq: bool = False,
-    safe: str = "",
+    safe: str | bytes = "",
     encoding: str | None = None,
     errors: str | None = None,
-    quote_via: Callable[[AnyStr, str, str, str], str] = ...,
-) -> str: ...
-@overload
-def urlencode(
-    query: _QueryType,
-    doseq: bool,
-    safe: _Q,
-    encoding: str | None = None,
-    errors: str | None = None,
-    quote_via: Callable[[AnyStr, _Q, str, str], str] = ...,
-) -> str: ...
-@overload
-def urlencode(
-    query: _QueryType,
-    doseq: bool = False,
-    *,
-    safe: _Q,
-    encoding: str | None = None,
-    errors: str | None = None,
-    quote_via: Callable[[AnyStr, _Q, str, str], str] = ...,
+    quote_via: _QuoteVia = ...,
 ) -> str: ...
 def urljoin(base: AnyStr, url: AnyStr | None, allow_fragments: bool = True) -> AnyStr: ...
 @overload

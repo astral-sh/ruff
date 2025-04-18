@@ -48,6 +48,11 @@ reveal_type(get_foo())  # revealed: Foo
 
 ## Deferred self-reference annotations in a class definition
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from __future__ import annotations
 
@@ -93,6 +98,11 @@ class Foo:
 ```
 
 ## Non-deferred self-reference annotations in a class definition
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 class Foo:
@@ -145,4 +155,25 @@ def _():
         # error: [unresolved-reference]
         def f(self) -> C:
             return self
+```
+
+## Base class references
+
+### Not deferred by __future__.annotations
+
+```py
+from __future__ import annotations
+
+class A(B):  # error: [unresolved-reference]
+    pass
+
+class B:
+    pass
+```
+
+### Deferred in stub files
+
+```pyi
+class A(B): ...
+class B: ...
 ```

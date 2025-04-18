@@ -3,7 +3,6 @@
 //! This checker is not responsible for traversing the AST itself. Instead, its
 //! [`SemanticSyntaxChecker::visit_stmt`] and [`SemanticSyntaxChecker::visit_expr`] methods should
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
-
 use std::fmt::Display;
 
 use ruff_python_ast::{
@@ -16,7 +15,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
     /// The checker has traversed past the `__future__` import boundary.
     ///
@@ -37,9 +36,7 @@ pub struct SemanticSyntaxChecker {
 
 impl SemanticSyntaxChecker {
     pub fn new() -> Self {
-        Self {
-            seen_futures_boundary: false,
-        }
+        Self::default()
     }
 }
 
@@ -96,19 +93,41 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
-            Stmt::Return(ast::StmtReturn {
-                value: Some(value), ..
-            }) => {
-                // test_err single_star_return
-                // def f(): return *x
-                Self::invalid_star_expression(value, ctx);
+            Stmt::Return(ast::StmtReturn { value, range }) => {
+                if let Some(value) = value {
+                    // test_err single_star_return
+                    // def f(): return *x
+                    Self::invalid_star_expression(value, ctx);
+                }
+                if !ctx.in_function_scope() {
+                    Self::add_error(ctx, SemanticSyntaxErrorKind::ReturnOutsideFunction, *range);
+                }
             }
-            Stmt::For(ast::StmtFor { target, iter, .. }) => {
+            Stmt::For(ast::StmtFor {
+                target,
+                iter,
+                is_async,
+                ..
+            }) => {
                 // test_err single_star_for
                 // for _ in *x: ...
                 // for *x in xs: ...
                 Self::invalid_star_expression(target, ctx);
                 Self::invalid_star_expression(iter, ctx);
+                if *is_async {
+                    Self::await_outside_async_function(
+                        ctx,
+                        stmt,
+                        AwaitOutsideAsyncFunctionKind::AsyncFor,
+                    );
+                }
+            }
+            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
+                Self::await_outside_async_function(
+                    ctx,
+                    stmt,
+                    AwaitOutsideAsyncFunctionKind::AsyncWith,
+                );
             }
             _ => {}
         }
@@ -119,13 +138,40 @@ impl SemanticSyntaxChecker {
 
     fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
+            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+                if ctx.python_version() > PythonVersion::PY313 {
+                    // test_ok valid_annotation_py313
+                    // # parse_options: {"target-version": "3.13"}
+                    // a: (x := 1)
+                    // def outer():
+                    //     b: (yield 1)
+                    //     c: (yield from 1)
+                    // async def outer():
+                    //     d: (await 1)
+
+                    // test_err invalid_annotation_py314
+                    // # parse_options: {"target-version": "3.14"}
+                    // a: (x := 1)
+                    // def outer():
+                    //     b: (yield 1)
+                    //     c: (yield from 1)
+                    // async def outer():
+                    //     d: (await 1)
+                    let mut visitor = InvalidExpressionVisitor {
+                        position: InvalidExpressionPosition::TypeAnnotation,
+                        ctx,
+                    };
+                    visitor.visit_expr(annotation);
+                }
+            }
             Stmt::FunctionDef(ast::StmtFunctionDef {
                 type_params,
                 parameters,
                 returns,
                 ..
             }) => {
-                // test_ok valid_annotation_function
+                // test_ok valid_annotation_function_py313
+                // # parse_options: {"target-version": "3.13"}
                 // def f() -> (y := 3): ...
                 // def g(arg: (x := 1)): ...
                 // def outer():
@@ -133,6 +179,9 @@ impl SemanticSyntaxChecker {
                 //     def k() -> (yield 1): ...
                 //     def m(x: (yield from 1)): ...
                 //     def o() -> (yield from 1): ...
+                // async def outer():
+                //     def f() -> (await 1): ...
+                //     def g(arg: (await 1)): ...
 
                 // test_err invalid_annotation_function_py314
                 // # parse_options: {"target-version": "3.14"}
@@ -143,8 +192,13 @@ impl SemanticSyntaxChecker {
                 //     def k() -> (yield 1): ...
                 //     def m(x: (yield from 1)): ...
                 //     def o() -> (yield from 1): ...
+                // async def outer():
+                //     def f() -> (await 1): ...
+                //     def g(arg: (await 1)): ...
 
                 // test_err invalid_annotation_function
+                // def d[T]() -> (await 1): ...
+                // def e[T](arg: (await 1)): ...
                 // def f[T]() -> (y := 3): ...
                 // def g[T](arg: (x := 1)): ...
                 // def h[T](x: (yield 1)): ...
@@ -159,6 +213,10 @@ impl SemanticSyntaxChecker {
                 // def u[T = (x := 1)](): ...      # named expr in TypeVar default
                 // def v[*Ts = (x := 1)](): ...    # named expr in TypeVarTuple default
                 // def w[**Ts = (x := 1)](): ...   # named expr in ParamSpec default
+                // def t[T: (await 1)](): ...       # await in TypeVar bound
+                // def u[T = (await 1)](): ...      # await in TypeVar default
+                // def v[*Ts = (await 1)](): ...    # await in TypeVarTuple default
+                // def w[**Ts = (await 1)](): ...   # await in ParamSpec default
                 let mut visitor = InvalidExpressionVisitor {
                     position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
@@ -194,6 +252,8 @@ impl SemanticSyntaxChecker {
                 // def f():
                 //     class G((yield 1)): ...
                 //     class H((yield from 1)): ...
+                // async def f():
+                //     class G((await 1)): ...
 
                 // test_err invalid_annotation_class
                 // class F[T](y := list): ...
@@ -201,6 +261,8 @@ impl SemanticSyntaxChecker {
                 // class J[T]((yield from 1)): ...
                 // class K[T: (yield 1)]: ...      # yield in TypeVar
                 // class L[T: (x := 1)]: ...       # named expr in TypeVar
+                // class M[T]((await 1)): ...
+                // class N[T: (await 1)]: ...
                 let mut visitor = InvalidExpressionVisitor {
                     position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
@@ -221,6 +283,8 @@ impl SemanticSyntaxChecker {
                 // type X[**Ts = (yield 1)] = int  # ParamSpec default
                 // type Y = (yield 1)              # yield in value
                 // type Y = (x := 1)               # named expr in value
+                // type Y[T: (await 1)] = int      # await in bound
+                // type Y = (await 1)              # await in value
                 let mut visitor = InvalidExpressionVisitor {
                     position: InvalidExpressionPosition::TypeAlias,
                     ctx,
@@ -428,7 +492,17 @@ impl SemanticSyntaxChecker {
         }
     }
 
+    /// Check `stmt` for semantic syntax errors and update the checker's internal state.
+    ///
+    /// Note that this method should only be called when traversing `stmt` *and* its children. For
+    /// example, if traversal of function bodies needs to be deferred, avoid calling `visit_stmt` on
+    /// the function itself until the deferred body is visited too. Failing to defer `visit_stmt` in
+    /// this case will break any internal state that depends on function scopes, such as `async`
+    /// context detection.
     pub fn visit_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
+        // check for errors
+        self.check_stmt(stmt, ctx);
+
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
@@ -439,15 +513,16 @@ impl SemanticSyntaxChecker {
                     self.seen_futures_boundary = true;
                 }
             }
+            Stmt::FunctionDef(_) => {
+                self.seen_futures_boundary = true;
+            }
             _ => {
                 self.seen_futures_boundary = true;
             }
         }
-
-        // check for errors
-        self.check_stmt(stmt, ctx);
     }
 
+    /// Check `expr` for semantic syntax errors and update the checker's internal state.
     pub fn visit_expr<Ctx: SemanticSyntaxContext>(&mut self, expr: &Expr, ctx: &Ctx) {
         match expr {
             Expr::ListComp(ast::ExprListComp {
@@ -455,10 +530,17 @@ impl SemanticSyntaxChecker {
             })
             | Expr::SetComp(ast::ExprSetComp {
                 elt, generators, ..
-            })
-            | Expr::Generator(ast::ExprGenerator {
-                elt, generators, ..
-            }) => Self::check_generator_expr(elt, generators, ctx),
+            }) => {
+                Self::check_generator_expr(elt, generators, ctx);
+                Self::async_comprehension_outside_async_function(ctx, generators);
+                for generator in generators.iter().filter(|g| g.is_async) {
+                    Self::await_outside_async_function(
+                        ctx,
+                        generator,
+                        AwaitOutsideAsyncFunctionKind::AsyncComprehension,
+                    );
+                }
+            }
             Expr::DictComp(ast::ExprDictComp {
                 key,
                 value,
@@ -467,6 +549,21 @@ impl SemanticSyntaxChecker {
             }) => {
                 Self::check_generator_expr(key, generators, ctx);
                 Self::check_generator_expr(value, generators, ctx);
+                Self::async_comprehension_outside_async_function(ctx, generators);
+                for generator in generators.iter().filter(|g| g.is_async) {
+                    Self::await_outside_async_function(
+                        ctx,
+                        generator,
+                        AwaitOutsideAsyncFunctionKind::AsyncComprehension,
+                    );
+                }
+            }
+            Expr::Generator(ast::ExprGenerator {
+                elt, generators, ..
+            }) => {
+                Self::check_generator_expr(elt, generators, ctx);
+                // Note that `await_outside_async_function` is not called here because generators
+                // are evaluated lazily. See the note in the function for more details.
             }
             Expr::Name(ast::ExprName {
                 range,
@@ -528,15 +625,93 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Expr::Yield(ast::ExprYield {
-                value: Some(value), ..
-            }) => {
-                // test_err single_star_yield
-                // def f(): yield *x
-                Self::invalid_star_expression(value, ctx);
+            Expr::Yield(ast::ExprYield { value, .. }) => {
+                if let Some(value) = value {
+                    // test_err single_star_yield
+                    // def f(): yield *x
+                    Self::invalid_star_expression(value, ctx);
+                }
+                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Yield);
+            }
+            Expr::YieldFrom(_) => {
+                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::YieldFrom);
+            }
+            Expr::Await(_) => {
+                Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
+                Self::await_outside_async_function(ctx, expr, AwaitOutsideAsyncFunctionKind::Await);
             }
             _ => {}
         }
+    }
+
+    /// PLE1142
+    fn await_outside_async_function<Ctx: SemanticSyntaxContext, Node: Ranged>(
+        ctx: &Ctx,
+        node: Node,
+        kind: AwaitOutsideAsyncFunctionKind,
+    ) {
+        if ctx.in_async_context() {
+            return;
+        }
+        // `await` is allowed at the top level of a Jupyter notebook.
+        // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
+        if ctx.in_module_scope() && ctx.in_notebook() {
+            return;
+        }
+        // Generators are evaluated lazily, so you can use `await` in them. For example:
+        //
+        // ```python
+        // # This is valid
+        // def f():
+        //     (await x for x in y)
+        //     (x async for x in y)
+        //
+        // # This is invalid
+        // def f():
+        //     (x for x in await y)
+        //     [await x for x in y]
+        // ```
+        //
+        // This check is required in addition to avoiding calling this function in `visit_expr`
+        // because the generator scope applies to nested parts of the `Expr::Generator` that are
+        // visited separately.
+        if ctx.in_generator_scope() {
+            return;
+        }
+        Self::add_error(
+            ctx,
+            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(kind),
+            node.range(),
+        );
+    }
+
+    /// F704
+    fn yield_outside_function<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        expr: &Expr,
+        kind: YieldOutsideFunctionKind,
+    ) {
+        // We are intentionally not inspecting the async status of the scope for now to mimic F704.
+        // await-outside-async is PLE1142 instead, so we'll end up emitting both syntax errors for
+        // cases that trigger F704
+        if kind.is_await() {
+            if ctx.in_await_allowed_context() {
+                return;
+            }
+            // `await` is allowed at the top level of a Jupyter notebook.
+            // See: https://ipython.readthedocs.io/en/stable/interactive/autoawait.html.
+            if ctx.in_module_scope() && ctx.in_notebook() {
+                return;
+            }
+        } else if ctx.in_function_scope() {
+            return;
+        }
+
+        Self::add_error(
+            ctx,
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind),
+            expr.range(),
+        );
     }
 
     /// Add a [`SyntaxErrorKind::ReboundComprehensionVariable`] if `expr` rebinds an iteration
@@ -578,11 +753,55 @@ impl SemanticSyntaxChecker {
             );
         }
     }
-}
 
-impl Default for SemanticSyntaxChecker {
-    fn default() -> Self {
-        Self::new()
+    fn async_comprehension_outside_async_function<Ctx: SemanticSyntaxContext>(
+        ctx: &Ctx,
+        generators: &[ast::Comprehension],
+    ) {
+        let python_version = ctx.python_version();
+        if python_version >= PythonVersion::PY311 {
+            return;
+        }
+        // async allowed at notebook top-level
+        if ctx.in_notebook() && ctx.in_module_scope() {
+            return;
+        }
+        if ctx.in_async_context() && !ctx.in_sync_comprehension() {
+            return;
+        }
+        for generator in generators.iter().filter(|gen| gen.is_async) {
+            // test_ok nested_async_comprehension_py311
+            // # parse_options: {"target-version": "3.11"}
+            // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+            // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+            // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+
+            // test_ok nested_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def f():
+            //     [_ for n in range(3)]
+            //     [_ async for n in range(3)]
+            // async def f():
+            //     def g(): ...
+            //     [_ async for n in range(3)]
+
+            // test_ok all_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def test(): return [[x async for x in elements(n)] async for n in range(3)]
+
+            // test_err nested_async_comprehension_py310
+            // # parse_options: {"target-version": "3.10"}
+            // async def f(): return [[x async for x in foo(n)] for n in range(3)]    # list
+            // async def g(): return [{x: 1 async for x in foo(n)} for n in range(3)] # dict
+            // async def h(): return [{x async for x in foo(n)} for n in range(3)]    # set
+            // async def i(): return [([y async for y in range(1)], [z for z in range(2)]) for x in range(5)]
+            // async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
+            Self::add_error(
+                ctx,
+                SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version),
+                generator.range,
+            );
+        }
     }
 }
 
@@ -647,6 +866,22 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::InvalidStarExpression => {
                 f.write_str("can't use starred expression here")
+            }
+            SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version) => {
+                write!(
+                    f,
+                    "cannot use an asynchronous comprehension outside of an asynchronous \
+                                function on Python {python_version} (syntax was added in 3.11)",
+                )
+            }
+            SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
+                write!(f, "`{kind}` statement outside of a function")
+            }
+            SemanticSyntaxErrorKind::ReturnOutsideFunction => {
+                f.write_str("`return` statement outside of a function")
+            }
+            SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(kind) => {
+                write!(f, "`{kind}` outside of an asynchronous function")
             }
         }
     }
@@ -833,6 +1068,43 @@ pub enum SemanticSyntaxErrorKind {
     ///     global counter
     ///     counter += 1
     /// ```
+    ///
+    /// ## Known Issues
+    ///
+    /// Note that the order in which the parts of a `try` statement are visited was changed in 3.13,
+    /// as tracked in Python issue [#111123]. For example, this code was valid on Python 3.12:
+    ///
+    /// ```python
+    /// a = 10
+    /// def g():
+    ///     try:
+    ///         1 / 0
+    ///     except:
+    ///         a = 1
+    ///     else:
+    ///         global a
+    /// ```
+    ///
+    /// While this more intuitive behavior aligned with the textual order was a syntax error:
+    ///
+    /// ```python
+    /// a = 10
+    /// def f():
+    ///     try:
+    ///         pass
+    ///     except:
+    ///         global a
+    ///     else:
+    ///         a = 1  # SyntaxError: name 'a' is assigned to before global declaration
+    /// ```
+    ///
+    /// This was reversed in version 3.13 to make the second case valid and the first case a syntax
+    /// error. We intentionally enforce the 3.13 ordering, regardless of the Python version, which
+    /// will lead to both false positives and false negatives on 3.12 code that takes advantage of
+    /// the old behavior. However, as mentioned in the Python issue, we expect code relying on this
+    /// to be very rare and not worth the additional complexity to detect.
+    ///
+    /// [#111123]: https://github.com/python/cpython/issues/111123
     LoadBeforeGlobalDeclaration { name: String, start: TextSize },
 
     /// Represents the use of a starred expression in an invalid location, such as a `return` or
@@ -847,6 +1119,123 @@ pub enum SemanticSyntaxErrorKind {
     /// for *x in xs: ...
     /// ```
     InvalidStarExpression,
+
+    /// Represents the use of an asynchronous comprehension inside of a synchronous comprehension
+    /// before Python 3.11.
+    ///
+    /// ## Examples
+    ///
+    /// Before Python 3.11, code like this produces a syntax error because of the implicit function
+    /// scope introduced by the outer comprehension:
+    ///
+    /// ```python
+    /// async def elements(n): yield n
+    ///
+    /// async def test(): return { n: [x async for x in elements(n)] for n in range(3)}
+    /// ```
+    ///
+    /// This was discussed in [BPO 33346] and fixed in Python 3.11.
+    ///
+    /// [BPO 33346]: https://github.com/python/cpython/issues/77527
+    AsyncComprehensionOutsideAsyncFunction(PythonVersion),
+
+    /// Represents the use of `yield`, `yield from`, or `await` outside of a function scope.
+    ///
+    ///
+    /// ## Examples
+    ///
+    /// `yield` and `yield from` are only allowed if the immediately-enclosing scope is a function
+    /// or lambda and not allowed otherwise:
+    ///
+    /// ```python
+    /// yield 1  # error
+    ///
+    /// def f():
+    ///     [(yield 1) for x in y]  # error
+    /// ```
+    ///
+    /// `await` is additionally allowed in comprehensions, if the comprehension itself is in a
+    /// function scope:
+    ///
+    /// ```python
+    /// await 1  # error
+    ///
+    /// async def f():
+    ///     await 1  # okay
+    ///     [await 1 for x in y]  # also okay
+    /// ```
+    ///
+    /// This last case _is_ an error, but it has to do with the lambda not being an async function.
+    /// For the sake of this error kind, this is okay.
+    ///
+    /// ## References
+    ///
+    /// See [PEP 255] for details on `yield`, [PEP 380] for the extension to `yield from`, [PEP 492]
+    /// for async-await syntax, and [PEP 530] for async comprehensions.
+    ///
+    /// [PEP 255]: https://peps.python.org/pep-0255/
+    /// [PEP 380]: https://peps.python.org/pep-0380/
+    /// [PEP 492]: https://peps.python.org/pep-0492/
+    /// [PEP 530]: https://peps.python.org/pep-0530/
+    YieldOutsideFunction(YieldOutsideFunctionKind),
+
+    /// Represents the use of `return` outside of a function scope.
+    ReturnOutsideFunction,
+
+    /// Represents the use of `await`, `async for`, or `async with` outside of an asynchronous
+    /// function.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f():
+    ///     await 1                # error
+    ///     async for x in y: ...  # error
+    ///     async with x: ...      # error
+    /// ```
+    AwaitOutsideAsyncFunction(AwaitOutsideAsyncFunctionKind),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AwaitOutsideAsyncFunctionKind {
+    Await,
+    AsyncFor,
+    AsyncWith,
+    AsyncComprehension,
+}
+
+impl Display for AwaitOutsideAsyncFunctionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            AwaitOutsideAsyncFunctionKind::Await => "await",
+            AwaitOutsideAsyncFunctionKind::AsyncFor => "async for",
+            AwaitOutsideAsyncFunctionKind::AsyncWith => "async with",
+            AwaitOutsideAsyncFunctionKind::AsyncComprehension => "asynchronous comprehension",
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum YieldOutsideFunctionKind {
+    Yield,
+    YieldFrom,
+    Await,
+}
+
+impl YieldOutsideFunctionKind {
+    pub fn is_await(&self) -> bool {
+        matches!(self, Self::Await)
+    }
+}
+
+impl Display for YieldOutsideFunctionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            YieldOutsideFunctionKind::Yield => "yield",
+            YieldOutsideFunctionKind::YieldFrom => "yield from",
+            YieldOutsideFunctionKind::Await => "await",
+        })
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -878,6 +1267,7 @@ impl Display for InvalidExpressionPosition {
 pub enum InvalidExpressionKind {
     Yield,
     NamedExpr,
+    Await,
 }
 
 impl Display for InvalidExpressionKind {
@@ -885,6 +1275,7 @@ impl Display for InvalidExpressionKind {
         f.write_str(match self {
             InvalidExpressionKind::Yield => "yield expression",
             InvalidExpressionKind::NamedExpr => "named expression",
+            InvalidExpressionKind::Await => "await expression",
         })
     }
 }
@@ -1115,6 +1506,16 @@ where
                     *range,
                 );
             }
+            Expr::Await(ast::ExprAwait { range, .. }) => {
+                SemanticSyntaxChecker::add_error(
+                    self.ctx,
+                    SemanticSyntaxErrorKind::InvalidExpression(
+                        InvalidExpressionKind::Await,
+                        self.position,
+                    ),
+                    *range,
+                );
+            }
             _ => {}
         }
         ast::visitor::walk_expr(self, expr);
@@ -1148,6 +1549,40 @@ where
     }
 }
 
+/// Information needed from a parent visitor to emit semantic syntax errors.
+///
+/// Note that the `in_*_scope` methods should refer to the immediately-enclosing scope. For example,
+/// `in_function_scope` should return true for this case:
+///
+/// ```python
+/// def f():
+///     x  # here
+/// ```
+///
+/// but not for this case:
+///
+/// ```python
+/// def f():
+///     class C:
+///         x  # here
+/// ```
+///
+/// In contrast, the `in_*_context` methods should traverse parent scopes. For example,
+/// `in_function_context` should return true for this case:
+///
+/// ```python
+/// def f():
+///     [x  # here
+///         for x in range(3)]
+/// ```
+///
+/// but not here:
+///
+/// ```python
+/// def f():
+///     class C:
+///         x  # here, classes break function scopes
+/// ```
 pub trait SemanticSyntaxContext {
     /// Returns `true` if a module's docstring boundary has been passed.
     fn seen_docstring_boundary(&self) -> bool;
@@ -1164,41 +1599,56 @@ pub trait SemanticSyntaxContext {
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;
 
+    /// Returns `true` if the visitor is currently in an async context, i.e. an async function.
+    fn in_async_context(&self) -> bool;
+
+    /// Returns `true` if the visitor is currently in a context where the `await` keyword is
+    /// allowed.
+    ///
+    /// Note that this is method is primarily used to report `YieldOutsideFunction` errors for
+    /// `await` outside function scopes, irrespective of their async status. As such, this differs
+    /// from `in_async_context` in two ways:
+    ///
+    /// 1. `await` is allowed in a lambda, despite it not being async
+    /// 2. `await` is allowed in any function, regardless of its async status
+    ///
+    /// In short, only nested class definitions should cause this method to return `false`, for
+    /// example:
+    ///
+    /// ```python
+    /// def f():
+    ///     await 1  # okay, in a function
+    ///     class C:
+    ///         await 1  # error
+    /// ```
+    ///
+    /// See the trait-level documentation for more details.
+    fn in_await_allowed_context(&self) -> bool;
+
+    /// Returns `true` if the visitor is currently inside of a synchronous comprehension.
+    ///
+    /// This method is necessary because `in_async_context` only checks for the nearest, enclosing
+    /// function to determine the (a)sync context. Instead, this method will search all enclosing
+    /// scopes until it finds a sync comprehension. As a result, the two methods will typically be
+    /// used together.
+    fn in_sync_comprehension(&self) -> bool;
+
+    /// Returns `true` if the visitor is at the top-level module scope.
+    fn in_module_scope(&self) -> bool;
+
+    /// Returns `true` if the visitor is in a function scope.
+    fn in_function_scope(&self) -> bool;
+
+    /// Returns `true` if the visitor is in a generator scope.
+    ///
+    /// Note that this refers to an `Expr::Generator` precisely, not to comprehensions more
+    /// generally.
+    fn in_generator_scope(&self) -> bool;
+
+    /// Returns `true` if the source file is a Jupyter notebook.
+    fn in_notebook(&self) -> bool;
+
     fn report_semantic_error(&self, error: SemanticSyntaxError);
-}
-
-#[derive(Default)]
-pub struct SemanticSyntaxCheckerVisitor<Ctx> {
-    checker: SemanticSyntaxChecker,
-    context: Ctx,
-}
-
-impl<Ctx> SemanticSyntaxCheckerVisitor<Ctx> {
-    pub fn new(context: Ctx) -> Self {
-        Self {
-            checker: SemanticSyntaxChecker::new(),
-            context,
-        }
-    }
-
-    pub fn into_context(self) -> Ctx {
-        self.context
-    }
-}
-
-impl<Ctx> Visitor<'_> for SemanticSyntaxCheckerVisitor<Ctx>
-where
-    Ctx: SemanticSyntaxContext,
-{
-    fn visit_stmt(&mut self, stmt: &'_ Stmt) {
-        self.checker.visit_stmt(stmt, &self.context);
-        ruff_python_ast::visitor::walk_stmt(self, stmt);
-    }
-
-    fn visit_expr(&mut self, expr: &'_ Expr) {
-        self.checker.visit_expr(expr, &self.context);
-        ruff_python_ast::visitor::walk_expr(self, expr);
-    }
 }
 
 /// Modified version of [`std::str::EscapeDefault`] that does not escape single or double quotes.

@@ -72,13 +72,11 @@ reveal_type(baz)  # revealed: Literal["bazfoo"]
 qux = (foo, bar)
 reveal_type(qux)  # revealed: tuple[Literal["foo"], Literal["bar"]]
 
-# TODO: Infer "LiteralString"
-reveal_type(foo.join(qux))  # revealed: @Todo(return type of overloaded function)
+reveal_type(foo.join(qux))  # revealed: LiteralString
 
 template: LiteralString = "{}, {}"
 reveal_type(template)  # revealed: Literal["{}, {}"]
-# TODO: Infer `LiteralString`
-reveal_type(template.format(foo, bar))  # revealed: @Todo(return type of overloaded function)
+reveal_type(template.format(foo, bar))  # revealed: LiteralString
 ```
 
 ### Assignability
@@ -147,4 +145,4 @@ def f():
     reveal_type(x)  # revealed: LiteralString
 ```
 
-[1]: https://typing.readthedocs.io/en/latest/spec/literal.html#literalstring
+[1]: https://typing.python.org/en/latest/spec/literal.html#literalstring

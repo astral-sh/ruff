@@ -21,8 +21,8 @@ use ruff_python_ast::PythonVersion;
 struct Case {
     db: ProjectDatabase,
     fs: MemoryFileSystem,
-    re: File,
-    re_path: SystemPathBuf,
+    file: File,
+    file_path: SystemPathBuf,
 }
 
 // "https://raw.githubusercontent.com/python/cpython/8e8a4baf652f6e1cee7acde9d78c4b6154539748/Lib/tomllib";
@@ -59,7 +59,7 @@ type KeyDiagnosticFields = (
     Severity,
 );
 
-static EXPECTED_DIAGNOSTICS: &[KeyDiagnosticFields] = &[(
+static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[(
     DiagnosticId::lint("unused-ignore-comment"),
     Some("/src/tomllib/_parser.py"),
     Some(22299..22333),
@@ -71,7 +71,7 @@ fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
 }
 
-fn setup_case() -> Case {
+fn setup_tomllib_case() -> Case {
     let system = TestSystem::default();
     let fs = system.memory_file_system().clone();
 
@@ -112,8 +112,8 @@ fn setup_case() -> Case {
     Case {
         db,
         fs,
-        re,
-        re_path,
+        file: re,
+        file_path: re_path,
     }
 }
 
@@ -135,16 +135,19 @@ fn setup_rayon() {
 
 fn benchmark_incremental(criterion: &mut Criterion) {
     fn setup() -> Case {
-        let case = setup_case();
+        let case = setup_tomllib_case();
 
         let result: Vec<_> = case.db.check().unwrap();
 
-        assert_diagnostics(&case.db, &result);
+        assert_diagnostics(&case.db, &result, EXPECTED_TOMLLIB_DIAGNOSTICS);
 
         case.fs
             .write_file_all(
-                &case.re_path,
-                format!("{}\n# A comment\n", source_text(&case.db, case.re).as_str()),
+                &case.file_path,
+                format!(
+                    "{}\n# A comment\n",
+                    source_text(&case.db, case.file).as_str()
+                ),
             )
             .unwrap();
 
@@ -156,7 +159,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
         db.apply_changes(
             vec![ChangeEvent::Changed {
-                path: case.re_path.clone(),
+                path: case.file_path.clone(),
                 kind: ChangedKind::FileContent,
             }],
             None,
@@ -164,7 +167,7 @@ fn benchmark_incremental(criterion: &mut Criterion) {
 
         let result = db.check().unwrap();
 
-        assert_eq!(result.len(), EXPECTED_DIAGNOSTICS.len());
+        assert_eq!(result.len(), EXPECTED_TOMLLIB_DIAGNOSTICS.len());
     }
 
     setup_rayon();
@@ -179,12 +182,12 @@ fn benchmark_cold(criterion: &mut Criterion) {
 
     criterion.bench_function("red_knot_check_file[cold]", |b| {
         b.iter_batched_ref(
-            setup_case,
+            setup_tomllib_case,
             |case| {
                 let Case { db, .. } = case;
                 let result: Vec<_> = db.check().unwrap();
 
-                assert_diagnostics(db, &result);
+                assert_diagnostics(db, &result, EXPECTED_TOMLLIB_DIAGNOSTICS);
             },
             BatchSize::SmallInput,
         );
@@ -192,7 +195,7 @@ fn benchmark_cold(criterion: &mut Criterion) {
 }
 
 #[track_caller]
-fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic]) {
+fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDiagnosticFields]) {
     let normalized: Vec<_> = diagnostics
         .iter()
         .map(|diagnostic| {
@@ -211,8 +214,99 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic]) {
             )
         })
         .collect();
-    assert_eq!(&normalized, EXPECTED_DIAGNOSTICS);
+    assert_eq!(&normalized, expected);
+}
+
+fn setup_micro_case(code: &str) -> Case {
+    let system = TestSystem::default();
+    let fs = system.memory_file_system().clone();
+
+    let file_path = "src/test.py";
+    fs.write_file_all(
+        SystemPathBuf::from(file_path),
+        ruff_python_trivia::textwrap::dedent(code),
+    )
+    .unwrap();
+
+    let src_root = SystemPath::new("/src");
+    let mut metadata = ProjectMetadata::discover(src_root, &system).unwrap();
+    metadata.apply_cli_options(Options {
+        environment: Some(EnvironmentOptions {
+            python_version: Some(RangedValue::cli(PythonVersion::PY312)),
+            ..EnvironmentOptions::default()
+        }),
+        ..Options::default()
+    });
+
+    let mut db = ProjectDatabase::new(metadata, system).unwrap();
+    let file = system_path_to_file(&db, SystemPathBuf::from(file_path)).unwrap();
+
+    db.project()
+        .set_open_files(&mut db, FxHashSet::from_iter([file]));
+
+    let file_path = file.path(&db).as_system_path().unwrap().to_owned();
+
+    Case {
+        db,
+        fs,
+        file,
+        file_path,
+    }
+}
+
+fn benchmark_many_string_assignments(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("red_knot_micro[many_string_assignments]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a micro benchmark, but it is effectively identical to a code sample
+                // observed "in the wild":
+                setup_micro_case(
+                    r#"
+                    def f(x) -> str:
+                        s = ""
+                        # Each conditional doubles the size of the union of string literal types,
+                        # so if we go up to attr10, we have 2**10 = 1024 string literal types
+                        if x.attr1:
+                            s += "attr1"
+                        if x.attr2:
+                            s += "attr2"
+                        if x.attr3:
+                            s += "attr3"
+                        if x.attr4:
+                            s += "attr4"
+                        if x.attr5:
+                            s += "attr5"
+                        if x.attr6:
+                            s += "attr6"
+                        if x.attr7:
+                            s += "attr7"
+                        if x.attr8:
+                            s += "attr8"
+                        if x.attr9:
+                            s += "attr9"
+                        if x.attr10:
+                            s += "attr10"
+                        # The above checked how fast we are in building the union; this checks how
+                        # we manage it once it is built. If implemented naively, this has to check
+                        # each member of the union for compatibility with the Sized protocol.
+                        if len(s) > 0:
+                            s = s[:-3]
+                        return s
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check().unwrap();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 criterion_group!(check_file, benchmark_cold, benchmark_incremental);
-criterion_main!(check_file);
+criterion_group!(micro, benchmark_many_string_assignments);
+criterion_main!(check_file, micro);

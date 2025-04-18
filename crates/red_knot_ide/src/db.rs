@@ -10,7 +10,7 @@ pub(crate) mod tests {
 
     use super::Db;
     use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-    use red_knot_python_semantic::{default_lint_registry, Db as SemanticDb};
+    use red_knot_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
     use ruff_db::files::{File, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
@@ -82,6 +82,10 @@ pub(crate) mod tests {
 
         fn files(&self) -> &Files {
             &self.files
+        }
+
+        fn python_version(&self) -> ruff_python_ast::PythonVersion {
+            Program::get(self).python_version(self)
         }
     }
 

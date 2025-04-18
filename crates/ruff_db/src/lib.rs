@@ -1,5 +1,6 @@
 use std::hash::BuildHasherDefault;
 
+use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHasher;
 
 use crate::files::Files;
@@ -27,6 +28,7 @@ pub trait Db: salsa::Database {
     fn vendored(&self) -> &VendoredFileSystem;
     fn system(&self) -> &dyn System;
     fn files(&self) -> &Files;
+    fn python_version(&self) -> PythonVersion;
 }
 
 /// Trait for upcasting a reference to a base trait object.
@@ -106,6 +108,10 @@ mod tests {
 
         fn files(&self) -> &Files {
             &self.files
+        }
+
+        fn python_version(&self) -> ruff_python_ast::PythonVersion {
+            ruff_python_ast::PythonVersion::latest()
         }
     }
 

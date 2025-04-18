@@ -1,5 +1,10 @@
 # Scoping rules for type variables
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Most of these tests come from the [Scoping rules for type variables][scoping] section of the typing
 spec.
 
@@ -59,10 +64,8 @@ to a different type each time.
 def f[T](x: T) -> T:
     return x
 
-# TODO: revealed: int or Literal[1]
-reveal_type(f(1))  # revealed: T
-# TODO: revealed: str or Literal["a"]
-reveal_type(f("a"))  # revealed: T
+reveal_type(f(1))  # revealed: Literal[1]
+reveal_type(f("a"))  # revealed: Literal["a"]
 ```
 
 ## Methods can mention class typevars
@@ -78,11 +81,49 @@ class C[T]:
     def m2(self, x: T) -> T:
         return x
 
-c: C[int] = C()
+c: C[int] = C[int]()
 c.m1(1)
 c.m2(1)
-# TODO: expected type `int`
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["string"]`"
 c.m2("string")
+```
+
+## Functions on generic classes are descriptors
+
+This repeats the tests in the [Functions as descriptors](./call/methods.md) test suite, but on a
+generic class. This ensures that we are carrying any specializations through the entirety of the
+descriptor protocol, which is how `self` parameters are bound to instance methods.
+
+```py
+from inspect import getattr_static
+
+class C[T]:
+    def f(self, x: T) -> str:
+        return "a"
+
+reveal_type(getattr_static(C[int], "f"))  # revealed: def f(self, x: int) -> str
+reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f[int]`>
+reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: def f(self, x: int) -> str
+# revealed: bound method C[int].f(x: int) -> str
+reveal_type(getattr_static(C[int], "f").__get__(C[int](), C[int]))
+
+reveal_type(C[int].f)  # revealed: def f(self, x: int) -> str
+reveal_type(C[int]().f)  # revealed: bound method C[int].f(x: int) -> str
+
+bound_method = C[int]().f
+reveal_type(bound_method.__self__)  # revealed: C[int]
+reveal_type(bound_method.__func__)  # revealed: def f(self, x: int) -> str
+
+reveal_type(C[int]().f(1))  # revealed: str
+reveal_type(bound_method(1))  # revealed: str
+
+C[int].f(1)  # error: [missing-argument]
+reveal_type(C[int].f(C[int](), 1))  # revealed: str
+
+class D[U](C[U]):
+    pass
+
+reveal_type(D[int]().f)  # revealed: bound method D[int].f(x: int) -> str
 ```
 
 ## Methods can mention other typevars
@@ -115,8 +156,7 @@ class C[T]:
         return y
 
 c: C[int] = C()
-# TODO: revealed: str
-reveal_type(c.m(1, "string"))  # revealed: S
+reveal_type(c.m(1, "string"))  # revealed: Literal["string"]
 ```
 
 ## Unbound typevars
@@ -134,13 +174,13 @@ S = TypeVar("S")
 
 def f(x: T) -> None:
     x: list[T] = []
-    # TODO: error
+    # TODO: invalid-assignment error
     y: list[S] = []
 
 # TODO: no error
 # error: [invalid-base]
 class C(Generic[T]):
-    # TODO: error
+    # TODO: error: cannot use S if it's not in the current generic context
     x: list[S] = []
 
     # This is not an error, as shown in the previous test
@@ -160,11 +200,11 @@ S = TypeVar("S")
 
 def f[T](x: T) -> None:
     x: list[T] = []
-    # TODO: error
+    # TODO: invalid assignment error
     y: list[S] = []
 
 class C[T]:
-    # TODO: error
+    # TODO: error: cannot use S if it's not in the current generic context
     x: list[S] = []
 
     def m1(self, x: S) -> S:
@@ -248,11 +288,11 @@ class C[T]:
     ok1: list[T] = []
 
     class Bad:
-        # TODO: error
+        # TODO: error: cannot refer to T in nested scope
         bad: list[T] = []
 
     class Inner[S]: ...
     ok2: Inner[T]
 ```
 
-[scoping]: https://typing.readthedocs.io/en/latest/spec/generics.html#scoping-rules-for-type-variables
+[scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables

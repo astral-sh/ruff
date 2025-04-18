@@ -1,5 +1,10 @@
 # Narrowing for `match` statements
 
+```toml
+[environment]
+python-version = "3.10"
+```
+
 ## Single `match` pattern
 
 ```py
@@ -34,8 +39,7 @@ match x:
     case A():
         reveal_type(x)  # revealed: A
     case B():
-        # TODO could be `B & ~A`
-        reveal_type(x)  # revealed: B
+        reveal_type(x)  # revealed: B & ~A
 
 reveal_type(x)  # revealed: object
 ```
@@ -83,7 +87,7 @@ match x:
     case 6.0:
         reveal_type(x)  # revealed: float
     case 1j:
-        reveal_type(x)  # revealed: complex
+        reveal_type(x)  # revealed: complex & ~float
     case b"foo":
         reveal_type(x)  # revealed: Literal[b"foo"]
 
@@ -129,11 +133,11 @@ match x:
     case "foo" | 42 | None:
         reveal_type(x)  # revealed: Literal["foo", 42] | None
     case "foo" | tuple():
-        reveal_type(x)  # revealed: Literal["foo"] | tuple
+        reveal_type(x)  # revealed: tuple
     case True | False:
         reveal_type(x)  # revealed: bool
     case 3.14 | 2.718 | 1.414:
-        reveal_type(x)  # revealed: float
+        reveal_type(x)  # revealed: float & ~tuple
 
 reveal_type(x)  # revealed: object
 ```
@@ -156,6 +160,52 @@ match x:
     case True | False if reveal_type(x):  # revealed: bool
         pass
     case 3.14 | 2.718 | 1.414 if reveal_type(x):  # revealed: float
+        pass
+
+reveal_type(x)  # revealed: object
+```
+
+## Narrowing due to guard
+
+```py
+def get_object() -> object:
+    return object()
+
+x = get_object()
+
+reveal_type(x)  # revealed: object
+
+match x:
+    case str() | float() if type(x) is str:
+        reveal_type(x)  #  revealed: str
+    case "foo" | 42 | None if isinstance(x, int):
+        reveal_type(x)  #  revealed: Literal[42]
+    case False if x:
+        reveal_type(x)  #  revealed: Never
+    case "foo" if x := "bar":
+        reveal_type(x)  # revealed: Literal["bar"]
+
+reveal_type(x)  # revealed: object
+```
+
+## Guard and reveal_type in guard
+
+```py
+def get_object() -> object:
+    return object()
+
+x = get_object()
+
+reveal_type(x)  # revealed: object
+
+match x:
+    case str() | float() if type(x) is str and reveal_type(x):  # revealed: str
+        pass
+    case "foo" | 42 | None if isinstance(x, int) and reveal_type(x):  #  revealed: Literal[42]
+        pass
+    case False if x and reveal_type(x):  #  revealed: Never
+        pass
+    case "foo" if (x := "bar") and reveal_type(x):  #  revealed: Literal["bar"]
         pass
 
 reveal_type(x)  # revealed: object

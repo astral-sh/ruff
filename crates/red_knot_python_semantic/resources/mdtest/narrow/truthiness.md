@@ -63,7 +63,7 @@ def bar(world: str, *args, **kwargs) -> float:
 x = foo if flag() else bar
 
 if x:
-    reveal_type(x)  # revealed: Literal[foo, bar]
+    reveal_type(x)  # revealed: (def foo(hello: int) -> bytes) | (def bar(world: str, *args, **kwargs) -> int | float)
 else:
     reveal_type(x)  # revealed: Never
 ```
@@ -246,7 +246,7 @@ class MetaTruthy(type):
 
 class MetaDeferred(type):
     def __bool__(self) -> MetaAmbiguous:
-        return MetaAmbiguous()
+        raise NotImplementedError
 
 class AmbiguousClass(metaclass=MetaAmbiguous): ...
 class FalsyClass(metaclass=MetaFalsy): ...

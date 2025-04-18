@@ -9,9 +9,6 @@ from airflow import (
     PY311,
     PY312,
 )
-from airflow import (
-    Dataset as DatasetFromRoot,
-)
 from airflow.api_connexion.security import requires_access, requires_access_dataset
 from airflow.auth.managers.base_auth_manager import is_authorized_dataset
 from airflow.auth.managers.models.resource_details import DatasetDetails
@@ -26,25 +23,16 @@ from airflow.configuration import (
     set,
 )
 from airflow.contrib.aws_athena_hook import AWSAthenaHook
-from airflow.datasets import (
-    Dataset,
-    DatasetAlias,
-    DatasetAliasEvent,
-    DatasetAll,
-    DatasetAny,
-    expand_alias_to_datasets,
-)
+from airflow.datasets import DatasetAliasEvent
 from airflow.datasets.manager import (
     DatasetManager,
     dataset_manager,
     resolve_dataset_manager,
 )
-from airflow.datasets.metadata import Metadata
 from airflow.hooks.base_hook import BaseHook
 from airflow.lineage.hook import DatasetLineageInfo
 from airflow.listeners.spec.dataset import on_dataset_changed, on_dataset_created
 from airflow.metrics.validators import AllowListValidator, BlockListValidator
-from airflow.models.baseoperator import chain, chain_linear, cross_downstream
 from airflow.operators.subdag import SubDagOperator
 from airflow.providers.amazon.aws.auth_manager.avp.entities import AvpEntities
 from airflow.providers.amazon.aws.datasets import s3
@@ -61,12 +49,10 @@ from airflow.providers.trino.datasets import trino
 from airflow.secrets.local_filesystem import LocalFilesystemBackend, load_connections
 from airflow.security.permissions import RESOURCE_DATASET
 from airflow.sensors.base_sensor_operator import BaseSensorOperator
-from airflow.timetables.datasets import DatasetOrTimeSchedule
 from airflow.timetables.simple import DatasetTriggeredTimetable
 from airflow.triggers.external_task import TaskStateTrigger
 from airflow.utils import dates
 from airflow.utils.dag_cycle_tester import test_cycle
-from airflow.utils.dag_parsing_context import get_parsing_context
 from airflow.utils.dates import (
     date_range,
     datetime_to_nano,
@@ -105,14 +91,9 @@ get, getboolean, getfloat, getint, has_option, remove_option, as_dict, set
 # airflow.contrib.*
 AWSAthenaHook()
 
+
 # airflow.datasets
-Dataset()
-DatasetAlias()
 DatasetAliasEvent()
-DatasetAll()
-DatasetAny()
-Metadata()
-expand_alias_to_datasets
 
 # airflow.datasets.manager
 DatasetManager()
@@ -132,10 +113,6 @@ on_dataset_created
 # airflow.metrics.validators
 AllowListValidator()
 BlockListValidator()
-
-
-# airflow.models.baseoperator
-chain, chain_linear, cross_downstream
 
 
 # airflow.operators.branch_operator
@@ -207,7 +184,6 @@ BaseSensorOperator()
 
 
 # airflow.timetables
-DatasetOrTimeSchedule()
 DatasetTriggeredTimetable()
 
 # airflow.triggers.external_task
@@ -231,8 +207,6 @@ dates.datetime_to_nano
 # airflow.utils.dag_cycle_tester
 test_cycle
 
-# airflow.utils.dag_parsing_context
-get_parsing_context
 
 # airflow.utils.db
 create_session

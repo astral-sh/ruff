@@ -1,7 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 /// The target platform to assume when resolving types.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -9,7 +9,6 @@ use std::fmt::{Display, Formatter};
 )]
 pub enum PythonPlatform {
     /// Do not make any assumptions about the target platform.
-    #[default]
     All,
 
     /// Assume a specific target platform like `linux`, `darwin` or `win32`.
@@ -35,6 +34,22 @@ impl Display for PythonPlatform {
         match self {
             PythonPlatform::All => f.write_str("all"),
             PythonPlatform::Identifier(name) => f.write_str(name),
+        }
+    }
+}
+
+impl Default for PythonPlatform {
+    fn default() -> Self {
+        if cfg!(target_os = "windows") {
+            PythonPlatform::Identifier("win32".to_string())
+        } else if cfg!(target_os = "macos") {
+            PythonPlatform::Identifier("darwin".to_string())
+        } else if cfg!(target_os = "android") {
+            PythonPlatform::Identifier("android".to_string())
+        } else if cfg!(target_os = "ios") {
+            PythonPlatform::Identifier("ios".to_string())
+        } else {
+            PythonPlatform::Identifier("linux".to_string())
         }
     }
 }

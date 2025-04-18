@@ -14,7 +14,7 @@ reveal_type(__package__)  # revealed: str | None
 reveal_type(__doc__)  # revealed: str | None
 reveal_type(__spec__)  # revealed: ModuleSpec | None
 
-reveal_type(__path__)  # revealed: @Todo(generics)
+reveal_type(__path__)  # revealed: @Todo(specialized non-generic class)
 
 class X:
     reveal_type(__name__)  # revealed: str
@@ -51,15 +51,15 @@ inside the module:
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: <bound method `__init__` of `ModuleType`>
+reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ellipsis) -> None
 
 # These come from `builtins.object`, not `types.ModuleType`:
-reveal_type(typing.__eq__)  # revealed: <bound method `__eq__` of `ModuleType`>
+reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
 
 reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
 
 # TODO: needs support generics; should be `dict[str, Any]`:
-reveal_type(typing.__dict__)  # revealed: @Todo(generics)
+reveal_type(typing.__dict__)  # revealed: @Todo(specialized non-generic class)
 ```
 
 Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType` to help out with
@@ -92,8 +92,8 @@ import foo
 from foo import __dict__ as foo_dict
 
 # TODO: needs support generics; should be `dict[str, Any]` for both of these:
-reveal_type(foo.__dict__)  # revealed: @Todo(generics)
-reveal_type(foo_dict)  # revealed: @Todo(generics)
+reveal_type(foo.__dict__)  # revealed: @Todo(specialized non-generic class)
+reveal_type(foo_dict)  # revealed: @Todo(specialized non-generic class)
 ```
 
 ## Conditionally global or `ModuleType` attribute

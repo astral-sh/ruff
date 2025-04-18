@@ -24,7 +24,7 @@ to the valid order:
 def f(**kw: int, x: str) -> int:
     return 1
 
-# error: 15 [invalid-argument-type] "Object of type `Literal[1]` cannot be assigned to parameter 1 (`x`) of function `f`; expected type `str`"
+# error: 15 [invalid-argument-type] "Argument to this function is incorrect: Expected `str`, found `Literal[1]`"
 reveal_type(f(1))  # revealed: int
 ```
 
@@ -38,7 +38,7 @@ def f(x: int = 1, y: str) -> int:
     return 1
 
 reveal_type(f(y="foo"))  # revealed: int
-# error: [invalid-argument-type] "Object of type `Literal["foo"]` cannot be assigned to parameter 1 (`x`) of function `f`; expected type `int`"
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `Literal["foo"]`"
 # error: [missing-argument] "No argument provided for required parameter `y` of function `f`"
 reveal_type(f("foo"))  # revealed: int
 ```

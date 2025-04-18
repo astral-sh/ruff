@@ -10,9 +10,9 @@ use salsa::plumbing::AsId;
 use salsa::Update;
 
 use crate::module_name::ModuleName;
+use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIds;
-use crate::semantic_index::attribute_assignment::AttributeAssignments;
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
@@ -23,7 +23,6 @@ use crate::semantic_index::use_def::{EagerBindingsKey, ScopedEagerBindingsId, Us
 use crate::Db;
 
 pub mod ast_ids;
-pub mod attribute_assignment;
 mod builder;
 pub mod definition;
 pub mod expression;
@@ -97,23 +96,25 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
     index.use_def_map(scope.file_scope_id(db))
 }
 
-/// Returns all attribute assignments for a specific class body scope.
-///
-/// Using [`attribute_assignments`] over [`semantic_index`] has the advantage that
-/// Salsa can avoid invalidating dependent queries if this scope's instance attributes
-/// are unchanged.
-#[salsa::tracked]
-pub(crate) fn attribute_assignments<'db>(
+/// Returns all attribute assignments (and their method scope IDs) for a specific class body scope.
+/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
+/// introduces a direct dependency on that file's AST.
+pub(crate) fn attribute_assignments<'db, 's>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
-) -> Option<Arc<AttributeAssignments<'db>>> {
+    name: &'s str,
+) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
     let file = class_body_scope.file(db);
     let index = semantic_index(db, file);
+    let class_scope_id = class_body_scope.file_scope_id(db);
 
-    index
-        .attribute_assignments
-        .get(&class_body_scope.file_scope_id(db))
-        .cloned()
+    ChildrenIter::new(index, class_scope_id).filter_map(|(file_scope_id, maybe_method)| {
+        maybe_method.node().as_function()?;
+        let attribute_table = index.instance_attribute_table(file_scope_id);
+        let symbol = attribute_table.symbol_id_by_name(name)?;
+        let use_def = &index.use_def_maps[file_scope_id];
+        Some((use_def.instance_attribute_bindings(symbol), file_scope_id))
+    })
 }
 
 /// Returns the module global scope of `file`.
@@ -135,6 +136,9 @@ pub(crate) enum EagerBindingsResult<'map, 'db> {
 pub(crate) struct SemanticIndex<'db> {
     /// List of all symbol tables in this file, indexed by scope.
     symbol_tables: IndexVec<FileScopeId, Arc<SymbolTable>>,
+
+    /// List of all instance attribute tables in this file, indexed by scope.
+    instance_attribute_tables: IndexVec<FileScopeId, SymbolTable>,
 
     /// List of all scopes in this file.
     scopes: IndexVec<FileScopeId, Scope>,
@@ -169,10 +173,6 @@ pub(crate) struct SemanticIndex<'db> {
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
 
-    /// Maps from class body scopes to attribute assignments that were found
-    /// in methods of that class.
-    attribute_assignments: FxHashMap<FileScopeId, Arc<AttributeAssignments<'db>>>,
-
     /// Map of all of the eager bindings that appear in this file.
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
 }
@@ -185,6 +185,10 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub(super) fn symbol_table(&self, scope_id: FileScopeId) -> Arc<SymbolTable> {
         self.symbol_tables[scope_id].clone()
+    }
+
+    pub(super) fn instance_attribute_table(&self, scope_id: FileScopeId) -> &SymbolTable {
+        &self.instance_attribute_tables[scope_id]
     }
 
     /// Returns the use-def map for a specific scope.
@@ -238,6 +242,41 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub(crate) fn parent_scope(&self, scope_id: FileScopeId) -> Option<&Scope> {
         Some(&self.scopes[self.parent_scope_id(scope_id)?])
+    }
+
+    fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {
+        self.parent_scope_id(scope_id)
+            .is_none_or(|parent_scope_id| {
+                if !self.is_scope_reachable(db, parent_scope_id) {
+                    return false;
+                }
+
+                let parent_use_def = self.use_def_map(parent_scope_id);
+                let reachability = self.scope(scope_id).reachability();
+
+                parent_use_def.is_reachable(db, reachability)
+            })
+    }
+
+    /// Returns true if a given AST node is reachable from the start of the scope. For example,
+    /// in the following code, expression `2` is reachable, but expressions `1` and `3` are not:
+    /// ```py
+    /// def f():
+    ///     x = 1
+    ///     if False:
+    ///         x  # 1
+    ///     x  # 2
+    ///     return
+    ///     x  # 3
+    /// ```
+    pub(crate) fn is_node_reachable(
+        &self,
+        db: &'db dyn crate::Db,
+        scope_id: FileScopeId,
+        node_key: NodeKey,
+    ) -> bool {
+        self.is_scope_reachable(db, scope_id)
+            && self.use_def_map(scope_id).is_node_reachable(db, node_key)
     }
 
     /// Returns an iterator over the descendent scopes of `scope`.
@@ -458,11 +497,10 @@ impl FusedIterator for ChildrenIter<'_> {}
 mod tests {
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::parsed::parsed_module;
-    use ruff_db::system::DbWithWritableSystem as _;
-    use ruff_python_ast as ast;
+    use ruff_python_ast::{self as ast};
     use ruff_text_size::{Ranged, TextRange};
 
-    use crate::db::tests::TestDb;
+    use crate::db::tests::{TestDb, TestDbBuilder};
     use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
     use crate::semantic_index::definition::{Definition, DefinitionKind};
     use crate::semantic_index::symbol::{
@@ -489,11 +527,15 @@ mod tests {
         file: File,
     }
 
-    fn test_case(content: impl AsRef<str>) -> TestCase {
-        let mut db = TestDb::new();
-        db.write_file("test.py", content).unwrap();
+    fn test_case(content: &str) -> TestCase {
+        const FILENAME: &str = "test.py";
 
-        let file = system_path_to_file(&db, "test.py").unwrap();
+        let db = TestDbBuilder::new()
+            .with_file(FILENAME, content)
+            .build()
+            .unwrap();
+
+        let file = system_path_to_file(&db, FILENAME).unwrap();
 
         TestCase { db, file }
     }

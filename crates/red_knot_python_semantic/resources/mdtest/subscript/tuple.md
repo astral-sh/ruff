@@ -69,8 +69,8 @@ def _(m: int, n: int):
     t[::0]  # error: [zero-stepsize-in-slice]
 
     tuple_slice = t[m:n]
-    # TODO: Support overloads... Should be `tuple[Literal[1, 'a', b"b"] | None, ...]`
-    reveal_type(tuple_slice)  # revealed: @Todo(return type of overloaded function)
+    # TODO: Should be `tuple[Literal[1, 'a', b"b"] | None, ...]`
+    reveal_type(tuple_slice)  # revealed: @Todo(full tuple[...] support)
 ```
 
 ## Inheritance

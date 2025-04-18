@@ -12,6 +12,11 @@
 //!     flattens into the outer one), intersections cannot contain other intersections (also
 //!     flattens), and intersections cannot contain unions (the intersection distributes over the
 //!     union, inverting it into a union-of-intersections).
+//!   * No type in a union can be a subtype of any other type in the union (just eliminate the
+//!     subtype from the union).
+//!   * No type in an intersection can be a supertype of any other type in the intersection (just
+//!     eliminate the supertype from the intersection).
+//!   * An intersection containing two non-overlapping types simplifies to [`Type::Never`].
 //!
 //! The implication of these invariants is that a [`UnionBuilder`] does not necessarily build a
 //! [`Type::Union`]. For example, if only one type is added to the [`UnionBuilder`], `build()` will
@@ -19,19 +24,100 @@
 //! union type is added to the intersection, it will distribute and [`IntersectionBuilder::build`]
 //! may end up returning a [`Type::Union`] of intersections.
 //!
-//! In the future we should have these additional invariants, but they aren't implemented yet:
-//!   * No type in a union can be a subtype of any other type in the union (just eliminate the
-//!     subtype from the union).
-//!   * No type in an intersection can be a supertype of any other type in the intersection (just
-//!     eliminate the supertype from the intersection).
-//!   * An intersection containing two non-overlapping types should simplify to [`Type::Never`].
+//! ## Performance
+//!
+//! In practice, there are two kinds of unions found in the wild: relatively-small unions made up
+//! of normal user types (classes, etc), and large unions made up of literals, which can occur via
+//! large enums (not yet implemented) or from string/integer/bytes literals, which can grow due to
+//! literal arithmetic or operations on literal strings/bytes. For normal unions, it's most
+//! efficient to just store the member types in a vector, and do O(n^2) `is_subtype_of` checks to
+//! maintain the union in simplified form. But literal unions can grow to a size where this becomes
+//! a performance problem. For this reason, we group literal types in `UnionBuilder`. Since every
+//! different string literal type shares exactly the same possible super-types, and none of them
+//! are subtypes of each other (unless exactly the same literal type), we can avoid many
+//! unnecessary `is_subtype_of` checks.
 
-use crate::types::{IntersectionType, KnownClass, Type, TypeVarBoundOrConstraints, UnionType};
+use crate::types::{
+    BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
+    TypeVarBoundOrConstraints, UnionType,
+};
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
+enum UnionElement<'db> {
+    IntLiterals(FxOrderSet<i64>),
+    StringLiterals(FxOrderSet<StringLiteralType<'db>>),
+    BytesLiterals(FxOrderSet<BytesLiteralType<'db>>),
+    Type(Type<'db>),
+}
+
+impl<'db> UnionElement<'db> {
+    /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
+    ///
+    /// If this `UnionElement` is a group of literals, filter the literals present if needed and
+    /// return `ReduceResult::KeepIf` with a boolean value indicating whether the remaining group
+    /// of literals should be kept in the union
+    ///
+    /// If this `UnionElement` is some other type, return `ReduceResult::Type` so `UnionBuilder`
+    /// can perform more complex checks on it.
+    fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
+        // `AlwaysTruthy` and `AlwaysFalsy` are the only types which can be a supertype of only
+        // _some_ literals of the same kind, so we need to walk the full set in this case.
+        let needs_filter = matches!(other_type, Type::AlwaysTruthy | Type::AlwaysFalsy);
+        match self {
+            UnionElement::IntLiterals(literals) => {
+                ReduceResult::KeepIf(if needs_filter {
+                    literals.retain(|literal| {
+                        !Type::IntLiteral(*literal).is_subtype_of(db, other_type)
+                    });
+                    !literals.is_empty()
+                } else {
+                    // SAFETY: All `UnionElement` literal kinds must always be non-empty
+                    !Type::IntLiteral(literals[0]).is_subtype_of(db, other_type)
+                })
+            }
+            UnionElement::StringLiterals(literals) => {
+                ReduceResult::KeepIf(if needs_filter {
+                    literals.retain(|literal| {
+                        !Type::StringLiteral(*literal).is_subtype_of(db, other_type)
+                    });
+                    !literals.is_empty()
+                } else {
+                    // SAFETY: All `UnionElement` literal kinds must always be non-empty
+                    !Type::StringLiteral(literals[0]).is_subtype_of(db, other_type)
+                })
+            }
+            UnionElement::BytesLiterals(literals) => {
+                ReduceResult::KeepIf(if needs_filter {
+                    literals.retain(|literal| {
+                        !Type::BytesLiteral(*literal).is_subtype_of(db, other_type)
+                    });
+                    !literals.is_empty()
+                } else {
+                    // SAFETY: All `UnionElement` literal kinds must always be non-empty
+                    !Type::BytesLiteral(literals[0]).is_subtype_of(db, other_type)
+                })
+            }
+            UnionElement::Type(existing) => ReduceResult::Type(*existing),
+        }
+    }
+}
+
+enum ReduceResult<'db> {
+    /// Reduction of this `UnionElement` is complete; keep it in the union if the nested
+    /// boolean is true, eliminate it from the union if false.
+    KeepIf(bool),
+    /// The given `Type` can stand-in for the entire `UnionElement` for further union
+    /// simplification checks.
+    Type(Type<'db>),
+}
+
+// TODO increase this once we extend `UnionElement` throughout all union/intersection
+// representations, so that we can make large unions of literals fast in all operations.
+const MAX_UNION_LITERALS: usize = 200;
+
 pub(crate) struct UnionBuilder<'db> {
-    elements: Vec<Type<'db>>,
+    elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
 }
 
@@ -48,27 +134,118 @@ impl<'db> UnionBuilder<'db> {
     }
 
     /// Collapse the union to a single type: `object`.
-    fn collapse_to_object(mut self) -> Self {
+    fn collapse_to_object(&mut self) {
         self.elements.clear();
-        self.elements.push(Type::object(self.db));
-        self
+        self.elements
+            .push(UnionElement::Type(Type::object(self.db)));
     }
 
     /// Adds a type to this union.
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
+        self.add_in_place(ty);
+        self
+    }
+
+    /// Adds a type to this union.
+    pub(crate) fn add_in_place(&mut self, ty: Type<'db>) {
         match ty {
             Type::Union(union) => {
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
                 for element in new_elements {
-                    self = self.add(*element);
+                    self.add_in_place(*element);
                 }
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
+            // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
+            // add it to, or an existing element that is a super-type of string literals, which
+            // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
+            // containing it.
+            Type::StringLiteral(literal) => {
+                let mut found = false;
+                for element in &mut self.elements {
+                    match element {
+                        UnionElement::StringLiterals(literals) => {
+                            if literals.len() >= MAX_UNION_LITERALS {
+                                let replace_with = KnownClass::Str.to_instance(self.db);
+                                self.add_in_place(replace_with);
+                                return;
+                            }
+                            literals.insert(literal);
+                            found = true;
+                            break;
+                        }
+                        UnionElement::Type(existing) if ty.is_subtype_of(self.db, *existing) => {
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+                if !found {
+                    self.elements
+                        .push(UnionElement::StringLiterals(FxOrderSet::from_iter([
+                            literal,
+                        ])));
+                }
+            }
+            // Same for bytes literals as for string literals, above.
+            Type::BytesLiteral(literal) => {
+                let mut found = false;
+                for element in &mut self.elements {
+                    match element {
+                        UnionElement::BytesLiterals(literals) => {
+                            if literals.len() >= MAX_UNION_LITERALS {
+                                let replace_with = KnownClass::Bytes.to_instance(self.db);
+                                self.add_in_place(replace_with);
+                                return;
+                            }
+                            literals.insert(literal);
+                            found = true;
+                            break;
+                        }
+                        UnionElement::Type(existing) if ty.is_subtype_of(self.db, *existing) => {
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+                if !found {
+                    self.elements
+                        .push(UnionElement::BytesLiterals(FxOrderSet::from_iter([
+                            literal,
+                        ])));
+                }
+            }
+            // And same for int literals as well.
+            Type::IntLiteral(literal) => {
+                let mut found = false;
+                for element in &mut self.elements {
+                    match element {
+                        UnionElement::IntLiterals(literals) => {
+                            if literals.len() >= MAX_UNION_LITERALS {
+                                let replace_with = KnownClass::Int.to_instance(self.db);
+                                self.add_in_place(replace_with);
+                                return;
+                            }
+                            literals.insert(literal);
+                            found = true;
+                            break;
+                        }
+                        UnionElement::Type(existing) if ty.is_subtype_of(self.db, *existing) => {
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+                if !found {
+                    self.elements
+                        .push(UnionElement::IntLiterals(FxOrderSet::from_iter([literal])));
+                }
+            }
             // Adding `object` to a union results in `object`.
             ty if ty.is_object(self.db) => {
-                return self.collapse_to_object();
+                self.collapse_to_object();
             }
             _ => {
                 let bool_pair = if let Type::BooleanLiteral(b) = ty {
@@ -81,8 +258,17 @@ impl<'db> UnionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 2]>::new();
                 let ty_negated = ty.negate(self.db);
 
-                for (index, element) in self.elements.iter().enumerate() {
-                    if Some(*element) == bool_pair {
+                for (index, element) in self.elements.iter_mut().enumerate() {
+                    let element_type = match element.try_reduce(self.db, ty) {
+                        ReduceResult::KeepIf(keep) => {
+                            if !keep {
+                                to_remove.push(index);
+                            }
+                            continue;
+                        }
+                        ReduceResult::Type(ty) => ty,
+                    };
+                    if Some(element_type) == bool_pair {
                         to_add = KnownClass::Bool.to_instance(self.db);
                         to_remove.push(index);
                         // The type we are adding is a BooleanLiteral, which doesn't have any
@@ -92,14 +278,14 @@ impl<'db> UnionBuilder<'db> {
                         break;
                     }
 
-                    if ty.is_same_gradual_form(*element)
-                        || ty.is_subtype_of(self.db, *element)
-                        || element.is_object(self.db)
+                    if ty.is_same_gradual_form(element_type)
+                        || ty.is_subtype_of(self.db, element_type)
+                        || element_type.is_object(self.db)
                     {
-                        return self;
-                    } else if element.is_subtype_of(self.db, ty) {
+                        return;
+                    } else if element_type.is_subtype_of(self.db, ty) {
                         to_remove.push(index);
-                    } else if ty_negated.is_subtype_of(self.db, *element) {
+                    } else if ty_negated.is_subtype_of(self.db, element_type) {
                         // We add `ty` to the union. We just checked that `~ty` is a subtype of an existing `element`.
                         // This also means that `~ty | ty` is a subtype of `element | ty`, because both elements in the
                         // first union are subtypes of the corresponding elements in the second union. But `~ty | ty` is
@@ -107,28 +293,43 @@ impl<'db> UnionBuilder<'db> {
                         // `element | ty` must be `object` (object has no other supertypes). This means we can simplify
                         // the whole union to just `object`, since all other potential elements would also be subtypes of
                         // `object`.
-                        return self.collapse_to_object();
+                        self.collapse_to_object();
+                        return;
                     }
                 }
                 if let Some((&first, rest)) = to_remove.split_first() {
-                    self.elements[first] = to_add;
+                    self.elements[first] = UnionElement::Type(to_add);
                     // We iterate in descending order to keep remaining indices valid after `swap_remove`.
                     for &index in rest.iter().rev() {
                         self.elements.swap_remove(index);
                     }
                 } else {
-                    self.elements.push(to_add);
+                    self.elements.push(UnionElement::Type(to_add));
                 }
             }
         }
-        self
     }
 
     pub(crate) fn build(self) -> Type<'db> {
-        match self.elements.len() {
+        let mut types = vec![];
+        for element in self.elements {
+            match element {
+                UnionElement::IntLiterals(literals) => {
+                    types.extend(literals.into_iter().map(Type::IntLiteral));
+                }
+                UnionElement::StringLiterals(literals) => {
+                    types.extend(literals.into_iter().map(Type::StringLiteral));
+                }
+                UnionElement::BytesLiterals(literals) => {
+                    types.extend(literals.into_iter().map(Type::BytesLiteral));
+                }
+                UnionElement::Type(ty) => types.push(ty),
+            }
+        }
+        match types.len() {
             0 => Type::Never,
-            1 => self.elements[0],
-            _ => Type::Union(UnionType::new(self.db, self.elements.into_boxed_slice())),
+            1 => types[0],
+            _ => Type::Union(UnionType::new(self.db, types.into_boxed_slice())),
         }
     }
 }
@@ -292,7 +493,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let known_instance = new_positive
                     .into_instance()
-                    .and_then(|instance| instance.class().known(db));
+                    .and_then(|instance| instance.class.known(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
@@ -312,7 +513,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             new_positive = Type::BooleanLiteral(false);
                         }
                         Type::Instance(instance)
-                            if instance.class().is_known(db, KnownClass::Bool) =>
+                            if instance.class.is_known(db, KnownClass::Bool) =>
                         {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
@@ -406,7 +607,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive
                 .iter()
                 .filter_map(|ty| ty.into_instance())
-                .filter_map(|instance| instance.class().known(db))
+                .filter_map(|instance| instance.class.known(db))
                 .any(KnownClass::is_bool)
         };
 
@@ -422,7 +623,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::Instance(instance) if instance.class().is_object(db) => {
+            Type::Instance(instance) if instance.class.is_object(db) => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);

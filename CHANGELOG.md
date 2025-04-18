@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.11.6
+
+### Preview features
+
+- Avoid adding whitespace to the end of a docstring after an escaped quote ([#17216](https://github.com/astral-sh/ruff/pull/17216))
+- \[`airflow`\] Extract `AIR311` from `AIR301` rules (`AIR301`, `AIR311`) ([#17310](https://github.com/astral-sh/ruff/pull/17310), [#17422](https://github.com/astral-sh/ruff/pull/17422))
+
+### Bug fixes
+
+- Raise syntax error when `\` is at end of file ([#17409](https://github.com/astral-sh/ruff/pull/17409))
+
+## 0.11.5
+
+### Preview features
+
+- \[`airflow`\] Add missing `AIR302` attribute check ([#17115](https://github.com/astral-sh/ruff/pull/17115))
+- \[`airflow`\] Expand module path check to individual symbols (`AIR302`) ([#17278](https://github.com/astral-sh/ruff/pull/17278))
+- \[`airflow`\] Extract `AIR312` from `AIR302` rules (`AIR302`, `AIR312`) ([#17152](https://github.com/astral-sh/ruff/pull/17152))
+- \[`airflow`\] Update oudated `AIR301`, `AIR302` rules ([#17123](https://github.com/astral-sh/ruff/pull/17123))
+- [syntax-errors] Async comprehension in sync comprehension ([#17177](https://github.com/astral-sh/ruff/pull/17177))
+- [syntax-errors] Check annotations in annotated assignments ([#17283](https://github.com/astral-sh/ruff/pull/17283))
+- [syntax-errors] Extend annotation checks to `await` ([#17282](https://github.com/astral-sh/ruff/pull/17282))
+
+### Bug fixes
+
+- \[`flake8-pie`\] Avoid false positive for multiple assignment with `auto()` (`PIE796`) ([#17274](https://github.com/astral-sh/ruff/pull/17274))
+
+### Rule changes
+
+- \[`ruff`\] Fix `RUF100` to detect unused file-level `noqa` directives with specific codes (#17042) ([#17061](https://github.com/astral-sh/ruff/pull/17061))
+- \[`flake8-pytest-style`\] Avoid false positive for legacy form of `pytest.raises` (`PT011`) ([#17231](https://github.com/astral-sh/ruff/pull/17231))
+
+### Documentation
+
+- Fix formatting of "See Style Guide" link ([#17272](https://github.com/astral-sh/ruff/pull/17272))
+
 ## 0.11.4
 
 ### Preview features

@@ -2,7 +2,7 @@
 
 References:
 
-- <https://typing.readthedocs.io/en/latest/spec/callables.html#callable>
+- <https://typing.python.org/en/latest/spec/callables.html#callable>
 
 Note that `typing.Callable` is deprecated at runtime, in favour of `collections.abc.Callable` (see:
 <https://docs.python.org/3/library/typing.html#deprecated-aliases>). However, removal of
@@ -237,6 +237,11 @@ def _(c: Callable[[Concatenate[int, str, ...], int], int]):
 
 ## Using `typing.ParamSpec`
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Using a `ParamSpec` in a `Callable` annotation:
 
 ```py
@@ -289,7 +294,7 @@ def _(c: Callable[[int, Unpack[Ts]], int]):
 from typing import Callable
 
 def _(c: Callable[[int], int]):
-    reveal_type(c.__init__)  # revealed: Literal[__init__]
+    reveal_type(c.__init__)  # revealed: def __init__(self) -> None
     reveal_type(c.__class__)  # revealed: type
 
     # TODO: The member lookup for `Callable` uses `object` which does not have a `__call__`
@@ -299,4 +304,4 @@ def _(c: Callable[[int], int]):
     reveal_type(c.__call__)  # revealed: Unknown
 ```
 
-[gradual form]: https://typing.readthedocs.io/en/latest/spec/glossary.html#term-gradual-form
+[gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

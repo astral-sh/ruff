@@ -4,7 +4,7 @@ use crate::db::Db;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::report_base_with_incompatible_slots;
-use crate::types::{Class, ClassLiteralType, Type};
+use crate::types::{ClassLiteralType, Type};
 
 use super::InferContext;
 
@@ -23,8 +23,9 @@ enum SlotsKind {
 }
 
 impl SlotsKind {
-    fn from(db: &dyn Db, base: Class) -> Self {
-        let Symbol::Type(slots_ty, bound) = base.own_class_member(db, "__slots__").symbol else {
+    fn from(db: &dyn Db, base: ClassLiteralType) -> Self {
+        let Symbol::Type(slots_ty, bound) = base.own_class_member(db, None, "__slots__").symbol
+        else {
             return Self::NotSpecified;
         };
 
@@ -50,7 +51,11 @@ impl SlotsKind {
     }
 }
 
-pub(super) fn check_class_slots(context: &InferContext, class: Class, node: &ast::StmtClassDef) {
+pub(super) fn check_class_slots(
+    context: &InferContext,
+    class: ClassLiteralType,
+    node: &ast::StmtClassDef,
+) {
     let db = context.db();
 
     let mut first_with_solid_base = None;
@@ -58,16 +63,17 @@ pub(super) fn check_class_slots(context: &InferContext, class: Class, node: &ast
     let mut found_second = false;
 
     for (index, base) in class.explicit_bases(db).iter().enumerate() {
-        let Type::ClassLiteral(ClassLiteralType { class: base }) = base else {
+        let Type::ClassLiteral(base) = base else {
             continue;
         };
 
-        let solid_base = base.iter_mro(db).find_map(|current| {
+        let solid_base = base.iter_mro(db, None).find_map(|current| {
             let ClassBase::Class(current) = current else {
                 return None;
             };
 
-            match SlotsKind::from(db, current) {
+            let (class_literal, _) = current.class_literal(db);
+            match SlotsKind::from(db, class_literal) {
                 SlotsKind::NotEmpty => Some(current),
                 SlotsKind::NotSpecified | SlotsKind::Empty => None,
                 SlotsKind::Dynamic => None,

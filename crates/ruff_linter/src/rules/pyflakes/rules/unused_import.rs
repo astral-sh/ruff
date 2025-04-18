@@ -94,7 +94,7 @@ use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 /// ## References
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
-/// - [Typing documentation: interface conventions](https://typing.readthedocs.io/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
+/// - [Typing documentation: interface conventions](https://typing.python.org/en/latest/source/libraries.html#library-interface-public-and-private-symbols)
 #[derive(ViolationMetadata)]
 pub(crate) struct UnusedImport {
     /// Qualified name of the import

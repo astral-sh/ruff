@@ -109,6 +109,29 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A
 ```
 
+## Narrowing for generic classes
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Note that `type` returns the runtime class of an object, which does _not_ include specializations in
+the case of a generic class. (The typevars are erased.) That means we cannot narrow the type to the
+specialization that we compare with; we must narrow to an unknown specialization of the generic
+class.
+
+```py
+class A[T = int]: ...
+class B: ...
+
+def _[T](x: A | B):
+    if type(x) is A[str]:
+        reveal_type(x)  # revealed: A[int] & A[Unknown] | B & A[Unknown]
+    else:
+        reveal_type(x)  # revealed: A[int] | B
+```
+
 ## Limitations
 
 ```py
@@ -120,4 +143,14 @@ def _(x: Base):
         # Ideally, this could be narrower, but there is now way to
         # express a constraint like `Base & ~ProperSubtypeOf[Base]`.
         reveal_type(x)  # revealed: Base
+```
+
+## Assignment expressions
+
+```py
+def _(x: object):
+    if (y := type(x)) is bool:
+        reveal_type(y)  # revealed: Literal[bool]
+    if (type(y := x)) is bool:
+        reveal_type(y)  # revealed: bool
 ```

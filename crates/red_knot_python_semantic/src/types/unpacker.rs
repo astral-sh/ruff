@@ -130,7 +130,7 @@ impl<'db> Unpacker<'db> {
 
                         let length_mismatch = match elts.len().cmp(&tuple_ty_elements.len()) {
                             Ordering::Less => {
-                                self.context.report_lint(
+                                self.context.report_lint_old(
                                     &INVALID_ASSIGNMENT,
                                     target,
                                     format_args!(
@@ -142,7 +142,7 @@ impl<'db> Unpacker<'db> {
                                 true
                             }
                             Ordering::Greater => {
-                                self.context.report_lint(
+                                self.context.report_lint_old(
                                     &INVALID_ASSIGNMENT,
                                     target,
                                     format_args!(
@@ -246,7 +246,7 @@ impl<'db> Unpacker<'db> {
 
             Cow::Owned(element_types)
         } else {
-            self.context.report_lint(
+            self.context.report_lint_old(
                 &INVALID_ASSIGNMENT,
                 expr,
                 format_args!(

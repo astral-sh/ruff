@@ -1,6 +1,6 @@
 # Literal
 
-<https://typing.readthedocs.io/en/latest/spec/literal.html#literals>
+<https://typing.python.org/en/latest/spec/literal.html#literals>
 
 ## Parameterization
 
@@ -68,7 +68,7 @@ def x(
     a3: Literal[Literal["w"], Literal["r"], Literal[Literal["w+"]]],
     a4: Literal[True] | Literal[1, 2] | Literal["foo"],
 ):
-    reveal_type(a1)  # revealed: Literal[1, 2, 3, "foo", 5] | None
+    reveal_type(a1)  # revealed: Literal[1, 2, 3, 5, "foo"] | None
     reveal_type(a2)  # revealed: Literal["w", "r"]
     reveal_type(a3)  # revealed: Literal["w", "r", "w+"]
     reveal_type(a4)  # revealed: Literal[True, 1, 2, "foo"]
@@ -108,7 +108,7 @@ def union_example(
         None,
     ],
 ):
-    reveal_type(x)  # revealed: Unknown | Literal[-1, "A", b"A", b"\x00", b"\x07", 0, 1, "B", "foo", "bar", True] | None
+    reveal_type(x)  # revealed: Unknown | Literal[-1, 0, 1, "A", "B", "foo", "bar", b"A", b"\x00", b"\x07", True] | None
 ```
 
 ## Detecting Literal outside typing and typing_extensions
@@ -137,7 +137,7 @@ from other import Literal
 a1: Literal[26]
 
 def f():
-    reveal_type(a1)  # revealed: @Todo(generics)
+    reveal_type(a1)  # revealed: @Todo(unknown type subscript)
 ```
 
 ## Detecting typing_extensions.Literal

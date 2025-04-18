@@ -50,7 +50,14 @@ pub(crate) fn infer_narrowing_constraint<'db>(
                 all_negative_narrowing_constraints_for_expression(db, expression)
             }
         }
-        PredicateNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern),
+        PredicateNode::Pattern(pattern) => {
+            if predicate.is_positive {
+                all_narrowing_constraints_for_pattern(db, pattern)
+            } else {
+                all_negative_narrowing_constraints_for_pattern(db, pattern)
+            }
+        }
+        PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
         constraints.get(&definition.symbol(db)).copied()
@@ -92,6 +99,15 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     expression: Expression<'db>,
 ) -> Option<NarrowingConstraints<'db>> {
     NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
+}
+
+#[allow(clippy::ref_option)]
+#[salsa::tracked(return_ref)]
+fn all_negative_narrowing_constraints_for_pattern<'db>(
+    db: &'db dyn Db,
+    pattern: PatternPredicate<'db>,
+) -> Option<NarrowingConstraints<'db>> {
+    NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), false).finish()
 }
 
 #[allow(clippy::ref_option)]
@@ -158,10 +174,10 @@ impl KnownConstraintFunction {
             Type::ClassLiteral(class_literal) => {
                 // At runtime (on Python 3.11+), this will return `True` for classes that actually
                 // do inherit `typing.Any` and `False` otherwise. We could accurately model that?
-                if class_literal.class().is_known(db, KnownClass::Any) {
+                if class_literal.is_known(db, KnownClass::Any) {
                     None
                 } else {
-                    Some(constraint_fn(class_literal.class()))
+                    Some(constraint_fn(class_literal.default_specialization(db)))
                 }
             }
             Type::SubclassOf(subclass_of_ty) => {
@@ -216,6 +232,23 @@ fn merge_constraints_or<'db>(
     }
 }
 
+fn negate_if<'db>(constraints: &mut NarrowingConstraints<'db>, db: &'db dyn Db, yes: bool) {
+    for (_symbol, ty) in constraints.iter_mut() {
+        *ty = ty.negate_if(db, yes);
+    }
+}
+
+fn expr_name(expr: &ast::Expr) -> Option<&ast::name::Name> {
+    match expr {
+        ast::Expr::Named(ast::ExprNamed { target, .. }) => match target.as_ref() {
+            ast::Expr::Name(ast::ExprName { id, .. }) => Some(id),
+            _ => None,
+        },
+        ast::Expr::Name(ast::ExprName { id, .. }) => Some(id),
+        _ => None,
+    }
+}
+
 struct NarrowingConstraintsBuilder<'db> {
     db: &'db dyn Db,
     predicate: PredicateNode<'db>,
@@ -236,7 +269,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             PredicateNode::Expression(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
-            PredicateNode::Pattern(pattern) => self.evaluate_pattern_predicate(pattern),
+            PredicateNode::Pattern(pattern) => {
+                self.evaluate_pattern_predicate(pattern, self.is_positive)
+            }
+            PredicateNode::StarImportPlaceholder(_) => return None,
         };
         if let Some(mut constraints) = constraints {
             constraints.shrink_to_fit();
@@ -273,7 +309,8 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 self.evaluate_expression_node_predicate(&unary_op.operand, expression, !is_positive)
             }
             ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression, is_positive),
-            _ => None, // TODO other test expression kinds
+            ast::Expr::Named(expr_named) => self.evaluate_expr_named(expr_named, is_positive),
+            _ => None,
         }
     }
 
@@ -298,10 +335,14 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     fn evaluate_pattern_predicate(
         &mut self,
         pattern: PatternPredicate<'db>,
+        is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = pattern.subject(self.db);
-
         self.evaluate_pattern_predicate_kind(pattern.kind(self.db), subject)
+            .map(|mut constraints| {
+                negate_if(&mut constraints, self.db, !is_positive);
+                constraints
+            })
     }
 
     fn symbols(&self) -> Arc<SymbolTable> {
@@ -312,6 +353,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         match self.predicate {
             PredicateNode::Expression(expression) => expression.scope(self.db),
             PredicateNode::Pattern(pattern) => pattern.scope(self.db),
+            PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }
 
@@ -340,6 +382,18 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         NarrowingConstraints::from_iter([(symbol, ty)])
     }
 
+    fn evaluate_expr_named(
+        &mut self,
+        expr_named: &ast::ExprNamed,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        if let ast::Expr::Name(expr_name) = expr_named.target.as_ref() {
+            Some(self.evaluate_expr_name(expr_name, is_positive))
+        } else {
+            None
+        }
+    }
+
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             match rhs_ty {
@@ -362,6 +416,44 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
+    fn evaluate_expr_compare_op(
+        &mut self,
+        lhs_ty: Type<'db>,
+        rhs_ty: Type<'db>,
+        op: ast::CmpOp,
+    ) -> Option<Type<'db>> {
+        match op {
+            ast::CmpOp::IsNot => {
+                if rhs_ty.is_singleton(self.db) {
+                    let ty = IntersectionBuilder::new(self.db)
+                        .add_negative(rhs_ty)
+                        .build();
+                    Some(ty)
+                } else {
+                    // Non-singletons cannot be safely narrowed using `is not`
+                    None
+                }
+            }
+            ast::CmpOp::Is => Some(rhs_ty),
+            ast::CmpOp::NotEq => {
+                if rhs_ty.is_single_valued(self.db) {
+                    let ty = IntersectionBuilder::new(self.db)
+                        .add_negative(rhs_ty)
+                        .build();
+                    Some(ty)
+                } else {
+                    None
+                }
+            }
+            ast::CmpOp::Eq if lhs_ty.is_literal_string() => Some(rhs_ty),
+            ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
+            ast::CmpOp::NotIn => self
+                .evaluate_expr_in(lhs_ty, rhs_ty)
+                .map(|ty| ty.negate(self.db)),
+            _ => None,
+        }
+    }
+
     fn evaluate_expr_compare(
         &mut self,
         expr_compare: &ast::ExprCompare,
@@ -369,7 +461,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         fn is_narrowing_target_candidate(expr: &ast::Expr) -> bool {
-            matches!(expr, ast::Expr::Name(_) | ast::Expr::Call(_))
+            matches!(
+                expr,
+                ast::Expr::Name(_) | ast::Expr::Call(_) | ast::Expr::Named(_)
+            )
         }
 
         let ast::ExprCompare {
@@ -413,50 +508,13 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             last_rhs_ty = Some(rhs_ty);
 
             match left {
-                ast::Expr::Name(ast::ExprName {
-                    range: _,
-                    id,
-                    ctx: _,
-                }) => {
-                    let symbol = self.expect_expr_name_symbol(id);
+                ast::Expr::Name(_) | ast::Expr::Named(_) => {
+                    if let Some(id) = expr_name(left) {
+                        let symbol = self.expect_expr_name_symbol(id);
+                        let op = if is_positive { *op } else { op.negate() };
 
-                    match if is_positive { *op } else { op.negate() } {
-                        ast::CmpOp::IsNot => {
-                            if rhs_ty.is_singleton(self.db) {
-                                let ty = IntersectionBuilder::new(self.db)
-                                    .add_negative(rhs_ty)
-                                    .build();
-                                constraints.insert(symbol, ty);
-                            } else {
-                                // Non-singletons cannot be safely narrowed using `is not`
-                            }
-                        }
-                        ast::CmpOp::Is => {
-                            constraints.insert(symbol, rhs_ty);
-                        }
-                        ast::CmpOp::NotEq => {
-                            if rhs_ty.is_single_valued(self.db) {
-                                let ty = IntersectionBuilder::new(self.db)
-                                    .add_negative(rhs_ty)
-                                    .build();
-                                constraints.insert(symbol, ty);
-                            }
-                        }
-                        ast::CmpOp::Eq if lhs_ty.is_literal_string() => {
-                            constraints.insert(symbol, rhs_ty);
-                        }
-                        ast::CmpOp::In => {
-                            if let Some(ty) = self.evaluate_expr_in(lhs_ty, rhs_ty) {
-                                constraints.insert(symbol, ty);
-                            }
-                        }
-                        ast::CmpOp::NotIn => {
-                            if let Some(ty) = self.evaluate_expr_in(lhs_ty, rhs_ty) {
-                                constraints.insert(symbol, ty.negate(self.db));
-                            }
-                        }
-                        _ => {
-                            // TODO other comparison types
+                        if let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, op) {
+                            constraints.insert(symbol, ty);
                         }
                     }
                 }
@@ -470,12 +528,22 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                             range: _,
                         },
                 }) if keywords.is_empty() => {
-                    let Type::ClassLiteral(ClassLiteralType { class: rhs_class }) = rhs_ty else {
-                        continue;
+                    let rhs_class = match rhs_ty {
+                        Type::ClassLiteral(class) => class,
+                        Type::GenericAlias(alias) => {
+                            ClassLiteralType::Generic(alias.origin(self.db))
+                        }
+                        _ => {
+                            continue;
+                        }
                     };
 
-                    let [ast::Expr::Name(ast::ExprName { id, .. })] = &**args else {
-                        continue;
+                    let id = match &**args {
+                        [first] => match expr_name(first) {
+                            Some(id) => id,
+                            None => continue,
+                        },
+                        _ => continue,
                     };
 
                     let is_valid_constraint = if is_positive {
@@ -493,10 +561,13 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
                     if callable_type
                         .into_class_literal()
-                        .is_some_and(|c| c.class().is_known(self.db, KnownClass::Type))
+                        .is_some_and(|c| c.is_known(self.db, KnownClass::Type))
                     {
                         let symbol = self.expect_expr_name_symbol(id);
-                        constraints.insert(symbol, Type::instance(rhs_class));
+                        constraints.insert(
+                            symbol,
+                            Type::instance(rhs_class.unknown_specialization(self.db)),
+                        );
                     }
                 }
                 _ => {}
@@ -523,10 +594,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
                 let function = function_type.known(self.db)?.into_constraint_function()?;
 
-                let [ast::Expr::Name(ast::ExprName { id, .. }), class_info] =
-                    &*expr_call.arguments.args
-                else {
-                    return None;
+                let (id, class_info) = match &*expr_call.arguments.args {
+                    [first, class_info] => match expr_name(first) {
+                        Some(id) => (id, class_info),
+                        None => return None,
+                    },
+                    _ => return None,
                 };
 
                 let symbol = self.expect_expr_name_symbol(id);
@@ -547,7 +620,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             Type::ClassLiteral(class_type)
                 if expr_call.arguments.args.len() == 1
                     && expr_call.arguments.keywords.is_empty()
-                    && class_type.class().is_known(self.db, KnownClass::Bool) =>
+                    && class_type.is_known(self.db, KnownClass::Bool) =>
             {
                 self.evaluate_expression_node_predicate(
                     &expr_call.arguments.args[0],

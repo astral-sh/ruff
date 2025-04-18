@@ -30,23 +30,16 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/function/return_ty
 # Diagnostics
 
 ```
-error: lint:invalid-return-type
- --> /src/mdtest_snippet.pyi:3:12
-  |
-1 | def f() -> int:
-2 |     # error: [invalid-return-type]
-3 |     return ...
-  |            ^^^ Object of type `ellipsis` is not assignable to return type `int`
-4 |
-5 | # error: [invalid-return-type]
-  |
-info
+error: lint:invalid-return-type: Return type does not match returned value
  --> /src/mdtest_snippet.pyi:1:12
   |
 1 | def f() -> int:
-  |            --- Return type is declared here as `int`
+  |            --- Expected `int` because of return type
 2 |     # error: [invalid-return-type]
 3 |     return ...
+  |            ^^^ Expected `int`, found `ellipsis`
+4 |
+5 | # error: [invalid-return-type]
   |
 
 ```

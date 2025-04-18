@@ -25,6 +25,11 @@ x = "foo"  # error: [invalid-assignment] "Object of type `Literal["foo"]` is not
 
 ## Tuple annotations are understood
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 `module.py`:
 
 ```py
@@ -56,7 +61,7 @@ reveal_type(d)  # revealed: tuple[tuple[str, str], tuple[int, int]]
 reveal_type(e)  # revealed: @Todo(full tuple[...] support)
 reveal_type(f)  # revealed: @Todo(full tuple[...] support)
 reveal_type(g)  # revealed: @Todo(full tuple[...] support)
-reveal_type(h)  # revealed: tuple[@Todo(generics), @Todo(generics)]
+reveal_type(h)  # revealed: tuple[@Todo(specialized non-generic class), @Todo(specialized non-generic class)]
 
 reveal_type(i)  # revealed: tuple[str | int, str | int]
 reveal_type(j)  # revealed: tuple[str | int]

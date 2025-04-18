@@ -89,7 +89,7 @@ def _(
     reveal_type(k)  # revealed: Unknown
     reveal_type(p)  # revealed: Unknown
     reveal_type(q)  # revealed: int | Unknown
-    reveal_type(r)  # revealed: @Todo(generics)
+    reveal_type(r)  # revealed: @Todo(unknown type subscript)
 ```
 
 ## Invalid Collection based AST nodes
