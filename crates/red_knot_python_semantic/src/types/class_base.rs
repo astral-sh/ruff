@@ -5,7 +5,7 @@ use itertools::Either;
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
 /// This is much more limited than the [`Type`] enum: all types that would be invalid to have as a
-/// class base are transformed into [`ClassBase::unknown`]
+/// class base are transformed into [`ClassBase::unknown()`]
 ///
 /// Note that a non-specialized generic class _cannot_ be a class base. When we see a
 /// non-specialized generic class in any type expression (including the list of base classes), we
@@ -14,7 +14,12 @@ use itertools::Either;
 pub enum ClassBase<'db> {
     Dynamic(DynamicType),
     Class(ClassType<'db>),
+    /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
+    /// and can appear in the MRO of a class.
     Protocol,
+    /// Bare `Generic` cannot be subclassed directly in user code,
+    /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
+    /// `Protocol[T]`, or bare `Protcool`.
     Generic,
 }
 
@@ -178,12 +183,20 @@ impl<'db> ClassBase<'db> {
     /// Iterate over the MRO of this base
     pub(super) fn mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            ClassBase::Dynamic(_) | ClassBase::Generic => {
-                Either::Left(Either::Left([self, ClassBase::object(db)].into_iter()))
-            }
-            ClassBase::Protocol => Either::Left(Either::Right(
+            ClassBase::Protocol => Either::Left(Either::Left(
                 [self, ClassBase::Generic, ClassBase::object(db)].into_iter(),
             )),
+            ClassBase::Dynamic(DynamicType::SubscriptedProtocol) => Either::Left(Either::Left(
+                [
+                    self,
+                    ClassBase::Dynamic(DynamicType::SubscriptedGeneric),
+                    ClassBase::object(db),
+                ]
+                .into_iter(),
+            )),
+            ClassBase::Dynamic(_) | ClassBase::Generic => {
+                Either::Left(Either::Right([self, ClassBase::object(db)].into_iter()))
+            }
             ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
         }
     }

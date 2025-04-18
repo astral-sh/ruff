@@ -777,8 +777,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                         continue;
                     }
-                    // dynamic/unknown bases are never `@final`
                     Type::ClassLiteral(class) => class,
+                    // dynamic/unknown bases are never `@final`
                     _ => continue,
                 };
 
@@ -6358,15 +6358,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                     // TODO: properly handle old-style generics; get rid of this temporary hack
                     if !value_ty.into_class_literal().is_some_and(|class| {
-                        class.iter_mro(self.db(), None).any(|base| {
-                            matches!(
-                                base,
-                                ClassBase::Dynamic(
-                                    DynamicType::SubscriptedGeneric
-                                        | DynamicType::SubscriptedProtocol,
-                                )
-                            )
-                        })
+                        class
+                            .iter_mro(self.db(), None)
+                            .any(|base| base == ClassBase::Dynamic(DynamicType::SubscriptedGeneric))
                     }) {
                         report_non_subscriptable(
                             &self.context,
