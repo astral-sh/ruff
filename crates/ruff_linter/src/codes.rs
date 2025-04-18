@@ -282,6 +282,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "W0244") => (RuleGroup::Preview, rules::pylint::rules::RedefinedSlotsInSubclass),
         (Pylint, "W0245") => (RuleGroup::Stable, rules::pylint::rules::SuperWithoutBrackets),
         (Pylint, "W0406") => (RuleGroup::Stable, rules::pylint::rules::ImportSelf),
+        (Pylint, "W0601") => (RuleGroup::Preview, rules::pylint::rules::GlobalVariableUndefined),
         (Pylint, "W0602") => (RuleGroup::Stable, rules::pylint::rules::GlobalVariableNotAssigned),
         (Pylint, "W0603") => (RuleGroup::Stable, rules::pylint::rules::GlobalStatement),
         (Pylint, "W0604") => (RuleGroup::Stable, rules::pylint::rules::GlobalAtModuleLevel),
