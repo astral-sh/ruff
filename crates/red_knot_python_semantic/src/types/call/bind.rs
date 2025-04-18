@@ -20,9 +20,9 @@ use crate::types::diagnostic::{
 use crate::types::generics::{Specialization, SpecializationBuilder};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    todo_type, BoundMethodType, ClassLiteralType, DataclassMetadata, FunctionDecorators,
-    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    TupleType, TypeVarBoundOrConstraints, TypeVarInstance, UnionType, WrapperDescriptorKind,
+    BoundMethodType, DataclassMetadata, FunctionDecorators, KnownClass, KnownFunction,
+    KnownInstanceType, MethodWrapperKind, PropertyInstanceType, TupleType,
+    TypeVarBoundOrConstraints, TypeVarInstance, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Severity, Span, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -707,7 +707,10 @@ impl<'db> Bindings<'db> {
                         // TODO: Raise a diagnostic if the name parameter doesn't match the name
                         // being assigned to.
                         let name = match containing_assignment.kind(db) {
-                            DefinitionKind::Assignment(assignment) => assignment.name().id.clone(),
+                            DefinitionKind::Assignment(assignment) => match assignment.target() {
+                                ast::Expr::Name(name) => name.id.clone(),
+                                _ => continue,
+                            },
                             _ => continue,
                         };
 

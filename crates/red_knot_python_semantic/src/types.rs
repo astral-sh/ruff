@@ -3951,8 +3951,11 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, &mut argument_types)
-                    .check_types(db, &mut argument_types, None)?;
+                let bindings = Bindings::match_parameters(signatures, argument_types).check_types(
+                    db,
+                    argument_types,
+                    None,
+                )?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }

@@ -3699,7 +3699,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op),
             ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
-            ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
+            ast::Expr::Subscript(subscript) => {
+                self.infer_subscript_expression(subscript, containing_assignment)
+            }
             ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
             ast::Expr::Named(named) => self.infer_named_expression(named),
             ast::Expr::If(if_expression) => self.infer_if_expression(if_expression),
@@ -6096,7 +6098,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         Ok(builder.build())
     }
 
-    fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
+    fn infer_subscript_expression(
+        &mut self,
+        subscript: &ast::ExprSubscript,
+        containing_assignment: Option<Definition<'db>>,
+    ) -> Type<'db> {
         let ast::ExprSubscript {
             range: _,
             value,
@@ -6112,7 +6118,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         // special cases, too.
         let value_ty = self.infer_expression(value);
         if let Type::ClassLiteral(ClassLiteralType::Generic(generic_class)) = value_ty {
-            return self.infer_explicit_class_specialization(subscript, value_ty, generic_class);
+            return self.infer_explicit_class_specialization(
+                subscript,
+                value_ty,
+                generic_class,
+                containing_assignment,
+            );
         }
 
         let slice_ty = self.infer_expression(slice);
@@ -6124,6 +6135,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_class: GenericClass<'db>,
+        containing_assignment: Option<Definition<'db>>,
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
         let mut call_argument_types = match slice_node {
@@ -6138,7 +6150,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             generic_context.signature(self.db()),
         ));
         let bindings = match Bindings::match_parameters(signatures, &mut call_argument_types)
-            .check_types(self.db(), &mut call_argument_types)
+            .check_types(self.db(), &mut call_argument_types, containing_assignment)
         {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
@@ -7247,8 +7259,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 value_ty
             }
             Type::ClassLiteral(ClassLiteralType::Generic(generic_class)) => {
-                let specialized_class =
-                    self.infer_explicit_class_specialization(subscript, value_ty, generic_class);
+                let specialized_class = self.infer_explicit_class_specialization(
+                    subscript,
+                    value_ty,
+                    generic_class,
+                    None,
+                );
                 specialized_class
                     .in_type_expression(self.db())
                     .unwrap_or(Type::unknown())
