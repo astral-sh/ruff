@@ -11,11 +11,14 @@ use crate::types::class_base::ClassBase;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    InstanceType, IntersectionType, KnownClass, MethodWrapperKind, StringLiteralType, Type,
-    TypeVarBoundOrConstraints, TypeVarInstance, UnionType, WrapperDescriptorKind,
+    FunctionSignature, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
+    StringLiteralType, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
+    WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
+
+use super::CallableType;
 
 impl<'db> Type<'db> {
     pub fn display(&self, db: &'db dyn Db) -> DisplayType {
@@ -95,32 +98,59 @@ impl Display for DisplayRepresentation<'_> {
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => {
                 let signature = function.signature(self.db);
+
                 // TODO: when generic function types are supported, we should add
                 // the generic type parameters to the signature, i.e.
                 // show `def foo[T](x: T) -> T`.
 
-                write!(
-                    f,
-                    // "def {name}{specialization}{signature}",
-                    "def {name}{signature}",
-                    name = function.name(self.db),
-                    signature = signature.display(self.db)
-                )
+                match signature {
+                    FunctionSignature::Single(signature) => {
+                        write!(
+                            f,
+                            // "def {name}{specialization}{signature}",
+                            "def {name}{signature}",
+                            name = function.name(self.db),
+                            signature = signature.display(self.db)
+                        )
+                    }
+                    FunctionSignature::Overloaded(signatures, _) => {
+                        // TODO: How to display overloads?
+                        f.write_str("Overload[")?;
+                        let mut join = f.join(", ");
+                        for signature in signatures {
+                            join.entry(&signature.display(self.db));
+                        }
+                        f.write_str("]")
+                    }
+                }
             }
-            Type::Callable(callable) => callable.signature(self.db).display(self.db).fmt(f),
+            Type::Callable(callable) => callable.display(self.db).fmt(f),
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
 
                 // TODO: use the specialization from the method. Similar to the comment above
                 // about the function specialization,
 
-                write!(
-                    f,
-                    "bound method {instance}.{method}{signature}",
-                    method = function.name(self.db),
-                    instance = bound_method.self_instance(self.db).display(self.db),
-                    signature = function.signature(self.db).bind_self().display(self.db)
-                )
+                match function.signature(self.db) {
+                    FunctionSignature::Single(signature) => {
+                        write!(
+                            f,
+                            "bound method {instance}.{method}{signature}",
+                            method = function.name(self.db),
+                            instance = bound_method.self_instance(self.db).display(self.db),
+                            signature = signature.bind_self().display(self.db)
+                        )
+                    }
+                    FunctionSignature::Overloaded(signatures, _) => {
+                        // TODO: How to display overloads?
+                        f.write_str("Overload[")?;
+                        let mut join = f.join(", ");
+                        for signature in signatures {
+                            join.entry(&signature.bind_self().display(self.db));
+                        }
+                        f.write_str("]")
+                    }
+                }
             }
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 write!(
@@ -355,8 +385,40 @@ impl Display for DisplaySpecialization<'_> {
     }
 }
 
+impl<'db> CallableType<'db> {
+    pub(crate) fn display(&'db self, db: &'db dyn Db) -> DisplayCallableType<'db> {
+        DisplayCallableType {
+            signatures: self.signatures(db),
+            db,
+        }
+    }
+}
+
+pub(crate) struct DisplayCallableType<'db> {
+    signatures: &'db [Signature<'db>],
+    db: &'db dyn Db,
+}
+
+impl Display for DisplayCallableType<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.signatures {
+            [signature] => write!(f, "{}", signature.display(self.db)),
+            signatures => {
+                // TODO: How to display overloads?
+                f.write_str("Overload[")?;
+                let mut join = f.join(", ");
+                for signature in signatures {
+                    join.entry(&signature.display(self.db));
+                }
+                join.finish()?;
+                f.write_char(']')
+            }
+        }
+    }
+}
+
 impl<'db> Signature<'db> {
-    fn display(&'db self, db: &'db dyn Db) -> DisplaySignature<'db> {
+    pub(crate) fn display(&'db self, db: &'db dyn Db) -> DisplaySignature<'db> {
         DisplaySignature {
             parameters: self.parameters(),
             return_ty: self.return_ty,
@@ -365,7 +427,7 @@ impl<'db> Signature<'db> {
     }
 }
 
-struct DisplaySignature<'db> {
+pub(crate) struct DisplaySignature<'db> {
     parameters: &'db Parameters<'db>,
     return_ty: Option<Type<'db>>,
     db: &'db dyn Db,

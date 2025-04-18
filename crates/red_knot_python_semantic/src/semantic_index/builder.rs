@@ -1115,6 +1115,17 @@ where
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
                 let (symbol, _) = self.add_symbol(name.id.clone());
+
+                // Record a use of the function name in the scope that it is defined in, so that it
+                // can be used to find previously defined functions with the same name. This is
+                // used to collect all the overloaded definitions of a function. This needs to be
+                // done on the `Identifier` node as opposed to `ExprName` because that's what the
+                // AST uses.
+                self.mark_symbol_used(symbol);
+                let use_id = self.current_ast_ids().record_use(name);
+                self.current_use_def_map_mut()
+                    .record_use(symbol, use_id, NodeKey::from_node(name));
+
                 self.add_definition(symbol, function_def);
             }
             ast::Stmt::ClassDef(class) => {

@@ -1153,5 +1153,187 @@ static_assert(not is_subtype_of(TypeOf[A.g], Callable[[], int]))
 static_assert(is_subtype_of(TypeOf[A.f], Callable[[A, int], int]))
 ```
 
+### Overloads
+
+#### Subtype overloaded
+
+For `B <: A`, if a callable `B` is overloaded with two or more signatures, it is a subtype of
+callable `A` if _at least one_ of the overloaded signatures in `B` is a subtype of `A`.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+class C: ...
+
+@overload
+def overloaded(x: A) -> None: ...
+@overload
+def overloaded(x: B) -> None: ...
+```
+
+```py
+from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from overloaded import A, B, C, overloaded
+
+def accepts_a(x: A) -> None: ...
+def accepts_b(x: B) -> None: ...
+def accepts_c(x: C) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[overloaded], CallableTypeOf[accepts_a]))
+static_assert(is_subtype_of(CallableTypeOf[overloaded], CallableTypeOf[accepts_b]))
+static_assert(not is_subtype_of(CallableTypeOf[overloaded], CallableTypeOf[accepts_c]))
+```
+
+#### Supertype overloaded
+
+For `B <: A`, if a callable `A` is overloaded with two or more signatures, callable `B` is a subtype
+of `A` if `B` is a subtype of _all_ of the signatures in `A`.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class Grandparent: ...
+class Parent(Grandparent): ...
+class Child(Parent): ...
+
+@overload
+def overloaded(a: Child) -> None: ...
+@overload
+def overloaded(a: Parent) -> None: ...
+@overload
+def overloaded(a: Grandparent) -> None: ...
+```
+
+```py
+from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from overloaded import Grandparent, Parent, Child, overloaded
+
+# This is a subtype of only the first overload
+def child(a: Child) -> None: ...
+
+# This is a subtype of the first and second overload
+def parent(a: Parent) -> None: ...
+
+# This is the only function that's a subtype of all overloads
+def grandparent(a: Grandparent) -> None: ...
+
+static_assert(not is_subtype_of(CallableTypeOf[child], CallableTypeOf[overloaded]))
+static_assert(not is_subtype_of(CallableTypeOf[parent], CallableTypeOf[overloaded]))
+static_assert(is_subtype_of(CallableTypeOf[grandparent], CallableTypeOf[overloaded]))
+```
+
+#### Both overloads
+
+For `B <: A`, if both `A` and `B` is a callable that's overloaded with two or more signatures, then
+`B` is a subtype of `A` if for _every_ signature in `A`, there is _at least one_ signature in `B`
+that is a subtype of it.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class Grandparent: ...
+class Parent(Grandparent): ...
+class Child(Parent): ...
+class Other: ...
+
+@overload
+def pg(a: Parent) -> None: ...
+@overload
+def pg(a: Grandparent) -> None: ...
+
+@overload
+def po(a: Parent) -> None: ...
+@overload
+def po(a: Other) -> None: ...
+
+@overload
+def go(a: Grandparent) -> None: ...
+@overload
+def go(a: Other) -> None: ...
+
+@overload
+def cpg(a: Child) -> None: ...
+@overload
+def cpg(a: Parent) -> None: ...
+@overload
+def cpg(a: Grandparent) -> None: ...
+
+@overload
+def empty_go() -> Child: ...
+@overload
+def empty_go(a: Grandparent) -> None: ...
+@overload
+def empty_go(a: Other) -> Other: ...
+
+@overload
+def empty_cp() -> Parent: ...
+@overload
+def empty_cp(a: Child) -> None: ...
+@overload
+def empty_cp(a: Parent) -> None: ...
+```
+
+```py
+from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from overloaded import pg, po, go, cpg, empty_go, empty_cp
+
+static_assert(is_subtype_of(CallableTypeOf[pg], CallableTypeOf[cpg]))
+static_assert(is_subtype_of(CallableTypeOf[cpg], CallableTypeOf[pg]))
+
+static_assert(not is_subtype_of(CallableTypeOf[po], CallableTypeOf[pg]))
+static_assert(not is_subtype_of(CallableTypeOf[pg], CallableTypeOf[po]))
+
+static_assert(is_subtype_of(CallableTypeOf[go], CallableTypeOf[pg]))
+static_assert(not is_subtype_of(CallableTypeOf[pg], CallableTypeOf[go]))
+
+# Overload 1 in `empty_go` is a subtype of overload 1 in `empty_cp`
+# Overload 2 in `empty_go` is a subtype of overload 2 in `empty_cp`
+# Overload 2 in `empty_go` is a subtype of overload 3 in `empty_cp`
+#
+# All overloads in `empty_cp` has a subtype in `empty_go`
+static_assert(is_subtype_of(CallableTypeOf[empty_go], CallableTypeOf[empty_cp]))
+
+static_assert(not is_subtype_of(CallableTypeOf[empty_cp], CallableTypeOf[empty_go]))
+```
+
+#### Order of overloads
+
+Order of overloads is irrelevant for subtyping.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class A: ...
+class B: ...
+
+@overload
+def overload_ab(x: A) -> None: ...
+@overload
+def overload_ab(x: B) -> None: ...
+
+@overload
+def overload_ba(x: B) -> None: ...
+@overload
+def overload_ba(x: A) -> None: ...
+```
+
+```py
+from overloaded import overload_ab, overload_ba
+from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+
+static_assert(is_subtype_of(CallableTypeOf[overload_ab], CallableTypeOf[overload_ba]))
+static_assert(is_subtype_of(CallableTypeOf[overload_ba], CallableTypeOf[overload_ab]))
+```
+
 [special case for float and complex]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
