@@ -59,3 +59,85 @@ async def elements(n):
 async def f():
     return {n: [x async for x in elements(n)] for n in range(3)}
 ```
+
+## Late `__future__` import
+
+```py
+from collections import namedtuple
+
+# error: [invalid-syntax] "__future__ imports must be at the top of the file"
+from __future__ import print_function
+```
+
+## Invalid annotation
+
+This one might be a bit redundant with the `invalid-type-form` error.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+
+# error: [invalid-type-form] "Named expressions are not allowed in type expressions"
+# error: [invalid-syntax] "named expression cannot be used within a type annotation"
+def f() -> (y := 3): ...
+```
+
+## Duplicate `match` key
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+match 2:
+    # error: [invalid-syntax] "mapping pattern checks duplicate key `"x"`"
+    case {"x": 1, "x": 2}:
+        ...
+```
+
+## `return`, `yield`, `yield from`, and `await` outside function
+
+```py
+# error: [invalid-syntax] "`return` statement outside of a function"
+return
+
+# error: [invalid-syntax] "`yield` statement outside of a function"
+yield
+
+# error: [invalid-syntax] "`yield from` statement outside of a function"
+yield from []
+
+# error: [invalid-syntax] "`await` statement outside of a function"
+# error: [invalid-syntax] "`await` outside of an asynchronous function"
+await 1
+
+def f():
+    # error: [invalid-syntax] "`await` outside of an asynchronous function"
+    await 1
+```
+
+Generators are evaluated lazily, so `await` is allowed, even outside of a function.
+
+```py
+async def g():
+    yield 1
+
+(x async for x in g())
+```
+
+## Load before `global` declaration
+
+This should be an error, but it's not yet.
+
+TODO implement `SemanticSyntaxContext::global`
+
+```py
+def f():
+    x = 1
+    global x
+```
