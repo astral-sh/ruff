@@ -169,6 +169,11 @@ def _(
 
 ## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import Literal
 from knot_extensions import AlwaysTruthy, AlwaysFalsy

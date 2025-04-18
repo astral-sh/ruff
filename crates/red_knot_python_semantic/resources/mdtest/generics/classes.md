@@ -164,12 +164,12 @@ consistent with each other.
 
 ```py
 class C[T]:
-    def __new__(cls, x: T) -> "C"[T]:
+    def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -181,7 +181,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -189,14 +189,14 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
-    def __new__(cls, x: T) -> "C"[T]:
+    def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
     def __init__(self, x: T) -> None: ...
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -204,25 +204,25 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
-    def __new__(cls, *args, **kwargs) -> "C"[T]:
+    def __new__(cls, *args, **kwargs) -> "C[T]":
         return object.__new__(cls)
 
     def __init__(self, x: T) -> None: ...
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
 class D[T]:
-    def __new__(cls, x: T) -> "D"[T]:
+    def __new__(cls, x: T) -> "D[T]":
         return object.__new__(cls)
 
     def __init__(self, *args, **kwargs) -> None: ...
 
 reveal_type(D(1))  # revealed: D[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `D[Literal["five"]]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -247,7 +247,7 @@ reveal_type(C(1, "string"))  # revealed: C[Unknown]
 # error: [invalid-argument-type]
 reveal_type(C(1, True))  # revealed: C[Unknown]
 
-# TODO: error for the correct reason
+# TODO: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `S`, found `Literal[1]`"
 wrong_innards: C[int] = C("five", 1)
 ```

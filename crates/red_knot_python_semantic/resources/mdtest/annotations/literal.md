@@ -137,7 +137,7 @@ from other import Literal
 a1: Literal[26]
 
 def f():
-    reveal_type(a1)  # revealed: @Todo(generics)
+    reveal_type(a1)  # revealed: @Todo(unknown type subscript)
 ```
 
 ## Detecting typing_extensions.Literal

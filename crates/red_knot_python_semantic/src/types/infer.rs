@@ -6044,12 +6044,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // special cases, too.
         let value_ty = self.infer_expression(value);
         if let Type::ClassLiteral(ClassLiteralType::Generic(generic_class)) = value_ty {
-            return self.infer_explicit_class_specialization(
-                subscript,
-                value_ty,
-                generic_class,
-                slice,
-            );
+            return self.infer_explicit_class_specialization(subscript, value_ty, generic_class);
         }
 
         let slice_ty = self.infer_expression(slice);
@@ -6061,8 +6056,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_class: GenericClass<'db>,
-        slice_node: &ast::Expr,
     ) -> Type<'db> {
+        let slice_node = subscript.slice.as_ref();
         let mut call_argument_types = match slice_node {
             ast::Expr::Tuple(tuple) => CallArgumentTypes::positional(
                 tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
@@ -7183,9 +7178,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(slice);
                 value_ty
             }
-            _ => {
+            Type::ClassLiteral(ClassLiteralType::Generic(generic_class)) => {
+                let specialized_class =
+                    self.infer_explicit_class_specialization(subscript, value_ty, generic_class);
+                specialized_class
+                    .in_type_expression(self.db())
+                    .unwrap_or(Type::unknown())
+            }
+            Type::ClassLiteral(ClassLiteralType::NonGeneric(_)) => {
+                // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
+                // specialize a non-generic class.
                 self.infer_type_expression(slice);
-                todo_type!("generics")
+                todo_type!("specialized non-generic class")
+            }
+            _ => {
+                // TODO: Emit a diagnostic once we've implemented all valid subscript type
+                // expressions.
+                self.infer_type_expression(slice);
+                todo_type!("unknown type subscript")
             }
         }
     }

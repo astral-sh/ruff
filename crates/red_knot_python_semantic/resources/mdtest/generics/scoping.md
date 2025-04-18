@@ -174,13 +174,13 @@ S = TypeVar("S")
 
 def f(x: T) -> None:
     x: list[T] = []
-    # TODO: error
+    # TODO: invalid-assignment error
     y: list[S] = []
 
 # TODO: no error
 # error: [invalid-base]
 class C(Generic[T]):
-    # TODO: error
+    # TODO: error: cannot use S if it's not in the current generic context
     x: list[S] = []
 
     # This is not an error, as shown in the previous test
@@ -200,11 +200,11 @@ S = TypeVar("S")
 
 def f[T](x: T) -> None:
     x: list[T] = []
-    # TODO: error
+    # TODO: invalid assignment error
     y: list[S] = []
 
 class C[T]:
-    # TODO: error
+    # TODO: error: cannot use S if it's not in the current generic context
     x: list[S] = []
 
     def m1(self, x: S) -> S:
@@ -288,7 +288,7 @@ class C[T]:
     ok1: list[T] = []
 
     class Bad:
-        # TODO: error
+        # TODO: error: cannot refer to T in nested scope
         bad: list[T] = []
 
     class Inner[S]: ...

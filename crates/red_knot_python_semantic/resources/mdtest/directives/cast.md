@@ -61,7 +61,7 @@ from knot_extensions import Unknown
 
 def f(x: Any, y: Unknown, z: Any | str | int):
     a = cast(dict[str, Any], x)
-    reveal_type(a)  # revealed: @Todo(generics)
+    reveal_type(a)  # revealed: @Todo(specialized non-generic class)
 
     b = cast(Any, y)
     reveal_type(b)  # revealed: Any

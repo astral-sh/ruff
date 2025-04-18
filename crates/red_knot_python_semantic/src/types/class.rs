@@ -257,11 +257,107 @@ impl<'db> ClassType<'db> {
         class_literal.is_final(db)
     }
 
+    /// If `self` and `other` are generic aliases of the same generic class, returns their
+    /// corresponding specializations.
+    fn compatible_specializations(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> Option<(Specialization<'db>, Specialization<'db>)> {
+        match (self, other) {
+            (ClassType::Generic(self_generic), ClassType::Generic(other_generic)) => {
+                if self_generic.origin(db) == other_generic.origin(db) {
+                    Some((
+                        self_generic.specialization(db),
+                        other_generic.specialization(db),
+                    ))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
-        self.iter_mro(db).contains(&ClassBase::Class(other))
+        if self.iter_mro(db).contains(&ClassBase::Class(other)) {
+            return true;
+        }
+
+        // `self` is a subclass of `other` if they are both generic aliases of the same generic
+        // class, and their specializations are compatible, taking into account the variance of the
+        // class's typevars.
+        if let Some((self_specialization, other_specialization)) =
+            self.compatible_specializations(db, other)
+        {
+            if self_specialization.is_subtype_of(db, other_specialization) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        if self == other {
+            return true;
+        }
+
+        // `self` is equivalent to `other` if they are both generic aliases of the same generic
+        // class, and their specializations are compatible, taking into account the variance of the
+        // class's typevars.
+        if let Some((self_specialization, other_specialization)) =
+            self.compatible_specializations(db, other)
+        {
+            if self_specialization.is_equivalent_to(db, other_specialization) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        // `is_subclass_of` is checking the subtype relation, in which gradual types do not
+        // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
+        if self.is_subclass_of(db, other) {
+            return true;
+        }
+
+        // `self` is assignable to `other` if they are both generic aliases of the same generic
+        // class, and their specializations are compatible, taking into account the variance of the
+        // class's typevars.
+        if let Some((self_specialization, other_specialization)) =
+            self.compatible_specializations(db, other)
+        {
+            if self_specialization.is_assignable_to(db, other_specialization) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        if self == other {
+            return true;
+        }
+
+        // `self` is equivalent to `other` if they are both generic aliases of the same generic
+        // class, and their specializations are compatible, taking into account the variance of the
+        // class's typevars.
+        if let Some((self_specialization, other_specialization)) =
+            self.compatible_specializations(db, other)
+        {
+            if self_specialization.is_gradual_equivalent_to(db, other_specialization) {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
@@ -1515,6 +1611,22 @@ impl<'db> InstanceType<'db> {
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
         // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)
+    }
+
+    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
+        self.class.is_equivalent_to(db, other.class)
+    }
+
+    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
+        self.class.is_assignable_to(db, other.class)
+    }
+
+    pub(super) fn is_gradual_equivalent_to(
+        self,
+        db: &'db dyn Db,
+        other: InstanceType<'db>,
+    ) -> bool {
+        self.class.is_gradual_equivalent_to(db, other.class)
     }
 }
 

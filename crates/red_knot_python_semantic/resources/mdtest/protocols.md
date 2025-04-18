@@ -344,7 +344,7 @@ class Foo(Protocol):
 # `tuple[Literal["x"], Literal["y"], Literal["z"], Literal["method_member"]]`
 #
 # `frozenset[Literal["x", "y", "z", "method_member"]]`
-reveal_type(get_protocol_members(Foo))  # revealed: @Todo(generics)
+reveal_type(get_protocol_members(Foo))  # revealed: @Todo(specialized non-generic class)
 ```
 
 Calling `get_protocol_members` on a non-protocol class raises an error at runtime:
@@ -353,7 +353,7 @@ Calling `get_protocol_members` on a non-protocol class raises an error at runtim
 class NotAProtocol: ...
 
 # TODO: should emit `[invalid-protocol]` error, should reveal `Unknown`
-reveal_type(get_protocol_members(NotAProtocol))  # revealed: @Todo(generics)
+reveal_type(get_protocol_members(NotAProtocol))  # revealed: @Todo(specialized non-generic class)
 ```
 
 Certain special attributes and methods are not considered protocol members at runtime, and should
@@ -372,7 +372,7 @@ class Lumberjack(Protocol):
         self.x = x
 
 # TODO: `tuple[Literal["x"]]` or `frozenset[Literal["x"]]`
-reveal_type(get_protocol_members(Lumberjack))  # revealed: @Todo(generics)
+reveal_type(get_protocol_members(Lumberjack))  # revealed: @Todo(specialized non-generic class)
 ```
 
 ## Subtyping of protocols with attribute members
