@@ -1425,24 +1425,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Returns true if both `self` and `other` are the same gradual form
-    /// (limited to `Any`, `Unknown`, or `Todo`).
-    pub(crate) fn is_same_gradual_form(self, other: Type<'db>) -> bool {
-        matches!(
-            (self, other),
-            (
-                Type::Dynamic(DynamicType::Any),
-                Type::Dynamic(DynamicType::Any)
-            ) | (
-                Type::Dynamic(DynamicType::Unknown),
-                Type::Dynamic(DynamicType::Unknown)
-            ) | (
-                Type::Dynamic(DynamicType::Todo(_)),
-                Type::Dynamic(DynamicType::Todo(_))
-            )
-        )
-    }
-
     /// Returns true if this type and `other` are gradual equivalent.
     ///
     /// > Two gradual types `A` and `B` are equivalent

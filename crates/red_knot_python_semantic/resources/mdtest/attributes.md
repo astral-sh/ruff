@@ -302,7 +302,7 @@ class C:
 
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
-reveal_type(c_instance.b)  # revealed: Unknown | @Todo(starred unpacking)
+reveal_type(c_instance.b)  # revealed: Unknown
 ```
 
 #### Attributes defined in for-loop (unpacking)
@@ -1890,6 +1890,17 @@ class B:
 
 reveal_type(B().x)  # revealed: Unknown | Literal[1]
 reveal_type(A().x)  # revealed: Unknown | Literal[1]
+```
+
+This case additionally tests our union/intersection simplification logic:
+
+```py
+class H:
+    def __init__(self):
+        self.x = 1
+
+    def copy(self, other: "H"):
+        self.x = other.x or self.x
 ```
 
 ### Builtin types attributes
