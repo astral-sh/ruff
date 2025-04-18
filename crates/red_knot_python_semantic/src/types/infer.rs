@@ -3894,27 +3894,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         if !is_first {
             self.infer_standalone_expression(iter);
         }
-        self.infer_comprehension_target(target);
+        self.infer_target_impl(target, None);
         for expr in ifs {
             self.infer_expression(expr);
-        }
-    }
-
-    // TODO: support attribute, subscription
-    fn infer_comprehension_target(&mut self, target: &ast::Expr) {
-        match target {
-            ast::Expr::Name(name) => {
-                self.infer_definition(name);
-            }
-            ast::Expr::Tuple(ast::ExprTuple { elts, .. })
-            | ast::Expr::List(ast::ExprList { elts, .. }) => {
-                for elt in elts {
-                    self.infer_comprehension_target(elt);
-                }
-            }
-            _ => {
-                self.infer_expression(target);
-            }
         }
     }
 
