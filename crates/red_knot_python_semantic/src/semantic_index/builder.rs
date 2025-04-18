@@ -1578,7 +1578,6 @@ where
                     .last()
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard());
 
-                let mut vis_constraints = vec![];
                 let mut post_case_snapshots = vec![];
                 let mut match_predicate;
 
@@ -1615,7 +1614,6 @@ where
                     self.record_visibility_constraint_id(vis_constraint_id);
 
                     self.visit_body(&case.body);
-                    vis_constraints.push(vis_constraint_id);
 
                     post_case_snapshots.push(self.flow_snapshot());
 
@@ -1635,9 +1633,7 @@ where
                         debug_assert!(case.guard.is_none());
                     }
 
-                    for id in &vis_constraints {
-                        self.record_negated_visibility_constraint(*id);
-                    }
+                    self.record_negated_visibility_constraint(vis_constraint_id);
                     no_case_matched = self.flow_snapshot();
                 }
 
