@@ -2,6 +2,7 @@ use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, 
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, ExprAttribute, ExprCall};
+use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -121,31 +122,19 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
     // Extract, e.g., `x` in `bin(x)`.
     let literal_text = checker.locator().slice(arg);
     // If we're calling a method on an integer, or an expression with lower precedence, parenthesize
-    // it. Moreover, we check if the fix is safe.
-    let (parenthesize, applicability): (bool, Applicability) = match arg {
+    // it.
+    let parenthesize: bool = match arg {
         Expr::NumberLiteral(ast::ExprNumberLiteral { .. }) => {
             let mut chars = literal_text.chars();
-            (
-                !matches!(
-                    (chars.next(), chars.next()),
-                    (Some('0'), Some('b' | 'B' | 'x' | 'X' | 'o' | 'O'))
-                ),
-                Applicability::Safe,
+            !matches!(
+                (chars.next(), chars.next()),
+                (Some('0'), Some('b' | 'B' | 'x' | 'X' | 'o' | 'O'))
             )
         }
 
-        Expr::StringLiteral(inner) => (
-            inner.value.is_implicit_concatenated(),
-            Applicability::Unsafe,
-        ),
-        Expr::BytesLiteral(inner) => (
-            inner.value.is_implicit_concatenated(),
-            Applicability::Unsafe,
-        ),
-        Expr::FString(inner) => (
-            inner.value.is_implicit_concatenated(),
-            Applicability::Unsafe,
-        ),
+        Expr::StringLiteral(inner) => inner.value.is_implicit_concatenated(),
+        Expr::BytesLiteral(inner) => inner.value.is_implicit_concatenated(),
+        Expr::FString(inner) => inner.value.is_implicit_concatenated(),
 
         Expr::Await(_)
         | Expr::Starred(_)
@@ -163,9 +152,7 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         | Expr::Compare(_)
         | Expr::Tuple(_)
         | Expr::Generator(_)
-        | Expr::IpyEscapeCommand(_) => (true, Applicability::Unsafe),
-
-        Expr::BooleanLiteral(_) => (false, Applicability::Unsafe),
+        | Expr::IpyEscapeCommand(_) => true,
 
         Expr::Call(_)
         | Expr::Dict(_)
@@ -175,8 +162,17 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         | Expr::DictComp(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
+        | Expr::BooleanLiteral(_)
         | Expr::Attribute(_)
-        | Expr::Subscript(_) => (false, Applicability::Unsafe),
+        | Expr::Subscript(_) => false,
+    };
+
+    // check if the fix is safe or not
+    let applicability: Applicability = match ResolvedPythonType::from(arg) {
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Integer | NumberLike::Bool)) => {
+            Applicability::Safe
+        }
+        _ => Applicability::Unsafe,
     };
 
     let replacement = if parenthesize {

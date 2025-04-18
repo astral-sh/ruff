@@ -116,7 +116,7 @@ FURB161.py:11:9: FURB161 [*] Use of `bin(0x10 + 0x1000).count('1')`
    |
    = help: Replace with `(0x10 + 0x1000).bit_count()`
 
-ℹ Unsafe fix
+ℹ Safe fix
 8  8  | count = bin(0b1010).count("1")  # FURB161
 9  9  | count = bin(0xA).count("1")  # FURB161
 10 10 | count = bin(0o12).count("1")  # FURB161
