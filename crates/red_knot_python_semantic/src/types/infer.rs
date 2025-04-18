@@ -6360,7 +6360,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if !value_ty.into_class_literal().is_some_and(|class| {
                         class
                             .iter_mro(self.db(), None)
-                            .any(|base| base == ClassBase::Dynamic(DynamicType::SubscriptedGeneric))
+                            .contains(&ClassBase::Dynamic(DynamicType::SubscriptedGeneric))
                     }) {
                         report_non_subscriptable(
                             &self.context,
