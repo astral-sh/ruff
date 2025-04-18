@@ -568,23 +568,16 @@ impl<'db> SemanticIndexBuilder<'db> {
         id
     }
 
-    /// Constructs a visibility constraint id without recording it
-    fn visibility_constraint_id(
-        &mut self,
-        predicate: Predicate<'db>,
-    ) -> ScopedVisibilityConstraintId {
-        let predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
-        self.current_visibility_constraints_mut()
-            .add_atom(predicate_id)
-    }
-
     /// Records a visibility constraint by applying it to all live bindings and declarations.
     #[must_use = "A visibility constraint must always be negated after it is added"]
     fn record_visibility_constraint(
         &mut self,
         predicate: Predicate<'db>,
     ) -> ScopedVisibilityConstraintId {
-        let id = self.visibility_constraint_id(predicate);
+        let predicate_id = self.current_use_def_map_mut().add_predicate(predicate);
+        let id = self
+            .current_visibility_constraints_mut()
+            .add_atom(predicate_id);
         self.record_visibility_constraint_id(id);
         id
     }
