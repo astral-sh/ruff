@@ -278,7 +278,7 @@ impl<'db> UnionBuilder<'db> {
                         break;
                     }
 
-                    if ty.is_same_gradual_form(element_type)
+                    if ty.is_gradual_equivalent_to(self.db, element_type)
                         || ty.is_subtype_of(self.db, element_type)
                         || element_type.is_object(self.db)
                     {
@@ -560,7 +560,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     // S & T = S    if S <: T
                     if existing_positive.is_subtype_of(db, new_positive)
-                        || existing_positive.is_same_gradual_form(new_positive)
+                        || existing_positive.is_gradual_equivalent_to(db, new_positive)
                     {
                         return;
                     }
@@ -656,7 +656,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // ~S & ~T = ~T    if S <: T
-                    if existing_negative.is_subtype_of(db, new_negative) {
+                    if existing_negative.is_subtype_of(db, new_negative)
+                        || existing_negative.is_gradual_equivalent_to(db, new_negative)
+                    {
                         to_remove.push(index);
                     }
                     // same rule, reverse order

@@ -842,7 +842,7 @@ def unknown(
 
 ### Mixed dynamic types
 
-We currently do not simplify mixed dynamic types, but might consider doing so in the future:
+Gradually-equivalent types can be simplified out of intersections:
 
 ```py
 from typing import Any
@@ -854,10 +854,10 @@ def mixed(
     i3: Intersection[Not[Any], Unknown],
     i4: Intersection[Not[Any], Not[Unknown]],
 ) -> None:
-    reveal_type(i1)  # revealed: Any & Unknown
-    reveal_type(i2)  # revealed: Any & Unknown
-    reveal_type(i3)  # revealed: Any & Unknown
-    reveal_type(i4)  # revealed: Any & Unknown
+    reveal_type(i1)  # revealed: Any
+    reveal_type(i2)  # revealed: Any
+    reveal_type(i3)  # revealed: Any
+    reveal_type(i4)  # revealed: Any
 ```
 
 ## Invalid
