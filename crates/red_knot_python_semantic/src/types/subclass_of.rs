@@ -102,6 +102,20 @@ impl<'db> SubclassOfType<'db> {
     }
 }
 
+/// An enumeration of the different kinds of `type[]` types that a [`SubclassOfType`] can represent:
+///
+/// 1. A "subclass of a class": `type[C]` for any class object `C`
+/// 2. A "subclass of a dynamic type": `type[Any]`, `type[Unknown]` and `type[@Todo]`
+///
+/// In the long term, we may want to implement <https://github.com/astral-sh/ruff/issues/15381>.
+/// Doing this would allow us to get rid of this enum,
+/// since `type[Any]` would be represented as `type & Any`
+/// rather than using the [`Type::SubclassOf`] variant at all;
+/// [`SubclassOfType`] would then be a simple wrapper around [`ClassType`].
+///
+/// Note that this enum is similar to the [`super::ClassBase`] enum,
+/// but does not include the `ClassBase::Protocol` and `ClassBase::Generic` variants
+/// (`type[Protocol]` and `type[Generic]` are not valid types).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
