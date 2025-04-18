@@ -7193,12 +7193,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(slice);
                 todo_type!("specialized non-generic class")
             }
-            Type::StringLiteral(_) => {
-                // Don't emit a diagnostic, since we haven't determined the type of the deferred
-                // string annotation yet.
-                self.infer_type_expression(slice);
-                Type::unknown()
-            }
             _ => {
                 // TODO: Emit a diagnostic once we've implemented all valid subscript type
                 // expressions.

@@ -164,7 +164,7 @@ consistent with each other.
 
 ```py
 class C[T]:
-    def __new__(cls, x: T) -> "C"[T]:
+    def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
@@ -189,7 +189,7 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
-    def __new__(cls, x: T) -> "C"[T]:
+    def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
     def __init__(self, x: T) -> None: ...
@@ -204,7 +204,7 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
-    def __new__(cls, *args, **kwargs) -> "C"[T]:
+    def __new__(cls, *args, **kwargs) -> "C[T]":
         return object.__new__(cls)
 
     def __init__(self, x: T) -> None: ...
@@ -215,7 +215,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 
 class D[T]:
-    def __new__(cls, x: T) -> "D"[T]:
+    def __new__(cls, x: T) -> "D[T]":
         return object.__new__(cls)
 
     def __init__(self, *args, **kwargs) -> None: ...
