@@ -252,7 +252,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
         r#"
             y = 4 / 0
 
-            for a in range(0, y):
+            for a in range(0, int(y)):
                 x = a
 
             print(x)  # possibly-unresolved-reference
@@ -271,17 +271,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
-      |
-
-    error: lint:no-matching-overload
-     --> <temp_dir>/test.py:4:10
-      |
-    2 | y = 4 / 0
-    3 |
-    4 | for a in range(0, y):
-      |          ^^^^^^^^^^^ No overload of function `__new__` matches arguments
-    5 |     x = a
+    4 | for a in range(0, int(y)):
       |
 
     warning: lint:possibly-unresolved-reference
@@ -293,7 +283,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
       |       ^ Name `x` used when possibly not defined
       |
 
-    Found 3 diagnostics
+    Found 2 diagnostics
 
     ----- stderr -----
     ");
@@ -308,8 +298,8 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     )?;
 
     assert_cmd_snapshot!(case.command(), @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
     warning: lint:division-by-zero
      --> <temp_dir>/test.py:2:5
@@ -317,20 +307,10 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
+    4 | for a in range(0, int(y)):
       |
 
-    error: lint:no-matching-overload
-     --> <temp_dir>/test.py:4:10
-      |
-    2 | y = 4 / 0
-    3 |
-    4 | for a in range(0, y):
-      |          ^^^^^^^^^^^ No overload of function `__new__` matches arguments
-    5 |     x = a
-      |
-
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     ");
@@ -348,7 +328,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
         y = 4 / 0
 
-        for a in range(0, y):
+        for a in range(0, int(y)):
             x = a
 
         print(x)  # possibly-unresolved-reference
@@ -378,17 +358,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     4 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     5 |
-    6 | for a in range(0, y):
-      |
-
-    error: lint:no-matching-overload
-     --> <temp_dir>/test.py:6:10
-      |
-    4 | y = 4 / 0
-    5 |
-    6 | for a in range(0, y):
-      |          ^^^^^^^^^^^ No overload of function `__new__` matches arguments
-    7 |     x = a
+    6 | for a in range(0, int(y)):
       |
 
     warning: lint:possibly-unresolved-reference
@@ -400,7 +370,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
       |       ^ Name `x` used when possibly not defined
       |
 
-    Found 4 diagnostics
+    Found 3 diagnostics
 
     ----- stderr -----
     ");
@@ -415,8 +385,8 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("--warn")
             .arg("unresolved-import"),
         @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
     warning: lint:unresolved-import
      --> <temp_dir>/test.py:2:8
@@ -435,20 +405,10 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     4 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     5 |
-    6 | for a in range(0, y):
+    6 | for a in range(0, int(y)):
       |
 
-    error: lint:no-matching-overload
-     --> <temp_dir>/test.py:6:10
-      |
-    4 | y = 4 / 0
-    5 |
-    6 | for a in range(0, y):
-      |          ^^^^^^^^^^^ No overload of function `__new__` matches arguments
-    7 |     x = a
-      |
-
-    Found 3 diagnostics
+    Found 2 diagnostics
 
     ----- stderr -----
     "
@@ -466,7 +426,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         r#"
         y = 4 / 0
 
-        for a in range(0, y):
+        for a in range(0, int(y)):
             x = a
 
         print(x)  # possibly-unresolved-reference
@@ -485,17 +445,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
-      |
-
-    error: lint:no-matching-overload
-     --> <temp_dir>/test.py:4:10
-      |
-    2 | y = 4 / 0
-    3 |
-    4 | for a in range(0, y):
-      |          ^^^^^^^^^^^ No overload of function `__new__` matches arguments
-    5 |     x = a
+    4 | for a in range(0, int(y)):
       |
 
     warning: lint:possibly-unresolved-reference
@@ -507,7 +457,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
       |       ^ Name `x` used when possibly not defined
       |
 
-    Found 3 diagnostics
+    Found 2 diagnostics
 
     ----- stderr -----
     ");
@@ -523,8 +473,8 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("--ignore")
             .arg("possibly-unresolved-reference"),
         @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
     warning: lint:division-by-zero
      --> <temp_dir>/test.py:2:5
@@ -532,20 +482,10 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
+    4 | for a in range(0, int(y)):
       |
 
-    error: lint:no-matching-overload
-     --> <temp_dir>/test.py:4:10
-      |
-    2 | y = 4 / 0
-    3 |
-    4 | for a in range(0, y):
-      |          ^^^^^^^^^^^ No overload of function `__new__` matches arguments
-    5 |     x = a
-      |
-
-    Found 2 diagnostics
+    Found 1 diagnostic
 
     ----- stderr -----
     "
@@ -874,7 +814,7 @@ fn user_configuration() -> anyhow::Result<()> {
             r#"
             y = 4 / 0
 
-            for a in range(0, y):
+            for a in range(0, int(y)):
                 x = a
 
             print(x)
@@ -892,8 +832,8 @@ fn user_configuration() -> anyhow::Result<()> {
     assert_cmd_snapshot!(
         case.command().current_dir(case.root().join("project")).env(config_env_var, config_directory.as_os_str()),
         @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
     warning: lint:division-by-zero
      --> <temp_dir>/project/main.py:2:5
@@ -901,17 +841,7 @@ fn user_configuration() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
-      |
-
-    error: lint:no-matching-overload
-     --> <temp_dir>/project/main.py:4:10
-      |
-    2 | y = 4 / 0
-    3 |
-    4 | for a in range(0, y):
-      |          ^^^^^^^^^^^ No overload of function `__new__` matches arguments
-    5 |     x = a
+    4 | for a in range(0, int(y)):
       |
 
     warning: lint:possibly-unresolved-reference
@@ -923,7 +853,7 @@ fn user_configuration() -> anyhow::Result<()> {
       |       ^ Name `x` used when possibly not defined
       |
 
-    Found 3 diagnostics
+    Found 2 diagnostics
 
     ----- stderr -----
     "
@@ -953,17 +883,7 @@ fn user_configuration() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
-      |
-
-    error: lint:no-matching-overload
-     --> <temp_dir>/project/main.py:4:10
-      |
-    2 | y = 4 / 0
-    3 |
-    4 | for a in range(0, y):
-      |          ^^^^^^^^^^^ No overload of function `__new__` matches arguments
-    5 |     x = a
+    4 | for a in range(0, int(y)):
       |
 
     error: lint:possibly-unresolved-reference
@@ -975,7 +895,7 @@ fn user_configuration() -> anyhow::Result<()> {
       |       ^ Name `x` used when possibly not defined
       |
 
-    Found 3 diagnostics
+    Found 2 diagnostics
 
     ----- stderr -----
     "

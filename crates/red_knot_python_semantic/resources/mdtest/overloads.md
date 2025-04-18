@@ -2,6 +2,21 @@
 
 Reference: <https://typing.python.org/en/latest/spec/overload.html>
 
+## `typing.overload`
+
+The definition of `typing.overload` in typeshed is an identity function.
+
+```py
+from typing import overload
+
+def foo(x: int) -> int:
+    return x
+
+reveal_type(foo)  # revealed: def foo(x: int) -> int
+bar = overload(foo)
+reveal_type(bar)  # revealed: def foo(x: int) -> int
+```
+
 ## Functions
 
 ```py
@@ -25,9 +40,9 @@ reveal_type(add(1, 2))  # revealed: int
 ## Overriding
 
 These scenarios are to verify that the overloaded and non-overloaded definitions are correctly
-overriden by each other.
+overridden by each other.
 
-An overloaded function is overridding another overloaded function:
+An overloaded function is overriding another overloaded function:
 
 ```py
 from typing import overload
@@ -55,7 +70,7 @@ reveal_type(foo())  # revealed: None
 reveal_type(foo(""))  # revealed: str
 ```
 
-A non-overloaded function is overridding an overloaded function:
+A non-overloaded function is overriding an overloaded function:
 
 ```py
 def foo(x: int) -> int:
@@ -64,9 +79,11 @@ def foo(x: int) -> int:
 reveal_type(foo)  # revealed: def foo(x: int) -> int
 ```
 
-An overloaded function is overridding a non-overloaded function:
+An overloaded function is overriding a non-overloaded function:
 
 ```py
+reveal_type(foo)  # revealed: def foo(x: int) -> int
+
 @overload
 def foo() -> None: ...
 @overload
@@ -265,6 +282,11 @@ reveal_type(func(""))  # revealed: str
 
 ## Generic
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 For an overloaded generic function, it's not necessary for all overloads to be generic.
 
 ```py
@@ -278,6 +300,7 @@ def func[T](x: T | None = None) -> T | None:
     return x
 
 reveal_type(func)  # revealed: Overload[() -> None, (x: T) -> T]
+reveal_type(func())  # revealed: None
 reveal_type(func(1))  # revealed: Literal[1]
 reveal_type(func(""))  # revealed: Literal[""]
 ```
@@ -455,45 +478,45 @@ class CheckClassMethod:
     # TODO: error because `@classmethod` does not exist on all overloads
     @overload
     @classmethod
-    def try_from(cls, x: int) -> CheckClassMethod: ...
+    def try_from1(cls, x: int) -> CheckClassMethod: ...
     @overload
-    def try_from(cls, x: str) -> None: ...
+    def try_from1(cls, x: str) -> None: ...
     @classmethod
-    def try_from(cls, x: int | str) -> CheckClassMethod | None:
+    def try_from1(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
         return None
     # TODO: error because `@classmethod` does not exist on all overloads
     @overload
-    def try_from(cls, x: int) -> CheckClassMethod: ...
+    def try_from2(cls, x: int) -> CheckClassMethod: ...
     @overload
     @classmethod
-    def try_from(cls, x: str) -> None: ...
+    def try_from2(cls, x: str) -> None: ...
     @classmethod
-    def try_from(cls, x: int | str) -> CheckClassMethod | None:
+    def try_from2(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
         return None
     # TODO: error because `@classmethod` does not exist on the implementation
     @overload
     @classmethod
-    def try_from(cls, x: int) -> CheckClassMethod: ...
+    def try_from3(cls, x: int) -> CheckClassMethod: ...
     @overload
     @classmethod
-    def try_from(cls, x: str) -> None: ...
-    def try_from(cls, x: int | str) -> CheckClassMethod | None:
+    def try_from3(cls, x: str) -> None: ...
+    def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
         return None
 
     @overload
     @classmethod
-    def try_from(cls, x: int) -> CheckClassMethod: ...
+    def try_from4(cls, x: int) -> CheckClassMethod: ...
     @overload
     @classmethod
-    def try_from(cls, x: str) -> None: ...
+    def try_from4(cls, x: str) -> None: ...
     @classmethod
-    def try_from(cls, x: int | str) -> CheckClassMethod | None:
+    def try_from4(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
         return None

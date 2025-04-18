@@ -536,6 +536,8 @@ impl<'db> Bindings<'db> {
                     }
 
                     Some(KnownFunction::Overload) => {
+                        // TODO: This can be removed once we understand legacy generics because the
+                        // typeshed definition for `typing.overload` is an identity function.
                         if let [Some(ty)] = overload.parameter_types() {
                             overload.set_return_type(*ty);
                         }

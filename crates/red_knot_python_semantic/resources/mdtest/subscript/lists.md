@@ -29,9 +29,11 @@ In assignment, we might also have a named assignment. This should also get type 
 x = [1, 2, 3]
 x[0 if (y := 2) else 1] = 5
 
+# TODO: better error than "method `__getitem__` not callable on type `list`"
 # error: [call-non-callable]
 x["a" if (y := 2) else 1] = 6
 
+# TODO: better error than "method `__getitem__` not callable on type `list`"
 # error: [call-non-callable]
 x["a" if (y := 2) else "b"] = 6
 ```

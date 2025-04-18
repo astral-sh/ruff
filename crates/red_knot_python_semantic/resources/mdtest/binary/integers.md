@@ -51,7 +51,9 @@ reveal_type(2**largest_u32)  # revealed: int
 
 def variable(x: int):
     reveal_type(x**2)  # revealed: int
+    # TODO: should be `Any` (overload 5 on `__pow__`), requires correct overload matching
     reveal_type(2**x)  # revealed: int
+    # TODO: should be `Any` (overload 5 on `__pow__`), requires correct overload matching
     reveal_type(x**x)  # revealed: int
 ```
 

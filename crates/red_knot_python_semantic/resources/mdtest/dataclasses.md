@@ -547,14 +547,14 @@ the descriptor's `__get__` method as if it had been called on the class itself, 
 for the `instance` argument.
 
 ```py
-from typing import overload
+from typing import Literal, overload
 from dataclasses import dataclass
 
 class ConvertToLength:
     _len: int = 0
 
     @overload
-    def __get__(self, instance: None, owner: type) -> str: ...
+    def __get__(self, instance: None, owner: type) -> Literal[""]: ...
     @overload
     def __get__(self, instance: object, owner: type | None) -> int: ...
     def __get__(self, instance: object | None, owner: type | None) -> str | int:
@@ -570,7 +570,7 @@ class ConvertToLength:
 class C:
     converter: ConvertToLength = ConvertToLength()
 
-reveal_type(C.__init__)  # revealed: (converter: str = str) -> None
+reveal_type(C.__init__)  # revealed: (converter: str = Literal[""]) -> None
 
 c = C("abc")
 reveal_type(c.converter)  # revealed: int

@@ -405,13 +405,13 @@ impl Display for DisplayCallableType<'_> {
             [signature] => write!(f, "{}", signature.display(self.db)),
             signatures => {
                 // TODO: How to display overloads?
-                f.write_char('(')?;
+                f.write_str("Overload[")?;
                 let mut join = f.join(", ");
                 for signature in signatures {
                     join.entry(&signature.display(self.db));
                 }
                 join.finish()?;
-                f.write_char(')')
+                f.write_char(']')
             }
         }
     }

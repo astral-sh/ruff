@@ -121,8 +121,11 @@ def static(x: str) -> str: ...
 ```
 
 ```py
-from knot_extensions import CallableTypeOf, is_fully_static, static_assert
+from knot_extensions import CallableTypeOf, TypeOf, is_fully_static, static_assert
 from overloaded import gradual, static
+
+static_assert(is_fully_static(TypeOf[gradual]))
+static_assert(is_fully_static(TypeOf[static]))
 
 static_assert(not is_fully_static(CallableTypeOf[gradual]))
 static_assert(is_fully_static(CallableTypeOf[static]))

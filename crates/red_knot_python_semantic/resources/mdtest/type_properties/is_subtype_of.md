@@ -1306,6 +1306,8 @@ static_assert(not is_subtype_of(CallableTypeOf[empty_cp], CallableTypeOf[empty_g
 
 #### Order of overloads
 
+Order of overloads is irrelevant for subtyping.
+
 `overloaded.pyi`:
 
 ```pyi

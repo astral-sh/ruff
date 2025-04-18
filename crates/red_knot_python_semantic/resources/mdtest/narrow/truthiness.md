@@ -246,8 +246,7 @@ class MetaTruthy(type):
 
 class MetaDeferred(type):
     def __bool__(self) -> MetaAmbiguous:
-        # error: [no-matching-overload]
-        return MetaAmbiguous()
+        raise NotImplementedError
 
 class AmbiguousClass(metaclass=MetaAmbiguous): ...
 class FalsyClass(metaclass=MetaFalsy): ...
