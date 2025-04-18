@@ -1,6 +1,7 @@
-use crate::types::{todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, Type};
+use crate::types::{
+    todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroIterator, Type,
+};
 use crate::Db;
-use itertools::Either;
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
@@ -183,21 +184,14 @@ impl<'db> ClassBase<'db> {
     /// Iterate over the MRO of this base
     pub(super) fn mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            ClassBase::Protocol => Either::Left(Either::Left(
-                [self, ClassBase::Generic, ClassBase::object(db)].into_iter(),
-            )),
-            ClassBase::Dynamic(DynamicType::SubscriptedProtocol) => Either::Left(Either::Left(
-                [
-                    self,
-                    ClassBase::Dynamic(DynamicType::SubscriptedGeneric),
-                    ClassBase::object(db),
-                ]
-                .into_iter(),
-            )),
-            ClassBase::Dynamic(_) | ClassBase::Generic => {
-                Either::Left(Either::Right([self, ClassBase::object(db)].into_iter()))
-            }
-            ClassBase::Class(class) => Either::Right(class.iter_mro(db)),
+            ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
+            ClassBase::Dynamic(DynamicType::SubscriptedProtocol) => ClassBaseMroIterator::length_3(
+                db,
+                self,
+                ClassBase::Dynamic(DynamicType::SubscriptedGeneric),
+            ),
+            ClassBase::Dynamic(_) | ClassBase::Generic => ClassBaseMroIterator::length_2(db, self),
+            ClassBase::Class(class) => ClassBaseMroIterator::unknown_length(db, class),
         }
     }
 }
@@ -224,3 +218,47 @@ impl<'db> From<&ClassBase<'db>> for Type<'db> {
         Self::from(*value)
     }
 }
+
+/// An iterator over the MRO of a class base.
+enum ClassBaseMroIterator<'db> {
+    Length2(core::array::IntoIter<ClassBase<'db>, 2>),
+    Length3(core::array::IntoIter<ClassBase<'db>, 3>),
+    UnknownLength(MroIterator<'db>),
+}
+
+impl<'db> ClassBaseMroIterator<'db> {
+    /// Iterate over an MRO of length 2 that consists of `first_element` and then `object`.
+    fn length_2(db: &'db dyn Db, first_element: ClassBase<'db>) -> Self {
+        ClassBaseMroIterator::Length2([first_element, ClassBase::object(db)].into_iter())
+    }
+
+    /// Iterate over an MRO of length 3 that consists of `first_element`, then `second_element`, then `object`.
+    fn length_3(
+        db: &'db dyn Db,
+        first_element: ClassBase<'db>,
+        second_element: ClassBase<'db>,
+    ) -> Self {
+        ClassBaseMroIterator::Length3(
+            [first_element, second_element, ClassBase::object(db)].into_iter(),
+        )
+    }
+
+    /// Iterate over the MRO of an arbitrary class. The MRO may be of any length.
+    fn unknown_length(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        ClassBaseMroIterator::UnknownLength(class.iter_mro(db))
+    }
+}
+
+impl<'db> Iterator for ClassBaseMroIterator<'db> {
+    type Item = ClassBase<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Length2(iter) => iter.next(),
+            Self::Length3(iter) => iter.next(),
+            Self::UnknownLength(iter) => iter.next(),
+        }
+    }
+}
+
+impl std::iter::FusedIterator for ClassBaseMroIterator<'_> {}
