@@ -6,11 +6,11 @@ use std::fmt::{self, Display};
 use crate::cfg::graph::{BlockId, BlockKind, Condition, ControlFlowGraph};
 
 /// Returns control flow graph in Mermaid syntax.
-pub fn draw_cfg(graph: ControlFlowGraph, source: &str) -> String {
+pub fn draw_cfg<'src>(graph: ControlFlowGraph<'src>, source: &'src str) -> String {
     CFGWithSource::new(graph, source).draw_graph()
 }
 
-trait MermaidGraph<'a>: DirectedGraph<'a> {
+trait MermaidGraph: DirectedGraph {
     fn draw_node(&self, node: Self::Node) -> MermaidNode;
     fn draw_edges(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, MermaidEdge)>;
 
@@ -146,7 +146,7 @@ impl Display for MermaidEdgeKind {
     }
 }
 
-pub trait DirectedGraph<'a> {
+pub trait DirectedGraph {
     type Node: Idx;
 
     fn num_nodes(&self) -> usize;
@@ -154,18 +154,18 @@ pub trait DirectedGraph<'a> {
     fn successors(&self, node: Self::Node) -> impl ExactSizeIterator<Item = Self::Node> + '_;
 }
 
-struct CFGWithSource<'stmt> {
+struct CFGWithSource<'source, 'stmt> {
     cfg: ControlFlowGraph<'stmt>,
-    source: &'stmt str,
+    source: &'source str,
 }
 
-impl<'stmt> CFGWithSource<'stmt> {
-    fn new(cfg: ControlFlowGraph<'stmt>, source: &'stmt str) -> Self {
+impl<'source, 'stmt> CFGWithSource<'source, 'stmt> {
+    fn new(cfg: ControlFlowGraph<'stmt>, source: &'source str) -> Self {
         Self { cfg, source }
     }
 }
 
-impl<'stmt> DirectedGraph<'stmt> for CFGWithSource<'stmt> {
+impl DirectedGraph for CFGWithSource<'_, '_> {
     type Node = BlockId;
 
     fn num_nodes(&self) -> usize {
@@ -176,12 +176,12 @@ impl<'stmt> DirectedGraph<'stmt> for CFGWithSource<'stmt> {
         self.cfg.initial()
     }
 
-    fn successors(&self, node: Self::Node) -> impl ExactSizeIterator<Item = Self::Node> + '_ {
+    fn successors(&self, node: Self::Node) -> impl ExactSizeIterator<Item = Self::Node> {
         self.cfg.outgoing(node).targets()
     }
 }
 
-impl<'stmt> MermaidGraph<'stmt> for CFGWithSource<'stmt> {
+impl MermaidGraph for CFGWithSource<'_, '_> {
     fn draw_node(&self, node: Self::Node) -> MermaidNode {
         let statements: Vec<String> = self
             .cfg
@@ -210,6 +210,14 @@ impl<'stmt> MermaidGraph<'stmt> for CFGWithSource<'stmt> {
                     shape: MermaidNodeShape::DoubleCircle,
                 }
             }
+            BlockKind::LoopGuard => {
+                return MermaidNode {
+                    content: "LOOP GUARD".to_string(),
+                    shape: MermaidNodeShape::default(),
+                }
+            }
+            BlockKind::ExceptionDispatch => "EXCEPTION DISPATCH".to_string(),
+            BlockKind::Recovery => "RECOVERY".to_string(),
         };
 
         MermaidNode::with_content(content)
@@ -235,6 +243,62 @@ impl<'stmt> MermaidGraph<'stmt> for CFGWithSource<'stmt> {
                             }
                         }
                     }
+                    Condition::Test(expr) => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: self.source[expr.range()].to_string(),
+                    },
+                    Condition::Else => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: "else".to_string(),
+                    },
+                    Condition::NotStopIter(expr) => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: self.source[expr.range()].to_string(),
+                    },
+                    Condition::Match { subject: _, case } => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: self.source[case.pattern.range()].to_string(),
+                    },
+                    Condition::ExceptHandler(handler) => {
+                        let exc_types = match &handler.type_ {
+                            Some(t) => self.source[t.range()].to_string(),
+                            None => "any exception".to_string(),
+                        };
+                        MermaidEdge {
+                            kind: MermaidEdgeKind::Arrow,
+                            content: format!("except {exc_types}"),
+                        }
+                    }
+                    Condition::UncaughtException => {
+                        if target == self.cfg.terminal() {
+                            MermaidEdge {
+                                kind: MermaidEdgeKind::ThickArrow,
+                                content: "Uncaught Exception".to_string(),
+                            }
+                        } else {
+                            MermaidEdge {
+                                kind: MermaidEdgeKind::Arrow,
+                                content: "Uncaught Exception".to_string(),
+                            }
+                        }
+                    }
+                    Condition::Deferred(_) => {
+                        if target == self.cfg.terminal() {
+                            MermaidEdge {
+                                kind: MermaidEdgeKind::ThickArrow,
+                                content: "Deferred".to_string(),
+                            }
+                        } else {
+                            MermaidEdge {
+                                kind: MermaidEdgeKind::Arrow,
+                                content: "Deferred".to_string(),
+                            }
+                        }
+                    }
+                    Condition::MaybeException => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: "exception".to_string(),
+                    },
                 };
                 (target, edge)
             })

@@ -348,7 +348,7 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 flake8_async::rules::async_function_with_timeout(checker, function_def);
             }
             #[cfg(any(feature = "test-rules", test))]
-            if checker.enabled(Rule::UnreachableCode) {
+            if checker.enabled(Rule::UnreachableCode) && !*is_async {
                 pylint::rules::in_function(checker, name, body);
             }
             if checker.enabled(Rule::ReimplementedOperator) {
