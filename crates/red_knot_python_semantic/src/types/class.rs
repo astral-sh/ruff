@@ -773,7 +773,12 @@ impl<'db> ClassLiteralType<'db> {
                         continue;
                     }
 
-                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
+                    // HACK: we should implement some more general logic here that supports arbitrary custom
+                    // metaclasses, not just `type` and `ABCMeta`.
+                    if matches!(
+                        class.known(db),
+                        Some(KnownClass::Type | KnownClass::ABCMeta)
+                    ) && policy.meta_class_no_type_fallback()
                     {
                         continue;
                     }
@@ -1567,6 +1572,8 @@ pub(crate) enum KnownClass {
     Super,
     // enum
     Enum,
+    // abc
+    ABCMeta,
     // Types
     GenericAlias,
     ModuleType,
@@ -1676,6 +1683,7 @@ impl<'db> KnownClass {
             | Self::Float
             | Self::Sized
             | Self::Enum
+            | Self::ABCMeta
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -1732,6 +1740,7 @@ impl<'db> KnownClass {
             Self::Sized => "Sized",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
@@ -1888,6 +1897,7 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
+            Self::ABCMeta => KnownModule::Abc,
             Self::Enum => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
@@ -1992,6 +2002,7 @@ impl<'db> KnownClass {
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
+            | Self::ABCMeta
             | Self::Super
             | Self::NewType => false,
         }
@@ -2051,6 +2062,7 @@ impl<'db> KnownClass {
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
+            | Self::ABCMeta
             | Self::Super
             | Self::UnionType
             | Self::NewType => false,
@@ -2112,6 +2124,7 @@ impl<'db> KnownClass {
             "SupportsIndex" => Self::SupportsIndex,
             "Sized" => Self::Sized,
             "Enum" => Self::Enum,
+            "ABCMeta" => Self::ABCMeta,
             "super" => Self::Super,
             "_version_info" => Self::VersionInfo,
             "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
@@ -2167,6 +2180,7 @@ impl<'db> KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
             | Self::UnionType
