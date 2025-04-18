@@ -2327,3 +2327,108 @@ fn cookiecutter_globbing() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn pragma_tags_option() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "format",
+            "--no-cache",
+            "--config",
+            "format.pragma-tags=[\"pragma:\", \"spellchecker:\"]",
+            "--isolated",
+            "-"
+        ])
+        .pass_stdin(r#"
+# Custom pragma tags fixtures
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # pragma: no cover - This shouldn't break with custom pragma_tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # spellchecker: ignore - This shouldn't break with custom pragma_tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # coverage: ignore - This should break without custom pragma_tags
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # Custom pragma tags fixtures
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # pragma: no cover - This shouldn't break with custom pragma_tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # spellchecker: ignore - This shouldn't break with custom pragma_tags
+    i = (
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )  # coverage: ignore - This should break without custom pragma_tags
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn pragma_tags_case_insensitive_option() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "format",
+            "--no-cache",
+            "--config",
+            "format.pragma-tags-case-insensitive=[\"todo\"]",
+            "--isolated",
+            "-"
+        ])
+        .pass_stdin(r#"
+# Case-insensitive pragma tags fixtures
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # TODO: This shouldn't break with case-insensitive pragma_tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # todo: This shouldn't break with case-insensitive pragma_tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # ToDo: This shouldn't break with case-insensitive pragma_tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # tada: This should break with case-insensitive pragma_tags
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # Case-insensitive pragma tags fixtures
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # TODO: This shouldn't break with case-insensitive pragma_tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # todo: This shouldn't break with case-insensitive pragma_tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # ToDo: This shouldn't break with case-insensitive pragma_tags
+    i = (
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )  # tada: This should break with case-insensitive pragma_tags
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn pragma_tags_default() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args([
+            "format",
+            "--no-cache",
+            "--isolated",
+            "-"
+        ])
+        .pass_stdin(r#"
+# Default pragma tags fixtures
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # noQa: E501 - This shouldn't break with default pragma tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # type: ignore - This shouldn't break with default pragma tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # pyright: ignore - This shouldn't break with default pragma tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # pylint: disable=line-too-long - This shouldn't break with default pragma tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # flake8: noqa - This shouldn't break with default pragma tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # ruff: noqa - This shouldn't break with default pragma tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # isort: skip - This shouldn't break with default pragma tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # nosec - This shouldn't break with default pragma tags
+i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # coverage: ignore - This should break without custom pragma tags
+"#), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    # Default pragma tags fixtures
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # noQa: E501 - This shouldn't break with default pragma tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # type: ignore - This shouldn't break with default pragma tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # pyright: ignore - This shouldn't break with default pragma tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # pylint: disable=line-too-long - This shouldn't break with default pragma tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # flake8: noqa - This shouldn't break with default pragma tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # ruff: noqa - This shouldn't break with default pragma tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # isort: skip - This shouldn't break with default pragma tags
+    i = ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",)  # nosec - This shouldn't break with default pragma tags
+    i = (
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    )  # coverage: ignore - This should break without custom pragma tags
+
+    ----- stderr -----
+    "#);
+}

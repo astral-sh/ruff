@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use ruff_python_trivia::{is_pragma_comment, CommentRanges};
+use ruff_python_trivia::{is_pragma_comment_with_defaults, CommentRanges};
 use ruff_source_file::Line;
 use ruff_text_size::{TextLen, TextRange};
 
@@ -126,7 +126,7 @@ impl<'a> StrippedLine<'a> {
         let comment = &line.as_str()[comment_range];
 
         // Ex) `# type: ignore`
-        if is_pragma_comment(comment) {
+        if is_pragma_comment_with_defaults(comment) {
             // Remove the pragma from the line.
             let prefix = &line.as_str()[..usize::from(comment_range.start())].trim_end();
             return Self::WithoutPragma(Line::new(prefix, line.start()));
