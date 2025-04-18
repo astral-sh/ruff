@@ -2463,6 +2463,10 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Literal
             | Self::LiteralString
             | Self::Optional
+            // This is a legacy `TypeVar` _outside_ of any generic class or function, so it's
+            // AlwaysTrue. The truthiness of a typevar inside of a generic class or function
+            // depends on its bounds and constraints; but that's represented by `Type::TypeVar` and
+            // handled in elsewhere.
             | Self::TypeVar(_)
             | Self::Union
             | Self::NoReturn

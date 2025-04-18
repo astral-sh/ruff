@@ -19,6 +19,9 @@ in newer Python releases.
 from typing import TypeVar
 
 T = TypeVar("T")
+reveal_type(type(T))  # revealed: Literal[TypeVar]
+reveal_type(T)  # revealed: T
+reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
 ### Directly assigned to a variable
@@ -55,6 +58,52 @@ T = TypeVar("T")
 
 # TODO: error
 T = TypeVar("T")
+```
+
+### Type variables with a default
+
+Note that the `__default__` property is only available in Python ≥3.13.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", default=int)
+reveal_type(T.__default__)  # revealed: int
+reveal_type(T.__bound__)  # revealed: None
+reveal_type(T.__constraints__)  # revealed: tuple[()]
+
+S = TypeVar("S")
+reveal_type(S.__default__)  # revealed: NoDefault
+```
+
+### Type variables with an upper bound
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", bound=int)
+reveal_type(T.__bound__)  # revealed: int
+reveal_type(T.__constraints__)  # revealed: tuple[()]
+
+S = TypeVar("S")
+reveal_type(S.__bound__)  # revealed: None
+```
+
+### Type variables with constraints
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+reveal_type(T.__constraints__)  # revealed: tuple[int, str]
+
+S = TypeVar("S")
+reveal_type(S.__constraints__)  # revealed: tuple[()]
 ```
 
 ### Cannot have only one constraint

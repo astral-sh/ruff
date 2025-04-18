@@ -3725,6 +3725,56 @@ impl<'db> Type<'db> {
                     Signatures::single(signature)
                 }
 
+                Some(KnownClass::TypeVar) => {
+                    // ```py
+                    // class TypeVar:
+                    //     def __new__(
+                    //         cls,
+                    //         name: str,
+                    //         *constraints: Any,
+                    //         bound: Any | None = None,
+                    //         contravariant: bool = False,
+                    //         covariant: bool = False,
+                    //         infer_variance: bool = False,
+                    //         default: Any = ...,
+                    //     ) -> Self: ...
+                    // ```
+                    let signature = CallableSignature::single(
+                        self,
+                        Signature::new(
+                            Parameters::new([
+                                Parameter::positional_or_keyword(Name::new_static("name"))
+                                    .with_annotated_type(Type::LiteralString),
+                                Parameter::variadic(Name::new_static("constraints"))
+                                    .type_form()
+                                    .with_annotated_type(Type::any()),
+                                Parameter::keyword_only(Name::new_static("bound"))
+                                    .type_form()
+                                    .with_annotated_type(UnionType::from_elements(
+                                        db,
+                                        [Type::any(), Type::none(db)],
+                                    ))
+                                    .with_default_type(Type::none(db)),
+                                Parameter::keyword_only(Name::new_static("default"))
+                                    .type_form()
+                                    .with_annotated_type(Type::any())
+                                    .with_default_type(KnownClass::NoneType.to_instance(db)),
+                                Parameter::keyword_only(Name::new_static("contravariant"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("covariant"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("infer_variance"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                            ]),
+                            Some(KnownClass::TypeVar.to_instance(db)),
+                        ),
+                    );
+                    Signatures::single(signature)
+                }
+
                 Some(KnownClass::Property) => {
                     let getter_signature = Signature::new(
                         Parameters::new([
@@ -3897,8 +3947,11 @@ impl<'db> Type<'db> {
         mut argument_types: CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, &mut argument_types)
-            .check_types(db, &mut argument_types)
+        Bindings::match_parameters(signatures, &mut argument_types).check_types(
+            db,
+            &mut argument_types,
+            None,
+        )
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -3936,8 +3989,11 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, argument_types)
-                    .check_types(db, argument_types)?;
+                let bindings = Bindings::match_parameters(signatures, argument_types).check_types(
+                    db,
+                    argument_types,
+                    None,
+                )?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
@@ -7338,6 +7394,7 @@ pub(crate) mod tests {
     use crate::symbol::{
         global_symbol, known_module_symbol, typing_extensions_symbol, typing_symbol,
     };
+    use crate::types::infer::{infer_expression_types_impl, InferExpressionTypes};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithWritableSystem as _;
@@ -7437,7 +7494,12 @@ pub(crate) mod tests {
             .value;
         let foo_call = semantic_index(&db, bar).expression(call);
 
-        assert_function_query_was_not_run(&db, infer_expression_types, foo_call, &events);
+        assert_function_query_was_not_run(
+            &db,
+            infer_expression_types_impl,
+            InferExpressionTypes::new(&db, foo_call, None),
+            &events,
+        );
 
         Ok(())
     }
