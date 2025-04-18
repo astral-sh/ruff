@@ -10,7 +10,7 @@ use crate::types::class::{ClassType, GenericAlias, GenericClass};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    FunctionSignature, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
+    FunctionSignature, FunctionType, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
     StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
     UnionType, WrapperDescriptorKind,
 };
@@ -108,7 +108,7 @@ impl Display for DisplayRepresentation<'_> {
                             f,
                             // "def {name}{specialization}{signature}",
                             "def {name}{signature}",
-                            name = function.name(self.db),
+                            name = function.function_literal(self.db).name(self.db),
                             signature = signature.display(self.db)
                         )
                     }
@@ -135,7 +135,7 @@ impl Display for DisplayRepresentation<'_> {
                         write!(
                             f,
                             "bound method {instance}.{method}{signature}",
-                            method = function.name(self.db),
+                            method = function.function_literal(self.db).name(self.db),
                             instance = bound_method.self_instance(self.db).display(self.db),
                             signature = signature.bind_self().display(self.db)
                         )
@@ -155,10 +155,12 @@ impl Display for DisplayRepresentation<'_> {
                 write!(
                     f,
                     "<method-wrapper `__get__` of `{function}{specialization}`>",
-                    function = function.name(self.db),
-                    specialization = if let Some(specialization) = function.specialization(self.db)
-                    {
-                        specialization.display_short(self.db).to_string()
+                    function = function.function_literal(self.db).name(self.db),
+                    specialization = if let FunctionType::Specialized(specialized) = function {
+                        specialized
+                            .specialization(self.db)
+                            .display_short(self.db)
+                            .to_string()
                     } else {
                         String::new()
                     },
@@ -168,10 +170,12 @@ impl Display for DisplayRepresentation<'_> {
                 write!(
                     f,
                     "<method-wrapper `__call__` of `{function}{specialization}`>",
-                    function = function.name(self.db),
-                    specialization = if let Some(specialization) = function.specialization(self.db)
-                    {
-                        specialization.display_short(self.db).to_string()
+                    function = function.function_literal(self.db).name(self.db),
+                    specialization = if let FunctionType::Specialized(specialized) = function {
+                        specialized
+                            .specialization(self.db)
+                            .display_short(self.db)
+                            .to_string()
                     } else {
                         String::new()
                     },

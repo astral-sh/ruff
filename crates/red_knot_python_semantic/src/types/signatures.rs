@@ -289,17 +289,18 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_specialization(
-        &self,
+        &mut self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
-    ) -> Self {
-        Self {
-            generic_context: self.generic_context,
-            parameters: self.parameters.apply_specialization(db, specialization),
-            return_ty: self
-                .return_ty
-                .map(|ty| ty.apply_specialization(db, specialization)),
-        }
+    ) {
+        self.parameters.apply_specialization(db, specialization);
+        self.return_ty
+            .as_mut()
+            .map(|ty| *ty = ty.apply_specialization(db, specialization));
+    }
+
+    pub(crate) fn set_generic_context(&mut self, generic_context: GenericContext<'db>) {
+        self.generic_context = Some(generic_context);
     }
 
     /// Return the parameters in this signature.
@@ -1000,15 +1001,10 @@ impl<'db> Parameters<'db> {
         )
     }
 
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        Self {
-            value: self
-                .value
-                .iter()
-                .map(|param| param.apply_specialization(db, specialization))
-                .collect(),
-            is_gradual: self.is_gradual,
-        }
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        self.value
+            .iter_mut()
+            .for_each(|param| param.apply_specialization(db, specialization));
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -1172,14 +1168,11 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        Self {
-            annotated_type: self
-                .annotated_type
-                .map(|ty| ty.apply_specialization(db, specialization)),
-            kind: self.kind.apply_specialization(db, specialization),
-            form: self.form,
-        }
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        self.annotated_type
+            .as_mut()
+            .map(|ty| *ty = ty.apply_specialization(db, specialization));
+        self.kind.apply_specialization(db, specialization);
     }
 
     /// Strip information from the parameter so that two equivalent parameters compare equal.
@@ -1369,27 +1362,16 @@ pub(crate) enum ParameterKind<'db> {
 }
 
 impl<'db> ParameterKind<'db> {
-    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
         match self {
-            Self::PositionalOnly { default_type, name } => Self::PositionalOnly {
-                default_type: default_type
-                    .as_ref()
-                    .map(|ty| ty.apply_specialization(db, specialization)),
-                name: name.clone(),
-            },
-            Self::PositionalOrKeyword { default_type, name } => Self::PositionalOrKeyword {
-                default_type: default_type
-                    .as_ref()
-                    .map(|ty| ty.apply_specialization(db, specialization)),
-                name: name.clone(),
-            },
-            Self::KeywordOnly { default_type, name } => Self::KeywordOnly {
-                default_type: default_type
-                    .as_ref()
-                    .map(|ty| ty.apply_specialization(db, specialization)),
-                name: name.clone(),
-            },
-            Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),
+            Self::PositionalOnly { default_type, .. }
+            | Self::PositionalOrKeyword { default_type, .. }
+            | Self::KeywordOnly { default_type, .. } => {
+                default_type
+                    .as_mut()
+                    .map(|ty| *ty = ty.apply_specialization(db, specialization));
+            }
+            Self::Variadic { .. } | Self::KeywordVariadic { .. } => {}
         }
     }
 }
@@ -1406,16 +1388,20 @@ mod tests {
     use super::*;
     use crate::db::tests::{setup_db, TestDb};
     use crate::symbol::global_symbol;
-    use crate::types::{FunctionSignature, FunctionType, KnownClass};
+    use crate::types::{FunctionLiteral, FunctionSignature, FunctionType, KnownClass};
     use ruff_db::system::DbWithWritableSystem as _;
 
     #[track_caller]
-    fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
+    fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionLiteral<'db> {
         let module = ruff_db::files::system_path_to_file(db, file).unwrap();
-        global_symbol(db, module, "f")
+        let function = global_symbol(db, module, "f")
             .symbol
             .expect_type()
-            .expect_function_literal()
+            .expect_function_literal();
+        let FunctionType::FunctionLiteral(literal) = function else {
+            panic!("function should be a function literal");
+        };
+        literal
     }
 
     #[track_caller]
@@ -1653,9 +1639,6 @@ mod tests {
         let expected_sig = func.internal_signature(&db);
 
         // With no decorators, internal and external signature are the same
-        assert_eq!(
-            func.signature(&db),
-            &FunctionSignature::Single(expected_sig)
-        );
+        assert_eq!(func.signature(&db), FunctionSignature::Single(expected_sig));
     }
 }

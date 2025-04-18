@@ -4623,8 +4623,8 @@ impl<'db> Type<'db> {
         match self {
             Type::TypeVar(typevar) => specialization.get(db, typevar).unwrap_or(self),
 
-            Type::FunctionLiteral(function) => {
-                Type::FunctionLiteral(function.apply_specialization(db, specialization))
+            Type::FunctionLiteral(function) =>{
+                Type::FunctionLiteral(FunctionType::Specialized(SpecializedFunction::new(db, function, specialization)))
             }
 
             // Note that we don't need to apply the specialization to `self_instance`, since it
@@ -4637,19 +4637,19 @@ impl<'db> Type<'db> {
             // specialized.)
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
-                method.function(db).apply_specialization(db, specialization),
+                FunctionType::Specialized(SpecializedFunction::new(db, method.function(db), specialization)),
                 method.self_instance(db),
             )),
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
-                    function.apply_specialization(db, specialization),
+                FunctionType::Specialized(SpecializedFunction::new(db, function, specialization))
                 ))
             }
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(
-                    function.apply_specialization(db, specialization),
+                FunctionType::Specialized(SpecializedFunction::new(db, function, specialization))
                 ))
             }
 
@@ -5852,6 +5852,34 @@ impl<'db> FunctionSignature<'db> {
     pub(crate) fn iter(&self) -> Iter<Signature<'db>> {
         self.as_slice().iter()
     }
+
+    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
+        match self {
+            Self::Single(signature) => signature.apply_specialization(db, specialization),
+            Self::Overloaded(signatures, implementation) => {
+                signatures
+                    .iter_mut()
+                    .for_each(|signature| signature.apply_specialization(db, specialization));
+                implementation
+                    .as_mut()
+                    .map(|signature| signature.apply_specialization(db, specialization));
+            }
+        }
+    }
+
+    fn set_generic_context(&mut self, generic_context: GenericContext<'db>) {
+        match self {
+            Self::Single(signature) => signature.set_generic_context(generic_context),
+            Self::Overloaded(signatures, implementation) => {
+                signatures
+                    .iter_mut()
+                    .for_each(|signature| signature.set_generic_context(generic_context));
+                implementation
+                    .as_mut()
+                    .map(|signature| signature.set_generic_context(generic_context));
+            }
+        }
+    }
 }
 
 impl<'db> IntoIterator for &'db FunctionSignature<'db> {
@@ -5864,7 +5892,9 @@ impl<'db> IntoIterator for &'db FunctionSignature<'db> {
 }
 
 /// A callable type that represents a single Python function.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update)]
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Supertype, salsa::Update,
+)]
 pub enum FunctionType<'db> {
     /// A function literal in the Python AST
     FunctionLiteral(FunctionLiteral<'db>),
@@ -5888,6 +5918,7 @@ impl<'db> FunctionType<'db> {
     fn function_literal(self, db: &'db dyn Db) -> FunctionLiteral<'db> {
         match self {
             FunctionType::FunctionLiteral(literal) => literal,
+            FunctionType::Specialized(specialized) => specialized.function(db).function_literal(db),
             FunctionType::InheritedGenericContext(inherited) => inherited.function(db),
         }
     }
@@ -5922,9 +5953,7 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
-        let body_scope = self.function_literal(db).body_scope(db);
-        let index = semantic_index(db, body_scope.file(db));
-        index.expect_single_definition(body_scope.node(db).expect_function())
+        self.function_literal(db).definition(db)
     }
 
     /// Typed externally-visible signature for this function.
@@ -5942,7 +5971,17 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
         match self {
             FunctionType::FunctionLiteral(literal) => literal.signature(db),
+            FunctionType::Specialized(specialized) => specialized.signature(db),
+            FunctionType::InheritedGenericContext(inherited) => inherited.signature(db),
         }
+    }
+
+    pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownFunction> {
+        self.function_literal(db).known(db)
+    }
+
+    pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
+        self.known(db) == Some(known_function)
     }
 }
 
@@ -5958,22 +5997,23 @@ pub struct FunctionLiteral<'db> {
     /// The scope that's created by the function, in which the function body is evaluated.
     body_scope: ScopeId<'db>,
 
+    /// The scope containing the PEP 695 type parameters in the function definition, if any.
+    type_params_scope: Option<ScopeId<'db>>,
+
     /// A set of special decorators that were applied to this function
     decorators: FunctionDecorators,
-
-    /// The generic context of a generic function.
-    generic_context: Option<GenericContext<'db>>,
-
-    /// A specialization that should be applied to the function's parameter and return types,
-    /// either because the function is itself generic, or because it appears in the body of a
-    /// generic class.
-    specialization: Option<Specialization<'db>>,
 }
 
 #[salsa::tracked]
 impl<'db> FunctionLiteral<'db> {
     fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.decorators(db).contains(decorator)
+    }
+
+    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+        let body_scope = self.body_scope(db);
+        let index = semantic_index(db, body_scope.file(db));
+        index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
     /// Typed externally-visible signature for this function.
@@ -5990,11 +6030,7 @@ impl<'db> FunctionLiteral<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked]
     fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
-        let mut internal_signature = self.internal_signature(db);
-
-        if let Some(specialization) = self.specialization(db) {
-            internal_signature = internal_signature.apply_specialization(db, specialization);
-        }
+        let internal_signature = self.internal_signature(db);
 
         // The semantic model records a use for each function on the name node. This is used here
         // to get the previous function definition with the same name.
@@ -6054,11 +6090,11 @@ impl<'db> FunctionLiteral<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
         let definition = self.definition(db);
-        Signature::from_function(db, self.generic_context(db), definition, function_stmt_node)
-    }
-
-    pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
-        self.known(db) == Some(known_function)
+        let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
+            let index = semantic_index(db, scope.file(db));
+            GenericContext::from_type_params(db, index, type_params)
+        });
+        Signature::from_function(db, generic_context, definition, function_stmt_node)
     }
 
     fn with_generic_context(
@@ -6072,21 +6108,27 @@ impl<'db> FunctionLiteral<'db> {
             generic_context,
         ))
     }
+}
 
-    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
-        let specialization = match self.specialization(db) {
-            Some(existing) => existing.apply_specialization(db, specialization),
-            None => specialization,
-        };
-        Self::new(
-            db,
-            self.name(db).clone(),
-            self.known(db),
-            self.body_scope(db),
-            self.decorators(db),
-            self.generic_context(db),
-            Some(specialization),
-        )
+impl<'db> From<FunctionLiteral<'db>> for Type<'db> {
+    fn from(literal: FunctionLiteral<'db>) -> Type<'db> {
+        Type::FunctionLiteral(FunctionType::FunctionLiteral(literal))
+    }
+}
+
+#[salsa::interned(debug)]
+pub struct SpecializedFunction<'db> {
+    function: FunctionType<'db>,
+    specialization: Specialization<'db>,
+}
+
+#[salsa::tracked]
+impl<'db> SpecializedFunction<'db> {
+    #[salsa::tracked]
+    fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
+        let mut signature = self.function(db).signature(db);
+        signature.apply_specialization(db, self.specialization(db));
+        signature
     }
 }
 
@@ -6094,6 +6136,16 @@ impl<'db> FunctionLiteral<'db> {
 pub struct FunctionWithInheritedGenericContext<'db> {
     function: FunctionLiteral<'db>,
     generic_context: GenericContext<'db>,
+}
+
+#[salsa::tracked]
+impl<'db> FunctionWithInheritedGenericContext<'db> {
+    #[salsa::tracked]
+    fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
+        let mut signature = self.function(db).signature(db);
+        signature.set_generic_context(self.generic_context(db));
+        signature
+    }
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
@@ -6308,9 +6360,11 @@ impl<'db> CallableType<'db> {
     fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         CallableType::from_overloads(
             db,
-            self.signatures(db)
-                .iter()
-                .map(|signature| signature.apply_specialization(db, specialization)),
+            self.signatures(db).iter().map(|signature| {
+                let mut signature = signature.clone();
+                signature.apply_specialization(db, specialization);
+                signature
+            }),
         )
     }
 

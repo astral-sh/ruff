@@ -1096,7 +1096,7 @@ fn report_invalid_assignment_with_message(
         Type::FunctionLiteral(function) => {
             context.report_lint_old(&INVALID_ASSIGNMENT, node, format_args!(
                     "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
-                    function.name(context.db())));
+                    function.function_literal(context.db()).name(context.db())));
         }
         _ => {
             context.report_lint_old(&INVALID_ASSIGNMENT, node, message);

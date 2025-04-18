@@ -170,7 +170,7 @@ impl<'db> InferContext<'db> {
                 // Iterate over all functions and test if any is decorated with `@no_type_check`.
                 function_scope_tys.any(|function_ty| {
                     function_ty
-                        .function_literal()
+                        .function_literal(self.db)
                         .has_known_decorator(self.db, FunctionDecorators::NO_TYPE_CHECK)
                 })
             }
