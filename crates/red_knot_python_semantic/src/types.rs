@@ -1362,6 +1362,10 @@ impl<'db> Type<'db> {
                 )
             }
 
+            (Type::Instance(self_instance), Type::Instance(target_instance)) => {
+                self_instance.is_assignable_to(db, target_instance)
+            }
+
             (Type::Callable(self_callable), Type::Callable(target_callable)) => {
                 self_callable.is_assignable_to(db, target_callable)
             }
@@ -1376,7 +1380,7 @@ impl<'db> Type<'db> {
                 .into_callable_type(db)
                 .is_assignable_to(db, target),
 
-            // TODO other types containing gradual forms (e.g. generics containing Any/Unknown)
+            // TODO other types containing gradual forms
             _ => self.is_subtype_of(db, target),
         }
     }
@@ -1396,6 +1400,7 @@ impl<'db> Type<'db> {
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
             (Type::Callable(left), Type::Callable(right)) => left.is_equivalent_to(db, right),
+            (Type::Instance(left), Type::Instance(right)) => left.is_equivalent_to(db, right),
             _ => self == other && self.is_fully_static(db) && other.is_fully_static(db),
         }
     }
@@ -1447,6 +1452,10 @@ impl<'db> Type<'db> {
             }
 
             (Type::TypeVar(first), Type::TypeVar(second)) => first == second,
+
+            (Type::Instance(first), Type::Instance(second)) => {
+                first.is_gradual_equivalent_to(db, second)
+            }
 
             (Type::Tuple(first), Type::Tuple(second)) => first.is_gradual_equivalent_to(db, second),
 

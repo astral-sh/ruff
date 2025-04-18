@@ -36,17 +36,9 @@ class C[T]:
 # error: [static-assert-error]
 static_assert(is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[B], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[Any], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[Any], C[B]))
 
 # TODO: no error
@@ -70,8 +62,6 @@ static_assert(not is_equivalent_to(C[Any], C[B]))
 static_assert(is_gradual_equivalent_to(C[A], C[A]))
 static_assert(is_gradual_equivalent_to(C[B], C[B]))
 static_assert(is_gradual_equivalent_to(C[Any], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[Any], C[Unknown]))
 static_assert(not is_gradual_equivalent_to(C[B], C[A]))
 static_assert(not is_gradual_equivalent_to(C[A], C[B]))
@@ -103,17 +93,9 @@ static_assert(not is_assignable_to(C[B], C[A]))
 # TODO: no error
 # error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[B]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[B], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[Any], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[Any], C[B]))
 
 static_assert(not is_subtype_of(C[B], C[A]))
@@ -137,8 +119,6 @@ static_assert(not is_equivalent_to(C[Any], C[B]))
 static_assert(is_gradual_equivalent_to(C[A], C[A]))
 static_assert(is_gradual_equivalent_to(C[B], C[B]))
 static_assert(is_gradual_equivalent_to(C[Any], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[Any], C[Unknown]))
 static_assert(not is_gradual_equivalent_to(C[B], C[A]))
 static_assert(not is_gradual_equivalent_to(C[A], C[B]))
@@ -183,17 +163,9 @@ class C[T]:
 
 static_assert(not is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[B], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[Any], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[Any], C[B]))
 
 static_assert(not is_subtype_of(C[B], C[A]))
@@ -215,8 +187,6 @@ static_assert(not is_equivalent_to(C[Any], C[B]))
 static_assert(is_gradual_equivalent_to(C[A], C[A]))
 static_assert(is_gradual_equivalent_to(C[B], C[B]))
 static_assert(is_gradual_equivalent_to(C[Any], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[Any], C[Unknown]))
 static_assert(not is_gradual_equivalent_to(C[B], C[A]))
 static_assert(not is_gradual_equivalent_to(C[A], C[B]))
@@ -251,17 +221,9 @@ static_assert(is_assignable_to(C[B], C[A]))
 # TODO: no error
 # error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[B]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[A], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[B], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[Any], C[A]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_assignable_to(C[Any], C[B]))
 
 # TODO: no error
@@ -291,8 +253,6 @@ static_assert(not is_equivalent_to(C[Any], C[B]))
 static_assert(is_gradual_equivalent_to(C[A], C[A]))
 static_assert(is_gradual_equivalent_to(C[B], C[B]))
 static_assert(is_gradual_equivalent_to(C[Any], C[Any]))
-# TODO: no error
-# error: [static-assert-error]
 static_assert(is_gradual_equivalent_to(C[Any], C[Unknown]))
 # TODO: no error
 # error: [static-assert-error]
