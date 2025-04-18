@@ -99,3 +99,34 @@ static_assert(not is_fully_static(CallableTypeOf[f13]))
 static_assert(not is_fully_static(CallableTypeOf[f14]))
 static_assert(not is_fully_static(CallableTypeOf[f15]))
 ```
+
+## Overloads
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+@overload
+def gradual() -> None: ...
+@overload
+def gradual(a: Any) -> None: ...
+
+@overload
+def static() -> None: ...
+@overload
+def static(x: int) -> None: ...
+@overload
+def static(x: str) -> str: ...
+```
+
+```py
+from knot_extensions import CallableTypeOf, TypeOf, is_fully_static, static_assert
+from overloaded import gradual, static
+
+static_assert(is_fully_static(TypeOf[gradual]))
+static_assert(is_fully_static(TypeOf[static]))
+
+static_assert(not is_fully_static(CallableTypeOf[gradual]))
+static_assert(is_fully_static(CallableTypeOf[static]))
+```

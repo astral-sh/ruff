@@ -522,4 +522,35 @@ c: Callable[[Any], str] = A().f
 c: Callable[[Any], str] = A().g
 ```
 
+### Overloads
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, overload
+
+@overload
+def overloaded() -> None: ...
+@overload
+def overloaded(a: str) -> str: ...
+@overload
+def overloaded(a: str, b: Any) -> str: ...
+```
+
+```py
+from overloaded import overloaded
+from typing import Any, Callable
+
+c: Callable[[], None] = overloaded
+c: Callable[[str], str] = overloaded
+c: Callable[[str, Any], Any] = overloaded
+c: Callable[..., str] = overloaded
+
+# error: [invalid-assignment]
+c: Callable[..., int] = overloaded
+
+# error: [invalid-assignment]
+c: Callable[[int], str] = overloaded
+```
+
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

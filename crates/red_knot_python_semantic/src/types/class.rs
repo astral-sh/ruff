@@ -931,7 +931,7 @@ impl<'db> ClassLiteralType<'db> {
 
             let init_signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
 
-            return Some(Type::Callable(CallableType::new(db, init_signature)));
+            return Some(Type::Callable(CallableType::single(db, init_signature)));
         } else if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__") {
             if metadata.contains(DataclassMetadata::ORDER) {
                 let signature = Signature::new(
@@ -943,7 +943,7 @@ impl<'db> ClassLiteralType<'db> {
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
-                return Some(Type::Callable(CallableType::new(db, signature)));
+                return Some(Type::Callable(CallableType::single(db, signature)));
             }
         }
 
@@ -2532,7 +2532,7 @@ impl<'db> KnownInstanceType<'db> {
     ///
     /// Most variants can only exist in one module, which is the same as `self.class().canonical_module()`.
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    fn check_module(self, module: KnownModule) -> bool {
+    pub(super) fn check_module(self, module: KnownModule) -> bool {
         match self {
             Self::Any
             | Self::ClassVar
@@ -2545,7 +2545,6 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Counter
             | Self::ChainMap
             | Self::OrderedDict
-            | Self::Protocol
             | Self::Optional
             | Self::Union
             | Self::NoReturn
@@ -2553,6 +2552,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Type
             | Self::Callable => module.is_typing(),
             Self::Annotated
+            | Self::Protocol
             | Self::Literal
             | Self::LiteralString
             | Self::Never

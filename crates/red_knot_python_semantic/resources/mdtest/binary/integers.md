@@ -50,9 +50,11 @@ reveal_type(1 ** (largest_u32 + 1))  # revealed: int
 reveal_type(2**largest_u32)  # revealed: int
 
 def variable(x: int):
-    reveal_type(x**2)  # revealed: @Todo(return type of overloaded function)
-    reveal_type(2**x)  # revealed: @Todo(return type of overloaded function)
-    reveal_type(x**x)  # revealed: @Todo(return type of overloaded function)
+    reveal_type(x**2)  # revealed: int
+    # TODO: should be `Any` (overload 5 on `__pow__`), requires correct overload matching
+    reveal_type(2**x)  # revealed: int
+    # TODO: should be `Any` (overload 5 on `__pow__`), requires correct overload matching
+    reveal_type(x**x)  # revealed: int
 ```
 
 If the second argument is \<0, a `float` is returned at runtime. If the first argument is \<0 but

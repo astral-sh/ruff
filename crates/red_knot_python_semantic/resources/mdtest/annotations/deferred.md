@@ -156,3 +156,24 @@ def _():
         def f(self) -> C:
             return self
 ```
+
+## Base class references
+
+### Not deferred by __future__.annotations
+
+```py
+from __future__ import annotations
+
+class A(B):  # error: [unresolved-reference]
+    pass
+
+class B:
+    pass
+```
+
+### Deferred in stub files
+
+```pyi
+class A(B): ...
+class B: ...
+```

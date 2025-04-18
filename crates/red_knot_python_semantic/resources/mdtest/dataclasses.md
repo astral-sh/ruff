@@ -547,14 +547,14 @@ the descriptor's `__get__` method as if it had been called on the class itself, 
 for the `instance` argument.
 
 ```py
-from typing import overload
+from typing import Literal, overload
 from dataclasses import dataclass
 
 class ConvertToLength:
     _len: int = 0
 
     @overload
-    def __get__(self, instance: None, owner: type) -> str: ...
+    def __get__(self, instance: None, owner: type) -> Literal[""]: ...
     @overload
     def __get__(self, instance: object, owner: type | None) -> int: ...
     def __get__(self, instance: object | None, owner: type | None) -> str | int:
@@ -570,12 +570,10 @@ class ConvertToLength:
 class C:
     converter: ConvertToLength = ConvertToLength()
 
-# TODO: Should be `(converter: str = Literal[""]) -> None` once we understand overloads
-reveal_type(C.__init__)  # revealed: (converter: str = str | int) -> None
+reveal_type(C.__init__)  # revealed: (converter: str = Literal[""]) -> None
 
 c = C("abc")
-# TODO: Should be `int` once we understand overloads
-reveal_type(c.converter)  # revealed: str | int
+reveal_type(c.converter)  # revealed: int
 
 # This is also okay:
 C()
@@ -611,8 +609,7 @@ class AcceptsStrAndInt:
 class C:
     field: AcceptsStrAndInt = AcceptsStrAndInt()
 
-# TODO: Should be `field: str | int = int` once we understand overloads
-reveal_type(C.__init__)  # revealed: (field: Unknown = int) -> None
+reveal_type(C.__init__)  # revealed: (field: str | int = int) -> None
 ```
 
 ## `dataclasses.field`

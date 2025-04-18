@@ -82,3 +82,14 @@ def _(x_flag: bool, y_flag: bool):
         reveal_type(x)  # revealed: bool
         reveal_type(y)  # revealed: bool
 ```
+
+## Assignment expressions
+
+```py
+def f() -> int | str | None: ...
+
+if (x := f()) is not None:
+    reveal_type(x)  # revealed: int | str
+else:
+    reveal_type(x)  # revealed: None
+```

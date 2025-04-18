@@ -459,11 +459,9 @@ class Descriptor:
 class C:
     d: Descriptor = Descriptor()
 
-# TODO: should be `Literal["called on class object"]
-reveal_type(C.d)  # revealed: LiteralString
+reveal_type(C.d)  # revealed: Literal["called on class object"]
 
-# TODO: should be `Literal["called on instance"]
-reveal_type(C().d)  # revealed: LiteralString
+reveal_type(C().d)  # revealed: Literal["called on instance"]
 ```
 
 ## Descriptor protocol for dunder methods

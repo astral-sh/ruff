@@ -252,7 +252,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
         r#"
             y = 4 / 0
 
-            for a in range(0, y):
+            for a in range(0, int(y)):
                 x = a
 
             print(x)  # possibly-unresolved-reference
@@ -271,7 +271,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
+    4 | for a in range(0, int(y)):
       |
 
     warning: lint:possibly-unresolved-reference
@@ -307,7 +307,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
+    4 | for a in range(0, int(y)):
       |
 
     Found 1 diagnostic
@@ -328,7 +328,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
         y = 4 / 0
 
-        for a in range(0, y):
+        for a in range(0, int(y)):
             x = a
 
         print(x)  # possibly-unresolved-reference
@@ -358,7 +358,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     4 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     5 |
-    6 | for a in range(0, y):
+    6 | for a in range(0, int(y)):
       |
 
     warning: lint:possibly-unresolved-reference
@@ -405,7 +405,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     4 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     5 |
-    6 | for a in range(0, y):
+    6 | for a in range(0, int(y)):
       |
 
     Found 2 diagnostics
@@ -426,7 +426,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
         r#"
         y = 4 / 0
 
-        for a in range(0, y):
+        for a in range(0, int(y)):
             x = a
 
         print(x)  # possibly-unresolved-reference
@@ -445,7 +445,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
+    4 | for a in range(0, int(y)):
       |
 
     warning: lint:possibly-unresolved-reference
@@ -482,7 +482,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
+    4 | for a in range(0, int(y)):
       |
 
     Found 1 diagnostic
@@ -814,7 +814,7 @@ fn user_configuration() -> anyhow::Result<()> {
             r#"
             y = 4 / 0
 
-            for a in range(0, y):
+            for a in range(0, int(y)):
                 x = a
 
             print(x)
@@ -841,7 +841,7 @@ fn user_configuration() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
+    4 | for a in range(0, int(y)):
       |
 
     warning: lint:possibly-unresolved-reference
@@ -883,7 +883,7 @@ fn user_configuration() -> anyhow::Result<()> {
     2 | y = 4 / 0
       |     ^^^^^ Cannot divide object of type `Literal[4]` by zero
     3 |
-    4 | for a in range(0, y):
+    4 | for a in range(0, int(y)):
       |
 
     error: lint:possibly-unresolved-reference

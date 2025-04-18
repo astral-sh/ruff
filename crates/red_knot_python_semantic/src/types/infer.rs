@@ -585,8 +585,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Are we currently inferring types in file with deferred types?
     /// This is true for stub files and files with `__future__.annotations`
-    fn are_all_types_deferred(&self) -> bool {
-        self.index.has_future_annotations() || self.file().is_stub(self.db().upcast())
+    fn defer_annotations(&self) -> bool {
+        self.index.has_future_annotations() || self.in_stub()
     }
 
     /// Are we currently inferring deferred types?
@@ -1467,7 +1467,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
         // `infer_function_type_params`, rather than here.
         if type_params.is_none() {
-            if self.are_all_types_deferred() {
+            if self.defer_annotations() {
                 self.types.deferred.insert(definition);
             } else {
                 self.infer_optional_annotation_expression(
@@ -1791,9 +1791,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // TODO: Only defer the references that are actually string literals, instead of
             // deferring the entire class definition if a string literal occurs anywhere in the
             // base class list.
-            if self.are_all_types_deferred()
-                || class_node.bases().iter().any(contains_string_literal)
-            {
+            if self.in_stub() || class_node.bases().iter().any(contains_string_literal) {
                 self.types.deferred.insert(definition);
             } else {
                 for base in class_node.bases() {
@@ -2919,7 +2917,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut declared_ty = self.infer_annotation_expression(
             annotation,
-            DeferredExpressionState::from(self.are_all_types_deferred()),
+            DeferredExpressionState::from(self.defer_annotations()),
         );
 
         if target
@@ -4133,7 +4131,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
         // rather than eagerly computing a return type without knowing the argument types.
-        Type::Callable(CallableType::new(
+        Type::Callable(CallableType::single(
             self.db(),
             Signature::new(parameters, Some(Type::unknown())),
         ))
@@ -7315,7 +7313,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let callable_type = if let (Some(parameters), Some(return_type), true) =
                     (parameters, return_type, correct_argument_number)
                 {
-                    CallableType::new(db, Signature::new(parameters, Some(return_type)))
+                    CallableType::single(db, Signature::new(parameters, Some(return_type)))
                 } else {
                     CallableType::unknown(db)
                 };
@@ -7396,8 +7394,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                     let argument_type = self.infer_expression(arguments_slice);
                     let signatures = argument_type.signatures(db);
 
-                    // TODO overloads
-                    let Some(signature) = signatures.iter().flatten().next() else {
+                    // SAFETY: This is enforced by the constructor methods on `Signatures` even in
+                    // the case of a non-callable union.
+                    let callable_signature = signatures
+                        .iter()
+                        .next()
+                        .expect("`Signatures` should have at least one `CallableSignature`");
+
+                    let mut signature_iter = callable_signature.iter().map(|signature| {
+                        if argument_type.is_bound_method() {
+                            signature.bind_self()
+                        } else {
+                            signature.clone()
+                        }
+                    });
+
+                    let Some(signature) = signature_iter.next() else {
                         self.context.report_lint_old(
                             &INVALID_TYPE_FORM,
                             arguments_slice,
@@ -7410,13 +7422,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Type::unknown();
                     };
 
-                    let revealed_signature = if argument_type.is_bound_method() {
-                        signature.bind_self()
-                    } else {
-                        signature.clone()
-                    };
-
-                    Type::Callable(CallableType::new(db, revealed_signature))
+                    Type::Callable(CallableType::from_overloads(
+                        db,
+                        std::iter::once(signature).chain(signature_iter),
+                    ))
                 }
             },
 

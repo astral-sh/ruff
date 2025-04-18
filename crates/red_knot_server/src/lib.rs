@@ -30,7 +30,7 @@ pub fn run_server() -> anyhow::Result<()> {
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
     let worker_threads = std::thread::available_parallelism()
         .unwrap_or(four)
-        .max(four);
+        .min(four);
 
     Server::new(worker_threads)
         .context("Failed to start server")?
