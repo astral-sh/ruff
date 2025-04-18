@@ -121,9 +121,10 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
     }
     // Extract, e.g., `x` in `bin(x)`.
     let literal_text = checker.locator().slice(arg);
+
     // If we're calling a method on an integer, or an expression with lower precedence, parenthesize
     // it.
-    let parenthesize: bool = match arg {
+    let parenthesize = match arg {
         Expr::NumberLiteral(ast::ExprNumberLiteral { .. }) => {
             let mut chars = literal_text.chars();
             !matches!(
@@ -160,9 +161,9 @@ pub(crate) fn bit_count(checker: &Checker, call: &ExprCall) {
         | Expr::ListComp(_)
         | Expr::SetComp(_)
         | Expr::DictComp(_)
+        | Expr::BooleanLiteral(_)
         | Expr::NoneLiteral(_)
         | Expr::EllipsisLiteral(_)
-        | Expr::BooleanLiteral(_)
         | Expr::Attribute(_)
         | Expr::Subscript(_) => false,
     };
