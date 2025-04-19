@@ -7,7 +7,6 @@ artigraph  # cycle panics (value_type_)
 cpython  # missing expression ID, access to field whilst being initialized, too many cycle iterations
 colour  # cycle panics (try_metaclass_)
 core  # cycle panics (value_type_)
-discord.py  # some kind of hang, only when multi-threaded?
 dragonchain  # too many cycle iterations (member_lookup_with_policy)
 manticore  # stack overflow
 materialize  # stack overflow
