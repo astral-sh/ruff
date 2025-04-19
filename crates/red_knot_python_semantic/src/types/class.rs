@@ -582,6 +582,17 @@ impl<'db> ClassLiteralType<'db> {
             .collect()
     }
 
+    /// Determine if this class is a protocol.
+    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+        self.explicit_bases(db).iter().any(|base| {
+            matches!(
+                base,
+                Type::KnownInstance(KnownInstanceType::Protocol)
+                    | Type::Dynamic(DynamicType::SubscriptedProtocol)
+            )
+        })
+    }
+
     /// Return the types of the decorators on this class
     #[salsa::tracked(return_ref)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {

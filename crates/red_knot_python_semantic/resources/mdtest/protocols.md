@@ -40,27 +40,63 @@ class Foo(Protocol, Protocol): ...  # error: [inconsistent-mro]
 reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
 ```
 
+Protocols can also be generic, either by including `Generic[]` in the bases list, subscripting
+`Protocol` directly in the bases list, using PEP-695 type parameters, or some combination of the
+above:
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+
+class Bar0(Protocol[T]):
+    x: T
+
+class Bar1(Protocol[T], Generic[T]):
+    x: T
+
+class Bar2[T](Protocol):
+    x: T
+
+class Bar3[T](Protocol[T]):
+    x: T
+```
+
+It's an error to include both bare `Protocol` and subscripted `Protocol[]` in the bases list
+simultaneously:
+
+```py
+# TODO: should emit a `[duplicate-bases]` error here:
+class DuplicateBases(Protocol, Protocol[T]):
+    x: T
+
+# TODO: should not have `Generic` multiple times and `Protocol` multiple times
+# revealed: tuple[Literal[DuplicateBases], typing.Protocol, typing.Generic, @Todo(`Protocol[]` subscript), @Todo(`Generic[]` subscript), Literal[object]]
+reveal_type(DuplicateBases.__mro__)
+```
+
 The introspection helper `typing(_extensions).is_protocol` can be used to verify whether a class is
 a protocol class or not:
 
 ```py
 from typing_extensions import is_protocol
 
-# TODO: should be `Literal[True]`
-reveal_type(is_protocol(MyProtocol))  # revealed: bool
+reveal_type(is_protocol(MyProtocol))  # revealed: Literal[True]
+reveal_type(is_protocol(Bar0))  # revealed: Literal[True]
+reveal_type(is_protocol(Bar1))  # revealed: Literal[True]
+reveal_type(is_protocol(Bar2))  # revealed: Literal[True]
+reveal_type(is_protocol(Bar3))  # revealed: Literal[True]
 
 class NotAProtocol: ...
 
-# TODO: should be `Literal[False]`
-reveal_type(is_protocol(NotAProtocol))  # revealed: bool
+reveal_type(is_protocol(NotAProtocol))  # revealed: Literal[False]
 ```
 
 A type checker should follow the typeshed stubs if a non-class is passed in, and typeshed's stubs
-indicate that the argument passed in must be an instance of `type`. `Literal[False]` should be
-inferred as the return type, however.
+indicate that the argument passed in must be an instance of `type`.
 
 ```py
-# TODO: the diagnostic is correct, but should infer `Literal[False]`
+# We could also reasonably infer `Literal[False]` here, but it probably doesn't matter that much:
 # error: [invalid-argument-type]
 reveal_type(is_protocol("not a class"))  # revealed: bool
 ```
@@ -74,8 +110,7 @@ class SubclassOfMyProtocol(MyProtocol): ...
 # revealed: tuple[Literal[SubclassOfMyProtocol], Literal[MyProtocol], typing.Protocol, typing.Generic, Literal[object]]
 reveal_type(SubclassOfMyProtocol.__mro__)
 
-# TODO: should be `Literal[False]`
-reveal_type(is_protocol(SubclassOfMyProtocol))  # revealed: bool
+reveal_type(is_protocol(SubclassOfMyProtocol))  # revealed: Literal[False]
 ```
 
 A protocol class may inherit from other protocols, however, as long as it re-inherits from
@@ -84,8 +119,7 @@ A protocol class may inherit from other protocols, however, as long as it re-inh
 ```py
 class SubProtocol(MyProtocol, Protocol): ...
 
-# TODO: should be `Literal[True]`
-reveal_type(is_protocol(SubProtocol))  # revealed: bool
+reveal_type(is_protocol(SubProtocol))  # revealed: Literal[True]
 
 class OtherProtocol(Protocol):
     some_attribute: str
@@ -95,8 +129,7 @@ class ComplexInheritance(SubProtocol, OtherProtocol, Protocol): ...
 # revealed: tuple[Literal[ComplexInheritance], Literal[SubProtocol], Literal[MyProtocol], Literal[OtherProtocol], typing.Protocol, typing.Generic, Literal[object]]
 reveal_type(ComplexInheritance.__mro__)
 
-# TODO: should be `Literal[True]`
-reveal_type(is_protocol(ComplexInheritance))  # revealed: bool
+reveal_type(is_protocol(ComplexInheritance))  # revealed: Literal[True]
 ```
 
 If `Protocol` is present in the bases tuple, all other bases in the tuple must be protocol classes,
@@ -134,6 +167,8 @@ reveal_type(Fine.__mro__)  # revealed: tuple[Literal[Fine], typing.Protocol, typ
 
 class StillFine(Protocol, Generic[T], object): ...
 class EvenThis[T](Protocol, object): ...
+class OrThis(Protocol[T], Generic[T]): ...
+class AndThis(Protocol[T], Generic[T], object): ...
 ```
 
 And multiple inheritance from a mix of protocol and non-protocol classes is fine as long as
@@ -150,8 +185,7 @@ But if `Protocol` is not present in the bases list, the resulting class doesn't 
 class anymore:
 
 ```py
-# TODO: should reveal `Literal[False]`
-reveal_type(is_protocol(FineAndDandy))  # revealed: bool
+reveal_type(is_protocol(FineAndDandy))  # revealed: Literal[False]
 ```
 
 A class does not *have* to inherit from a protocol class in order for it to be considered a subtype
@@ -230,9 +264,10 @@ class Foo(typing.Protocol):
 class Bar(typing_extensions.Protocol):
     x: int
 
-# TODO: these should pass
-static_assert(typing_extensions.is_protocol(Foo))  # error: [static-assert-error]
-static_assert(typing_extensions.is_protocol(Bar))  # error: [static-assert-error]
+static_assert(typing_extensions.is_protocol(Foo))
+static_assert(typing_extensions.is_protocol(Bar))
+
+# TODO: should pass
 static_assert(is_equivalent_to(Foo, Bar))  # error: [static-assert-error]
 ```
 
@@ -247,9 +282,10 @@ class RuntimeCheckableFoo(typing.Protocol):
 class RuntimeCheckableBar(typing_extensions.Protocol):
     x: int
 
-# TODO: these should pass
-static_assert(typing_extensions.is_protocol(RuntimeCheckableFoo))  # error: [static-assert-error]
-static_assert(typing_extensions.is_protocol(RuntimeCheckableBar))  # error: [static-assert-error]
+static_assert(typing_extensions.is_protocol(RuntimeCheckableFoo))
+static_assert(typing_extensions.is_protocol(RuntimeCheckableBar))
+
+# TODO: should pass
 static_assert(is_equivalent_to(RuntimeCheckableFoo, RuntimeCheckableBar))  # error: [static-assert-error]
 
 # These should not error because the protocols are decorated with `@runtime_checkable`
