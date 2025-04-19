@@ -1,18 +1,20 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{Expr, ExprAttribute, ExprCall, ExprNumberLiteral, ExprUnaryOp, Int, Number, UnaryOp};
+use ruff_python_ast::{
+    Expr, ExprAttribute, ExprCall, ExprNumberLiteral, ExprUnaryOp, Int, Number, UnaryOp,
+};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for access to the first or last element of `str.split()` without 
+/// Checks for access to the first or last element of `str.split()` without
 /// `maxsplit=1`
 ///
 /// ## Why is this bad?
-/// Calling `str.split()` without maxsplit set splits on every delimiter in the 
-/// string. When accessing only the first or last element of the result, it 
+/// Calling `str.split()` without maxsplit set splits on every delimiter in the
+/// string. When accessing only the first or last element of the result, it
 /// would be more efficient to only split once.
 ///
 /// ## Example
@@ -33,14 +35,18 @@ pub(crate) struct MissingMaxsplitArg;
 impl Violation for MissingMaxsplitArg {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Accessing only the first or last element of `str.split()` without setting `maxsplit=1`".to_string()
+        "Accessing only the first or last element of `str.split()` without setting `maxsplit=1`"
+            .to_string()
     }
 }
 
 /// PLC0207
 pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr, expr: &Expr) {
     // Check the sliced expression is a function
-    let Expr::Call(ExprCall { func, arguments, .. }) = value else {
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = value
+    else {
         return;
     };
 
@@ -68,8 +74,7 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         return;
     }
 
-
-    if let Expr::Attribute(ExprAttribute {attr, value, .. }) = func.as_ref() {
+    if let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() {
         // Check the function is "split" or "rsplit"
         let attr = attr.as_str();
         if !matches!(attr, "split" | "rsplit") {
@@ -81,19 +86,18 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
             let semantic = checker.semantic();
 
             let Some(binding_id) = semantic.only_binding(name) else {
-                return; 
+                return;
             };
             let binding = semantic.binding(binding_id);
 
             if !typing::is_string(binding, semantic) {
                 return;
-            } 
+            }
         } else if let Expr::StringLiteral(_) = value.as_ref() {
             // pass
         } else {
             return;
         }
-
     } else {
         return;
     }
@@ -101,8 +105,11 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     // Check the function does not have kwarg maxsplit=1 or arg[1]=1
     if let Some(maxsplit_arg) = arguments.find_argument_value("maxsplit", 1) {
         if matches!(
-            maxsplit_arg, 
-            Expr::NumberLiteral(ExprNumberLiteral { value: Number::Int(Int::ONE), .. })
+            maxsplit_arg,
+            Expr::NumberLiteral(ExprNumberLiteral {
+                value: Number::Int(Int::ONE),
+                ..
+            })
         ) {
             return;
         }
