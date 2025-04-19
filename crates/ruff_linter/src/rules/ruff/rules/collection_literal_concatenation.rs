@@ -33,6 +33,12 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// bar = [1, *foo, 5, 6]
 /// ```
 ///
+/// ## Fix safety
+///
+/// The fix is always marked as unsafe because `+` operator uses the `__add__` magic method while
+/// the `*` uses the `__iter__` magic method, and these two could have custom
+/// implementations making the fix changing the program behaviour.
+///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
 /// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
