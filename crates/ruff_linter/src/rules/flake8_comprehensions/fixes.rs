@@ -1,4 +1,5 @@
 use std::iter;
+use std::sync::LazyLock;
 
 use anyhow::{bail, Result};
 use itertools::Itertools;
@@ -9,9 +10,13 @@ use libcst_native::{
     ParenthesizedWhitespace, RightCurlyBrace, RightParen, RightSquareBracket, SetComp,
     SimpleString, SimpleWhitespace, TrailingWhitespace, Tuple,
 };
+use regex::{Captures, Regex, Replacer};
 
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::{
+    self as ast, AnyNodeRef, Comprehension, Expr, ExprCall, ExprContext, ExprRef,
+};
 use ruff_python_codegen::Stylist;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
@@ -214,10 +219,7 @@ pub(crate) fn fix_unnecessary_literal_dict(expr: &Expr, checker: &Checker) -> Re
 }
 
 /// (C408) Convert `dict(a=1, b=2)` to `{"a": 1, "b": 2}`.
-pub(crate) fn fix_unnecessary_collection_call(
-    expr: &ast::ExprCall,
-    checker: &Checker,
-) -> Result<Edit> {
+pub(crate) fn fix_unnecessary_collection_call(expr: &ExprCall, checker: &Checker) -> Result<Edit> {
     let locator = checker.locator();
     let stylist = checker.stylist();
 
@@ -801,6 +803,211 @@ pub(crate) fn fix_unnecessary_map(
     }
 
     Ok(Edit::range_replacement(content, call_ast_node.range()))
+}
+
+/// (C417) Return a fix that converts:
+///
+/// ```python
+/// # Before                               # After
+/// map(lambda x: x * 2, a)                # (x * 2 for x in a)
+/// map(lambda x, y: (x, y), a, b)         # ((x, y) for x in zip(a, b))
+/// list(map(lambda x: x * 2, a))          # [x * 2 for x in a]
+/// list(map(lambda x, y: (x, y), a, b))   # [(x, y) for x in zip(a, b)]
+/// set(map(lambda x: x * 2, a))           # {x * 2 for x in a}
+/// set(map(lambda x, y: (x, y), a, b))    # {(x, y) for x in zip(a, b)}
+/// dict(map(lambda x, y: (x, y), a, b))   # {x: y for x, y in zip(a, b)}
+/// ```
+pub(crate) fn fix_unnecessary_map_preview(
+    call: &ExprCall,
+    object_type: ObjectType,
+    lambda: &ast::ExprLambda,
+    iterables: &[Expr],
+    checker: &Checker,
+) -> Result<Edit> {
+    let generator = checker.generator();
+    let semantic = checker.semantic();
+
+    let (Some(parameters), body) = (&lambda.parameters, &*lambda.body) else {
+        bail!("Lambda has no parameters");
+    };
+
+    let loop_iter = if let [iterable] = iterables {
+        iterable.clone()
+    } else if semantic.has_builtin_binding("zip") {
+        ExprCall {
+            func: Expr::Name(ast::ExprName {
+                id: ast::name::Name::new("zip"),
+                ctx: ExprContext::Load,
+                range: TextRange::default(),
+            })
+            .into(),
+            arguments: ast::Arguments {
+                args: iterables.into(),
+                keywords: [].into(),
+                range: TextRange::default(),
+            },
+            range: TextRange::default(),
+        }
+        .into()
+    } else {
+        bail!("Cannot create fix: `zip` is shadowed locally");
+    };
+
+    let loop_target = {
+        let mut elements: Vec<Expr> = parameters
+            .posonlyargs
+            .iter()
+            .chain(&parameters.args)
+            .map(|parameter| {
+                Expr::Name(ast::ExprName {
+                    id: parameter.name().id.clone(),
+                    ctx: ExprContext::Store,
+                    range: TextRange::default(),
+                })
+            })
+            .collect();
+
+        if elements.len() == 1 {
+            elements.remove(0)
+        } else {
+            Expr::Tuple(ast::ExprTuple {
+                elts: elements,
+                parenthesized: false,
+                ctx: ExprContext::Store,
+                range: TextRange::default(),
+            })
+        }
+    };
+
+    let generators = vec![Comprehension {
+        target: loop_target,
+        iter: loop_iter,
+        ifs: vec![],
+        is_async: false,
+        range: TextRange::default(),
+    }];
+
+    let placeholder = Expr::EllipsisLiteral(ast::ExprEllipsisLiteral::default());
+
+    let expr = match object_type {
+        ObjectType::Generator => Expr::Generator(ast::ExprGenerator {
+            elt: placeholder.into(),
+            generators,
+            parenthesized: true,
+            range: TextRange::default(),
+        }),
+
+        ObjectType::List => Expr::ListComp(ast::ExprListComp {
+            elt: placeholder.into(),
+            generators,
+            range: TextRange::default(),
+        }),
+
+        ObjectType::Set => Expr::SetComp(ast::ExprSetComp {
+            elt: placeholder.into(),
+            generators,
+            range: TextRange::default(),
+        }),
+
+        ObjectType::Dict => Expr::DictComp(ast::ExprDictComp {
+            key: placeholder.clone().into(),
+            value: placeholder.into(),
+            generators,
+            range: TextRange::default(),
+        }),
+    };
+
+    let comment_ranges = checker.comment_ranges();
+    let source = checker.source();
+    let locator = checker.locator();
+
+    let mut content = generator.expr(&expr);
+
+    let original_expr_in_source = |expr: ExprRef, parent: AnyNodeRef| {
+        let original_range =
+            parenthesized_range(expr, parent, comment_ranges, source).unwrap_or(expr.range());
+
+        locator.slice(original_range)
+    };
+
+    let replacements: Vec<String> = match object_type {
+        ObjectType::Dict => {
+            fn parenthesized_if_necessary(expr: &Expr, as_str: &str) -> String {
+                if expr.is_named_expr() {
+                    format!("({as_str})")
+                } else {
+                    as_str.to_string()
+                }
+            }
+
+            let (key, value) = match body {
+                Expr::Tuple(ast::ExprTuple { elts, .. })
+                | Expr::List(ast::ExprList { elts, .. }) => {
+                    let [key, value] = &elts[..] else {
+                        bail!("Body is not key-value pair");
+                    };
+
+                    (key, value)
+                }
+                _ => bail!("Body is not key-value pair"),
+            };
+
+            let original_key = original_expr_in_source(key.into(), body.into());
+            let original_value = original_expr_in_source(value.into(), body.into());
+
+            vec![
+                parenthesized_if_necessary(key, original_key),
+                parenthesized_if_necessary(value, original_value),
+            ]
+        }
+
+        _ => {
+            let original_body = original_expr_in_source(body.into(), lambda.into());
+            vec![original_body.to_string()]
+        }
+    };
+
+    content = replace_placeholders(&content, &replacements);
+
+    // If the expression is embedded in an f-string, surround it with spaces to avoid
+    // syntax errors.
+    if matches!(object_type, ObjectType::Set | ObjectType::Dict) {
+        if semantic.current_expressions().any(Expr::is_f_string_expr) {
+            content = format!(" {content} ");
+        }
+    }
+
+    Ok(Edit::range_replacement(content, call.range))
+}
+
+/// Replace placeholder ellipsis literals with the given replacements.
+fn replace_placeholders(original: &str, replacements: &[String]) -> String {
+    // `str::replacen()` does not allow specifying different replacements.
+    static PLACEHOLDER_ELLIPSIS_LITERALS: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\.\.\.").unwrap());
+
+    struct ItemPlaceholderReplacer<'a> {
+        index: usize,
+        replacements: &'a [String],
+    }
+
+    impl Replacer for ItemPlaceholderReplacer<'_> {
+        fn replace_append(&mut self, _caps: &Captures<'_>, dst: &mut String) {
+            dst.push_str(&self.replacements[self.index]);
+            self.index += 1;
+        }
+    }
+
+    PLACEHOLDER_ELLIPSIS_LITERALS
+        .replacen(
+            original,
+            replacements.len(),
+            ItemPlaceholderReplacer {
+                index: 0,
+                replacements,
+            },
+        )
+        .to_string()
 }
 
 /// (C419) Convert `[i for i in a]` into `i for i in a`
