@@ -48,8 +48,9 @@ use crate::importer::ImportRequest;
 ///
 /// ## Fix safety
 ///
-/// The rule's fix is marked as unsafe because it can delete comments in case of a multiline
-/// expression.
+/// The fix is always marked as unsafe because `sum` uses the `__add__` magic method while
+/// `operator.iadd` uses the `__iadd__` magic method, and these two could have different
+/// implementations. Moreover, the fix could remove comments from the original code.
 ///
 /// ## References
 /// - [_How Not to Flatten a List of Lists in Python_](https://mathieularose.com/how-not-to-flatten-a-list-of-lists-in-python)
