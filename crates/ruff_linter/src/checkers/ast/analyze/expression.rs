@@ -965,6 +965,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.any_enabled(&[
                 Rule::PytestRaisesWithoutException,
                 Rule::PytestRaisesTooBroad,
+                Rule::DeprecatedPytestRaisesCallableForm,
             ]) {
                 flake8_pytest_style::rules::raises_call(checker, call);
             }
