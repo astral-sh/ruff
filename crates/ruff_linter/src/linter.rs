@@ -1022,6 +1022,7 @@ mod tests {
 		",
         PythonVersion::PY310
     )]
+    #[test_case("false_positive", "[x async for x in y]", PythonVersion::PY310)]
     fn test_async_comprehension_in_sync_comprehension(
         name: &str,
         contents: &str,
