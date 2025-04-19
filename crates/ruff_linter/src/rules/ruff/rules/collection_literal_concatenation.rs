@@ -33,6 +33,13 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// bar = [1, *foo, 5, 6]
 /// ```
 ///
+/// ## Fix safety
+///
+/// The fix is always marked as unsafe. Indeed, the proposed fix could be unsafe if the
+/// non-literal expression in the expression has overridden the `__add__` (or `__radd__`)
+/// magic methods, i.e., the fix would change the program behaviour. Moreover, the fix
+/// could delete comments.
+///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
 /// - [Python documentation: Sequence Types — `list`, `tuple`, `range`](https://docs.python.org/3/library/stdtypes.html#sequence-types-list-tuple-range)
