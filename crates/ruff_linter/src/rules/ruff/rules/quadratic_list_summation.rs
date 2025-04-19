@@ -48,8 +48,8 @@ use crate::importer::ImportRequest;
 ///
 /// ## Fix safety
 ///
-/// The rule's fix is marked as unsafe because it could convert lists into iterators, and it can
-/// delete comments in case of a multiline expression.
+/// The rule's fix is marked as unsafe because it can delete comments in case of a multiline
+/// expression.
 ///
 /// ## References
 /// - [_How Not to Flatten a List of Lists in Python_](https://mathieularose.com/how-not-to-flatten-a-list-of-lists-in-python)
