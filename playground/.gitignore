@@ -131,3 +131,8 @@ dist
 
 # Wrangler
 api/.wrangler
+
+# Workspace lockfiles
+/shared/package-lock.json
+/knot/package-lock.json
+/ruff/package-lock.json
