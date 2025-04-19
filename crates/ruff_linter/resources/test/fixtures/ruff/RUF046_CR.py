@@ -1,0 +1,1 @@
+int(-    1) # Carriage return as newline
