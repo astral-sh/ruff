@@ -160,7 +160,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 
 1. Update the generated files (documentation and generated code).
 
-To trigger the violation, you'll likely want to augment the logic in `crates/ruff_linter/src/checkers/ast.rs`
+To trigger the violation, you'll likely want to augment the logic in `crates/ruff_linter/src/checkers/ast/mod.rs`
 to call your new function at the appropriate time and with the appropriate inputs. The `Checker`
 defined therein is a Python AST visitor, which iterates over the AST, building up a semantic model,
 and calling out to lint rule analyzer functions as it goes.
