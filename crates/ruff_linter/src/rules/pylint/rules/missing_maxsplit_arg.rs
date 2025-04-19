@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{Expr, ExprAttribute, ExprCall, ExprNumberLiteral, ExprUnaryOp, Int, Number, UnaryOp};
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
@@ -38,25 +38,25 @@ impl Violation for MissingMaxsplitArg {
 }
 
 /// PLC0207
-pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &ast::Expr, slice: &ast::Expr, expr: &ast::Expr) {
+pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr, expr: &Expr) {
     // Check the sliced expression is a function
-    let ast::Expr::Call(ast::ExprCall { func, arguments, .. }) = value else {
+    let Expr::Call(ExprCall { func, arguments, .. }) = value else {
         return;
     };
 
     // Check the slice index is either 0 or -1 (first or last value)
     let index = match slice {
-        ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(number_value),
+        Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(number_value),
             ..
         }) => number_value.as_i64(),
-        ast::Expr::UnaryOp(ast::ExprUnaryOp {
-            op: ast::UnaryOp::USub,
+        Expr::UnaryOp(ExprUnaryOp {
+            op: UnaryOp::USub,
             operand,
             ..
         }) => match operand.as_ref() {
-            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(number_value),
+            Expr::NumberLiteral(ExprNumberLiteral {
+                value: Number::Int(number_value),
                 ..
             }) => number_value.as_i64().map(|number| -number),
             _ => return,
@@ -69,7 +69,7 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &ast::Expr, slice: 
     }
 
 
-    if let ast::Expr::Attribute(ast::ExprAttribute {attr, value, .. }) = func.as_ref() {
+    if let Expr::Attribute(ExprAttribute {attr, value, .. }) = func.as_ref() {
         // Check the function is "split" or "rsplit"
         let attr = attr.as_str();
         if !matches!(attr, "split" | "rsplit") {
@@ -77,7 +77,7 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &ast::Expr, slice: 
         }
 
         // Check the function is called on a string
-        if let ast::Expr::Name(name) = value.as_ref() {
+        if let Expr::Name(name) = value.as_ref() {
             let semantic = checker.semantic();
 
             let Some(binding_id) = semantic.only_binding(name) else {
@@ -88,7 +88,7 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &ast::Expr, slice: 
             if !typing::is_string(binding, semantic) {
                 return;
             } 
-        } else if let ast::Expr::StringLiteral(_) = value.as_ref() {
+        } else if let Expr::StringLiteral(_) = value.as_ref() {
             // pass
         } else {
             return;
@@ -101,11 +101,8 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &ast::Expr, slice: 
     // Check the function does not have kwarg maxsplit=1 or arg[1]=1
     if let Some(maxsplit_arg) = arguments.find_argument_value("maxsplit", 1) {
         if matches!(
-            maxsplit_arg,
-            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                value: ast::Number::Int(ast::Int::ONE),
-                ..
-            })
+            maxsplit_arg, 
+            Expr::NumberLiteral(ExprNumberLiteral { value: Number::Int(Int::ONE), .. })
         ) {
             return;
         }
