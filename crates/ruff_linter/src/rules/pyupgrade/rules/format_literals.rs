@@ -39,9 +39,10 @@ use crate::Locator;
 /// "{}, {}".format("Hello", "World")  # "Hello, World"
 /// ```
 ///
-/// ## Fix safety
-/// This fix is unsafe: it may remove comments when rewriting the call,
-/// and relies on the argument order matching the format string indices.
+/// This fix is unsafe because:
+
+/// - Comments attached to arguments are not moved, which can cause comments to mismatch the actual arguments.
+/// - If arguments have side effects (e.g., print), reordering may change program behavior.
 ///
 /// ## References
 /// - [Python documentation: Format String Syntax](https://docs.python.org/3/library/string.html#format-string-syntax)
