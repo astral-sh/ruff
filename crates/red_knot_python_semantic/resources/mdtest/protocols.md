@@ -136,13 +136,13 @@ If `Protocol` is present in the bases tuple, all other bases in the tuple must b
 or `TypeError` is raised at runtime when the class is created.
 
 ```py
-# TODO: should emit `[invalid-protocol]`
+# error: [invalid-protocol] "Protocol class `Invalid` cannot inherit from non-protocol class `NotAProtocol`"
 class Invalid(NotAProtocol, Protocol): ...
 
 # revealed: tuple[Literal[Invalid], Literal[NotAProtocol], typing.Protocol, typing.Generic, Literal[object]]
 reveal_type(Invalid.__mro__)
 
-# TODO: should emit an `[invalid-protocol`] error
+# error: [invalid-protocol] "Protocol class `AlsoInvalid` cannot inherit from non-protocol class `NotAProtocol`"
 class AlsoInvalid(MyProtocol, OtherProtocol, NotAProtocol, Protocol): ...
 
 # revealed: tuple[Literal[AlsoInvalid], Literal[MyProtocol], Literal[OtherProtocol], Literal[NotAProtocol], typing.Protocol, typing.Generic, Literal[object]]

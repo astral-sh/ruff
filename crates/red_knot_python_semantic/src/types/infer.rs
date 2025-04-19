@@ -99,8 +99,8 @@ use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    report_unresolved_reference, INVALID_METACLASS, INVALID_PROTOCOL, REDUNDANT_CAST,
+    STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -763,17 +763,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 continue;
             }
 
-            // (2) Check for inheritance from plain `Generic`,
-            //     and from classes that inherit from `@final` classes
+            let is_protocol = class.is_protocol(self.db());
+
+            // (2) Iterate through the class's explicit bases to check for various possible errors:
+            //     - Check for inheritance from plain `Generic`,
+            //     - Check for inheritance from a `@final` classes
+            //     - If the class is a protocol class: check for inheritance from a non-protocol class
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
                 let base_class = match base_class {
                     Type::KnownInstance(KnownInstanceType::Generic) => {
-                        // `Generic` can appear in the MRO of many classes,
+                        // Unsubscripted `Generic` can appear in the MRO of many classes,
                         // but it is never valid as an explicit base class in user code.
                         self.context.report_lint_old(
                             &INVALID_BASE,
                             &class_node.bases()[i],
-                            format_args!("Cannot inherit from plain `Generic`",),
+                            format_args!("Cannot inherit from plain `Generic`"),
                         );
                         continue;
                     }
@@ -782,18 +786,32 @@ impl<'db> TypeInferenceBuilder<'db> {
                     _ => continue,
                 };
 
-                if !base_class.is_final(self.db()) {
-                    continue;
+                if is_protocol
+                    && !(base_class.is_protocol(self.db())
+                        || base_class.is_known(self.db(), KnownClass::Object))
+                {
+                    self.context.report_lint_old(
+                        &INVALID_PROTOCOL,
+                        &class_node.bases()[i],
+                        format_args!(
+                            "Protocol class `{}` cannot inherit from non-protocol class `{}`",
+                            class.name(self.db()),
+                            base_class.name(self.db()),
+                        ),
+                    );
                 }
-                self.context.report_lint_old(
-                    &SUBCLASS_OF_FINAL_CLASS,
-                    &class_node.bases()[i],
-                    format_args!(
-                        "Class `{}` cannot inherit from final class `{}`",
-                        class.name(self.db()),
-                        base_class.name(self.db()),
-                    ),
-                );
+
+                if base_class.is_final(self.db()) {
+                    self.context.report_lint_old(
+                        &SUBCLASS_OF_FINAL_CLASS,
+                        &class_node.bases()[i],
+                        format_args!(
+                            "Class `{}` cannot inherit from final class `{}`",
+                            class.name(self.db()),
+                            base_class.name(self.db()),
+                        ),
+                    );
+                }
             }
 
             // (3) Check that the class's MRO is resolvable
