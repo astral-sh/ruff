@@ -1,97 +1,96 @@
-name: PR comment (mypy_primer)
-
 on: # zizmor: ignore[dangerous-triggers]
   workflow_run:
-    workflows: [Run mypy_primer]
-    types: [completed]
-  workflow_dispatch:
-    inputs:
-      workflow_run_id:
-        description: The mypy_primer workflow that triggers the workflow run
-        required: true
+    workflows:
+      - Run mypy_primer
+    types:
+      - completed
+
+permissions: {}
 
 jobs:
   comment:
-    runs-on: ubuntu-24.04
+    name: Comment PR from mypy_primer
+    runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     steps:
-      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
-        name: Download PR number
+      - name: Download diffs
+        uses: actions/github-script@v7
         with:
-          name: pr-number
-          run_id: ${{ github.event.workflow_run.id ||  github.event.inputs.workflow_run_id }}
-          if_no_artifact_found: ignore
-          allow_forks: true
+          script: |
+            const fs = require('fs');
+            const artifacts = await github.rest.actions.listWorkflowRunArtifacts({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               run_id: ${{ github.event.workflow_run.id }},
+            });
+            const [matchArtifact] = artifacts.data.artifacts.filter((artifact) =>
+              artifact.name == "mypy_primer_diffs");
 
-      - name: Parse pull request number
-        id: pr-number
-        run: |
-          if [[ -f pr-number ]]
-          then
-            echo "pr-number=$(<pr-number)" >> "$GITHUB_OUTPUT"
-          fi
+            const download = await github.rest.actions.downloadArtifact({
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               artifact_id: matchArtifact.id,
+               archive_format: "zip",
+            });
+            fs.writeFileSync("diff.zip", Buffer.from(download.data));
 
-      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
-        name: "Download mypy_primer results"
-        id: download-mypy_primer_diff
-        if: steps.pr-number.outputs.pr-number
+      - run: unzip diff.zip
+      - run: |
+          cat mypy_primer_*.diff | tee fulldiff.txt
+
+      - name: Post comment
+        id: post-comment
+        uses: actions/github-script@v7
         with:
-          name: mypy_primer_diff
-          workflow: mypy_primer.yaml
-          pr: ${{ steps.pr-number.outputs.pr-number }}
-          path: pr/mypy_primer_diff
-          workflow_conclusion: completed
-          if_no_artifact_found: ignore
-          allow_forks: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const MAX_CHARACTERS = 50000
+            const MAX_CHARACTERS_PER_PROJECT = MAX_CHARACTERS / 3
 
-      - name: Generate comment content
-        id: generate-comment
-        if: steps.download-mypy_primer_diff.outputs.found_artifact == 'true'
-        run: |
-          # Guard against malicious mypy_primer results that symlink to a secret
-          # file on this runner
-          if [[ -L pr/mypy_primer_diff/mypy_primer.diff ]]
-          then
-              echo "Error: mypy_primer.diff cannot be a symlink"
-              exit 1
-          fi
+            const fs = require('fs')
+            let data = fs.readFileSync('fulldiff.txt', { encoding: 'utf8' })
 
-          # Note this identifier is used to find the comment to update on
-          # subsequent runs
-          echo '<!-- generated-comment mypy_primer -->' >> comment.txt
+            function truncateIfNeeded(original, maxLength) {
+              if (original.length <= maxLength) {
+                return original
+              }
+              let truncated = original.substring(0, maxLength)
+              // further, remove last line that might be truncated
+              truncated = truncated.substring(0, truncated.lastIndexOf('\n'))
+              let lines_truncated = original.split('\n').length - truncated.split('\n').length
+              return `${truncated}\n\n... (truncated ${lines_truncated} lines) ...`
+            }
 
-          echo '## `mypy_primer` results' >> comment.txt
-          if [ -s "pr/mypy_primer_diff/mypy_primer.diff" ]; then
-            echo '<details>' >> comment.txt
-            echo '<summary>Changes were detected when running on open source projects</summary>' >> comment.txt
-            echo '' >> comment.txt
-            echo '```diff' >> comment.txt
-            cat pr/mypy_primer_diff/mypy_primer.diff >> comment.txt
-            echo '```' >> comment.txt
-            echo '</details>' >> comment.txt
-          else
-            echo 'No ecosystem changes detected ✅' >> comment.txt
-          fi
+            const projects = data.split('\n\n')
+            // don't let one project dominate
+            data = projects.map(project => truncateIfNeeded(project, MAX_CHARACTERS_PER_PROJECT)).join('\n\n')
+            // posting comment fails if too long, so truncate
+            data = truncateIfNeeded(data, MAX_CHARACTERS)
 
-          echo 'comment<<EOF' >> "$GITHUB_OUTPUT"
-          cat comment.txt >> "$GITHUB_OUTPUT"
-          echo 'EOF' >> "$GITHUB_OUTPUT"
+            console.log("Diff from mypy_primer:")
+            console.log(data)
 
-      - name: Find existing comment
-        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e # v3
-        if: steps.generate-comment.outcome == 'success'
-        id: find-comment
+            let body
+            if (data.trim()) {
+              body = 'Diff from [mypy_primer](https://github.com/hauntsaninja/mypy_primer), showing the effect of this PR on open source code:\n```diff\n' + data + '```'
+            } else {
+              body = "According to [mypy_primer](https://github.com/hauntsaninja/mypy_primer), this change doesn't affect type check results on a corpus of open source code. ✅"
+            }
+            const prNumber = parseInt(fs.readFileSync("pr-number", { encoding: "utf8" }))
+            await github.rest.issues.createComment({
+              issue_number: prNumber,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            })
+            return prNumber
+
+      - name: Hide old comments
+        # v0.4.0
+        uses: kanga333/comment-hider@c12bb20b48aeb8fc098e35967de8d4f8018fffdf
         with:
-          issue-number: ${{ steps.pr-number.outputs.pr-number }}
-          comment-author: "github-actions[bot]"
-          body-includes: "<!-- generated-comment mypy_primer -->"
-
-      - name: Create or update comment
-        if: steps.find-comment.outcome == 'success'
-        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043 # v4
-        with:
-          comment-id: ${{ steps.find-comment.outputs.comment-id }}
-          issue-number: ${{ steps.pr-number.outputs.pr-number }}
-          body-path: comment.txt
-          edit-mode: replace
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          leave_visible: 1
+          issue_number: ${{ steps.post-comment.outputs.result }}
