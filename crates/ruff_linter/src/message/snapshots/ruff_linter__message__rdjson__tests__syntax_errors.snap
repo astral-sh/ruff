@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_linter/src/message/rdjson.rs
 expression: content
-snapshot_kind: text
 ---
 {
   "diagnostics": [
@@ -11,7 +10,7 @@ snapshot_kind: text
         "value": null
       },
       "location": {
-        "path": "syntax_errors.py",
+        "path": "/projects/project/syntax_errors.py",
         "range": {
           "end": {
             "column": 1,
@@ -31,7 +30,7 @@ snapshot_kind: text
         "value": null
       },
       "location": {
-        "path": "syntax_errors.py",
+        "path": "/projects/project/syntax_errors.py",
         "range": {
           "end": {
             "column": 1,

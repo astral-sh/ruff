@@ -12,7 +12,7 @@ expression: redact_fingerprint(&content)
         "begin": 1,
         "end": 2
       },
-      "path": "syntax_errors.py"
+      "path": "/projects/project/syntax_errors.py"
     },
     "severity": "major"
   },
@@ -25,7 +25,7 @@ expression: redact_fingerprint(&content)
         "begin": 3,
         "end": 4
       },
-      "path": "syntax_errors.py"
+      "path": "/projects/project/syntax_errors.py"
     },
     "severity": "major"
   }

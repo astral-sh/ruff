@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_linter/src/message/rdjson.rs
 expression: content
-snapshot_kind: text
 ---
 {
   "diagnostics": [
@@ -11,7 +10,7 @@ snapshot_kind: text
         "value": "F401"
       },
       "location": {
-        "path": "fib.py",
+        "path": "/projects/project/fib.py",
         "range": {
           "end": {
             "column": 10,
@@ -46,7 +45,7 @@ snapshot_kind: text
         "value": "F841"
       },
       "location": {
-        "path": "fib.py",
+        "path": "/projects/project/fib.py",
         "range": {
           "end": {
             "column": 6,
@@ -81,7 +80,7 @@ snapshot_kind: text
         "value": "F821"
       },
       "location": {
-        "path": "undef.py",
+        "path": "/projects/project/undef.py",
         "range": {
           "end": {
             "column": 5,
