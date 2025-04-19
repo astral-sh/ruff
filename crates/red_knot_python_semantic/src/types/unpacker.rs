@@ -18,16 +18,22 @@ use super::{TupleType, UnionType};
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db> {
     context: InferContext<'db>,
-    scope: ScopeId<'db>,
+    target_scope: ScopeId<'db>,
+    value_scope: ScopeId<'db>,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
 }
 
 impl<'db> Unpacker<'db> {
-    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        target_scope: ScopeId<'db>,
+        value_scope: ScopeId<'db>,
+    ) -> Self {
         Self {
-            context: InferContext::new(db, scope),
+            context: InferContext::new(db, target_scope),
             targets: FxHashMap::default(),
-            scope,
+            target_scope,
+            value_scope,
         }
     }
 
@@ -43,7 +49,7 @@ impl<'db> Unpacker<'db> {
         );
 
         let value_type = infer_expression_types(self.db(), value.expression())
-            .expression_type(value.scoped_expression_id(self.db(), self.scope));
+            .expression_type(value.scoped_expression_id(self.db(), self.value_scope));
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -79,8 +85,10 @@ impl<'db> Unpacker<'db> {
     ) {
         match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
-                self.targets
-                    .insert(target.scoped_expression_id(self.db(), self.scope), value_ty);
+                self.targets.insert(
+                    target.scoped_expression_id(self.db(), self.target_scope),
+                    value_ty,
+                );
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.unpack_inner(value, value_expr, value_ty);

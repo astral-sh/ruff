@@ -6,7 +6,9 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
-use ruff_python_ast::{self as ast, Alias, Expr, Parameter, ParameterWithDefault, Stmt};
+use ruff_python_ast::{
+    self as ast, Alias, Comprehension, Expr, Parameter, ParameterWithDefault, Stmt,
+};
 
 fn setup_db(project_root: &SystemPath, system: TestSystem) -> anyhow::Result<ProjectDatabase> {
     let project = ProjectMetadata::discover(project_root, &system)?;
@@ -256,6 +258,14 @@ impl SourceOrderVisitor<'_> for PullTypesVisitor<'_> {
         let _ty = expr.inferred_type(&self.model);
 
         source_order::walk_expr(self, expr);
+    }
+
+    fn visit_comprehension(&mut self, comprehension: &Comprehension) {
+        self.visit_expr(&comprehension.iter);
+        self.visit_target(&comprehension.target);
+        for if_expr in &comprehension.ifs {
+            self.visit_expr(if_expr);
+        }
     }
 
     fn visit_parameter(&mut self, parameter: &Parameter) {

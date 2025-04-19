@@ -18,11 +18,12 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AnnotatedAssignmentDefinitionNodeRef,
-    AssignmentDefinitionKind, AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef,
-    Definition, DefinitionCategory, DefinitionKind, DefinitionNodeKey, DefinitionNodeRef,
-    Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionKind, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    StarImportDefinitionNodeRef, TargetKind, WithItemDefinitionKind, WithItemDefinitionNodeRef,
+    AssignmentDefinitionKind, AssignmentDefinitionNodeRef, ComprehensionDefinitionKind,
+    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
+    DefinitionNodeKey, DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionKind, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
+    ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef,
+    TargetKind, WithItemDefinitionKind, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
@@ -850,31 +851,35 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
         // nodes are evaluated in the inner scope.
-        self.add_standalone_expression(&generator.iter);
+        let value = self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
         self.push_scope(scope);
 
-        self.push_assignment(CurrentAssignment::Comprehension {
-            node: generator,
-            first: true,
-        });
-        self.visit_expr(&generator.target);
-        self.pop_assignment();
+        self.add_unpackable_assignment(
+            &Unpackable::Comprehension {
+                node: generator,
+                first: true,
+            },
+            &generator.target,
+            value,
+        );
 
         for expr in &generator.ifs {
             self.visit_expr(expr);
         }
 
         for generator in generators_iter {
-            self.add_standalone_expression(&generator.iter);
+            let value = self.add_standalone_expression(&generator.iter);
             self.visit_expr(&generator.iter);
 
-            self.push_assignment(CurrentAssignment::Comprehension {
-                node: generator,
-                first: false,
-            });
-            self.visit_expr(&generator.target);
-            self.pop_assignment();
+            self.add_unpackable_assignment(
+                &Unpackable::Comprehension {
+                    node: generator,
+                    first: false,
+                },
+                &generator.target,
+                value,
+            );
 
             for expr in &generator.ifs {
                 self.visit_expr(expr);
@@ -933,9 +938,30 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+                if matches!(unpackable, Unpackable::Comprehension { .. }) {
+                    debug_assert_eq!(
+                        self.scopes[self.current_scope()].node().scope_kind(),
+                        ScopeKind::Comprehension
+                    );
+                }
+                // The first iterator of the comprehension is evaluated in the outer scope, while all subsequent
+                // nodes are evaluated in the inner scope.
+                // SAFETY: The current scope is the comprehension, and the comprehension scope must have a parent scope.
+                let value_file_scope =
+                    if let Unpackable::Comprehension { first: true, .. } = unpackable {
+                        self.scope_stack
+                            .iter()
+                            .rev()
+                            .nth(1)
+                            .expect("The comprehension scope must have a parent scope")
+                            .file_scope_id
+                    } else {
+                        self.current_scope()
+                    };
                 let unpack = Some(Unpack::new(
                     self.db,
                     self.file,
+                    value_file_scope,
                     self.current_scope(),
                     // SAFETY: `target` belongs to the `self.module` tree
                     #[allow(unsafe_code)]
@@ -1804,7 +1830,7 @@ where
         let node_key = NodeKey::from_node(expr);
 
         match expr {
-            ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
+            ast::Expr::Name(ast::ExprName { id, ctx, .. }) => {
                 let (is_use, is_definition) = match (ctx, self.current_assignment()) {
                     (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
                         // For augmented assignment, the target expression is also used.
@@ -1867,12 +1893,17 @@ where
                             // implemented.
                             self.add_definition(symbol, named);
                         }
-                        Some(CurrentAssignment::Comprehension { node, first }) => {
+                        Some(CurrentAssignment::Comprehension {
+                            unpack,
+                            node,
+                            first,
+                        }) => {
                             self.add_definition(
                                 symbol,
                                 ComprehensionDefinitionNodeRef {
+                                    unpack,
                                     iterable: &node.iter,
-                                    target: name_node,
+                                    target: expr,
                                     first,
                                     is_async: node.is_async,
                                 },
@@ -2143,14 +2174,37 @@ where
                                 DefinitionKind::WithItem(assignment),
                             );
                         }
-                        Some(CurrentAssignment::Comprehension { .. }) => {
-                            // TODO:
+                        Some(CurrentAssignment::Comprehension {
+                            unpack,
+                            node,
+                            first,
+                        }) => {
+                            // SAFETY: `iter` and `expr` belong to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            let assignment = ComprehensionDefinitionKind {
+                                target_kind: TargetKind::from(unpack),
+                                iterable: unsafe {
+                                    AstNodeRef::new(self.module.clone(), &node.iter)
+                                },
+                                target: unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                                first,
+                                is_async: node.is_async,
+                            };
+                            // Temporarily move to the scope of the method to which the instance attribute is defined.
+                            // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
+                            let scope = self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope");
+                            self.register_attribute_assignment(
+                                object,
+                                attr,
+                                DefinitionKind::Comprehension(assignment),
+                            );
+                            self.scope_stack.push(scope);
                         }
                         Some(CurrentAssignment::AugAssign(_)) => {
                             // TODO:
                         }
                         Some(CurrentAssignment::Named(_)) => {
-                            // TODO:
+                            // A named expression whose target is an attribute is syntactically prohibited
                         }
                         None => {}
                     }
@@ -2244,6 +2298,7 @@ enum CurrentAssignment<'a> {
     Comprehension {
         node: &'a ast::Comprehension,
         first: bool,
+        unpack: Option<(UnpackPosition, Unpack<'a>)>,
     },
     WithItem {
         item: &'a ast::WithItem,
@@ -2257,11 +2312,9 @@ impl CurrentAssignment<'_> {
         match self {
             Self::Assign { unpack, .. }
             | Self::For { unpack, .. }
-            | Self::WithItem { unpack, .. } => unpack.as_mut().map(|(position, _)| position),
-            Self::AnnAssign(_)
-            | Self::AugAssign(_)
-            | Self::Named(_)
-            | Self::Comprehension { .. } => None,
+            | Self::WithItem { unpack, .. }
+            | Self::Comprehension { unpack, .. } => unpack.as_mut().map(|(position, _)| position),
+            Self::AnnAssign(_) | Self::AugAssign(_) | Self::Named(_) => None,
         }
     }
 }
@@ -2316,13 +2369,17 @@ enum Unpackable<'a> {
         item: &'a ast::WithItem,
         is_async: bool,
     },
+    Comprehension {
+        first: bool,
+        node: &'a ast::Comprehension,
+    },
 }
 
 impl<'a> Unpackable<'a> {
     const fn kind(&self) -> UnpackKind {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
-            Unpackable::For(_) => UnpackKind::Iterable,
+            Unpackable::For(_) | Unpackable::Comprehension { .. } => UnpackKind::Iterable,
             Unpackable::WithItem { .. } => UnpackKind::ContextManager,
         }
     }
@@ -2335,6 +2392,11 @@ impl<'a> Unpackable<'a> {
             Unpackable::WithItem { item, is_async } => CurrentAssignment::WithItem {
                 item,
                 is_async: *is_async,
+                unpack,
+            },
+            Unpackable::Comprehension { node, first } => CurrentAssignment::Comprehension {
+                node,
+                first: *first,
                 unpack,
             },
         }

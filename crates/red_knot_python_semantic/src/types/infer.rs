@@ -49,9 +49,9 @@ use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, Definition, DefinitionKind,
-    DefinitionNodeKey, ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
-    WithItemDefinitionKind,
+    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
+    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::symbol::{
@@ -306,7 +306,7 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     let _span =
         tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), ?file).entered();
 
-    let mut unpacker = Unpacker::new(db, unpack.scope(db));
+    let mut unpacker = Unpacker::new(db, unpack.target_scope(db), unpack.value_scope(db));
     unpacker.unpack(unpack.target(db), unpack.value(db));
     unpacker.finish()
 }
@@ -946,13 +946,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_named_expression_definition(named_expression.node(), definition);
             }
             DefinitionKind::Comprehension(comprehension) => {
-                self.infer_comprehension_definition(
-                    comprehension.iterable(),
-                    comprehension.target(),
-                    comprehension.is_first(),
-                    comprehension.is_async(),
-                    definition,
-                );
+                self.infer_comprehension_definition(comprehension, definition);
             }
             DefinitionKind::VariadicPositionalParameter(parameter) => {
                 self.infer_variadic_positional_parameter_definition(parameter, definition);
@@ -1937,11 +1931,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         for item in items {
             let target = item.optional_vars.as_deref();
             if let Some(target) = target {
-                self.infer_target(target, &item.context_expr, |db, ctx_manager_ty| {
+                self.infer_target(target, &item.context_expr, |builder, context_expr| {
                     // TODO: `infer_with_statement_definition` reports a diagnostic if `ctx_manager_ty` isn't a context manager
                     //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
                     //  `with not_context_manager as a.x: ...
-                    ctx_manager_ty.enter(db)
+                    builder
+                        .infer_standalone_expression(context_expr)
+                        .enter(builder.db())
                 });
             } else {
                 // Call into the context expression inference to validate that it evaluates
@@ -2347,7 +2343,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = assignment;
 
         for target in targets {
-            self.infer_target(target, value, |_, ty| ty);
+            self.infer_target(target, value, |builder, value_expr| {
+                builder.infer_standalone_expression(value_expr)
+            });
         }
     }
 
@@ -2357,23 +2355,16 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// targets (unpacking). If `target` is an attribute expression, we check that the assignment
     /// is valid. For 'target's that are definitions, this check happens elsewhere.
     ///
-    /// The `to_assigned_ty` function is used to convert the inferred type of the `value` expression
-    /// to the type that is eventually assigned to the `target`.
-    ///
-    /// # Panics
-    ///
-    /// If the `value` is not a standalone expression.
-    fn infer_target<F>(&mut self, target: &ast::Expr, value: &ast::Expr, to_assigned_ty: F)
+    /// The `infer_value_expr` function is used to infer the type of the `value` expression which
+    /// are not `Name` expressions. The returned type is the one that is eventually assigned to the
+    /// `target`.
+    fn infer_target<F>(&mut self, target: &ast::Expr, value: &ast::Expr, infer_value_expr: F)
     where
-        F: Fn(&'db dyn Db, Type<'db>) -> Type<'db>,
+        F: Fn(&mut TypeInferenceBuilder<'db>, &ast::Expr) -> Type<'db>,
     {
         let assigned_ty = match target {
             ast::Expr::Name(_) => None,
-            _ => {
-                let value_ty = self.infer_standalone_expression(value);
-
-                Some(to_assigned_ty(self.db(), value_ty))
-            }
+            _ => Some(infer_value_expr(self, value)),
         };
         self.infer_target_impl(target, assigned_ty);
     }
@@ -3126,11 +3117,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = for_statement;
 
-        self.infer_target(target, iter, |db, iter_ty| {
+        self.infer_target(target, iter, |builder, iter_expr| {
             // TODO: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
-            iter_ty.iterate(db)
+            builder
+                .infer_standalone_expression(iter_expr)
+                .iterate(builder.db())
         });
 
         self.infer_body(body);
@@ -3959,15 +3952,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = comprehension;
 
-        if !is_first {
-            self.infer_standalone_expression(iter);
-        }
-        // TODO more complex assignment targets
-        if let ast::Expr::Name(name) = target {
-            self.infer_definition(name);
-        } else {
-            self.infer_expression(target);
-        }
+        self.infer_target(target, iter, |builder, iter_expr| {
+            // TODO: `infer_comprehension_definition` reports a diagnostic if `iter_ty` isn't iterable
+            //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
+            //  `[... for a.x in not_iterable]
+            if is_first {
+                infer_same_file_expression_type(builder.db(), builder.index.expression(iter_expr))
+            } else {
+                builder.infer_standalone_expression(iter_expr)
+            }
+            .iterate(builder.db())
+        });
         for expr in ifs {
             self.infer_expression(expr);
         }
@@ -3975,12 +3970,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_comprehension_definition(
         &mut self,
-        iterable: &ast::Expr,
-        target: &ast::ExprName,
-        is_first: bool,
-        is_async: bool,
+        comprehension: &ComprehensionDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
+        let iterable = comprehension.iterable();
+        let target = comprehension.target();
+
         let expression = self.index.expression(iterable);
         let result = infer_expression_types(self.db(), expression);
 
@@ -3990,7 +3985,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // (2) We must *not* call `self.extend()` on the result of the type inference,
         //     because `ScopedExpressionId`s are only meaningful within their own scope, so
         //     we'd add types for random wrong expressions in the current scope
-        let iterable_type = if is_first {
+        let iterable_type = if comprehension.is_first() {
             let lookup_scope = self
                 .index
                 .parent_scope_id(self.scope().file_scope_id(self.db()))
@@ -4002,14 +3997,26 @@ impl<'db> TypeInferenceBuilder<'db> {
             result.expression_type(iterable.scoped_expression_id(self.db(), self.scope()))
         };
 
-        let target_type = if is_async {
+        let target_type = if comprehension.is_async() {
             // TODO: async iterables/iterators! -- Alex
             todo_type!("async iterables/iterators")
         } else {
-            iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                err.fallback_element_type(self.db())
-            })
+            match comprehension.target_kind() {
+                TargetKind::Sequence(unpack_position, unpack) => {
+                    let unpacked = infer_unpack_types(self.db(), unpack);
+                    if unpack_position == UnpackPosition::First {
+                        self.context.extend(unpacked.diagnostics());
+                    }
+                    let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
+                    unpacked.expression_type(target_ast_id)
+                }
+                TargetKind::NameOrAttribute => {
+                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                        err.fallback_element_type(self.db())
+                    })
+                }
+            }
         };
 
         self.types.expressions.insert(
