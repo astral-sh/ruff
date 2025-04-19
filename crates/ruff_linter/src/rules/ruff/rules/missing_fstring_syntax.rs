@@ -53,6 +53,11 @@ use crate::Locator;
 /// print(f"Hello {name}! It is {day_of_week} today!")
 /// ```
 ///
+/// ## Fix safety
+///
+/// The fix is always marked as unsafe, because it is possible to find a string literal which
+/// doesn't fall in one of the cases listed in the `details` section.
+///
 /// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [gettext]: https://docs.python.org/3/library/gettext.html
 /// [FastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/
