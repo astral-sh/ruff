@@ -295,7 +295,7 @@ impl MainLoop {
 
                             writeln!(
                                 stdout,
-                                "Found {} diagnostic{}",
+                                "Founded {} diagnostic{}",
                                 diagnostics_count,
                                 if diagnostics_count > 1 { "s" } else { "" }
                             )?;
