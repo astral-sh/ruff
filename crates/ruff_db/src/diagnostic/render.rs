@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use colored::Colorize;
+
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
     Renderer as AnnotateRenderer, Snippet as AnnotateSnippet,
@@ -60,13 +62,17 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if matches!(self.config.format, DiagnosticFormat::Concise) {
             match self.diag.severity() {
-                Severity::Info => f.write_str("info")?,
-                Severity::Warning => f.write_str("warning")?,
-                Severity::Error => f.write_str("error")?,
-                Severity::Fatal => f.write_str("fatal")?,
+                Severity::Info => write!(f, "{}", "info".bright_cyan().bold())?,
+                Severity::Warning => write!(f, "{}", "warning".bright_yellow().bold())?,
+                Severity::Error => write!(f, "{}", "error".bright_red().bold())?,
+                Severity::Fatal => write!(f, "{}", "fatal".bright_red().bold())?,
             }
 
-            write!(f, "[{rule}]", rule = self.diag.id())?;
+            write!(
+                f,
+                "[{rule}]",
+                rule = self.diag.id().to_string().bright_white().bold()
+            )?;
             if let Some(span) = self.diag.primary_span() {
                 write!(f, " {path}", path = self.resolver.path(span.file()))?;
                 if let Some(range) = span.range() {
@@ -76,7 +82,11 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 }
                 write!(f, ":")?;
             }
-            return writeln!(f, " {}", self.diag.concise_message());
+            return writeln!(
+                f,
+                " {}",
+                self.diag.concise_message().to_string().bright_red().bold()
+            );
         }
 
         let resolved = Resolved::new(&self.resolver, self.diag);
