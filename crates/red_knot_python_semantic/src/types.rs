@@ -10,6 +10,7 @@ use diagnostic::{
     CALL_POSSIBLY_UNBOUND_METHOD, INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
+use ruff_db::diagnostic::create_semantic_syntax_diagnostic;
 use ruff_db::files::{File, FileRange};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -85,6 +86,10 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
     for scope_id in index.scope_ids() {
         let result = infer_scope_types(db, scope_id);
         diagnostics.extend(result.diagnostics());
+    }
+
+    for error in index.semantic_syntax_errors() {
+        diagnostics.push(create_semantic_syntax_diagnostic(file, error));
     }
 
     check_suppressions(db, file, &mut diagnostics);

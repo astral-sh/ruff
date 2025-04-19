@@ -1367,7 +1367,7 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 {
                     if !seen.insert(ComparableExpr::from(key)) {
                         let key_range = key.range();
-                        let duplicate_key = self.ctx.source()[key_range].to_string();
+                        let duplicate_key = self.ctx.with_source(|src| src[key_range].to_string());
                         // test_ok duplicate_match_key_attr
                         // match x:
                         //     case {x.a: 1, x.a: 2}: ...
@@ -1593,8 +1593,12 @@ pub trait SemanticSyntaxContext {
     /// The target Python version for detecting backwards-incompatible syntax changes.
     fn python_version(&self) -> PythonVersion;
 
-    /// Returns the source text under analysis.
-    fn source(&self) -> &str;
+    /// Call `f` with the source text under analysis and return its result.
+    ///
+    /// This somewhat awkward API allows for cases where retrieving the source text requires an
+    /// intermediate reference that can't be returned directly (such as red-knot's `source_text`
+    /// function).
+    fn with_source<T>(&self, f: impl FnOnce(&str) -> T) -> T;
 
     /// Return the [`TextRange`] at which a name is declared as `global` in the current scope.
     fn global(&self, name: &str) -> Option<TextRange>;

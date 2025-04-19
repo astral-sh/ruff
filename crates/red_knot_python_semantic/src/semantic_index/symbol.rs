@@ -259,6 +259,10 @@ impl ScopeKind {
         )
     }
 
+    pub(crate) fn is_module(self) -> bool {
+        matches!(self, ScopeKind::Module)
+    }
+
     pub(crate) fn is_class(self) -> bool {
         matches!(self, ScopeKind::Class)
     }

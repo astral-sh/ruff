@@ -5,6 +5,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
 
+use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use salsa::Update;
@@ -175,6 +176,9 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// Map of all of the eager bindings that appear in this file.
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
+
+    /// List of all semantic syntax errors in this file.
+    semantic_syntax_errors: Vec<SemanticSyntaxError>,
 }
 
 impl<'db> SemanticIndex<'db> {
@@ -398,6 +402,10 @@ impl<'db> SemanticIndex<'db> {
             Some(bindings) => EagerBindingsResult::Found(bindings),
             None => EagerBindingsResult::NotFound,
         }
+    }
+
+    pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
+        &self.semantic_syntax_errors
     }
 }
 

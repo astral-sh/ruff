@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
@@ -5,10 +6,15 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
+use ruff_db::source::source_text;
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_python_parser::semantic_errors::{
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+};
+use ruff_text_size::TextRange;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
@@ -32,8 +38,8 @@ use crate::semantic_index::predicate::{
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
-    SymbolTableBuilder,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
+    ScopedSymbolId, SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
     EagerBindingsKey, FlowSnapshot, ScopedEagerBindingsId, UseDefMapBuilder,
@@ -43,7 +49,7 @@ use crate::semantic_index::visibility_constraints::{
 };
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
-use crate::Db;
+use crate::{Db, Program};
 
 mod except_handlers;
 
@@ -84,6 +90,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
+    seen_module_docstring_boundary: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -98,6 +105,9 @@ pub(super) struct SemanticIndexBuilder<'db> {
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
+    semantic_checker: SemanticSyntaxChecker,
+    /// Errors collected by the `semantic_checker`.
+    semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -113,6 +123,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
+            seen_module_docstring_boundary: false,
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -129,6 +140,9 @@ impl<'db> SemanticIndexBuilder<'db> {
             imported_modules: FxHashSet::default(),
 
             eager_bindings: FxHashMap::default(),
+
+            semantic_checker: SemanticSyntaxChecker::default(),
+            semantic_syntax_errors: RefCell::default(),
         };
 
         builder.push_scope_with_parent(
@@ -1051,7 +1065,14 @@ impl<'db> SemanticIndexBuilder<'db> {
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             eager_bindings: self.eager_bindings,
+            semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
         }
+    }
+
+    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
+        let mut checker = std::mem::take(&mut self.semantic_checker);
+        f(&mut checker, self);
+        self.semantic_checker = checker;
     }
 }
 
@@ -1060,6 +1081,10 @@ where
     'ast: 'db,
 {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+
+        self.seen_module_docstring_boundary = true;
+
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
                 let ast::StmtFunctionDef {
@@ -1823,6 +1848,8 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
         self.current_ast_ids().record_expression(expr);
@@ -2279,6 +2306,104 @@ where
         }
 
         self.current_match_case.as_mut().unwrap().index += 1;
+    }
+}
+
+impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
+    fn seen_docstring_boundary(&self) -> bool {
+        self.seen_module_docstring_boundary
+    }
+
+    fn future_annotations_or_stub(&self) -> bool {
+        self.has_future_annotations
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        Program::get(self.db).python_version(self.db)
+    }
+
+    fn with_source<T>(&self, f: impl FnOnce(&str) -> T) -> T {
+        let src = source_text(self.db.upcast(), self.file);
+        f(src.as_str())
+    }
+
+    // TODO(brent) handle looking up `global` bindings
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
+    }
+
+    fn in_async_context(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            match scope.kind() {
+                ScopeKind::Class | ScopeKind::Lambda => return false,
+                ScopeKind::Function => {
+                    if let Some(f) = scope.node().as_function() {
+                        return f.is_async;
+                    }
+                }
+                ScopeKind::Comprehension
+                | ScopeKind::Module
+                | ScopeKind::TypeAlias
+                | ScopeKind::Annotation => {}
+            }
+        }
+        false
+    }
+
+    fn in_await_allowed_context(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            match scope.kind() {
+                ScopeKind::Class => return false,
+                ScopeKind::Function | ScopeKind::Lambda => return true,
+                ScopeKind::Comprehension
+                | ScopeKind::Module
+                | ScopeKind::TypeAlias
+                | ScopeKind::Annotation => {}
+            }
+        }
+        false
+    }
+
+    fn in_sync_comprehension(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            let generators = match scope.node() {
+                NodeWithScopeKind::ListComprehension(node) => &node.generators,
+                NodeWithScopeKind::SetComprehension(node) => &node.generators,
+                NodeWithScopeKind::DictComprehension(node) => &node.generators,
+                _ => continue,
+            };
+            if generators.iter().all(|gen| !gen.is_async) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn in_module_scope(&self) -> bool {
+        self.scopes[self.current_scope()].kind().is_module()
+    }
+
+    fn in_function_scope(&self) -> bool {
+        let kind = self.scopes[self.current_scope()].kind();
+        matches!(kind, ScopeKind::Function | ScopeKind::Lambda)
+    }
+
+    fn in_generator_scope(&self) -> bool {
+        matches!(
+            self.scopes[self.current_scope()].node(),
+            NodeWithScopeKind::GeneratorExpression(_)
+        )
+    }
+
+    fn in_notebook(&self) -> bool {
+        source_text(self.db.upcast(), self.file).is_notebook()
+    }
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        self.semantic_syntax_errors.borrow_mut().push(error);
     }
 }
 
