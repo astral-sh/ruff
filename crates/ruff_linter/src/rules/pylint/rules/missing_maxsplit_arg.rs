@@ -40,7 +40,7 @@ impl Violation for MissingMaxsplitArg {
 /// PLC0207
 pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &ast::Expr, slice: &ast::Expr, expr: &ast::Expr) {
     // Check the sliced expression is a function
-    let ast::Expr::Call(ast::ExprCall { func, arguments: ast::Arguments { args, keywords, .. }, .. }) = value else {
+    let ast::Expr::Call(ast::ExprCall { func, arguments, .. }) = value else {
         return;
     };
 
@@ -98,30 +98,18 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &ast::Expr, slice: 
         return;
     }
 
-    // Check the function does not have kwarg maxsplit=1
-    if keywords.iter().any(|kw| {
-        kw.arg.as_deref() == Some("maxsplit")
-            && matches!(
-                kw.value,
-                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(ast::Int::ONE),
-                    ..
-                })
-            )
-    }) {
-        return;
-    }
-
-    // Check the function does not have arg[1]=1
-    if matches!(
-        args.get(1),
-        Some(ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-            value: ast::Number::Int(ast::Int::ONE),
-            ..
-        }))
-    ) {
-        return;
-    }
+    // Check the function does not have kwarg maxsplit=1 or arg[1]=1
+    if let Some(maxsplit_arg) = arguments.find_argument_value("maxsplit", 1) {
+        if matches!(
+            maxsplit_arg,
+            ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                value: ast::Number::Int(ast::Int::ONE),
+                ..
+            })
+        ) {
+            return;
+        }
+    };
 
     checker.report_diagnostic(Diagnostic::new(MissingMaxsplitArg, expr.range()));
 }
