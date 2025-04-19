@@ -46,6 +46,11 @@ use crate::importer::ImportRequest;
 /// functools.reduce(operator.iadd, lists, [])
 /// ```
 ///
+/// ## Fix safety
+///
+/// The rule's fix is marked as unsafe because it could convert lists into iterators, and it can
+/// delete comments in case of a multiline expression.
+///
 /// ## References
 /// - [_How Not to Flatten a List of Lists in Python_](https://mathieularose.com/how-not-to-flatten-a-list-of-lists-in-python)
 /// - [_How do I make a flat list out of a list of lists?_](https://stackoverflow.com/questions/952914/how-do-i-make-a-flat-list-out-of-a-list-of-lists/953097#953097)
