@@ -189,7 +189,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "C0132") => (RuleGroup::Stable, rules::pylint::rules::TypeParamNameMismatch),
         (Pylint, "C0205") => (RuleGroup::Stable, rules::pylint::rules::SingleStringSlots),
         (Pylint, "C0206") => (RuleGroup::Stable, rules::pylint::rules::DictIndexMissingItems),
-        (Pylint, "C0207") => (RuleGroup::Stable, rules::pylint::rules::MissingMaxsplitArg),
+        (Pylint, "C0207") => (RuleGroup::Preview, rules::pylint::rules::MissingMaxsplitArg),
         (Pylint, "C0208") => (RuleGroup::Stable, rules::pylint::rules::IterationOverSet),
         (Pylint, "C0414") => (RuleGroup::Stable, rules::pylint::rules::UselessImportAlias),
         (Pylint, "C0415") => (RuleGroup::Preview, rules::pylint::rules::ImportOutsideTopLevel),
