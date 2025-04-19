@@ -73,3 +73,42 @@ PT032.py:31:5: PT032 [*] Use context-manager form of `pytest.raises()`
 31    |-    pytest.raises(func=func, expected_exception=ZeroDivisionError)
    31 |+    with pytest.raises(ZeroDivisionError):
    32 |+        func()
+32 33 | 
+33 34 | 
+34 35 | def test_error_multi_statement():
+
+PT032.py:35:15: PT032 [*] Use context-manager form of `pytest.raises()`
+   |
+34 | def test_error_multi_statement():
+35 |     excinfo = pytest.raises(ValueError, int, "hello")
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT032
+36 |     assert excinfo.match("^invalid literal")
+   |
+   = help: Use `pytest.raises()` as a context-manager
+
+ℹ Unsafe fix
+32 32 | 
+33 33 | 
+34 34 | def test_error_multi_statement():
+35    |-    excinfo = pytest.raises(ValueError, int, "hello")
+   35 |+    with pytest.raises(ValueError) as excinfo:
+   36 |+        int("hello")
+36 37 |     assert excinfo.match("^invalid literal")
+37 38 | 
+38 39 | 
+
+PT032.py:40:5: PT032 [*] Use context-manager form of `pytest.raises()`
+   |
+39 | def test_error_lambda():
+40 |     pytest.raises(ZeroDivisionError, lambda: 1 / 0)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT032
+   |
+   = help: Use `pytest.raises()` as a context-manager
+
+ℹ Unsafe fix
+37 37 | 
+38 38 | 
+39 39 | def test_error_lambda():
+40    |-    pytest.raises(ZeroDivisionError, lambda: 1 / 0)
+   40 |+    with pytest.raises(ZeroDivisionError):
+   41 |+        (lambda: 1 / 0)()

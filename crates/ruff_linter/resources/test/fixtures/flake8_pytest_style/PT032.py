@@ -29,3 +29,12 @@ def test_error_assign():
 
 def test_error_kwargs():
     pytest.raises(func=func, expected_exception=ZeroDivisionError)
+
+
+def test_error_multi_statement():
+    excinfo = pytest.raises(ValueError, int, "hello")
+    assert excinfo.match("^invalid literal")
+
+
+def test_error_lambda():
+    pytest.raises(ZeroDivisionError, lambda: 1 / 0)
