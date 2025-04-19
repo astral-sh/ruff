@@ -1,5 +1,5 @@
-use anyhow::{bail, Context};
-use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
+use itertools::{Either, Itertools};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtExpr, StmtWith, WithItem};
@@ -188,8 +188,7 @@ impl Violation for PytestRaisesWithoutException {
 pub(crate) struct DeprecatedPytestRaisesCallableForm;
 
 impl Violation for DeprecatedPytestRaisesCallableForm {
-    const FIX_AVAILABILITY: ruff_diagnostics::FixAvailability =
-        ruff_diagnostics::FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -197,7 +196,7 @@ impl Violation for DeprecatedPytestRaisesCallableForm {
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Rewrite `pytest.raises()` in a context-manager form".to_string())
+        Some("Use `pytest.raises()` as a context-manager".to_string())
     }
 }
 
@@ -238,8 +237,8 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
             if !has_leading_content(stmt.start(), checker.source())
                 && !has_trailing_content(stmt.end(), checker.source())
             {
-                let generated = try_fix_legacy_raises(stmt, checker.semantic()).map(|with| {
-                    let generated = checker.generator().stmt(&Stmt::With(with));
+                if let Some(with_stmt) = try_fix_legacy_raises(stmt, checker.semantic()) {
+                    let generated = checker.generator().stmt(&Stmt::With(with_stmt));
                     let first_line = checker.locator().line_str(stmt.start());
                     let indentation = leading_indentation(first_line);
                     let mut indented = String::new();
@@ -252,14 +251,12 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
                             indented.push_str(&line);
                         }
                     }
-                    indented
-                });
-                diagnostic.try_set_fix(|| {
-                    Ok(Fix::unsafe_edit(Edit::range_replacement(
-                        generated?,
+
+                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                        indented,
                         stmt.range(),
-                    )))
-                });
+                    )));
+                }
             }
             checker.report_diagnostic(diagnostic);
         }
@@ -352,12 +349,10 @@ fn exception_needs_match(checker: &Checker, exception: &Expr) {
     }
 }
 
-fn try_fix_legacy_raises(stmt: &Stmt, semantic: &SemanticModel) -> anyhow::Result<StmtWith> {
+fn try_fix_legacy_raises(stmt: &Stmt, semantic: &SemanticModel) -> Option<StmtWith> {
     match stmt {
         Stmt::Expr(StmtExpr { value, .. }) => {
-            let Some(call) = value.as_call_expr() else {
-                bail!("Expected call expression")
-            };
+            let call = value.as_call_expr()?;
 
             if is_pytest_raises(&call.func, semantic) {
                 generate_with_raises(call, None, None)
@@ -367,8 +362,7 @@ fn try_fix_legacy_raises(stmt: &Stmt, semantic: &SemanticModel) -> anyhow::Resul
                     .as_attribute_expr()
                     .filter(|expr_attribute| &expr_attribute.attr == "match")
                     .and_then(|expr_attribute| expr_attribute.value.as_call_expr())
-                    .filter(|inner_call| is_pytest_raises(&inner_call.func, semantic))
-                    .context("Expected call to `match` on the result of `pytest.raises`")?;
+                    .filter(|inner_call| is_pytest_raises(&inner_call.func, semantic))?;
                 generate_with_raises(inner_raises_call, call.arguments.args.first(), None)
             }
         }
@@ -378,19 +372,18 @@ fn try_fix_legacy_raises(stmt: &Stmt, semantic: &SemanticModel) -> anyhow::Resul
             value,
         }) => {
             let [target] = targets.as_slice() else {
-                bail!("Expected one assignment target")
+                return None;
             };
 
             let raises_call = value
                 .as_call_expr()
-                .filter(|call| is_pytest_raises(&call.func, semantic))
-                .context("Expected call to `pytest.raises`")?;
+                .filter(|call| is_pytest_raises(&call.func, semantic))?;
 
             let optional_vars = Some(target);
             let match_call = None;
             generate_with_raises(raises_call, match_call, optional_vars)
         }
-        _ => bail!("Expected direct call or assign statement"),
+        _ => None,
     }
 }
 
@@ -398,24 +391,14 @@ fn generate_with_raises(
     legacy_raises_call: &ast::ExprCall,
     match_arg: Option<&Expr>,
     optional_vars: Option<&Expr>,
-) -> anyhow::Result<StmtWith> {
-    let expected_exception = match legacy_raises_call
+) -> Option<StmtWith> {
+    let expected_exception = legacy_raises_call
         .arguments
-        .find_argument("expected_exception", 0)
-        .context("Expected `expected_exception` argument in the call")?
-    {
-        ast::ArgOrKeyword::Arg(arg) => arg,
-        ast::ArgOrKeyword::Keyword(kw) => &kw.value,
-    };
+        .find_argument_value("expected_exception", 0)?;
 
-    let func = match legacy_raises_call
+    let func = legacy_raises_call
         .arguments
-        .find_argument("func", 1)
-        .context("Expected `func` argument in the call")?
-    {
-        ast::ArgOrKeyword::Arg(arg) => arg,
-        ast::ArgOrKeyword::Keyword(kw) => &kw.value,
-    };
+        .find_argument_value("func", 1)?;
 
     let raises_call = ast::ExprCall {
         range: TextRange::default(),
@@ -436,21 +419,16 @@ fn generate_with_raises(
         },
     };
 
-    let func_args = legacy_raises_call
+    let (func_args, func_keywords): (Vec<_>, Vec<_>) = legacy_raises_call
         .arguments
-        .args
-        .iter()
-        .filter(|&arg| arg != expected_exception && arg != func)
-        .map(Expr::clone)
-        .collect();
-
-    let func_keywords = legacy_raises_call
-        .arguments
-        .keywords
-        .iter()
-        .filter(|&keyword| &keyword.value != expected_exception && &keyword.value != func)
-        .map(ast::Keyword::clone)
-        .collect();
+        .arguments_source_order()
+        .skip(2)
+        .partition_map(|arg_or_keyword| match arg_or_keyword {
+            ast::ArgOrKeyword::Arg(expr) => Either::Left(expr.clone()),
+            ast::ArgOrKeyword::Keyword(keyword) => Either::Right(keyword.clone()),
+        });
+    let func_args = func_args.into_boxed_slice();
+    let func_keywords = func_keywords.into_boxed_slice();
 
     let func_call = ast::ExprCall {
         range: TextRange::default(),
@@ -462,7 +440,7 @@ fn generate_with_raises(
         },
     };
 
-    Ok(StmtWith {
+    Some(StmtWith {
         range: TextRange::default(),
         is_async: false,
         items: vec![WithItem {

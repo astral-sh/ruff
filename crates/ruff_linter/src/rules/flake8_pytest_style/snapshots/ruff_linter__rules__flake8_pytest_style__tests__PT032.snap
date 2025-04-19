@@ -7,7 +7,7 @@ PT032.py:19:5: PT032 [*] Use context-manager form of `pytest.raises()`
 19 |     pytest.raises(ZeroDivisionError, func, 1, b=0)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT032
    |
-   = help: Rewrite `pytest.raises()` in a context-manager form
+   = help: Use `pytest.raises()` as a context-manager
 
 ℹ Unsafe fix
 16 16 | 
@@ -26,7 +26,7 @@ PT032.py:23:5: PT032 [*] Use context-manager form of `pytest.raises()`
 23 |     pytest.raises(ZeroDivisionError, func, 1, b=0).match("division by zero")
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT032
    |
-   = help: Rewrite `pytest.raises()` in a context-manager form
+   = help: Use `pytest.raises()` as a context-manager
 
 ℹ Unsafe fix
 20 20 | 
@@ -45,7 +45,7 @@ PT032.py:27:15: PT032 [*] Use context-manager form of `pytest.raises()`
 27 |     excinfo = pytest.raises(ZeroDivisionError, func, 1, b=0)
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT032
    |
-   = help: Rewrite `pytest.raises()` in a context-manager form
+   = help: Use `pytest.raises()` as a context-manager
 
 ℹ Unsafe fix
 24 24 | 
@@ -64,7 +64,7 @@ PT032.py:31:5: PT032 [*] Use context-manager form of `pytest.raises()`
 31 |     pytest.raises(func=func, expected_exception=ZeroDivisionError)
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT032
    |
-   = help: Rewrite `pytest.raises()` in a context-manager form
+   = help: Use `pytest.raises()` as a context-manager
 
 ℹ Unsafe fix
 28 28 | 
