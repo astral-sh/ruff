@@ -47,7 +47,7 @@ use crate::Locator;
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-/// 
+///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe because comments associated with the
 /// exception argument may not be reliably matched to their original code
@@ -107,7 +107,7 @@ impl Violation for RawStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-/// 
+///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe because comments associated with the
 /// exception argument may not be reliably matched to their original code
@@ -168,7 +168,7 @@ impl Violation for FStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
-/// 
+///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe because comments associated with the
 /// exception argument may not be reliably matched to their original code
