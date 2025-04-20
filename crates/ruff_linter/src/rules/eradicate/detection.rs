@@ -55,7 +55,10 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
-static HASH_NUMBER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"#\d").unwrap());
+// Regex that matches references to Jira issues, github/gitlab issues (#123), gitlab merge requests (!123)
+// and others that follow this format.
+static ISSUE_REFERENCE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"([A-Z][A-Z]+-|#|!)\d+").unwrap());
 
 static POSITIVE_CASES: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
@@ -102,8 +105,8 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
         return false;
     }
 
-    // Ignore non-comment related hashes (e.g., "# Issue #999").
-    if HASH_NUMBER.is_match(line) {
+    // Ignore lines with references to issues.
+    if ISSUE_REFERENCE.is_match(line) {
         return false;
     }
 
@@ -155,6 +158,8 @@ mod tests {
             "# Issue #999: This is not code",
             &[]
         ));
+        assert!(!comment_contains_code("# See: PROJ-999", &[]));
+        assert!(!comment_contains_code("# See !999: This is not code", &[]));
         assert!(!comment_contains_code("# mypy: allow-untyped-calls", &[]));
         assert!(!comment_contains_code(
             "# SPDX-License-Identifier: MIT",
