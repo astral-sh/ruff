@@ -34,7 +34,7 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 /// async def func():
 ///     await trio.sleep_forever()
 /// ```
-/// 
+///
 /// ## Fix safety
 ///
 /// This fix is unsafe because it changes a finite sleep to an indefinite one.
