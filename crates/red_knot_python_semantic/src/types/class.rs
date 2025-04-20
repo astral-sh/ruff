@@ -10,7 +10,9 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters};
-use crate::types::{CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature};
+use crate::types::{
+    CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
+};
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{

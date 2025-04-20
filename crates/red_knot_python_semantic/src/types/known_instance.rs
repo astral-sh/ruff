@@ -365,4 +365,8 @@ impl<'db> KnownInstanceType<'db> {
             | Self::CallableTypeOf => module.is_knot_extensions(),
         }
     }
+
+    pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.class().to_class_literal(db)
+    }
 }

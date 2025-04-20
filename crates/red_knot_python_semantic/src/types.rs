@@ -465,7 +465,8 @@ pub enum Type<'db> {
     GenericAlias(GenericAlias<'db>),
     /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
     SubclassOf(SubclassOfType<'db>),
-    /// The set of Python objects with the given class in their __class__'s method resolution order
+    /// The set of Python objects with the given class in their __class__'s method resolution order.
+    /// Construct this variant using the `Type::instance` constructor function.
     Instance(InstanceType<'db>),
     /// A single Python object that requires special treatment in the type system
     KnownInstance(KnownInstanceType<'db>),
@@ -695,10 +696,6 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub const fn is_instance(&self) -> bool {
-        matches!(self, Type::Instance(..))
-    }
-
     pub const fn is_property_instance(&self) -> bool {
         matches!(self, Type::PropertyInstance(..))
     }
@@ -797,13 +794,6 @@ impl<'db> Type<'db> {
     pub fn expect_int_literal(self) -> i64 {
         self.into_int_literal()
             .expect("Expected a Type::IntLiteral variant")
-    }
-
-    pub const fn into_instance(self) -> Option<InstanceType<'db>> {
-        match self {
-            Type::Instance(instance_type) => Some(instance_type),
-            _ => None,
-        }
     }
 
     pub const fn into_known_instance(self) -> Option<KnownInstanceType<'db>> {
@@ -1901,12 +1891,7 @@ impl<'db> Type<'db> {
                 other.is_disjoint_from(db, KnownClass::ModuleType.to_instance(db))
             }
 
-            (Type::Instance(left_instance), Type::Instance(right_instance)) => {
-                let left_class = left_instance.class();
-                let right_class = right_instance.class();
-                (left_class.is_final(db) && !left_class.is_subclass_of(db, right_class))
-                    || (right_class.is_final(db) && !right_class.is_subclass_of(db, left_class))
-            }
+            (Type::Instance(left), Type::Instance(right)) => left.is_disjoint_from(db, right),
 
             (Type::Tuple(tuple), Type::Tuple(other_tuple)) => {
                 let self_elements = tuple.elements(db);
@@ -2085,10 +2070,7 @@ impl<'db> Type<'db> {
                 false
             }
             Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => false,
-            Type::Instance(instance) => instance
-                .class()
-                .known(db)
-                .is_some_and(KnownClass::is_singleton),
+            Type::Instance(instance) => instance.is_singleton(db),
             Type::PropertyInstance(_) => false,
             Type::Tuple(..) => {
                 // The empty tuple is a singleton on CPython and PyPy, but not on other Python
@@ -2160,10 +2142,7 @@ impl<'db> Type<'db> {
                 .iter()
                 .all(|elem| elem.is_single_valued(db)),
 
-            Type::Instance(instance) => instance
-                .class()
-                .known(db)
-                .is_some_and(KnownClass::is_single_valued),
+            Type::Instance(instance) => instance.is_single_valued(db),
 
             Type::BoundSuper(_) => {
                 // At runtime two super instances never compare equal, even if their arguments are identical.
@@ -4633,8 +4612,8 @@ impl<'db> Type<'db> {
     pub fn to_meta_type(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Type::Never => Type::Never,
-            Type::Instance(instance) => SubclassOfType::from(db, instance.class()),
-            Type::KnownInstance(known_instance) => known_instance.class().to_class_literal(db),
+            Type::Instance(instance) => instance.to_meta_type(db),
+            Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::BooleanLiteral(_) => KnownClass::Bool.to_class_literal(db),
