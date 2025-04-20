@@ -13,5 +13,6 @@ pub fn is_feature_name(name: &str) -> bool {
             | "barry_as_FLUFL"
             | "generator_stop"
             | "annotations"
+            | "braces" // Not in `all_feature_names`, but we raise a Syntax Error for this instead
     )
 }
