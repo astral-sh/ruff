@@ -1,0 +1,43 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/from_future_import_braces.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..30,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    range: 0..29,
+                    module: Some(
+                        Identifier {
+                            id: Name("__future__"),
+                            range: 5..15,
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 23..29,
+                            name: Identifier {
+                                id: Name("braces"),
+                                range: 23..29,
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                },
+            ),
+        ],
+    },
+)
+```
+## Semantic Syntax Errors
+
+  |
+1 | from __future__ import braces
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: not a chance
+  |

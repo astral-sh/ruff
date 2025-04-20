@@ -55,9 +55,26 @@ impl SemanticSyntaxChecker {
 
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
-            Stmt::ImportFrom(StmtImportFrom { range, module, .. }) => {
-                if self.seen_futures_boundary && matches!(module.as_deref(), Some("__future__")) {
-                    Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+            Stmt::ImportFrom(StmtImportFrom {
+                range,
+                module,
+                names,
+                ..
+            }) => {
+                if matches!(module.as_deref(), Some("__future__")) {
+                    if self.seen_futures_boundary {
+                        Self::add_error(ctx, SemanticSyntaxErrorKind::LateFutureImport, *range);
+                    }
+
+                    // test_err from_future_import_braces
+                    // from __future__ import braces
+                    if names.iter().any(|alias| alias.name.as_str() == "braces") {
+                        Self::add_error(
+                            ctx,
+                            SemanticSyntaxErrorKind::FromFutureImportBraces,
+                            *range,
+                        );
+                    }
                 }
             }
             Stmt::Match(match_stmt) => {
@@ -883,6 +900,7 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(kind) => {
                 write!(f, "`{kind}` outside of an asynchronous function")
             }
+            SemanticSyntaxErrorKind::FromFutureImportBraces => f.write_str("not a chance"),
         }
     }
 }
@@ -1194,6 +1212,9 @@ pub enum SemanticSyntaxErrorKind {
     ///     async with x: ...      # error
     /// ```
     AwaitOutsideAsyncFunction(AwaitOutsideAsyncFunctionKind),
+
+    /// `from __future__ import braces`
+    FromFutureImportBraces,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
