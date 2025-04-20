@@ -29,6 +29,13 @@ use crate::checkers::ast::Checker;
 ///         ...
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is unsafe because if the file is iterated multiple times,
+/// replacing `readlines()` with direct iteration may consume the file
+/// contents in earlier iterations, resulting in empty results for
+/// subsequent iterations.
+///
 /// ## References
 /// - [Python documentation: `io.IOBase.readlines`](https://docs.python.org/3/library/io.html#io.IOBase.readlines)
 #[derive(ViolationMetadata)]
