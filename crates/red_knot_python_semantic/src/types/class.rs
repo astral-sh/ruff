@@ -1693,10 +1693,14 @@ impl InheritanceCycle {
 /// A type representing the set of runtime objects which are instances of a certain class.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
 pub struct InstanceType<'db> {
-    pub class: ClassType<'db>,
+    class: ClassType<'db>,
 }
 
 impl<'db> InstanceType<'db> {
+    pub(super) fn class(self) -> ClassType<'db> {
+        self.class
+    }
+
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
         // N.B. The subclass relation is fully static
         self.class.is_subclass_of(db, other.class)
@@ -1724,6 +1728,13 @@ impl<'db> From<InstanceType<'db>> for Type<'db> {
         Self::Instance(value)
     }
 }
+
+impl<'db> Type<'db> {
+    pub const fn instance(class: ClassType<'db>) -> Self {
+        Self::Instance(InstanceType { class })
+    }
+}
+
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
 /// for easier syntax when interacting with very common classes.
 ///
