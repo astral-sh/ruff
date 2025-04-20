@@ -28,6 +28,12 @@ use crate::rules::flynt::helpers;
 /// f"{foo} {bar}"
 /// ```
 ///
+/// # Fix safety
+/// The fix is always marked unsafe because f-strings implicitly call `str()` on the joined
+/// elements, while `str.join()` strictly requires an iterable of strings and will raise a
+/// `TypeError` if non-string elements are encountered, thus explicitly signaling a problem that
+/// the f-string silently bypasses.
+///
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
