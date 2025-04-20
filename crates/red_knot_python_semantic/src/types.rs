@@ -47,9 +47,10 @@ pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{
-    Class, ClassLiteralType, ClassType, GenericAlias, GenericClass, InstanceType, KnownClass,
-    KnownInstanceType, NonGenericClass,
+    Class, ClassLiteralType, ClassType, GenericAlias, GenericClass, KnownClass, NonGenericClass,
 };
+pub(crate) use instance::InstanceType;
+pub(crate) use known_instance::KnownInstanceType;
 
 mod builder;
 mod call;
@@ -60,6 +61,8 @@ mod diagnostic;
 mod display;
 mod generics;
 mod infer;
+mod instance;
+mod known_instance;
 mod mro;
 mod narrow;
 mod signatures;
