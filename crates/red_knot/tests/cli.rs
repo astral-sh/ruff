@@ -1014,6 +1014,7 @@ fn check_non_existing_path() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
+    will color is yellow
     error: io: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
 
     error: io: `<temp_dir>/project/tests`: No such file or directory (os error 2)
