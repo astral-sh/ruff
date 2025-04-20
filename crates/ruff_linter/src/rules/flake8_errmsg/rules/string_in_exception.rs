@@ -47,6 +47,11 @@ use crate::Locator;
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
+/// 
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because comments associated with the
+/// exception argument may not be reliably matched to their original code
+/// positions after the fix is applied.
 #[derive(ViolationMetadata)]
 pub(crate) struct RawStringInException;
 
@@ -102,6 +107,11 @@ impl Violation for RawStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
+/// 
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because comments associated with the
+/// exception argument may not be reliably matched to their original code
+/// positions after the fix is applied.
 #[derive(ViolationMetadata)]
 pub(crate) struct FStringInException;
 
@@ -158,6 +168,11 @@ impl Violation for FStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
+/// 
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because comments associated with the
+/// exception argument may not be reliably matched to their original code
+/// positions after the fix is applied.
 #[derive(ViolationMetadata)]
 pub(crate) struct DotFormatInException;
 
