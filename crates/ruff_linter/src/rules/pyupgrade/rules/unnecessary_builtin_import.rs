@@ -27,6 +27,10 @@ use crate::fix;
 /// str(1)
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because it may remove comments associated
+/// with the import statement.
+///
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
 #[derive(ViolationMetadata)]
