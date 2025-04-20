@@ -105,7 +105,7 @@ pub(crate) fn comment_contains_code(line: &str, task_tags: &[String]) -> bool {
         return false;
     }
 
-    // Ignore lines with references to issues.
+    // Ignore lines with references to github/gitlab/jira (#999, PROJ-123, !54).
     if ISSUE_REFERENCE.is_match(line) {
         return false;
     }
