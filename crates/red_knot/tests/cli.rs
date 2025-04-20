@@ -1042,8 +1042,14 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning[lint:unresolved-reference] <temp_dir>/test.py:2:7: Name `x` used when not defined
-    error[lint:non-subscriptable] <temp_dir>/test.py:3:7: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    will color is bright yellow
+    warningwill color is bright white
+    [lint:unresolved-reference] <temp_dir>/test.py:2:7:will color is bright red
+     Name `x` used when not defined
+    will color is bright red
+    errorwill color is bright white
+    [lint:non-subscriptable] <temp_dir>/test.py:3:7:will color is bright red
+     Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     Found 2 diagnostics
 
     ----- stderr -----
@@ -1076,7 +1082,10 @@ fn concise_revealed_type() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    info[revealed-type] <temp_dir>/test.py:5:1: Revealed type: `Literal["hello"]`
+    will color is bright cyan
+    infowill color is bright white
+    [revealed-type] <temp_dir>/test.py:5:1:will color is bright red
+     Revealed type: `Literal["hello"]`
     Found 1 diagnostic
 
     ----- stderr -----
