@@ -1118,8 +1118,27 @@ impl<'db> Type<'db> {
                 self_subclass_ty.is_subtype_of(db, target_subclass_ty)
             }
 
-            (Type::ClassLiteral(class), Type::Callable(_)) => {
-                let new_symbol = class.own_class_member(db, None, "__new__").symbol;
+            (Type::ClassLiteral(_), Type::Callable(_)) => {
+                let metaclass_call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        "__call__".into(),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .symbol;
+                if let Symbol::Type(Type::BoundMethod(new_function), _) = metaclass_call_symbol {
+                    let metaclass_call_callable = new_function.into_callable_type(db);
+                    return metaclass_call_callable.is_subtype_of(db, target);
+                }
+                let new_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        "__new__".into(),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .symbol;
                 match new_symbol {
                     Symbol::Type(Type::FunctionLiteral(new_function), _) => {
                         let new_callable = new_function.into_bound_method_type(db, self);
