@@ -45,7 +45,7 @@ jobs:
 
       - name: Install mypy_primer
         run: |
-          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support-v6"
+          uv tool install "git+https://github.com/hauntsaninja/mypy_primer@ebaa9fd27b51a278873b63676fd25490cec6823b"
 
       - name: Run mypy_primer
         shell: bash
