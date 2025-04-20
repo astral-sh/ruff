@@ -102,17 +102,9 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         return;
     }
 
-    // Check the function does not have kwarg maxsplit=1 or arg[1]=1
-    if let Some(maxsplit_arg) = arguments.find_argument_value("maxsplit", 1) {
-        if matches!(
-            maxsplit_arg,
-            Expr::NumberLiteral(ExprNumberLiteral {
-                value: Number::Int(Int::ONE),
-                ..
-            })
-        ) {
-            return;
-        }
+    // Check the function does not have maxsplit set
+    if arguments.find_argument_value("maxsplit", 1).is_some() {
+        return;
     };
 
     checker.report_diagnostic(Diagnostic::new(MissingMaxsplitArg, expr.range()));
