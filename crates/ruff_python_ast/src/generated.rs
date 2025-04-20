@@ -7268,7 +7268,7 @@ impl StmtTypeAlias {
             visitor.visit_type_params(type_params);
         }
 
-        visitor.visit_expr(value);
+        visitor.visit_annotation(value);
     }
 }
 
