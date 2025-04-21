@@ -169,10 +169,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_scope_info().file_scope_id
     }
 
-    fn current_scope_is_global_scope(&self) -> bool {
-        self.scope_stack.len() == 1
-    }
-
     /// Returns the scope ID of the surrounding class body scope if the current scope
     /// is a method inside a class body. Returns `None` otherwise, e.g. if the current
     /// scope is a function body outside of a class, or if the current scope is not a
@@ -1254,7 +1250,7 @@ where
 
                         // Wildcard imports are invalid syntax everywhere except the top-level scope,
                         // and thus do not bind any definitions anywhere else
-                        if !self.current_scope_is_global_scope() {
+                        if !self.in_module_scope() {
                             continue;
                         }
 
@@ -2329,7 +2325,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
     }
 
     fn in_module_scope(&self) -> bool {
-        self.scopes[self.current_scope()].kind().is_module()
+        self.scope_stack.len() == 1
     }
 
     fn in_function_scope(&self) -> bool {
