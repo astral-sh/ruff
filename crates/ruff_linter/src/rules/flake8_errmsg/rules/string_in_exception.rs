@@ -111,7 +111,7 @@ impl Violation for RawStringInException {
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe because:
+/// This fix is marked as unsafe because:
 /// - Comments associated with the exception argument may not be reliably matched
 ///   to their original code positions after the fix is applied.
 /// - The introduced `msg` variable may shadow an existing variable in the same
