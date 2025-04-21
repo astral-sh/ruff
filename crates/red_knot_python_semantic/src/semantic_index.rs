@@ -940,7 +940,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             panic!("expected generator definition")
         };
         let target = comprehension.target();
-        let name = target.id().as_str();
+        let name = target.as_name_expr().unwrap().id().as_str();
 
         assert_eq!(name, "x");
         assert_eq!(target.range(), TextRange::new(23.into(), 24.into()));

@@ -302,7 +302,7 @@ class C:
 
 c_instance = C()
 reveal_type(c_instance.a)  # revealed: Unknown | Literal[1]
-reveal_type(c_instance.b)  # revealed: Unknown | @Todo(starred unpacking)
+reveal_type(c_instance.b)  # revealed: Unknown
 ```
 
 #### Attributes defined in for-loop (unpacking)
@@ -397,15 +397,27 @@ class IntIterable:
     def __iter__(self) -> IntIterator:
         return IntIterator()
 
+class TupleIterator:
+    def __next__(self) -> tuple[int, str]:
+        return (1, "a")
+
+class TupleIterable:
+    def __iter__(self) -> TupleIterator:
+        return TupleIterator()
+
 class C:
     def __init__(self) -> None:
         [... for self.a in IntIterable()]
+        [... for (self.b, self.c) in TupleIterable()]
+        [... for self.d in IntIterable() for self.e in IntIterable()]
 
 c_instance = C()
 
-# TODO: Should be `Unknown | int`
-# error: [unresolved-attribute]
-reveal_type(c_instance.a)  # revealed: Unknown
+reveal_type(c_instance.a)  # revealed: Unknown | int
+reveal_type(c_instance.b)  # revealed: Unknown | int
+reveal_type(c_instance.c)  # revealed: Unknown | str
+reveal_type(c_instance.d)  # revealed: Unknown | int
+reveal_type(c_instance.e)  # revealed: Unknown | int
 ```
 
 #### Conditionally declared / bound attributes
@@ -1890,6 +1902,17 @@ class B:
 
 reveal_type(B().x)  # revealed: Unknown | Literal[1]
 reveal_type(A().x)  # revealed: Unknown | Literal[1]
+```
+
+This case additionally tests our union/intersection simplification logic:
+
+```py
+class H:
+    def __init__(self):
+        self.x = 1
+
+    def copy(self, other: "H"):
+        self.x = other.x or self.x
 ```
 
 ### Builtin types attributes

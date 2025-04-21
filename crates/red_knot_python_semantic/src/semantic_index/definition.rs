@@ -281,8 +281,9 @@ pub(crate) struct ExceptHandlerDefinitionNodeRef<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ComprehensionDefinitionNodeRef<'a> {
+    pub(crate) unpack: Option<(UnpackPosition, Unpack<'a>)>,
     pub(crate) iterable: &'a ast::Expr,
-    pub(crate) target: &'a ast::ExprName,
+    pub(crate) target: &'a ast::Expr,
     pub(crate) first: bool,
     pub(crate) is_async: bool,
 }
@@ -374,11 +375,13 @@ impl<'db> DefinitionNodeRef<'db> {
                 is_async,
             }),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
+                unpack,
                 iterable,
                 target,
                 first,
                 is_async,
             }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind {
+                target_kind: TargetKind::from(unpack),
                 iterable: AstNodeRef::new(parsed.clone(), iterable),
                 target: AstNodeRef::new(parsed, target),
                 first,
@@ -474,7 +477,9 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack: _,
                 is_async: _,
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
-            Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => target.into(),
+            Self::Comprehension(ComprehensionDefinitionNodeRef { target, .. }) => {
+                DefinitionNodeKey(NodeKey::from_node(target))
+            }
             Self::VariadicPositionalParameter(node) => node.into(),
             Self::VariadicKeywordParameter(node) => node.into(),
             Self::Parameter(node) => node.into(),
@@ -550,7 +555,7 @@ pub enum DefinitionKind<'db> {
     AnnotatedAssignment(AnnotatedAssignmentDefinitionKind),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
     For(ForStmtDefinitionKind<'db>),
-    Comprehension(ComprehensionDefinitionKind),
+    Comprehension(ComprehensionDefinitionKind<'db>),
     VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
     VariadicKeywordParameter(AstNodeRef<ast::Parameter>),
     Parameter(AstNodeRef<ast::ParameterWithDefault>),
@@ -749,19 +754,24 @@ impl MatchPatternDefinitionKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct ComprehensionDefinitionKind {
-    iterable: AstNodeRef<ast::Expr>,
-    target: AstNodeRef<ast::ExprName>,
-    first: bool,
-    is_async: bool,
+pub struct ComprehensionDefinitionKind<'db> {
+    pub(super) target_kind: TargetKind<'db>,
+    pub(super) iterable: AstNodeRef<ast::Expr>,
+    pub(super) target: AstNodeRef<ast::Expr>,
+    pub(super) first: bool,
+    pub(super) is_async: bool,
 }
 
-impl ComprehensionDefinitionKind {
+impl<'db> ComprehensionDefinitionKind<'db> {
     pub(crate) fn iterable(&self) -> &ast::Expr {
         self.iterable.node()
     }
 
-    pub(crate) fn target(&self) -> &ast::ExprName {
+    pub(crate) fn target_kind(&self) -> TargetKind<'db> {
+        self.target_kind
+    }
+
+    pub(crate) fn target(&self) -> &ast::Expr {
         self.target.node()
     }
 

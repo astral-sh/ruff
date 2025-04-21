@@ -12,7 +12,7 @@ x = [1, 2, 3]
 reveal_type(x)  # revealed: list
 
 # TODO reveal int
-reveal_type(x[0])  # revealed: Unknown | @Todo(Support for `typing.TypeVar` instances in type expressions)
+reveal_type(x[0])  # revealed: Unknown
 
 # TODO reveal list
 reveal_type(x[0:1])  # revealed: @Todo(specialized non-generic class)
