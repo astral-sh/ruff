@@ -28,7 +28,7 @@ use crate::fix;
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe because it may remove comments associated
+/// This fix is marked as unsafe because it may remove comments associated
 /// with the import statement.
 ///
 /// ## References
