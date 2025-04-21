@@ -881,7 +881,7 @@ impl Display for SemanticSyntaxError {
                 f.write_str("`return` statement outside of a function")
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(kind) => {
-                write!(f, "`{kind}` outside of an asynchronous function")
+                write!(f, "{kind} outside of an asynchronous function")
             }
         }
     }
@@ -1207,9 +1207,9 @@ pub enum AwaitOutsideAsyncFunctionKind {
 impl Display for AwaitOutsideAsyncFunctionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            AwaitOutsideAsyncFunctionKind::Await => "await",
-            AwaitOutsideAsyncFunctionKind::AsyncFor => "async for",
-            AwaitOutsideAsyncFunctionKind::AsyncWith => "async with",
+            AwaitOutsideAsyncFunctionKind::Await => "`await`",
+            AwaitOutsideAsyncFunctionKind::AsyncFor => "`async for`",
+            AwaitOutsideAsyncFunctionKind::AsyncWith => "`async with`",
             AwaitOutsideAsyncFunctionKind::AsyncComprehension => "asynchronous comprehension",
         })
     }

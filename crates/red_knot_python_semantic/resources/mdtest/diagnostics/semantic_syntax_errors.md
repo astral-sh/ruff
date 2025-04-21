@@ -130,6 +130,28 @@ async def g():
 (x async for x in g())
 ```
 
+## `await` outside async function
+
+This error includes `await`, `async for`, `async with`, and `async` comprehensions.
+
+```python
+async def elements(n):
+    yield n
+
+def _():
+    # error: [invalid-syntax] "`await` outside of an asynchronous function"
+    await 1
+    # error: [invalid-syntax] "`async for` outside of an asynchronous function"
+    async for _ in elements(1):
+        ...
+    # error: [invalid-syntax] "`async with` outside of an asynchronous function"
+    async with elements(1) as x:
+        ...
+    # error: [invalid-syntax] "cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.9 (syntax was added in 3.11)"
+    # error: [invalid-syntax] "asynchronous comprehension outside of an asynchronous function"
+    [x async for x in elements(1)]
+```
+
 ## Load before `global` declaration
 
 This should be an error, but it's not yet.
