@@ -1134,6 +1134,27 @@ impl<'db> Type<'db> {
                 self_subclass_ty.is_subtype_of(db, target_subclass_ty)
             }
 
+            (Type::ClassLiteral(_), Type::Callable(_)) => {
+                let metaclass_call_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        "__call__".into(),
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .symbol;
+
+                if let Symbol::Type(Type::BoundMethod(new_function), _) = metaclass_call_symbol {
+                    // TODO: this intentionally diverges from step 1 in
+                    // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
+                    // by always respecting the signature of the metaclass `__call__`, rather than
+                    // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
+                    let new_function = new_function.into_callable_type(db);
+                    return new_function.is_subtype_of(db, target);
+                }
+                false
+            }
+
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
