@@ -74,7 +74,7 @@ struct BlockData<'stmt> {
     stmts: &'stmt [Stmt],
     /// Outgoing edges, indicating possible paths of execution after the
     /// block has concluded
-    out: Edges,
+    out: Edges<'stmt>,
     /// Collection of indices for basic blocks having the current
     /// block as the target of an edge
     parents: Vec<BlockId>,
@@ -101,6 +101,7 @@ pub(crate) enum BlockKind {
     Start,
     /// Terminal block for the control flow graph
     Terminal,
+    LoopGuard,
 }
 
 /// Holds a collection of edges. Each edge is determined by:
@@ -130,7 +131,7 @@ impl<'stmt> Edges<'stmt> {
     }
 
     /// Returns iterator over [`Condition`]s which must be satisfied to traverse corresponding edge
-    pub fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition> {
+    pub fn conditions(&self) -> impl ExactSizeIterator<Item = &Condition<'stmt>> {
         self.conditions.iter()
     }
 
@@ -138,7 +139,7 @@ impl<'stmt> Edges<'stmt> {
         self.targets.is_empty()
     }
 
-    pub fn filter_targets_by_conditions<'a, T: FnMut(&Condition) -> bool + 'a>(
+    pub fn filter_targets_by_conditions<'a: 'stmt, T: FnMut(&Condition) -> bool + 'a>(
         &'a self,
         mut predicate: T,
     ) -> impl Iterator<Item = BlockId> + 'a {
@@ -151,9 +152,15 @@ impl<'stmt> Edges<'stmt> {
 
 /// Represents a condition to be tested in a multi-way branch
 #[derive(Debug, Clone)]
-pub enum Condition {
+pub enum Condition<'stmt> {
     /// Unconditional edge
     Always,
+    /// A boolean test expression
+    Test(&'stmt Expr),
+    /// Test whether `next` on iterator gives `StopIteration`
+    NotStopIter(&'stmt Expr),
+    /// A fallback case (else/wildcard case/etc.)
+    Else,
 }
 
 struct CFGBuilder<'stmt> {
@@ -163,6 +170,8 @@ struct CFGBuilder<'stmt> {
     current: BlockId,
     /// Exit block index for current control flow
     exit: BlockId,
+    /// Loop contexts
+    loops: Vec<LoopContext>,
 }
 
 impl<'stmt> CFGBuilder<'stmt> {
@@ -186,6 +195,7 @@ impl<'stmt> CFGBuilder<'stmt> {
             },
             current: initial,
             exit: terminal,
+            loops: Vec::default(),
         }
     }
 
@@ -297,6 +307,64 @@ impl<'stmt> CFGBuilder<'stmt> {
         self.cfg.blocks.push(BlockData::default())
     }
 
+    /// Returns index of block where control flow should proceed
+    /// at the current depth.
+    ///
+    /// Creates a new block if there are remaining statements, otherwise
+    /// returns provided default.
+    fn next_or_default_block(
+        &mut self,
+        remaining_stmts: &'stmt [Stmt],
+        default: BlockId,
+    ) -> BlockId {
+        if remaining_stmts.is_empty() {
+            default
+        } else {
+            self.new_block()
+        }
+    }
+
+    /// Creates a new block to handle entering and exiting a loop body.
+    fn new_loop_guard(&mut self) -> BlockId {
+        let Some(currblock) = self.cfg.blocks.get_mut(self.current) else {
+            return self.cfg.blocks.push(BlockData {
+                kind: BlockKind::LoopGuard,
+                ..BlockData::default()
+            });
+        };
+        if matches!(currblock.kind, BlockKind::Generic) && currblock.stmts.is_empty() {
+            currblock.kind = BlockKind::LoopGuard;
+            self.current
+        } else {
+            self.cfg.blocks.push(BlockData {
+                kind: BlockKind::LoopGuard,
+                ..BlockData::default()
+            })
+        }
+    }
+
+    /// Returns the current loop exit block without removing it.
+    fn loop_exit(&self) -> Option<BlockId> {
+        self.loops.last().map(|ctxt| ctxt.exit)
+    }
+    /// Returns the current loop guard block without removing it.
+    fn loop_guard(&self) -> Option<BlockId> {
+        self.loops.last().map(|ctxt| ctxt.guard)
+    }
+
+    /// Pushes a block onto the loop exit stack.
+    /// This block represents where control should flow when encountering a
+    /// 'break' statement within a loop.
+    fn push_loop(&mut self, guard: BlockId, exit: BlockId) {
+        self.loops.push(LoopContext { guard, exit });
+    }
+
+    /// Pops and returns the most recently pushed loop exit block.
+    /// This is called when finishing the processing of a loop construct.
+    fn pop_loop(&mut self) -> Option<LoopContext> {
+        self.loops.pop()
+    }
+
     /// Populates the current basic block with the given set of statements.
     ///
     /// This should only be called once on any given block.
@@ -311,11 +379,17 @@ impl<'stmt> CFGBuilder<'stmt> {
     /// Draws provided edges out of the current basic block.
     ///
     /// This should only be called once on any given block.
-    fn set_current_block_edges(&mut self, edges: Edges) {
+    fn set_current_block_edges(&mut self, edges: Edges<'stmt>) {
         debug_assert!(
             self.cfg.blocks[self.current].out.is_empty(),
             "Attempting to set edges on a basic block that already has an outgoing edge."
         );
         self.cfg.blocks[self.current].out = edges;
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LoopContext {
+    guard: BlockId,
+    exit: BlockId,
 }

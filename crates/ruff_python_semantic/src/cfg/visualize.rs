@@ -210,6 +210,12 @@ impl MermaidGraph for CFGWithSource<'_, '_> {
                     shape: MermaidNodeShape::DoubleCircle,
                 }
             }
+            BlockKind::LoopGuard => {
+                return MermaidNode {
+                    content: "LOOP GUARD".to_string(),
+                    shape: MermaidNodeShape::default(),
+                }
+            }
         };
 
         MermaidNode::with_content(content)
@@ -235,6 +241,18 @@ impl MermaidGraph for CFGWithSource<'_, '_> {
                             }
                         }
                     }
+                    Condition::Test(expr) => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: self.source[expr.range()].to_string(),
+                    },
+                    Condition::Else => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: "else".to_string(),
+                    },
+                    Condition::NotStopIter(expr) => MermaidEdge {
+                        kind: MermaidEdgeKind::Arrow,
+                        content: self.source[expr.range()].to_string(),
+                    },
                 };
                 (target, edge)
             })
