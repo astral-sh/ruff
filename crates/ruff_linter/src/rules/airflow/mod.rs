@@ -18,6 +18,7 @@ mod tests {
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_args.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names_fix.py"))]
+    #[test_case(Rule::Airflow3Removal, Path::new("AIR301_provider_names_fix.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_names_try.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_class_attribute.py"))]
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_airflow_plugin.py"))]
