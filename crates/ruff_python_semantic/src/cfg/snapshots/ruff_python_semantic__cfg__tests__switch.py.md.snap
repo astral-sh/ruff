@@ -1,0 +1,90 @@
+---
+source: crates/ruff_python_semantic/src/cfg/mod.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def simple_match():
+    match bar:
+        case This:
+            print("this")
+        case That:
+            print("that")
+    print("after")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["match bar:
+        case This:
+            print(#quot;this#quot;)
+        case That:
+            print(#quot;that#quot;)"]
+	node1((("EXIT")))
+	node2["print(#quot;after#quot;)"]
+	node3["print(#quot;this#quot;)"]
+	node4["print(#quot;that#quot;)"]
+	node0-->|"This"|node3
+	node0-->|"That"|node4
+	node2==>node1
+	node3-->node2
+	node4-->node2
+```
+
+## Function 1
+### Source
+```python
+def simple_if(cond):
+    if cond:
+        return 1
+    return 2
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["if cond:
+        return 1"]
+	node1((("EXIT")))
+	node2["return 2"]
+	node3["return 1"]
+	node0-->|"cond"|node3
+	node0-->|"else"|node2
+	node2==>node1
+	node3==>node1
+```
+
+## Function 2
+### Source
+```python
+def if_else(cond0,cond1):
+    if cond0:
+        x = 1
+    elif cond1:
+        x = 2
+    else:
+        return 5
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["if cond0:
+        x = 1
+    elif cond1:
+        x = 2
+    else:
+        return 5"]
+	node1((("EXIT")))
+	node2["x = 1"]
+	node3["x = 2"]
+	node4["return 5"]
+	node0-->|"cond0"|node2
+	node0-->|"cond1"|node3
+	node0-->|"else"|node4
+	node2==>node1
+	node3==>node1
+	node4==>node1
+```

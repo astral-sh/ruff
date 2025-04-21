@@ -92,3 +92,11 @@ unreachable.py:58:9: PLW0101 Unreachable code in `empty_iter`
 59 |     else:
 60 |         print("reachable")
    |
+
+unreachable.py:72:5: PLW0101 Unreachable code in `simple_switch`
+   |
+70 |     else:
+71 |         return "reachable"
+72 |     print("unreachable")
+   |     ^^^^^^^^^^^^^^^^^^^^ PLW0101
+   |
