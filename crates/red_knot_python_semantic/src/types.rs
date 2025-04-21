@@ -1129,20 +1129,10 @@ impl<'db> Type<'db> {
                     .symbol;
 
                 if let Symbol::Type(Type::BoundMethod(new_function), _) = metaclass_call_symbol {
-                    let overrides_type_call = match new_function.function(db).signature(db) {
-                        FunctionSignature::Single(signature)
-                        | FunctionSignature::Overloaded(_, Some(signature)) => {
-                            match signature.return_ty {
-                                Some(ty) => !self.is_subtype_of(db, ty.to_meta_type(db)),
-                                _ => false,
-                            }
-                        }
-                        FunctionSignature::Overloaded(..) => false,
-                    };
-                    if overrides_type_call {
-                        let new_function = new_function.into_callable_type(db);
-                        return new_function.is_subtype_of(db, target);
-                    }
+                    // TODO: this intentionally diverges from step 1 in https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable,
+                    // by always respecting the signature of the metaclass `__call__`, which makes unwarranted assumptions.
+                    let new_function = new_function.into_callable_type(db);
+                    return new_function.is_subtype_of(db, target);
                 }
                 false
             }

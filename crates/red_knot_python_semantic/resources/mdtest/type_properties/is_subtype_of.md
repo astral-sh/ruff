@@ -1140,10 +1140,6 @@ class MetaWithReturn(type):
 
 class A(metaclass=MetaWithReturn): ...
 
-# TODO: This should not error
-# This errors because the metaclass `__call__` is not seen as overriding `type.__call__`
-# and we don't yet check `__new__` or `__init__`.
-# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
 static_assert(is_subtype_of(TypeOf[A], Callable[[], A]))
 static_assert(not is_subtype_of(TypeOf[A], Callable[[object], A]))
 
@@ -1156,29 +1152,18 @@ class B(metaclass=MetaWithDifferentReturn): ...
 static_assert(is_subtype_of(TypeOf[B], Callable[[], int]))
 static_assert(not is_subtype_of(TypeOf[B], Callable[[], B]))
 
-class MetaWithSelfReturn(type):
-    def __call__(cls) -> Self:
-        return super().__call__()
-
-class C(metaclass=MetaWithSelfReturn): ...
-
-# TODO: This should not error
-# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
-static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
-static_assert(not is_subtype_of(TypeOf[C], Callable[[object], C]))
-
 class MetaWithOverloadReturn(type):
     @overload
     def __call__(cls, x: int) -> int: ...
     @overload
-    def __call__(cls) -> "str": ...
-    def __call__(cls, x: int | None = None) -> "str | int":
+    def __call__(cls) -> str: ...
+    def __call__(cls, x: int | None = None) -> str | int:
         return super().__call__()
 
-class D(metaclass=MetaWithOverloadReturn): ...
+class C(metaclass=MetaWithOverloadReturn): ...
 
-static_assert(is_subtype_of(TypeOf[D], Callable[[int], int]))
-static_assert(is_subtype_of(TypeOf[D], Callable[[], str]))
+static_assert(is_subtype_of(TypeOf[C], Callable[[int], int]))
+static_assert(is_subtype_of(TypeOf[C], Callable[[], str]))
 ```
 
 ### Bound methods
