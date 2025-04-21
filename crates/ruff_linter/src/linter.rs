@@ -111,7 +111,7 @@ pub fn check_path(
     source_kind: &SourceKind,
     source_type: PySourceType,
     parsed: &Parsed<ModModule>,
-    target_version: PythonVersion,
+    target_version: Option<PythonVersion>,
 ) -> Vec<Message> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -451,7 +451,7 @@ pub fn lint_only(
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version, PythonVersion::PY314) && !is_py314_support_enabled(settings) {
+    if matches!(target_version, Some(PythonVersion::PY314)) && !is_py314_support_enabled(settings) {
         warn_user_once!("Support for Python 3.14 is under development and may be unstable. Enable `preview` to remove this warning.");
     }
 
@@ -564,7 +564,7 @@ pub fn lint_fix<'a>(
 
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version, PythonVersion::PY314) && !is_py314_support_enabled(settings) {
+    if matches!(target_version, Some(PythonVersion::PY314)) && !is_py314_support_enabled(settings) {
         warn_user_once!("Support for Python 3.14 is under development and may be unstable. Enable `preview` to remove this warning.");
     }
 
@@ -757,7 +757,7 @@ impl ParseSource {
         self,
         source_kind: &SourceKind,
         source_type: PySourceType,
-        target_version: PythonVersion,
+        target_version: Option<PythonVersion>,
     ) -> Parsed<ModModule> {
         match self {
             ParseSource::None => parse_unchecked_source(source_kind, source_type, target_version),
@@ -771,7 +771,7 @@ impl ParseSource {
 fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
-    target_version: PythonVersion,
+    target_version: Option<PythonVersion>,
 ) -> Parsed<ModModule> {
     let options = ParseOptions::from(source_type).with_target_version(target_version);
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
@@ -1075,7 +1075,7 @@ mod tests {
             contents,
             &LinterSettings {
                 rules: settings::rule_table::RuleTable::empty(),
-                unresolved_target_version: python_version,
+                unresolved_target_version: Some(python_version),
                 preview: settings::types::PreviewMode::Enabled,
                 ..Default::default()
             },
@@ -1093,7 +1093,7 @@ mod tests {
             &SourceKind::IpyNotebook(Notebook::from_path(path)?),
             path,
             &LinterSettings {
-                unresolved_target_version: python_version,
+                unresolved_target_version: Some(python_version),
                 rules: settings::rule_table::RuleTable::empty(),
                 preview: settings::types::PreviewMode::Enabled,
                 ..Default::default()
@@ -1157,7 +1157,7 @@ mod tests {
         "pyi019_adds_typing_extensions",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion::PY310,
+			unresolved_target_version: Some(PythonVersion::PY310),
 			typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1166,7 +1166,7 @@ mod tests {
         "pyi019_does_not_add_typing_extensions",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion::PY310,
+			unresolved_target_version: Some(PythonVersion::PY310),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1175,7 +1175,7 @@ mod tests {
         "pyi019_adds_typing_without_extensions_disabled",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion::PY311,
+			unresolved_target_version: Some(PythonVersion::PY311),
 			typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1184,7 +1184,7 @@ mod tests {
         "pyi019_adds_typing_with_extensions_disabled",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion::PY311,
+			unresolved_target_version: Some(PythonVersion::PY311),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1196,7 +1196,7 @@ mod tests {
 			def __new__(cls) -> C: ...
 		",
 		&LinterSettings {
-			unresolved_target_version: PythonVersion { major: 3, minor: 10 },
+			unresolved_target_version: Some(PythonVersion { major: 3, minor: 10 }),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::NonSelfReturnType)
 		}
@@ -1213,7 +1213,7 @@ mod tests {
 			return commons
 		"#,
 		&LinterSettings {
-			unresolved_target_version: PythonVersion { major: 3, minor: 8 },
+			unresolved_target_version: Some(PythonVersion { major: 3, minor: 8 }),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::FastApiNonAnnotatedDependency)
 		}
@@ -1228,7 +1228,7 @@ mod tests {
 		"pyi026_disabled",
 		"Vector = list[float]",
 		&LinterSettings {
-			unresolved_target_version: PythonVersion { major: 3, minor: 9 },
+			unresolved_target_version: Some(PythonVersion { major: 3, minor: 9 }),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::TypeAliasWithoutAnnotation)
 		}

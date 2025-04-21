@@ -135,7 +135,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
                 },
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: Some(PythonVersion::PY310),
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;

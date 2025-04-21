@@ -19,7 +19,7 @@ pub(crate) fn check_file_path(
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-    target_version: PythonVersion,
+    target_version: Option<PythonVersion>,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 

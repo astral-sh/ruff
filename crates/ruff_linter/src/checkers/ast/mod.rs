@@ -232,7 +232,7 @@ pub(crate) struct Checker<'a> {
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
     /// The target [`PythonVersion`] for version-dependent checks.
-    target_version: PythonVersion,
+    target_version: Option<PythonVersion>,
     /// Helper visitor for detecting semantic syntax errors.
     #[allow(clippy::struct_field_names)]
     semantic_checker: SemanticSyntaxChecker,
@@ -257,7 +257,7 @@ impl<'a> Checker<'a> {
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
-        target_version: PythonVersion,
+        target_version: Option<PythonVersion>,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -2923,7 +2923,7 @@ pub(crate) fn check_ast(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
-    target_version: PythonVersion,
+    target_version: Option<PythonVersion>,
 ) -> (Vec<Diagnostic>, Vec<SemanticSyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)
