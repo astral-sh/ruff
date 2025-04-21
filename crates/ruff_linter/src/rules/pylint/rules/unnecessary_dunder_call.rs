@@ -75,8 +75,12 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
+    let Some(target_version) = checker.target_version() else {
+        return;
+    };
+
     // If this is an allowed dunder method, abort.
-    if allowed_dunder_constants(attr, checker.target_version()) {
+    if allowed_dunder_constants(attr, target_version) {
         return;
     }
 

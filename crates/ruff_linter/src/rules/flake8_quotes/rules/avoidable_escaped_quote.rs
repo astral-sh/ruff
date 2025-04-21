@@ -61,11 +61,12 @@ pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike
         return;
     }
 
-    let mut rule_checker = AvoidableEscapedQuoteChecker::new(
-        checker.locator(),
-        checker.settings,
-        checker.target_version(),
-    );
+    let Some(target_version) = checker.target_version() else {
+        return;
+    };
+
+    let mut rule_checker =
+        AvoidableEscapedQuoteChecker::new(checker.locator(), checker.settings, target_version);
 
     for part in string_like.parts() {
         match part {

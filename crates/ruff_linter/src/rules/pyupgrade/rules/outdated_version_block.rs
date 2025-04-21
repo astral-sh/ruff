@@ -119,7 +119,9 @@ pub(crate) fn outdated_version_block(checker: &Checker, stmt_if: &StmtIf) {
                     let Some(version) = extract_version(elts) else {
                         return;
                     };
-                    let target = checker.target_version();
+                    let Some(target) = checker.target_version() else {
+                        return;
+                    };
                     match version_always_less_than(
                         &version,
                         target,

@@ -716,13 +716,17 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
         return;
     }
 
+    let Some(target_version) = checker.target_version() else {
+        return;
+    };
+
     let fixer = ImportReplacer::new(
         import_from_stmt,
         module,
         checker.locator(),
         checker.stylist(),
         checker.tokens(),
-        checker.target_version(),
+        target_version,
     );
 
     for (operation, fix) in fixer.without_renames() {
