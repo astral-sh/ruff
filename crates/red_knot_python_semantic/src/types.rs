@@ -1135,7 +1135,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::ClassLiteral(_), Type::Callable(_)) => {
-                let metaclass_call_symbol = self
+                let metaclass_call_function_symbol = self
                     .member_lookup_with_policy(
                         db,
                         "__call__".into(),
@@ -1145,7 +1145,7 @@ impl<'db> Type<'db> {
                     .symbol;
 
                 if let Symbol::Type(Type::BoundMethod(metaclass_call_function), _) =
-                    metaclass_call_symbol
+                    metaclass_call_function_symbol
                 {
                     // TODO: this intentionally diverges from step 1 in
                     // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
