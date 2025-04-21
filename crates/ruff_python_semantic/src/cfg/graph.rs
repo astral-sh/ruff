@@ -1,5 +1,5 @@
 use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::{Expr, MatchCase, Stmt};
 use ruff_text_size::{Ranged, TextRange};
 
 /// Returns the control flow graph associated to an array of statements
@@ -157,6 +157,11 @@ pub enum Condition<'stmt> {
     Always,
     /// A boolean test expression
     Test(&'stmt Expr),
+    /// A match case with its subject expression
+    Match {
+        subject: &'stmt Expr,
+        case: &'stmt MatchCase,
+    },
     /// Test whether `next` on iterator gives `StopIteration`
     NotStopIter(&'stmt Expr),
     /// A fallback case (else/wildcard case/etc.)
