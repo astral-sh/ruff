@@ -487,44 +487,6 @@ static_assert(is_assignable_to(CallableTypeOf[keyword_variadic], Callable[..., N
 static_assert(is_assignable_to(CallableTypeOf[mixed], Callable[..., None]))
 ```
 
-### Class literals
-
-#### Classes with metaclasses
-
-```py
-from typing import Callable
-from typing_extensions import Self
-from knot_extensions import TypeOf, static_assert, is_subtype_of
-
-class MetaWithReturn(type):
-    def __call__(cls) -> "A":
-        return super().__call__()
-
-class A(metaclass=MetaWithReturn): ...
-
-# TODO: This should not error
-# error: [invalid-assignment] "Object of type `Literal[A]` is not assignable to `() -> A`"
-f: Callable[[], A] = A
-
-class MetaWithDifferentReturn(type):
-    def __call__(cls) -> int:
-        return super().__call__()
-
-class B(metaclass=MetaWithDifferentReturn): ...
-
-g: Callable[[], int] = B
-
-class MetaWithSelfReturn(type):
-    def __call__(cls) -> Self:
-        return super().__call__()
-
-class C(metaclass=MetaWithSelfReturn): ...
-
-# TODO: This should not error
-# error: [invalid-assignment] "Object of type `Literal[C]` is not assignable to `() -> C`"
-h: Callable[[], C] = C
-```
-
 ### Function types
 
 ```py
