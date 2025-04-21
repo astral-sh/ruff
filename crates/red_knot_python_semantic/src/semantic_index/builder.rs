@@ -2341,7 +2341,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
     }
 
     fn in_notebook(&self) -> bool {
-        source_text(self.db.upcast(), self.file).is_notebook()
+        self.file.source_type(self.db.upcast()).is_ipynb()
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
