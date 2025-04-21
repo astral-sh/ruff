@@ -555,7 +555,7 @@ impl<'a> Checker<'a> {
         member: &'b str,
         version_added_to_typing: PythonVersion,
     ) -> Option<TypingImporter<'b, 'a>> {
-        let source_module = if self.target_version() >= version_added_to_typing {
+        let source_module = if self.target_version_or_latest() >= version_added_to_typing {
             "typing"
         } else if !self.settings.typing_extensions {
             return None;

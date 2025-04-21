@@ -239,7 +239,7 @@ fn create_diagnostic(
 
     let mut diagnostic = Diagnostic::new(
         FastApiNonAnnotatedDependency {
-            py_version: checker.target_version(),
+            py_version: checker.target_version_or_latest(),
         },
         parameter.range,
     );
