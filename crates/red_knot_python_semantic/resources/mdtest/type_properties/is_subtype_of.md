@@ -1130,7 +1130,7 @@ f(a)
 #### Classes with metaclasses
 
 ```py
-from typing import Callable
+from typing import Callable, overload
 from typing_extensions import Self
 from knot_extensions import TypeOf, static_assert, is_subtype_of
 
@@ -1166,6 +1166,19 @@ class C(metaclass=MetaWithSelfReturn): ...
 # error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
 static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
 static_assert(not is_subtype_of(TypeOf[C], Callable[[object], C]))
+
+class MetaWithOverloadReturn(type):
+    @overload
+    def __call__(cls, x: int) -> int: ...
+    @overload
+    def __call__(cls) -> "str": ...
+    def __call__(cls, x: int | None = None) -> "str | int":
+        return super().__call__()
+
+class D(metaclass=MetaWithOverloadReturn): ...
+
+static_assert(is_subtype_of(TypeOf[D], Callable[[int], int]))
+static_assert(is_subtype_of(TypeOf[D], Callable[[], str]))
 ```
 
 ### Bound methods
