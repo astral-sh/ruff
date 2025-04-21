@@ -260,3 +260,9 @@ def f():
     for i in range(5):
         if j := i:
             items.append(j)
+
+def f():
+    values = [1, 2, 3]
+    result = list()  # this should be replaced with a comprehension
+    for i in values:
+        result.append(i + 1)  # PERF401
