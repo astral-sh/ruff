@@ -1152,6 +1152,20 @@ impl<'db> Type<'db> {
                     let new_function = new_function.into_callable_type(db);
                     return new_function.is_subtype_of(db, target);
                 }
+
+                let new_symbol = self
+                    .member_lookup_with_policy(
+                        db,
+                        "__new__".into(),
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .symbol;
+
+                if let Symbol::Type(Type::BoundMethod(new_function), _) = new_symbol {
+                    let new_function = new_function.into_callable_type(db);
+                    return new_function.is_subtype_of(db, target);
+                }
                 false
             }
 
