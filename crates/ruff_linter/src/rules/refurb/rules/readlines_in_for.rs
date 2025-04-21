@@ -31,7 +31,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Fix safety
 ///
-/// This fix is unsafe because if the file is iterated multiple times,
+/// This fix is marked as unsafe if the file is iterated multiple times,
 /// replacing `readlines()` with direct iteration may consume the file
 /// contents in earlier iterations, resulting in empty results for
 /// subsequent iterations.
