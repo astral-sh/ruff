@@ -524,9 +524,8 @@ impl<'a> Checker<'a> {
     }
 
     /// Return the [`PythonVersion`] to use for version-related checks.
-    pub(crate) fn target_version(&self) -> PythonVersion {
-        // TODO(brent)
-        self.target_version.unwrap_or_default()
+    pub(crate) fn target_version(&self) -> Option<PythonVersion> {
+        self.target_version
     }
 
     /// Return the [`PythonVersion`] to use for version-related checks.
