@@ -1,7 +1,6 @@
 use ruff_index::{newtype_index, IndexVec};
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange};
-use smallvec::{smallvec, SmallVec};
 
 /// Returns the control flow graph associated to an array of statements
 pub fn build_cfg(stmts: &[Stmt]) -> ControlFlowGraph<'_> {
@@ -78,7 +77,7 @@ struct BlockData<'stmt> {
     out: Edges,
     /// Collection of indices for basic blocks having the current
     /// block as the target of an edge
-    parents: SmallVec<[BlockId; 2]>,
+    parents: Vec<BlockId>,
 }
 
 impl Ranged for BlockData<'_> {
@@ -111,17 +110,17 @@ pub(crate) enum BlockKind {
 /// The conditions and targets are kept in two separate
 /// vectors which must always be kept the same length.
 #[derive(Debug, Default, Clone)]
-pub struct Edges {
-    conditions: SmallVec<[Condition; 4]>,
-    targets: SmallVec<[BlockId; 4]>,
+pub struct Edges<'stmt> {
+    conditions: Vec<Condition<'stmt>>,
+    targets: Vec<BlockId>,
 }
 
-impl Edges {
+impl<'stmt> Edges<'stmt> {
     /// Creates an unconditional edge to the target block
     fn always(target: BlockId) -> Self {
         Self {
-            conditions: smallvec![Condition::Always],
-            targets: smallvec![target],
+            conditions: vec![Condition::Always],
+            targets: vec![target],
         }
     }
 
