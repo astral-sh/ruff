@@ -535,6 +535,15 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    Some(KnownFunction::IsProtocol) => {
+                        if let [Some(ty)] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                ty.into_class_literal()
+                                    .is_some_and(|class| class.is_protocol(db)),
+                            ));
+                        }
+                    }
+
                     Some(KnownFunction::Overload) => {
                         // TODO: This can be removed once we understand legacy generics because the
                         // typeshed definition for `typing.overload` is an identity function.

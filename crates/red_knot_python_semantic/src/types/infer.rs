@@ -81,9 +81,9 @@ use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    todo_type, CallDunderError, CallableSignature, CallableType, Class, ClassLiteralType,
-    ClassType, DataclassMetadata, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
-    GenericClass, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
+    binding_type, todo_type, CallDunderError, CallableSignature, CallableType, Class,
+    ClassLiteralType, ClassType, DataclassMetadata, DynamicType, FunctionDecorators, FunctionType,
+    GenericAlias, GenericClass, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
     KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, NonGenericClass, Parameter,
     ParameterForm, Parameters, Signature, Signatures, SliceLiteralType, StringLiteralType,
     SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
@@ -1224,7 +1224,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Returns `true` if the current scope is the function body scope of a method of a protocol
     /// (that is, a class which directly inherits `typing.Protocol`.)
-    fn in_class_that_inherits_protocol_directly(&self) -> bool {
+    fn in_protocol_class(&self) -> bool {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         let Some(parent_scope_id) = current_scope.parent() else {
@@ -1252,13 +1252,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             return false;
         };
 
-        // TODO move this to `Class` once we add proper `Protocol` support
-        node_ref.bases().iter().any(|base| {
-            matches!(
-                self.file_expression_type(base),
-                Type::KnownInstance(KnownInstanceType::Protocol)
-            )
-        })
+        let class_definition = self.index.expect_single_definition(node_ref.node());
+
+        let Type::ClassLiteral(class) = binding_type(self.db(), class_definition) else {
+            return false;
+        };
+
+        class.is_protocol(self.db())
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -1322,7 +1322,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             if (self.in_stub()
                 || self.in_function_overload_or_abstractmethod()
-                || self.in_class_that_inherits_protocol_directly())
+                || self.in_protocol_class())
                 && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
             {
@@ -1625,7 +1625,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 } else if (self.in_stub()
                     || self.in_function_overload_or_abstractmethod()
-                    || self.in_class_that_inherits_protocol_directly())
+                    || self.in_protocol_class())
                     && default
                         .as_ref()
                         .is_some_and(|d| d.is_ellipsis_literal_expr())
