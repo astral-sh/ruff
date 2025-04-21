@@ -1,0 +1,198 @@
+---
+source: crates/ruff_python_semantic/src/cfg/mod.rs
+description: "This is a Mermaid graph. You can use https://mermaid.live to visualize it as a diagram."
+---
+## Function 0
+### Source
+```python
+def simple_while():
+    while cond:
+        foo()
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["START"]
+	node1((("EXIT")))
+	node2["LOOP GUARD"]
+	node3["foo()"]
+	node0-->node2
+	node2-->|"cond"|node3
+	node2-->|"else"|node1
+	node3-->node2
+```
+
+## Function 1
+### Source
+```python
+def surround_while():
+    x = 1
+    while cond:
+        x = 2
+    x = 2
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["x = 1"]
+	node1((("EXIT")))
+	node2["x = 2"]
+	node3["LOOP GUARD"]
+	node4["x = 2"]
+	node0-->node3
+	node2==>node1
+	node3-->|"cond"|node4
+	node3-->|"else"|node2
+	node4-->node3
+```
+
+## Function 2
+### Source
+```python
+def nested_while():
+    x = 1
+    while cond0:
+        while cond1:
+            while cond2:
+                print("hey")
+                print("there")
+            print("okay")
+        print("more")
+    print("done")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["x = 1"]
+	node1((("EXIT")))
+	node2["print(#quot;done#quot;)"]
+	node3["LOOP GUARD"]
+	node4["LOOP GUARD"]
+	node5["print(#quot;more#quot;)"]
+	node6["LOOP GUARD"]
+	node7["print(#quot;okay#quot;)"]
+	node8["print(#quot;hey#quot;)
+print(#quot;there#quot;)"]
+	node0-->node3
+	node2==>node1
+	node3-->|"cond0"|node4
+	node3-->|"else"|node2
+	node4-->|"cond1"|node6
+	node4-->|"else"|node5
+	node5-->node3
+	node6-->|"cond2"|node8
+	node6-->|"else"|node7
+	node7-->node4
+	node8-->node6
+```
+
+## Function 3
+### Source
+```python
+def never_loop_return():
+    while cond:
+        return 1
+    print("something")
+    return 2
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["START"]
+	node1((("EXIT")))
+	node2["print(#quot;something#quot;)
+return 2"]
+	node3["LOOP GUARD"]
+	node4["return 1"]
+	node0-->node3
+	node2==>node1
+	node3-->|"cond"|node4
+	node3-->|"else"|node2
+	node4==>node1
+```
+
+## Function 4
+### Source
+```python
+def never_loop_break():
+    while cond:
+        break
+    print("never looped")
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["START"]
+	node1((("EXIT")))
+	node2["print(#quot;never looped#quot;)"]
+	node3["LOOP GUARD"]
+	node4["break"]
+	node0-->node3
+	node2==>node1
+	node3-->|"cond"|node4
+	node3-->|"else"|node2
+	node4-->node2
+```
+
+## Function 5
+### Source
+```python
+def nested_loop_break():
+    while cond0:
+        while cond1:
+            print("break to outer")
+            break
+        break
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["START"]
+	node1((("EXIT")))
+	node2["LOOP GUARD"]
+	node3["LOOP GUARD"]
+	node4["break"]
+	node5["print(#quot;break to outer#quot;)
+break"]
+	node0-->node2
+	node2-->|"cond0"|node3
+	node2-->|"else"|node1
+	node3-->|"cond1"|node5
+	node3-->|"else"|node4
+	node4==>node1
+	node5-->node4
+```
+
+## Function 6
+### Source
+```python
+def for_else():
+    for i in [1,2,3]:
+        continue
+    else:
+        print("ok")
+    return 3
+```
+
+### Control Flow Graph
+```mermaid
+flowchart TD
+	node0["START"]
+	node1((("EXIT")))
+	node2["return 3"]
+	node3["LOOP GUARD"]
+	node4["continue"]
+	node5["print(#quot;ok#quot;)"]
+	node0-->node3
+	node2==>node1
+	node3-->|"[1,2,3]"|node4
+	node3-->|"else"|node5
+	node4-->node3
+	node5-->node2
+```
