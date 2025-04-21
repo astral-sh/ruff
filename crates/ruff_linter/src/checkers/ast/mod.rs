@@ -591,7 +591,7 @@ impl TypingImporter<'_, '_> {
 
 impl SemanticSyntaxContext for Checker<'_> {
     fn python_version(&self) -> PythonVersion {
-        self.target_version()
+        self.target_version().unwrap_or_default()
     }
 
     fn global(&self, name: &str) -> Option<TextRange> {
