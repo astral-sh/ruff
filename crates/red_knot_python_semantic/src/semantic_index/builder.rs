@@ -2252,7 +2252,7 @@ where
 }
 
 impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
-    fn seen_docstring_boundary(&self) -> bool {
+    fn seen_module_docstring_boundary(&self) -> bool {
         self.seen_module_docstring_boundary
     }
 

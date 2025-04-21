@@ -506,7 +506,7 @@ impl SemanticSyntaxChecker {
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
-                if !ctx.seen_docstring_boundary() && value.is_string_literal_expr() => {}
+                if !ctx.seen_module_docstring_boundary() && value.is_string_literal_expr() => {}
             Stmt::ImportFrom(StmtImportFrom { module, .. }) => {
                 // Allow __future__ imports until we see a non-__future__ import.
                 if !matches!(module.as_deref(), Some("__future__")) {
@@ -1585,7 +1585,7 @@ where
 /// ```
 pub trait SemanticSyntaxContext {
     /// Returns `true` if a module's docstring boundary has been passed.
-    fn seen_docstring_boundary(&self) -> bool;
+    fn seen_module_docstring_boundary(&self) -> bool;
 
     /// Returns `true` if `__future__`-style type annotations are enabled.
     fn future_annotations_or_stub(&self) -> bool;

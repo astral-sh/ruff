@@ -504,7 +504,7 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
 }
 
 impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
-    fn seen_docstring_boundary(&self) -> bool {
+    fn seen_module_docstring_boundary(&self) -> bool {
         false
     }
 
