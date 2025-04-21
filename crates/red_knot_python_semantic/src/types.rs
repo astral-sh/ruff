@@ -1153,7 +1153,7 @@ impl<'db> Type<'db> {
                     return new_function.is_subtype_of(db, target);
                 }
 
-                let new_symbol = self
+                let new_function_symbol = self
                     .member_lookup_with_policy(
                         db,
                         "__new__".into(),
@@ -1162,10 +1162,11 @@ impl<'db> Type<'db> {
                     )
                     .symbol;
 
-                if let Symbol::Type(Type::BoundMethod(new_function), _) = new_symbol {
-                    let new_function = new_function.into_callable_type(db);
+                if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+                    let new_function = new_function.into_bound_method_type(db, self);
                     return new_function.is_subtype_of(db, target);
                 }
+
                 false
             }
 
@@ -5916,6 +5917,15 @@ impl<'db> FunctionType<'db> {
             db,
             self.signature(db).iter().cloned(),
         ))
+    }
+
+    /// Convert the `FunctionType` into a [`Type::BoundMethod`].
+    pub(crate) fn into_bound_method_type(
+        self,
+        db: &'db dyn Db,
+        self_instance: Type<'db>,
+    ) -> Type<'db> {
+        Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
     }
 
     /// Returns the [`FileRange`] of the function's name.
