@@ -79,7 +79,10 @@ impl Violation for ClassWithMixedTypeVars {
 
 /// RUF053
 pub(crate) fn class_with_mixed_type_vars(checker: &Checker, class_def: &StmtClassDef) {
-    if checker.target_version() < PythonVersion::PY312 {
+    if checker
+        .target_version()
+        .is_none_or(|v| v < PythonVersion::PY312)
+    {
         return;
     }
 

@@ -69,7 +69,10 @@ impl AlwaysFixableViolation for SliceToRemovePrefixOrSuffix {
 
 /// FURB188
 pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprIf) {
-    if checker.target_version() < PythonVersion::PY39 {
+    if checker
+        .target_version()
+        .is_none_or(|v| v < PythonVersion::PY39)
+    {
         return;
     }
 
@@ -100,7 +103,10 @@ pub(crate) fn slice_to_remove_affix_expr(checker: &Checker, if_expr: &ast::ExprI
 
 /// FURB188
 pub(crate) fn slice_to_remove_affix_stmt(checker: &Checker, if_stmt: &ast::StmtIf) {
-    if checker.target_version() < PythonVersion::PY39 {
+    if checker
+        .target_version()
+        .is_none_or(|v| v < PythonVersion::PY39)
+    {
         return;
     }
     if let Some(removal_data) = affix_removal_data_stmt(if_stmt) {

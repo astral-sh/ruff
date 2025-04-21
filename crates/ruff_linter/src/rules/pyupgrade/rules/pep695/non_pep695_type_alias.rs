@@ -111,7 +111,10 @@ impl Violation for NonPEP695TypeAlias {
 
 /// UP040
 pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
-    if checker.target_version() < PythonVersion::PY312 {
+    if checker
+        .target_version()
+        .is_none_or(|v| v < PythonVersion::PY312)
+    {
         return;
     }
 
@@ -182,7 +185,10 @@ pub(crate) fn non_pep695_type_alias_type(checker: &Checker, stmt: &StmtAssign) {
 
 /// UP040
 pub(crate) fn non_pep695_type_alias(checker: &Checker, stmt: &StmtAnnAssign) {
-    if checker.target_version() < PythonVersion::PY312 {
+    if checker
+        .target_version()
+        .is_none_or(|v| v < PythonVersion::PY312)
+    {
         return;
     }
 

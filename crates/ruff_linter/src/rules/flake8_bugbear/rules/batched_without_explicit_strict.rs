@@ -59,7 +59,10 @@ impl Violation for BatchedWithoutExplicitStrict {
 
 /// B911
 pub(crate) fn batched_without_explicit_strict(checker: &Checker, call: &ExprCall) {
-    if checker.target_version() < PythonVersion::PY313 {
+    if checker
+        .target_version()
+        .is_none_or(|v| v < PythonVersion::PY313)
+    {
         return;
     }
 
