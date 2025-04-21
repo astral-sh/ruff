@@ -166,7 +166,9 @@ impl Workspace {
         let target_version = self.settings.linter.unresolved_target_version;
 
         // Parse once.
-        let options = ParseOptions::from(source_type).with_target_version(target_version);
+        let options = ParseOptions::from(source_type).with_target_version(
+            target_version.unwrap_or_else(ruff_python_ast::PythonVersion::latest),
+        );
         let parsed = parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("`PySourceType` always parses to a `ModModule`.");

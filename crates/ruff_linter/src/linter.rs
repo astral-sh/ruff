@@ -773,7 +773,8 @@ fn parse_unchecked_source(
     source_type: PySourceType,
     target_version: Option<PythonVersion>,
 ) -> Parsed<ModModule> {
-    let options = ParseOptions::from(source_type).with_target_version(target_version);
+    let options = ParseOptions::from(source_type)
+        .with_target_version(target_version.unwrap_or_else(PythonVersion::latest));
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
@@ -973,8 +974,11 @@ mod tests {
         settings: &LinterSettings,
     ) -> Vec<Message> {
         let source_type = PySourceType::from(path);
-        let options =
-            ParseOptions::from(source_type).with_target_version(settings.unresolved_target_version);
+        let options = ParseOptions::from(source_type).with_target_version(
+            settings
+                .unresolved_target_version
+                .unwrap_or_else(PythonVersion::latest),
+        );
         let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("PySourceType always parses into a module");
