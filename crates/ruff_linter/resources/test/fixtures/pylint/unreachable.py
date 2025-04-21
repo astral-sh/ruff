@@ -58,3 +58,15 @@ def empty_iter():
         print("unreachable")
     else:
         print("reachable")
+
+def simple_switch(cond):
+    if cond:
+        return "reachable"
+    print("reachable")
+
+def simple_switch(cond):
+    if cond:
+        return "reachable"
+    else:
+        return "reachable"
+    print("unreachable")
