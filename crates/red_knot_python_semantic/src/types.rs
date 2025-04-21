@@ -1144,13 +1144,15 @@ impl<'db> Type<'db> {
                     )
                     .symbol;
 
-                if let Symbol::Type(Type::BoundMethod(new_function), _) = metaclass_call_symbol {
+                if let Symbol::Type(Type::BoundMethod(metaclass_call_function), _) =
+                    metaclass_call_symbol
+                {
                     // TODO: this intentionally diverges from step 1 in
                     // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
                     // by always respecting the signature of the metaclass `__call__`, rather than
                     // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-                    let new_function = new_function.into_callable_type(db);
-                    return new_function.is_subtype_of(db, target);
+                    let metaclass_call_function = metaclass_call_function.into_callable_type(db);
+                    return metaclass_call_function.is_subtype_of(db, target);
                 }
                 false
             }
