@@ -224,8 +224,104 @@ impl<'stmt> CFGBuilder<'stmt> {
                 | Stmt::Delete(_)
                 | Stmt::IpyEscapeCommand(_) => {}
                 // Loops
-                Stmt::While(_) => {}
-                Stmt::For(_) => {}
+                Stmt::While(stmt_while) => {
+                    // Block to move to after processing loop
+                    let next_block = self.next_or_default_block(&stmts[end + 1..], self.exit);
+
+                    // Blocks for guard, body, and (optional) else clause
+                    let guard = self.new_loop_guard();
+                    let body = self.new_block();
+                    let orelse = if stmt_while.orelse.is_empty() {
+                        None
+                    } else {
+                        Some(self.new_block())
+                    };
+
+                    // Finish current block and move to guard
+                    if self.current != guard {
+                        self.set_current_block_stmts(&stmts[start..end]);
+                        self.set_current_block_edges(Edges::always(guard));
+                        self.move_to(guard);
+                    }
+
+                    // Finish guard and push loop context
+                    let guard_target = orelse.unwrap_or(next_block);
+                    let targets = vec![body, guard_target];
+                    let conditions = vec![Condition::Test(&stmt_while.test), Condition::Else];
+                    let edges = Edges {
+                        conditions,
+                        targets,
+                    };
+                    self.set_current_block_stmts(&stmts[end..=end]);
+                    self.set_current_block_edges(edges);
+                    self.push_loop(guard, next_block);
+
+                    // Process body
+                    self.update_exit(guard);
+                    self.move_to(body);
+                    self.process_stmts(&stmt_while.body);
+
+                    // Process (optional) else
+                    if let Some(orelse) = orelse {
+                        self.update_exit(next_block);
+                        self.move_to(orelse);
+                        self.process_stmts(&stmt_while.orelse);
+                    }
+
+                    // Cleanup
+                    self.pop_loop();
+                    self.move_to(next_block);
+                    start = end + 1;
+                }
+                Stmt::For(stmt_for) => {
+                    // Block to move to after processing loop
+                    let next_block = self.next_or_default_block(&stmts[end + 1..], self.exit);
+
+                    // Blocks for guard, body, and (optional) else clause
+                    let guard = self.new_loop_guard();
+                    let body = self.new_block();
+                    let orelse = if stmt_for.orelse.is_empty() {
+                        None
+                    } else {
+                        Some(self.new_block())
+                    };
+
+                    // Finish current block and move to guard
+                    if self.current != guard {
+                        self.set_current_block_stmts(&stmts[start..end]);
+                        self.set_current_block_edges(Edges::always(guard));
+                        self.move_to(guard);
+                    }
+
+                    // Finish guard and push loop context
+                    let guard_target = orelse.unwrap_or(next_block);
+                    let targets = vec![body, guard_target];
+                    let conditions = vec![Condition::NotStopIter(&stmt_for.iter), Condition::Else];
+                    let edges = Edges {
+                        conditions,
+                        targets,
+                    };
+                    self.set_current_block_stmts(&stmts[end..=end]);
+                    self.set_current_block_edges(edges);
+                    self.push_loop(guard, next_block);
+
+                    // Process body
+                    self.update_exit(guard);
+                    self.move_to(body);
+                    self.process_stmts(&stmt_for.body);
+
+                    // Process (optional) else
+                    if let Some(orelse) = orelse {
+                        self.update_exit(next_block);
+                        self.move_to(orelse);
+                        self.process_stmts(&stmt_for.orelse);
+                    }
+
+                    // Cleanup
+                    self.pop_loop();
+                    self.move_to(next_block);
+                    start = end + 1;
+                }
 
                 // Switch statements
                 Stmt::If(_) => {}
@@ -247,8 +343,32 @@ impl<'stmt> CFGBuilder<'stmt> {
                         self.move_to(next_block);
                     }
                 }
-                Stmt::Break(_) => {}
-                Stmt::Continue(_) => {}
+                Stmt::Break(_) => {
+                    let edges = Edges::always(
+                        self.loop_exit()
+                            .expect("`break` should only occur inside loop context"),
+                    );
+                    self.set_current_block_stmts(&stmts[start..=end]);
+                    self.set_current_block_edges(edges);
+                    start = end + 1;
+                    if stmts.get(start).is_some() {
+                        let next_block = self.new_block();
+                        self.move_to(next_block);
+                    }
+                }
+                Stmt::Continue(_) => {
+                    let edges = Edges::always(
+                        self.loop_guard()
+                            .expect("`continue` should only occur inside loop context"),
+                    );
+                    self.set_current_block_stmts(&stmts[start..=end]);
+                    self.set_current_block_edges(edges);
+                    start = end + 1;
+                    if stmts.get(start).is_some() {
+                        let next_block = self.new_block();
+                        self.move_to(next_block);
+                    }
+                }
                 Stmt::Raise(_) => {
                     let edges = Edges::always(self.cfg.terminal());
                     self.set_current_block_stmts(&stmts[start..=end]);
@@ -275,7 +395,8 @@ impl<'stmt> CFGBuilder<'stmt> {
             self.set_current_block_stmts(&stmts[start..]);
         }
         // Add edge to exit if not already present
-        if self.cfg.blocks[self.current].out.is_empty() {
+        // and not _already_ at exit
+        if self.current != self.exit && self.cfg.blocks[self.current].out.is_empty() {
             let edges = Edges::always(self.exit());
             self.set_current_block_edges(edges);
         }
