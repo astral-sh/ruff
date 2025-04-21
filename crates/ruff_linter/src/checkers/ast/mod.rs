@@ -524,8 +524,9 @@ impl<'a> Checker<'a> {
     }
 
     /// Return the [`PythonVersion`] to use for version-related checks.
-    pub(crate) const fn target_version(&self) -> PythonVersion {
-        self.target_version
+    pub(crate) fn target_version(&self) -> PythonVersion {
+        // TODO(brent)
+        self.target_version.unwrap_or_default()
     }
 
     /// Return the [`PythonVersion`] to use for version-related checks.
@@ -591,7 +592,7 @@ impl TypingImporter<'_, '_> {
 
 impl SemanticSyntaxContext for Checker<'_> {
     fn python_version(&self) -> PythonVersion {
-        self.target_version
+        self.target_version()
     }
 
     fn global(&self, name: &str) -> Option<TextRange> {
