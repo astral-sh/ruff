@@ -34,7 +34,7 @@ use crate::checkers::ast::Checker;
 /// This fix is unsafe because if the removed argument or keyword is an
 /// expression with side effects. Removing such arguments may
 /// skip the execution of those side effects.
-/// 
+///
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
 #[derive(ViolationMetadata)]
