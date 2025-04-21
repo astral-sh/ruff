@@ -487,6 +487,50 @@ static_assert(is_assignable_to(CallableTypeOf[keyword_variadic], Callable[..., N
 static_assert(is_assignable_to(CallableTypeOf[mixed], Callable[..., None]))
 ```
 
+### Class literals
+
+#### Classes with metaclasses
+
+```py
+from typing import Callable
+from typing_extensions import Self
+from knot_extensions import TypeOf, static_assert, is_subtype_of
+
+class MetaWithReturn(type):
+    def __call__(cls) -> "A":
+        return super().__call__()
+
+class A(metaclass=MetaWithReturn): ...
+
+def f(x: Callable[[], A]) -> None: ...
+
+# TODO: This should not error
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `() -> A`, found `Literal[A]`"
+f(A)
+
+class MetaWithDifferentReturn(type):
+    def __call__(cls) -> int:
+        return super().__call__()
+
+class B(metaclass=MetaWithDifferentReturn): ...
+
+def g(x: Callable[[], int]) -> None: ...
+
+g(B)
+
+class MetaWithSelfReturn(type):
+    def __call__(cls) -> Self:
+        return super().__call__()
+
+class C(metaclass=MetaWithSelfReturn): ...
+
+def h(x: Callable[[], C]) -> None: ...
+
+# TODO: This should not error
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `() -> C`, found `Literal[C]`"
+h(C)
+```
+
 ### Function types
 
 ```py

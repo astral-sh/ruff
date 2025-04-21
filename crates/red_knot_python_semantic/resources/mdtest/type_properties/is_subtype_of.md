@@ -1127,24 +1127,45 @@ f(a)
 
 ### Class literals
 
+#### Classes with metaclasses
+
 ```py
 from typing import Callable
+from typing_extensions import Self
 from knot_extensions import TypeOf, static_assert, is_subtype_of
 
-class Meta(type):
+class MetaWithReturn(type):
     def __call__(cls) -> "A":
         return super().__call__()
 
-class A(metaclass=Meta): ...
+class A(metaclass=MetaWithReturn): ...
 
+# TODO: This should not error
+# This errors because the metaclass `__call__` is not seen as overriding `type.__call__`
+# and we don't yet check `__new__` or `__init__`.
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
 static_assert(is_subtype_of(TypeOf[A], Callable[[], A]))
 static_assert(not is_subtype_of(TypeOf[A], Callable[[object], A]))
 
-class B:
-    def __new__(cls) -> "B":
-        return super().__new__(cls)
+class MetaWithDifferentReturn(type):
+    def __call__(cls) -> int:
+        return super().__call__()
 
-static_assert(is_subtype_of(TypeOf[B], Callable[[], B]))
+class B(metaclass=MetaWithDifferentReturn): ...
+
+static_assert(is_subtype_of(TypeOf[B], Callable[[], int]))
+static_assert(not is_subtype_of(TypeOf[B], Callable[[], B]))
+
+class MetaWithSelfReturn(type):
+    def __call__(cls) -> Self:
+        return super().__call__()
+
+class C(metaclass=MetaWithSelfReturn): ...
+
+# TODO: This should not error
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
+static_assert(not is_subtype_of(TypeOf[C], Callable[[object], C]))
 ```
 
 ### Bound methods

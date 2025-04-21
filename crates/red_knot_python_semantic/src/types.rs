@@ -1123,29 +1123,28 @@ impl<'db> Type<'db> {
                     .member_lookup_with_policy(
                         db,
                         "__call__".into(),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
                             | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
                     )
                     .symbol;
+
                 if let Symbol::Type(Type::BoundMethod(new_function), _) = metaclass_call_symbol {
-                    let metaclass_call_callable = new_function.into_callable_type(db);
-                    return metaclass_call_callable.is_subtype_of(db, target);
-                }
-                let new_symbol = self
-                    .member_lookup_with_policy(
-                        db,
-                        "__new__".into(),
-                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                    )
-                    .symbol;
-                match new_symbol {
-                    Symbol::Type(Type::FunctionLiteral(new_function), _) => {
-                        let new_callable = new_function.into_bound_method_type(db, self);
-                        new_callable.is_subtype_of(db, target)
+                    let overrides_type_call = match new_function.function(db).signature(db) {
+                        FunctionSignature::Single(signature)
+                        | FunctionSignature::Overloaded(_, Some(signature)) => {
+                            match signature.return_ty {
+                                Some(ty) => !self.is_subtype_of(db, ty.to_meta_type(db)),
+                                _ => false,
+                            }
+                        }
+                        FunctionSignature::Overloaded(..) => false,
+                    };
+                    if overrides_type_call {
+                        let new_function = new_function.into_callable_type(db);
+                        return new_function.is_subtype_of(db, target);
                     }
-                    _ => false,
                 }
+                false
             }
 
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
@@ -5894,15 +5893,6 @@ impl<'db> FunctionType<'db> {
             db,
             self.signature(db).iter().cloned(),
         ))
-    }
-
-    /// Convert the `FunctionType` into a [`Type::BoundMethod`].
-    pub(crate) fn into_bound_method_type(
-        self,
-        db: &'db dyn Db,
-        self_instance: Type<'db>,
-    ) -> Type<'db> {
-        Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
     }
 
     /// Returns the [`FileRange`] of the function's name.
