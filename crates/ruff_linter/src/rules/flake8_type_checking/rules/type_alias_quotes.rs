@@ -281,9 +281,13 @@ pub(crate) fn quoted_type_alias(
         }
     }
 
+    let Some(target_version) = checker.target_version() else {
+        return;
+    };
+
     // explicit type aliases require some additional checks to avoid false positives
     if checker.semantic().in_annotated_type_alias_value()
-        && quotes_are_unremovable(checker.semantic(), expr, checker.target_version())
+        && quotes_are_unremovable(checker.semantic(), expr, checker.target_version_or_default())
     {
         return;
     }
