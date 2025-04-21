@@ -502,11 +502,9 @@ class MetaWithReturn(type):
 
 class A(metaclass=MetaWithReturn): ...
 
-def f(x: Callable[[], A]) -> None: ...
-
 # TODO: This should not error
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `() -> A`, found `Literal[A]`"
-f(A)
+# error: [invalid-assignment] "Object of type `Literal[A]` is not assignable to `() -> A`"
+f: Callable[[], A] = A
 
 class MetaWithDifferentReturn(type):
     def __call__(cls) -> int:
@@ -514,9 +512,7 @@ class MetaWithDifferentReturn(type):
 
 class B(metaclass=MetaWithDifferentReturn): ...
 
-def g(x: Callable[[], int]) -> None: ...
-
-g(B)
+g: Callable[[], int] = B
 
 class MetaWithSelfReturn(type):
     def __call__(cls) -> Self:
@@ -524,11 +520,9 @@ class MetaWithSelfReturn(type):
 
 class C(metaclass=MetaWithSelfReturn): ...
 
-def h(x: Callable[[], C]) -> None: ...
-
 # TODO: This should not error
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `() -> C`, found `Literal[C]`"
-h(C)
+# error: [invalid-assignment] "Object of type `Literal[C]` is not assignable to `() -> C`"
+h: Callable[[], C] = C
 ```
 
 ### Function types
