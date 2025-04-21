@@ -215,7 +215,7 @@ pub fn check_path(
                     package,
                     source_type,
                     cell_offsets,
-                    target_version,
+                    target_version.unwrap_or_else(PythonVersion::latest),
                 );
 
                 diagnostics.extend(import_diagnostics);
