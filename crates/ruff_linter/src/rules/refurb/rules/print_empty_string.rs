@@ -31,9 +31,9 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety
-/// This fix is unsafe because if the removed argument or keyword is an
-/// expression with side effects. Removing such arguments may
-/// skip the execution of those side effects.
+/// This fix is marked as unsafe if it removes an unused `sep` keyword argument
+/// that may have side effects. Removing such arguments may change the program's
+/// behavior by skipping the execution of those side effects.
 ///
 /// ## References
 /// - [Python documentation: `print`](https://docs.python.org/3/library/functions.html#print)
