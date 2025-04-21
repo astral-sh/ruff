@@ -45,7 +45,7 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// - `lint.flake8-tidy-imports.ban-relative-imports`
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe because it may remove comments associated
+/// This fix is marked as unsafe if it may remove comments associated
 /// with the import statement. The fix is only applied when the absolute module
 /// path can be reliably determined.
 ///
