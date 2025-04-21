@@ -6,8 +6,9 @@ pub(super) fn shadows_builtin(
     name: &str,
     source_type: PySourceType,
     ignorelist: &[String],
-    python_version: PythonVersion,
+    python_version: Option<PythonVersion>,
 ) -> bool {
+    let python_version = python_version.unwrap_or_else(PythonVersion::latest);
     if is_python_builtin(name, python_version.minor, source_type.is_ipynb()) {
         ignorelist.iter().all(|ignore| ignore != name)
     } else {

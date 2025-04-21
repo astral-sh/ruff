@@ -2374,7 +2374,7 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        let target_version = self.target_version();
+        let target_version = self.target_version_or_latest();
         let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
