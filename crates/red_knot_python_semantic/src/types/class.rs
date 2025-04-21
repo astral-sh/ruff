@@ -134,6 +134,23 @@ impl<'db> Class<'db> {
 pub struct NonGenericClass<'db> {
     #[return_ref]
     pub(crate) class: Class<'db>,
+
+    pub(crate) specialization: Option<Specialization<'db>>,
+}
+
+impl<'db> NonGenericClass<'db> {
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        eprintln!(
+            "==> specialize {} with {}",
+            Type::from(self).display(db),
+            specialization.display(db)
+        );
+        NonGenericClass::new(db, self.class(db), Some(specialization))
+    }
 }
 
 impl<'db> From<NonGenericClass<'db>> for Type<'db> {
@@ -223,7 +240,13 @@ impl<'db> ClassType<'db> {
 
     fn specialize_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
-            Self::NonGeneric(_) => ty,
+            Self::NonGeneric(non_generic) => {
+                if let Some(specialization) = non_generic.specialization(db) {
+                    ty.apply_specialization(db, specialization)
+                } else {
+                    ty
+                }
+            }
             Self::Generic(generic) => ty.apply_specialization(db, generic.specialization(db)),
         }
     }

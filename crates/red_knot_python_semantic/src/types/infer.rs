@@ -1795,7 +1795,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             Some(generic_context) => {
                 ClassLiteralType::Generic(GenericClass::new(self.db(), class, generic_context))
             }
-            None => ClassLiteralType::NonGeneric(NonGenericClass::new(self.db(), class)),
+            None => {
+                let specialization = None;
+                ClassLiteralType::NonGeneric(NonGenericClass::new(self.db(), class, specialization))
+            }
         };
         let class_ty = Type::from(class_literal);
 

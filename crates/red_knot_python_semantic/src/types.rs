@@ -4651,6 +4651,12 @@ impl<'db> Type<'db> {
                 Type::Callable(callable.apply_specialization(db, specialization))
             }
 
+            Type::ClassLiteral(ClassLiteralType::NonGeneric(class)) => {
+                Type::from(class.apply_specialization(db, specialization))
+            }
+
+            Type::ClassLiteral(ClassLiteralType::Generic(_)) => self,
+
             Type::GenericAlias(generic) => {
                 let specialization = generic
                     .specialization(db)
@@ -4692,10 +4698,6 @@ impl<'db> Type<'db> {
             | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
             | Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
-            // A non-generic class never needs to be specialized. A generic class is specialized
-            // explicitly (via a subscript expression) or implicitly (via a call), and not because
-            // some other generic context's specialization is applied to it.
-            | Type::ClassLiteral(_)
             // SubclassOf contains a ClassType, which has already been specialized if needed, like
             // above with BoundMethod's self_instance.
             | Type::SubclassOf(_)

@@ -56,6 +56,15 @@ class D(C[T]): ...
 
 (Examples `E` and `F` from above do not have analogues in the legacy syntax.)
 
+## fwomp
+
+```py
+class C[T]:
+    x: T
+
+reveal_type(C[int]())  # revealed: C[int]
+```
+
 ## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
@@ -158,7 +167,7 @@ If the type of a constructor parameter is a class typevar, we can use that to in
 parameter. The types inferred from a type context and from a constructor parameter must be
 consistent with each other.
 
-## `__new__` only
+### `__new__` only
 
 ```py
 class C[T]:
@@ -171,7 +180,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
-## `__init__` only
+### `__init__` only
 
 ```py
 class C[T]:
@@ -183,7 +192,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
-## Identical `__new__` and `__init__` signatures
+### Identical `__new__` and `__init__` signatures
 
 ```py
 class C[T]:
@@ -198,7 +207,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
-## Compatible `__new__` and `__init__` signatures
+### Compatible `__new__` and `__init__` signatures
 
 ```py
 class C[T]:
@@ -224,7 +233,7 @@ reveal_type(D(1))  # revealed: D[Literal[1]]
 wrong_innards: D[int] = D("five")
 ```
 
-## `__init__` is itself generic
+### `__init__` is itself generic
 
 TODO: These do not currently work yet, because we don't correctly model the nested generic contexts.
 
@@ -283,6 +292,33 @@ class C[T]:
 
 c: C[int] = C[int]()
 reveal_type(c.method("string"))  # revealed: Literal["string"]
+```
+
+## Nested classes
+
+```py
+class C[T]:
+    class D:
+        x: T
+
+    class E[U]:
+        x: T
+        y: U
+
+    def method1(self) -> "D":
+        return self.D()
+
+    def method2(self) -> "E[str]":
+        return self.E[str]()
+
+reveal_type(C[int]().method1())  # revealed: D
+# TODO: revealed: int
+reveal_type(C[int]().method1().x)  # revealed: T
+
+reveal_type(C[int]().method2())  # revealed: E[str]
+# TODO: revealed: int
+reveal_type(C[int]().method2().x)  # revealed: T
+reveal_type(C[int]().method2().y)  # revealed: str
 ```
 
 ## Cyclic class definition
