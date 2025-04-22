@@ -3450,6 +3450,9 @@ impl<'db> Type<'db> {
                 ))
             }
 
+            // TODO: We should probably also check the original return type of the function
+            // that was decorated with `@dataclass_transform`, to see if it is consistent with
+            // with what we configure here.
             Type::DataclassTransformer(_) => Signatures::single(CallableSignature::single(
                 self,
                 Signature::new(
