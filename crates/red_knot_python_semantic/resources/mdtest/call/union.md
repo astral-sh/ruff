@@ -162,6 +162,30 @@ def _(flag: bool):
     reveal_type(f("string"))  # revealed: Literal["string", "'string'"]
 ```
 
+## Unions with literals and negations
+
+```py
+from typing import Literal, Union
+from knot_extensions import Not, AlwaysFalsy, static_assert, is_subtype_of, is_assignable_to
+
+static_assert(is_subtype_of(Literal["a", ""], Union[Literal["a", ""], Not[AlwaysFalsy]]))
+static_assert(is_subtype_of(Not[AlwaysFalsy], Union[Literal["", "a"], Not[AlwaysFalsy]]))
+static_assert(is_subtype_of(Literal["a", ""], Union[Not[AlwaysFalsy], Literal["a", ""]]))
+static_assert(is_subtype_of(Not[AlwaysFalsy], Union[Not[AlwaysFalsy], Literal["a", ""]]))
+
+static_assert(is_subtype_of(Literal["a", ""], Union[Literal["a", ""], Not[Literal[""]]]))
+static_assert(is_subtype_of(Not[Literal[""]], Union[Literal["a", ""], Not[Literal[""]]]))
+static_assert(is_subtype_of(Literal["a", ""], Union[Not[Literal[""]], Literal["a", ""]]))
+static_assert(is_subtype_of(Not[Literal[""]], Union[Not[Literal[""]], Literal["a", ""]]))
+
+def _(
+    x: Union[Literal["a", ""], Not[AlwaysFalsy]],
+    y: Union[Literal["a", ""], Not[Literal[""]]],
+):
+    reveal_type(x)  # revealed: Literal[""] | ~AlwaysFalsy
+    reveal_type(y)  # revealed: Literal[""] | ~Literal[""]
+```
+
 ## Cannot use an argument as both a value and a type form
 
 ```py
