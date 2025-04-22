@@ -1,5 +1,6 @@
+use crate::importer::ImportRequest;
 use crate::rules::airflow::helpers::ProviderReplacement;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
@@ -48,6 +49,12 @@ impl Violation for Airflow3MovedToProvider {
                 provider,
                 version: _,
             }
+            | ProviderReplacement::AutoImport {
+                name: _,
+                module: _,
+                provider,
+                version: _,
+            }
             | ProviderReplacement::SourceModuleMovedToProvider {
                 name: _,
                 module: _,
@@ -72,6 +79,14 @@ impl Violation for Airflow3MovedToProvider {
                     "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` instead."
                 ))
             },
+            ProviderReplacement::AutoImport {
+                name,
+                module,
+                provider,
+                version,
+            } => {
+                Some(format!("Install `apache-airflow-provider-{provider}>={version}` and use `{module}.{name}` instead."))
+            } ,
             ProviderReplacement::SourceModuleMovedToProvider {
                 name,
                 module,
@@ -765,11 +780,32 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
         _ => return,
     };
-    checker.report_diagnostic(Diagnostic::new(
+
+    let mut diagnostic = Diagnostic::new(
         Airflow3MovedToProvider {
             deprecated: qualified_name.to_string(),
-            replacement,
+            replacement: replacement.clone(),
         },
         ranged.range(),
-    ));
+    );
+
+    if let ProviderReplacement::AutoImport {
+        module,
+        name,
+        provider: _,
+        version: _,
+    } = replacement
+    {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from(module, name),
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let replacement_edit = Edit::range_replacement(binding, ranged.range());
+            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+        });
+    }
+
+    checker.report_diagnostic(diagnostic);
 }
