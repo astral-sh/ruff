@@ -8,7 +8,7 @@ Unless otherwise specified, all quotations come from the [Generics] section of t
 
 ## Type variables
 
-### Defining legacy type variables fwomp
+### Defining legacy type variables
 
 > Generics can be parameterized by using a factory available in `typing` called `TypeVar`.
 
