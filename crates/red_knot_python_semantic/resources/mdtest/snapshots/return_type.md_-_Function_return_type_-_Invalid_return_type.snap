@@ -35,12 +35,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/function/return_ty
 # Diagnostics
 
 ```
-error: lint:invalid-return-type
+error: lint:invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `int`
  --> /src/mdtest_snippet.py:2:12
   |
 1 | # error: [invalid-return-type]
 2 | def f() -> int:
-  |            ^^^ Function can implicitly return `None`, which is not assignable to return type `int`
+  |            ^^^
 3 |     1
   |
 

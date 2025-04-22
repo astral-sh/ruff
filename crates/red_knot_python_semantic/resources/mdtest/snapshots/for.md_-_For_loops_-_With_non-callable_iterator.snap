@@ -45,13 +45,13 @@ error: lint:not-iterable
 ```
 
 ```
-warning: lint:possibly-unresolved-reference
+warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
   --> /src/mdtest_snippet.py:16:17
    |
 14 |     # revealed: Unknown
 15 |     # error: [possibly-unresolved-reference]
 16 |     reveal_type(x)
-   |                 ^ Name `x` used when possibly not defined
+   |                 ^
    |
 
 ```
