@@ -90,6 +90,7 @@ rich
 rotki
 schema_salad
 scrapy
+setuptools
 sockeye
 speedrun.com_global_scoreboard_webapp
 starlette

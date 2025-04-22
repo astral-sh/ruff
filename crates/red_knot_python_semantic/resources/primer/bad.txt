@@ -24,7 +24,6 @@ pywin32  # bad use-def map (binding with definitely-visible unbound)
 schemathesis  # cycle panics (signature_)
 scikit-learn  # success, but mypy-primer hangs processing the output
 scipy  # missing expression ID
-setuptools  # too many cycle iterations (infer_definition_types)
 spack  # success, but mypy-primer hangs processing the output
 spark  # missing expression ID
 sphinx  # missing expression ID
