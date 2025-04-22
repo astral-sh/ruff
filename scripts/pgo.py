@@ -15,14 +15,23 @@ TRIPLE = "x86_64-unknown-linux-gnu"
 env = os.environ.copy()
 env["LLVM_PROFILE_FILE"] = f"{os.getcwd()}/target/pgo-profiles/ruff_%m_%p.profraw"
 
+
 def run_command(cmd, env, cwd=None, check=False):
     print(f">>> {cmd}")
-    subprocess.run(cmd, shell=True, check=check, cwd=cwd, env=env, stdout = subprocess.DEVNULL, stderr= subprocess.DEVNULL)
+    subprocess.run(
+        cmd,
+        shell=True,
+        check=check,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
 
 def main():
     CLONE_DIR.mkdir(exist_ok=True)
-    
+
     with open(PROJECTS_JSON, "r") as f:
         projects = json.load(f)
 
@@ -38,12 +47,21 @@ def main():
         print(f">> collecting data on {name}.")
 
         if not dest.exists():
-            run_command(f"git clone --depth 1 --quiet --branch {branch} {url} {dest}", env=env)
+            run_command(
+                f"git clone --depth 1 --quiet --branch {branch} {url} {dest}", env=env
+            )
 
-        run_command(f"../../target/{TRIPLE}/release/ruff check -n -e --diff .", env=env, cwd=dest)
-        run_command(f"../../target/{TRIPLE}/release/ruff format -n --check .", env=env, cwd=dest)
+        run_command(
+            f"../../target/{TRIPLE}/release/ruff check -n -e --diff .",
+            env=env,
+            cwd=dest,
+        )
+        run_command(
+            f"../../target/{TRIPLE}/release/ruff format -n --check .", env=env, cwd=dest
+        )
 
     run_command("cargo pgo optimize", env=env)
+
 
 if __name__ == "__main__":
     main()
