@@ -163,7 +163,7 @@ class ModuleType:
 `/typeshed/stdlib/typing_extensions.pyi`:
 
 ```pyi
-def reveal_type(obj, /): ...
+def reveal_type[T](obj: T, /) -> T: ...
 ```
 
 `main.py`:
