@@ -1203,6 +1203,7 @@ If `__call__` and `__new__` are both present, `__call__` takes precedence.
 ```py
 from typing import Callable
 from knot_extensions import TypeOf, static_assert, is_subtype_of
+
 class MetaWithIntReturn(type):
     def __call__(cls) -> int:
         return super().__call__()

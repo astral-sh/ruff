@@ -1167,7 +1167,7 @@ impl<'db> Type<'db> {
                     return new_function.is_subtype_of(db, target);
                 }
 
-            // TODO handle `__init__` also
+                // TODO handle `__init__` also
                 false
             }
 
