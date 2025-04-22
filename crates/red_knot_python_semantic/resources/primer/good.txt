@@ -18,6 +18,7 @@ python-chess
 python-htmlgen
 rich
 scrapy
+strawberry
 typeshed-stats
 werkzeug
 zipp

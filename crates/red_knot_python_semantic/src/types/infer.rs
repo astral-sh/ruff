@@ -82,7 +82,7 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     binding_type, todo_type, CallDunderError, CallableSignature, CallableType, Class,
-    ClassLiteralType, ClassType, DataclassMetadata, DynamicType, FunctionDecorators, FunctionType,
+    ClassLiteralType, ClassType, DataclassParams, DynamicType, FunctionDecorators, FunctionType,
     GenericAlias, GenericClass, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
     KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, NonGenericClass, Parameter,
     ParameterForm, Parameters, Signature, Signatures, SliceLiteralType, StringLiteralType,
@@ -1457,6 +1457,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
+        let mut dataclass_transformer_params = None;
 
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
@@ -1477,6 +1478,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     function_decorators |= FunctionDecorators::CLASSMETHOD;
                     continue;
                 }
+            } else if let Type::DataclassTransformer(params) = decorator_ty {
+                dataclass_transformer_params = Some(params);
             }
 
             decorator_types_and_nodes.push((decorator_ty, decorator));
@@ -1523,6 +1526,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             function_kind,
             body_scope,
             function_decorators,
+            dataclass_transformer_params,
             generic_context,
             specialization,
         ));
@@ -1757,19 +1761,32 @@ impl<'db> TypeInferenceBuilder<'db> {
             body: _,
         } = class_node;
 
-        let mut dataclass_metadata = None;
+        let mut dataclass_params = None;
+        let mut dataclass_transformer_params = None;
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
             if decorator_ty
                 .into_function_literal()
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
             {
-                dataclass_metadata = Some(DataclassMetadata::default());
+                dataclass_params = Some(DataclassParams::default());
                 continue;
             }
 
-            if let Type::DataclassDecorator(metadata) = decorator_ty {
-                dataclass_metadata = Some(metadata);
+            if let Type::DataclassDecorator(params) = decorator_ty {
+                dataclass_params = Some(params);
+                continue;
+            }
+
+            if let Type::FunctionLiteral(f) = decorator_ty {
+                if let Some(params) = f.dataclass_transformer_params(self.db()) {
+                    dataclass_params = Some(params.into());
+                    continue;
+                }
+            }
+
+            if let Type::DataclassTransformer(params) = decorator_ty {
+                dataclass_transformer_params = Some(params);
                 continue;
             }
         }
@@ -1789,7 +1806,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             name: name.id.clone(),
             body_scope,
             known: maybe_known_class,
-            dataclass_metadata,
+            dataclass_params,
+            dataclass_transformer_params,
         };
         let class_literal = match generic_context {
             Some(generic_context) => {
@@ -2502,6 +2520,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
@@ -4882,6 +4901,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
                 | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
@@ -5164,6 +5184,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
@@ -5188,6 +5209,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
