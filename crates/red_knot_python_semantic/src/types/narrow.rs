@@ -446,6 +446,11 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                 }
             }
             ast::CmpOp::Eq if lhs_ty.is_literal_string() => Some(rhs_ty),
+            ast::CmpOp::Eq if !rhs_ty.is_none(self.db) => Some(
+                IntersectionBuilder::new(self.db)
+                    .add_negative(Type::none(self.db))
+                    .build(),
+            ),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self
                 .evaluate_expr_in(lhs_ty, rhs_ty)
