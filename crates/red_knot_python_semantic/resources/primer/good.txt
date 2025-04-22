@@ -30,6 +30,7 @@ dd-trace-py
 dedupe
 django-stubs
 downforeveryone
+dragonchain
 dulwich
 flake8
 flake8-pyi
