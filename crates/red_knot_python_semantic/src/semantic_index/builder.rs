@@ -1040,6 +1040,9 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
+        if !self.db.is_file_open(self.file) {
+            return;
+        }
         let mut checker = std::mem::take(&mut self.semantic_checker);
         f(&mut checker, self);
         self.semantic_checker = checker;
