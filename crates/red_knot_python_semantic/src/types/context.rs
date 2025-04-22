@@ -81,22 +81,6 @@ impl<'db> InferContext<'db> {
         self.diagnostics.get_mut().extend(other);
     }
 
-    /// Reports a lint located at `ranged`.
-    pub(super) fn report_lint_old<T>(
-        &self,
-        lint: &'static LintMetadata,
-        ranged: T,
-        message: fmt::Arguments,
-    ) where
-        T: Ranged,
-    {
-        let Some(builder) = self.report_lint(lint, ranged) else {
-            return;
-        };
-        let mut diag = builder.into_diagnostic("");
-        diag.set_primary_message(message);
-    }
-
     /// Optionally return a builder for a lint diagnostic guard.
     ///
     /// If the current context believes a diagnostic should be reported for
