@@ -28,7 +28,7 @@ spack  # success, but mypy-primer hangs processing the output
 spark  # cycle panics (try_metaclass_)
 sphinx  # missing expression ID
 steam.py  # missing expression ID
-streamlit  # cycle panic (signature)
+streamlit  # cycle panic (signature_)
 sympy  # stack overflow
 trio  # missing expression ID
 xarray  # cycle panics (try_metaclass_)
