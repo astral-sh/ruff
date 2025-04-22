@@ -35,12 +35,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Iterable` may not be iterable because it may not have an `__iter__` method or a `__getitem__` method
   --> /src/mdtest_snippet.py:17:14
    |
 16 |     # error: [not-iterable]
 17 |     for x in Iterable():
-   |              ^^^^^^^^^^ Object of type `Iterable` may not be iterable because it may not have an `__iter__` method or a `__getitem__` method
+   |              ^^^^^^^^^^
 18 |         reveal_type(x)  # revealed: int | bytes
    |
 

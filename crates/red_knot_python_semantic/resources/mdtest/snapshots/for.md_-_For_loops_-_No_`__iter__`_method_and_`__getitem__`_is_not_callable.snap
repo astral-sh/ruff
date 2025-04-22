@@ -25,12 +25,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Bad` is not iterable because it has no `__iter__` method and its `__getitem__` attribute has type `None`, which is not callable
  --> /src/mdtest_snippet.py:7:10
   |
 6 | # error: [not-iterable]
 7 | for x in Bad():
-  |          ^^^^^ Object of type `Bad` is not iterable because it has no `__iter__` method and its `__getitem__` attribute has type `None`, which is not callable
+  |          ^^^^^
 8 |     reveal_type(x)  # revealed: Unknown
   |
 
