@@ -2174,10 +2174,6 @@ impl<'db> Type<'db> {
                 .is_some_and(|instance| instance.class().is_known(db, KnownClass::Bool))
     }
 
-    fn is_negatively_narrowable(self, db: &'db dyn Db) -> bool {
-        self.is_single_valued(db)
-    }
-
     /// This function is roughly equivalent to `find_name_in_mro` as defined in the [descriptor guide] or
     /// [`_PyType_Lookup`] in CPython's `Objects/typeobject.c`. It should typically be called through
     /// [Type::class_member], unless it is known that `self` is a class-like type. This function returns

@@ -405,7 +405,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expr_ne(&mut self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if rhs_ty.is_negatively_narrowable(self.db) {
+        if rhs_ty.is_single_valued(self.db) {
             Some(rhs_ty.negate(self.db))
         } else {
             None
