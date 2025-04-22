@@ -30,11 +30,6 @@ pub trait SourceOrderVisitor<'a> {
     }
 
     #[inline]
-    fn visit_annotation(&mut self, expr: &'a Expr) {
-        walk_annotation(self, expr);
-    }
-
-    #[inline]
     fn visit_expr(&mut self, expr: &'a Expr) {
         walk_expr(self, expr);
     }
@@ -224,15 +219,6 @@ impl TraversalSignal {
     pub const fn is_traverse(self) -> bool {
         matches!(self, TraversalSignal::Traverse)
     }
-}
-
-pub fn walk_annotation<'a, V: SourceOrderVisitor<'a> + ?Sized>(visitor: &mut V, expr: &'a Expr) {
-    let node = AnyNodeRef::from(expr);
-    if visitor.enter_node(node).is_traverse() {
-        visitor.visit_expr(expr);
-    }
-
-    visitor.leave_node(node);
 }
 
 pub fn walk_decorator<'a, V>(visitor: &mut V, decorator: &'a Decorator)

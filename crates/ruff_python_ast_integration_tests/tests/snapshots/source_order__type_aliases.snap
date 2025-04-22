@@ -16,6 +16,5 @@ expression: trace
       - TypeParamParamSpec
         - Identifier
     - ExprSubscript
-      - ExprSubscript
-        - ExprName
-        - ExprName
+      - ExprName
+      - ExprName
