@@ -808,6 +808,41 @@ impl<'db> ClassLiteralType<'db> {
         Ok(candidate.metaclass.into())
     }
 
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let self_ty = Type::from(self);
+        let metaclass_call_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__call__".into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        if let Symbol::Type(Type::BoundMethod(new_function), _) = metaclass_call_symbol {
+            // TODO: this intentionally diverges from step 1 in
+            // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
+            // by always respecting the signature of the metaclass `__call__`, rather than
+            // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
+            return Some(new_function.into_callable_type(db));
+        }
+
+        let new_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__new__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+            return Some(new_function.into_bound_method_type(db, self.into()));
+        }
+        // TODO handle `__init__` also
+        None
+    }
+
     /// Returns the class member of this class named `name`.
     ///
     /// The member resolves to a member on the class itself or any of its proper superclasses.
