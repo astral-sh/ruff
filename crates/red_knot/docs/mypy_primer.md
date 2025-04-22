@@ -2,16 +2,16 @@
 
 ## Basics
 
-For now, we use our own [fork of mypy primer]. It can be run using `uvx --from "…" mypy_primer`. For example, to see the help message, run:
+`mypy_primer` can be run using `uvx --from "…" mypy_primer`. For example, to see the help message, run:
 
 ```sh
-uvx --from "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support" mypy_primer -h
+uvx --from "git+https://github.com/hauntsaninja/mypy_primer" mypy_primer -h
 ```
 
 Alternatively, you can install the forked version of `mypy_primer` using:
 
 ```sh
-uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support"
+uv tool install "git+https://github.com/hauntsaninja/mypy_primer"
 ```
 
 and then run it using `uvx mypy_primer` or just `mypy_primer`, if your `PATH` is set up accordingly (see: [Tool executables]).
@@ -31,7 +31,7 @@ mypy_primer \
 ```
 
 This will show the diagnostics diff for the `black` project between the `main` branch and your `my/feature` branch. To run the
-diff for all projects, you currently need to copy the project-selector regex from the CI pipeline in `.github/workflows/mypy_primer.yaml`.
+diff for all projects we currently enable in CI, use `--project-selector "/($(paste -s -d'|' crates/red_knot_python_semantic/resources/primer/good.txt))\$"`.
 
 You can also take a look at the [full list of ecosystem projects]. Note that some of them might still need a `knot_paths` configuration
 option to work correctly.
@@ -56,6 +56,5 @@ mypy_primer --repo /path/to/ruff --old origin/main --new my/local-branch …
 
 Note that you might need to clean up `/tmp/mypy_primer` in order for this to work correctly.
 
-[fork of mypy primer]: https://github.com/astral-sh/mypy_primer/tree/add-red-knot-support
-[full list of ecosystem projects]: https://github.com/astral-sh/mypy_primer/blob/add-red-knot-support/mypy_primer/projects.py
+[full list of ecosystem projects]: https://github.com/hauntsaninja/mypy_primer/blob/master/mypy_primer/projects.py
 [tool executables]: https://docs.astral.sh/uv/concepts/tools/#tool-executables

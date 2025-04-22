@@ -278,7 +278,7 @@ impl<'db> UnionBuilder<'db> {
                         break;
                     }
 
-                    if ty.is_same_gradual_form(element_type)
+                    if ty.is_gradual_equivalent_to(self.db, element_type)
                         || ty.is_subtype_of(self.db, element_type)
                         || element_type.is_object(self.db)
                     {
@@ -493,7 +493,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 let known_instance = new_positive
                     .into_instance()
-                    .and_then(|instance| instance.class.known(db));
+                    .and_then(|instance| instance.class().known(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
@@ -513,7 +513,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             new_positive = Type::BooleanLiteral(false);
                         }
                         Type::Instance(instance)
-                            if instance.class.is_known(db, KnownClass::Bool) =>
+                            if instance.class().is_known(db, KnownClass::Bool) =>
                         {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
@@ -560,7 +560,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     // S & T = S    if S <: T
                     if existing_positive.is_subtype_of(db, new_positive)
-                        || existing_positive.is_same_gradual_form(new_positive)
+                        || existing_positive.is_gradual_equivalent_to(db, new_positive)
                     {
                         return;
                     }
@@ -607,7 +607,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             self.positive
                 .iter()
                 .filter_map(|ty| ty.into_instance())
-                .filter_map(|instance| instance.class.known(db))
+                .filter_map(|instance| instance.class().known(db))
                 .any(KnownClass::is_bool)
         };
 
@@ -623,7 +623,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::Instance(instance) if instance.class.is_object(db) => {
+            Type::Instance(instance) if instance.class().is_object(db) => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
@@ -656,7 +656,9 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
                 for (index, existing_negative) in self.negative.iter().enumerate() {
                     // ~S & ~T = ~T    if S <: T
-                    if existing_negative.is_subtype_of(db, new_negative) {
+                    if existing_negative.is_subtype_of(db, new_negative)
+                        || existing_negative.is_gradual_equivalent_to(db, new_negative)
+                    {
                         to_remove.push(index);
                     }
                     // same rule, reverse order

@@ -201,3 +201,15 @@ def _(literals_2: Literal[0, 1], b: bool, flag: bool):
     # Now union the two:
     reveal_type(bool_and_literals_128 if flag else literals_128_shifted)  # revealed: int
 ```
+
+## Simplifying gradually-equivalent types
+
+If two types are gradually equivalent, we can keep just one of them in a union:
+
+```py
+from typing import Any, Union
+from knot_extensions import Intersection, Not
+
+def _(x: Union[Intersection[Any, Not[int]], Intersection[Any, Not[int]]]):
+    reveal_type(x)  # revealed: Any & ~int
+```

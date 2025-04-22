@@ -137,8 +137,6 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 S = TypeVar("S")
 
-# TODO: no error
-# error: [invalid-base]
 class Legacy(Generic[T]):
     def m(self, x: T, y: S) -> S:
         return y
@@ -177,8 +175,6 @@ def f(x: T) -> None:
     # TODO: invalid-assignment error
     y: list[S] = []
 
-# TODO: no error
-# error: [invalid-base]
 class C(Generic[T]):
     # TODO: error: cannot use S if it's not in the current generic context
     x: list[S] = []
@@ -259,8 +255,7 @@ def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
     # TODO: error for reuse of typevar
     class Bad1[T]: ...
-    # TODO: no non-subscriptable error, error for reuse of typevar
-    # error: [non-subscriptable]
+    # TODO: error for reuse of typevar
     class Bad2(Iterable[T]): ...
 ```
 
@@ -273,8 +268,7 @@ class C[T]:
     class Ok1[S]: ...
     # TODO: error for reuse of typevar
     class Bad1[T]: ...
-    # TODO: no non-subscriptable error, error for reuse of typevar
-    # error: [non-subscriptable]
+    # TODO: error for reuse of typevar
     class Bad2(Iterable[T]): ...
 ```
 

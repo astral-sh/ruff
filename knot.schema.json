@@ -460,6 +460,16 @@
             }
           ]
         },
+        "invalid-protocol": {
+          "title": "detects invalid protocol class definitions",
+          "description": "## What it does\nChecks for invalidly defined protocol classes.\n\n## Why is this bad?\nAn invalidly defined protocol class may lead to the type checker inferring\nunexpected things. It may also lead to `TypeError`s at runtime.\n\n## Examples\nA `Protocol` class cannot inherit from a non-`Protocol` class;\nthis raises a `TypeError` at runtime:\n\n```pycon\n>>> from typing import Protocol\n>>> class Foo(int, Protocol): ...\n...\nTraceback (most recent call last):\n  File \"<python-input-1>\", line 1, in <module>\n    class Foo(int, Protocol): ...\nTypeError: Protocols can only inherit from other protocols, got <class 'int'>\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-raise": {
           "title": "detects `raise` statements that raise invalid exceptions or use invalid causes",
           "description": "Checks for `raise` statements that raise non-exceptions or use invalid\ncauses for their raised exceptions.\n\n## Why is this bad?\nOnly subclasses or instances of `BaseException` can be raised.\nFor an exception's cause, the same rules apply, except that `None` is also\npermitted. Violating these rules results in a `TypeError` at runtime.\n\n## Examples\n```python\ndef f():\n    try:\n        something()\n    except NameError:\n        raise \"oops!\" from f\n\ndef g():\n    raise NotImplemented from 42\n```\n\nUse instead:\n```python\ndef f():\n    try:\n        something()\n    except NameError as e:\n        raise RuntimeError(\"oops!\") from e\n\ndef g():\n    raise NotImplementedError from None\n```\n\n## References\n- [Python documentation: The `raise` statement](https://docs.python.org/3/reference/simple_stmts.html#raise)\n- [Python documentation: Built-in Exceptions](https://docs.python.org/3/library/exceptions.html#built-in-exceptions)",

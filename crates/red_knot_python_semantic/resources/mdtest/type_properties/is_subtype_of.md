@@ -1125,6 +1125,47 @@ def f(fn: Callable[[int], int]) -> None: ...
 f(a)
 ```
 
+### Class literals
+
+#### Classes with metaclasses
+
+```py
+from typing import Callable, overload
+from typing_extensions import Self
+from knot_extensions import TypeOf, static_assert, is_subtype_of
+
+class MetaWithReturn(type):
+    def __call__(cls) -> "A":
+        return super().__call__()
+
+class A(metaclass=MetaWithReturn): ...
+
+static_assert(is_subtype_of(TypeOf[A], Callable[[], A]))
+static_assert(not is_subtype_of(TypeOf[A], Callable[[object], A]))
+
+class MetaWithDifferentReturn(type):
+    def __call__(cls) -> int:
+        return super().__call__()
+
+class B(metaclass=MetaWithDifferentReturn): ...
+
+static_assert(is_subtype_of(TypeOf[B], Callable[[], int]))
+static_assert(not is_subtype_of(TypeOf[B], Callable[[], B]))
+
+class MetaWithOverloadReturn(type):
+    @overload
+    def __call__(cls, x: int) -> int: ...
+    @overload
+    def __call__(cls) -> str: ...
+    def __call__(cls, x: int | None = None) -> str | int:
+        return super().__call__()
+
+class C(metaclass=MetaWithOverloadReturn): ...
+
+static_assert(is_subtype_of(TypeOf[C], Callable[[int], int]))
+static_assert(is_subtype_of(TypeOf[C], Callable[[], str]))
+```
+
 ### Bound methods
 
 ```py

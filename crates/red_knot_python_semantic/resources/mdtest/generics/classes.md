@@ -45,8 +45,6 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
-# TODO: no error
-# error: [invalid-base]
 class C(Generic[T]): ...
 ```
 

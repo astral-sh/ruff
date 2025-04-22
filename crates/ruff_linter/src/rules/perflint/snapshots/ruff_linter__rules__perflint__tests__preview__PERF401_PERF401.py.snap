@@ -169,10 +169,10 @@ PERF401.py:119:13: PERF401 [*] Use a list comprehension to create a transformed 
 117     |-        # single-line comment 2 should be protected
 118     |-        if i % 2:  # single-line comment 3 should be protected
 119     |-            result.append(i)  # PERF401
-    115 |+    # single-line comment 1 should be protected
-    116 |+    # single-line comment 2 should be protected
-    117 |+    # single-line comment 3 should be protected
-    118 |+    # comment after assignment should be protected
+    115 |+    # comment after assignment should be protected
+    116 |+    # single-line comment 1 should be protected
+    117 |+    # single-line comment 2 should be protected
+    118 |+    # single-line comment 3 should be protected
     119 |+    result = [i for i in range(10) if i % 2]  # PERF401
 120 120 | 
 121 121 | 
@@ -492,6 +492,8 @@ PERF401.py:262:13: PERF401 [*] Use a list comprehension to create a transformed 
 261 |         if j := i:
 262 |             items.append(j)
     |             ^^^^^^^^^^^^^^^ PERF401
+263 |
+264 | def f():
     |
     = help: Replace for loop with list comprehension
 
@@ -505,3 +507,25 @@ PERF401.py:262:13: PERF401 [*] Use a list comprehension to create a transformed 
 261     |-        if j := i:
 262     |-            items.append(j)
     259 |+    items = [j for i in range(5) if (j := i)]
+263 260 | 
+264 261 | def f():
+265 262 |     values = [1, 2, 3]
+
+PERF401.py:268:9: PERF401 [*] Use a list comprehension to create a transformed list
+    |
+266 |     result = list()  # this should be replaced with a comprehension
+267 |     for i in values:
+268 |         result.append(i + 1)  # PERF401
+    |         ^^^^^^^^^^^^^^^^^^^^ PERF401
+    |
+    = help: Replace for loop with list comprehension
+
+ℹ Unsafe fix
+263 263 | 
+264 264 | def f():
+265 265 |     values = [1, 2, 3]
+266     |-    result = list()  # this should be replaced with a comprehension
+267     |-    for i in values:
+268     |-        result.append(i + 1)  # PERF401
+    266 |+    # this should be replaced with a comprehension
+    267 |+    result = [i + 1 for i in values]  # PERF401

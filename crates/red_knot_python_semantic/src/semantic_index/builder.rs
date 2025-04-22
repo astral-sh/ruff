@@ -18,11 +18,12 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AnnotatedAssignmentDefinitionNodeRef,
-    AssignmentDefinitionKind, AssignmentDefinitionNodeRef, ComprehensionDefinitionNodeRef,
-    Definition, DefinitionCategory, DefinitionKind, DefinitionNodeKey, DefinitionNodeRef,
-    Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionKind, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    StarImportDefinitionNodeRef, TargetKind, WithItemDefinitionKind, WithItemDefinitionNodeRef,
+    AssignmentDefinitionKind, AssignmentDefinitionNodeRef, ComprehensionDefinitionKind,
+    ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionKind,
+    DefinitionNodeKey, DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionKind, ForStmtDefinitionNodeRef, ImportDefinitionNodeRef,
+    ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef,
+    TargetKind, WithItemDefinitionKind, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::predicate::{
@@ -354,15 +355,14 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().merge(state);
     }
 
-    /// Return a 2-element tuple, where the first element is the [`ScopedSymbolId`] of the
-    /// symbol added, and the second element is a boolean indicating whether the symbol was *newly*
-    /// added or not
-    fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
+    /// Add a symbol to the symbol table and the use-def map.
+    /// Return the [`ScopedSymbolId`] that uniquely identifies the symbol in both.
+    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
         let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_symbol(symbol_id);
         }
-        (symbol_id, added)
+        symbol_id
     }
 
     fn add_attribute(&mut self, name: Name) -> ScopedSymbolId {
@@ -796,7 +796,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                         ..
                     }) => (name, &None, default),
                 };
-                let (symbol, _) = self.add_symbol(name.id.clone());
+                let symbol = self.add_symbol(name.id.clone());
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
@@ -850,31 +850,35 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         // The `iter` of the first generator is evaluated in the outer scope, while all subsequent
         // nodes are evaluated in the inner scope.
-        self.add_standalone_expression(&generator.iter);
+        let value = self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
         self.push_scope(scope);
 
-        self.push_assignment(CurrentAssignment::Comprehension {
-            node: generator,
-            first: true,
-        });
-        self.visit_expr(&generator.target);
-        self.pop_assignment();
+        self.add_unpackable_assignment(
+            &Unpackable::Comprehension {
+                node: generator,
+                first: true,
+            },
+            &generator.target,
+            value,
+        );
 
         for expr in &generator.ifs {
             self.visit_expr(expr);
         }
 
         for generator in generators_iter {
-            self.add_standalone_expression(&generator.iter);
+            let value = self.add_standalone_expression(&generator.iter);
             self.visit_expr(&generator.iter);
 
-            self.push_assignment(CurrentAssignment::Comprehension {
-                node: generator,
-                first: false,
-            });
-            self.visit_expr(&generator.target);
-            self.pop_assignment();
+            self.add_unpackable_assignment(
+                &Unpackable::Comprehension {
+                    node: generator,
+                    first: false,
+                },
+                &generator.target,
+                value,
+            );
 
             for expr in &generator.ifs {
                 self.visit_expr(expr);
@@ -890,20 +894,20 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.declare_parameter(parameter);
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
-            let (symbol, _) = self.add_symbol(vararg.name.id().clone());
+            let symbol = self.add_symbol(vararg.name.id().clone());
             self.add_definition(
                 symbol,
                 DefinitionNodeRef::VariadicPositionalParameter(vararg),
             );
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let (symbol, _) = self.add_symbol(kwarg.name.id().clone());
+            let symbol = self.add_symbol(kwarg.name.id().clone());
             self.add_definition(symbol, DefinitionNodeRef::VariadicKeywordParameter(kwarg));
         }
     }
 
     fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
-        let (symbol, _) = self.add_symbol(parameter.name().id().clone());
+        let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 
@@ -933,9 +937,30 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         let current_assignment = match target {
             ast::Expr::List(_) | ast::Expr::Tuple(_) => {
+                if matches!(unpackable, Unpackable::Comprehension { .. }) {
+                    debug_assert_eq!(
+                        self.scopes[self.current_scope()].node().scope_kind(),
+                        ScopeKind::Comprehension
+                    );
+                }
+                // The first iterator of the comprehension is evaluated in the outer scope, while all subsequent
+                // nodes are evaluated in the inner scope.
+                // SAFETY: The current scope is the comprehension, and the comprehension scope must have a parent scope.
+                let value_file_scope =
+                    if let Unpackable::Comprehension { first: true, .. } = unpackable {
+                        self.scope_stack
+                            .iter()
+                            .rev()
+                            .nth(1)
+                            .expect("The comprehension scope must have a parent scope")
+                            .file_scope_id
+                    } else {
+                        self.current_scope()
+                    };
                 let unpack = Some(Unpack::new(
                     self.db,
                     self.file,
+                    value_file_scope,
                     self.current_scope(),
                     // SAFETY: `target` belongs to the `self.module` tree
                     #[allow(unsafe_code)]
@@ -1113,7 +1138,7 @@ where
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let (symbol, _) = self.add_symbol(name.id.clone());
+                let symbol = self.add_symbol(name.id.clone());
 
                 // Record a use of the function name in the scope that it is defined in, so that it
                 // can be used to find previously defined functions with the same name. This is
@@ -1148,11 +1173,11 @@ where
                 );
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
-                let (symbol, _) = self.add_symbol(class.name.id.clone());
+                let symbol = self.add_symbol(class.name.id.clone());
                 self.add_definition(symbol, class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
-                let (symbol, _) = self.add_symbol(
+                let symbol = self.add_symbol(
                     type_alias
                         .name
                         .as_name_expr()
@@ -1189,7 +1214,7 @@ where
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
                     };
 
-                    let (symbol, _) = self.add_symbol(symbol_name);
+                    let symbol = self.add_symbol(symbol_name);
                     self.add_definition(
                         symbol,
                         ImportDefinitionNodeRef {
@@ -1260,7 +1285,7 @@ where
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
                         for export in exported_names(self.db, referenced_module) {
-                            let (symbol_id, newly_added) = self.add_symbol(export.clone());
+                            let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
@@ -1269,28 +1294,15 @@ where
                                 referenced_module,
                             );
 
-                            // Fast path for if there were no previous definitions
-                            // of the symbol defined through the `*` import:
-                            // we can apply the visibility constraint to *only* the added definition,
-                            // rather than all definitions
-                            if newly_added {
-                                self.push_additional_definition(symbol_id, node_ref);
-                                self.current_use_def_map_mut()
-                                    .record_and_negate_star_import_visibility_constraint(
-                                        star_import,
-                                        symbol_id,
-                                    );
-                            } else {
-                                let pre_definition = self.flow_snapshot();
-                                self.push_additional_definition(symbol_id, node_ref);
-                                let constraint_id =
-                                    self.record_visibility_constraint(star_import.into());
-                                let post_definition = self.flow_snapshot();
-                                self.flow_restore(pre_definition.clone());
-                                self.record_negated_visibility_constraint(constraint_id);
-                                self.flow_merge(post_definition);
-                                self.simplify_visibility_constraints(pre_definition);
-                            }
+                            let pre_definition =
+                                self.current_use_def_map().single_symbol_snapshot(symbol_id);
+                            self.push_additional_definition(symbol_id, node_ref);
+                            self.current_use_def_map_mut()
+                                .record_and_negate_star_import_visibility_constraint(
+                                    star_import,
+                                    symbol_id,
+                                    pre_definition,
+                                );
                         }
 
                         continue;
@@ -1310,7 +1322,7 @@ where
                     self.has_future_annotations |= alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
-                    let (symbol, _) = self.add_symbol(symbol_name.clone());
+                    let symbol = self.add_symbol(symbol_name.clone());
 
                     self.add_definition(
                         symbol,
@@ -1728,7 +1740,7 @@ where
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
                         if let Some(symbol_name) = symbol_name {
-                            let (symbol, _) = self.add_symbol(symbol_name.id.clone());
+                            let symbol = self.add_symbol(symbol_name.id.clone());
 
                             self.add_definition(
                                 symbol,
@@ -1804,7 +1816,7 @@ where
         let node_key = NodeKey::from_node(expr);
 
         match expr {
-            ast::Expr::Name(name_node @ ast::ExprName { id, ctx, .. }) => {
+            ast::Expr::Name(ast::ExprName { id, ctx, .. }) => {
                 let (is_use, is_definition) = match (ctx, self.current_assignment()) {
                     (ast::ExprContext::Store, Some(CurrentAssignment::AugAssign(_))) => {
                         // For augmented assignment, the target expression is also used.
@@ -1815,7 +1827,7 @@ where
                     (ast::ExprContext::Del, _) => (false, true),
                     (ast::ExprContext::Invalid, _) => (false, false),
                 };
-                let (symbol, _) = self.add_symbol(id.clone());
+                let symbol = self.add_symbol(id.clone());
 
                 if is_use {
                     self.mark_symbol_used(symbol);
@@ -1867,12 +1879,17 @@ where
                             // implemented.
                             self.add_definition(symbol, named);
                         }
-                        Some(CurrentAssignment::Comprehension { node, first }) => {
+                        Some(CurrentAssignment::Comprehension {
+                            unpack,
+                            node,
+                            first,
+                        }) => {
                             self.add_definition(
                                 symbol,
                                 ComprehensionDefinitionNodeRef {
+                                    unpack,
                                     iterable: &node.iter,
-                                    target: name_node,
+                                    target: expr,
                                     first,
                                     is_async: node.is_async,
                                 },
@@ -2143,14 +2160,37 @@ where
                                 DefinitionKind::WithItem(assignment),
                             );
                         }
-                        Some(CurrentAssignment::Comprehension { .. }) => {
-                            // TODO:
+                        Some(CurrentAssignment::Comprehension {
+                            unpack,
+                            node,
+                            first,
+                        }) => {
+                            // SAFETY: `iter` and `expr` belong to the `self.module` tree
+                            #[allow(unsafe_code)]
+                            let assignment = ComprehensionDefinitionKind {
+                                target_kind: TargetKind::from(unpack),
+                                iterable: unsafe {
+                                    AstNodeRef::new(self.module.clone(), &node.iter)
+                                },
+                                target: unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                                first,
+                                is_async: node.is_async,
+                            };
+                            // Temporarily move to the scope of the method to which the instance attribute is defined.
+                            // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
+                            let scope = self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope");
+                            self.register_attribute_assignment(
+                                object,
+                                attr,
+                                DefinitionKind::Comprehension(assignment),
+                            );
+                            self.scope_stack.push(scope);
                         }
                         Some(CurrentAssignment::AugAssign(_)) => {
                             // TODO:
                         }
                         Some(CurrentAssignment::Named(_)) => {
-                            // TODO:
+                            // A named expression whose target is an attribute is syntactically prohibited
                         }
                         None => {}
                     }
@@ -2191,7 +2231,7 @@ where
             range: _,
         }) = pattern
         {
-            let (symbol, _) = self.add_symbol(name.id().clone());
+            let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
@@ -2212,7 +2252,7 @@ where
             rest: Some(name), ..
         }) = pattern
         {
-            let (symbol, _) = self.add_symbol(name.id().clone());
+            let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
@@ -2244,6 +2284,7 @@ enum CurrentAssignment<'a> {
     Comprehension {
         node: &'a ast::Comprehension,
         first: bool,
+        unpack: Option<(UnpackPosition, Unpack<'a>)>,
     },
     WithItem {
         item: &'a ast::WithItem,
@@ -2257,11 +2298,9 @@ impl CurrentAssignment<'_> {
         match self {
             Self::Assign { unpack, .. }
             | Self::For { unpack, .. }
-            | Self::WithItem { unpack, .. } => unpack.as_mut().map(|(position, _)| position),
-            Self::AnnAssign(_)
-            | Self::AugAssign(_)
-            | Self::Named(_)
-            | Self::Comprehension { .. } => None,
+            | Self::WithItem { unpack, .. }
+            | Self::Comprehension { unpack, .. } => unpack.as_mut().map(|(position, _)| position),
+            Self::AnnAssign(_) | Self::AugAssign(_) | Self::Named(_) => None,
         }
     }
 }
@@ -2316,13 +2355,17 @@ enum Unpackable<'a> {
         item: &'a ast::WithItem,
         is_async: bool,
     },
+    Comprehension {
+        first: bool,
+        node: &'a ast::Comprehension,
+    },
 }
 
 impl<'a> Unpackable<'a> {
     const fn kind(&self) -> UnpackKind {
         match self {
             Unpackable::Assign(_) => UnpackKind::Assign,
-            Unpackable::For(_) => UnpackKind::Iterable,
+            Unpackable::For(_) | Unpackable::Comprehension { .. } => UnpackKind::Iterable,
             Unpackable::WithItem { .. } => UnpackKind::ContextManager,
         }
     }
@@ -2335,6 +2378,11 @@ impl<'a> Unpackable<'a> {
             Unpackable::WithItem { item, is_async } => CurrentAssignment::WithItem {
                 item,
                 is_async: *is_async,
+                unpack,
+            },
+            Unpackable::Comprehension { node, first } => CurrentAssignment::Comprehension {
+                node,
+                first: *first,
                 unpack,
             },
         }
