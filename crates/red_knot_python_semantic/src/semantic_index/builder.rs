@@ -91,6 +91,10 @@ pub(super) struct SemanticIndexBuilder<'db> {
     /// Flags about the file's global scope
     has_future_annotations: bool,
 
+    // Used for checking semantic syntax errors
+    python_version: PythonVersion,
+    semantic_checker: SemanticSyntaxChecker,
+
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
@@ -104,8 +108,6 @@ pub(super) struct SemanticIndexBuilder<'db> {
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
-    python_version: PythonVersion,
-    semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
