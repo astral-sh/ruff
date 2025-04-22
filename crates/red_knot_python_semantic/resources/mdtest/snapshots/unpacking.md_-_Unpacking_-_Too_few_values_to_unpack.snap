@@ -12,17 +12,19 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unpack
 ## mdtest_snippet.py
 
 ```
-1 | a, b = (1,)  # error: [invalid-assignment]
+1 | [a, *b, c, d] = (1, 2)  # error: [invalid-assignment]
 ```
 
 # Diagnostics
 
 ```
-error: lint:invalid-assignment
+error: lint:invalid-assignment: Not enough values to unpack
  --> /src/mdtest_snippet.py:1:1
   |
-1 | a, b = (1,)  # error: [invalid-assignment]
-  | ^^^^ Not enough values to unpack (expected 2, got 1)
+1 | [a, *b, c, d] = (1, 2)  # error: [invalid-assignment]
+  | ^^^^^^^^^^^^^   ------ Got 2
+  | |
+  | Expected 3 or more
   |
 
 ```

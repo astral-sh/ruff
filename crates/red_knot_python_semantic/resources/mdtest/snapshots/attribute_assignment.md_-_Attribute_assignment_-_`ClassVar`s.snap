@@ -27,12 +27,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attrib
 # Diagnostics
 
 ```
-error: lint:invalid-assignment
+error: lint:invalid-assignment: Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
  --> /src/mdtest_snippet.py:7:1
   |
 6 | C.attr = 1  # fine
 7 | C.attr = "wrong"  # error: [invalid-assignment]
-  | ^^^^^^ Object of type `Literal["wrong"]` is not assignable to attribute `attr` of type `int`
+  | ^^^^^^
 8 |
 9 | instance = C()
   |
@@ -40,12 +40,12 @@ error: lint:invalid-assignment
 ```
 
 ```
-error: lint:invalid-attribute-access
+error: lint:invalid-attribute-access: Cannot assign to ClassVar `attr` from an instance of type `C`
   --> /src/mdtest_snippet.py:10:1
    |
  9 | instance = C()
 10 | instance.attr = 1  # error: [invalid-attribute-access]
-   | ^^^^^^^^^^^^^ Cannot assign to ClassVar `attr` from an instance of type `C`
+   | ^^^^^^^^^^^^^
    |
 
 ```

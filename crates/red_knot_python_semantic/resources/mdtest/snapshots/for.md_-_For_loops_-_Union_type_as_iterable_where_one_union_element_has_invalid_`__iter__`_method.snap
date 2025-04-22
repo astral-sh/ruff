@@ -36,13 +36,13 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Test | Test2` may not be iterable because its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
   --> /src/mdtest_snippet.py:18:14
    |
 16 |     # TODO: Improve error message to state which union variant isn't iterable (https://github.com/astral-sh/ruff/issues/13989)
 17 |     # error: [not-iterable]
 18 |     for x in Test() if flag else Test2():
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Object of type `Test | Test2` may not be iterable because its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 19 |         reveal_type(x)  # revealed: int
    |
 

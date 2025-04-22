@@ -21,11 +21,12 @@ env:
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
 
 jobs:
   mypy_primer:
     name: Run mypy_primer
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: depot-ubuntu-22.04-32
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -45,7 +46,7 @@ jobs:
 
       - name: Install mypy_primer
         run: |
-          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support-v5"
+          uv tool install "git+https://github.com/hauntsaninja/mypy_primer@ebaa9fd27b51a278873b63676fd25490cec6823b"
 
       - name: Run mypy_primer
         shell: bash

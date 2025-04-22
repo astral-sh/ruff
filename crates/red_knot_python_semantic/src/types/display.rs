@@ -10,9 +10,9 @@ use crate::types::class::{ClassType, GenericAlias, GenericClass};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    FunctionSignature, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
-    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
-    UnionType, WrapperDescriptorKind,
+    FunctionSignature, IntersectionType, KnownClass, MethodWrapperKind, StringLiteralType,
+    SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
+    WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -73,7 +73,7 @@ impl Display for DisplayRepresentation<'_> {
         match self.ty {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Instance(InstanceType { class }) => match (class, class.known(self.db)) {
+            Type::Instance(instance) => match (instance.class(), instance.class().known(self.db)) {
                 (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                 (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
                 (ClassType::NonGeneric(class), _) => f.write_str(&class.class(self.db).name),
@@ -195,7 +195,10 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
             }
             Type::DataclassDecorator(_) => {
-                f.write_str("<decorator produced by dataclasses.dataclass>")
+                f.write_str("<decorator produced by dataclass-like function>")
+            }
+            Type::DataclassTransformer(_) => {
+                f.write_str("<decorator produced by typing.dataclass_transform>")
             }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),

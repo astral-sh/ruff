@@ -65,28 +65,20 @@ impl<'db> InferContext<'db> {
         Span::from(self.file()).with_range(ranged.range())
     }
 
+    /// Create a secondary annotation attached to the range of the given value in
+    /// the file currently being type checked.
+    ///
+    /// The annotation returned has no message attached to it.
+    pub(crate) fn secondary<T: Ranged>(&self, ranged: T) -> Annotation {
+        Annotation::secondary(self.span(ranged))
+    }
+
     pub(crate) fn db(&self) -> &'db dyn Db {
         self.db
     }
 
     pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
         self.diagnostics.get_mut().extend(other);
-    }
-
-    /// Reports a lint located at `ranged`.
-    pub(super) fn report_lint_old<T>(
-        &self,
-        lint: &'static LintMetadata,
-        ranged: T,
-        message: fmt::Arguments,
-    ) where
-        T: Ranged,
-    {
-        let Some(builder) = self.report_lint(lint, ranged) else {
-            return;
-        };
-        let mut diag = builder.into_diagnostic("");
-        diag.set_primary_message(message);
     }
 
     /// Optionally return a builder for a lint diagnostic guard.
@@ -396,7 +388,6 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     ///
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
-    #[must_use]
     pub(super) fn into_diagnostic(
         self,
         message: impl std::fmt::Display,
@@ -533,7 +524,6 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
     ///
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
-    #[must_use]
     pub(super) fn into_diagnostic(
         self,
         message: impl std::fmt::Display,

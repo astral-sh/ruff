@@ -37,12 +37,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attrib
 # Diagnostics
 
 ```
-error: lint:invalid-assignment
+error: lint:invalid-assignment: Object of type `Literal[1]` is not assignable to attribute `attr` on type `Literal[C1, C1]`
   --> /src/mdtest_snippet.py:11:5
    |
 10 |     # TODO: The error message here could be improved to explain why the assignment fails.
 11 |     C1.attr = 1  # error: [invalid-assignment]
-   |     ^^^^^^^ Object of type `Literal[1]` is not assignable to attribute `attr` on type `Literal[C1, C1]`
+   |     ^^^^^^^
 12 |
 13 |     class C2:
    |

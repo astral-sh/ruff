@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    class_base::ClassBase, subclass_of::SubclassOfInner, DynamicType, InstanceType,
-    KnownInstanceType, SuperOwnerKind, TodoType, Type,
+    class_base::ClassBase, subclass_of::SubclassOfInner, DynamicType, KnownInstanceType,
+    SuperOwnerKind, TodoType, Type,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -79,6 +79,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::DataclassDecorator(_), _) => Ordering::Less,
         (_, Type::DataclassDecorator(_)) => Ordering::Greater,
 
+        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => {
+            left.bits().cmp(&right.bits())
+        }
+        (Type::DataclassTransformer(_), _) => Ordering::Less,
+        (_, Type::DataclassTransformer(_)) => Ordering::Greater,
+
         (Type::Callable(left), Type::Callable(right)) => {
             debug_assert_eq!(*left, left.normalized(db));
             debug_assert_eq!(*right, right.normalized(db));
@@ -120,10 +126,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
-        (
-            Type::Instance(InstanceType { class: left }),
-            Type::Instance(InstanceType { class: right }),
-        ) => left.cmp(right),
+        (Type::Instance(left), Type::Instance(right)) => left.class().cmp(&right.class()),
 
         (Type::Instance(_), _) => Ordering::Less,
         (_, Type::Instance(_)) => Ordering::Greater,
@@ -155,10 +158,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => left.cmp(right),
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
-                (
-                    SuperOwnerKind::Instance(InstanceType { class: left }),
-                    SuperOwnerKind::Instance(InstanceType { class: right }),
-                ) => left.cmp(right),
+                (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
+                    left.class().cmp(&right.class())
+                }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {

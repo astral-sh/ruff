@@ -22,12 +22,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/unary/not.md
 # Diagnostics
 
 ```
-error: lint:unsupported-bool-conversion
+error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
  --> /src/mdtest_snippet.py:5:1
   |
 4 | # error: [unsupported-bool-conversion]
 5 | not NotBoolable()
-  | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
+  | ^^^^^^^^^^^^^^^^^
   |
 
 ```
