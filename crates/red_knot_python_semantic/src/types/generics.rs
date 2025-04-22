@@ -5,7 +5,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     declaration_type, KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance,
-    UnionBuilder, UnionType,
+    UnionType,
 };
 use crate::{Db, FxOrderSet};
 
@@ -326,7 +326,7 @@ impl<'db> Specialization<'db> {
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
-    types: FxHashMap<TypeVarInstance<'db>, UnionBuilder<'db>>,
+    types: FxHashMap<TypeVarInstance<'db>, Type<'db>>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
@@ -343,8 +343,8 @@ impl<'db> SpecializationBuilder<'db> {
             .iter()
             .map(|variable| {
                 self.types
-                    .remove(variable)
-                    .map(UnionBuilder::build)
+                    .get(variable)
+                    .copied()
                     .unwrap_or(variable.default_ty(self.db).unwrap_or(Type::unknown()))
             })
             .collect();
@@ -352,17 +352,21 @@ impl<'db> SpecializationBuilder<'db> {
     }
 
     fn add_type_mapping(&mut self, typevar: TypeVarInstance<'db>, ty: Type<'db>) {
-        let builder = self
-            .types
+        self.types
             .entry(typevar)
-            .or_insert_with(|| UnionBuilder::new(self.db));
-        builder.add_in_place(ty);
+            .and_modify(|existing| {
+                *existing = UnionType::from_elements(self.db, [*existing, ty]);
+            })
+            .or_insert(ty);
     }
 
     pub(crate) fn infer(&mut self, formal: Type<'db>, actual: Type<'db>) {
-        // If the actual type is already assignable to the formal type, then return without adding
-        // any new type mappings. (Note that if the formal type contains any typevars, this check
-        // will fail, since no non-typevar types are assignable to a typevar.)
+        // If the actual type is a subtype of the formal type, then return without adding any new
+        // type mappings. (Note that if the formal type contains any typevars, this check will
+        // fail, since no non-typevar types are assignable to a typevar. Also note that we are
+        // checking _subtyping_, not _assignability_, so that we do specialize typevars to dynamic
+        // argument types; and we have a special case for `Never`, which is a subtype of all types,
+        // but which we also do want as a specialization candidate.)
         //
         // In particular, this handles a case like
         //
@@ -373,7 +377,7 @@ impl<'db> SpecializationBuilder<'db> {
         // ```
         //
         // without specializing `T` to `None`.
-        if actual.is_assignable_to(self.db, formal) {
+        if !actual.is_never() && actual.is_subtype_of(self.db, formal) {
             return;
         }
 
