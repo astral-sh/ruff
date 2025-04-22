@@ -341,6 +341,13 @@ impl<'db> ClassType<'db> {
             }
         }
 
+        if self
+            .iter_mro(db)
+            .any(|base| matches!(base, ClassBase::Dynamic(DynamicType::Any)))
+        {
+            return true;
+        }
+
         false
     }
 

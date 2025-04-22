@@ -50,10 +50,9 @@ y: Any = "not an Any"  # error: [invalid-assignment]
 
 The spec allows you to define subclasses of `Any`.
 
-TODO: Handle assignments correctly. `Subclass` has an unknown superclass, which might be `int`. The
-assignment to `x` should not be allowed, even when the unknown superclass is `int`. The assignment
-to `y` should be allowed, since `Subclass` might have `int` as a superclass, and is therefore
-assignable to `int`.
+`Subclass` has an unknown superclass, which might be `int`. The assignment to `x` should not be
+allowed, even when the unknown superclass is `int`. The assignment to `y` should be allowed, since
+`Subclass` might have `int` as a superclass, and is therefore assignable to `int`.
 
 ```py
 from typing import Any
@@ -63,11 +62,19 @@ class Subclass(Any): ...
 reveal_type(Subclass.__mro__)  # revealed: tuple[Literal[Subclass], Any, Literal[object]]
 
 x: Subclass = 1  # error: [invalid-assignment]
-# TODO: no diagnostic
-y: int = Subclass()  # error: [invalid-assignment]
+y: int = Subclass()
 
 def _(s: Subclass):
     reveal_type(s)  # revealed: Subclass
+```
+
+A use case where this comes up is with mocking libraries, where the mock object should be assignable
+to any type:
+
+```py
+from unittest.mock import MagicMock
+
+x: int = MagicMock()
 ```
 
 ## Invalid
