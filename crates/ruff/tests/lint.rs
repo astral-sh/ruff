@@ -5175,8 +5175,8 @@ fn a005_module_shadowing_non_strict() -> Result<()> {
 }
 
 /// Test A005 with `strict-checking` unset
-/// TODO(brent) This should currently match the strict version, but after the next minor
-/// release it will match the non-strict version directly above
+///
+/// This should match the non-strict version directly above
 #[test]
 fn a005_module_shadowing_strict_default() -> Result<()> {
     let tempdir = TempDir::new()?;
