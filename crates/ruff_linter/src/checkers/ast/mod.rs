@@ -623,8 +623,8 @@ impl SemanticSyntaxContext for Checker<'_> {
         }
     }
 
-    fn with_source<T>(&self, f: impl FnOnce(&str) -> T) -> T {
-        f(self.source())
+    fn source(&self) -> &str {
+        self.source()
     }
 
     fn future_annotations_or_stub(&self) -> bool {

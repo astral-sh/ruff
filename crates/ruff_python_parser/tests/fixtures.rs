@@ -516,8 +516,8 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         self.diagnostics.borrow_mut().push(error);
     }
 
-    fn with_source<T>(&self, f: impl FnOnce(&str) -> T) -> T {
-        f(self.source)
+    fn source(&self) -> &str {
+        self.source
     }
 
     fn global(&self, _name: &str) -> Option<TextRange> {

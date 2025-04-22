@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
@@ -6,7 +6,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
-use ruff_db::source::source_text;
+use ruff_db::source::{source_text, SourceText};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
@@ -93,6 +93,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
 
     // Used for checking semantic syntax errors
     python_version: PythonVersion,
+    source_text: OnceCell<SourceText>,
     semantic_checker: Option<SemanticSyntaxChecker>,
 
     // Semantic Index fields
@@ -143,6 +144,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             eager_bindings: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
+            source_text: OnceCell::new(),
             semantic_checker: db.is_file_open(file).then(SemanticSyntaxChecker::default),
             semantic_syntax_errors: RefCell::default(),
         };
@@ -1072,6 +1074,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             f(checker, self);
         }
         self.semantic_checker = checker;
+    }
+
+    fn source_text(&self) -> &SourceText {
+        self.source_text
+            .get_or_init(|| source_text(self.db.upcast(), self.file))
     }
 }
 
@@ -2302,9 +2309,8 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         self.python_version
     }
 
-    fn with_source<T>(&self, f: impl FnOnce(&str) -> T) -> T {
-        let src = source_text(self.db.upcast(), self.file);
-        f(src.as_str())
+    fn source(&self) -> &str {
+        self.source_text().as_str()
     }
 
     // TODO(brent) handle looking up `global` bindings
@@ -2377,7 +2383,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
     }
 
     fn in_notebook(&self) -> bool {
-        self.file.source_type(self.db.upcast()).is_ipynb()
+        self.source_text().is_notebook()
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
