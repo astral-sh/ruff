@@ -364,8 +364,8 @@ impl Default for DataclassParams {
     }
 }
 
-impl DataclassParams {
-    fn from_transformer_params(params: DataclassTransformerParams) -> Self {
+impl From<DataclassTransformerParams> for DataclassParams {
+    fn from(params: DataclassTransformerParams) -> Self {
         let mut result = Self::default();
 
         result.set(

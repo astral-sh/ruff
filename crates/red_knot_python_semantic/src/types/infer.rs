@@ -1780,7 +1780,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             if let Type::FunctionLiteral(f) = decorator_ty {
                 if let Some(params) = f.dataclass_transformer_params(self.db()) {
-                    dataclass_params = Some(DataclassParams::from_transformer_params(params));
+                    dataclass_params = Some(params.into());
                     continue;
                 }
             }

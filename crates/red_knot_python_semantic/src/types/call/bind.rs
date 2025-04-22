@@ -690,8 +690,7 @@ impl<'db> Bindings<'db> {
                             // the argument type and overwrite the corresponding flag in `dataclass_params` after
                             // constructing them from the `dataclass_transformer`-parameter defaults.
 
-                            let mut dataclass_params =
-                                DataclassParams::from_transformer_params(params);
+                            let mut dataclass_params = DataclassParams::from(params);
 
                             if let Some(Some(Type::BooleanLiteral(order))) = callable_signature
                                 .iter()
