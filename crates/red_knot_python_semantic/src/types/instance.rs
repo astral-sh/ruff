@@ -43,8 +43,29 @@ impl<'db> InstanceType<'db> {
     }
 
     pub(super) fn is_disjoint_from(self, db: &'db dyn Db, other: Self) -> bool {
-        (self.class.is_final(db) && !self.class.is_subclass_of(db, other.class))
-            || (other.class.is_final(db) && !other.class.is_subclass_of(db, self.class))
+        if self.class.is_final(db) && !self.class.is_subclass_of(db, other.class) {
+            return true;
+        }
+
+        if other.class.is_final(db) && !other.class.is_subclass_of(db, self.class) {
+            return true;
+        }
+
+        // Check to see whether the metaclasses of `self` and `other` are disjoint.
+        // Avoid this check if the metaclass of either `self` or `other` is `type`,
+        // however, since we end up with infinite recursion in that case due to the fact
+        // that `type` is its own metaclass (and we know that `type` cannot be disjoint
+        // from any metaclass, anyway).
+        let type_type = KnownClass::Type.to_instance(db);
+        let self_metaclass = self.class.metaclass_instance_type(db);
+        if self_metaclass == type_type {
+            return false;
+        }
+        let other_metaclass = other.class.metaclass_instance_type(db);
+        if other_metaclass == type_type {
+            return false;
+        }
+        self_metaclass.is_disjoint_from(db, other_metaclass)
     }
 
     pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
