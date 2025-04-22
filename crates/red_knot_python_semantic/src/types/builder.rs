@@ -54,12 +54,12 @@ enum LiteralKind {
 impl<'db> Type<'db> {
     /// Return `true` if this type can be a supertype of some literals of `kind` and not others.
     fn splits_literals(self, db: &'db dyn Db, kind: LiteralKind) -> bool {
-        match self {
-            Type::AlwaysFalsy | Type::AlwaysTruthy => true,
-            Type::StringLiteral(_) if kind == LiteralKind::String => true,
-            Type::BytesLiteral(_) if kind == LiteralKind::Bytes => true,
-            Type::IntLiteral(_) if kind == LiteralKind::Int => true,
-            Type::Intersection(intersection) => {
+        match (self, kind) {
+            (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => true,
+            (Type::StringLiteral(_), LiteralKind::String) => true,
+            (Type::BytesLiteral(_), LiteralKind::Bytes) => true,
+            (Type::IntLiteral(_), LiteralKind::Int) => true,
+            (Type::Intersection(intersection), _) => {
                 intersection
                     .positive(db)
                     .iter()
@@ -69,7 +69,7 @@ impl<'db> Type<'db> {
                         .iter()
                         .any(|ty| ty.splits_literals(db, kind))
             }
-            Type::Union(union) => union
+            (Type::Union(union), _) => union
                 .elements(db)
                 .iter()
                 .any(|ty| ty.splits_literals(db, kind)),
