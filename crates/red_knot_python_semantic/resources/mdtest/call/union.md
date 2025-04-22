@@ -183,6 +183,7 @@ def _(
     y: Union[Literal["a", ""], Not[Literal[""]]],
 ):
     reveal_type(x)  # revealed: Literal[""] | ~AlwaysFalsy
+    # TODO should be `object`
     reveal_type(y)  # revealed: Literal[""] | ~Literal[""]
 ```
 
