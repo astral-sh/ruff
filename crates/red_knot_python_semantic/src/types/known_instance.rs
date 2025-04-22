@@ -189,6 +189,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::Protocol => "typing.Protocol",
             Self::Generic => "typing.Generic",
             Self::ReadOnly => "typing.ReadOnly",
+            // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
+            // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
+            // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
             Self::TypeVar(_) => "typing.TypeVar",
             Self::TypeAliasType(_) => "typing.TypeAliasType",
             Self::Unknown => "knot_extensions.Unknown",
