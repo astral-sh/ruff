@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use crate::db::Db;
 
 use super::{
-    class_base::ClassBase, DynamicType, InstanceType, KnownInstanceType, SuperOwnerKind, TodoType,
-    Type,
+    class_base::ClassBase, subclass_of::SubclassOfInner, DynamicType, KnownInstanceType,
+    SuperOwnerKind, TodoType, Type,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -79,6 +79,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::DataclassDecorator(_), _) => Ordering::Less,
         (_, Type::DataclassDecorator(_)) => Ordering::Greater,
 
+        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => {
+            left.bits().cmp(&right.bits())
+        }
+        (Type::DataclassTransformer(_), _) => Ordering::Less,
+        (_, Type::DataclassTransformer(_)) => Ordering::Greater,
+
         (Type::Callable(left), Type::Callable(right)) => {
             debug_assert_eq!(*left, left.normalized(db));
             debug_assert_eq!(*right, right.normalized(db));
@@ -109,10 +115,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::SubclassOf(left), Type::SubclassOf(right)) => {
             match (left.subclass_of(), right.subclass_of()) {
-                (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(&right),
-                (ClassBase::Class(_), _) => Ordering::Less,
-                (_, ClassBase::Class(_)) => Ordering::Greater,
-                (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
+                (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => left.cmp(&right),
+                (SubclassOfInner::Class(_), _) => Ordering::Less,
+                (_, SubclassOfInner::Class(_)) => Ordering::Greater,
+                (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
             }
@@ -120,10 +126,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
-        (
-            Type::Instance(InstanceType { class: left }),
-            Type::Instance(InstanceType { class: right }),
-        ) => left.cmp(right),
+        (Type::Instance(left), Type::Instance(right)) => left.class().cmp(&right.class()),
 
         (Type::Instance(_), _) => Ordering::Less,
         (_, Type::Instance(_)) => Ordering::Greater,
@@ -143,6 +146,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(right),
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
+                (ClassBase::Protocol, _) => Ordering::Less,
+                (_, ClassBase::Protocol) => Ordering::Greater,
+                (ClassBase::Generic, _) => Ordering::Less,
+                (_, ClassBase::Generic) => Ordering::Greater,
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     dynamic_elements_ordering(*left, *right)
                 }
@@ -151,10 +158,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => left.cmp(right),
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
-                (
-                    SuperOwnerKind::Instance(InstanceType { class: left }),
-                    SuperOwnerKind::Instance(InstanceType { class: right }),
-                ) => left.cmp(right),
+                (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
+                    left.class().cmp(&right.class())
+                }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
@@ -229,6 +235,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
                 (KnownInstanceType::OrderedDict, _) => Ordering::Less,
                 (_, KnownInstanceType::OrderedDict) => Ordering::Greater,
+
+                (KnownInstanceType::Generic, _) => Ordering::Less,
+                (_, KnownInstanceType::Generic) => Ordering::Greater,
 
                 (KnownInstanceType::Protocol, _) => Ordering::Less,
                 (_, KnownInstanceType::Protocol) => Ordering::Greater,
@@ -364,7 +373,10 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
 
-        (DynamicType::TodoProtocol, _) => Ordering::Less,
-        (_, DynamicType::TodoProtocol) => Ordering::Greater,
+        (DynamicType::SubscriptedGeneric, _) => Ordering::Less,
+        (_, DynamicType::SubscriptedGeneric) => Ordering::Greater,
+
+        (DynamicType::SubscriptedProtocol, _) => Ordering::Less,
+        (_, DynamicType::SubscriptedProtocol) => Ordering::Greater,
     }
 }

@@ -36,6 +36,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
+    registry.register_lint(&INVALID_PROTOCOL);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
@@ -225,6 +226,34 @@ declare_lint! {
     /// ```
     pub(crate) static INCOMPATIBLE_SLOTS = {
         summary: "detects class definitions whose MRO has conflicting `__slots__`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalidly defined protocol classes.
+    ///
+    /// ## Why is this bad?
+    /// An invalidly defined protocol class may lead to the type checker inferring
+    /// unexpected things. It may also lead to `TypeError`s at runtime.
+    ///
+    /// ## Examples
+    /// A `Protocol` class cannot inherit from a non-`Protocol` class;
+    /// this raises a `TypeError` at runtime:
+    ///
+    /// ```pycon
+    /// >>> from typing import Protocol
+    /// >>> class Foo(int, Protocol): ...
+    /// ...
+    /// Traceback (most recent call last):
+    ///   File "<python-input-1>", line 1, in <module>
+    ///     class Foo(int, Protocol): ...
+    /// TypeError: Protocols can only inherit from other protocols, got <class 'int'>
+    /// ```
+    pub(crate) static INVALID_PROTOCOL = {
+        summary: "detects invalid protocol class definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

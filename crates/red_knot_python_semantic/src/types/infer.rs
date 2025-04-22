@@ -49,9 +49,9 @@ use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
-    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, Definition, DefinitionKind,
-    DefinitionNodeKey, ExceptHandlerDefinitionKind, ForStmtDefinitionKind, TargetKind,
-    WithItemDefinitionKind,
+    AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
+    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::symbol::{
@@ -81,9 +81,9 @@ use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    todo_type, CallDunderError, CallableSignature, CallableType, Class, ClassLiteralType,
-    ClassType, DataclassMetadata, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
-    GenericClass, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
+    binding_type, todo_type, CallDunderError, CallableSignature, CallableType, Class,
+    ClassLiteralType, ClassType, DataclassParams, DynamicType, FunctionDecorators, FunctionType,
+    GenericAlias, GenericClass, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
     KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, NonGenericClass, Parameter,
     ParameterForm, Parameters, Signature, Signatures, SliceLiteralType, StringLiteralType,
     SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
@@ -94,20 +94,20 @@ use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
 use crate::Db;
 
-use super::class_base::ClassBase;
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
     report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
-    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    report_unresolved_reference, INVALID_METACLASS, INVALID_PROTOCOL, REDUNDANT_CAST,
+    STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
-use super::{BoundSuperError, BoundSuperType};
+use super::subclass_of::SubclassOfInner;
+use super::{BoundSuperError, BoundSuperType, ClassBase};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -306,7 +306,7 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
     let _span =
         tracing::trace_span!("infer_unpack_types", range=?unpack.range(db), ?file).entered();
 
-    let mut unpacker = Unpacker::new(db, unpack.scope(db));
+    let mut unpacker = Unpacker::new(db, unpack.target_scope(db), unpack.value_scope(db));
     unpacker.unpack(unpack.target(db), unpack.value(db));
     unpacker.finish()
 }
@@ -763,24 +763,55 @@ impl<'db> TypeInferenceBuilder<'db> {
                 continue;
             }
 
-            // (2) Check for classes that inherit from `@final` classes
+            let is_protocol = class.is_protocol(self.db());
+
+            // (2) Iterate through the class's explicit bases to check for various possible errors:
+            //     - Check for inheritance from plain `Generic`,
+            //     - Check for inheritance from a `@final` classes
+            //     - If the class is a protocol class: check for inheritance from a non-protocol class
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
-                // dynamic/unknown bases are never `@final`
-                let Some(base_class) = base_class.into_class_literal() else {
-                    continue;
+                let base_class = match base_class {
+                    Type::KnownInstance(KnownInstanceType::Generic) => {
+                        // Unsubscripted `Generic` can appear in the MRO of many classes,
+                        // but it is never valid as an explicit base class in user code.
+                        self.context.report_lint_old(
+                            &INVALID_BASE,
+                            &class_node.bases()[i],
+                            format_args!("Cannot inherit from plain `Generic`"),
+                        );
+                        continue;
+                    }
+                    Type::ClassLiteral(class) => class,
+                    // dynamic/unknown bases are never `@final`
+                    _ => continue,
                 };
-                if !base_class.is_final(self.db()) {
-                    continue;
+
+                if is_protocol
+                    && !(base_class.is_protocol(self.db())
+                        || base_class.is_known(self.db(), KnownClass::Object))
+                {
+                    self.context.report_lint_old(
+                        &INVALID_PROTOCOL,
+                        &class_node.bases()[i],
+                        format_args!(
+                            "Protocol class `{}` cannot inherit from non-protocol class `{}`",
+                            class.name(self.db()),
+                            base_class.name(self.db()),
+                        ),
+                    );
                 }
-                self.context.report_lint_old(
-                    &SUBCLASS_OF_FINAL_CLASS,
-                    &class_node.bases()[i],
-                    format_args!(
-                        "Class `{}` cannot inherit from final class `{}`",
-                        class.name(self.db()),
-                        base_class.name(self.db()),
-                    ),
-                );
+
+                if base_class.is_final(self.db()) {
+                    self.context.report_lint_old(
+                        &SUBCLASS_OF_FINAL_CLASS,
+                        &class_node.bases()[i],
+                        format_args!(
+                            "Class `{}` cannot inherit from final class `{}`",
+                            class.name(self.db()),
+                            base_class.name(self.db()),
+                        ),
+                    );
+                }
             }
 
             // (3) Check that the class's MRO is resolvable
@@ -933,13 +964,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_named_expression_definition(named_expression.node(), definition);
             }
             DefinitionKind::Comprehension(comprehension) => {
-                self.infer_comprehension_definition(
-                    comprehension.iterable(),
-                    comprehension.target(),
-                    comprehension.is_first(),
-                    comprehension.is_async(),
-                    definition,
-                );
+                self.infer_comprehension_definition(comprehension, definition);
             }
             DefinitionKind::VariadicPositionalParameter(parameter) => {
                 self.infer_variadic_positional_parameter_definition(parameter, definition);
@@ -1016,7 +1041,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
             Type::Instance(instance)
                 if matches!(
-                    instance.class.known(self.db()),
+                    instance.class().known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
             _ => return false,
@@ -1217,7 +1242,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     /// Returns `true` if the current scope is the function body scope of a method of a protocol
     /// (that is, a class which directly inherits `typing.Protocol`.)
-    fn in_class_that_inherits_protocol_directly(&self) -> bool {
+    fn in_protocol_class(&self) -> bool {
         let current_scope_id = self.scope().file_scope_id(self.db());
         let current_scope = self.index.scope(current_scope_id);
         let Some(parent_scope_id) = current_scope.parent() else {
@@ -1245,13 +1270,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             return false;
         };
 
-        // TODO move this to `Class` once we add proper `Protocol` support
-        node_ref.bases().iter().any(|base| {
-            matches!(
-                self.file_expression_type(base),
-                Type::KnownInstance(KnownInstanceType::Protocol)
-            )
-        })
+        let class_definition = self.index.expect_single_definition(node_ref.node());
+
+        let Type::ClassLiteral(class) = binding_type(self.db(), class_definition) else {
+            return false;
+        };
+
+        class.is_protocol(self.db())
     }
 
     /// Returns `true` if the current scope is the function body scope of a function overload (that
@@ -1315,7 +1340,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             if (self.in_stub()
                 || self.in_function_overload_or_abstractmethod()
-                || self.in_class_that_inherits_protocol_directly())
+                || self.in_protocol_class())
                 && self.return_types_and_ranges.is_empty()
                 && is_stub_suite(&function.body)
             {
@@ -1432,6 +1457,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
+        let mut dataclass_transformer_params = None;
 
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
@@ -1452,6 +1478,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     function_decorators |= FunctionDecorators::CLASSMETHOD;
                     continue;
                 }
+            } else if let Type::DataclassTransformer(params) = decorator_ty {
+                dataclass_transformer_params = Some(params);
             }
 
             decorator_types_and_nodes.push((decorator_ty, decorator));
@@ -1498,6 +1526,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             function_kind,
             body_scope,
             function_decorators,
+            dataclass_transformer_params,
             generic_context,
             specialization,
         ));
@@ -1618,7 +1647,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 } else if (self.in_stub()
                     || self.in_function_overload_or_abstractmethod()
-                    || self.in_class_that_inherits_protocol_directly())
+                    || self.in_protocol_class())
                     && default
                         .as_ref()
                         .is_some_and(|d| d.is_ellipsis_literal_expr())
@@ -1732,19 +1761,32 @@ impl<'db> TypeInferenceBuilder<'db> {
             body: _,
         } = class_node;
 
-        let mut dataclass_metadata = None;
+        let mut dataclass_params = None;
+        let mut dataclass_transformer_params = None;
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
             if decorator_ty
                 .into_function_literal()
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
             {
-                dataclass_metadata = Some(DataclassMetadata::default());
+                dataclass_params = Some(DataclassParams::default());
                 continue;
             }
 
-            if let Type::DataclassDecorator(metadata) = decorator_ty {
-                dataclass_metadata = Some(metadata);
+            if let Type::DataclassDecorator(params) = decorator_ty {
+                dataclass_params = Some(params);
+                continue;
+            }
+
+            if let Type::FunctionLiteral(f) = decorator_ty {
+                if let Some(params) = f.dataclass_transformer_params(self.db()) {
+                    dataclass_params = Some(params.into());
+                    continue;
+                }
+            }
+
+            if let Type::DataclassTransformer(params) = decorator_ty {
+                dataclass_transformer_params = Some(params);
                 continue;
             }
         }
@@ -1764,7 +1806,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             name: name.id.clone(),
             body_scope,
             known: maybe_known_class,
-            dataclass_metadata,
+            dataclass_params,
+            dataclass_transformer_params,
         };
         let class_literal = match generic_context {
             Some(generic_context) => {
@@ -1924,11 +1967,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         for item in items {
             let target = item.optional_vars.as_deref();
             if let Some(target) = target {
-                self.infer_target(target, &item.context_expr, |db, ctx_manager_ty| {
+                self.infer_target(target, &item.context_expr, |builder, context_expr| {
                     // TODO: `infer_with_statement_definition` reports a diagnostic if `ctx_manager_ty` isn't a context manager
                     //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
                     //  `with not_context_manager as a.x: ...
-                    ctx_manager_ty.enter(db)
+                    builder
+                        .infer_standalone_expression(context_expr)
+                        .enter(builder.db())
                 });
             } else {
                 // Call into the context expression inference to validate that it evaluates
@@ -2334,7 +2379,9 @@ impl<'db> TypeInferenceBuilder<'db> {
         } = assignment;
 
         for target in targets {
-            self.infer_target(target, value, |_, ty| ty);
+            self.infer_target(target, value, |builder, value_expr| {
+                builder.infer_standalone_expression(value_expr)
+            });
         }
     }
 
@@ -2344,23 +2391,16 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// targets (unpacking). If `target` is an attribute expression, we check that the assignment
     /// is valid. For 'target's that are definitions, this check happens elsewhere.
     ///
-    /// The `to_assigned_ty` function is used to convert the inferred type of the `value` expression
-    /// to the type that is eventually assigned to the `target`.
-    ///
-    /// # Panics
-    ///
-    /// If the `value` is not a standalone expression.
-    fn infer_target<F>(&mut self, target: &ast::Expr, value: &ast::Expr, to_assigned_ty: F)
+    /// The `infer_value_expr` function is used to infer the type of the `value` expression which
+    /// are not `Name` expressions. The returned type is the one that is eventually assigned to the
+    /// `target`.
+    fn infer_target<F>(&mut self, target: &ast::Expr, value: &ast::Expr, infer_value_expr: F)
     where
-        F: Fn(&'db dyn Db, Type<'db>) -> Type<'db>,
+        F: Fn(&mut TypeInferenceBuilder<'db>, &ast::Expr) -> Type<'db>,
     {
         let assigned_ty = match target {
             ast::Expr::Name(_) => None,
-            _ => {
-                let value_ty = self.infer_standalone_expression(value);
-
-                Some(to_assigned_ty(self.db(), value_ty))
-            }
+            _ => Some(infer_value_expr(self, value)),
         };
         self.infer_target_impl(target, assigned_ty);
     }
@@ -2435,7 +2475,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Super instances do not allow attribute assignment
-            Type::Instance(instance) if instance.class.is_known(db, KnownClass::Super) => {
+            Type::Instance(instance) if instance.class().is_known(db, KnownClass::Super) => {
                 if emit_diagnostics {
                     self.context.report_lint_old(
                         &INVALID_ASSIGNMENT,
@@ -2480,6 +2520,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::MethodWrapper(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
@@ -2950,7 +2991,10 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // Handle various singletons.
         if let Type::Instance(instance) = declared_ty.inner_type() {
-            if instance.class.is_known(self.db(), KnownClass::SpecialForm) {
+            if instance
+                .class()
+                .is_known(self.db(), KnownClass::SpecialForm)
+            {
                 if let Some(name_expr) = target.as_name_expr() {
                     if let Some(known_instance) = KnownInstanceType::try_from_file_and_name(
                         self.db(),
@@ -3113,11 +3157,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = for_statement;
 
-        self.infer_target(target, iter, |db, iter_ty| {
+        self.infer_target(target, iter, |builder, iter_expr| {
             // TODO: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
-            iter_ty.iterate(db)
+            builder
+                .infer_standalone_expression(iter_expr)
+                .iterate(builder.db())
         });
 
         self.infer_body(body);
@@ -3946,15 +3992,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             is_async: _,
         } = comprehension;
 
-        if !is_first {
-            self.infer_standalone_expression(iter);
-        }
-        // TODO more complex assignment targets
-        if let ast::Expr::Name(name) = target {
-            self.infer_definition(name);
-        } else {
-            self.infer_expression(target);
-        }
+        self.infer_target(target, iter, |builder, iter_expr| {
+            // TODO: `infer_comprehension_definition` reports a diagnostic if `iter_ty` isn't iterable
+            //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
+            //  `[... for a.x in not_iterable]
+            if is_first {
+                infer_same_file_expression_type(builder.db(), builder.index.expression(iter_expr))
+            } else {
+                builder.infer_standalone_expression(iter_expr)
+            }
+            .iterate(builder.db())
+        });
         for expr in ifs {
             self.infer_expression(expr);
         }
@@ -3962,12 +4010,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_comprehension_definition(
         &mut self,
-        iterable: &ast::Expr,
-        target: &ast::ExprName,
-        is_first: bool,
-        is_async: bool,
+        comprehension: &ComprehensionDefinitionKind<'db>,
         definition: Definition<'db>,
     ) {
+        let iterable = comprehension.iterable();
+        let target = comprehension.target();
+
         let expression = self.index.expression(iterable);
         let result = infer_expression_types(self.db(), expression);
 
@@ -3977,7 +4025,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // (2) We must *not* call `self.extend()` on the result of the type inference,
         //     because `ScopedExpressionId`s are only meaningful within their own scope, so
         //     we'd add types for random wrong expressions in the current scope
-        let iterable_type = if is_first {
+        let iterable_type = if comprehension.is_first() {
             let lookup_scope = self
                 .index
                 .parent_scope_id(self.scope().file_scope_id(self.db()))
@@ -3989,14 +4037,26 @@ impl<'db> TypeInferenceBuilder<'db> {
             result.expression_type(iterable.scoped_expression_id(self.db(), self.scope()))
         };
 
-        let target_type = if is_async {
+        let target_type = if comprehension.is_async() {
             // TODO: async iterables/iterators! -- Alex
             todo_type!("async iterables/iterators")
         } else {
-            iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
-                err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                err.fallback_element_type(self.db())
-            })
+            match comprehension.target_kind() {
+                TargetKind::Sequence(unpack_position, unpack) => {
+                    let unpacked = infer_unpack_types(self.db(), unpack);
+                    if unpack_position == UnpackPosition::First {
+                        self.context.extend(unpacked.diagnostics());
+                    }
+                    let target_ast_id = target.scoped_expression_id(self.db(), self.scope());
+                    unpacked.expression_type(target_ast_id)
+                }
+                TargetKind::NameOrAttribute => {
+                    iterable_type.try_iterate(self.db()).unwrap_or_else(|err| {
+                        err.report_diagnostic(&self.context, iterable_type, iterable.into());
+                        err.fallback_element_type(self.db())
+                    })
+                }
+            }
         };
 
         self.types.expressions.insert(
@@ -4736,10 +4796,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                             }
                             Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
                                 match subclass_of.subclass_of() {
-                                    ClassBase::Class(class) => {
+                                    SubclassOfInner::Class(class) => {
                                         !class.instance_member(db, attr).symbol.is_unbound()
                                     }
-                                    ClassBase::Dynamic(_) => unreachable!(
+                                    SubclassOfInner::Dynamic(_) => unreachable!(
                                         "Attribute lookup on a dynamic `SubclassOf` type should always return a bound symbol"
                                     ),
                                 }
@@ -4844,6 +4904,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
                 | Type::BoundMethod(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
@@ -4981,8 +5042,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
             (todo @ Type::Dynamic(DynamicType::Todo(_)), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
-            (todo @ Type::Dynamic(DynamicType::TodoProtocol), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::TodoProtocol), _) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _) => Some(todo),
+            (todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _, _)
+            | (_, todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -5124,6 +5187,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
@@ -5148,6 +5212,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::WrapperDescriptor(_)
                 | Type::MethodWrapper(_)
                 | Type::DataclassDecorator(_)
+                | Type::DataclassTransformer(_)
                 | Type::ModuleLiteral(_)
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
@@ -5718,7 +5783,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 range,
             ),
             (Type::Tuple(_), Type::Instance(instance))
-                if instance.class.is_known(self.db(), KnownClass::VersionInfo) =>
+                if instance
+                    .class()
+                    .is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(
                     left,
@@ -5728,7 +5795,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 )
             }
             (Type::Instance(instance), Type::Tuple(_))
-                if instance.class.is_known(self.db(), KnownClass::VersionInfo) =>
+                if instance
+                    .class()
+                    .is_known(self.db(), KnownClass::VersionInfo) =>
             {
                 self.infer_binary_type_comparison(
                     Type::version_info_tuple(self.db()),
@@ -6106,12 +6175,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             (
                 Type::Instance(instance),
                 Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
-            ) if instance.class.is_known(self.db(), KnownClass::VersionInfo) => self
-                .infer_subscript_expression_types(
+            ) if instance
+                .class()
+                .is_known(self.db(), KnownClass::VersionInfo) =>
+            {
+                self.infer_subscript_expression_types(
                     value_node,
                     Type::version_info_tuple(self.db()),
                     slice_ty,
-                ),
+                )
+            }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::Tuple(tuple_ty), Type::IntLiteral(int)) if i32::try_from(int).is_ok() => {
@@ -6224,7 +6297,10 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::IntLiteral(i64::from(bool)),
             ),
             (Type::KnownInstance(KnownInstanceType::Protocol), _) => {
-                Type::Dynamic(DynamicType::TodoProtocol)
+                Type::Dynamic(DynamicType::SubscriptedProtocol)
+            }
+            (Type::KnownInstance(KnownInstanceType::Generic), _) => {
+                Type::Dynamic(DynamicType::SubscriptedGeneric)
             }
             (Type::KnownInstance(known_instance), _)
                 if known_instance.class().is_special_form() =>
@@ -6331,12 +6407,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                     }
 
-                    report_non_subscriptable(
-                        &self.context,
-                        value_node.into(),
-                        value_ty,
-                        "__class_getitem__",
-                    );
+                    // TODO: properly handle old-style generics; get rid of this temporary hack
+                    if !value_ty.into_class_literal().is_some_and(|class| {
+                        class
+                            .iter_mro(self.db(), None)
+                            .contains(&ClassBase::Dynamic(DynamicType::SubscriptedGeneric))
+                    }) {
+                        report_non_subscriptable(
+                            &self.context,
+                            value_node.into(),
+                            value_ty,
+                            "__class_getitem__",
+                        );
+                    }
                 } else {
                     report_non_subscriptable(
                         &self.context,
@@ -6387,7 +6470,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
             Some(Type::Instance(instance))
-                if instance.class.is_known(self.db(), KnownClass::NoneType) =>
+                if instance.class().is_known(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
             }
@@ -7508,7 +7591,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::Protocol => {
                 self.infer_type_expression(arguments_slice);
-                Type::Dynamic(DynamicType::TodoProtocol)
+                Type::Dynamic(DynamicType::SubscriptedProtocol)
+            }
+            KnownInstanceType::Generic => {
+                self.infer_type_expression(arguments_slice);
+                Type::Dynamic(DynamicType::SubscriptedGeneric)
             }
             KnownInstanceType::NoReturn
             | KnownInstanceType::Never

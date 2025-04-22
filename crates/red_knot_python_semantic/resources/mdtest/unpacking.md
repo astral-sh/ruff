@@ -708,3 +708,95 @@ with ContextManager() as (a, b, c):
     reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
 ```
+
+## Comprehension
+
+Unpacking in a comprehension.
+
+### Same types
+
+```py
+def _(arg: tuple[tuple[int, int], tuple[int, int]]):
+    # revealed: tuple[int, int]
+    [reveal_type((a, b)) for a, b in arg]
+```
+
+### Mixed types (1)
+
+```py
+def _(arg: tuple[tuple[int, int], tuple[int, str]]):
+    # revealed: tuple[int, int | str]
+    [reveal_type((a, b)) for a, b in arg]
+```
+
+### Mixed types (2)
+
+```py
+def _(arg: tuple[tuple[int, str], tuple[str, int]]):
+    # revealed: tuple[int | str, str | int]
+    [reveal_type((a, b)) for a, b in arg]
+```
+
+### Mixed types (3)
+
+```py
+def _(arg: tuple[tuple[int, int, int], tuple[int, str, bytes], tuple[int, int, str]]):
+    # revealed: tuple[int, int | str, int | bytes | str]
+    [reveal_type((a, b, c)) for a, b, c in arg]
+```
+
+### Same literal values
+
+```py
+# revealed: tuple[Literal[1, 3], Literal[2, 4]]
+[reveal_type((a, b)) for a, b in ((1, 2), (3, 4))]
+```
+
+### Mixed literal values (1)
+
+```py
+# revealed: tuple[Literal[1, "a"], Literal[2, "b"]]
+[reveal_type((a, b)) for a, b in ((1, 2), ("a", "b"))]
+```
+
+### Mixed literals values (2)
+
+```py
+# error: "Object of type `Literal[1]` is not iterable"
+# error: "Object of type `Literal[2]` is not iterable"
+# error: "Object of type `Literal[4]` is not iterable"
+# error: [invalid-assignment] "Not enough values to unpack (expected 2, got 1)"
+# revealed: tuple[Unknown | Literal[3, 5], Unknown | Literal["a", "b"]]
+[reveal_type((a, b)) for a, b in (1, 2, (3, "a"), 4, (5, "b"), "c")]
+```
+
+### Custom iterator (1)
+
+```py
+class Iterator:
+    def __next__(self) -> tuple[int, int]:
+        return (1, 2)
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+# revealed: tuple[int, int]
+[reveal_type((a, b)) for a, b in Iterable()]
+```
+
+### Custom iterator (2)
+
+```py
+class Iterator:
+    def __next__(self) -> bytes:
+        return b""
+
+class Iterable:
+    def __iter__(self) -> Iterator:
+        return Iterator()
+
+def _(arg: tuple[tuple[int, str], Iterable]):
+    # revealed: tuple[int | bytes, str | bytes]
+    [reveal_type((a, b)) for a, b in arg]
+```

@@ -41,7 +41,7 @@ class Foo:
 One thing that is supported is error messages for using special forms in type expressions.
 
 ```py
-from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec
+from typing_extensions import Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec, Generic
 
 def _(
     a: Unpack,  # error: [invalid-type-form] "`typing.Unpack` requires exactly one argument when used in a type expression"
@@ -49,6 +49,7 @@ def _(
     c: TypeIs,  # error: [invalid-type-form] "`typing.TypeIs` requires exactly one argument when used in a type expression"
     d: Concatenate,  # error: [invalid-type-form] "`typing.Concatenate` requires at least two arguments when used in a type expression"
     e: ParamSpec,
+    f: Generic,  # error: [invalid-type-form] "`typing.Generic` is not allowed in type expressions"
 ) -> None:
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -65,7 +66,7 @@ You can't inherit from most of these. `typing.Callable` is an exception.
 
 ```py
 from typing import Callable
-from typing_extensions import Self, Unpack, TypeGuard, TypeIs, Concatenate
+from typing_extensions import Self, Unpack, TypeGuard, TypeIs, Concatenate, Generic
 
 class A(Self): ...  # error: [invalid-base]
 class B(Unpack): ...  # error: [invalid-base]
@@ -73,6 +74,7 @@ class C(TypeGuard): ...  # error: [invalid-base]
 class D(TypeIs): ...  # error: [invalid-base]
 class E(Concatenate): ...  # error: [invalid-base]
 class F(Callable): ...
+class G(Generic): ...  # error: [invalid-base] "Cannot inherit from plain `Generic`"
 
 reveal_type(F.__mro__)  # revealed: tuple[Literal[F], @Todo(Support for Callable as a base class), Literal[object]]
 ```
