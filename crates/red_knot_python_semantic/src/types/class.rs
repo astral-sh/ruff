@@ -972,7 +972,7 @@ impl<'db> ClassLiteralType<'db> {
                     Some(_),
                     "__new__" | "__init__",
                 ) => Type::FunctionLiteral(
-                    function.with_generic_context(db, origin.generic_context(db)),
+                    function.with_inherited_generic_context(db, origin.generic_context(db)),
                 ),
                 _ => ty,
             }

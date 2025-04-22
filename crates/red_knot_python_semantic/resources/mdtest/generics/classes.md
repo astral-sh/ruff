@@ -232,21 +232,11 @@ TODO: These do not currently work yet, because we don't correctly model the nest
 class C[T]:
     def __init__[S](self, x: T, y: S) -> None: ...
 
-# TODO: no error
-# TODO: revealed: C[Literal[1]]
-# error: [invalid-argument-type]
-reveal_type(C(1, 1))  # revealed: C[Unknown]
-# TODO: no error
-# TODO: revealed: C[Literal[1]]
-# error: [invalid-argument-type]
-reveal_type(C(1, "string"))  # revealed: C[Unknown]
-# TODO: no error
-# TODO: revealed: C[Literal[1]]
-# error: [invalid-argument-type]
-reveal_type(C(1, True))  # revealed: C[Unknown]
+reveal_type(C(1, 1))  # revealed: C[Literal[1]]
+reveal_type(C(1, "string"))  # revealed: C[Literal[1]]
+reveal_type(C(1, True))  # revealed: C[Literal[1]]
 
-# TODO: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `S`, found `Literal[1]`"
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 
