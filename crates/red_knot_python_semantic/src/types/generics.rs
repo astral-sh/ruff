@@ -299,22 +299,19 @@ impl<'db> Specialization<'db> {
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
-    generic_context: GenericContext<'db>,
     types: FxHashMap<TypeVarInstance<'db>, UnionBuilder<'db>>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db, generic_context: GenericContext<'db>) -> Self {
+    pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
-            generic_context,
             types: FxHashMap::default(),
         }
     }
 
-    pub(crate) fn build(mut self) -> Specialization<'db> {
-        let types: Box<[_]> = self
-            .generic_context
+    pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
+        let types: Box<[_]> = generic_context
             .variables(self.db)
             .iter()
             .map(|variable| {
@@ -324,7 +321,7 @@ impl<'db> SpecializationBuilder<'db> {
                     .unwrap_or(variable.default_ty(self.db).unwrap_or(Type::unknown()))
             })
             .collect();
-        Specialization::new(self.db, self.generic_context, types)
+        Specialization::new(self.db, generic_context, types)
     }
 
     fn add_type_mapping(&mut self, typevar: TypeVarInstance<'db>, ty: Type<'db>) {
