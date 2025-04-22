@@ -104,6 +104,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
+    python_version: PythonVersion,
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
@@ -140,6 +141,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
             eager_bindings: FxHashMap::default(),
 
+            python_version: Program::get(db).python_version(db),
             semantic_checker: SemanticSyntaxChecker::default(),
             semantic_syntax_errors: RefCell::default(),
         };
@@ -2264,7 +2266,7 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
     }
 
     fn python_version(&self) -> PythonVersion {
-        Program::get(self.db).python_version(self.db)
+        self.python_version
     }
 
     fn with_source<T>(&self, f: impl FnOnce(&str) -> T) -> T {
