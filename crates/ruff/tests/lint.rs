@@ -994,6 +994,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.extend-per-file-ignores`
     - `lint.exclude`
     - `lint.preview`
+    - `lint.disable-typing-extensions`
 
     For more information, try '--help'.
     ");
@@ -2117,7 +2118,7 @@ requires-python = ">= 3.11"
             .arg("test.py")
             .arg("-")
             .current_dir(project_dir)
-            , @r###"
+            , @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -2207,6 +2208,7 @@ requires-python = ">= 3.11"
         	XXX,
         ]
         linter.typing_modules = []
+        linter.disable_typing_extensions = false
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -2390,7 +2392,7 @@ requires-python = ">= 3.11"
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -2428,7 +2430,7 @@ requires-python = ">= 3.11"
             .arg("test.py")
             .arg("-")
             .current_dir(project_dir)
-            , @r###"
+            , @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -2518,6 +2520,7 @@ requires-python = ">= 3.11"
         	XXX,
         ]
         linter.typing_modules = []
+        linter.disable_typing_extensions = false
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -2701,7 +2704,7 @@ requires-python = ">= 3.11"
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -2790,7 +2793,7 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg("test.py")
             .arg("--show-settings")
-            .current_dir(project_dir), @r###"
+            .current_dir(project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -2881,6 +2884,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.disable_typing_extensions = false
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -3064,7 +3068,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -3170,7 +3174,7 @@ from typing import Union;foo: Union[int, str] = 1
             .arg("--show-settings")
             .args(["--select","UP007"])
             .arg("foo/test.py")
-            .current_dir(&project_dir), @r###"
+            .current_dir(&project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -3260,6 +3264,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.disable_typing_extensions = false
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -3443,7 +3448,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -3497,7 +3502,7 @@ from typing import Union;foo: Union[int, str] = 1
             .arg("--show-settings")
             .args(["--select","UP007"])
             .arg("foo/test.py")
-            .current_dir(&project_dir), @r###"
+            .current_dir(&project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -3587,6 +3592,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.disable_typing_extensions = false
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -3770,7 +3776,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -3823,7 +3829,7 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg("--show-settings")
             .arg("foo/test.py")
-            .current_dir(&project_dir), @r###"
+            .current_dir(&project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -3914,6 +3920,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.disable_typing_extensions = false
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -4097,7 +4104,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     insta::with_settings!({
@@ -4107,7 +4114,7 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg("--show-settings")
             .arg("test.py")
-            .current_dir(project_dir.join("foo")), @r###"
+            .current_dir(project_dir.join("foo")), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -4198,6 +4205,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.disable_typing_extensions = false
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -4381,7 +4389,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
     Ok(())
 }
@@ -4444,7 +4452,7 @@ from typing import Union;foo: Union[int, str] = 1
             .args(STDIN_BASE_OPTIONS)
             .arg("--show-settings")
             .arg("test.py")
-            .current_dir(&project_dir), @r###"
+            .current_dir(&project_dir), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -4535,6 +4543,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
+        linter.disable_typing_extensions = false
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -4718,7 +4727,7 @@ from typing import Union;foo: Union[int, str] = 1
         analyze.include_dependencies = {}
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())
