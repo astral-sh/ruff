@@ -304,7 +304,7 @@ AIR302.py:259:1: AIR302 `airflow.operators.check_operator.SQLCheckOperator` is m
     |
     = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
 
-AIR302.py:260:1: AIR302 `airflow.operators.presto_check_operator.SQLCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302.py:260:1: AIR302 `airflow.operators.presto_check_operator.CheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 258 | PrestoValueCheckOperator()
 259 | SQLCheckOperator()
@@ -348,7 +348,7 @@ AIR302.py:263:1: AIR302 `airflow.operators.check_operator.SQLIntervalCheckOperat
     |
     = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
 
-AIR302.py:264:1: AIR302 `airflow.operators.presto_check_operator.SQLIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302.py:264:1: AIR302 `airflow.operators.presto_check_operator.IntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 262 | SQLColumnCheckOperator2()
 263 | SQLIntervalCheckOperator()
@@ -403,7 +403,7 @@ AIR302.py:269:1: AIR302 `airflow.operators.check_operator.SQLValueCheckOperator`
     |
     = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
 
-AIR302.py:270:1: AIR302 `airflow.operators.presto_check_operator.SQLValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
+AIR302.py:270:1: AIR302 `airflow.operators.presto_check_operator.ValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
 268 | SQLThresholdCheckOperator2()
 269 | SQLValueCheckOperator()
@@ -423,7 +423,7 @@ AIR302.py:271:1: AIR302 `airflow.operators.sql.SQLValueCheckOperator` is moved i
 272 | SqlSensor()
 273 | SqlSensor2()
     |
-    = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
 
 AIR302.py:272:1: AIR302 `airflow.sensors.sql.SqlSensor` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -516,7 +516,7 @@ AIR302.py:287:1: AIR302 `airflow.operators.druid_check_operator.DruidCheckOperat
 288 |
 289 | # apache-airflow-providers-apache-hdfs
     |
-    = help: Install `apache-airflow-providers-common-sql>=4.0.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
 
 AIR302.py:290:1: AIR302 `airflow.hooks.webhdfs_hook.WebHDFSHook` is moved into `apache-hdfs` provider in Airflow 3.0;
     |

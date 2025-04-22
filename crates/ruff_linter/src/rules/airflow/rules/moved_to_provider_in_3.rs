@@ -62,6 +62,7 @@ impl Violation for Airflow3MovedToProvider {
     fn fix_title(&self) -> Option<String> {
         let Airflow3MovedToProvider { replacement, .. } = self;
         match replacement {
+            ProviderReplacement::None => {None}
             ProviderReplacement::ProviderName {
                 name,
                 provider,
@@ -79,7 +80,6 @@ impl Violation for Airflow3MovedToProvider {
             } => {
                 Some(format!("Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."))
             } ,
-            _ => None,
         }
     }
 }
@@ -187,68 +187,48 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "common-sql",
             version: "1.0.0"
         },
-        ["airflow", "operators", "check_operator", rest] => match *rest {
-            "SQLCheckOperator" | "CheckOperator" => ProviderReplacement::ProviderName {
+        ["airflow", "operators", "check_operator" | "sql", "SQLCheckOperator"]
+        | ["airflow", "operators", "check_operator" | "druid_check_operator" | "presto_check_operator", "CheckOperator"]
+        | ["airflow", "operators", "druid_check_operator", "DruidCheckOperator"]
+        | ["airflow", "operators", "presto_check_operator", "PrestoCheckOperator"] => {
+            ProviderReplacement::ProviderName {
                 name: "airflow.providers.common.sql.operators.sql.SQLCheckOperator",
                 provider: "common-sql",
                 version: "1.1.0"
-            },
-            "SQLIntervalCheckOperator" | "IntervalCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            "SQLThresholdCheckOperator" | "ThresholdCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            "SQLValueCheckOperator" | "ValueCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLValueCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            _ => return
+            }
         },
-        ["airflow", "operators", "druid_check_operator", "DruidCheckOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.common.sql.operators.sql.SQLCheckOperator",
+        ["airflow", "operators", "check_operator" | "presto_check_operator", "IntervalCheckOperator"]
+        | ["airflow", "operators", "check_operator" | "sql", "SQLIntervalCheckOperator"]
+        | ["airflow", "operators", "presto_check_operator", "PrestoIntervalCheckOperator"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator",
             provider: "common-sql",
-            version: "4.0.0"
+            version: "1.1.0"
         },
-        ["airflow", "operators", "presto_check_operator", rest] => match *rest {
-            "SQLCheckOperator" | "PrestoCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            "SQLIntervalCheckOperator" | "PrestoIntervalCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            "SQLValueCheckOperator" | "PrestoValueCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLValueCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            _ => return
-        }
+        ["airflow", "operators", "check_operator" | "sql" , "SQLThresholdCheckOperator"]
+        | ["airflow", "operators", "check_operator", "ThresholdCheckOperator"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator",
+            provider: "common-sql",
+            version: "1.1.0"
+        },
+        ["airflow", "operators", "check_operator" | "presto_check_operator", "ValueCheckOperator"]
+        | ["airflow", "operators", "presto_check_operator", "PrestoValueCheckOperator"]
+        | ["airflow", "operators", "check_operator" | "sql", "SQLValueCheckOperator"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.common.sql.operators.sql.SQLValueCheckOperator",
+            provider: "common-sql",
+            version: "1.1.0"
+        },
         ["airflow", "operators", "sql", rest] => match *rest {
-            "BaseSQLOperator" |
-            "BranchSQLOperator" |
-            "SQLCheckOperator" |
-            "SQLIntervalCheckOperator" |
-            "SQLTablecheckOperator"  |
-            "SQLThresholdCheckOperator" => ProviderReplacement::SourceModuleMovedToProvider {
+            "BaseSQLOperator"
+            | "BranchSQLOperator"
+            | "SQLTablecheckOperator" => ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
                 module: "airflow.providers.common.sql.operators.sql",
                 provider: "common-sql",
                 version: "1.1.0"
             },
-            "SQLColumnCheckOperator" |
-            "SQLValueCheckOperator" |
-            "_convert_to_float_if_possible" |
-            "parse_boolean" => ProviderReplacement::SourceModuleMovedToProvider {
+            "SQLColumnCheckOperator"
+            | "_convert_to_float_if_possible"
+            | "parse_boolean" => ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
                 module: "airflow.providers.common.sql.operators.sql",
                 provider: "common-sql",
@@ -260,6 +240,16 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             name: "airflow.providers.common.sql.sensors.sql.SqlSensor",
             provider: "common-sql",
             version: "1.0.0"
+        },
+        ["airflow", "operators", "jdbc_operator", "JdbcOperator"]
+        | ["airflow", "operators", "mssql_operator", "MsSqlOperator"]
+        | ["airflow", "operators", "mysql_operator", "MySqlOperator"]
+        | ["airflow", "operators", "oracle_operator", "OracleOperator"]
+        | ["airflow", "operators", "postgres_operator", "PostgresOperator"]
+        | ["airflow", "operators", "sqlite_operator", "SqliteOperator"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator",
+            provider: "common-sql",
+            version: "1.3.0"
         },
 
         // apache-airflow-providers-daskexecutor
@@ -464,11 +454,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "jdbc",
             version: "1.0.0"
         },
-        ["airflow", "operators", "jdbc_operator", "JdbcOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator",
-            provider: "common-sql",
-            version: "1.3.0"
-        },
 
         // apache-airflow-providers-cncf-kubernetes
         ["airflow", "executors", "kubernetes_executor_types", rest @ (
@@ -632,22 +617,12 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "microsoft-mssql",
             version: "1.0.0"
         },
-        ["airflow", "operators", "mssql_operator", "MsSqlOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator",
-            provider: "common-sql",
-            version: "1.3.0"
-        },
 
         // apache-airflow-providers-mysql
         ["airflow", "hooks", "mysql_hook", "MySqlHook"] => ProviderReplacement::ProviderName {
             name: "airflow.providers.mysql.hooks.mysql.MySqlHook",
             provider: "mysql",
             version: "1.0.0"
-        },
-        ["airflow", "operators", "mysql_operator", "MySqlOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator",
-            provider: "common-sql",
-            version: "1.3.0"
         },
         ["airflow", "operators", "presto_to_mysql", "PrestoToMySqlOperator" | "PrestoToMySqlTransfer"] => ProviderReplacement::ProviderName {
             name: "airflow.providers.mysql.transfers.presto_to_mysql.PrestoToMySqlOperator",
@@ -660,11 +635,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             name: "airflow.providers.oracle.hooks.oracle.OracleHook",
             provider: "oracle",
             version: "1.0.0"
-        },
-        ["airflow", "operators", "oracle_operator", "OracleOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator",
-            provider: "common-sql",
-            version: "1.3.0"
         },
 
         // apache-airflow-providers-papermill
@@ -693,11 +663,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "operators", "postgres_operator", "Mapping"] => ProviderReplacement::None,
-        ["airflow", "operators", "postgres_operator", "PostgresOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator",
-            provider: "common-sql",
-            version: "1.3.0"
-        },
 
         // apache-airflow-providers-presto
         ["airflow", "hooks", "presto_hook", "PrestoHook"] => ProviderReplacement::ProviderName {
@@ -742,12 +707,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "sqlite",
             version: "1.0.0"
         },
-        ["airflow", "operators", "sqlite_operator", "SqliteOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator",
-            provider: "common-sql",
-            version: "1.3.0"
-        },
-
 
         // apache-airflow-providers-zendesk
         ["airflow", "hooks", "zendesk_hook", "ZendeskHook"] =>
