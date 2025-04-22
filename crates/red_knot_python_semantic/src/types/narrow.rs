@@ -410,7 +410,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+    fn evaluate_expr_ne(&mut self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
             Some(rhs_ty.negate(self.db))
         } else {
@@ -460,7 +460,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             }
             ast::CmpOp::Is => Some(rhs_ty),
             ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
-            ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
+            ast::CmpOp::NotEq => self.evaluate_expr_ne(rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self
                 .evaluate_expr_in(lhs_ty, rhs_ty)
