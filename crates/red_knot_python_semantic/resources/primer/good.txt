@@ -65,6 +65,7 @@ packaging
 paroxython
 parso
 pegen
+pip
 porcupine
 ppb-vector
 psycopg

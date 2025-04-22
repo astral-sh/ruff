@@ -18,7 +18,6 @@ mypy  # cycle panic (signature_)
 pandas  # slow
 pandas-stubs  # cycle panics (try_metaclass_)
 pandera  # cycle panics (try_metaclass_)
-pip  # too many cycle iterations (infer_expression_types)
 poetry  # too many cycle iterations (member_lookup_with_policy, infer_expression_type)
 prefect # slow
 pytest  # cycle panics (signature_), missing expression ID
