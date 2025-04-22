@@ -25,7 +25,7 @@ schemathesis  # cycle panics (signature_)
 scikit-learn  # success, but mypy-primer hangs processing the output
 scipy  # missing expression ID
 spack  # success, but mypy-primer hangs processing the output
-spark  # missing expression ID
+spark  # cycle panics (try_metaclass_)
 sphinx  # missing expression ID
 steam.py  # missing expression ID
 streamlit  # cycle panic (signature)
