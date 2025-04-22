@@ -8,7 +8,7 @@ Unless otherwise specified, all quotations come from the [Generics] section of t
 
 ## Type variables
 
-### Defining legacy type variables
+### Defining legacy type variables fwomp
 
 > Generics can be parameterized by using a factory available in `typing` called `TypeVar`.
 
@@ -20,7 +20,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 reveal_type(type(T))  # revealed: Literal[TypeVar]
-reveal_type(T)  # revealed: TypeVar
+reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 

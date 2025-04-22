@@ -339,6 +339,19 @@ impl<'db> PropertyInstanceType<'db> {
             .map(|ty| ty.apply_specialization(db, specialization));
         Self::new(db, getter, setter)
     }
+
+    fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        if let Some(ty) = self.getter(db) {
+            ty.find_legacy_typevars(db, typevars);
+        }
+        if let Some(ty) = self.setter(db) {
+            ty.find_legacy_typevars(db, typevars);
+        }
+    }
 }
 
 bitflags! {
@@ -4846,6 +4859,89 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// Locates any legacy `TypeVar`s in this type, and adds them to a set. This is used to build
+    /// up a generic context from any legacy `TypeVar`s that appear in a function parameter list or
+    /// `Generic` specialization.
+    pub(crate) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        match self {
+            Type::TypeVar(typevar) => {
+                if typevar.is_legacy(db) {
+                    typevars.insert(typevar);
+                }
+            }
+
+            Type::FunctionLiteral(function) => function.find_legacy_typevars(db, typevars),
+
+            Type::BoundMethod(method) => {
+                method.self_instance(db).find_legacy_typevars(db, typevars);
+                method.function(db).find_legacy_typevars(db, typevars);
+            }
+
+            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function))
+            | Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
+                function.find_legacy_typevars(db, typevars);
+            }
+
+            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property))
+            | Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
+                property.find_legacy_typevars(db, typevars);
+            }
+
+            Type::Callable(callable) => {
+                callable.find_legacy_typevars(db, typevars);
+            }
+
+            Type::PropertyInstance(property) => {
+                property.find_legacy_typevars(db, typevars);
+            }
+
+            Type::Union(union) => {
+                for element in union.iter(db) {
+                    element.find_legacy_typevars(db, typevars);
+                }
+            }
+            Type::Intersection(intersection) => {
+                for positive in intersection.positive(db) {
+                    positive.find_legacy_typevars(db, typevars);
+                }
+                for negative in intersection.negative(db) {
+                    negative.find_legacy_typevars(db, typevars);
+                }
+            }
+            Type::Tuple(tuple) => {
+                for element in tuple.iter(db) {
+                    element.find_legacy_typevars(db, typevars);
+                }
+            }
+
+            Type::Dynamic(_)
+            | Type::Never
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::WrapperDescriptor(_)
+            | Type::MethodWrapper(MethodWrapperKind::StrStartswith(_))
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::IntLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::SliceLiteral(_)
+            | Type::BoundSuper(_)
+            | Type::Instance(_)
+            | Type::KnownInstance(_) => {}
+        }
+    }
+
     /// Return the string representation of this type when converted to string as it would be
     /// provided by the `__str__` method.
     ///
@@ -4856,9 +4952,7 @@ impl<'db> Type<'db> {
         match self {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
-            Type::KnownInstance(known_instance) => {
-                Type::string_literal(db, known_instance.repr(db))
-            }
+            Type::KnownInstance(known_instance) => Type::string_literal(db, known_instance.repr()),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -4876,9 +4970,7 @@ impl<'db> Type<'db> {
                 Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
             }
             Type::LiteralString => Type::LiteralString,
-            Type::KnownInstance(known_instance) => {
-                Type::string_literal(db, known_instance.repr(db))
-            }
+            Type::KnownInstance(known_instance) => Type::string_literal(db, known_instance.repr()),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -5155,12 +5247,12 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
                         "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions)",
-                        q = qualifier.repr(self.db)
+                        q = qualifier.repr()
                     ),
                     InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
                         f,
                         "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)",
-                        q = qualifier.repr(self.db)
+                        q = qualifier.repr()
                     ),
                     InvalidTypeExpression::InvalidType(ty) => write!(
                         f,
@@ -5212,6 +5304,10 @@ pub struct TypeVarInstance<'db> {
 }
 
 impl<'db> TypeVarInstance<'db> {
+    pub(crate) fn is_legacy(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), TypeVarKind::Legacy)
+    }
+
     #[allow(unused)]
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
@@ -6208,6 +6304,17 @@ impl<'db> FunctionType<'db> {
             Some(specialization),
         )
     }
+
+    fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        let signatures = self.signature(db);
+        for signature in signatures {
+            signature.find_legacy_typevars(db, typevars);
+        }
+    }
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
@@ -6429,6 +6536,16 @@ impl<'db> CallableType<'db> {
                 .iter()
                 .map(|signature| signature.apply_specialization(db, specialization)),
         )
+    }
+
+    fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        for signature in self.signatures(db) {
+            signature.find_legacy_typevars(db, typevars);
+        }
     }
 
     /// Check whether this callable type is fully static.

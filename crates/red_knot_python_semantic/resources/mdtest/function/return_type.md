@@ -206,7 +206,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# TODO: `invalid-return-type` error should be emitted
+# error: [invalid-return-type]
 def m(x: T) -> T: ...
 ```
 

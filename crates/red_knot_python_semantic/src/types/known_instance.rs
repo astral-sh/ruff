@@ -154,7 +154,7 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return the repr of the symbol at runtime
-    pub(crate) fn repr(self, db: &'db dyn Db) -> &'db str {
+    pub(crate) fn repr(self) -> &'db str {
         match self {
             Self::Annotated => "typing.Annotated",
             Self::Literal => "typing.Literal",
@@ -189,7 +189,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Protocol => "typing.Protocol",
             Self::Generic => "typing.Generic",
             Self::ReadOnly => "typing.ReadOnly",
-            Self::TypeVar(typevar) => typevar.name(db),
+            Self::TypeVar(_) => "typing.TypeVar",
             Self::TypeAliasType(_) => "typing.TypeAliasType",
             Self::Unknown => "knot_extensions.Unknown",
             Self::AlwaysTruthy => "knot_extensions.AlwaysTruthy",

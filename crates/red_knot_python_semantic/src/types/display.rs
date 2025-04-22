@@ -94,7 +94,7 @@ impl Display for DisplayRepresentation<'_> {
                 SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
-            Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
+            Type::KnownInstance(known_instance) => f.write_str(known_instance.repr()),
             Type::FunctionLiteral(function) => {
                 let signature = function.signature(self.db);
 

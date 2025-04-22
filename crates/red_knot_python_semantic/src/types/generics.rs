@@ -7,7 +7,7 @@ use crate::types::{
     declaration_type, KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance,
     UnionBuilder, UnionType,
 };
-use crate::Db;
+use crate::{Db, FxOrderSet};
 
 /// A list of formal type variables for a generic function, class, or type alias.
 ///
@@ -20,6 +20,7 @@ pub struct GenericContext<'db> {
 }
 
 impl<'db> GenericContext<'db> {
+    /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
@@ -51,6 +52,32 @@ impl<'db> GenericContext<'db> {
             ast::TypeParam::ParamSpec(_) => None,
             ast::TypeParam::TypeVarTuple(_) => None,
         }
+    }
+
+    /// Creates a generic context from the legecy `TypeVar`s that appear in a function parameter
+    /// list.
+    pub(crate) fn from_function_params(
+        db: &'db dyn Db,
+        parameters: &Parameters<'db>,
+        return_type: Option<Type<'db>>,
+    ) -> Option<Self> {
+        let mut variables = FxOrderSet::default();
+        for param in parameters {
+            if let Some(ty) = param.annotated_type() {
+                ty.find_legacy_typevars(db, &mut variables);
+            }
+            if let Some(ty) = param.default_type() {
+                ty.find_legacy_typevars(db, &mut variables);
+            }
+        }
+        if let Some(ty) = return_type {
+            ty.find_legacy_typevars(db, &mut variables);
+        }
+        if variables.is_empty() {
+            return None;
+        }
+        let variables: Box<[_]> = variables.into_iter().collect();
+        Some(Self::new(db, variables))
     }
 
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {

@@ -1311,7 +1311,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
         subscript,
         format_args!(
             "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
-            KnownInstanceType::Annotated.repr(context.db())
+            KnownInstanceType::Annotated.repr()
         ),
     );
 }
@@ -1325,7 +1325,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
         subscript,
         format_args!(
             "Special form `{}` expected exactly two arguments (parameter types and return type)",
-            KnownInstanceType::Callable.repr(context.db())
+            KnownInstanceType::Callable.repr()
         ),
     );
 }

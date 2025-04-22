@@ -6731,7 +6731,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 subscript,
                                 format_args!(
                                     "Type qualifier `{type_qualifier}` expects exactly one type parameter",
-                                    type_qualifier = known_instance.repr(self.db()),
+                                    type_qualifier = known_instance.repr(),
                                 ),
                             );
                             Type::unknown().into()
@@ -7510,7 +7510,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         subscript,
                         format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(db)
+                            known_instance.repr()
                         ),
                     );
                     Type::unknown()
@@ -7539,7 +7539,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         subscript,
                         format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(db)
+                            known_instance.repr()
                         ),
                     );
                     Type::unknown()
@@ -7557,7 +7557,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         subscript,
                         format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(db)
+                            known_instance.repr()
                         ),
                     );
                     Type::unknown()
@@ -7587,7 +7587,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             arguments_slice,
                             format_args!(
                                 "Expected the first argument to `{}` to be a callable object, but got an object of type `{}`",
-                                known_instance.repr(db),
+                                known_instance.repr(),
                                 argument_type.display(db)
                             ),
                         );
@@ -7653,7 +7653,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     subscript,
                     format_args!(
                         "Type qualifier `{}` is not allowed in type expressions (only in annotation expressions)",
-                        known_instance.repr(db)
+                        known_instance.repr()
                     ),
                 );
                 self.infer_type_expression(arguments_slice)
@@ -7696,7 +7696,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     subscript,
                     format_args!(
                         "Type `{}` expected no type parameter",
-                        known_instance.repr(db)
+                        known_instance.repr()
                     ),
                 );
                 Type::unknown()
@@ -7709,7 +7709,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     subscript,
                     format_args!(
                         "Special form `{}` expected no type parameter",
-                        known_instance.repr(db)
+                        known_instance.repr()
                     ),
                 );
                 Type::unknown()
@@ -7720,7 +7720,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     subscript,
                     format_args!(
                         "Type `{}` expected no type parameter. Did you mean to use `Literal[...]` instead?",
-                        known_instance.repr(db)
+                        known_instance.repr()
                     ),
                 );
                 Type::unknown()
@@ -8267,7 +8267,7 @@ mod tests {
                              constraints: Option<&[&'static str]>,
                              default: Option<&'static str>| {
             let var_ty = get_symbol(&db, "src/a.py", &["f"], var).expect_type();
-            assert_eq!(var_ty.display(&db).to_string(), var);
+            assert_eq!(var_ty.display(&db).to_string(), "typing.TypeVar");
 
             let expected_name_ty = format!(r#"Literal["{var}"]"#);
             let name_ty = var_ty.member(&db, "__name__").symbol.expect_type();
