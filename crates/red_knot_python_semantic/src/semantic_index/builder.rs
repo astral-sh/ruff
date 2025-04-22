@@ -105,7 +105,6 @@ pub(super) struct SemanticIndexBuilder<'db> {
     imported_modules: FxHashSet<ModuleName>,
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
     python_version: PythonVersion,
-    is_file_open: bool,
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
@@ -142,7 +141,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             eager_bindings: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
-            is_file_open: db.is_file_open(file),
             semantic_checker: SemanticSyntaxChecker::default(),
             semantic_syntax_errors: RefCell::default(),
         };
@@ -1067,9 +1065,6 @@ impl<'db> SemanticIndexBuilder<'db> {
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
-        if !self.is_file_open {
-            return;
-        }
         let mut checker = std::mem::take(&mut self.semantic_checker);
         f(&mut checker, self);
         self.semantic_checker = checker;
