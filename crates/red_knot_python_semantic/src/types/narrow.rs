@@ -395,13 +395,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        // TODO: move this to a `Type` function
-        if (lhs_ty.is_single_valued(self.db)
-            || lhs_ty.is_union_of_single_valued(self.db)
-            || lhs_ty.is_literal_string()
-            || lhs_ty
-                .into_instance()
-                .is_some_and(|instance| instance.class().is_known(self.db, KnownClass::Bool)))
+        if lhs_ty.is_positively_narrowable(self.db)
             && (rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db))
         {
             Some(rhs_ty)
@@ -411,7 +405,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expr_ne(&mut self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if rhs_ty.is_single_valued(self.db) {
+        if rhs_ty.is_negatively_narrowable(self.db) {
             Some(rhs_ty.negate(self.db))
         } else {
             None
