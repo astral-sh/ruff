@@ -88,9 +88,12 @@ pub fn check_types(db: &dyn Db, file: File) -> TypeCheckDiagnostics {
         diagnostics.extend(result.diagnostics());
     }
 
-    for error in index.semantic_syntax_errors() {
-        diagnostics.push(create_semantic_syntax_diagnostic(file, error));
-    }
+    diagnostics.extend_diagnostics(
+        index
+            .semantic_syntax_errors()
+            .iter()
+            .map(|error| create_semantic_syntax_diagnostic(file, error)),
+    );
 
     check_suppressions(db, file, &mut diagnostics);
 

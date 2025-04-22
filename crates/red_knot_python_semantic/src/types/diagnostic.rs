@@ -991,6 +991,10 @@ impl TypeCheckDiagnostics {
         self.used_suppressions.extend(&other.used_suppressions);
     }
 
+    pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
+        self.diagnostics.extend(diagnostics);
+    }
+
     pub(crate) fn mark_used(&mut self, suppression_id: FileSuppressionId) {
         self.used_suppressions.insert(suppression_id);
     }
