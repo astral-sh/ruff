@@ -1194,7 +1194,13 @@ static_assert(is_subtype_of(TypeOf[E], Callable[[], C]))
 static_assert(is_subtype_of(TypeOf[E], Callable[[], B]))
 static_assert(not is_subtype_of(TypeOf[D], Callable[[], C]))
 static_assert(is_subtype_of(TypeOf[D], Callable[[], B]))
+```
 
+#### Classes with `__call__` and `__new__`
+
+If `__call__` and `__new__` are both present, `__call__` takes precedence.
+
+```py
 class MetaWithIntReturn(type):
     def __call__(cls) -> int:
         return super().__call__()
