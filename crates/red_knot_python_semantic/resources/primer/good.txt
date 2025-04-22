@@ -66,6 +66,7 @@ paroxython
 parso
 pegen
 pip
+poetry
 porcupine
 ppb-vector
 psycopg
