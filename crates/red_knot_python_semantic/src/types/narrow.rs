@@ -411,7 +411,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expr_ne(&mut self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
+        if rhs_ty.is_single_valued(self.db) {
             Some(rhs_ty.negate(self.db))
         } else {
             None
