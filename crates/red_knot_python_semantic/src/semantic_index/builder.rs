@@ -93,7 +93,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
 
     // Used for checking semantic syntax errors
     python_version: PythonVersion,
-    semantic_checker: SemanticSyntaxChecker,
+    semantic_checker: Option<SemanticSyntaxChecker>,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -143,7 +143,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             eager_bindings: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
-            semantic_checker: SemanticSyntaxChecker::default(),
+            semantic_checker: db.is_file_open(file).then(SemanticSyntaxChecker::default),
             semantic_syntax_errors: RefCell::default(),
         };
 
@@ -1068,7 +1068,9 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
         let mut checker = std::mem::take(&mut self.semantic_checker);
-        f(&mut checker, self);
+        if let Some(checker) = &mut checker {
+            f(checker, self);
+        }
         self.semantic_checker = checker;
     }
 }
