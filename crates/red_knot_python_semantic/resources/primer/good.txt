@@ -30,6 +30,7 @@ dd-trace-py
 dedupe
 django-stubs
 downforeveryone
+dragonchain
 dulwich
 flake8
 flake8-pyi
@@ -64,6 +65,8 @@ packaging
 paroxython
 parso
 pegen
+pip
+poetry
 porcupine
 ppb-vector
 psycopg
@@ -87,6 +90,7 @@ rich
 rotki
 schema_salad
 scrapy
+setuptools
 sockeye
 speedrun.com_global_scoreboard_webapp
 starlette

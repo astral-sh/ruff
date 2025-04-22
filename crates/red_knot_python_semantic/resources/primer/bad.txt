@@ -1,0 +1,34 @@
+Tanjun  # cycle panic (signature_)
+aiohttp  # missing expression ID
+alerta  # missing expression ID
+altair  # cycle panics (try_metaclass_)
+antidote  # hangs / slow
+artigraph  # cycle panics (value_type_)
+colour  # cycle panics (try_metaclass_)
+core  # cycle panics (value_type_)
+cpython  # missing expression ID, access to field whilst being initialized, too many cycle iterations
+discord.py  # some kind of hang, only when multi-threaded?
+freqtrade  # cycle panics (try_metaclass_)
+hydpy  # cycle panics (try_metaclass_)
+ibis  # cycle panics (try_metaclass_)
+manticore  # stack overflow
+materialize  # stack overflow
+meson  # missing expression ID
+mypy  # cycle panic (signature_)
+pandas  # slow
+pandas-stubs  # cycle panics (try_metaclass_)
+pandera  # cycle panics (try_metaclass_)
+prefect # slow
+pytest  # cycle panics (signature_), missing expression ID
+pywin32  # bad use-def map (binding with definitely-visible unbound)
+schemathesis  # cycle panics (signature_)
+scikit-learn  # success, but mypy-primer hangs processing the output
+scipy  # missing expression ID
+spack  # success, but mypy-primer hangs processing the output
+spark  # cycle panics (try_metaclass_)
+sphinx  # missing expression ID
+steam.py  # missing expression ID
+streamlit  # cycle panic (signature_)
+sympy  # stack overflow
+trio  # missing expression ID
+xarray  # cycle panics (try_metaclass_)
