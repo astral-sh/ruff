@@ -15,7 +15,7 @@ manticore  # stack overflow
 materialize  # stack overflow
 meson  # missing expression ID
 mypy  # cycle panic (signature_)
-pandas  # too many cycle iterations (member_lookup_with_policy)
+pandas  # slow
 pandas-stubs  # cycle panics (try_metaclass_)
 pandera  # cycle panics (try_metaclass_)
 pip  # too many cycle iterations (infer_expression_types)
