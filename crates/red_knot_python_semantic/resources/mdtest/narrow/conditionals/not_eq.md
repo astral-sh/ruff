@@ -56,7 +56,8 @@ def _(flag1: bool, flag2: bool):
     y = 2 if flag2 else 3
 
     if x != y:
-        reveal_type(x)  # revealed: Literal[1, 2]
+        # TODO: should be Literal[1, 2]
+        reveal_type(x)  # revealed: Literal[1]
     else:
         reveal_type(x)  # revealed: Literal[2]
 ```

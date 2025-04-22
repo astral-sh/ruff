@@ -395,8 +395,24 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
+        // TODO: move this to a `Type` function
+        if (lhs_ty.is_single_valued(self.db)
+            || lhs_ty.is_union_of_single_valued(self.db)
+            || lhs_ty.is_literal_string()
+            || lhs_ty
+                .into_instance()
+                .is_some_and(|instance| instance.class().is_known(self.db, KnownClass::Bool)))
+            && (rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db))
+        {
             Some(rhs_ty)
+        } else {
+            None
+        }
+    }
+
+    fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
+            Some(rhs_ty.negate(self.db))
         } else {
             None
         }
@@ -444,9 +460,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             }
             ast::CmpOp::Is => Some(rhs_ty),
             ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
-            ast::CmpOp::NotEq => self
-                .evaluate_expr_eq(lhs_ty, rhs_ty)
-                .map(|ty| ty.negate(self.db)),
+            ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self
                 .evaluate_expr_in(lhs_ty, rhs_ty)
