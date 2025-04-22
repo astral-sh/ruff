@@ -817,8 +817,6 @@ def write_source_order(out: list[str], ast: Ast) -> None:
 
             for field in node.fields_in_source_order():
                 visitor = type_to_visitor_function[field.parsed_ty.inner]
-                if field.is_annotation:
-                    visitor = annotation_visitor_function
 
                 if field.parsed_ty.optional:
                     body += f"""
