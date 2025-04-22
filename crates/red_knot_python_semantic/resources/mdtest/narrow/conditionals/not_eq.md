@@ -9,8 +9,7 @@ def _(flag: bool):
     if x != None:
         reveal_type(x)  # revealed: Literal[1]
     else:
-        # TODO should be None
-        reveal_type(x)  # revealed: None | Literal[1]
+        reveal_type(x)  # revealed: None
 ```
 
 ## `!=` for other singleton types
@@ -22,8 +21,7 @@ def _(flag: bool):
     if x != False:
         reveal_type(x)  # revealed: Literal[True]
     else:
-        # TODO should be Literal[False]
-        reveal_type(x)  # revealed: bool
+        reveal_type(x)  # revealed: Literal[False]
 ```
 
 ## `x != y` where `y` is of literal type
@@ -47,8 +45,7 @@ def _(flag: bool):
     if C != A:
         reveal_type(C)  # revealed: Literal[B]
     else:
-        # TODO should be Literal[A]
-        reveal_type(C)  # revealed: Literal[A, B]
+        reveal_type(C)  # revealed: Literal[A]
 ```
 
 ## `x != y` where `y` has multiple single-valued options
@@ -61,8 +58,7 @@ def _(flag1: bool, flag2: bool):
     if x != y:
         reveal_type(x)  # revealed: Literal[1, 2]
     else:
-        # TODO should be Literal[2]
-        reveal_type(x)  # revealed: Literal[1, 2]
+        reveal_type(x)  # revealed: Literal[2]
 ```
 
 ## `!=` for non-single-valued types
@@ -101,6 +97,5 @@ def f() -> Literal[1, 2, 3]:
 if (x := f()) != 1:
     reveal_type(x)  # revealed: Literal[2, 3]
 else:
-    # TODO should be Literal[1]
-    reveal_type(x)  # revealed: Literal[1, 2, 3]
+    reveal_type(x)  # revealed: Literal[1]
 ```

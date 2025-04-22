@@ -29,7 +29,7 @@ def _(x: Literal[1, 2, 3], y: Literal[1, 2, 3]):
     assert x is 2
     reveal_type(x)  # revealed: Literal[2]
     assert y == 2
-    reveal_type(y)  # revealed: Literal[1, 2, 3]
+    reveal_type(y)  # revealed: Literal[2]
 ```
 
 ## `assert` with `isinstance`
