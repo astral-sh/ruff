@@ -478,7 +478,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -487,21 +487,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "compact_str"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b79c4069c6cad78e2e0cdfcbd26275770669fb39fd308a752dc110e83b9af32"
-dependencies = [
- "castaway",
- "cfg-if",
- "itoa",
- "rustversion",
- "ryu",
- "static_assertions",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -918,7 +904,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1499,7 +1485,7 @@ checksum = "e04d7f318608d35d4b61ddd75cbdaee86b023ebe2bd5a66ee0915f0bf93095a9"
 dependencies = [
  "hermit-abi 0.5.0",
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2572,7 +2558,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.0",
  "camino",
- "compact_str 0.9.0",
+ "compact_str",
  "countme",
  "dir-test",
  "drop_bomb",
@@ -3101,7 +3087,7 @@ version = "0.0.0"
 dependencies = [
  "aho-corasick",
  "bitflags 2.9.0",
- "compact_str 0.9.0",
+ "compact_str",
  "is-macro",
  "itertools 0.14.0",
  "memchr",
@@ -3199,7 +3185,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.0",
  "bstr",
- "compact_str 0.9.0",
+ "compact_str",
  "insta",
  "memchr",
  "ruff_annotate_snippets",
@@ -3427,7 +3413,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3440,7 +3426,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.3",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3457,11 +3443,12 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "salsa"
-version = "0.19.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=87bf6b6c2d5f6479741271da73bd9d30c2580c26#87bf6b6c2d5f6479741271da73bd9d30c2580c26"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1be22155f8d9732518b2db2bf379fe6f0b2375e76b08b7c8fe6c1b887d548c24"
 dependencies = [
  "boxcar",
- "compact_str 0.8.1",
+ "compact_str",
  "crossbeam-queue",
  "dashmap 6.1.0",
  "hashbrown 0.15.2",
@@ -3480,13 +3467,15 @@ dependencies = [
 
 [[package]]
 name = "salsa-macro-rules"
-version = "0.19.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=87bf6b6c2d5f6479741271da73bd9d30c2580c26#87bf6b6c2d5f6479741271da73bd9d30c2580c26"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f55a7ef0a84e336f7c5f0332d81727f5629fe042d2aa556c75307afebc9f78a5"
 
 [[package]]
 name = "salsa-macros"
-version = "0.19.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=87bf6b6c2d5f6479741271da73bd9d30c2580c26#87bf6b6c2d5f6479741271da73bd9d30c2580c26"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d0e88a9c0c0d231a63f83dcd1a2c5e5d11044fac4b65bc9ad3b68ab48b0a0ab"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -3826,7 +3815,7 @@ dependencies = [
  "getrandom 0.3.2",
  "once_cell",
  "rustix 1.0.2",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -4598,7 +4587,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
