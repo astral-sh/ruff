@@ -324,7 +324,7 @@ impl<'db> Bindings<'db> {
                     [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), ..] => {
                         match property
                             .getter(db)
-                            .and_then(|getter| getter.into_function_literal())
+                            .and_then(Type::into_function_literal)
                             .map(|f| f.name(db).as_str())
                         {
                             Some("__name__") => {

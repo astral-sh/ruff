@@ -4881,13 +4881,17 @@ impl<'db> Type<'db> {
                 method.function(db).find_legacy_typevars(db, typevars);
             }
 
-            Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function))
-            | Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderCall(function)) => {
+            Type::MethodWrapper(
+                MethodWrapperKind::FunctionTypeDunderGet(function)
+                | MethodWrapperKind::FunctionTypeDunderCall(function),
+            ) => {
                 function.find_legacy_typevars(db, typevars);
             }
 
-            Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property))
-            | Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
+            Type::MethodWrapper(
+                MethodWrapperKind::PropertyDunderGet(property)
+                | MethodWrapperKind::PropertyDunderSet(property),
+            ) => {
                 property.find_legacy_typevars(db, typevars);
             }
 
