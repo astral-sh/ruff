@@ -796,7 +796,6 @@ type_to_visitor_function: dict[str, VisitorInfo] = {
     "StringLiteralValue": VisitorInfo("visit_string_literal"),
     "BytesLiteralValue": VisitorInfo("visit_bytes_literal"),
 }
-annotation_visitor_function = VisitorInfo("visit_annotation")
 
 
 def write_source_order(out: list[str], ast: Ast) -> None:
