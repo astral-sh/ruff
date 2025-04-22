@@ -1,4 +1,5 @@
 use super::context::InferContext;
+use super::ClassLiteralType;
 use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
@@ -8,9 +9,9 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{KnownInstanceType, Type};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
 
@@ -1311,6 +1312,51 @@ pub(crate) fn report_invalid_arguments_to_annotated(
          (one type and at least one metadata element)",
         KnownInstanceType::Annotated.repr(context.db())
     ));
+}
+
+pub(crate) fn report_bad_argument_to_get_protocol_members(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    class: ClassLiteralType,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic("Invalid argument to `get_protocol_members`");
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
+
+    let class_scope = class.body_scope(db);
+    let class_node = class_scope.node(db).expect_class();
+    let class_name = &class_node.name;
+    let class_def_diagnostic_range = TextRange::new(
+        class_name.start(),
+        class_node
+            .arguments
+            .as_deref()
+            .map(Ranged::end)
+            .unwrap_or_else(|| class_name.end()),
+    );
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        format_args!("`{class_name}` is declared here, but it is not a protocol class:"),
+    );
+    class_def_diagnostic.annotate(Annotation::primary(
+        Span::from(class_scope.file(db)).with_range(class_def_diagnostic_range),
+    ));
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(
+        "A class is only a protocol class if it directly inherits \
+            from `typing.Protocol` or `typing_extensions.Protocol`",
+    );
+    // TODO the typing spec isn't really designed as user-facing documentation,
+    // but there isn't really any user-facing documentation that covers this specific issue well
+    // (it's not described well in the CPython docs; and PEP-544 is a snapshot of a decision taken
+    // years ago rather than up-to-date documentation). We should either write our own docs
+    // describing this well or contribute to type-checker-agnostic docs somewhere and link to those.
+    diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
 }
 
 pub(crate) fn report_invalid_arguments_to_callable(

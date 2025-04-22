@@ -96,7 +96,8 @@ use crate::Db;
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
-    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
+    report_bad_argument_to_get_protocol_members, report_index_out_of_bounds,
+    report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
     report_unresolved_reference, INVALID_METACLASS, INVALID_PROTOCOL, REDUNDANT_CAST,
@@ -4483,6 +4484,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     casted_type.display(db),
                                                 ));
                                             }
+                                        }
+                                    }
+                                }
+                                KnownFunction::GetProtocolMembers => {
+                                    if let [Some(Type::ClassLiteral(class))] =
+                                        overload.parameter_types()
+                                    {
+                                        if !class.is_protocol(self.db()) {
+                                            report_bad_argument_to_get_protocol_members(
+                                                &self.context,
+                                                call_expression,
+                                                *class,
+                                            );
                                         }
                                     }
                                 }

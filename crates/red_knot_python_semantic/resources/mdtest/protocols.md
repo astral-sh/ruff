@@ -375,15 +375,6 @@ class Foo(Protocol):
 reveal_type(get_protocol_members(Foo))  # revealed: @Todo(specialized non-generic class)
 ```
 
-Calling `get_protocol_members` on a non-protocol class raises an error at runtime:
-
-```py
-class NotAProtocol: ...
-
-# TODO: should emit `[invalid-protocol]` error, should reveal `Unknown`
-reveal_type(get_protocol_members(NotAProtocol))  # revealed: @Todo(specialized non-generic class)
-```
-
 Certain special attributes and methods are not considered protocol members at runtime, and should
 not be considered protocol members by type checkers either:
 
@@ -421,6 +412,38 @@ class Baz2(Bar, Foo, Protocol): ...
 # `tuple[Literal["spam"], Literal["x"], Literal["y"], Literal["z"], Literal["method_member"]]`
 # or `frozenset[Literal["spam", "x", "y", "z", "method_member"]]`
 reveal_type(get_protocol_members(Baz2))  # revealed: @Todo(specialized non-generic class)
+```
+
+## Invalid calls to `get_protocol_members()`
+
+<!-- snapshot-diagnostics -->
+
+Calling `get_protocol_members` on a non-protocol class raises an error at runtime:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Protocol, get_protocol_members
+
+class NotAProtocol: ...
+
+get_protocol_members(NotAProtocol)  # error: [invalid-argument-type]
+
+class AlsoNotAProtocol(NotAProtocol, object): ...
+
+get_protocol_members(AlsoNotAProtocol)  # error: [invalid-argument-type]
+```
+
+The original class object must be passed to the function; a specialised version of a generic version
+does not suffice:
+
+```py
+class GenericProtocol[T](Protocol): ...
+
+get_protocol_members(GenericProtocol[int])  # TODO: should emit a diagnostic here (https://github.com/astral-sh/ruff/issues/17549)
 ```
 
 ## Subtyping of protocols with attribute members
