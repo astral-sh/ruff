@@ -6231,9 +6231,11 @@ impl<'db> FunctionType<'db> {
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
 /// have special behavior.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, strum_macros::EnumString)]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Hash, strum_macros::EnumString, strum_macros::IntoStaticStr,
+)]
 #[strum(serialize_all = "snake_case")]
-#[cfg_attr(test, derive(strum_macros::EnumIter, strum_macros::IntoStaticStr))]
+#[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum KnownFunction {
     /// `builtins.isinstance`
     #[strum(serialize = "isinstance")]

@@ -99,7 +99,8 @@ use super::diagnostic::{
     report_bad_argument_to_get_protocol_members, report_index_out_of_bounds,
     report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
+    report_non_subscriptable, report_possibly_unresolved_reference,
+    report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference, INVALID_METACLASS, INVALID_PROTOCOL, REDUNDANT_CAST,
     STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
@@ -4494,6 +4495,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                 call_expression,
                                                 *class,
                                             );
+                                        }
+                                    }
+                                }
+                                KnownFunction::IsInstance | KnownFunction::IsSubclass => {
+                                    if let [_, Some(Type::ClassLiteral(class))] =
+                                        overload.parameter_types()
+                                    {
+                                        if let Some(protocol_class) =
+                                            class.into_protocol_class(self.db())
+                                        {
+                                            if !protocol_class.is_runtime_checkable(self.db()) {
+                                                report_runtime_check_against_non_runtime_checkable_protocol(
+                                                    &self.context,
+                                                    call_expression,
+                                                    protocol_class,
+                                                    known_function
+                                                );
+                                            }
                                         }
                                     }
                                 }
