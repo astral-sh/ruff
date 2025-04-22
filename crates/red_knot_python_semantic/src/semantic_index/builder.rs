@@ -89,7 +89,6 @@ pub(super) struct SemanticIndexBuilder<'db> {
 
     /// Flags about the file's global scope
     has_future_annotations: bool,
-    seen_module_docstring_boundary: bool,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -123,7 +122,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             try_node_context_stack_manager: TryNodeContextStackManager::default(),
 
             has_future_annotations: false,
-            seen_module_docstring_boundary: false,
 
             scopes: IndexVec::new(),
             symbol_tables: IndexVec::new(),
@@ -1057,8 +1055,6 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
         self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
-
-        self.seen_module_docstring_boundary = true;
 
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
@@ -2257,10 +2253,6 @@ where
 }
 
 impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
-    fn seen_module_docstring_boundary(&self) -> bool {
-        self.seen_module_docstring_boundary
-    }
-
     fn future_annotations_or_stub(&self) -> bool {
         self.has_future_annotations
     }
