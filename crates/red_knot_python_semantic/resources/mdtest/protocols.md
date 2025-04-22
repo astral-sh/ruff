@@ -363,16 +363,8 @@ class Foo(Protocol):
     def method_member(self) -> bytes:
         return b"foo"
 
-# TODO: at runtime, `get_protocol_members` returns a `frozenset`,
-# but for now we might pretend it returns a `tuple`, as we support heterogeneous `tuple` types
-# but not yet generic `frozenset`s
-#
-# So this should either be
-#
-# `tuple[Literal["x"], Literal["y"], Literal["z"], Literal["method_member"]]`
-#
-# `frozenset[Literal["x", "y", "z", "method_member"]]`
-reveal_type(get_protocol_members(Foo))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset (requires support for legacy generics)
+reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["method_member"], Literal["x"], Literal["y"], Literal["z"]]
 ```
 
 Certain special attributes and methods are not considered protocol members at runtime, and should
@@ -390,8 +382,8 @@ class Lumberjack(Protocol):
     def __init__(self, x: int) -> None:
         self.x = x
 
-# TODO: `tuple[Literal["x"]]` or `frozenset[Literal["x"]]`
-reveal_type(get_protocol_members(Lumberjack))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset
+reveal_type(get_protocol_members(Lumberjack))  # revealed: tuple[Literal["x"]]
 ```
 
 A sub-protocol inherits and extends the members of its superclass protocol(s):
@@ -403,15 +395,14 @@ class Bar(Protocol):
 class Baz(Bar, Protocol):
     ham: memoryview
 
-# TODO: `tuple[Literal["spam", "ham"]]` or `frozenset[Literal["spam", "ham"]]`
-reveal_type(get_protocol_members(Baz))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset
+reveal_type(get_protocol_members(Baz))  # revealed: tuple[Literal["ham"], Literal["spam"]]
 
 class Baz2(Bar, Foo, Protocol): ...
 
-# TODO: either
-# `tuple[Literal["spam"], Literal["x"], Literal["y"], Literal["z"], Literal["method_member"]]`
-# or `frozenset[Literal["spam", "x", "y", "z", "method_member"]]`
-reveal_type(get_protocol_members(Baz2))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset
+# revealed: tuple[Literal["method_member"], Literal["spam"], Literal["x"], Literal["y"], Literal["z"]]
+reveal_type(get_protocol_members(Baz2))
 ```
 
 ## Invalid calls to `get_protocol_members()`
@@ -639,9 +630,9 @@ class LotsOfBindings(Protocol):
         case l:  # TODO: this should error with `[invalid-protocol]` (`l` is not declared)
             ...
 
-# TODO: all bindings in the above class should be understood as protocol members,
-# even those that we complained about with a diagnostic
-reveal_type(get_protocol_members(LotsOfBindings))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset
+# revealed: tuple[Literal["Nested"], Literal["NestedProtocol"], Literal["a"], Literal["b"], Literal["c"], Literal["d"], Literal["e"], Literal["f"], Literal["g"], Literal["h"], Literal["i"], Literal["j"], Literal["k"], Literal["l"]]
+reveal_type(get_protocol_members(LotsOfBindings))
 ```
 
 Attribute members are allowed to have assignments in methods on the protocol class, just like

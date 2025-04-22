@@ -20,8 +20,8 @@ use crate::types::generics::{Specialization, SpecializationBuilder};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, KnownClass,
-    KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType,
-    WrapperDescriptorKind,
+    KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType, TupleType,
+    UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Severity, Span, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -558,6 +558,21 @@ impl<'db> Bindings<'db> {
                                 ty.into_class_literal()
                                     .is_some_and(|class| class.is_protocol(db)),
                             ));
+                        }
+                    }
+
+                    Some(KnownFunction::GetProtocolMembers) => {
+                        if let [Some(Type::ClassLiteral(class))] = overload.parameter_types() {
+                            if let Some(protocol_class) = class.into_protocol_class(db) {
+                                overload.set_return_type(Type::Tuple(TupleType::new(
+                                    db,
+                                    protocol_class
+                                        .members(db)
+                                        .iter()
+                                        .map(|member| Type::string_literal(db, member))
+                                        .collect::<Box<[Type<'db>]>>(),
+                                )));
+                            }
                         }
                     }
 
