@@ -1,4 +1,4 @@
-Tanjun  # hangs?
+Tanjun  # cycle panic (signature_)
 aiohttp  # missing expression ID
 alerta  # missing expression ID
 altair  # cycle panics (try_metaclass_)
