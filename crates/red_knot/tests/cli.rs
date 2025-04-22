@@ -274,13 +274,13 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     4 | for a in range(0, int(y)):
       |
 
-    warning: lint:possibly-unresolved-reference
+    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> <temp_dir>/test.py:7:7
       |
     5 |     x = a
     6 |
     7 | print(x)  # possibly-unresolved-reference
-      |       ^ Name `x` used when possibly not defined
+      |       ^
       |
 
     Found 2 diagnostics
@@ -361,13 +361,13 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     6 | for a in range(0, int(y)):
       |
 
-    warning: lint:possibly-unresolved-reference
+    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> <temp_dir>/test.py:9:7
       |
     7 |     x = a
     8 |
     9 | print(x)  # possibly-unresolved-reference
-      |       ^ Name `x` used when possibly not defined
+      |       ^
       |
 
     Found 3 diagnostics
@@ -448,13 +448,13 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     4 | for a in range(0, int(y)):
       |
 
-    warning: lint:possibly-unresolved-reference
+    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> <temp_dir>/test.py:7:7
       |
     5 |     x = a
     6 |
     7 | print(x)  # possibly-unresolved-reference
-      |       ^ Name `x` used when possibly not defined
+      |       ^
       |
 
     Found 2 diagnostics
@@ -555,11 +555,11 @@ fn exit_code_only_warnings() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: lint:unresolved-reference
+    warning: lint:unresolved-reference: Name `x` used when not defined
      --> <temp_dir>/test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
-      |       ^ Name `x` used when not defined
+      |       ^
       |
 
     Found 1 diagnostic
@@ -638,11 +638,11 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: lint:unresolved-reference
+    warning: lint:unresolved-reference: Name `x` used when not defined
      --> <temp_dir>/test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
-      |       ^ Name `x` used when not defined
+      |       ^
       |
 
     Found 1 diagnostic
@@ -670,11 +670,11 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: lint:unresolved-reference
+    warning: lint:unresolved-reference: Name `x` used when not defined
      --> <temp_dir>/test.py:1:7
       |
     1 | print(x)  # [unresolved-reference]
-      |       ^ Name `x` used when not defined
+      |       ^
       |
 
     Found 1 diagnostic
@@ -699,20 +699,20 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: lint:unresolved-reference
+    warning: lint:unresolved-reference: Name `x` used when not defined
      --> <temp_dir>/test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
-      |       ^ Name `x` used when not defined
+      |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
 
-    error: lint:non-subscriptable
+    error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> <temp_dir>/test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [non-subscriptable]
-      |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+      |       ^
       |
 
     Found 2 diagnostics
@@ -737,20 +737,20 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: lint:unresolved-reference
+    warning: lint:unresolved-reference: Name `x` used when not defined
      --> <temp_dir>/test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
-      |       ^ Name `x` used when not defined
+      |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
 
-    error: lint:non-subscriptable
+    error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> <temp_dir>/test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [non-subscriptable]
-      |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+      |       ^
       |
 
     Found 2 diagnostics
@@ -775,20 +775,20 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: lint:unresolved-reference
+    warning: lint:unresolved-reference: Name `x` used when not defined
      --> <temp_dir>/test.py:2:7
       |
     2 | print(x)     # [unresolved-reference]
-      |       ^ Name `x` used when not defined
+      |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
 
-    error: lint:non-subscriptable
+    error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> <temp_dir>/test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
     3 | print(4[1])  # [non-subscriptable]
-      |       ^ Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+      |       ^
       |
 
     Found 2 diagnostics
@@ -844,13 +844,13 @@ fn user_configuration() -> anyhow::Result<()> {
     4 | for a in range(0, int(y)):
       |
 
-    warning: lint:possibly-unresolved-reference
+    warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> <temp_dir>/project/main.py:7:7
       |
     5 |     x = a
     6 |
     7 | print(x)
-      |       ^ Name `x` used when possibly not defined
+      |       ^
       |
 
     Found 2 diagnostics
@@ -886,13 +886,13 @@ fn user_configuration() -> anyhow::Result<()> {
     4 | for a in range(0, int(y)):
       |
 
-    error: lint:possibly-unresolved-reference
+    error: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> <temp_dir>/project/main.py:7:7
       |
     5 |     x = a
     6 |
     7 | print(x)
-      |       ^ Name `x` used when possibly not defined
+      |       ^
       |
 
     Found 2 diagnostics
