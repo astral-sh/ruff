@@ -1731,7 +1731,7 @@ impl<'db> ClassLiteralType<'db> {
     /// Returns the [`Span`] of the class's "header": the class name
     /// and any arguments passed to the `class` statement. E.g.
     ///
-    /// ```
+    /// ```ignore
     /// class Foo(Bar, metaclass=Baz): ...
     ///       ^^^^^^^^^^^^^^^^^^^^^^^
     /// ```
