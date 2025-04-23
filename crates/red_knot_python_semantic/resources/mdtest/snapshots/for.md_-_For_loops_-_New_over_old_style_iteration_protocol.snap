@@ -24,13 +24,13 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `NotIterable` is not iterable because its `__iter__` attribute has type `None`, which is not callable
  --> /src/mdtest_snippet.py:6:10
   |
 4 |     __iter__: None = None
 5 |
 6 | for x in NotIterable():  # error: [not-iterable]
-  |          ^^^^^^^^^^^^^ Object of type `NotIterable` is not iterable because its `__iter__` attribute has type `None`, which is not callable
+  |          ^^^^^^^^^^^^^
 7 |     pass
   |
 

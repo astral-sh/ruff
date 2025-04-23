@@ -26,12 +26,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/tuples.
 # Diagnostics
 
 ```
-error: lint:unsupported-bool-conversion
+error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
  --> /src/mdtest_snippet.py:9:1
   |
 8 | # error: [unsupported-bool-conversion]
 9 | (A(),) == (A(),)
-  | ^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
+  | ^^^^^^^^^^^^^^^^
   |
 
 ```

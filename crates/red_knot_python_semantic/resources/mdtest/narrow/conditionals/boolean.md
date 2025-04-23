@@ -10,7 +10,7 @@ def _(x: A | B):
     if isinstance(x, A) and isinstance(x, B):
         reveal_type(x)  # revealed:  A & B
     else:
-        reveal_type(x)  # revealed:  B & ~A | A & ~B
+        reveal_type(x)  # revealed:  (B & ~A) | (A & ~B)
 ```
 
 ## Arms might not add narrowing constraints
@@ -131,8 +131,8 @@ def _(x: A | B | C, y: A | B | C):
         # The same for `y`
         reveal_type(y)  # revealed:  A | B | C
     else:
-        reveal_type(x)  # revealed:  B & ~A | C & ~A
-        reveal_type(y)  # revealed:  B & ~A | C & ~A
+        reveal_type(x)  # revealed:  (B & ~A) | (C & ~A)
+        reveal_type(y)  # revealed:  (B & ~A) | (C & ~A)
 
     if (isinstance(x, A) and isinstance(y, A)) or (isinstance(x, B) and isinstance(y, B)):
         # Here, types of `x` and `y` can be narrowd since all `or` arms constraint them.
@@ -155,7 +155,7 @@ def _(x: A | B | C):
         reveal_type(x)  # revealed:  B & ~C
     else:
         # ~(B & ~C) -> ~B | C -> (A & ~B) | (C & ~B) | C -> (A & ~B) | C
-        reveal_type(x)  # revealed: A & ~B | C
+        reveal_type(x)  # revealed: (A & ~B) | C
 ```
 
 ## mixing `or` and `not`
@@ -167,7 +167,7 @@ class C: ...
 
 def _(x: A | B | C):
     if isinstance(x, B) or not isinstance(x, C):
-        reveal_type(x)  # revealed: B | A & ~C
+        reveal_type(x)  # revealed: B | (A & ~C)
     else:
         reveal_type(x)  # revealed: C & ~B
 ```
@@ -181,7 +181,7 @@ class C: ...
 
 def _(x: A | B | C):
     if isinstance(x, A) or (isinstance(x, B) and not isinstance(x, C)):
-        reveal_type(x)  # revealed:  A | B & ~C
+        reveal_type(x)  # revealed:  A | (B & ~C)
     else:
         # ~(A | (B & ~C)) -> ~A & ~(B & ~C) -> ~A & (~B | C) -> (~A & C) | (~A ~ B)
         reveal_type(x)  # revealed:  C & ~A
@@ -197,7 +197,7 @@ class C: ...
 def _(x: A | B | C):
     if isinstance(x, A) and (isinstance(x, B) or not isinstance(x, C)):
         # A & (B | ~C) -> (A & B) | (A & ~C)
-        reveal_type(x)  # revealed:  A & B | A & ~C
+        reveal_type(x)  # revealed:  (A & B) | (A & ~C)
     else:
         # ~((A & B) | (A & ~C)) ->
         # ~(A & B) & ~(A & ~C) ->
@@ -206,7 +206,7 @@ def _(x: A | B | C):
         # ~A | (~A & C) | (~B & C) ->
         # ~A | (C & ~B) ->
         # ~A | (C & ~B)  The positive side of ~A is  A | B | C ->
-        reveal_type(x)  # revealed:  B & ~A | C & ~A | C & ~B
+        reveal_type(x)  # revealed:  (B & ~A) | (C & ~A) | (C & ~B)
 ```
 
 ## Boolean expression internal narrowing

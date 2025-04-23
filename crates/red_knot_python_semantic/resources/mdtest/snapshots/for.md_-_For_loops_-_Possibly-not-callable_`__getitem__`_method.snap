@@ -46,12 +46,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Iterable1` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `CustomCallable`) may not be callable
   --> /src/mdtest_snippet.py:22:14
    |
 21 |     # error: [not-iterable]
 22 |     for x in Iterable1():
-   |              ^^^^^^^^^^^ Object of type `Iterable1` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `CustomCallable`) may not be callable
+   |              ^^^^^^^^^^^
 23 |         # TODO... `int` might be ideal here?
 24 |         reveal_type(x)  # revealed: int | Unknown
    |
@@ -73,12 +73,12 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Iterable2` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `(bound method Iterable2.__getitem__(key: int) -> int) | None`) may not be callable
   --> /src/mdtest_snippet.py:27:14
    |
 26 |     # error: [not-iterable]
 27 |     for y in Iterable2():
-   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `(bound method Iterable2.__getitem__(key: int) -> int) | None`) may not be callable
+   |              ^^^^^^^^^^^
 28 |         # TODO... `int` might be ideal here?
 29 |         reveal_type(y)  # revealed: int | Unknown
    |

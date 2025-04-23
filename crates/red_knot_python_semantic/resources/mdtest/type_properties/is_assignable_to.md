@@ -47,6 +47,13 @@ static_assert(is_assignable_to(Unknown, Literal[1]))
 static_assert(is_assignable_to(Any, Literal[1]))
 static_assert(is_assignable_to(Literal[1], Unknown))
 static_assert(is_assignable_to(Literal[1], Any))
+
+class SubtypeOfAny(Any): ...
+
+static_assert(is_assignable_to(SubtypeOfAny, Any))
+static_assert(is_assignable_to(SubtypeOfAny, int))
+static_assert(is_assignable_to(Any, SubtypeOfAny))
+static_assert(not is_assignable_to(int, SubtypeOfAny))
 ```
 
 ## Literal types

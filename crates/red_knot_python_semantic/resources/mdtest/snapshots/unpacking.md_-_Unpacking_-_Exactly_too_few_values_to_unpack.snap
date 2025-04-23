@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: unpacking.md - Unpacking - Too many values to unpack
+mdtest name: unpacking.md - Unpacking - Exactly too few values to unpack
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unpacking.md
 ---
 
@@ -12,17 +12,19 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unpack
 ## mdtest_snippet.py
 
 ```
-1 | a, b = (1, 2, 3)  # error: [invalid-assignment]
+1 | a, b = (1,)  # error: [invalid-assignment]
 ```
 
 # Diagnostics
 
 ```
-error: lint:invalid-assignment
+error: lint:invalid-assignment: Not enough values to unpack
  --> /src/mdtest_snippet.py:1:1
   |
-1 | a, b = (1, 2, 3)  # error: [invalid-assignment]
-  | ^^^^ Too many values to unpack (expected 2, got 3)
+1 | a, b = (1,)  # error: [invalid-assignment]
+  | ^^^^   ---- Got 1
+  | |
+  | Expected 2
   |
 
 ```

@@ -37,7 +37,7 @@ class C:
         return self
 
 x = A() < B() < C()
-reveal_type(x)  # revealed: A & ~AlwaysTruthy | B
+reveal_type(x)  # revealed: (A & ~AlwaysTruthy) | B
 
 y = 0 < 1 < A() < 3
 reveal_type(y)  # revealed: Literal[False] | A

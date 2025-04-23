@@ -56,6 +56,19 @@ static_assert(not is_disjoint_from(FinalSubclass, A))
 # ... which makes it disjoint from B1, B2:
 static_assert(is_disjoint_from(B1, FinalSubclass))
 static_assert(is_disjoint_from(B2, FinalSubclass))
+
+# Instance types can also be disjoint if they have disjoint metaclasses.
+# No possible subclass of `Meta1` and `Meta2` could exist, therefore
+# no possible subclass of `UsesMeta1` and `UsesMeta2` can exist:
+class Meta1(type): ...
+class UsesMeta1(metaclass=Meta1): ...
+
+@final
+class Meta2(type): ...
+
+class UsesMeta2(metaclass=Meta2): ...
+
+static_assert(is_disjoint_from(UsesMeta1, UsesMeta2))
 ```
 
 ## Tuple types
@@ -342,8 +355,8 @@ static_assert(is_disjoint_from(Meta1, type[UsesMeta2]))
 
 ### `type[T]` versus `type[S]`
 
-By the same token, `type[T]` is disjoint from `type[S]` if the metaclass of `T` is disjoint from the
-metaclass of `S`.
+By the same token, `type[T]` is disjoint from `type[S]` if `T` is `@final`, `S` is `@final`, or the
+metaclass of `T` is disjoint from the metaclass of `S`.
 
 ```py
 from typing import final
@@ -353,6 +366,9 @@ from knot_extensions import static_assert, is_disjoint_from
 class Meta1(type): ...
 
 class Meta2(type): ...
+
+static_assert(is_disjoint_from(type[Meta1], type[Meta2]))
+
 class UsesMeta1(metaclass=Meta1): ...
 class UsesMeta2(metaclass=Meta2): ...
 

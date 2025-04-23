@@ -96,6 +96,7 @@ speedrun.com_global_scoreboard_webapp
 starlette
 static-frame
 stone
+strawberry
 tornado
 twine
 typeshed-stats

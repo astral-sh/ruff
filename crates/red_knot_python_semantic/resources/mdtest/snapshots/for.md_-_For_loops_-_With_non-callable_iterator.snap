@@ -33,25 +33,25 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `NotIterable` is not iterable because its `__iter__` attribute has type `int | None`, which is not callable
   --> /src/mdtest_snippet.py:11:14
    |
 10 |     # error: [not-iterable]
 11 |     for x in NotIterable():
-   |              ^^^^^^^^^^^^^ Object of type `NotIterable` is not iterable because its `__iter__` attribute has type `int | None`, which is not callable
+   |              ^^^^^^^^^^^^^
 12 |         pass
    |
 
 ```
 
 ```
-warning: lint:possibly-unresolved-reference
+warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
   --> /src/mdtest_snippet.py:16:17
    |
 14 |     # revealed: Unknown
 15 |     # error: [possibly-unresolved-reference]
 16 |     reveal_type(x)
-   |                 ^ Name `x` used when possibly not defined
+   |                 ^
    |
 
 ```

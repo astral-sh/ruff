@@ -45,12 +45,12 @@ error: lint:invalid-return-type: Return type does not match returned value
 ```
 
 ```
-error: lint:invalid-return-type
+error: lint:invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `int`
  --> /src/mdtest_snippet.pyi:6:14
   |
 5 | # error: [invalid-return-type]
 6 | def foo() -> int:
-  |              ^^^ Function can implicitly return `None`, which is not assignable to return type `int`
+  |              ^^^
 7 |     print("...")
 8 |     ...
   |
@@ -58,12 +58,12 @@ error: lint:invalid-return-type
 ```
 
 ```
-error: lint:invalid-return-type
+error: lint:invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `int`
   --> /src/mdtest_snippet.pyi:11:14
    |
 10 | # error: [invalid-return-type]
 11 | def foo() -> int:
-   |              ^^^ Function can implicitly return `None`, which is not assignable to return type `int`
+   |              ^^^
 12 |     f"""{foo} is a function that ..."""
 13 |     ...
    |
