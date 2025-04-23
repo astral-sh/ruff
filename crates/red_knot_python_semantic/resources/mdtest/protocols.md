@@ -315,7 +315,7 @@ reveal_type(Protocol())  # revealed: Unknown
 class MyProtocol(Protocol):
     x: int
 
-# error
+# TODO: should emit error
 reveal_type(MyProtocol())  # revealed: MyProtocol
 ```
 
@@ -363,16 +363,8 @@ class Foo(Protocol):
     def method_member(self) -> bytes:
         return b"foo"
 
-# TODO: at runtime, `get_protocol_members` returns a `frozenset`,
-# but for now we might pretend it returns a `tuple`, as we support heterogeneous `tuple` types
-# but not yet generic `frozenset`s
-#
-# So this should either be
-#
-# `tuple[Literal["x"], Literal["y"], Literal["z"], Literal["method_member"]]`
-#
-# `frozenset[Literal["x", "y", "z", "method_member"]]`
-reveal_type(get_protocol_members(Foo))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset (requires support for legacy generics)
+reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["method_member"], Literal["x"], Literal["y"], Literal["z"]]
 ```
 
 Certain special attributes and methods are not considered protocol members at runtime, and should
@@ -390,8 +382,8 @@ class Lumberjack(Protocol):
     def __init__(self, x: int) -> None:
         self.x = x
 
-# TODO: `tuple[Literal["x"]]` or `frozenset[Literal["x"]]`
-reveal_type(get_protocol_members(Lumberjack))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset
+reveal_type(get_protocol_members(Lumberjack))  # revealed: tuple[Literal["x"]]
 ```
 
 A sub-protocol inherits and extends the members of its superclass protocol(s):
@@ -403,15 +395,42 @@ class Bar(Protocol):
 class Baz(Bar, Protocol):
     ham: memoryview
 
-# TODO: `tuple[Literal["spam", "ham"]]` or `frozenset[Literal["spam", "ham"]]`
-reveal_type(get_protocol_members(Baz))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset
+reveal_type(get_protocol_members(Baz))  # revealed: tuple[Literal["ham"], Literal["spam"]]
 
 class Baz2(Bar, Foo, Protocol): ...
 
-# TODO: either
-# `tuple[Literal["spam"], Literal["x"], Literal["y"], Literal["z"], Literal["method_member"]]`
-# or `frozenset[Literal["spam", "x", "y", "z", "method_member"]]`
-reveal_type(get_protocol_members(Baz2))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset
+# revealed: tuple[Literal["method_member"], Literal["spam"], Literal["x"], Literal["y"], Literal["z"]]
+reveal_type(get_protocol_members(Baz2))
+```
+
+## Protocol members in statically known branches
+
+The list of protocol members does not include any members declared in branches that are statically
+known to be unreachable:
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+import sys
+from typing_extensions import Protocol, get_protocol_members
+
+class Foo(Protocol):
+    if sys.version_info >= (3, 10):
+        a: int
+        b = 42
+        def c(self) -> None: ...
+    else:
+        d: int
+        e = 56
+        def f(self) -> None: ...
+
+# TODO: actually a frozenset
+reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["d"], Literal["e"], Literal["f"]]
 ```
 
 ## Invalid calls to `get_protocol_members()`
@@ -639,14 +658,14 @@ class LotsOfBindings(Protocol):
         case l:  # TODO: this should error with `[invalid-protocol]` (`l` is not declared)
             ...
 
-# TODO: all bindings in the above class should be understood as protocol members,
-# even those that we complained about with a diagnostic
-reveal_type(get_protocol_members(LotsOfBindings))  # revealed: @Todo(specialized non-generic class)
+# TODO: actually a frozenset
+# revealed: tuple[Literal["Nested"], Literal["NestedProtocol"], Literal["a"], Literal["b"], Literal["c"], Literal["d"], Literal["e"], Literal["f"], Literal["g"], Literal["h"], Literal["i"], Literal["j"], Literal["k"], Literal["l"]]
+reveal_type(get_protocol_members(LotsOfBindings))
 ```
 
 Attribute members are allowed to have assignments in methods on the protocol class, just like
-non-protocol classes. Unlike other classes, however, *implicit* instance attributes -- those that
-are not declared in the class body -- are not allowed:
+non-protocol classes. Unlike other classes, however, instance attributes that are not declared in
+the class body are disallowed:
 
 ```py
 class Foo(Protocol):
@@ -655,11 +674,18 @@ class Foo(Protocol):
 
     def __init__(self) -> None:
         self.x = 42  # fine
-        self.a = 56  # error
+        self.a = 56  # TODO: should emit diagnostic
+        self.b: int = 128  # TODO: should emit diagnostic
 
     def non_init_method(self) -> None:
         self.y = 64  # fine
-        self.b = 72  # error
+        self.c = 72  # TODO: should emit diagnostic
+
+# Note: the list of members does not include `a`, `b` or `c`,
+# as none of these attributes is declared in the class body.
+#
+# TODO: actually a frozenset
+reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["non_init_method"], Literal["x"], Literal["y"]]
 ```
 
 If a protocol has 0 members, then all other types are assignable to it, and all fully static types
