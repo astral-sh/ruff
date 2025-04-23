@@ -1,8 +1,8 @@
 use crate::db::tests::TestDb;
 use crate::symbol::{builtins_symbol, known_module_symbol};
 use crate::types::{
-    BoundMethodType, CallableType, IntersectionBuilder, KnownClass, KnownInstanceType, Parameter,
-    Parameters, Signature, SubclassOfType, TupleType, Type, UnionType,
+    BoundMethodType, CallableType, DynamicType, IntersectionBuilder, KnownClass, KnownInstanceType,
+    Parameter, Parameters, Signature, SubclassOfType, TupleType, Type, UnionType,
 };
 use crate::{Db, KnownModule};
 use hashbrown::HashSet;
@@ -162,7 +162,7 @@ impl Ty {
                 let elements = tys.into_iter().map(|ty| ty.into_type(db));
                 TupleType::from_elements(db, elements)
             }
-            Ty::SubclassOfAny => SubclassOfType::subclass_of_any(),
+            Ty::SubclassOfAny => SubclassOfType::from(db, DynamicType::Any),
             Ty::SubclassOfBuiltinClass(s) => SubclassOfType::from(
                 db,
                 builtins_symbol(db, s)

@@ -2552,6 +2552,18 @@ impl<'db> Type<'db> {
                     .find_name_in_mro_with_policy(db, name, policy)
             }
 
+            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => KnownClass::Object
+                    .to_class_literal(db)
+                    .find_name_in_mro_with_policy(db, name, policy),
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.find_name_in_mro_with_policy(db, name, policy)
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    Type::Union(constraints).find_name_in_mro_with_policy(db, name, policy)
+                }
+            },
+
             Type::FunctionLiteral(_)
             | Type::Callable(_)
             | Type::BoundMethod(_)
@@ -2569,7 +2581,6 @@ impl<'db> Type<'db> {
             | Type::LiteralString
             | Type::BytesLiteral(_)
             | Type::Tuple(_)
-            | Type::TypeVar(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_) => None,
@@ -4818,10 +4829,11 @@ impl<'db> Type<'db> {
     /// `Type::ClassLiteral(builtins.int)`, that is, it is the `int` class itself. As a type
     /// expression, it names the type `Type::NominalInstance(builtins.int)`, that is, all objects whose
     /// `__class__` is `int`.
-    pub fn in_type_expression(
+    fn in_type_expression(
         &self,
         db: &'db dyn Db,
         scope_id: ScopeId<'db>,
+        context: TypeExpressionContext,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -4881,10 +4893,19 @@ impl<'db> Type<'db> {
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::TypeAliasType(alias) => Ok(alias.value_type(db)),
                 KnownInstanceType::Never | KnownInstanceType::NoReturn => Ok(Type::Never),
-                KnownInstanceType::LiteralString => Ok(Type::LiteralString),
                 KnownInstanceType::Unknown => Ok(Type::unknown()),
                 KnownInstanceType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
                 KnownInstanceType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
+
+                KnownInstanceType::LiteralString if context.in_subclass_of_expression() => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec![
+                            InvalidTypeExpression::InvalidTypeInContext { ty: *self, context }
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                }
+                KnownInstanceType::LiteralString => Ok(Type::LiteralString),
 
                 // We treat `typing.Type` exactly the same as `builtins.type`:
                 KnownInstanceType::Type => Ok(KnownClass::Type.to_instance(db)),
@@ -4903,7 +4924,14 @@ impl<'db> Type<'db> {
 
                 KnownInstanceType::TypeVar(typevar) => Ok(Type::TypeVar(*typevar)),
 
-                // TODO: Use an opt-in rule for a bare `Callable`
+                KnownInstanceType::Callable if context.in_subclass_of_expression() => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec![
+                            InvalidTypeExpression::InvalidTypeInContext { ty: *self, context }
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                }
                 KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
                 KnownInstanceType::TypingSelf => {
@@ -4929,6 +4957,17 @@ impl<'db> Type<'db> {
                         TypeVarKind::Legacy,
                     )))
                 }
+                // TODO: invalid in most contexts (in parameters or a return type);
+                // only valid in `ast::AnnAssign` nodes.
+                KnownInstanceType::TypeAlias if context.in_subclass_of_expression() => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec::smallvec![
+                            InvalidTypeExpression::InvalidTypeInContext { ty: *self, context }
+                        ],
+                        fallback_type: Type::unknown(),
+                    })
+                }
+
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
                 KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
@@ -4995,7 +5034,7 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db, scope_id) {
+                    match element.in_type_expression(db, scope_id, context) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
@@ -5110,15 +5149,29 @@ impl<'db> Type<'db> {
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_class_literal(db),
             Type::Tuple(_) => KnownClass::Tuple.to_class_literal(db),
 
-            Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
-                None => KnownClass::Object.to_class_literal(db),
-                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    // TODO: If we add a proper `OneOf` connector, we should use that here instead
-                    // of union. (Using a union here doesn't break anything, but it is imprecise.)
-                    constraints.map(db, |constraint| constraint.to_meta_type(db))
-                }
-            },
+            Type::TypeVar(typevar) => {
+                let bound_or_constraints = match typevar.bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(upper_bound)) => Some(
+                        TypeVarBoundOrConstraints::UpperBound(upper_bound.to_meta_type(db)),
+                    ),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => Some(
+                        match constraints.map(db, |constraint| constraint.to_meta_type(db)) {
+                            Type::Union(union) => TypeVarBoundOrConstraints::Constraints(union),
+                            other_type => TypeVarBoundOrConstraints::UpperBound(other_type),
+                        },
+                    ),
+                    None => None,
+                };
+                Type::TypeVar(TypeVarInstance::new(
+                    db,
+                    Name::new(format!("{}'meta", typevar.name(db))),
+                    None,
+                    bound_or_constraints,
+                    typevar.variance(db),
+                    None,
+                    typevar.kind(db),
+                ))
+            }
 
             Type::ClassLiteral(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(*alias).metaclass(db),
@@ -5728,6 +5781,34 @@ impl<'db> From<Type<'db>> for TypeAndQualifiers<'db> {
     }
 }
 
+bitflags! {
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+    struct TypeExpressionContext: u8 {
+        /// The type expression is directly nested inside `type[]` or `Type[]`.
+        const SUBCLASS_OF = 1 << 0;
+    }
+}
+
+impl TypeExpressionContext {
+    const fn in_subclass_of_expression(self) -> bool {
+        self.contains(Self::SUBCLASS_OF)
+    }
+
+    const fn as_str(self) -> &'static str {
+        if self.in_subclass_of_expression() {
+            "in a type expression when nested directly inside `type[]` or `Type[]`"
+        } else {
+            "at the top-level of a type expression"
+        }
+    }
+}
+
+impl std::fmt::Display for TypeExpressionContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 /// Error struct providing information on type(s) that were deemed to be invalid
 /// in a type expression context, and the type we should therefore fallback to
 /// for the problematic type expression.
@@ -5782,6 +5863,11 @@ enum InvalidTypeExpression<'db> {
     TypeQualifierRequiresOneArgument(KnownInstanceType<'db>),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
+    /// Some types are always invalid in specific contexts in type expressions
+    InvalidTypeInContext {
+        ty: Type<'db>,
+        context: TypeExpressionContext,
+    },
 }
 
 impl<'db> InvalidTypeExpression<'db> {
@@ -5830,6 +5916,11 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Variable of type `{ty}` is not allowed in a type expression",
                         ty = ty.display(self.db)
                     ),
+                    InvalidTypeExpression::InvalidTypeInContext { ty, context } => write!(
+                        f,
+                        "Variable of type `{ty}` is not allowed {context}",
+                        ty = ty.display(self.db),
+                    ),
                 }
             }
         }
@@ -5856,7 +5947,7 @@ impl<'db> InvalidTypeExpression<'db> {
             return;
         };
         if module_member_with_same_name
-            .in_type_expression(db, scope)
+            .in_type_expression(db, scope, TypeExpressionContext::empty())
             .is_err()
         {
             return;
