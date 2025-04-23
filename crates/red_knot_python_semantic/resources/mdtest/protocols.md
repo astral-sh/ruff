@@ -304,10 +304,12 @@ reveal_type(typing.Protocol is not typing_extensions.Protocol)  # revealed: bool
 
 ## Calls to protocol classes
 
+<!-- snapshot-diagnostics -->
+
 Neither `Protocol`, nor any protocol class, can be directly instantiated:
 
 ```py
-from typing import Protocol
+from typing_extensions import Protocol, reveal_type
 
 # error: [call-non-callable]
 reveal_type(Protocol())  # revealed: Unknown
@@ -315,7 +317,7 @@ reveal_type(Protocol())  # revealed: Unknown
 class MyProtocol(Protocol):
     x: int
 
-# TODO: should emit error
+# error: [call-non-callable] "Cannot instantiate abstract class `MyProtocol`"
 reveal_type(MyProtocol())  # revealed: MyProtocol
 ```
 
