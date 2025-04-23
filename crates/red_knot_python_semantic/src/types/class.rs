@@ -324,8 +324,6 @@ impl<'db> ClassType<'db> {
     }
 
     pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        // `is_subclass_of` is checking the subtype relation, in which gradual types do not
-        // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         if self.is_subclass_of(db, other) {
             return true;
         }
@@ -339,6 +337,16 @@ impl<'db> ClassType<'db> {
             if self_specialization.is_assignable_to(db, other_specialization) {
                 return true;
             }
+        }
+
+        if self.iter_mro(db).any(|base| {
+            matches!(
+                base,
+                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
+            )
+        }) && !other.is_final(db)
+        {
+            return true;
         }
 
         false
