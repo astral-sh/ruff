@@ -292,7 +292,7 @@ class NotBoolable:
 def _(target: int, flag: NotBoolable):
     y = 1
     match target:
-        # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable"
+        # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
         case 1 if flag:
             y = 2
         case 2:
