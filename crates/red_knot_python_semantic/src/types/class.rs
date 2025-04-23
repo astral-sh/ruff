@@ -344,7 +344,8 @@ impl<'db> ClassType<'db> {
                 base,
                 ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
             )
-        }) {
+        }) && !other.is_final(db)
+        {
             return true;
         }
 

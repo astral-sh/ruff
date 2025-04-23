@@ -68,6 +68,18 @@ def _(s: Subclass):
     reveal_type(s)  # revealed: Subclass
 ```
 
+`Subclass` should not be assignable to a final class though, because `Subclass` could not possibly
+be a subclass of `FinalClass`:
+
+```py
+from typing import final
+
+@final
+class FinalClass: ...
+
+f: FinalClass = Subclass()  # error: [invalid-assignment]
+```
+
 A use case where this comes up is with mocking libraries, where the mock object should be assignable
 to any type:
 
