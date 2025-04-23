@@ -314,18 +314,21 @@ impl Project {
     /// * It has a [`SystemPath`] and belongs to a package's `src` files
     /// * It has a [`SystemVirtualPath`](ruff_db::system::SystemVirtualPath)
     pub fn is_file_open(self, db: &dyn Db, file: File) -> bool {
+        let path = file.path(db);
+
+        // Try to return early to avoid adding a dependency on `open_files` or `file_set` which
+        // both have a durability of `LOW`.
+        if path.is_vendored_path() {
+            return false;
+        }
+
         if let Some(open_files) = self.open_files(db) {
             open_files.contains(&file)
         } else if file.path(db).is_system_path() {
-            self.contains_file(db, file)
+            self.files(db).contains(&file)
         } else {
             file.path(db).is_system_virtual_path()
         }
-    }
-
-    /// Returns `true` if `file` is a first-party file part of this package.
-    pub fn contains_file(self, db: &dyn Db, file: File) -> bool {
-        self.files(db).contains(&file)
     }
 
     #[tracing::instrument(level = "debug", skip(self, db))]
