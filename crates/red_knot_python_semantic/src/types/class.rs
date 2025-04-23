@@ -629,12 +629,20 @@ impl<'db> ClassLiteralType<'db> {
             .collect()
     }
 
-    /// Is this class final?
-    pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
+    fn known_function_decorators(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = KnownFunction> + 'db {
         self.decorators(db)
             .iter()
             .filter_map(|deco| deco.into_function_literal())
-            .any(|decorator| decorator.is_known(db, KnownFunction::Final))
+            .filter_map(|decorator| decorator.known(db))
+    }
+
+    /// Is this class final?
+    pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
+        self.known_function_decorators(db)
+            .contains(&KnownFunction::Final)
     }
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
@@ -1836,6 +1844,11 @@ impl<'db> ProtocolClassLiteral<'db> {
         }
 
         cached_protocol_members(db, *self)
+    }
+
+    pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
+        self.known_function_decorators(db)
+            .contains(&KnownFunction::RuntimeCheckable)
     }
 }
 

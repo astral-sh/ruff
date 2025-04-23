@@ -8,7 +8,7 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{KnownInstanceType, Type};
+use crate::types::{class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -1374,4 +1374,50 @@ pub(crate) fn report_invalid_arguments_to_callable(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
         KnownInstanceType::Callable.repr(context.db())
     ));
+}
+
+pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    protocol: ProtocolClassLiteral,
+    function: KnownFunction,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = protocol.name(db);
+    let function_name: &'static str = function.into();
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Class `{class_name}` cannot be used as the second argument to `{function_name}`",
+    ));
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+
+    let class_scope = protocol.body_scope(db);
+    let class_node = class_scope.node(db).expect_class();
+    let class_def_arguments = class_node
+        .arguments
+        .as_ref()
+        .expect("A `Protocol` class should always have at least one explicit base");
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        format_args!(
+            "`{class_name}` is declared as a protocol class, \
+                but it is not declared as runtime-checkable"
+        ),
+    );
+    class_def_diagnostic.annotate(
+        Annotation::primary(Span::from(class_scope.file(db)).with_range(TextRange::new(
+            class_node.name.start(),
+            class_def_arguments.end(),
+        )))
+        .message(format_args!("`{class_name}` declared here")),
+    );
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(format_args!(
+        "A protocol class can only be used in `{function_name}` checks if it is decorated \
+            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`"
+    ));
+    diagnostic.info("See https://docs.python.org/3/library/typing.html#typing.runtime_checkable");
 }

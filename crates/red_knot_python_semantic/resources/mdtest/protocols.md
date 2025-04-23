@@ -1199,23 +1199,25 @@ static_assert(is_assignable_to(HasGetAttrAndSetAttr, XAsymmetricProperty))  # er
 
 ## Narrowing of protocols
 
+<!-- snapshot-diagnostics -->
+
 By default, a protocol class cannot be used as the second argument to `isinstance()` or
 `issubclass()`, and a type checker must emit an error on such calls. However, we still narrow the
 type inside these branches (this matches the behaviour of other type checkers):
 
 ```py
-from typing import Protocol
+from typing_extensions import Protocol, reveal_type
 
 class HasX(Protocol):
     x: int
 
 def f(arg: object, arg2: type):
-    if isinstance(arg, HasX):  # error
+    if isinstance(arg, HasX):  # error: [invalid-argument-type]
         reveal_type(arg)  # revealed: HasX
     else:
         reveal_type(arg)  # revealed: ~HasX
 
-    if issubclass(arg2, HasX):  # error
+    if issubclass(arg2, HasX):  # error: [invalid-argument-type]
         reveal_type(arg2)  # revealed: type[HasX]
     else:
         reveal_type(arg2)  # revealed: type & ~type[HasX]
@@ -1250,10 +1252,10 @@ class OnlyMethodMembers(Protocol):
     def method(self) -> None: ...
 
 def f(arg1: type, arg2: type):
-    if issubclass(arg1, OnlyMethodMembers):  # error
-        reveal_type(arg1)  # revealed: type[OnlyMethodMembers]
+    if issubclass(arg1, RuntimeCheckableHasX):  # TODO: should emit an error here (has non-method members)
+        reveal_type(arg1)  # revealed: type[RuntimeCheckableHasX]
     else:
-        reveal_type(arg1)  # revealed: type & ~type[OnlyMethodMembers]
+        reveal_type(arg1)  # revealed: type & ~type[RuntimeCheckableHasX]
 
     if issubclass(arg2, OnlyMethodMembers):  # no error!
         reveal_type(arg2)  # revealed: type[OnlyMethodMembers]
@@ -1289,8 +1291,6 @@ def _(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
 
 Add tests for:
 
-- Assignments without declarations in protocol class bodies. And various weird ways of creating
-    attributes in a class body or instance method. [Example mypy tests][mypy_weird_protocols].
 - More tests for protocols inside `type[]`. [Spec reference][protocols_inside_type_spec].
 - Protocols with instance-method members
 - Protocols with `@classmethod` and `@staticmethod`
@@ -1313,7 +1313,6 @@ Add tests for:
 
 [mypy_protocol_docs]: https://mypy.readthedocs.io/en/stable/protocols.html#protocols-and-structural-subtyping
 [mypy_protocol_tests]: https://github.com/python/mypy/blob/master/test-data/unit/check-protocols.test
-[mypy_weird_protocols]: https://github.com/python/mypy/blob/a3ce6d5307e99a1b6c181eaa7c5cf134c53b7d8b/test-data/unit/check-protocols.test#L2131-L2132
 [protocol conformance tests]: https://github.com/python/typing/tree/main/conformance/tests
 [protocols_inside_type_spec]: https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols
 [recursive_protocols_spec]: https://typing.python.org/en/latest/spec/protocol.html#recursive-protocols
