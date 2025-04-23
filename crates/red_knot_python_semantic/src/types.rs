@@ -4907,6 +4907,45 @@ impl<'db> Type<'db> {
     /// Returns a tuple of two spans. The first is
     /// the span for the identifier of the function
     /// definition for `self`. The second is
+    /// the span for the return type in the function
+    /// definition for `self`.
+    ///
+    /// If there are no meaningful spans, then this
+    /// returns `None`. For example, when this type
+    /// isn't callable or if the function has no
+    /// declared return type.
+    ///
+    /// # Performance
+    ///
+    /// Note that this may introduce cross-module
+    /// dependencies. This can have an impact on
+    /// the effectiveness of incremental caching
+    /// and should therefore be used judiciously.
+    ///
+    /// An example of a good use case is to improve
+    /// a diagnostic.
+    fn return_type_span(&self, db: &'db dyn Db) -> Option<(Span, Span)> {
+        match *self {
+            Type::FunctionLiteral(function) => {
+                let function_scope = function.body_scope(db);
+                let span = Span::from(function_scope.file(db));
+                let node = function_scope.node(db);
+                let func_def = node.as_function()?;
+                let return_type_range = func_def.returns.as_ref()?.range();
+                let name_span = span.clone().with_range(func_def.name.range);
+                let return_type_span = span.with_range(return_type_range);
+                Some((name_span, return_type_span))
+            }
+            Type::BoundMethod(bound_method) => {
+                Type::FunctionLiteral(bound_method.function(db)).return_type_span(db)
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns a tuple of two spans. The first is
+    /// the span for the identifier of the function
+    /// definition for `self`. The second is
     /// the span for the parameter in the function
     /// definition for `self`.
     ///
