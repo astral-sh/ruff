@@ -19,9 +19,9 @@ use crate::types::diagnostic::{
 use crate::types::generics::{Specialization, SpecializationBuilder};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
-    BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, FunctionType,
-    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
-    UnionType, WrapperDescriptorKind,
+    BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, KnownClass,
+    KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType, UnionType,
+    WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Severity, Span, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -424,16 +424,9 @@ impl<'db> Bindings<'db> {
 
                 Type::DataclassTransformer(params) => {
                     if let [Some(Type::FunctionLiteral(function))] = overload.parameter_types() {
-                        overload.set_return_type(Type::FunctionLiteral(FunctionType::new(
-                            db,
-                            function.name(db),
-                            function.known(db),
-                            function.body_scope(db),
-                            function.decorators(db),
-                            Some(params),
-                            function.generic_context(db),
-                            function.specialization(db),
-                        )));
+                        overload.set_return_type(Type::FunctionLiteral(
+                            function.with_dataclass_transformer_params(db, params),
+                        ));
                     }
                 }
 
@@ -961,6 +954,10 @@ pub(crate) struct Binding<'db> {
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
 
+    /// The specialization that was inferred for a class method's containing generic class, if it
+    /// is being used to infer a specialization for the class.
+    inherited_specialization: Option<Specialization<'db>>,
+
     /// The formal parameter that each argument is matched with, in argument source order, or
     /// `None` if the argument was not matched to any parameter.
     argument_parameters: Box<[Option<usize>]>,
@@ -1097,6 +1094,7 @@ impl<'db> Binding<'db> {
         Self {
             return_ty: signature.return_ty.unwrap_or(Type::unknown()),
             specialization: None,
+            inherited_specialization: None,
             argument_parameters: argument_parameters.into_boxed_slice(),
             parameter_tys: vec![None; parameters.len()].into_boxed_slice(),
             errors,
@@ -1112,8 +1110,8 @@ impl<'db> Binding<'db> {
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
         let parameters = signature.parameters();
-        self.specialization = signature.generic_context.map(|generic_context| {
-            let mut builder = SpecializationBuilder::new(db, generic_context);
+        if signature.generic_context.is_some() || signature.inherited_generic_context.is_some() {
+            let mut builder = SpecializationBuilder::new(db);
             for (argument_index, (_, argument_type)) in argument_types.iter().enumerate() {
                 let Some(parameter_index) = self.argument_parameters[argument_index] else {
                     // There was an error with argument when matching parameters, so don't bother
@@ -1126,8 +1124,11 @@ impl<'db> Binding<'db> {
                 };
                 builder.infer(expected_type, argument_type);
             }
-            builder.build()
-        });
+            self.specialization = signature.generic_context.map(|gc| builder.build(gc));
+            self.inherited_specialization = signature
+                .inherited_generic_context
+                .map(|gc| builder.build(gc));
+        }
 
         let mut num_synthetic_args = 0;
         let get_argument_index = |argument_index: usize, num_synthetic_args: usize| {
@@ -1155,6 +1156,9 @@ impl<'db> Binding<'db> {
                 if let Some(specialization) = self.specialization {
                     expected_ty = expected_ty.apply_specialization(db, specialization);
                 }
+                if let Some(inherited_specialization) = self.inherited_specialization {
+                    expected_ty = expected_ty.apply_specialization(db, inherited_specialization);
+                }
                 if !argument_type.is_assignable_to(db, expected_ty) {
                     let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
                         && !parameter.is_variadic();
@@ -1180,6 +1184,11 @@ impl<'db> Binding<'db> {
         if let Some(specialization) = self.specialization {
             self.return_ty = self.return_ty.apply_specialization(db, specialization);
         }
+        if let Some(inherited_specialization) = self.inherited_specialization {
+            self.return_ty = self
+                .return_ty
+                .apply_specialization(db, inherited_specialization);
+        }
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
@@ -1190,8 +1199,8 @@ impl<'db> Binding<'db> {
         self.return_ty
     }
 
-    pub(crate) fn specialization(&self) -> Option<Specialization<'db>> {
-        self.specialization
+    pub(crate) fn inherited_specialization(&self) -> Option<Specialization<'db>> {
+        self.inherited_specialization
     }
 
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {

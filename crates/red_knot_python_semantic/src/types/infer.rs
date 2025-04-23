@@ -1525,10 +1525,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let generic_context = type_params.as_ref().map(|type_params| {
-            GenericContext::from_type_params(self.db(), self.index, type_params)
-        });
-
         let function_kind =
             KnownFunction::try_from_definition_and_name(self.db(), definition, name);
 
@@ -1537,6 +1533,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Function(function))
             .to_scope_id(self.db(), self.file());
 
+        let inherited_generic_context = None;
         let specialization = None;
 
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
@@ -1546,7 +1543,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             body_scope,
             function_decorators,
             dataclass_transformer_params,
-            generic_context,
+            inherited_generic_context,
             specialization,
         ));
 

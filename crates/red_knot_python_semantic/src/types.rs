@@ -4268,13 +4268,13 @@ impl<'db> Type<'db> {
                     .as_ref()
                     .and_then(Bindings::single_element)
                     .and_then(CallableBinding::matching_overload)
-                    .and_then(|(_, binding)| binding.specialization());
+                    .and_then(|(_, binding)| binding.inherited_specialization());
                 let init_specialization = init_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
                     .and_then(CallableBinding::matching_overload)
-                    .and_then(|(_, binding)| binding.specialization());
+                    .and_then(|(_, binding)| binding.inherited_specialization());
                 let specialization = match (new_specialization, init_specialization) {
                     (None, None) => None,
                     (Some(specialization), None) | (None, Some(specialization)) => {
@@ -5940,8 +5940,10 @@ pub struct FunctionType<'db> {
     /// with `@dataclass_transformer(...)`.
     dataclass_transformer_params: Option<DataclassTransformerParams>,
 
-    /// The generic context of a generic function.
-    generic_context: Option<GenericContext<'db>>,
+    /// The inherited generic context, if this function is a class method being used to infer the
+    /// specialization of its generic class. If the method is itself generic, this is in addition
+    /// to its own generic context.
+    inherited_generic_context: Option<GenericContext<'db>>,
 
     /// A specialization that should be applied to the function's parameter and return types,
     /// either because the function is itself generic, or because it appears in the body of a
@@ -6007,11 +6009,7 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
-        let mut internal_signature = self.internal_signature(db);
-
-        if let Some(specialization) = self.specialization(db) {
-            internal_signature = internal_signature.apply_specialization(db, specialization);
-        }
+        let internal_signature = self.internal_signature(db);
 
         // The semantic model records a use for each function on the name node. This is used here
         // to get the previous function definition with the same name.
@@ -6071,14 +6069,51 @@ impl<'db> FunctionType<'db> {
         let scope = self.body_scope(db);
         let function_stmt_node = scope.node(db).expect_function();
         let definition = self.definition(db);
-        Signature::from_function(db, self.generic_context(db), definition, function_stmt_node)
+        let generic_context = function_stmt_node.type_params.as_ref().map(|type_params| {
+            let index = semantic_index(db, scope.file(db));
+            GenericContext::from_type_params(db, index, type_params)
+        });
+        let mut signature = Signature::from_function(
+            db,
+            generic_context,
+            self.inherited_generic_context(db),
+            definition,
+            function_stmt_node,
+        );
+        if let Some(specialization) = self.specialization(db) {
+            signature = signature.apply_specialization(db, specialization);
+        }
+        signature
     }
 
     pub(crate) fn is_known(self, db: &'db dyn Db, known_function: KnownFunction) -> bool {
         self.known(db) == Some(known_function)
     }
 
-    fn with_generic_context(self, db: &'db dyn Db, generic_context: GenericContext<'db>) -> Self {
+    fn with_dataclass_transformer_params(
+        self,
+        db: &'db dyn Db,
+        params: DataclassTransformerParams,
+    ) -> Self {
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            Some(params),
+            self.inherited_generic_context(db),
+            self.specialization(db),
+        )
+    }
+
+    fn with_inherited_generic_context(
+        self,
+        db: &'db dyn Db,
+        inherited_generic_context: GenericContext<'db>,
+    ) -> Self {
+        // A function cannot inherit more than one generic context from its containing class.
+        debug_assert!(self.inherited_generic_context(db).is_none());
         Self::new(
             db,
             self.name(db).clone(),
@@ -6086,7 +6121,7 @@ impl<'db> FunctionType<'db> {
             self.body_scope(db),
             self.decorators(db),
             self.dataclass_transformer_params(db),
-            Some(generic_context),
+            Some(inherited_generic_context),
             self.specialization(db),
         )
     }
@@ -6103,7 +6138,7 @@ impl<'db> FunctionType<'db> {
             self.body_scope(db),
             self.decorators(db),
             self.dataclass_transformer_params(db),
-            self.generic_context(db),
+            self.inherited_generic_context(db),
             Some(specialization),
         )
     }
