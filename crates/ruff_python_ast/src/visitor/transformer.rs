@@ -169,7 +169,7 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
             type_params,
             value,
         }) => {
-            visitor.visit_expr(value);
+            visitor.visit_annotation(value);
             if let Some(type_params) = type_params {
                 visitor.visit_type_params(type_params);
             }

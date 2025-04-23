@@ -418,7 +418,7 @@ impl ast::Parameter {
 
         visitor.visit_identifier(name);
         if let Some(expr) = annotation {
-            visitor.visit_annotation(expr);
+            visitor.visit_expr(expr);
         }
     }
 }

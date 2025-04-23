@@ -7187,7 +7187,7 @@ impl StmtFunctionDef {
         visitor.visit_parameters(parameters);
 
         if let Some(returns) = returns {
-            visitor.visit_annotation(returns);
+            visitor.visit_expr(returns);
         }
 
         visitor.visit_body(body);
@@ -7320,7 +7320,7 @@ impl StmtAnnAssign {
             range: _,
         } = self;
         visitor.visit_expr(target);
-        visitor.visit_annotation(annotation);
+        visitor.visit_expr(annotation);
 
         if let Some(value) = value {
             visitor.visit_expr(value);
