@@ -439,14 +439,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         }
 
         // apache-airflow-providers-apache-hive
-        ["airflow", "macros", "hive", rest @ ("closest_ds_partition" | "max_partition")] => {
-            ProviderReplacement::SourceModuleMovedToProvider {
-                name: (*rest).to_string(),
-                module: "airflow.providers.apache.hive.macros.hive",
-                provider: "apache-hive",
-                version: "5.1.0",
-            }
-        }
         ["airflow", "hooks", "hive_hooks", rest @ ("HiveCliHook"
         | "HiveMetastoreHook"
         | "HiveServer2Hook"
@@ -456,6 +448,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "apache-hive",
             version: "1.0.0",
         },
+        ["airflow", "macros", "hive", rest @ ("closest_ds_partition" | "max_partition")] => {
+            ProviderReplacement::SourceModuleMovedToProvider {
+                name: (*rest).to_string(),
+                module: "airflow.providers.apache.hive.macros.hive",
+                provider: "apache-hive",
+                version: "5.1.0",
+            }
+        }
         ["airflow", "operators", "hive_operator", "HiveOperator"] => {
             ProviderReplacement::AutoImport {
                 module: "airflow.providers.apache.hive.operators.hive",
