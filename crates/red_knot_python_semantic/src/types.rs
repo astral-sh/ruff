@@ -1175,25 +1175,9 @@ impl<'db> Type<'db> {
                 self_subclass_ty.is_subtype_of(db, target_subclass_ty)
             }
 
-            (Type::ClassLiteral(_), Type::Callable(_)) => {
-                let metaclass_call_function_symbol = self
-                    .member_lookup_with_policy(
-                        db,
-                        "__call__".into(),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                    )
-                    .symbol;
-
-                if let Symbol::Type(Type::BoundMethod(metaclass_call_function), _) =
-                    metaclass_call_function_symbol
-                {
-                    // TODO: this intentionally diverges from step 1 in
-                    // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
-                    // by always respecting the signature of the metaclass `__call__`, rather than
-                    // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-                    let metaclass_call_function = metaclass_call_function.into_callable_type(db);
-                    return metaclass_call_function.is_subtype_of(db, target);
+            (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
+                if let Some(callable) = class_literal.into_callable(db) {
+                    return callable.is_subtype_of(db, target);
                 }
                 false
             }
@@ -5959,6 +5943,15 @@ impl<'db> FunctionType<'db> {
             db,
             self.signature(db).iter().cloned(),
         ))
+    }
+
+    /// Convert the `FunctionType` into a [`Type::BoundMethod`].
+    pub(crate) fn into_bound_method_type(
+        self,
+        db: &'db dyn Db,
+        self_instance: Type<'db>,
+    ) -> Type<'db> {
+        Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
     }
 
     /// Returns the [`FileRange`] of the function's name.
