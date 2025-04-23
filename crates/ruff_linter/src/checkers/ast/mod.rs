@@ -1539,25 +1539,37 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::Cast) => {
-                        let mut args = arguments.args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_type_definition(arg);
-
-                            if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
-                                flake8_type_checking::rules::runtime_cast_value(self, arg);
+                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                            match (i, arg) {
+                                (0, ArgOrKeyword::Arg(arg)) => self.visit_cast_type_argument(arg),
+                                (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
+                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                    if let Some(id) = arg {
+                                        if id == "typ" {
+                                            self.visit_cast_type_argument(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
+                                }
                             }
-                        }
-                        for arg in args {
-                            self.visit_expr(arg);
                         }
                     }
                     Some(typing::Callable::NewType) => {
-                        let mut args = arguments.args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_non_type_definition(arg);
-                        }
-                        for arg in args {
-                            self.visit_type_definition(arg);
+                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                            match (i, arg) {
+                                (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
+                                (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
+                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                    if let Some(id) = arg {
+                                        if id == "tp" {
+                                            self.visit_type_definition(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     Some(typing::Callable::TypeVar) => {
@@ -2207,6 +2219,15 @@ impl<'a> Checker<'a> {
         self.semantic.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
         self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as the `typ` argument to `typing.cast`.
+    fn visit_cast_type_argument(&mut self, arg: &'a Expr) {
+        self.visit_type_definition(arg);
+
+        if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
+            flake8_type_checking::rules::runtime_cast_value(self, arg);
+        }
     }
 
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
