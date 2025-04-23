@@ -312,9 +312,9 @@ impl<'db> Signature<'db> {
         specialization: Specialization<'db>,
     ) {
         self.parameters.apply_specialization(db, specialization);
-        self.return_ty
-            .as_mut()
-            .map(|ty| *ty = ty.apply_specialization(db, specialization));
+        if let Some(ty) = self.return_ty.as_mut() {
+            *ty = ty.apply_specialization(db, specialization);
+        }
     }
 
     /// Return the parameters in this signature.
@@ -1184,9 +1184,9 @@ impl<'db> Parameter<'db> {
     }
 
     fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
-        self.annotated_type
-            .as_mut()
-            .map(|ty| *ty = ty.apply_specialization(db, specialization));
+        if let Some(ty) = self.annotated_type.as_mut() {
+            *ty = ty.apply_specialization(db, specialization);
+        }
         self.kind.apply_specialization(db, specialization);
     }
 
@@ -1382,9 +1382,9 @@ impl<'db> ParameterKind<'db> {
             Self::PositionalOnly { default_type, .. }
             | Self::PositionalOrKeyword { default_type, .. }
             | Self::KeywordOnly { default_type, .. } => {
-                default_type
-                    .as_mut()
-                    .map(|ty| *ty = ty.apply_specialization(db, specialization));
+                if let Some(ty) = default_type.as_mut() {
+                    *ty = ty.apply_specialization(db, specialization);
+                }
             }
             Self::Variadic { .. } | Self::KeywordVariadic { .. } => {}
         }
