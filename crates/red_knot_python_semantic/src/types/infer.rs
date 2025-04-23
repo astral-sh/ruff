@@ -4384,16 +4384,20 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             match known_function {
                                 KnownFunction::RevealType => {
-                                    let revealed_type = overload.return_type();
-                                    if let Some(builder) = self.context.report_diagnostic(
-                                        DiagnosticId::RevealedType,
-                                        Severity::Info,
-                                    ) {
-                                        let mut diag = builder.into_diagnostic("Revealed type");
-                                        let span = self.context.span(call_expression);
-                                        diag.annotate(Annotation::primary(span).message(
-                                            format_args!("`{}`", revealed_type.display(self.db())),
-                                        ));
+                                    if let [Some(revealed_type)] = overload.parameter_types() {
+                                        if let Some(builder) = self.context.report_diagnostic(
+                                            DiagnosticId::RevealedType,
+                                            Severity::Info,
+                                        ) {
+                                            let mut diag = builder.into_diagnostic("Revealed type");
+                                            let span = self.context.span(call_expression);
+                                            diag.annotate(Annotation::primary(span).message(
+                                                format_args!(
+                                                    "`{}`",
+                                                    revealed_type.display(self.db())
+                                                ),
+                                            ));
+                                        }
                                     }
                                 }
                                 KnownFunction::AssertType => {
