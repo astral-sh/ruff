@@ -686,7 +686,7 @@ impl Display for DisplayMaybeParenthesizedType<'_> {
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::Union(_) => write_parentheses(f),
-            Type::Intersection(intersection) if !intersection.is_single_valued(self.db) => {
+            Type::Intersection(intersection) if !intersection.has_one_element(self.db) => {
                 write_parentheses(f)
             }
             _ => self.ty.display(self.db).fmt(f),

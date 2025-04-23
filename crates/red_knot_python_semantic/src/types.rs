@@ -6994,7 +6994,7 @@ impl<'db> IntersectionType<'db> {
         self.positive(db).iter().copied()
     }
 
-    pub fn is_single_valued(&self, db: &'db dyn Db) -> bool {
+    pub fn has_one_element(&self, db: &'db dyn Db) -> bool {
         (self.positive(db).len() + self.negative(db).len()) == 1
     }
 }
