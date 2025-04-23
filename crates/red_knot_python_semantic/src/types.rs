@@ -6995,8 +6995,7 @@ impl<'db> IntersectionType<'db> {
     }
 
     pub fn is_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.positive(db).len() == 1 && self.negative(db).is_empty()
-            || self.positive(db).is_empty() && self.negative(db).len() == 1
+        (self.positive(db).len() + self.negative(db).len()) == 1
     }
 }
 
