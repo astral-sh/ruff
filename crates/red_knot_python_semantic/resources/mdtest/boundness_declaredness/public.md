@@ -292,3 +292,66 @@ reveal_type(a)  # revealed: Unknown
 # Modifications allowed in this case:
 a = None
 ```
+
+## In stub files
+
+In stub files, we have a minor modification to the rules above: we do not union with `Unknown` for
+undeclared symbols.
+
+### Undeclared and bound
+
+`mod.pyi`:
+
+```pyi
+MyInt = int
+
+class C:
+    MyStr = str
+```
+
+```py
+from mod import MyInt, C
+
+reveal_type(MyInt)  # revealed: Literal[int]
+reveal_type(C.MyStr)  # revealed: Literal[str]
+```
+
+### Undeclared and possibly unbound
+
+`mod.pyi`:
+
+```pyi
+def flag() -> bool:
+    return True
+
+if flag():
+    MyInt = int
+
+    class C:
+        MyStr = str
+```
+
+```py
+# error: [possibly-unbound-import]
+# error: [possibly-unbound-import]
+from mod import MyInt, C
+
+reveal_type(MyInt)  # revealed: Literal[int]
+reveal_type(C.MyStr)  # revealed: Literal[str]
+```
+
+### Undeclared and unbound
+
+`mod.pyi`:
+
+```pyi
+if False:
+    MyInt = int
+```
+
+```py
+# error: [unresolved-import]
+from mod import MyInt
+
+reveal_type(MyInt)  # revealed: Unknown
+```
