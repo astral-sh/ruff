@@ -1475,6 +1475,16 @@ impl<'db> Type<'db> {
                 self_callable.is_assignable_to(db, target_callable)
             }
 
+            (Type::Instance(_), Type::Callable(_)) => {
+                let call_symbol = self.member(db, "__call__").symbol;
+                match call_symbol {
+                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
+                        .into_callable_type(db)
+                        .is_assignable_to(db, target),
+                    _ => false,
+                }
+            }
+
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
                     .into_callable_type(db)
