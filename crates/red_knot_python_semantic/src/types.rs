@@ -6126,11 +6126,7 @@ impl<'db> FunctionType<'db> {
             Some(specialization),
         )
     }
-}
 
-// This is a separate block for now to avoid making `to_overloaded` a salsa query. This is a
-// temporary workaround until salsa supports returning `Option<&T>` from a tracked query.
-impl<'db> FunctionType<'db> {
     /// Returns `self` as [`OverloadedFunction`] if it is overloaded, [`None`] otherwise.
     fn to_overloaded(self, db: &'db dyn Db) -> Option<&'db OverloadedFunction<'db>> {
         #[allow(clippy::ref_option)] // TODO: Remove once salsa supports deref (https://github.com/salsa-rs/salsa/pull/772)
