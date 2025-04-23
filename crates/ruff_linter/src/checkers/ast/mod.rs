@@ -557,10 +557,6 @@ impl<'a> Checker<'a> {
 }
 
 impl SemanticSyntaxContext for Checker<'_> {
-    fn seen_docstring_boundary(&self) -> bool {
-        self.semantic.seen_module_docstring_boundary()
-    }
-
     fn python_version(&self) -> PythonVersion {
         self.target_version
     }

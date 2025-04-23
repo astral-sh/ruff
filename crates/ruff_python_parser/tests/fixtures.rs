@@ -504,10 +504,6 @@ impl<'a> SemanticSyntaxCheckerVisitor<'a> {
 }
 
 impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
-    fn seen_docstring_boundary(&self) -> bool {
-        false
-    }
-
     fn future_annotations_or_stub(&self) -> bool {
         false
     }
