@@ -1491,6 +1491,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                 } else if function.is_known(self.db(), KnownFunction::Overload) {
                     function_decorators |= FunctionDecorators::OVERLOAD;
                     continue;
+                } else if function.is_known(self.db(), KnownFunction::AbstractMethod) {
+                    function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
+                    continue;
                 }
             } else if let Type::ClassLiteral(class) = decorator_ty {
                 if class.is_known(self.db(), KnownClass::Classmethod) {

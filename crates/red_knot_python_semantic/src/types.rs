@@ -5876,10 +5876,12 @@ bitflags! {
     pub struct FunctionDecorators: u8 {
         /// `@classmethod`
         const CLASSMETHOD = 1 << 0;
-        /// `@no_type_check`
+        /// `@typing.no_type_check`
         const NO_TYPE_CHECK = 1 << 1;
-        /// `@overload`
+        /// `@typing.overload`
         const OVERLOAD = 1 << 2;
+        /// `@abc.abstractmethod`
+        const ABSTRACT_METHOD = 1 << 3;
     }
 }
 
