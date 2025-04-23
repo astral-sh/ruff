@@ -564,10 +564,11 @@ impl<'db> Bindings<'db> {
                     Some(KnownFunction::GetProtocolMembers) => {
                         if let [Some(Type::ClassLiteral(class))] = overload.parameter_types() {
                             if let Some(protocol_class) = class.into_protocol_class(db) {
+                                // TODO: actually a frozenset at runtime (requires support for legacy generic classes)
                                 overload.set_return_type(Type::Tuple(TupleType::new(
                                     db,
                                     protocol_class
-                                        .members(db)
+                                        .protocol_members(db)
                                         .iter()
                                         .map(|member| Type::string_literal(db, member))
                                         .collect::<Box<[Type<'db>]>>(),

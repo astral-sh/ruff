@@ -1733,10 +1733,24 @@ impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
 pub(super) struct ProtocolClassLiteral<'db>(ClassLiteralType<'db>);
 
 impl<'db> ProtocolClassLiteral<'db> {
-    pub(super) fn members(self, db: &'db dyn Db) -> &'db ordermap::set::Slice<Name> {
+    /// Returns the protocol members of this class.
+    ///
+    /// A protocol's members define the interface declared by the protocol.
+    /// They therefore determine how the protocol should behave with regards to
+    /// assignability and subtyping.
+    ///
+    /// The list of members consists of all bindings and declarations that take place
+    /// in the protocol's class body, except for a list of excluded attributes which should
+    /// not be taken into account. (This list includes `__init__` and `__new__`, which can
+    /// legally be defined on protocol classes but do not constitute protocol members.)
+    ///
+    /// It is illegal for a protocol class to have any instance attributes that are not declared
+    /// in the protocol's class body. If any are assigned to, they are not taken into account in
+    /// the protocol's list of members.
+    pub(super) fn protocol_members(self, db: &'db dyn Db) -> &'db ordermap::set::Slice<Name> {
         /// The list of excluded members is subject to change between Python versions,
         /// especially for dunders, but it probably doesn't matter *too* much if this
-        /// list goes out of date. It's up-to-date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
+        /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
         /// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1791>)
         fn excluded_from_proto_members(member: &str) -> bool {
             matches!(
