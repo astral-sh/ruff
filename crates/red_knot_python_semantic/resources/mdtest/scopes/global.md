@@ -78,7 +78,7 @@ def f():
     x = 1
     def g() -> None:
         nonlocal x
-        global x  # TODO error: [invalid-syntax] "name 'x' is nonlocal and global"
+        global x  # TODO: error: [invalid-syntax] "name 'x' is nonlocal and global"
         x = None
 ```
 
