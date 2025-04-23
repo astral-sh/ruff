@@ -1,6 +1,6 @@
 name: Run mypy_primer
 
-permissions: {}
+permissions: { }
 
 on:
   pull_request:
@@ -20,6 +20,8 @@ env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
+  CARGO_PROFILE_DEV_OPT_LEVEL: 3
+  CARGO_PROFILE_DEV_LTO: thin
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
 
