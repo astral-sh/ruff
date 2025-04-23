@@ -66,7 +66,6 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
-
 ## `nonlocal` and `global`
 
 A binding cannot be both `nonlocal` and `global`. This should emit a semantic syntax error. CPython
@@ -177,8 +176,3 @@ def f():
 x = None
 global x
 ```
-
-[mypy]: https://mypy-play.net/?mypy=latest&python=3.12&gist=84f45a50e34d0426db26f5f57449ab98
-[pyright]: https://pyright-play.net/?pythonVersion=3.8&strict=true&code=B4LgBAlgdgLmA%2BYByB7KBTAUJgJugZmPgBQCUImYVYA5gDYoBGAhnWMJdcGALxgCMnKgCd0AN3SsA%2BjACeAB3TFgpKgGIwoia3Q5wAGQgx0w1gG1%2BAXUxA
-[t]: https://github.com/python/mypy/blob/master/test-data/unit/check-optional.test#L1134
-[test]: https://github.com/python/mypy/blob/master/test-data/unit/check-possibly-undefined.test#L194
