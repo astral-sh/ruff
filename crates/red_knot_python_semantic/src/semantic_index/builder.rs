@@ -94,7 +94,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     // Used for checking semantic syntax errors
     python_version: PythonVersion,
     source_text: OnceCell<SourceText>,
-    semantic_checker: Option<SemanticSyntaxChecker>,
+    semantic_checker: SemanticSyntaxChecker,
 
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
@@ -145,7 +145,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
-            semantic_checker: db.is_file_open(file).then(SemanticSyntaxChecker::default),
+            semantic_checker: SemanticSyntaxChecker::default(),
             semantic_syntax_errors: RefCell::default(),
         };
 
@@ -1070,9 +1070,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
         let mut checker = std::mem::take(&mut self.semantic_checker);
-        if let Some(checker) = &mut checker {
-            f(checker, self);
-        }
+        f(&mut checker, self);
         self.semantic_checker = checker;
     }
 
@@ -2387,7 +2385,9 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
-        self.semantic_syntax_errors.borrow_mut().push(error);
+        if self.db.is_file_open(self.file) {
+            self.semantic_syntax_errors.borrow_mut().push(error);
+        }
     }
 }
 
