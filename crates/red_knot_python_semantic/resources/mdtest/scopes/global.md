@@ -32,13 +32,13 @@ def f():
     y = ""
 
     global x
-    # @Todo(error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`")
+    # TODO: error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
     x = ""
 ```
 
 ## Nested intervening scope
 
-TODO this should give the outer module type of `Unknown | Literal[1]`, not `Literal[""]`
+A `global` statement causes lookup to skip any bindings in intervening scopes:
 
 ```py
 x = 1
@@ -48,14 +48,14 @@ def outer():
 
     def inner():
         global x
+        # TODO should be `Unknown | Literal[1]`
         reveal_type(x)  # revealed: Unknown | Literal[""]
 ```
 
 ## Narrowing
 
 An assignment following a `global` statement should narrow the type in the local scope after the
-assignment. The revealed type of `Literal[1]` here is in line with [pyright], while [mypy] reports
-`builtins.int`.
+assignment.
 
 ```py
 x: int | None
@@ -66,20 +66,6 @@ def f():
     reveal_type(x)  # revealed: Literal[1]
 ```
 
-This related case is adapted from a `mypy` [test][t] with the comment:
-
-> This is unsafe, but we don't generate an error, for convenience. Besides, this is probably a very
-> rare case.
-
-```py
-g: str | None
-
-def f():
-    global g
-    g = "x"
-    def nested() -> str:
-        return g
-```
 
 ## `nonlocal` and `global`
 
@@ -98,8 +84,6 @@ def f():
 ```
 
 ## Global declaration after `global` statement
-
-This is also adapted from a `mypy` [test].
 
 ```py
 def f():
