@@ -315,7 +315,7 @@ reveal_type(Protocol())  # revealed: Unknown
 class MyProtocol(Protocol):
     x: int
 
-# error
+# TODO: should emit error
 reveal_type(MyProtocol())  # revealed: MyProtocol
 ```
 
@@ -403,6 +403,30 @@ class Baz2(Bar, Foo, Protocol): ...
 # TODO: actually a frozenset
 # revealed: tuple[Literal["method_member"], Literal["spam"], Literal["x"], Literal["y"], Literal["z"]]
 reveal_type(get_protocol_members(Baz2))
+```
+
+## Protocol members in statically known branches
+
+The list of protocol members does not include any members declared in branches that are statically
+known to be unreachable:
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+import sys
+from typing_extensions import Protocol, get_protocol_members
+
+class Foo(Protocol):
+    if sys.version_info >= (3, 10):
+        x: int
+    else:
+        y: str
+
+# TODO: actually a frozenset
+reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["y"]]
 ```
 
 ## Invalid calls to `get_protocol_members()`
@@ -636,8 +660,8 @@ reveal_type(get_protocol_members(LotsOfBindings))
 ```
 
 Attribute members are allowed to have assignments in methods on the protocol class, just like
-non-protocol classes. Unlike other classes, however, *implicit* instance attributes -- those that
-are not declared in the class body -- are not allowed:
+non-protocol classes. Unlike other classes, however, instance attributes that are not declared in
+the class body are disallowed:
 
 ```py
 class Foo(Protocol):
@@ -646,11 +670,18 @@ class Foo(Protocol):
 
     def __init__(self) -> None:
         self.x = 42  # fine
-        self.a = 56  # error
+        self.a = 56  # TODO: should emit diagnostic
+        self.b: int = 128  # TODO: should emit diagnostic
 
     def non_init_method(self) -> None:
         self.y = 64  # fine
-        self.b = 72  # error
+        self.c = 72  # TODO: should emit diagnostic
+
+# Note: the list of members does not include `a`, `b` or `c`,
+# as none of these attributes is declared in the class body.
+#
+# TODO: actually a frozenset
+reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["non_init_method"], Literal["x"], Literal["y"]]
 ```
 
 If a protocol has 0 members, then all other types are assignable to it, and all fully static types
