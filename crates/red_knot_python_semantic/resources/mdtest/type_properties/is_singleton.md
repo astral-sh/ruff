@@ -128,10 +128,7 @@ python-version = "3.10"
 import types
 from knot_extensions import static_assert, is_singleton
 
-# TODO: types.NotImplementedType is a TypeAlias of builtins._NotImplementedType
-# Once TypeAlias support is added, it should satisfy `is_singleton`
-reveal_type(types.NotImplementedType)  # revealed: Unknown | Literal[_NotImplementedType]
-static_assert(not is_singleton(types.NotImplementedType))
+static_assert(is_singleton(types.NotImplementedType))
 ```
 
 ### Callables
