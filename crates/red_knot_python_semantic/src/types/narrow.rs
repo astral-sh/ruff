@@ -395,10 +395,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if lhs_ty.is_positively_narrowable(self.db)
-            && (rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db))
-        {
-            Some(rhs_ty)
+        if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
+            let union = UnionBuilder::new(self.db)
+                .add(
+                    lhs_ty
+                        .positively_narrowable_with(self.db, rhs_ty)
+                        .negate(self.db),
+                )
+                .add(rhs_ty)
+                .build();
+            Some(union)
         } else {
             None
         }

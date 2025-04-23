@@ -99,3 +99,15 @@ if (x := f()) != 1:
 else:
     reveal_type(x)  # revealed: Literal[1]
 ```
+
+## `Any` narrowing
+
+```py
+from typing import Any
+
+def _(x: Any | None, y: Any | None):
+    if x != 1:
+        reveal_type(x)  # revealed: Any & ~Literal[1] | None
+    if y == 1:
+        reveal_type(y)  # revealed: Any & ~None
+```

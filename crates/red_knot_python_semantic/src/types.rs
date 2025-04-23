@@ -542,6 +542,11 @@ impl<'db> Type<'db> {
             .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
     }
 
+    fn is_bool(&self, db: &'db dyn Db) -> bool {
+        self.into_instance()
+            .is_some_and(|instance| instance.class().is_known(db, KnownClass::Bool))
+    }
+
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.into_instance().is_some_and(|instance| {
             instance
@@ -778,6 +783,8 @@ impl<'db> Type<'db> {
     pub fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
         self.into_union()
             .is_some_and(|union| union.elements(db).iter().all(|ty| ty.is_single_valued(db)))
+            || self.is_literal_string()
+            || self.is_bool(db)
     }
 
     pub const fn into_int_literal(self) -> Option<i64> {
@@ -2165,13 +2172,26 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn is_positively_narrowable(self, db: &'db dyn Db) -> bool {
-        self.is_single_valued(db)
-            || self.is_union_of_single_valued(db)
-            || self.is_literal_string()
-            || self
-                .into_instance()
-                .is_some_and(|instance| instance.class().is_known(db, KnownClass::Bool))
+    // Get the part of the type that is positively narrowable and are not a subtype of the other type.
+    fn positively_narrowable_with(self, db: &'db dyn Db, target: Type<'db>) -> Type<'db> {
+        if self.is_single_valued(db) || self.is_union_of_single_valued(db) {
+            if self.is_subtype_of(db, target) {
+                Type::Never
+            } else {
+                self
+            }
+        } else {
+            match self {
+                Type::Union(union) => {
+                    let elements = union
+                        .elements(db)
+                        .iter()
+                        .map(|elem| elem.positively_narrowable_with(db, target));
+                    UnionType::from_elements(db, elements)
+                }
+                _ => Type::Never,
+            }
+        }
     }
 
     /// This function is roughly equivalent to `find_name_in_mro` as defined in the [descriptor guide] or
