@@ -263,6 +263,7 @@ impl<'db> Signature<'db> {
     pub(super) fn from_function(
         db: &'db dyn Db,
         generic_context: Option<GenericContext<'db>>,
+        inherited_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
     ) -> Self {
@@ -276,7 +277,7 @@ impl<'db> Signature<'db> {
 
         Self {
             generic_context,
-            inherited_generic_context: None,
+            inherited_generic_context,
             parameters: Parameters::from_parameters(
                 db,
                 definition,
@@ -299,21 +300,18 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn set_inherited_generic_context(
-        &mut self,
-        inherited_generic_context: GenericContext<'db>,
-    ) {
-        self.inherited_generic_context = Some(inherited_generic_context);
-    }
-
     pub(crate) fn apply_specialization(
-        &mut self,
+        &self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
-    ) {
-        self.parameters.apply_specialization(db, specialization);
-        if let Some(ty) = self.return_ty.as_mut() {
-            *ty = ty.apply_specialization(db, specialization);
+    ) -> Self {
+        Self {
+            generic_context: self.generic_context,
+            inherited_generic_context: self.inherited_generic_context,
+            parameters: self.parameters.apply_specialization(db, specialization),
+            return_ty: self
+                .return_ty
+                .map(|ty| ty.apply_specialization(db, specialization)),
         }
     }
 
@@ -1016,10 +1014,15 @@ impl<'db> Parameters<'db> {
         )
     }
 
-    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
-        self.value
-            .iter_mut()
-            .for_each(|param| param.apply_specialization(db, specialization));
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        Self {
+            value: self
+                .value
+                .iter()
+                .map(|param| param.apply_specialization(db, specialization))
+                .collect(),
+            is_gradual: self.is_gradual,
+        }
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -1183,11 +1186,14 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
-        if let Some(ty) = self.annotated_type.as_mut() {
-            *ty = ty.apply_specialization(db, specialization);
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        Self {
+            annotated_type: self
+                .annotated_type
+                .map(|ty| ty.apply_specialization(db, specialization)),
+            kind: self.kind.apply_specialization(db, specialization),
+            form: self.form,
         }
-        self.kind.apply_specialization(db, specialization);
     }
 
     /// Strip information from the parameter so that two equivalent parameters compare equal.
@@ -1377,16 +1383,27 @@ pub(crate) enum ParameterKind<'db> {
 }
 
 impl<'db> ParameterKind<'db> {
-    fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         match self {
-            Self::PositionalOnly { default_type, .. }
-            | Self::PositionalOrKeyword { default_type, .. }
-            | Self::KeywordOnly { default_type, .. } => {
-                if let Some(ty) = default_type.as_mut() {
-                    *ty = ty.apply_specialization(db, specialization);
-                }
-            }
-            Self::Variadic { .. } | Self::KeywordVariadic { .. } => {}
+            Self::PositionalOnly { default_type, name } => Self::PositionalOnly {
+                default_type: default_type
+                    .as_ref()
+                    .map(|ty| ty.apply_specialization(db, specialization)),
+                name: name.clone(),
+            },
+            Self::PositionalOrKeyword { default_type, name } => Self::PositionalOrKeyword {
+                default_type: default_type
+                    .as_ref()
+                    .map(|ty| ty.apply_specialization(db, specialization)),
+                name: name.clone(),
+            },
+            Self::KeywordOnly { default_type, name } => Self::KeywordOnly {
+                default_type: default_type
+                    .as_ref()
+                    .map(|ty| ty.apply_specialization(db, specialization)),
+                name: name.clone(),
+            },
+            Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),
         }
     }
 }
@@ -1426,7 +1443,7 @@ mod tests {
         db.write_dedented("/src/a.py", "def f(): ...").unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.function(&db).internal_signature(&db);
+        let sig = func.internal_signature(&db);
 
         assert!(sig.return_ty.is_none());
         assert_params(&sig, &[]);
@@ -1449,7 +1466,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.function(&db).internal_signature(&db);
+        let sig = func.internal_signature(&db);
 
         assert_eq!(sig.return_ty.unwrap().display(&db).to_string(), "bytes");
         assert_params(
@@ -1500,7 +1517,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.function(&db).internal_signature(&db);
+        let sig = func.internal_signature(&db);
 
         let [Parameter {
             annotated_type,
@@ -1534,7 +1551,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi");
 
-        let sig = func.function(&db).internal_signature(&db);
+        let sig = func.internal_signature(&db);
 
         let [Parameter {
             annotated_type,
@@ -1568,7 +1585,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let sig = func.function(&db).internal_signature(&db);
+        let sig = func.internal_signature(&db);
 
         let [Parameter {
             annotated_type: a_annotated_ty,
@@ -1611,7 +1628,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.pyi");
 
-        let sig = func.function(&db).internal_signature(&db);
+        let sig = func.internal_signature(&db);
 
         let [Parameter {
             annotated_type: a_annotated_ty,
@@ -1647,7 +1664,7 @@ mod tests {
         .unwrap();
         let func = get_function_f(&db, "/src/a.py");
 
-        let expected_sig = func.function(&db).internal_signature(&db);
+        let expected_sig = func.internal_signature(&db);
 
         // With no decorators, internal and external signature are the same
         assert_eq!(

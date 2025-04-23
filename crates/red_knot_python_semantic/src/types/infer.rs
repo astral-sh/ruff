@@ -82,7 +82,7 @@ use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     binding_type, todo_type, CallDunderError, CallableSignature, CallableType, Class,
-    ClassLiteralType, ClassType, DataclassParams, DynamicType, FunctionDecorators, FunctionLiteral,
+    ClassLiteralType, ClassType, DataclassParams, DynamicType, FunctionDecorators, FunctionType,
     GenericAlias, GenericClass, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
     KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, NonGenericClass, Parameter,
     ParameterForm, Parameters, Signature, Signatures, SliceLiteralType, StringLiteralType,
@@ -1533,17 +1533,19 @@ impl<'db> TypeInferenceBuilder<'db> {
             .node_scope(NodeWithScopeRef::Function(function))
             .to_scope_id(self.db(), self.file());
 
-        let mut inferred_ty = Type::function_literal(
+        let inherited_generic_context = None;
+        let specialization = None;
+
+        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(
             self.db(),
-            FunctionLiteral::new(
-                self.db(),
-                &name.id,
-                function_kind,
-                body_scope,
-                function_decorators,
-                dataclass_transformer_params,
-            ),
-        );
+            &name.id,
+            function_kind,
+            body_scope,
+            function_decorators,
+            dataclass_transformer_params,
+            inherited_generic_context,
+            specialization,
+        ));
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = match decorator_ty
@@ -1797,10 +1799,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             if let Type::FunctionLiteral(f) = decorator_ty {
-                if let Some(params) = f
-                    .function(self.db())
-                    .dataclass_transformer_params(self.db())
-                {
+                if let Some(params) = f.dataclass_transformer_params(self.db()) {
                     dataclass_params = Some(params.into());
                     continue;
                 }

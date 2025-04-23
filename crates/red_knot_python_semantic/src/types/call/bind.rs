@@ -676,9 +676,7 @@ impl<'db> Bindings<'db> {
                     }
 
                     _ => {
-                        if let Some(params) =
-                            function_type.function(db).dataclass_transformer_params(db)
-                        {
+                        if let Some(params) = function_type.dataclass_transformer_params(db) {
                             // This is a call to a custom function that was decorated with `@dataclass_transformer`.
                             // If this function was called with a keyword argument like `order=False`, we extract
                             // the argument type and overwrite the corresponding flag in `dataclass_params` after
@@ -1379,7 +1377,7 @@ impl<'db> BindingError<'db> {
     ) -> Option<(Span, Span)> {
         match callable_ty {
             Type::FunctionLiteral(function) => {
-                let function_scope = function.function(db).body_scope(db);
+                let function_scope = function.body_scope(db);
                 let span = Span::from(function_scope.file(db));
                 let node = function_scope.node(db);
                 if let Some(func_def) = node.as_function() {
