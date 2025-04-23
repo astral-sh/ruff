@@ -168,6 +168,18 @@ pub(crate) fn custom_type_var_instead_of_self(
         .map(Ranged::end)
         .unwrap_or_else(|| parameters.end());
 
+    let fix = replace_custom_typevar_with_self(
+        checker,
+        function_def,
+        custom_typevar,
+        self_or_cls_parameter,
+        self_or_cls_annotation,
+    );
+
+    if matches!(fix, Ok(None)) {
+        return None;
+    }
+
     let mut diagnostic = Diagnostic::new(
         CustomTypeVarForSelf {
             typevar_name: custom_typevar.name(checker.source()).to_string(),
@@ -175,15 +187,7 @@ pub(crate) fn custom_type_var_instead_of_self(
         TextRange::new(function_name.end(), function_header_end),
     );
 
-    diagnostic.try_set_optional_fix(|| {
-        replace_custom_typevar_with_self(
-            checker,
-            function_def,
-            custom_typevar,
-            self_or_cls_parameter,
-            self_or_cls_annotation,
-        )
-    });
+    diagnostic.try_set_optional_fix(|| fix);
 
     Some(diagnostic)
 }
