@@ -5905,15 +5905,15 @@ impl<'db> FunctionSignature<'db> {
     }
 
     fn set_inherited_generic_context(&mut self, inherited_generic_context: GenericContext<'db>) {
-        self.iter_mut().for_each(|signature| {
+        for signature in self.iter_mut() {
             signature.set_inherited_generic_context(inherited_generic_context);
-        });
+        }
     }
 
     fn apply_specialization(&mut self, db: &'db dyn Db, specialization: Specialization<'db>) {
-        self.iter_mut().for_each(|signature| {
+        for signature in self.iter_mut() {
             signature.apply_specialization(db, specialization);
-        });
+        }
     }
 }
 
@@ -6003,7 +6003,7 @@ impl<'db> FunctionType<'db> {
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(return_ref)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
-        let mut signature = self.function(db).signature(db).clone();
+        let mut signature = self.function(db).signature(db);
         if let Some(inherited_generic_context) = self.inherited_generic_context(db) {
             signature.set_inherited_generic_context(inherited_generic_context);
         }
@@ -6098,7 +6098,7 @@ impl<'db> FunctionLiteral<'db> {
         index.expect_single_definition(body_scope.node(db).expect_function())
     }
 
-    #[salsa::tracked(return_ref)]
+    #[salsa::tracked]
     fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
         let internal_signature = self.internal_signature(db);
 
