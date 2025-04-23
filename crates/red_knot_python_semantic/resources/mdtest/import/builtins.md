@@ -40,7 +40,7 @@ custom_builtin: Custom
 `/typeshed/stdlib/typing_extensions.pyi`:
 
 ```pyi
-def reveal_type[T](obj: T, /) -> T: ...
+def reveal_type(obj, /): ...
 ```
 
 ```py
