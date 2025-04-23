@@ -403,11 +403,36 @@ class Lumberjack(Protocol):
 reveal_type(get_protocol_members(Lumberjack))  # revealed: @Todo(specialized non-generic class)
 ```
 
+A sub-protocol inherits and extends the members of its superclass protocol(s):
+
+```py
+class Bar(Protocol):
+    spam: str
+
+class Baz(Bar, Protocol):
+    ham: memoryview
+
+# TODO: `tuple[Literal["spam", "ham"]]` or `frozenset[Literal["spam", "ham"]]`
+reveal_type(get_protocol_members(Baz))  # revealed: @Todo(specialized non-generic class)
+
+class Baz2(Bar, Foo, Protocol): ...
+
+# TODO: either
+# `tuple[Literal["spam"], Literal["x"], Literal["y"], Literal["z"], Literal["method_member"]]`
+# or `frozenset[Literal["spam", "x", "y", "z", "method_member"]]`
+reveal_type(get_protocol_members(Baz2))  # revealed: @Todo(specialized non-generic class)
+```
+
 ## Subtyping of protocols with attribute members
 
 In the following example, the protocol class `HasX` defines an interface such that any other fully
 static type can be said to be a subtype of `HasX` if all inhabitants of that other type have a
 mutable `x` attribute of type `int`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 ```py
 from typing import Protocol
@@ -546,6 +571,54 @@ reveal_type(ExplicitSubclass.x)  # revealed: int
 def f(arg: HasXWithDefault):
     # TODO: should emit `[unresolved-reference]` and reveal `Unknown`
     reveal_type(type(arg).x)  # revealed: int
+```
+
+Assignments in a class body of a protocol -- of any kind -- are not permitted by red-knot unless the
+symbol being assigned to is also explicitly declared in the protocol's class body. Note that this is
+stricter validation of protocol members than many other type checkers currently apply (as of
+2025/04/21).
+
+The reason for this strict validation is that undeclared variables in the class body would lead to
+an ambiguous interface being declared by the protocol.
+
+```py
+from typing_extensions import TypeAlias, get_protocol_members
+
+class MyContext:
+    def __enter__(self) -> int:
+        return 42
+
+    def __exit__(self, *args) -> None: ...
+
+class LotsOfBindings(Protocol):
+    a: int
+    a = 42  # this is fine, since `a` is declared in the class body
+    b: int = 56  # this is also fine, by the same principle
+
+    type c = str  # this is very strange but I can't see a good reason to disallow it
+    d: TypeAlias = bytes  # same here
+
+    class Nested: ...  # also weird, but we should also probably allow it
+    class NestedProtocol(Protocol): ...  # same here...
+    e = 72  # TODO: this should error with `[invalid-protocol]` (`e` is not declared)
+
+    f, g = (1, 2)  # TODO: this should error with `[invalid-protocol]` (`f` and `g` are not declared)
+
+    h: int = (i := 3)  # TODO: this should error with `[invalid-protocol]` (`i` is not declared)
+
+    for j in range(42):  # TODO: this should error with `[invalid-protocol]` (`j` is not declared)
+        pass
+
+    with MyContext() as k:  # TODO: this should error with `[invalid-protocol]` (`k` is not declared)
+        pass
+
+    match object():
+        case l:  # TODO: this should error with `[invalid-protocol]` (`l` is not declared)
+            ...
+
+# TODO: all bindings in the above class should be understood as protocol members,
+# even those that we complained about with a diagnostic
+reveal_type(get_protocol_members(LotsOfBindings))  # revealed: @Todo(specialized non-generic class)
 ```
 
 Attribute members are allowed to have assignments in methods on the protocol class, just like
