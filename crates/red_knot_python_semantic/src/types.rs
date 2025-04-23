@@ -585,11 +585,7 @@ impl<'db> Type<'db> {
 
     pub fn contains_todo(&self, db: &'db dyn Db) -> bool {
         match self {
-            Self::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::SubscriptedProtocol
-                | DynamicType::SubscriptedGeneric,
-            ) => true,
+            Self::Dynamic(DynamicType::Todo(_) | DynamicType::SubscriptedProtocol) => true,
 
             Self::AlwaysFalsy
             | Self::AlwaysTruthy
@@ -632,9 +628,7 @@ impl<'db> Type<'db> {
 
             Self::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::SubscriptedProtocol
-                    | DynamicType::SubscriptedGeneric,
+                    DynamicType::Todo(_) | DynamicType::SubscriptedProtocol,
                 ) => true,
                 SubclassOfInner::Dynamic(DynamicType::Unknown | DynamicType::Any) => false,
                 SubclassOfInner::Class(_) => false,
@@ -652,17 +646,11 @@ impl<'db> Type<'db> {
             Self::BoundSuper(bound_super) => {
                 matches!(
                     bound_super.pivot_class(db),
-                    ClassBase::Dynamic(
-                        DynamicType::Todo(_)
-                            | DynamicType::SubscriptedGeneric
-                            | DynamicType::SubscriptedProtocol
-                    )
+                    ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::SubscriptedProtocol)
                 ) || matches!(
                     bound_super.owner(db),
                     SuperOwnerKind::Dynamic(
-                        DynamicType::Todo(_)
-                            | DynamicType::SubscriptedGeneric
-                            | DynamicType::SubscriptedProtocol
+                        DynamicType::Todo(_) | DynamicType::SubscriptedProtocol
                     )
                 )
             }
@@ -4590,7 +4578,7 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::Generic => Err(InvalidTypeExpressionError {
+                KnownInstanceType::Generic(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
@@ -5230,9 +5218,6 @@ pub enum DynamicType {
     /// Temporary type until we support generic protocols.
     /// We use a separate variant (instead of `Todo(…)`) in order to be able to match on them explicitly.
     SubscriptedProtocol,
-    /// Temporary type until we support old-style generics.
-    /// We use a separate variant (instead of `Todo(…)`) in order to be able to match on them explicitly.
-    SubscriptedGeneric,
 }
 
 impl std::fmt::Display for DynamicType {
@@ -5245,11 +5230,6 @@ impl std::fmt::Display for DynamicType {
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
             DynamicType::SubscriptedProtocol => f.write_str(if cfg!(debug_assertions) {
                 "@Todo(`Protocol[]` subscript)"
-            } else {
-                "@Todo"
-            }),
-            DynamicType::SubscriptedGeneric => f.write_str(if cfg!(debug_assertions) {
-                "@Todo(`Generic[]` subscript)"
             } else {
                 "@Todo"
             }),
@@ -7633,7 +7613,7 @@ impl SliceLiteralType<'_> {
 #[salsa::interned(debug)]
 pub struct TupleType<'db> {
     #[return_ref]
-    elements: Box<[Type<'db>]>,
+    pub(crate) elements: Box<[Type<'db>]>,
 }
 
 impl<'db> TupleType<'db> {

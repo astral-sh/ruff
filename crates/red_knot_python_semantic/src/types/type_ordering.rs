@@ -148,8 +148,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (_, ClassBase::Class(_)) => Ordering::Greater,
                 (ClassBase::Protocol, _) => Ordering::Less,
                 (_, ClassBase::Protocol) => Ordering::Greater,
-                (ClassBase::Generic, _) => Ordering::Less,
-                (_, ClassBase::Generic) => Ordering::Greater,
+                (ClassBase::Generic(left), ClassBase::Generic(right)) => left.cmp(right),
+                (ClassBase::Generic(_), _) => Ordering::Less,
+                (_, ClassBase::Generic(_)) => Ordering::Greater,
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     dynamic_elements_ordering(*left, *right)
                 }
@@ -239,8 +240,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (KnownInstanceType::OrderedDict, _) => Ordering::Less,
                 (_, KnownInstanceType::OrderedDict) => Ordering::Greater,
 
-                (KnownInstanceType::Generic, _) => Ordering::Less,
-                (_, KnownInstanceType::Generic) => Ordering::Greater,
+                (KnownInstanceType::Generic(left), KnownInstanceType::Generic(right)) => {
+                    left.cmp(right)
+                }
+                (KnownInstanceType::Generic(_), _) => Ordering::Less,
+                (_, KnownInstanceType::Generic(_)) => Ordering::Greater,
 
                 (KnownInstanceType::Protocol, _) => Ordering::Less,
                 (_, KnownInstanceType::Protocol) => Ordering::Greater,
@@ -375,9 +379,6 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
-
-        (DynamicType::SubscriptedGeneric, _) => Ordering::Less,
-        (_, DynamicType::SubscriptedGeneric) => Ordering::Greater,
 
         (DynamicType::SubscriptedProtocol, _) => Ordering::Less,
         (_, DynamicType::SubscriptedProtocol) => Ordering::Greater,

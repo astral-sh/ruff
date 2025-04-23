@@ -72,10 +72,10 @@ use crate::types::diagnostic::{
     report_possibly_unbound_attribute, TypeCheckDiagnostics, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO,
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DECLARATION, INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT,
+    INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT,
+    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
@@ -774,7 +774,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
                 let base_class = match base_class {
-                    Type::KnownInstance(KnownInstanceType::Generic) => {
+                    Type::KnownInstance(KnownInstanceType::Generic(None)) => {
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_BASE, &class_node.bases()[i])
@@ -5257,8 +5257,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
             (todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _) => Some(todo),
-            (todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -6519,8 +6517,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::KnownInstance(KnownInstanceType::Protocol), _) => {
                 Type::Dynamic(DynamicType::SubscriptedProtocol)
             }
-            (Type::KnownInstance(KnownInstanceType::Generic), _) => {
-                Type::Dynamic(DynamicType::SubscriptedGeneric)
+            (Type::KnownInstance(KnownInstanceType::Generic(None)), Type::Tuple(typevars)) => {
+                self.infer_subscript_legacy_generic_class(value_node, typevars.elements(self.db()))
+            }
+            (Type::KnownInstance(KnownInstanceType::Generic(None)), typevar) => self
+                .infer_subscript_legacy_generic_class(value_node, std::slice::from_ref(&typevar)),
+            (Type::KnownInstance(KnownInstanceType::Generic(Some(_))), _) => {
+                // TODO: emit a diagnostic
+                todo_type!("doubly-specialized typing.Generic")
             }
             (Type::KnownInstance(known_instance), _)
                 if known_instance.class().is_special_form() =>
@@ -6641,7 +6645,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if !value_ty.into_class_literal().is_some_and(|class| {
                         class
                             .iter_mro(self.db(), None)
-                            .contains(&ClassBase::Dynamic(DynamicType::SubscriptedGeneric))
+                            .any(|base| matches!(base, ClassBase::Generic(_)))
                     }) {
                         report_non_subscriptable(
                             &self.context,
@@ -6674,6 +6678,35 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
         }
+    }
+
+    fn infer_subscript_legacy_generic_class(
+        &mut self,
+        value_node: &ast::Expr,
+        typevars: &[Type<'db>],
+    ) -> Type<'db> {
+        let typevars: Option<Box<[_]>> = typevars
+            .iter()
+            .map(|typevar| match typevar {
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(*typevar),
+                _ => {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "`{}` is not a valid argument to `typing.Generic`",
+                            typevar.display(self.db()),
+                        ));
+                    }
+                    None
+                }
+            })
+            .collect();
+        let Some(typevars) = typevars else {
+            return Type::unknown();
+        };
+        let generic_context = GenericContext::new(self.db(), typevars);
+        Type::KnownInstance(KnownInstanceType::Generic(Some(generic_context)))
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
@@ -7824,9 +7857,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(arguments_slice);
                 Type::Dynamic(DynamicType::SubscriptedProtocol)
             }
-            KnownInstanceType::Generic => {
-                self.infer_type_expression(arguments_slice);
-                Type::Dynamic(DynamicType::SubscriptedGeneric)
+            KnownInstanceType::Generic(_) => {
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "`typing.Generic` is not allowed in type expressions",
+                    ));
+                }
+                Type::unknown()
             }
             KnownInstanceType::NoReturn
             | KnownInstanceType::Never

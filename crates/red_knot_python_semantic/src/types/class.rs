@@ -856,10 +856,8 @@ impl<'db> ClassLiteral<'db> {
 
         for superclass in mro_iter {
             match superclass {
-                ClassBase::Dynamic(
-                    DynamicType::SubscriptedGeneric | DynamicType::SubscriptedProtocol,
-                )
-                | ClassBase::Generic
+                ClassBase::Dynamic(DynamicType::SubscriptedProtocol)
+                | ClassBase::Generic(_)
                 | ClassBase::Protocol => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
@@ -1206,10 +1204,8 @@ impl<'db> ClassLiteral<'db> {
 
         for superclass in self.iter_mro(db, specialization) {
             match superclass {
-                ClassBase::Dynamic(
-                    DynamicType::SubscriptedProtocol | DynamicType::SubscriptedGeneric,
-                )
-                | ClassBase::Generic
+                ClassBase::Dynamic(DynamicType::SubscriptedProtocol)
+                | ClassBase::Generic(_)
                 | ClassBase::Protocol => {
                     // TODO: We currently skip these when looking up instance members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise

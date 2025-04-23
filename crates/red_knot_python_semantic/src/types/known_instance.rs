@@ -8,6 +8,7 @@
 //! variant can only be inhabited by one or two specific objects at runtime with
 //! locations that are known in advance.
 
+use super::generics::GenericContext;
 use super::{class::KnownClass, ClassType, Truthiness, Type, TypeAliasType, TypeVarInstance};
 use crate::db::Db;
 use crate::module_resolver::{file_to_module, KnownModule};
@@ -59,7 +60,7 @@ pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
     Protocol,
     /// The symbol `typing.Generic` (which can also be found as `typing_extensions.Generic`)
-    Generic,
+    Generic(Option<GenericContext<'db>>),
     /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
     Type,
     /// A single instance of `typing.TypeVar`
@@ -142,7 +143,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::ChainMap
             | Self::OrderedDict
             | Self::Protocol
-            | Self::Generic
+            | Self::Generic(_)
             | Self::ReadOnly
             | Self::TypeAliasType(_)
             | Self::Unknown
@@ -190,7 +191,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => "typing.ChainMap",
             Self::OrderedDict => "typing.OrderedDict",
             Self::Protocol => "typing.Protocol",
-            Self::Generic => "typing.Generic",
+            Self::Generic(_) => "typing.Generic",
             Self::ReadOnly => "typing.ReadOnly",
             // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
             // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
@@ -243,7 +244,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => KnownClass::StdlibAlias,
             Self::OrderedDict => KnownClass::StdlibAlias,
             Self::Protocol => KnownClass::SpecialForm, // actually `_ProtocolMeta` at runtime but this is what typeshed says
-            Self::Generic => KnownClass::SpecialForm, // actually `type` at runtime but this is what typeshed says
+            Self::Generic(_) => KnownClass::SpecialForm, // actually `type` at runtime but this is what typeshed says
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::TypeOf => KnownClass::SpecialForm,
@@ -287,7 +288,7 @@ impl<'db> KnownInstanceType<'db> {
             "Counter" => Self::Counter,
             "ChainMap" => Self::ChainMap,
             "OrderedDict" => Self::OrderedDict,
-            "Generic" => Self::Generic,
+            "Generic" => Self::Generic(None),
             "Protocol" => Self::Protocol,
             "Optional" => Self::Optional,
             "Union" => Self::Union,
@@ -347,7 +348,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::NoReturn
             | Self::Tuple
             | Self::Type
-            | Self::Generic
+            | Self::Generic(_)
             | Self::Callable => module.is_typing(),
             Self::Annotated
             | Self::Protocol
