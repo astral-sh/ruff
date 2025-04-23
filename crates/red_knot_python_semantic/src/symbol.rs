@@ -593,7 +593,7 @@ fn symbol_by_id<'db>(
                 "__slots__" | "TYPE_CHECKING"
             );
 
-            if scope.is_module_scope(db) && scope.file(db).is_stub(db.upcast()) {
+            if scope.file(db).is_stub(db.upcast()) {
                 // We generally trust module-level undeclared symbols in stubs and do not union
                 // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in
                 // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which
