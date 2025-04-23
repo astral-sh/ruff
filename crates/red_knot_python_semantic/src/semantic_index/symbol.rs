@@ -115,6 +115,10 @@ impl<'db> ScopeId<'db> {
         self.node(db).scope_kind().is_function_like()
     }
 
+    pub(crate) fn is_module_scope(self, db: &'db dyn Db) -> bool {
+        self.node(db).scope_kind().is_module()
+    }
+
     pub(crate) fn is_type_parameter(self, db: &'db dyn Db) -> bool {
         self.node(db).scope_kind().is_type_parameter()
     }
@@ -261,6 +265,10 @@ impl ScopeKind {
 
     pub(crate) fn is_class(self) -> bool {
         matches!(self, ScopeKind::Class)
+    }
+
+    pub(crate) fn is_module(self) -> bool {
+        matches!(self, ScopeKind::Module)
     }
 
     pub(crate) fn is_type_parameter(self) -> bool {

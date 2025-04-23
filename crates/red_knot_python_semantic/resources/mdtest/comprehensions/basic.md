@@ -127,8 +127,9 @@ class AsyncIterable:
     def __aiter__(self) -> AsyncIterator:
         return AsyncIterator()
 
-# revealed: @Todo(async iterables/iterators)
-[reveal_type(x) async for x in AsyncIterable()]
+async def _():
+    # revealed: @Todo(async iterables/iterators)
+    [reveal_type(x) async for x in AsyncIterable()]
 ```
 
 ### Invalid async comprehension
@@ -145,6 +146,7 @@ class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
 
-# revealed: @Todo(async iterables/iterators)
-[reveal_type(x) async for x in Iterable()]
+async def _():
+    # revealed: @Todo(async iterables/iterators)
+    [reveal_type(x) async for x in Iterable()]
 ```
