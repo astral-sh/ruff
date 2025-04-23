@@ -6128,6 +6128,32 @@ impl<'db> FunctionType<'db> {
     }
 
     /// Returns `self` as [`OverloadedFunction`] if it is overloaded, [`None`] otherwise.
+    ///
+    /// ## Note
+    ///
+    /// The way this method works only allows us to "see" the overloads that are defined before
+    /// this function definition. This is because the semantic model records a use for each
+    /// function on the name node which is used to get the previous function definition with the
+    /// same name. This means that [`OverloadedFunction`] would only include the functions that
+    /// comes before this function definition. Consider the following example:
+    ///
+    /// ```py
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def foo() -> None: ...
+    /// @overload
+    /// def foo(x: int) -> int: ...
+    /// def foo(x: int | None) -> int | None:
+    ///     return x
+    /// ```
+    ///
+    /// Here, when the `to_overloaded` method is invoked on the
+    /// 1. first `foo` definition, it would only contain a single overload which is itself and no
+    ///    implementation
+    /// 2. second `foo` definition, it would contain both overloads and still no implementation
+    /// 3. third `foo` definition, it would contain both overloads and the implementation which is
+    ///    itself
     fn to_overloaded(self, db: &'db dyn Db) -> Option<&'db OverloadedFunction<'db>> {
         #[allow(clippy::ref_option)] // TODO: Remove once salsa supports deref (https://github.com/salsa-rs/salsa/pull/772)
         #[salsa::tracked(return_ref)]
