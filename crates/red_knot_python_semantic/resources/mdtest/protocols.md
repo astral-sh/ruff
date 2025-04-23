@@ -421,12 +421,16 @@ from typing_extensions import Protocol, get_protocol_members
 
 class Foo(Protocol):
     if sys.version_info >= (3, 10):
-        x: int
+        a: int
+        b = 42
+        def c(self) -> None: ...
     else:
-        y: str
+        d: int
+        e = 56
+        def f(self) -> None: ...
 
 # TODO: actually a frozenset
-reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["y"]]
+reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["d"], Literal["e"], Literal["f"]]
 ```
 
 ## Invalid calls to `get_protocol_members()`

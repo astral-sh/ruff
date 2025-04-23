@@ -1796,11 +1796,28 @@ impl<'db> ProtocolClassLiteral<'db> {
                 .filter_map(ClassBase::into_class)
                 .filter_map(|class| class.class_literal(db).0.into_protocol_class(db))
             {
+                let parent_scope = parent_protocol.body_scope(db);
+                let use_def_map = use_def_map(db, parent_scope);
+                let symbol_table = symbol_table(db, parent_scope);
+
                 members.extend(
-                    symbol_table(db, parent_protocol.body_scope(db))
-                        .symbols()
-                        .filter(|symbol| symbol.is_bound() || symbol.is_declared())
-                        .map(crate::semantic_index::symbol::Symbol::name)
+                    use_def_map
+                        .all_public_declarations()
+                        .flat_map(|(symbol_id, declarations)| {
+                            symbol_from_declarations(db, declarations)
+                                .map(|symbol| (symbol_id, symbol))
+                        })
+                        .filter_map(|(symbol_id, symbol)| {
+                            symbol.symbol.ignore_possibly_unbound().map(|_| symbol_id)
+                        })
+                        .chain(use_def_map.all_public_bindings().filter_map(
+                            |(symbol_id, bindings)| {
+                                symbol_from_bindings(db, bindings)
+                                    .ignore_possibly_unbound()
+                                    .map(|_| symbol_id)
+                            },
+                        ))
+                        .map(|symbol_id| symbol_table.symbol(symbol_id).name())
                         .filter(|name| !excluded_from_proto_members(name))
                         .cloned(),
                 );
