@@ -5935,9 +5935,6 @@ pub struct FunctionType<'db> {
     /// The scope that's created by the function, in which the function body is evaluated.
     body_scope: ScopeId<'db>,
 
-    /// The scope containing the PEP 695 type parameters in the function definition, if any.
-    type_params_scope: Option<ScopeId<'db>>,
-
     /// A set of special decorators that were applied to this function
     decorators: FunctionDecorators,
 
@@ -6096,7 +6093,6 @@ impl<'db> FunctionType<'db> {
             self.name(db).clone(),
             self.known(db),
             self.body_scope(db),
-            self.type_params_scope(db),
             self.decorators(db),
             Some(params),
             self.inherited_generic_context(db),
@@ -6116,7 +6112,6 @@ impl<'db> FunctionType<'db> {
             self.name(db).clone(),
             self.known(db),
             self.body_scope(db),
-            self.type_params_scope(db),
             self.decorators(db),
             self.dataclass_transformer_params(db),
             Some(inherited_generic_context),
@@ -6134,7 +6129,6 @@ impl<'db> FunctionType<'db> {
             self.name(db).clone(),
             self.known(db),
             self.body_scope(db),
-            self.type_params_scope(db),
             self.decorators(db),
             self.dataclass_transformer_params(db),
             self.inherited_generic_context(db),

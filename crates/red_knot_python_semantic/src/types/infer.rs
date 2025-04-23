@@ -1513,11 +1513,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             .index
             .node_scope(NodeWithScopeRef::Function(function))
             .to_scope_id(self.db(), self.file());
-        let type_params_scope = type_params.as_ref().map(|_| {
-            self.index
-                .node_scope(NodeWithScopeRef::FunctionTypeParameters(function))
-                .to_scope_id(self.db(), self.file())
-        });
 
         let inherited_generic_context = None;
         let specialization = None;
@@ -1527,7 +1522,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             &name.id,
             function_kind,
             body_scope,
-            type_params_scope,
             function_decorators,
             dataclass_transformer_params,
             inherited_generic_context,
