@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprCall, ExprNumberLiteral, ExprUnaryOp, Int, Number, UnaryOp,
+    Expr, ExprAttribute, ExprCall, ExprNumberLiteral, ExprUnaryOp, Number, UnaryOp,
 };
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -81,15 +81,20 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
             return;
         }
 
+        let semantic = checker.semantic();
+
         // Check the function is called on a string
         if let Expr::Name(name) = value.as_ref() {
-            let semantic = checker.semantic();
-
             let Some(binding_id) = semantic.only_binding(name) else {
                 return;
             };
             let binding = semantic.binding(binding_id);
 
+            if !typing::is_string(binding, semantic) {
+                return;
+            }
+        } else if let Some(binding_id) = semantic.lookup_attribute(value) {
+            let binding = semantic.binding(binding_id);
             if !typing::is_string(binding, semantic) {
                 return;
             }
@@ -105,7 +110,7 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     // Check the function does not have maxsplit set
     if arguments.find_argument_value("maxsplit", 1).is_some() {
         return;
-    };
+    }
 
     checker.report_diagnostic(Diagnostic::new(MissingMaxsplitArg, expr.range()));
 }
