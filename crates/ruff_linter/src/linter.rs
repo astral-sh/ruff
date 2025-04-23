@@ -1139,6 +1139,21 @@ mod tests {
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
     )]
+    // This case doesn't actually make much sense because `Union` is available on our earliest
+    // supported Python version, but it still checks that the `import_from_typing` call is handled
+    // properly.
+    #[test_case(
+        "pyi016_disabled",
+		"
+		from typing import Union
+		foo: Union[str, str, int]
+		",
+		LinterSettings {
+			unresolved_target_version: PythonVersion { major: 2, minor: 7 },
+			disable_typing_extensions: true,
+			..LinterSettings::for_rule(Rule::DuplicateUnionMember)
+		}
+    )]
     fn test_disabled_typing_extensions(name: &str, contents: &str, settings: LinterSettings) {
         let snapshot = format!("disabled_typing_extensions_{name}");
         let messages = test_snippet(contents, &settings);

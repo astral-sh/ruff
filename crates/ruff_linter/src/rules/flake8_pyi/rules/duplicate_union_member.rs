@@ -118,10 +118,11 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
                 applicability,
             )),
             UnionKind::TypingUnion => {
-                let Ok(fix) = generate_union_fix(checker, unique_nodes, expr, applicability) else {
+                let Ok(Some(fix)) = generate_union_fix(checker, unique_nodes, expr, applicability)
+                else {
                     return;
                 };
-                fix
+                Some(fix)
             }
         }
     };
