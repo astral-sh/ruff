@@ -33,7 +33,6 @@ mod tests {
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_hive.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_http.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_jdbc.py"))]
-    // TODO
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_kubernetes.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_mysql.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_oracle.py"))]
