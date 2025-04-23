@@ -181,24 +181,23 @@ impl<'db> Bindings<'db> {
         // If all union elements are not callable, report that the union as a whole is not
         // callable.
         if self.into_iter().all(|b| !b.is_callable()) {
-            context.report_lint_old(
-                &CALL_NON_CALLABLE,
-                node,
-                format_args!(
+            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+                builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
                     self.callable_type().display(context.db())
-                ),
-            );
+                ));
+            }
             return;
         }
 
         for (index, conflicting_form) in self.conflicting_forms.iter().enumerate() {
             if *conflicting_form {
-                context.report_lint_old(
-                    &CONFLICTING_ARGUMENT_FORMS,
-                    BindingError::get_node(node, Some(index)),
-                    format_args!("Argument is used as both a value and a type form in call"),
-                );
+                let node = BindingError::get_node(node, Some(index));
+                if let Some(builder) = context.report_lint(&CONFLICTING_ARGUMENT_FORMS, node) {
+                    builder.into_diagnostic(
+                        "Argument is used as both a value and a type form in call",
+                    );
+                }
             }
         }
 
@@ -995,43 +994,37 @@ impl<'db> CallableBinding<'db> {
 
     fn report_diagnostics(&self, context: &InferContext<'db>, node: ast::AnyNodeRef) {
         if !self.is_callable() {
-            context.report_lint_old(
-                &CALL_NON_CALLABLE,
-                node,
-                format_args!(
+            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+                builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable",
                     self.callable_type.display(context.db()),
-                ),
-            );
+                ));
+            }
             return;
         }
 
         if self.dunder_call_is_possibly_unbound {
-            context.report_lint_old(
-                &CALL_NON_CALLABLE,
-                node,
-                format_args!(
+            if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+                builder.into_diagnostic(format_args!(
                     "Object of type `{}` is not callable (possibly unbound `__call__` method)",
                     self.callable_type.display(context.db()),
-                ),
-            );
+                ));
+            }
             return;
         }
 
         let callable_description = CallableDescription::new(context.db(), self.callable_type);
         if self.overloads.len() > 1 {
-            context.report_lint_old(
-                &NO_MATCHING_OVERLOAD,
-                node,
-                format_args!(
+            if let Some(builder) = context.report_lint(&NO_MATCHING_OVERLOAD, node) {
+                builder.into_diagnostic(format_args!(
                     "No overload{} matches arguments",
                     if let Some(CallableDescription { kind, name }) = callable_description {
                         format!(" of {kind} `{name}`")
                     } else {
                         String::new()
                     }
-                ),
-            );
+                ));
+            }
             return;
         }
 
@@ -1562,10 +1555,9 @@ impl<'db> BindingError<'db> {
                 expected_positional_count,
                 provided_positional_count,
             } => {
-                context.report_lint_old(
-                    &TOO_MANY_POSITIONAL_ARGUMENTS,
-                    Self::get_node(node, *first_excess_argument_index),
-                    format_args!(
+                let node = Self::get_node(node, *first_excess_argument_index);
+                if let Some(builder) = context.report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, node) {
+                    builder.into_diagnostic(format_args!(
                         "Too many positional arguments{}: expected \
                         {expected_positional_count}, got {provided_positional_count}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
@@ -1573,75 +1565,70 @@ impl<'db> BindingError<'db> {
                         } else {
                             String::new()
                         }
-                    ),
-                );
+                    ));
+                }
             }
 
             Self::MissingArguments { parameters } => {
-                let s = if parameters.0.len() == 1 { "" } else { "s" };
-                context.report_lint_old(
-                    &MISSING_ARGUMENT,
-                    node,
-                    format_args!(
+                if let Some(builder) = context.report_lint(&MISSING_ARGUMENT, node) {
+                    let s = if parameters.0.len() == 1 { "" } else { "s" };
+                    builder.into_diagnostic(format_args!(
                         "No argument{s} provided for required parameter{s} {parameters}{}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
-                    ),
-                );
+                    ));
+                }
             }
 
             Self::UnknownArgument {
                 argument_name,
                 argument_index,
             } => {
-                context.report_lint_old(
-                    &UNKNOWN_ARGUMENT,
-                    Self::get_node(node, *argument_index),
-                    format_args!(
+                let node = Self::get_node(node, *argument_index);
+                if let Some(builder) = context.report_lint(&UNKNOWN_ARGUMENT, node) {
+                    builder.into_diagnostic(format_args!(
                         "Argument `{argument_name}` does not match any known parameter{}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
-                    ),
-                );
+                    ));
+                }
             }
 
             Self::ParameterAlreadyAssigned {
                 argument_index,
                 parameter,
             } => {
-                context.report_lint_old(
-                    &PARAMETER_ALREADY_ASSIGNED,
-                    Self::get_node(node, *argument_index),
-                    format_args!(
+                let node = Self::get_node(node, *argument_index);
+                if let Some(builder) = context.report_lint(&PARAMETER_ALREADY_ASSIGNED, node) {
+                    builder.into_diagnostic(format_args!(
                         "Multiple values provided for parameter {parameter}{}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
-                    ),
-                );
+                    ));
+                }
             }
 
             Self::InternalCallError(reason) => {
-                context.report_lint_old(
-                    &CALL_NON_CALLABLE,
-                    Self::get_node(node, None),
-                    format_args!(
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+                    builder.into_diagnostic(format_args!(
                         "Call{} failed: {reason}",
                         if let Some(CallableDescription { kind, name }) = callable_description {
                             format!(" of {kind} `{name}`")
                         } else {
                             String::new()
                         }
-                    ),
-                );
+                    ));
+                }
             }
         }
     }

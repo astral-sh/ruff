@@ -679,14 +679,17 @@ struct DisplayMaybeParenthesizedType<'db> {
 
 impl Display for DisplayMaybeParenthesizedType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Type::Callable(_)
-        | Type::MethodWrapper(_)
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_) = self.ty
-        {
-            write!(f, "({})", self.ty.display(self.db))
-        } else {
-            self.ty.display(self.db).fmt(f)
+        let write_parentheses = |f: &mut Formatter<'_>| write!(f, "({})", self.ty.display(self.db));
+        match self.ty {
+            Type::Callable(_)
+            | Type::MethodWrapper(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::Union(_) => write_parentheses(f),
+            Type::Intersection(intersection) if !intersection.has_one_element(self.db) => {
+                write_parentheses(f)
+            }
+            _ => self.ty.display(self.db).fmt(f),
         }
     }
 }

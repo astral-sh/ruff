@@ -27,12 +27,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/import/basic.md
 # Diagnostics
 
 ```
-error: lint:unresolved-import
+error: lint:unresolved-import: Cannot resolve import `a.foo`
  --> /src/mdtest_snippet.py:2:8
   |
 1 | # Topmost component resolvable, submodule not resolvable:
 2 | import a.foo  # error: [unresolved-import] "Cannot resolve import `a.foo`"
-  |        ^^^^^ Cannot resolve import `a.foo`
+  |        ^^^^^
 3 |
 4 | # Topmost component unresolvable:
   |
@@ -40,12 +40,12 @@ error: lint:unresolved-import
 ```
 
 ```
-error: lint:unresolved-import
+error: lint:unresolved-import: Cannot resolve import `b.foo`
  --> /src/mdtest_snippet.py:5:8
   |
 4 | # Topmost component unresolvable:
 5 | import b.foo  # error: [unresolved-import] "Cannot resolve import `b.foo`"
-  |        ^^^^^ Cannot resolve import `b.foo`
+  |        ^^^^^
   |
 
 ```

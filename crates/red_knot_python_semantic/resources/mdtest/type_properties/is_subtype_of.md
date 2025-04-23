@@ -1166,6 +1166,56 @@ static_assert(is_subtype_of(TypeOf[C], Callable[[int], int]))
 static_assert(is_subtype_of(TypeOf[C], Callable[[], str]))
 ```
 
+#### Classes with `__new__`
+
+```py
+from typing import Callable
+from knot_extensions import TypeOf, static_assert, is_subtype_of
+
+class A:
+    def __new__(cls, a: int) -> int:
+        return a
+
+static_assert(is_subtype_of(TypeOf[A], Callable[[int], int]))
+static_assert(not is_subtype_of(TypeOf[A], Callable[[], int]))
+
+class B: ...
+class C(B): ...
+
+class D:
+    def __new__(cls) -> B:
+        return B()
+
+class E(D):
+    def __new__(cls) -> C:
+        return C()
+
+static_assert(is_subtype_of(TypeOf[E], Callable[[], C]))
+static_assert(is_subtype_of(TypeOf[E], Callable[[], B]))
+static_assert(not is_subtype_of(TypeOf[D], Callable[[], C]))
+static_assert(is_subtype_of(TypeOf[D], Callable[[], B]))
+```
+
+#### Classes with `__call__` and `__new__`
+
+If `__call__` and `__new__` are both present, `__call__` takes precedence.
+
+```py
+from typing import Callable
+from knot_extensions import TypeOf, static_assert, is_subtype_of
+
+class MetaWithIntReturn(type):
+    def __call__(cls) -> int:
+        return super().__call__()
+
+class F(metaclass=MetaWithIntReturn):
+    def __new__(cls) -> str:
+        return super().__new__(cls)
+
+static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
+static_assert(not is_subtype_of(TypeOf[F], Callable[[], str]))
+```
+
 ### Bound methods
 
 ```py

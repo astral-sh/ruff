@@ -1,4 +1,5 @@
 use super::context::InferContext;
+use super::ClassLiteralType;
 use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
@@ -8,9 +9,9 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{KnownInstanceType, Type};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
 
@@ -1075,14 +1076,13 @@ pub(super) fn report_index_out_of_bounds(
     length: usize,
     index: i64,
 ) {
-    context.report_lint_old(
-        &INDEX_OUT_OF_BOUNDS,
-        node,
-        format_args!(
-            "Index {index} is out of bounds for {kind} `{}` with length {length}",
-            tuple_ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&INDEX_OUT_OF_BOUNDS, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Index {index} is out of bounds for {kind} `{}` with length {length}",
+        tuple_ty.display(context.db())
+    ));
 }
 
 /// Emit a diagnostic declaring that a type does not support subscripting.
@@ -1092,22 +1092,20 @@ pub(super) fn report_non_subscriptable(
     non_subscriptable_ty: Type,
     method: &str,
 ) {
-    context.report_lint_old(
-        &NON_SUBSCRIPTABLE,
-        node,
-        format_args!(
-            "Cannot subscript object of type `{}` with no `{method}` method",
-            non_subscriptable_ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&NON_SUBSCRIPTABLE, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Cannot subscript object of type `{}` with no `{method}` method",
+        non_subscriptable_ty.display(context.db())
+    ));
 }
 
 pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {
-    context.report_lint_old(
-        &ZERO_STEPSIZE_IN_SLICE,
-        node,
-        format_args!("Slice step size can not be zero"),
-    );
+    let Some(builder) = context.report_lint(&ZERO_STEPSIZE_IN_SLICE, node) else {
+        return;
+    };
+    builder.into_diagnostic("Slice step size can not be zero");
 }
 
 fn report_invalid_assignment_with_message(
@@ -1116,19 +1114,26 @@ fn report_invalid_assignment_with_message(
     target_ty: Type,
     message: std::fmt::Arguments,
 ) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, node) else {
+        return;
+    };
     match target_ty {
         Type::ClassLiteral(class) => {
-            context.report_lint_old(&INVALID_ASSIGNMENT, node, format_args!(
-                    "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
-                    class.name(context.db())));
+            let mut diag = builder.into_diagnostic(format_args!(
+                "Implicit shadowing of class `{}`",
+                class.name(context.db()),
+            ));
+            diag.info("Annotate to make it explicit if this is intentional");
         }
         Type::FunctionLiteral(function) => {
-            context.report_lint_old(&INVALID_ASSIGNMENT, node, format_args!(
-                    "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
-                    function.name(context.db())));
+            let mut diag = builder.into_diagnostic(format_args!(
+                "Implicit shadowing of function `{}`",
+                function.name(context.db()),
+            ));
+            diag.info("Annotate to make it explicit if this is intentional");
         }
         _ => {
-            context.report_lint_old(&INVALID_ASSIGNMENT, node, message);
+            builder.into_diagnostic(message);
         }
     }
 }
@@ -1202,21 +1207,21 @@ pub(super) fn report_implicit_return_type(
     range: impl Ranged,
     expected_ty: Type,
 ) {
-    context.report_lint_old(
-        &INVALID_RETURN_TYPE,
-        range,
-        format_args!(
-            "Function can implicitly return `None`, which is not assignable to return type `{}`",
-            expected_ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Function can implicitly return `None`, which is not assignable to return type `{}`",
+        expected_ty.display(context.db())
+    ));
 }
 
 pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: AnyNodeRef) {
-    context.report_lint_old(
-        &INVALID_TYPE_CHECKING_CONSTANT,
-        node,
-        format_args!("The name TYPE_CHECKING is reserved for use as a flag; only False can be assigned to it.",),
+    let Some(builder) = context.report_lint(&INVALID_TYPE_CHECKING_CONSTANT, node) else {
+        return;
+    };
+    builder.into_diagnostic(
+        "The name TYPE_CHECKING is reserved for use as a flag; only False can be assigned to it",
     );
 }
 
@@ -1224,13 +1229,12 @@ pub(super) fn report_possibly_unresolved_reference(
     context: &InferContext,
     expr_name_node: &ast::ExprName,
 ) {
-    let ast::ExprName { id, .. } = expr_name_node;
+    let Some(builder) = context.report_lint(&POSSIBLY_UNRESOLVED_REFERENCE, expr_name_node) else {
+        return;
+    };
 
-    context.report_lint_old(
-        &POSSIBLY_UNRESOLVED_REFERENCE,
-        expr_name_node,
-        format_args!("Name `{id}` used when possibly not defined"),
-    );
+    let ast::ExprName { id, .. } = expr_name_node;
+    builder.into_diagnostic(format_args!("Name `{id}` used when possibly not defined"));
 }
 
 pub(super) fn report_possibly_unbound_attribute(
@@ -1239,93 +1243,131 @@ pub(super) fn report_possibly_unbound_attribute(
     attribute: &str,
     object_ty: Type,
 ) {
-    context.report_lint_old(
-        &POSSIBLY_UNBOUND_ATTRIBUTE,
-        target,
-        format_args!(
-            "Attribute `{attribute}` on type `{}` is possibly unbound",
-            object_ty.display(context.db()),
-        ),
-    );
+    let Some(builder) = context.report_lint(&POSSIBLY_UNBOUND_ATTRIBUTE, target) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Attribute `{attribute}` on type `{}` is possibly unbound",
+        object_ty.display(context.db()),
+    ));
 }
 
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
-    let ast::ExprName { id, .. } = expr_name_node;
+    let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
+        return;
+    };
 
-    context.report_lint_old(
-        &UNRESOLVED_REFERENCE,
-        expr_name_node,
-        format_args!("Name `{id}` used when not defined"),
-    );
+    let ast::ExprName { id, .. } = expr_name_node;
+    builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
 }
 
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
-    context.report_lint_old(
-        &INVALID_EXCEPTION_CAUGHT,
-        node,
-        format_args!(
-            "Cannot catch object of type `{}` in an exception handler \
+    let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Cannot catch object of type `{}` in an exception handler \
             (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
-            ty.display(context.db())
-        ),
-    );
+        ty.display(context.db())
+    ));
 }
 
 pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast::Expr, ty: Type) {
-    context.report_lint_old(
-        &INVALID_RAISE,
-        node,
-        format_args!(
-            "Cannot raise object of type `{}` (must be a `BaseException` subclass or instance)",
-            ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Cannot raise object of type `{}` (must be a `BaseException` subclass or instance)",
+        ty.display(context.db())
+    ));
 }
 
 pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
-    context.report_lint_old(
-        &INVALID_RAISE,
-        node,
-        format_args!(
-            "Cannot use object of type `{}` as exception cause \
-            (must be a `BaseException` subclass or instance or `None`)",
-            ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Cannot use object of type `{}` as exception cause \
+         (must be a `BaseException` subclass or instance or `None`)",
+        ty.display(context.db())
+    ));
 }
 
 pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: &ast::Expr) {
-    context.report_lint_old(
-        &INCOMPATIBLE_SLOTS,
-        node,
-        format_args!("Class base has incompatible `__slots__`"),
-    );
+    let Some(builder) = context.report_lint(&INCOMPATIBLE_SLOTS, node) else {
+        return;
+    };
+    builder.into_diagnostic("Class base has incompatible `__slots__`");
 }
 
 pub(crate) fn report_invalid_arguments_to_annotated(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
-    context.report_lint_old(
-        &INVALID_TYPE_FORM,
-        subscript,
-        format_args!(
-            "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
-            KnownInstanceType::Annotated.repr()
-        ),
+    let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Special form `{}` expected at least 2 arguments \
+         (one type and at least one metadata element)",
+        KnownInstanceType::Annotated.repr()
+    ));
+}
+
+pub(crate) fn report_bad_argument_to_get_protocol_members(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    class: ClassLiteralType,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic("Invalid argument to `get_protocol_members`");
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
+
+    let class_scope = class.body_scope(db);
+    let class_node = class_scope.node(db).expect_class();
+    let class_name = &class_node.name;
+    let class_def_diagnostic_range = TextRange::new(
+        class_name.start(),
+        class_node
+            .arguments
+            .as_deref()
+            .map(Ranged::end)
+            .unwrap_or_else(|| class_name.end()),
     );
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        format_args!("`{class_name}` is declared here, but it is not a protocol class:"),
+    );
+    class_def_diagnostic.annotate(Annotation::primary(
+        Span::from(class_scope.file(db)).with_range(class_def_diagnostic_range),
+    ));
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(
+        "A class is only a protocol class if it directly inherits \
+            from `typing.Protocol` or `typing_extensions.Protocol`",
+    );
+    // TODO the typing spec isn't really designed as user-facing documentation,
+    // but there isn't really any user-facing documentation that covers this specific issue well
+    // (it's not described well in the CPython docs; and PEP-544 is a snapshot of a decision taken
+    // years ago rather than up-to-date documentation). We should either write our own docs
+    // describing this well or contribute to type-checker-agnostic docs somewhere and link to those.
+    diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
 }
 
 pub(crate) fn report_invalid_arguments_to_callable(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
-    context.report_lint_old(
-        &INVALID_TYPE_FORM,
-        subscript,
-        format_args!(
-            "Special form `{}` expected exactly two arguments (parameter types and return type)",
-            KnownInstanceType::Callable.repr()
-        ),
-    );
+    let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Special form `{}` expected exactly two arguments (parameter types and return type)",
+        KnownInstanceType::Callable.repr()
+    ));
 }

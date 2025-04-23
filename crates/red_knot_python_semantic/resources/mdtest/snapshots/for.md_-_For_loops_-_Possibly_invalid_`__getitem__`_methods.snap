@@ -43,12 +43,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Iterable1` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `(bound method Iterable1.__getitem__(item: int) -> str) | None`) may not be callable
   --> /src/mdtest_snippet.py:20:14
    |
 19 |     # error: [not-iterable]
 20 |     for x in Iterable1():
-   |              ^^^^^^^^^^^ Object of type `Iterable1` may not be iterable because it has no `__iter__` method and its `__getitem__` attribute (with type `(bound method Iterable1.__getitem__(item: int) -> str) | None`) may not be callable
+   |              ^^^^^^^^^^^
 21 |         # TODO: `str` might be better
 22 |         reveal_type(x)  # revealed: str | Unknown
    |
@@ -70,12 +70,12 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Iterable2` may not be iterable because it has no `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
   --> /src/mdtest_snippet.py:25:14
    |
 24 |     # error: [not-iterable]
 25 |     for y in Iterable2():
-   |              ^^^^^^^^^^^ Object of type `Iterable2` may not be iterable because it has no `__iter__` method and its `__getitem__` method (with type `(bound method Iterable2.__getitem__(item: int) -> str) | (bound method Iterable2.__getitem__(item: str) -> int)`) may have an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
+   |              ^^^^^^^^^^^
 26 |         reveal_type(y)  # revealed: str | int
    |
 

@@ -1190,25 +1190,9 @@ impl<'db> Type<'db> {
                 self_subclass_ty.is_subtype_of(db, target_subclass_ty)
             }
 
-            (Type::ClassLiteral(_), Type::Callable(_)) => {
-                let metaclass_call_function_symbol = self
-                    .member_lookup_with_policy(
-                        db,
-                        "__call__".into(),
-                        MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                            | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                    )
-                    .symbol;
-
-                if let Symbol::Type(Type::BoundMethod(metaclass_call_function), _) =
-                    metaclass_call_function_symbol
-                {
-                    // TODO: this intentionally diverges from step 1 in
-                    // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
-                    // by always respecting the signature of the metaclass `__call__`, rather than
-                    // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-                    let metaclass_call_function = metaclass_call_function.into_callable_type(db);
-                    return metaclass_call_function.is_subtype_of(db, target);
+            (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
+                if let Some(callable) = class_literal.into_callable(db) {
+                    return callable.is_subtype_of(db, target);
                 }
                 false
             }
@@ -5183,11 +5167,10 @@ impl<'db> InvalidTypeExpressionError<'db> {
         } = self;
         if is_reachable {
             for error in invalid_expressions {
-                context.report_lint_old(
-                    &INVALID_TYPE_FORM,
-                    node,
-                    format_args!("{}", error.reason(context.db())),
-                );
+                let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, node) else {
+                    continue;
+                };
+                builder.into_diagnostic(error.reason(context.db()));
             }
         }
         fallback_type
@@ -5385,6 +5368,11 @@ impl<'db> ContextManagerError<'db> {
         context_expression_type: Type<'db>,
         context_expression_node: ast::AnyNodeRef,
     ) {
+        let Some(builder) = context.report_lint(&INVALID_CONTEXT_MANAGER, context_expression_node)
+        else {
+            return;
+        };
+
         let format_call_dunder_error = |call_dunder_error: &CallDunderError<'db>, name: &str| {
             match call_dunder_error {
                 CallDunderError::MethodNotAvailable => format!("it does not implement `{name}`"),
@@ -5436,9 +5424,7 @@ impl<'db> ContextManagerError<'db> {
             } => format_call_dunder_errors(enter_error, "__enter__", exit_error, "__exit__"),
         };
 
-        context.report_lint_old(
-            &INVALID_CONTEXT_MANAGER,
-            context_expression_node,
+        builder.into_diagnostic(
             format_args!(
                 "Object of type `{context_expression}` cannot be used with `with` because {formatted_errors}",
                 context_expression = context_expression_type.display(db)
@@ -5536,10 +5522,13 @@ impl<'db> IterationError<'db> {
         iterable_type: Type<'db>,
         iterable_node: ast::AnyNodeRef,
     ) {
+        let Some(builder) = context.report_lint(&NOT_ITERABLE, iterable_node) else {
+            return;
+        };
         let db = context.db();
 
         let report_not_iterable = |arguments: std::fmt::Arguments| {
-            context.report_lint_old(&NOT_ITERABLE, iterable_node, arguments);
+            builder.into_diagnostic(arguments);
         };
 
         // TODO: for all of these error variants, the "explanation" for the diagnostic
@@ -5813,13 +5802,14 @@ impl<'db> BoolError<'db> {
     }
 
     fn report_diagnostic_impl(&self, context: &InferContext, condition: TextRange) {
+        let Some(builder) = context.report_lint(&UNSUPPORTED_BOOL_CONVERSION, condition) else {
+            return;
+        };
         match self {
             Self::IncorrectArguments {
                 not_boolable_type, ..
             } => {
-                context.report_lint_old(
-                    &UNSUPPORTED_BOOL_CONVERSION,
-                    condition,
+                builder.into_diagnostic(
                     format_args!(
                         "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
                         not_boolable_type.display(context.db())
@@ -5830,25 +5820,20 @@ impl<'db> BoolError<'db> {
                 not_boolable_type,
                 return_type,
             } => {
-                context.report_lint_old(
-                    &UNSUPPORTED_BOOL_CONVERSION,
-                    condition,
-                    format_args!(
-                        "Boolean conversion is unsupported for type `{not_boolable}`; the return type of its bool method (`{return_type}`) isn't assignable to `bool",
-                        not_boolable = not_boolable_type.display(context.db()),
-                        return_type = return_type.display(context.db())
-                    ),
-                );
+                builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{not_boolable}`; \
+                     the return type of its bool method (`{return_type}`) \
+                     isn't assignable to `bool",
+                    not_boolable = not_boolable_type.display(context.db()),
+                    return_type = return_type.display(context.db())
+                ));
             }
             Self::NotCallable { not_boolable_type } => {
-                context.report_lint_old(
-                    &UNSUPPORTED_BOOL_CONVERSION,
-                    condition,
-                    format_args!(
-                        "Boolean conversion is unsupported for type `{}`; its `__bool__` method isn't callable",
-                        not_boolable_type.display(context.db())
-                    ),
-                );
+                builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{}`; \
+                     its `__bool__` method isn't callable",
+                    not_boolable_type.display(context.db())
+                ));
             }
             Self::Union { union, .. } => {
                 let first_error = union
@@ -5857,26 +5842,20 @@ impl<'db> BoolError<'db> {
                     .find_map(|element| element.try_bool(context.db()).err())
                     .unwrap();
 
-                context.report_lint_old(
-                        &UNSUPPORTED_BOOL_CONVERSION,
-                        condition,
-                        format_args!(
-                            "Boolean conversion is unsupported for union `{}` because `{}` doesn't implement `__bool__` correctly",
-                            Type::Union(*union).display(context.db()),
-                            first_error.not_boolable_type().display(context.db()),
-                        ),
-                    );
+                builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for union `{}` \
+                     because `{}` doesn't implement `__bool__` correctly",
+                    Type::Union(*union).display(context.db()),
+                    first_error.not_boolable_type().display(context.db()),
+                ));
             }
 
             Self::Other { not_boolable_type } => {
-                context.report_lint_old(
-                    &UNSUPPORTED_BOOL_CONVERSION,
-                    condition,
-                    format_args!(
-                        "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
-                        not_boolable_type.display(context.db())
-                    ),
-                );
+                builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{}`; \
+                     it incorrectly implements `__bool__`",
+                    not_boolable_type.display(context.db())
+                ));
             }
         }
     }
@@ -5907,27 +5886,28 @@ impl<'db> ConstructorCallError<'db> {
     ) {
         let report_init_error = |call_dunder_error: &CallDunderError<'db>| match call_dunder_error {
             CallDunderError::MethodNotAvailable => {
-                // If we are using vendored typeshed, it should be impossible to have missing
-                // or unbound `__init__` method on a class, as all classes have `object` in MRO.
-                // Thus the following may only trigger if a custom typeshed is used.
-                context.report_lint_old(
-                    &CALL_POSSIBLY_UNBOUND_METHOD,
-                    context_expression_node,
-                    format_args!(
-                        "`__init__` method is missing on type `{}`. Make sure your `object` in typeshed has its definition.",
+                if let Some(builder) =
+                    context.report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, context_expression_node)
+                {
+                    // If we are using vendored typeshed, it should be impossible to have missing
+                    // or unbound `__init__` method on a class, as all classes have `object` in MRO.
+                    // Thus the following may only trigger if a custom typeshed is used.
+                    builder.into_diagnostic(format_args!(
+                        "`__init__` method is missing on type `{}`. \
+                         Make sure your `object` in typeshed has its definition.",
                         context_expression_type.display(context.db()),
-                    ),
-                );
+                    ));
+                }
             }
             CallDunderError::PossiblyUnbound(bindings) => {
-                context.report_lint_old(
-                    &CALL_POSSIBLY_UNBOUND_METHOD,
-                    context_expression_node,
-                    format_args!(
+                if let Some(builder) =
+                    context.report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, context_expression_node)
+                {
+                    builder.into_diagnostic(format_args!(
                         "Method `__init__` on type `{}` is possibly unbound.",
                         context_expression_type.display(context.db()),
-                    ),
-                );
+                    ));
+                }
 
                 bindings.report_diagnostics(context, context_expression_node);
             }
@@ -5943,14 +5923,14 @@ impl<'db> ConstructorCallError<'db> {
                 unreachable!("`__new__` method may not be called if missing");
             }
             CallDunderError::PossiblyUnbound(bindings) => {
-                context.report_lint_old(
-                    &CALL_POSSIBLY_UNBOUND_METHOD,
-                    context_expression_node,
-                    format_args!(
+                if let Some(builder) =
+                    context.report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, context_expression_node)
+                {
+                    builder.into_diagnostic(format_args!(
                         "Method `__new__` on type `{}` is possibly unbound.",
                         context_expression_type.display(context.db()),
-                    ),
-                );
+                    ));
+                }
 
                 bindings.report_diagnostics(context, context_expression_node);
             }
@@ -6102,9 +6082,6 @@ pub struct FunctionType<'db> {
     /// The scope that's created by the function, in which the function body is evaluated.
     body_scope: ScopeId<'db>,
 
-    /// The scope containing the PEP 695 type parameters in the function definition, if any.
-    type_params_scope: Option<ScopeId<'db>>,
-
     /// A set of special decorators that were applied to this function
     decorators: FunctionDecorators,
 
@@ -6135,6 +6112,15 @@ impl<'db> FunctionType<'db> {
             db,
             self.signature(db).iter().cloned(),
         ))
+    }
+
+    /// Convert the `FunctionType` into a [`Type::BoundMethod`].
+    pub(crate) fn into_bound_method_type(
+        self,
+        db: &'db dyn Db,
+        self_instance: Type<'db>,
+    ) -> Type<'db> {
+        Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
     }
 
     /// Returns the [`FileRange`] of the function's name.
@@ -6263,7 +6249,6 @@ impl<'db> FunctionType<'db> {
             self.name(db).clone(),
             self.known(db),
             self.body_scope(db),
-            self.type_params_scope(db),
             self.decorators(db),
             Some(params),
             self.inherited_generic_context(db),
@@ -6283,7 +6268,6 @@ impl<'db> FunctionType<'db> {
             self.name(db).clone(),
             self.known(db),
             self.body_scope(db),
-            self.type_params_scope(db),
             self.decorators(db),
             self.dataclass_transformer_params(db),
             Some(inherited_generic_context),
@@ -6301,7 +6285,6 @@ impl<'db> FunctionType<'db> {
             self.name(db).clone(),
             self.known(db),
             self.body_scope(db),
-            self.type_params_scope(db),
             self.decorators(db),
             self.dataclass_transformer_params(db),
             self.inherited_generic_context(db),
@@ -6453,7 +6436,7 @@ impl KnownFunction {
 /// on an instance of a class. For example, the expression `Path("a.txt").touch` creates
 /// a bound method object that represents the `Path.touch` method which is bound to the
 /// instance `Path("a.txt")`.
-#[salsa::tracked(debug)]
+#[salsa::interned(debug)]
 pub struct BoundMethodType<'db> {
     /// The function that is being bound. Corresponds to the `__func__` attribute on a
     /// bound method object
@@ -7226,6 +7209,10 @@ impl<'db> IntersectionType<'db> {
     pub fn iter_positive(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         self.positive(db).iter().copied()
     }
+
+    pub fn has_one_element(&self, db: &'db dyn Db) -> bool {
+        (self.positive(db).len() + self.negative(db).len()) == 1
+    }
 }
 
 #[salsa::interned(debug)]
@@ -7359,34 +7346,31 @@ impl BoundSuperError<'_> {
     pub(super) fn report_diagnostic(&self, context: &InferContext, node: AnyNodeRef) {
         match self {
             BoundSuperError::InvalidPivotClassType { pivot_class } => {
-                context.report_lint_old(
-                    &INVALID_SUPER_ARGUMENT,
-                    node,
-                    format_args!(
+                if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
+                    builder.into_diagnostic(format_args!(
                         "`{pivot_class}` is not a valid class",
                         pivot_class = pivot_class.display(context.db()),
-                    ),
-                );
+                    ));
+                }
             }
             BoundSuperError::FailingConditionCheck { pivot_class, owner } => {
-                context.report_lint_old(
-                    &INVALID_SUPER_ARGUMENT,
-                    node,
-                    format_args!(
-                        "`{owner}` is not an instance or subclass of `{pivot_class}` in `super({pivot_class}, {owner})` call",
+                if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
+                    builder.into_diagnostic(format_args!(
+                        "`{owner}` is not an instance or subclass of \
+                         `{pivot_class}` in `super({pivot_class}, {owner})` call",
                         pivot_class = pivot_class.display(context.db()),
                         owner = owner.display(context.db()),
-                    ),
-                );
+                    ));
+                }
             }
             BoundSuperError::UnavailableImplicitArguments => {
-                context.report_lint_old(
-                    &UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
-                    node,
-                    format_args!(
+                if let Some(builder) =
+                    context.report_lint(&UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS, node)
+                {
+                    builder.into_diagnostic(format_args!(
                         "Cannot determine implicit arguments for 'super()' in this context",
-                    ),
-                );
+                    ));
+                }
             }
         }
     }

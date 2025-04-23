@@ -33,12 +33,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/instanc
 # Diagnostics
 
 ```
-error: lint:unsupported-bool-conversion
+error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
   --> /src/mdtest_snippet.py:12:1
    |
 11 | # error: [unsupported-bool-conversion]
 12 | 10 < Comparable() < 20
-   | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
+   | ^^^^^^^^^^^^^^^^^
 13 | # error: [unsupported-bool-conversion]
 14 | 10 < Comparable() < Comparable()
    |
@@ -46,13 +46,13 @@ error: lint:unsupported-bool-conversion
 ```
 
 ```
-error: lint:unsupported-bool-conversion
+error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
   --> /src/mdtest_snippet.py:14:1
    |
 12 | 10 < Comparable() < 20
 13 | # error: [unsupported-bool-conversion]
 14 | 10 < Comparable() < Comparable()
-   | ^^^^^^^^^^^^^^^^^ Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable
+   | ^^^^^^^^^^^^^^^^^
 15 |
 16 | Comparable() < Comparable()  # fine
    |

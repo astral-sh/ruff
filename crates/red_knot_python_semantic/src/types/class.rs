@@ -324,8 +324,6 @@ impl<'db> ClassType<'db> {
     }
 
     pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        // `is_subclass_of` is checking the subtype relation, in which gradual types do not
-        // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
         if self.is_subclass_of(db, other) {
             return true;
         }
@@ -339,6 +337,16 @@ impl<'db> ClassType<'db> {
             if self_specialization.is_assignable_to(db, other_specialization) {
                 return true;
             }
+        }
+
+        if self.iter_mro(db).any(|base| {
+            matches!(
+                base,
+                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
+            )
+        }) && !other.is_final(db)
+        {
+            return true;
         }
 
         false
@@ -816,6 +824,43 @@ impl<'db> ClassLiteralType<'db> {
             candidate.metaclass.into(),
             candidate.metaclass.class(db).dataclass_transformer_params,
         ))
+    }
+
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let self_ty = Type::from(self);
+        let metaclass_call_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__call__".into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        if let Symbol::Type(Type::BoundMethod(metaclass_call_function), _) =
+            metaclass_call_function_symbol
+        {
+            // TODO: this intentionally diverges from step 1 in
+            // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
+            // by always respecting the signature of the metaclass `__call__`, rather than
+            // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
+            return Some(metaclass_call_function.into_callable_type(db));
+        }
+
+        let new_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__new__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+            return Some(new_function.into_bound_method_type(db, self.into()));
+        }
+        // TODO handle `__init__` also
+        None
     }
 
     /// Returns the class member of this class named `name`.
