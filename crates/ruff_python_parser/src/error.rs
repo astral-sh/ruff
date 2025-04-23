@@ -126,8 +126,6 @@ pub enum ParseErrorType {
     /// A default value was found for a `*` or `**` parameter.
     VarParameterWithDefault,
 
-    /// A duplicate parameter was found in a function definition or lambda expression.
-    DuplicateParameter(String),
     /// A keyword argument was repeated.
     DuplicateKeywordArgumentError(String),
 
@@ -285,9 +283,6 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Invalid augmented assignment target")
             }
             ParseErrorType::InvalidDeleteTarget => f.write_str("Invalid delete target"),
-            ParseErrorType::DuplicateParameter(arg_name) => {
-                write!(f, "Duplicate parameter {arg_name:?}")
-            }
             ParseErrorType::DuplicateKeywordArgumentError(arg_name) => {
                 write!(f, "Duplicate keyword argument {arg_name:?}")
             }
