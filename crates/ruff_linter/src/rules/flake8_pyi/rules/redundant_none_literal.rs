@@ -225,11 +225,14 @@ fn create_fix(
 
     let fix = match union_kind {
         UnionKind::TypingOptional => {
-            let (import_edit, bound_name) = checker.import_from_typing(
+            let Some((import_edit, bound_name)) = checker.import_from_typing(
                 "Optional",
                 literal_expr.start(),
                 PythonVersion::lowest(),
-            )?;
+            )?
+            else {
+                return Ok(None);
+            };
             let optional_expr = typing_optional(new_literal_expr, Name::from(bound_name));
             let content = checker.generator().expr(&optional_expr);
             let optional_edit = Edit::range_replacement(content, literal_expr.range());

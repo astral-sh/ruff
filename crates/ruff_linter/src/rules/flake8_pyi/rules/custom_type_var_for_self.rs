@@ -175,7 +175,7 @@ pub(crate) fn custom_type_var_instead_of_self(
         TextRange::new(function_name.end(), function_header_end),
     );
 
-    diagnostic.try_set_fix(|| {
+    diagnostic.try_set_optional_fix(|| {
         replace_custom_typevar_with_self(
             checker,
             function_def,
@@ -314,10 +314,13 @@ fn replace_custom_typevar_with_self(
     custom_typevar: TypeVar,
     self_or_cls_parameter: &ast::ParameterWithDefault,
     self_or_cls_annotation: &ast::Expr,
-) -> anyhow::Result<Fix> {
+) -> anyhow::Result<Option<Fix>> {
     // (1) Import `Self` (if necessary)
-    let (import_edit, self_symbol_binding) =
-        checker.import_from_typing("Self", function_def.start(), PythonVersion::PY311)?;
+    let Some((import_edit, self_symbol_binding)) =
+        checker.import_from_typing("Self", function_def.start(), PythonVersion::PY311)?
+    else {
+        return Ok(None);
+    };
 
     // (2) Remove the first parameter's annotation
     let mut other_edits = vec![Edit::deletion(
@@ -360,11 +363,11 @@ fn replace_custom_typevar_with_self(
         Applicability::Safe
     };
 
-    Ok(Fix::applicable_edits(
+    Ok(Some(Fix::applicable_edits(
         import_edit,
         other_edits,
         applicability,
-    ))
+    )))
 }
 
 /// Returns a series of [`Edit`]s that modify all references to the given `typevar`.

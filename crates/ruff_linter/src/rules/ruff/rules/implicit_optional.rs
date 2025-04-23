@@ -120,7 +120,11 @@ impl From<PythonVersion> for ConversionType {
 }
 
 /// Generate a [`Fix`] for the given [`Expr`] as per the [`ConversionType`].
-fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr) -> Result<Fix> {
+fn generate_fix(
+    checker: &Checker,
+    conversion_type: ConversionType,
+    expr: &Expr,
+) -> Result<Option<Fix>> {
     match conversion_type {
         ConversionType::BinOpOr => {
             let new_expr = Expr::BinOp(ast::ExprBinOp {
@@ -130,14 +134,17 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 range: TextRange::default(),
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::unsafe_edit(Edit::range_replacement(
+            Ok(Some(Fix::unsafe_edit(Edit::range_replacement(
                 content,
                 expr.range(),
-            )))
+            ))))
         }
         ConversionType::Optional => {
-            let (import_edit, binding) =
-                checker.import_from_typing("Optional", expr.start(), PythonVersion::lowest())?;
+            let Some((import_edit, binding)) =
+                checker.import_from_typing("Optional", expr.start(), PythonVersion::lowest())?
+            else {
+                return Ok(None);
+            };
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 value: Box::new(Expr::Name(ast::ExprName {
@@ -149,10 +156,10 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 ctx: ast::ExprContext::Load,
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::unsafe_edits(
+            Ok(Some(Fix::unsafe_edits(
                 Edit::range_replacement(content, expr.range()),
                 [import_edit],
-            ))
+            )))
         }
     }
 }
@@ -182,7 +189,8 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
                 if parsed_annotation.kind().is_simple() {
-                    diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
+                    diagnostic
+                        .try_set_optional_fix(|| generate_fix(checker, conversion_type, expr));
                 }
                 checker.report_diagnostic(diagnostic);
             }
@@ -197,7 +205,7 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
+            diagnostic.try_set_optional_fix(|| generate_fix(checker, conversion_type, expr));
             checker.report_diagnostic(diagnostic);
         }
     }

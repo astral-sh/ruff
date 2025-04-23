@@ -544,40 +544,20 @@ impl<'a> Checker<'a> {
         member: &str,
         position: TextSize,
         version_added_to_typing: PythonVersion,
-    ) -> Result<(Edit, String), TypingImportError> {
+    ) -> Result<Option<(Edit, String)>, ResolutionError> {
         let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
         } else if self.settings.disable_typing_extensions {
-            return Err(TypingImportError::TypingExtensionsDisabled);
+            return Ok(None);
         } else {
             "typing_extensions"
         };
         let request = ImportRequest::import_from(source_module, member);
         self.importer()
             .get_or_import_symbol(&request, position, self.semantic())
-            .map_err(TypingImportError::ResolutionError)
+            .map(Some)
     }
 }
-
-/// The result of a [`Checker::import_from_typing`] call.
-#[derive(Debug)]
-pub(crate) enum TypingImportError {
-    ResolutionError(ResolutionError),
-    TypingExtensionsDisabled,
-}
-
-impl std::fmt::Display for TypingImportError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TypingImportError::ResolutionError(resolution_error) => resolution_error.fmt(f),
-            TypingImportError::TypingExtensionsDisabled => f.write_str(
-                "`typing_extensions` disabled by `lint.disable_typing_extensions` config option",
-            ),
-        }
-    }
-}
-
-impl std::error::Error for TypingImportError {}
 
 impl SemanticSyntaxContext for Checker<'_> {
     fn python_version(&self) -> PythonVersion {

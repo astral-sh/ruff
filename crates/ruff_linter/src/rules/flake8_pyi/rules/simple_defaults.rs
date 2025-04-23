@@ -680,13 +680,16 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         },
         target.range(),
     );
-    diagnostic.try_set_fix(|| {
-        let (import_edit, binding) =
-            checker.import_from_typing("TypeAlias", target.start(), PythonVersion::PY310)?;
-        Ok(Fix::safe_edits(
+    diagnostic.try_set_optional_fix(|| {
+        let Some((import_edit, binding)) =
+            checker.import_from_typing("TypeAlias", target.start(), PythonVersion::PY310)?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(Fix::safe_edits(
             Edit::range_replacement(format!("{id}: {binding}"), target.range()),
             [import_edit],
-        ))
+        )))
     });
     checker.report_diagnostic(diagnostic);
 }

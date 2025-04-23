@@ -200,7 +200,7 @@ fn add_diagnostic(
         stmt.identifier(),
     );
 
-    diagnostic.try_set_fix(|| replace_with_self_fix(checker, stmt, returns, class_def));
+    diagnostic.try_set_optional_fix(|| replace_with_self_fix(checker, stmt, returns, class_def));
 
     checker.report_diagnostic(diagnostic);
 }
@@ -210,11 +210,14 @@ fn replace_with_self_fix(
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
-) -> anyhow::Result<Fix> {
+) -> anyhow::Result<Option<Fix>> {
     let semantic = checker.semantic();
 
-    let (self_import, self_binding) =
-        checker.import_from_typing("Self", returns.start(), PythonVersion::PY311)?;
+    let Some((self_import, self_binding)) =
+        checker.import_from_typing("Self", returns.start(), PythonVersion::PY311)?
+    else {
+        return Ok(None);
+    };
 
     let mut others = Vec::with_capacity(2);
 
@@ -236,7 +239,11 @@ fn replace_with_self_fix(
         Applicability::Unsafe
     };
 
-    Ok(Fix::applicable_edits(self_import, others, applicability))
+    Ok(Some(Fix::applicable_edits(
+        self_import,
+        others,
+        applicability,
+    )))
 }
 
 /// Return true if `annotation` is either `ClassName` or `type[ClassName]`

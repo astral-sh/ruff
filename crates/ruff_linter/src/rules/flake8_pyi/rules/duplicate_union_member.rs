@@ -118,7 +118,10 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
                 applicability,
             )),
             UnionKind::TypingUnion => {
-                generate_union_fix(checker, unique_nodes, expr, applicability).ok()
+                let Ok(fix) = generate_union_fix(checker, unique_nodes, expr, applicability) else {
+                    return;
+                };
+                fix
             }
         }
     };
@@ -178,12 +181,15 @@ fn generate_union_fix(
     nodes: Vec<&Expr>,
     annotation: &Expr,
     applicability: Applicability,
-) -> Result<Fix> {
+) -> Result<Option<Fix>> {
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
 
     // Request `typing.Union`
-    let (import_edit, binding) =
-        checker.import_from_typing("Union", annotation.start(), PythonVersion::lowest())?;
+    let Some((import_edit, binding)) =
+        checker.import_from_typing("Union", annotation.start(), PythonVersion::lowest())?
+    else {
+        return Ok(None);
+    };
 
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {
@@ -202,9 +208,9 @@ fn generate_union_fix(
         ctx: ExprContext::Load,
     });
 
-    Ok(Fix::applicable_edits(
+    Ok(Some(Fix::applicable_edits(
         Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
         [import_edit],
         applicability,
-    ))
+    )))
 }
