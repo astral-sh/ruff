@@ -585,6 +585,14 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    Some(KnownFunction::AbstractMethod) => {
+                        // TODO: This can be removed once we understand legacy generics because the
+                        // typeshed definition for `abc.abstractmethod` is an identity function.
+                        if let [Some(ty)] = overload.parameter_types() {
+                            overload.set_return_type(*ty);
+                        }
+                    }
+
                     Some(KnownFunction::GetattrStatic) => {
                         let [Some(instance_ty), Some(attr_name), default] =
                             overload.parameter_types()

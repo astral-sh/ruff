@@ -1482,24 +1482,37 @@ impl<'db> TypeInferenceBuilder<'db> {
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
 
-            if let Type::FunctionLiteral(function) = decorator_ty {
-                if function.is_known(self.db(), KnownFunction::NoTypeCheck) {
-                    // If the function is decorated with the `no_type_check` decorator,
-                    // we need to suppress any errors that come after the decorators.
-                    self.context.set_in_no_type_check(InNoTypeCheck::Yes);
-                    function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
-                    continue;
-                } else if function.is_known(self.db(), KnownFunction::Overload) {
-                    function_decorators |= FunctionDecorators::OVERLOAD;
-                    continue;
+            match decorator_ty {
+                Type::FunctionLiteral(function) => {
+                    match function.known(self.db()) {
+                        Some(KnownFunction::NoTypeCheck) => {
+                            // If the function is decorated with the `no_type_check` decorator,
+                            // we need to suppress any errors that come after the decorators.
+                            self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                            function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
+                            continue;
+                        }
+                        Some(KnownFunction::Overload) => {
+                            function_decorators |= FunctionDecorators::OVERLOAD;
+                            continue;
+                        }
+                        Some(KnownFunction::AbstractMethod) => {
+                            function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
+                            continue;
+                        }
+                        _ => {}
+                    }
                 }
-            } else if let Type::ClassLiteral(class) = decorator_ty {
-                if class.is_known(self.db(), KnownClass::Classmethod) {
-                    function_decorators |= FunctionDecorators::CLASSMETHOD;
-                    continue;
+                Type::ClassLiteral(class) => {
+                    if class.is_known(self.db(), KnownClass::Classmethod) {
+                        function_decorators |= FunctionDecorators::CLASSMETHOD;
+                        continue;
+                    }
                 }
-            } else if let Type::DataclassTransformer(params) = decorator_ty {
-                dataclass_transformer_params = Some(params);
+                Type::DataclassTransformer(params) => {
+                    dataclass_transformer_params = Some(params);
+                }
+                _ => {}
             }
 
             decorator_types_and_nodes.push((decorator_ty, decorator));
