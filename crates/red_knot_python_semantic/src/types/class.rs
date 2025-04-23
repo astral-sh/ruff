@@ -1785,7 +1785,7 @@ impl<'db> ProtocolClassLiteral<'db> {
         }
 
         #[salsa::tracked(return_ref)]
-        fn cached_members<'db>(
+        fn cached_protocol_members<'db>(
             db: &'db dyn Db,
             class: ClassLiteralType<'db>,
         ) -> Box<ordermap::set::Slice<Name>> {
@@ -1810,6 +1810,14 @@ impl<'db> ProtocolClassLiteral<'db> {
                         .filter_map(|(symbol_id, symbol)| {
                             symbol.symbol.ignore_possibly_unbound().map(|_| symbol_id)
                         })
+                        // Bindings in the class body that are not declared in the class body
+                        // are not valid protocol members, and we plan to emit diagnostics for them
+                        // elsewhere. Invalid or not, however, it's important that we still consider
+                        // them to be protocol members. The implementation of `issubclass()` and
+                        // `isinstance()` for runtime-checkable protocols considers them to be protocol
+                        // members at runtime, and it's important that we accurately understand
+                        // type narrowing that uses `isinstance()` or `issubclass()` with
+                        // runtime-checkable protocols.
                         .chain(use_def_map.all_public_bindings().filter_map(
                             |(symbol_id, bindings)| {
                                 symbol_from_bindings(db, bindings)
@@ -1827,7 +1835,7 @@ impl<'db> ProtocolClassLiteral<'db> {
             members.into_boxed_slice()
         }
 
-        cached_members(db, *self)
+        cached_protocol_members(db, *self)
     }
 }
 
