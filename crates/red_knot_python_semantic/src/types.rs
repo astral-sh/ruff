@@ -6396,6 +6396,10 @@ impl<'db> FunctionType<'db> {
         Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
     }
 
+    pub(crate) fn node(self, db: &'db dyn Db) -> &'db ast::StmtFunctionDef {
+        self.body_scope(db).node(db).expect_function()
+    }
+
     /// Returns the [`FileRange`] of the function's name.
     pub fn focus_range(self, db: &dyn Db) -> FileRange {
         FileRange::new(

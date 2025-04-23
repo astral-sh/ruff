@@ -101,8 +101,8 @@ use super::diagnostic::{
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, INVALID_PROTOCOL, REDUNDANT_CAST,
-    STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    report_unresolved_reference, INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL,
+    REDUNDANT_CAST, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -524,6 +524,29 @@ pub(super) struct TypeInferenceBuilder<'db> {
     /// The returned types and their corresponding ranges of the region, if it is a function body.
     return_types_and_ranges: Vec<TypeAndRange<'db>>,
 
+    /// A set of functions that have been defined **and** called in this region.
+    ///
+    /// This is a set because the same function could be called multiple times in the same region.
+    /// This is mainly used in [`check_overloaded_functions`] to check an overloaded function that
+    /// is shadowed by a function with the same name in this scope but has been called before. For
+    /// example:
+    ///
+    /// ```py
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def foo() -> None: ...
+    /// @overload
+    /// def foo(x: int) -> int: ...
+    /// def foo(x: int | None) -> int | None: return x
+    ///
+    /// foo()  # An overloaded function that was defined in this scope have been called
+    ///
+    /// def foo(x: int) -> int:
+    ///     return x
+    /// ```
+    called_functions: FxHashSet<FunctionType<'db>>,
+
     /// The deferred state of inferring types of certain expressions within the region.
     ///
     /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
@@ -556,6 +579,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             index,
             region,
             return_types_and_ranges: vec![],
+            called_functions: FxHashSet::default(),
             deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
         }
@@ -718,6 +742,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // TODO: Only call this function when diagnostics are enabled.
         self.check_class_definitions();
+        self.check_overloaded_functions();
     }
 
     /// Iterate over all class definitions to check that the definition will not cause an exception
@@ -946,6 +971,82 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ));
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check the overloaded functions in this scope.
+    ///
+    /// This only checks the overloaded functions that are:
+    /// 1. Visible publicly at the end of this scope
+    /// 2. Or, defined and called in this scope
+    ///
+    /// For (1), this has the consequence of not checking an overloaded function that is being
+    /// shadowed by another function with the same name in this scope.
+    fn check_overloaded_functions(&mut self) {
+        let mut functions_to_check = self.called_functions.clone();
+
+        // Collect all the unique overloaded function symbols in this scope. This requires a set
+        // because an overloaded function uses the same symbol for each of the overloads and the
+        // implementation.
+        let overloaded_function_symbols: FxHashSet<_> = self
+            .types
+            .declarations
+            .iter()
+            .filter_map(|(definition, ty)| {
+                // Filter out function literals that result from anything other than a function
+                // definition e.g., imports.
+                if !matches!(definition.kind(self.db()), DefinitionKind::Function(_)) {
+                    return None;
+                }
+                let function = ty.inner_type().into_function_literal()?;
+                if function.has_known_decorator(self.db(), FunctionDecorators::OVERLOAD) {
+                    Some(definition.symbol(self.db()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let use_def = self
+            .index
+            .use_def_map(self.scope().file_scope_id(self.db()));
+
+        for symbol in overloaded_function_symbols {
+            if let Symbol::Type(Type::FunctionLiteral(function), Boundness::Bound) =
+                symbol_from_bindings(self.db(), use_def.public_bindings(symbol))
+            {
+                // Extend the functions that we need to check with the publicly visible overloaded
+                // function. This is always going to be either the implementation or the last
+                // overload if the implementation doesn't exists.
+                functions_to_check.insert(function);
+            }
+        }
+
+        for function in functions_to_check {
+            let Some(overloaded) = function.to_overloaded(self.db()) else {
+                continue;
+            };
+
+            let function_node = function.node(self.db());
+
+            if overloaded.overloads.len() < 2 {
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_OVERLOAD, &function_node.name)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Function `{}` requires at least two overloads",
+                        &function_node.name
+                    ));
+                    if let Some(first_overload) = overloaded.overloads.first() {
+                        diagnostic.annotate(
+                            self.context
+                                .secondary(first_overload.focus_range(self.db()))
+                                .message(format_args!("Only one overload defined here")),
+                        );
                     }
                 }
             }
@@ -4297,6 +4398,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         // are assignable to any parameter annotations.
         let mut call_arguments = Self::parse_arguments(arguments);
         let callable_type = self.infer_expression(func);
+
+        if let Type::FunctionLiteral(function) = callable_type {
+            if function.definition(self.db()).scope(self.db()) == self.scope() {
+                self.called_functions.insert(function);
+            }
+        }
 
         // It might look odd here that we emit an error for class-literals but not `type[]` types.
         // But it's deliberate! The typing spec explicitly mandates that `type[]` types can be called

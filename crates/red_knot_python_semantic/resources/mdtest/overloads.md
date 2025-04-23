@@ -309,16 +309,22 @@ reveal_type(func(""))  # revealed: Literal[""]
 
 ### At least two overloads
 
+<!-- snapshot-diagnostics -->
+
 At least two `@overload`-decorated definitions must be present.
 
 ```py
 from typing import overload
 
-# TODO: error
 @overload
-def func(x: int) -> int: ...
-def func(x: int | str) -> int | str:
+def func1(x: int) -> int: ...
+# error: [invalid-overload]
+def func1(x: int | str) -> int | str:
     return x
+
+@overload
+# error: [invalid-overload]
+def func2(x: int) -> int: ...
 ```
 
 ### Overload without an implementation
