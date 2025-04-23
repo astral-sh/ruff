@@ -66,27 +66,28 @@ function Items({
     );
   }
 
+  const uniqueIds: Map<string, number> = new Map();
+
   return (
     <ul className="space-y-0.5 grow overflow-y-scroll">
-      {diagnostics.map((diagnostic, index) => {
+      {diagnostics.map((diagnostic) => {
+        const row = diagnostic.start_location.row;
+        const column = diagnostic.start_location.column;
+        const mostlyUniqueId = `${row}:${column}-${diagnostic.code}`;
+
+        const disambiguator = uniqueIds.get(mostlyUniqueId) ?? 0;
+        uniqueIds.set(mostlyUniqueId, disambiguator + 1);
+
         return (
-          <li
-            key={`${diagnostic.start_location.row}:${diagnostic.start_location.column}-${diagnostic.code ?? index}`}
-          >
+          <li key={`${mostlyUniqueId}-${disambiguator}`}>
             <button
-              onClick={() =>
-                onGoTo(
-                  diagnostic.start_location.row,
-                  diagnostic.start_location.column,
-                )
-              }
+              onClick={() => onGoTo(row, column)}
               className="w-full text-start cursor-pointer select-text"
             >
               {diagnostic.message}{" "}
               <span className="text-gray-500">
-                {diagnostic.code != null && `(${diagnostic.code})`} [Ln{" "}
-                {diagnostic.start_location.row}, Col{" "}
-                {diagnostic.start_location.column}]
+                {diagnostic.code != null && `(${diagnostic.code})`} [Ln {row},
+                Col {column}]
               </span>
             </button>
           </li>

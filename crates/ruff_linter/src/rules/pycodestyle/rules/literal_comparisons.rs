@@ -1,9 +1,9 @@
+use ruff_python_ast::parenthesize::parenthesized_range;
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysFixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::helpers;
-use ruff_python_ast::helpers::generate_comparison;
+use ruff_python_ast::helpers::{self, generate_comparison};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
 use ruff_text_size::Ranged;
 
@@ -170,6 +170,42 @@ impl AlwaysFixableViolation for TrueFalseComparison {
     }
 }
 
+fn is_redundant_boolean_comparison(op: CmpOp, comparator: &Expr) -> Option<bool> {
+    let value = comparator.as_boolean_literal_expr()?.value;
+    match op {
+        CmpOp::Is | CmpOp::Eq => Some(value),
+        CmpOp::IsNot | CmpOp::NotEq => Some(!value),
+        _ => None,
+    }
+}
+
+fn generate_redundant_comparison(
+    compare: &ast::ExprCompare,
+    comment_ranges: &ruff_python_trivia::CommentRanges,
+    source: &str,
+    comparator: &Expr,
+    kind: bool,
+    needs_wrap: bool,
+) -> String {
+    let comparator_range =
+        parenthesized_range(comparator.into(), compare.into(), comment_ranges, source)
+            .unwrap_or(comparator.range());
+
+    let comparator_str = &source[comparator_range];
+
+    let result = if kind {
+        comparator_str.to_string()
+    } else {
+        format!("not {comparator_str}")
+    };
+
+    if needs_wrap {
+        format!("({result})")
+    } else {
+        result
+    }
+}
+
 /// E711, E712
 pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare) {
     // Mapping from (bad operator index) to (replacement operator). As we iterate
@@ -323,7 +359,6 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
     // TODO(charlie): Respect `noqa` directives. If one of the operators has a
     // `noqa`, but another doesn't, both will be removed here.
     if !bad_ops.is_empty() {
-        // Replace the entire comparison expression.
         let ops = compare
             .ops
             .iter()
@@ -331,14 +366,53 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
             .map(|(idx, op)| bad_ops.get(&idx).unwrap_or(op))
             .copied()
             .collect::<Vec<_>>();
-        let content = generate_comparison(
-            &compare.left,
-            &ops,
-            &compare.comparators,
-            compare.into(),
-            checker.comment_ranges(),
-            checker.source(),
-        );
+
+        let comment_ranges = checker.comment_ranges();
+        let source = checker.source();
+
+        let content = match (&*compare.ops, &*compare.comparators) {
+            ([op], [comparator]) => {
+                if let Some(kind) = is_redundant_boolean_comparison(*op, &compare.left) {
+                    let needs_wrap = compare.left.range().start() != compare.range().start();
+                    generate_redundant_comparison(
+                        compare,
+                        comment_ranges,
+                        source,
+                        comparator,
+                        kind,
+                        needs_wrap,
+                    )
+                } else if let Some(kind) = is_redundant_boolean_comparison(*op, comparator) {
+                    let needs_wrap = comparator.range().end() != compare.range().end();
+                    generate_redundant_comparison(
+                        compare,
+                        comment_ranges,
+                        source,
+                        &compare.left,
+                        kind,
+                        needs_wrap,
+                    )
+                } else {
+                    generate_comparison(
+                        &compare.left,
+                        &ops,
+                        &compare.comparators,
+                        compare.into(),
+                        comment_ranges,
+                        source,
+                    )
+                }
+            }
+            _ => generate_comparison(
+                &compare.left,
+                &ops,
+                &compare.comparators,
+                compare.into(),
+                comment_ranges,
+                source,
+            ),
+        };
+
         for diagnostic in &mut diagnostics {
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
                 content.to_string(),
