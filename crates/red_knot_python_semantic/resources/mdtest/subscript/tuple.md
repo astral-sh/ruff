@@ -81,13 +81,11 @@ python-version = "3.9"
 ```
 
 ```py
-# TODO: `tuple[int, str]` is a valid base (generics)
-# error: [invalid-base] "Invalid class base with type `GenericAlias` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class A(tuple[int, str]): ...
 
 # Runtime value: `(A, tuple, object)`
 # TODO: Generics
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Unknown, Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[Literal[A], @Todo(GenericAlias instance), Literal[object]]
 ```
 
 ## `typing.Tuple`

@@ -326,8 +326,6 @@ class Sub(Base[Sub]): ...
 ## Another cyclic case
 
 ```pyi
-# TODO no error (generics)
-# error: [invalid-base]
 class Derived[T](list[Derived[T]]): ...
 ```
 
