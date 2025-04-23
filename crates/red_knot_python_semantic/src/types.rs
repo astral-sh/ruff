@@ -5670,12 +5670,11 @@ impl<'db> BoolError<'db> {
             Self::IncorrectArguments {
                 not_boolable_type, ..
             } => {
-                builder.into_diagnostic(
-                    format_args!(
-                        "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
-                        not_boolable_type.display(context.db())
-                    ),
-                );
+                builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{}`; \
+                     it incorrectly implements `__bool__`",
+                    not_boolable_type.display(context.db())
+                ));
             }
             Self::IncorrectReturnType {
                 not_boolable_type,
