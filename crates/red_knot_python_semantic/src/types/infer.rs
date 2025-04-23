@@ -6541,7 +6541,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         if let ClassLiteralType::Generic(_) = class {
                             // TODO: specialize the generic class using these explicit type
-                            // variable assignments
+                            // variable assignments. This branch is only encountered when an
+                            // explicit class specialization appears inside of some other subscript
+                            // expression, e.g. `tuple[list[int], ...]`. We have already inferred
+                            // the type of the outer subscript slice as a value expression, which
+                            // means we can't re-infer the inner specialization here as a type
+                            // expression.
                             return value_ty;
                         }
                     }
