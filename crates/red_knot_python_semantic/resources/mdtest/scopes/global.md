@@ -41,15 +41,15 @@ def f():
 A `global` statement causes lookup to skip any bindings in intervening scopes:
 
 ```py
-x = 1
+x: int = 1
 
 def outer():
-    x = ""
+    x: str = ""
 
     def inner():
         global x
-        # TODO should be `Unknown | Literal[1]`
-        reveal_type(x)  # revealed: Unknown | Literal[""]
+        # TODO: revealed: int
+        reveal_type(x)  # revealed: str
 ```
 
 ## Narrowing
