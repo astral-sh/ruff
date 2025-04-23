@@ -36,7 +36,6 @@ mod tests {
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_kubernetes.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_mysql.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_oracle.py"))]
-    // TODO: all of the following are todos
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_papermill.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_pig.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_postgres.py"))]
