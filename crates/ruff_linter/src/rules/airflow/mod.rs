@@ -25,7 +25,6 @@ mod tests {
     #[test_case(Rule::Airflow3Removal, Path::new("AIR301_context.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_amazon.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_celery.py"))]
-    // TODO
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_common_sql.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_daskexecutor.py"))]
     #[test_case(Rule::Airflow3MovedToProvider, Path::new("AIR302_druid.py"))]
