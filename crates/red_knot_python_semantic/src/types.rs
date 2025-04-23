@@ -2172,28 +2172,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    // Get the part of the type that is positively narrowable and are not a subtype of the other type.
-    fn positively_narrowable_with(self, db: &'db dyn Db, target: Type<'db>) -> Type<'db> {
-        if self.is_single_valued(db) || self.is_union_of_single_valued(db) {
-            if self.is_subtype_of(db, target) {
-                Type::Never
-            } else {
-                self
-            }
-        } else {
-            match self {
-                Type::Union(union) => {
-                    let elements = union
-                        .elements(db)
-                        .iter()
-                        .map(|elem| elem.positively_narrowable_with(db, target));
-                    UnionType::from_elements(db, elements)
-                }
-                _ => Type::Never,
-            }
-        }
-    }
-
     /// This function is roughly equivalent to `find_name_in_mro` as defined in the [descriptor guide] or
     /// [`_PyType_Lookup`] in CPython's `Objects/typeobject.c`. It should typically be called through
     /// [Type::class_member], unless it is known that `self` is a class-like type. This function returns

@@ -100,7 +100,7 @@ else:
     reveal_type(x)  # revealed: Literal[1]
 ```
 
-## `Any` narrowing
+## Union with `Any`
 
 ```py
 from typing import Any
@@ -110,4 +110,15 @@ def _(x: Any | None, y: Any | None):
         reveal_type(x)  # revealed: Any & ~Literal[1] | None
     if y == 1:
         reveal_type(y)  # revealed: Any & ~None
+```
+
+## Booleans and integers
+
+```py
+def _(b: bool):
+    if b == 1:
+        reveal_type(b)  # revealed: Literal[True]
+    else:
+        # TODO could be Literal[False]
+        reveal_type(b)  # revealed: bool
 ```

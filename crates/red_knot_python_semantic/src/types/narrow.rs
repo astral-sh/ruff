@@ -395,16 +395,52 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        // We can only narrow on equality checks against single-valued types.
         if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
-            let union = UnionBuilder::new(self.db)
-                .add(
-                    lhs_ty
-                        .positively_narrowable_with(self.db, rhs_ty)
-                        .negate(self.db),
-                )
-                .add(rhs_ty)
-                .build();
-            Some(union)
+            // The fully-general (and more efficient) approach here would be to introduce a
+            // `NeverEqualTo` type that can wrap a single-valued type, and then simply return
+            // `~NeverEqualTo(rhs_ty)` here and let union/intersection builder sort it out. This is
+            // how we handle `AlwaysTruthy` and `AlwaysFalsy`. But this means we have to deal with
+            // this type everywhere, and possibly have it show up unsimplified in some cases, and
+            // so we instead prefer to just do the simplification here. (Another hybrid option that
+            // would be similar to this, but more efficient, would be to allow narrowing to return
+            // something that is not a type, and handle this not-a-type in `symbol_from_bindings`,
+            // instead of intersecting with a type.)
+
+            // Filter the `lhs_ty` to just the types that cannot be equal to `rhs_ty`.
+            fn filter_to_cannot_be_equal<'db>(
+                db: &'db dyn Db,
+                ty: Type<'db>,
+                rhs_ty: Type<'db>,
+            ) -> Type<'db> {
+                match ty {
+                    Type::Union(union) => {
+                        union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty))
+                    }
+                    Type::Instance(instance) if instance.class().is_known(db, KnownClass::Bool) => {
+                        if !Type::BooleanLiteral(false).is_subtype_of(db, rhs_ty) {
+                            Type::BooleanLiteral(false)
+                        } else if !Type::BooleanLiteral(true).is_subtype_of(db, rhs_ty) {
+                            Type::BooleanLiteral(true)
+                        } else {
+                            Type::Never
+                        }
+                    }
+                    _ => {
+                        if ty.is_single_valued(db) && !ty.is_subtype_of(db, rhs_ty) {
+                            ty
+                        } else {
+                            Type::Never
+                        }
+                    }
+                }
+            }
+            Some(match lhs_ty {
+                // We cannot put this inside `filter_to_cannot_be_equal` because intersecting with
+                // `rhs_ty` is not valid if there are any non-single-valued types in the LHS.
+                Type::LiteralString => rhs_ty,
+                _ => filter_to_cannot_be_equal(self.db, lhs_ty, rhs_ty).negate(self.db),
+            })
         } else {
             None
         }
