@@ -13,7 +13,7 @@ reveal_type(1 is not 1)  # revealed: bool
 reveal_type(1 is 2)  # revealed: Literal[False]
 reveal_type(1 is not 7)  # revealed: Literal[True]
 # error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `str`, in comparing `Literal[1]` with `Literal[""]`"
-reveal_type(1 <= "" and 0 < 1)  # revealed: Unknown & ~AlwaysTruthy | Literal[True]
+reveal_type(1 <= "" and 0 < 1)  # revealed: (Unknown & ~AlwaysTruthy) | Literal[True]
 ```
 
 ## Integer instance

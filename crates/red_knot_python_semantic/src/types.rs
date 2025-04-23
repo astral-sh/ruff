@@ -6993,6 +6993,10 @@ impl<'db> IntersectionType<'db> {
     pub fn iter_positive(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         self.positive(db).iter().copied()
     }
+
+    pub fn has_one_element(&self, db: &'db dyn Db) -> bool {
+        (self.positive(db).len() + self.negative(db).len()) == 1
+    }
 }
 
 #[salsa::interned(debug)]
