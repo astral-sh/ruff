@@ -25,12 +25,22 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unsupp
 # Diagnostics
 
 ```
-error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`; the return type of its bool method (`str`) isn't assignable to `bool
+error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`
  --> /src/mdtest_snippet.py:8:8
   |
 7 | # error: [unsupported-bool-conversion]
 8 | 10 and a and True
   |        ^
+  |
+info: `str` is not assignable to `bool`
+ --> /src/mdtest_snippet.py:2:9
+  |
+1 | class NotBoolable:
+2 |     def __bool__(self) -> str:
+  |         --------          ^^^ Incorrect return type
+  |         |
+  |         Method defined here
+3 |         return "wat"
   |
 
 ```

@@ -10,7 +10,9 @@ use diagnostic::{
     CALL_POSSIBLY_UNBOUND_METHOD, INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
-use ruff_db::diagnostic::create_semantic_syntax_diagnostic;
+use ruff_db::diagnostic::{
+    create_semantic_syntax_diagnostic, Annotation, Severity, Span, SubDiagnostic,
+};
 use ruff_db::files::{File, FileRange};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -5763,30 +5765,71 @@ impl<'db> BoolError<'db> {
             Self::IncorrectArguments {
                 not_boolable_type, ..
             } => {
-                builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{}`; \
-                     it incorrectly implements `__bool__`",
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{}`",
                     not_boolable_type.display(context.db())
                 ));
+                let mut sub = SubDiagnostic::new(
+                    Severity::Info,
+                    "`__bool__` methods must only have a `self` parameter",
+                );
+                if let Some((func_span, parameter_span)) = not_boolable_type
+                    .member(context.db(), "__bool__")
+                    .into_lookup_result()
+                    .ok()
+                    .and_then(|quals| quals.inner_type().parameter_span(context.db(), None))
+                {
+                    sub.annotate(
+                        Annotation::primary(parameter_span).message("Incorrect parameters"),
+                    );
+                    sub.annotate(Annotation::secondary(func_span).message("Method defined here"));
+                }
+                diag.sub(sub);
             }
             Self::IncorrectReturnType {
                 not_boolable_type,
                 return_type,
             } => {
-                builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{not_boolable}`; \
-                     the return type of its bool method (`{return_type}`) \
-                     isn't assignable to `bool",
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{not_boolable}`",
                     not_boolable = not_boolable_type.display(context.db()),
-                    return_type = return_type.display(context.db())
                 ));
+                let mut sub = SubDiagnostic::new(
+                    Severity::Info,
+                    format_args!(
+                        "`{return_type}` is not assignable to `bool`",
+                        return_type = return_type.display(context.db()),
+                    ),
+                );
+                if let Some((func_span, return_type_span)) = not_boolable_type
+                    .member(context.db(), "__bool__")
+                    .into_lookup_result()
+                    .ok()
+                    .and_then(|quals| quals.inner_type().return_type_span(context.db()))
+                {
+                    sub.annotate(
+                        Annotation::primary(return_type_span).message("Incorrect return type"),
+                    );
+                    sub.annotate(Annotation::secondary(func_span).message("Method defined here"));
+                }
+                diag.sub(sub);
             }
             Self::NotCallable { not_boolable_type } => {
-                builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{}`; \
-                     its `__bool__` method isn't callable",
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{}`",
                     not_boolable_type.display(context.db())
                 ));
+                let sub = SubDiagnostic::new(
+                    Severity::Info,
+                    format_args!(
+                        "`__bool__` on `{}` must be callable",
+                        not_boolable_type.display(context.db())
+                    ),
+                );
+                // TODO: It would be nice to create an annotation here for
+                // where `__bool__` is defined. At time of writing, I couldn't
+                // figure out a straight-forward way of doing this. ---AG
+                diag.sub(sub);
             }
             Self::Union { union, .. } => {
                 let first_error = union
