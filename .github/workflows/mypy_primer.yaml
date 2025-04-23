@@ -46,7 +46,7 @@ jobs:
 
       - name: Install mypy_primer
         run: |
-          uv tool install "git+https://github.com/hauntsaninja/mypy_primer@ebaa9fd27b51a278873b63676fd25490cec6823b"
+          uv tool install "git+https://github.com/hauntsaninja/mypy_primer@4c22d192a456e27badf85b3ea0f830707375d2b7"
 
       - name: Run mypy_primer
         shell: bash
