@@ -6993,6 +6993,11 @@ impl<'db> IntersectionType<'db> {
     pub fn iter_positive(&self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         self.positive(db).iter().copied()
     }
+
+    pub fn is_single_valued(&self, db: &'db dyn Db) -> bool {
+        self.positive(db).len() == 1 && self.negative(db).is_empty()
+            || self.positive(db).is_empty() && self.negative(db).len() == 1
+    }
 }
 
 #[salsa::interned(debug)]
