@@ -192,6 +192,12 @@ fn add_diagnostic(
     class_def: &ast::StmtClassDef,
     method_name: &str,
 ) {
+    let fix = replace_with_self_fix(checker, stmt, returns, class_def);
+
+    if matches!(fix, Ok(None)) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
         NonSelfReturnType {
             class_name: class_def.name.to_string(),
@@ -200,7 +206,7 @@ fn add_diagnostic(
         stmt.identifier(),
     );
 
-    diagnostic.try_set_optional_fix(|| replace_with_self_fix(checker, stmt, returns, class_def));
+    diagnostic.try_set_optional_fix(|| fix);
 
     checker.report_diagnostic(diagnostic);
 }

@@ -1154,6 +1154,18 @@ mod tests {
 			..LinterSettings::for_rule(Rule::DuplicateUnionMember)
 		}
     )]
+    #[test_case(
+        "pyi034_disabled",
+		"
+		class C:
+			def __new__(cls) -> C: ...
+		",
+		&LinterSettings {
+			unresolved_target_version: PythonVersion { major: 3, minor: 10 },
+			disable_typing_extensions: true,
+			..LinterSettings::for_rule(Rule::NonSelfReturnType)
+		}
+    )]
     fn test_disabled_typing_extensions(name: &str, contents: &str, settings: LinterSettings) {
         let snapshot = format!("disabled_typing_extensions_{name}");
         let messages = test_snippet(contents, &settings);
