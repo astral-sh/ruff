@@ -126,12 +126,20 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::SubclassOf(_), _) => Ordering::Less,
         (_, Type::SubclassOf(_)) => Ordering::Greater,
+
         (Type::NominalInstance(left), Type::NominalInstance(right)) => {
             left.class().cmp(&right.class())
         }
-
         (Type::NominalInstance(_), _) => Ordering::Less,
         (_, Type::NominalInstance(_)) => Ordering::Greater,
+
+        (Type::ProtocolInstance(left_proto), Type::ProtocolInstance(right_proto)) => {
+            debug_assert_eq!(*left, left_proto.normalized(db));
+            debug_assert_eq!(*right, right_proto.normalized(db));
+            left_proto.cmp(right_proto)
+        }
+        (Type::ProtocolInstance(_), _) => Ordering::Less,
+        (_, Type::ProtocolInstance(_)) => Ordering::Greater,
 
         (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
         (Type::TypeVar(_), _) => Ordering::Less,

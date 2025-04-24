@@ -159,7 +159,7 @@ impl KnownConstraintFunction {
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
         let constraint_fn = |class| match self {
-            KnownConstraintFunction::IsInstance => Type::instance(class),
+            KnownConstraintFunction::IsInstance => Type::instance(db, class),
             KnownConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
         };
 
@@ -682,7 +682,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         let symbol = self.expect_expr_name_symbol(id);
                         constraints.insert(
                             symbol,
-                            Type::instance(rhs_class.unknown_specialization(self.db)),
+                            Type::instance(self.db, rhs_class.unknown_specialization(self.db)),
                         );
                     }
                 }
