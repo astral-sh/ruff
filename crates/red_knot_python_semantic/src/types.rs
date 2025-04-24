@@ -6195,7 +6195,7 @@ impl<'db> FunctionType<'db> {
             }
 
             // Overloads are inserted in reverse order, from bottom to top.
-            let mut overloads: Vec<_> = overloads.into_iter().rev().collect();
+            overloads.reverse();
 
             let implementation = if function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
                 overloads.push(function);
