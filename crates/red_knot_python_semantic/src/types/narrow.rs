@@ -472,7 +472,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty))
                     }
                     // Treat `bool` as `Literal[True, False]`.
-                    Type::NominalInstance(instance) if instance.class().is_known(db, KnownClass::Bool) => {
+                    Type::NominalInstance(instance)
+                        if instance.class().is_known(db, KnownClass::Bool) =>
+                    {
                         UnionType::from_elements(
                             db,
                             [Type::BooleanLiteral(true), Type::BooleanLiteral(false)]
