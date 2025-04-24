@@ -154,7 +154,21 @@ impl<'db> From<NonGenericClass<'db>> for Type<'db> {
 pub struct GenericClass<'db> {
     #[return_ref]
     pub(crate) class: Class<'db>,
-    pub(crate) generic_context: GenericContext<'db>,
+}
+
+#[salsa::tracked]
+impl<'db> GenericClass<'db> {
+    #[salsa::tracked]
+    pub(crate) fn generic_context(self, db: &'db dyn Db) -> GenericContext<'db> {
+        let scope = self.class(db).body_scope;
+        let class_def_node = scope.node(db).expect_class();
+        let type_params = class_def_node
+            .type_params
+            .as_ref()
+            .expect("generic class definition should have type parameters");
+        let index = semantic_index(db, scope.file(db));
+        GenericContext::from_type_params(db, index, type_params)
+    }
 }
 
 impl<'db> From<GenericClass<'db>> for Type<'db> {

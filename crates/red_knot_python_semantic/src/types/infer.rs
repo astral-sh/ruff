@@ -77,7 +77,6 @@ use crate::types::diagnostic::{
     POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
     UNSUPPORTED_OPERATOR,
 };
-use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
@@ -1825,10 +1824,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let generic_context = type_params.as_ref().map(|type_params| {
-            GenericContext::from_type_params(self.db(), self.index, type_params)
-        });
-
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class_node))
@@ -1843,10 +1838,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             dataclass_params,
             dataclass_transformer_params,
         };
-        let class_literal = match generic_context {
-            Some(generic_context) => {
-                ClassLiteralType::Generic(GenericClass::new(self.db(), class, generic_context))
-            }
+        let class_literal = match type_params.as_ref() {
+            Some(_) => ClassLiteralType::Generic(GenericClass::new(self.db(), class)),
             None => ClassLiteralType::NonGeneric(NonGenericClass::new(self.db(), class)),
         };
         let class_ty = Type::from(class_literal);
