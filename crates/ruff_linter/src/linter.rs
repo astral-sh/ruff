@@ -1064,6 +1064,10 @@ mod tests {
 
     #[test_case(Rule::YieldOutsideFunction, Path::new("yield_scope.py"))]
     #[test_case(Rule::ReturnOutsideFunction, Path::new("return_outside_function.py"))]
+    #[test_case(
+        Rule::LoadBeforeGlobalDeclaration,
+        Path::new("load_before_global_declaration.py")
+    )]
     fn test_syntax_errors(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);
