@@ -1106,7 +1106,7 @@ mod tests {
     #[test_case(
         "adds_typing_extensions",
 		TYPING_EXTENSIONS_EXAMPLE,
-		LinterSettings {
+		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY310,
 			disable_typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
@@ -1115,7 +1115,7 @@ mod tests {
     #[test_case(
         "does_not_add_typing_extensions",
 		TYPING_EXTENSIONS_EXAMPLE,
-		LinterSettings {
+		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY310,
 			disable_typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
@@ -1124,7 +1124,7 @@ mod tests {
     #[test_case(
         "adds_typing_without_extensions_disabled",
 		TYPING_EXTENSIONS_EXAMPLE,
-		LinterSettings {
+		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY311,
 			disable_typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
@@ -1133,7 +1133,7 @@ mod tests {
     #[test_case(
         "adds_typing_with_extensions_disabled",
 		TYPING_EXTENSIONS_EXAMPLE,
-		LinterSettings {
+		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY311,
 			disable_typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
@@ -1170,7 +1170,7 @@ mod tests {
     )]
     fn test_disabled_typing_extensions(name: &str, contents: &str, settings: &LinterSettings) {
         let snapshot = format!("disabled_typing_extensions_{name}");
-        let messages = test_snippet(contents, &settings);
+        let messages = test_snippet(contents, settings);
         assert_messages!(snapshot, messages);
     }
 
