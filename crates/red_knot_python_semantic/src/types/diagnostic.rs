@@ -8,10 +8,10 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{KnownInstanceType, Type};
+use crate::types::{class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
 
@@ -1360,24 +1360,14 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
     diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
 
-    let class_scope = class.body_scope(db);
-    let class_node = class_scope.node(db).expect_class();
-    let class_name = &class_node.name;
-    let class_def_diagnostic_range = TextRange::new(
-        class_name.start(),
-        class_node
-            .arguments
-            .as_deref()
-            .map(Ranged::end)
-            .unwrap_or_else(|| class_name.end()),
-    );
     let mut class_def_diagnostic = SubDiagnostic::new(
         Severity::Info,
-        format_args!("`{class_name}` is declared here, but it is not a protocol class:"),
+        format_args!(
+            "`{}` is declared here, but it is not a protocol class:",
+            class.name(db)
+        ),
     );
-    class_def_diagnostic.annotate(Annotation::primary(
-        Span::from(class_scope.file(db)).with_range(class_def_diagnostic_range),
-    ));
+    class_def_diagnostic.annotate(Annotation::primary(class.header_span(db)));
     diagnostic.sub(class_def_diagnostic);
 
     diagnostic.info(
@@ -1403,4 +1393,66 @@ pub(crate) fn report_invalid_arguments_to_callable(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
         KnownInstanceType::Callable.repr()
     ));
+}
+
+pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    protocol: ProtocolClassLiteral,
+    function: KnownFunction,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = protocol.name(db);
+    let function_name: &'static str = function.into();
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Class `{class_name}` cannot be used as the second argument to `{function_name}`",
+    ));
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        format_args!(
+            "`{class_name}` is declared as a protocol class, \
+                but it is not declared as runtime-checkable"
+        ),
+    );
+    class_def_diagnostic.annotate(
+        Annotation::primary(protocol.header_span(db))
+            .message(format_args!("`{class_name}` declared here")),
+    );
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(format_args!(
+        "A protocol class can only be used in `{function_name}` checks if it is decorated \
+            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`"
+    ));
+    diagnostic.info("See https://docs.python.org/3/library/typing.html#typing.runtime_checkable");
+}
+
+pub(crate) fn report_attempted_protocol_instantiation(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    protocol: ProtocolClassLiteral,
+) {
+    let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = protocol.name(db);
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Cannot instantiate class `{class_name}`",));
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        format_args!("Protocol classes cannot be instantiated"),
+    );
+    class_def_diagnostic.annotate(
+        Annotation::primary(protocol.header_span(db))
+            .message(format_args!("`{class_name}` declared as a protocol here")),
+    );
+    diagnostic.sub(class_def_diagnostic);
 }

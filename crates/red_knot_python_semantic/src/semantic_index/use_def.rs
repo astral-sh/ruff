@@ -437,6 +437,15 @@ impl<'db> UseDefMap<'db> {
             .map(|symbol_id| (symbol_id, self.public_declarations(symbol_id)))
     }
 
+    pub(crate) fn all_public_bindings<'map>(
+        &'map self,
+    ) -> impl Iterator<Item = (ScopedSymbolId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
+    {
+        (0..self.public_symbols.len())
+            .map(ScopedSymbolId::from_usize)
+            .map(|symbol_id| (symbol_id, self.public_bindings(symbol_id)))
+    }
+
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
         !self

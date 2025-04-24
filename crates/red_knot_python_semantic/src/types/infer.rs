@@ -96,10 +96,11 @@ use crate::Db;
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
-    report_bad_argument_to_get_protocol_members, report_index_out_of_bounds,
-    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_attempted_protocol_instantiation, report_bad_argument_to_get_protocol_members,
+    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference, report_slice_step_size_zero,
+    report_non_subscriptable, report_possibly_unresolved_reference,
+    report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference, INVALID_METACLASS, INVALID_PROTOCOL, REDUNDANT_CAST,
     STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
@@ -1524,24 +1525,37 @@ impl<'db> TypeInferenceBuilder<'db> {
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
 
-            if let Type::FunctionLiteral(function) = decorator_ty {
-                if function.is_known(self.db(), KnownFunction::NoTypeCheck) {
-                    // If the function is decorated with the `no_type_check` decorator,
-                    // we need to suppress any errors that come after the decorators.
-                    self.context.set_in_no_type_check(InNoTypeCheck::Yes);
-                    function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
-                    continue;
-                } else if function.is_known(self.db(), KnownFunction::Overload) {
-                    function_decorators |= FunctionDecorators::OVERLOAD;
-                    continue;
+            match decorator_ty {
+                Type::FunctionLiteral(function) => {
+                    match function.known(self.db()) {
+                        Some(KnownFunction::NoTypeCheck) => {
+                            // If the function is decorated with the `no_type_check` decorator,
+                            // we need to suppress any errors that come after the decorators.
+                            self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+                            function_decorators |= FunctionDecorators::NO_TYPE_CHECK;
+                            continue;
+                        }
+                        Some(KnownFunction::Overload) => {
+                            function_decorators |= FunctionDecorators::OVERLOAD;
+                            continue;
+                        }
+                        Some(KnownFunction::AbstractMethod) => {
+                            function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
+                            continue;
+                        }
+                        _ => {}
+                    }
                 }
-            } else if let Type::ClassLiteral(class) = decorator_ty {
-                if class.is_known(self.db(), KnownClass::Classmethod) {
-                    function_decorators |= FunctionDecorators::CLASSMETHOD;
-                    continue;
+                Type::ClassLiteral(class) => {
+                    if class.is_known(self.db(), KnownClass::Classmethod) {
+                        function_decorators |= FunctionDecorators::CLASSMETHOD;
+                        continue;
+                    }
                 }
-            } else if let Type::DataclassTransformer(params) = decorator_ty {
-                dataclass_transformer_params = Some(params);
+                Type::DataclassTransformer(params) => {
+                    dataclass_transformer_params = Some(params);
+                }
+                _ => {}
             }
 
             decorator_types_and_nodes.push((decorator_ty, decorator));
@@ -4350,6 +4364,20 @@ impl<'db> TypeInferenceBuilder<'db> {
         let mut call_arguments = Self::parse_arguments(arguments);
         let callable_type = self.infer_expression(func);
 
+        // It might look odd here that we emit an error for class-literals but not `type[]` types.
+        // But it's deliberate! The typing spec explicitly mandates that `type[]` types can be called
+        // even though class-literals cannot. This is because even though a protocol class `SomeProtocol`
+        // is always an abstract class, `type[SomeProtocol]` can be a concrete subclass of that protocol
+        // -- and indeed, according to the spec, type checkers must disallow abstract subclasses of the
+        // protocol to be passed to parameters that accept `type[SomeProtocol]`.
+        // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
+        if let Some(protocol_class) = callable_type
+            .into_class_literal()
+            .and_then(|class| class.into_protocol_class(self.db()))
+        {
+            report_attempted_protocol_instantiation(&self.context, call_expression, protocol_class);
+        }
+
         // For class literals we model the entire class instantiation logic, so it is handled
         // in a separate function. For some known classes we have manual signatures defined and use
         // the `try_call` path below.
@@ -4566,6 +4594,24 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                 call_expression,
                                                 *class,
                                             );
+                                        }
+                                    }
+                                }
+                                KnownFunction::IsInstance | KnownFunction::IsSubclass => {
+                                    if let [_, Some(Type::ClassLiteral(class))] =
+                                        overload.parameter_types()
+                                    {
+                                        if let Some(protocol_class) =
+                                            class.into_protocol_class(self.db())
+                                        {
+                                            if !protocol_class.is_runtime_checkable(self.db()) {
+                                                report_runtime_check_against_non_runtime_checkable_protocol(
+                                                    &self.context,
+                                                    call_expression,
+                                                    protocol_class,
+                                                    known_function
+                                                );
+                                            }
                                         }
                                     }
                                 }

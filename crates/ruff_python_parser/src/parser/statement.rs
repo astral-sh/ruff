@@ -1,8 +1,6 @@
 use compact_str::CompactString;
 use std::fmt::{Display, Write};
 
-use rustc_hash::{FxBuildHasher, FxHashSet};
-
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator, PythonVersion, Stmt,
@@ -3339,10 +3337,6 @@ impl<'src> Parser<'src> {
 
         parameters.range = self.node_range(start);
 
-        // test_err params_duplicate_names
-        // def foo(a, a=10, *a, a, a: str, **a): ...
-        self.validate_parameters(&parameters);
-
         parameters
     }
 
@@ -3627,25 +3621,6 @@ impl<'src> Parser<'src> {
             }
             Expr::Name(_) | Expr::Attribute(_) | Expr::Subscript(_) => {}
             _ => self.add_error(ParseErrorType::InvalidDeleteTarget, expr),
-        }
-    }
-
-    /// Validate that the given parameters doesn't have any duplicate names.
-    ///
-    /// Report errors for all the duplicate names found.
-    fn validate_parameters(&mut self, parameters: &ast::Parameters) {
-        let mut all_arg_names =
-            FxHashSet::with_capacity_and_hasher(parameters.len(), FxBuildHasher);
-
-        for parameter in parameters {
-            let range = parameter.name().range();
-            let param_name = parameter.name().as_str();
-            if !all_arg_names.insert(param_name) {
-                self.add_error(
-                    ParseErrorType::DuplicateParameter(param_name.to_string()),
-                    range,
-                );
-            }
         }
     }
 
