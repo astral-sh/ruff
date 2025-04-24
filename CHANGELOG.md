@@ -10,8 +10,8 @@
 
 ### Bug fixes
 
-- Fixes how the checker visits `typing.cast`/`typing.NewType` arguments ([#17538](https://github.com/astral-sh/ruff/pull/17538))
-- \[`airflow`\] fix typos (`AIR302`, `AIR312`) ([#17574](https://github.com/astral-sh/ruff/pull/17574))
+- \[`flake8-type-checking`\] Visit keyword arguments in checks involving `typing.cast`/`typing.NewType` arguments ([#17538](https://github.com/astral-sh/ruff/pull/17538))
+- \[`airflow`\] Fix typos in provider package names (`AIR302`, `AIR312`) ([#17574](https://github.com/astral-sh/ruff/pull/17574))
 - \[`pyupgrade`\] Preserve parenthesis when fixing native literals containing newlines (`UP018`) ([#17220](https://github.com/astral-sh/ruff/pull/17220))
 - \[`refurb`\] Mark the `FURB161` fix unsafe except for integers and booleans ([#17240](https://github.com/astral-sh/ruff/pull/17240))
 
@@ -23,16 +23,7 @@
 
 ### Documentation
 
-- \[`pyflakes`\] Add fix safety section (`F841`) ([#17410](https://github.com/astral-sh/ruff/pull/17410))
-- \[`pyflakes`\] Add fix safety section to docs (`F601`, `F602`) ([#17440](https://github.com/astral-sh/ruff/pull/17440))
-- \[`pyupgrade`\] Add fix safety section to docs (`UP008`, `UP022`) ([#17441](https://github.com/astral-sh/ruff/pull/17441))
-- \[`pyupgrade`\] Add fix safety section to docs (`UP030`) ([#17443](https://github.com/astral-sh/ruff/pull/17443))
-- \[`pyupgrade`\] Add fix safety section to docs (`UP036`) ([#17444](https://github.com/astral-sh/ruff/pull/17444))
-
-### Other changes
-
-- Fix stale diagnostics in Ruff playground ([#17583](https://github.com/astral-sh/ruff/pull/17583))
-- [red-knot] allow assignment expression in call compare narrowing ([#17461](https://github.com/astral-sh/ruff/pull/17461))
+- Add fix safety sections to docs for several rules ([#17410](https://github.com/astral-sh/ruff/pull/17410),[#17440](https://github.com/astral-sh/ruff/pull/17440),[#17441](https://github.com/astral-sh/ruff/pull/17441),[#17443](https://github.com/astral-sh/ruff/pull/17443),[#17444](https://github.com/astral-sh/ruff/pull/17444))
 
 ## 0.11.6
 
