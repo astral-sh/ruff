@@ -433,5 +433,16 @@ AIR301_names.py:152:1: AIR301 `airflow.www.utils.should_hide_value_for_key` is r
 151 | get_sensitive_variables_fields
 152 | should_hide_value_for_key
     | ^^^^^^^^^^^^^^^^^^^^^^^^^ AIR301
+153 |
+154 | # airflow.operators.python
     |
     = help: Use `airflow.utils.log.secrets_masker.should_hide_value_for_key` instead
+
+AIR301_names.py:157:1: AIR301 `airflow.operators.python.get_current_context` is removed in Airflow 3.0
+    |
+155 | from airflow.operators.python import get_current_context
+156 |
+157 | get_current_context()
+    | ^^^^^^^^^^^^^^^^^^^ AIR301
+    |
+    = help: Use `airflow.sdk.get_current_context` instead
