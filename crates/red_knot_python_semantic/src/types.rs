@@ -6308,64 +6308,54 @@ impl<'db> FunctionType<'db> {
             db: &'db dyn Db,
             function: FunctionType<'db>,
         ) -> Option<OverloadedFunction<'db>> {
-            // The semantic model records a use for each function on the name node. This is used here
-            // to get the previous function definition with the same name.
-            let scope = function.definition(db).scope(db);
-            let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
-            let use_id = function
-                .body_scope(db)
-                .node(db)
-                .expect_function()
-                .name
-                .scoped_use_id(db, scope);
+            let mut current = function;
+            let mut overloads = vec![];
 
-            if let Symbol::Type(Type::FunctionLiteral(function_literal), Boundness::Bound) =
-                symbol_from_bindings(db, use_def.bindings_at_use(use_id))
-            {
-                match function_literal.to_overloaded(db) {
-                    None => {
-                        debug_assert!(
-                        !function_literal.has_known_decorator(db, FunctionDecorators::OVERLOAD),
-                        "Expected `Some(OverloadedFunction)` if the previous function was an overload"
-                    );
-                    }
-                    Some(OverloadedFunction {
-                        implementation: Some(_),
-                        ..
-                    }) => {
-                        // If the previous overloaded function already has an implementation, then this
-                        // new signature completely replaces it.
-                    }
-                    Some(OverloadedFunction {
-                        overloads,
-                        implementation: None,
-                    }) => {
-                        return Some(
-                            if function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-                                let mut overloads = overloads.clone();
-                                overloads.push(function);
-                                OverloadedFunction {
-                                    overloads,
-                                    implementation: None,
-                                }
-                            } else {
-                                OverloadedFunction {
-                                    overloads: overloads.clone(),
-                                    implementation: Some(function),
-                                }
-                            },
-                        );
-                    }
+            loop {
+                // The semantic model records a use for each function on the name node. This is used
+                // here to get the previous function definition with the same name.
+                let scope = current.definition(db).scope(db);
+                let use_def =
+                    semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+                let use_id = current
+                    .body_scope(db)
+                    .node(db)
+                    .expect_function()
+                    .name
+                    .scoped_use_id(db, scope);
+
+                let Symbol::Type(Type::FunctionLiteral(previous), Boundness::Bound) =
+                    symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+                else {
+                    break;
+                };
+
+                if previous.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+                    overloads.push(previous);
+                } else {
+                    break;
                 }
+
+                current = previous;
             }
 
-            if function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-                Some(OverloadedFunction {
-                    overloads: vec![function],
-                    implementation: None,
-                })
-            } else {
+            // Overloads are inserted in reverse order, from bottom to top.
+            overloads.reverse();
+
+            let implementation = if function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+                overloads.push(function);
                 None
+            } else {
+                Some(function)
+            };
+
+            if overloads.is_empty() {
+                None
+            } else {
+                Some(OverloadedFunction {
+                    overloads,
+                    implementation,
+                })
             }
         }
 
