@@ -317,7 +317,7 @@ reveal_type(Protocol())  # revealed: Unknown
 class MyProtocol(Protocol):
     x: int
 
-# error: [call-non-callable] "Cannot instantiate abstract class `MyProtocol`"
+# error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
 reveal_type(MyProtocol())  # revealed: MyProtocol
 ```
 

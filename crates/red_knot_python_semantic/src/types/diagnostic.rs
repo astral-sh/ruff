@@ -1413,21 +1413,17 @@ pub(crate) fn report_attempted_protocol_instantiation(
     };
     let db = context.db();
     let class_name = protocol.name(db);
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Cannot instantiate abstract class `{class_name}`",
-    ));
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Cannot instantiate class `{class_name}`",));
     diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
 
     let mut class_def_diagnostic = SubDiagnostic::new(
         Severity::Info,
-        format_args!(
-            "`{class_name}` is declared as a protocol class, \
-                meaning it is implicitly abstract"
-        ),
+        format_args!("Protocol classes cannot be instantiated"),
     );
     class_def_diagnostic.annotate(
         Annotation::primary(protocol.header_span(db))
-            .message(format_args!("`{class_name}` declared here")),
+            .message(format_args!("`{class_name}` declared as a protocol here")),
     );
     diagnostic.sub(class_def_diagnostic);
 }

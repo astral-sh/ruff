@@ -20,7 +20,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/protocols.md
  6 | class MyProtocol(Protocol):
  7 |     x: int
  8 | 
- 9 | # error: [call-non-callable] "Cannot instantiate abstract class `MyProtocol`"
+ 9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
 10 | reveal_type(MyProtocol())  # revealed: MyProtocol
 11 | class SubclassOfMyProtocol(MyProtocol): ...
 12 | 
@@ -58,21 +58,21 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:call-non-callable: Cannot instantiate abstract class `MyProtocol`
+error: lint:call-non-callable: Cannot instantiate class `MyProtocol`
   --> /src/mdtest_snippet.py:10:13
    |
- 9 | # error: [call-non-callable] "Cannot instantiate abstract class `MyProtocol`"
+ 9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
 10 | reveal_type(MyProtocol())  # revealed: MyProtocol
    |             ^^^^^^^^^^^^ This call will raise `TypeError` at runtime
 11 | class SubclassOfMyProtocol(MyProtocol): ...
    |
-info: `MyProtocol` is declared as a protocol class, meaning it is implicitly abstract
+info: Protocol classes cannot be instantiated
  --> /src/mdtest_snippet.py:6:7
   |
 4 | reveal_type(Protocol())  # revealed: Unknown
 5 |
 6 | class MyProtocol(Protocol):
-  |       ^^^^^^^^^^^^^^^^^^^^ `MyProtocol` declared here
+  |       ^^^^^^^^^^^^^^^^^^^^ `MyProtocol` declared as a protocol here
 7 |     x: int
   |
 
@@ -82,7 +82,7 @@ info: `MyProtocol` is declared as a protocol class, meaning it is implicitly abs
 info: revealed-type: Revealed type
   --> /src/mdtest_snippet.py:10:1
    |
- 9 | # error: [call-non-callable] "Cannot instantiate abstract class `MyProtocol`"
+ 9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
 10 | reveal_type(MyProtocol())  # revealed: MyProtocol
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ `MyProtocol`
 11 | class SubclassOfMyProtocol(MyProtocol): ...
