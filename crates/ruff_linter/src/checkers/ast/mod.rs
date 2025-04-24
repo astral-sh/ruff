@@ -615,7 +615,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
-            | SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(_)
+            | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
             | SemanticSyntaxErrorKind::DuplicateParameter(_) => {
                 if self.settings.preview.is_enabled() {
                     self.semantic_errors.borrow_mut().push(error);
