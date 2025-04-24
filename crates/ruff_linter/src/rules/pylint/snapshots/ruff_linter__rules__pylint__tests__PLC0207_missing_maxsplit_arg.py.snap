@@ -1,183 +1,183 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-missing_maxsplit_arg.py:11:13: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:11:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
  9 | # Errors
 10 | ## Test split called directly on string literal
-11 | get_first = "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
-   |             ^^^^^^^^^^^^^^^^^^^^^ PLC0207
-12 | get_last = "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
-13 | get_first = "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+11 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^ PLC0207
+12 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+13 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:12:12: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:12:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
 10 | ## Test split called directly on string literal
-11 | get_first = "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
-12 | get_last = "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
-   |            ^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-13 | get_first = "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
-14 | get_last = "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+11 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+12 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+13 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+14 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:13:13: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:13:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
-11 | get_first = "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
-12 | get_last = "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
-13 | get_first = "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
-   |             ^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-14 | get_last = "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+11 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
+12 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+13 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+14 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:14:12: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:14:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
-12 | get_last = "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
-13 | get_first = "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
-14 | get_last = "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
-   |            ^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+12 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
+13 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
+14 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
 15 |
 16 | ## Test split called on string variable
    |
 
-missing_maxsplit_arg.py:17:13: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:17:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
 16 | ## Test split called on string variable
-17 | get_first = SEQ.split(",")[0]  # [missing-maxsplit-arg]
-   |             ^^^^^^^^^^^^^^^^^ PLC0207
-18 | get_last = SEQ.split(",")[-1]  # [missing-maxsplit-arg]
-19 | get_first = SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+17 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^ PLC0207
+18 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+19 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:18:12: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:18:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
 16 | ## Test split called on string variable
-17 | get_first = SEQ.split(",")[0]  # [missing-maxsplit-arg]
-18 | get_last = SEQ.split(",")[-1]  # [missing-maxsplit-arg]
-   |            ^^^^^^^^^^^^^^^^^^ PLC0207
-19 | get_first = SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
-20 | get_last = SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+17 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+18 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^ PLC0207
+19 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+20 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:19:13: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:19:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
-17 | get_first = SEQ.split(",")[0]  # [missing-maxsplit-arg]
-18 | get_last = SEQ.split(",")[-1]  # [missing-maxsplit-arg]
-19 | get_first = SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
-   |             ^^^^^^^^^^^^^^^^^^ PLC0207
-20 | get_last = SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+17 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
+18 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+19 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^ PLC0207
+20 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:20:12: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:20:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
-18 | get_last = SEQ.split(",")[-1]  # [missing-maxsplit-arg]
-19 | get_first = SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
-20 | get_last = SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
-   |            ^^^^^^^^^^^^^^^^^^^ PLC0207
+18 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
+19 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
+20 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^ PLC0207
 21 |
 22 | ## Test split called on class attribute
    |
 
-missing_maxsplit_arg.py:23:13: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:23:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
 22 | ## Test split called on class attribute
-23 | get_first = Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-24 | get_last = Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
-25 | get_first = Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+23 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+24 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+25 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:24:12: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:24:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
 22 | ## Test split called on class attribute
-23 | get_first = Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
-24 | get_last = Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-25 | get_first = Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
-26 | get_last = Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+23 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+24 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+25 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+26 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:25:13: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:25:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
-23 | get_first = Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
-24 | get_last = Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
-25 | get_first = Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-26 | get_last = Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+23 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
+24 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+25 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+26 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:26:12: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:26:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
-24 | get_last = Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
-25 | get_first = Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
-26 | get_last = Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+24 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
+25 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
+26 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
 27 |
 28 | ## Test sep given as named argument
    |
 
-missing_maxsplit_arg.py:29:13: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:29:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
 28 | ## Test sep given as named argument
-29 | get_first = "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-30 | get_last = "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
-31 | get_first = "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+29 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+30 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+31 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:30:12: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:30:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
 28 | ## Test sep given as named argument
-29 | get_first = "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
-30 | get_last = "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-31 | get_first = "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
-32 | get_last = "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+29 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+30 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+31 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+32 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:31:13: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:31:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
-29 | get_first = "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
-30 | get_last = "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
-31 | get_first = "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-32 | get_last = "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+29 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
+30 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+31 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+32 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:32:12: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:32:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
-30 | get_last = "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
-31 | get_first = "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
-32 | get_last = "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
-   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+30 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
+31 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
+32 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
 33 |
 34 | ## Special cases
    |
 
-missing_maxsplit_arg.py:35:5: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:35:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
 34 | ## Special cases
-35 | a = "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
-   |     ^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-36 | a = "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
-37 | a = "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+35 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+36 | "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
+37 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:36:5: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:36:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
 34 | ## Special cases
-35 | a = "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
-36 | a = "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
-37 | a = "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+35 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+36 | "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+37 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
    |
 
-missing_maxsplit_arg.py:37:5: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+missing_maxsplit_arg.py:37:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
    |
-35 | a = "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
-36 | a = "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
-37 | a = "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+35 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
+36 | "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
+37 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
 38 |
 39 | # OK
    |
