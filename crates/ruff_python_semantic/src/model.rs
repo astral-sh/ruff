@@ -1505,7 +1505,27 @@ impl<'a> SemanticModel<'a> {
     pub fn set_globals(&mut self, globals: Globals<'a>) {
         // If any global bindings don't already exist in the global scope, add them, unless we are
         // also in the global scope, where we don't want these to count as definitions for rules
-        // like `undefined-name` (F821)
+        // like `undefined-name` (F821). For example, adding bindings in the top-level scope causes
+        // a false negative in cases like this:
+        //
+        // ```python
+        // global x
+        //
+        // def f():
+        //     print(x)  # F821 false negative
+        // ```
+        //
+        // On the other hand, failing to add bindings in non-top-level scopes causes false
+        // positives:
+        //
+        // ```python
+        // def f():
+        //     global foo
+        //     import foo
+        //
+        // def g():
+        //     foo.is_used()  # F821 false positive
+        // ```
         if !self.at_top_level() {
             for (name, range) in globals.iter() {
                 if self
