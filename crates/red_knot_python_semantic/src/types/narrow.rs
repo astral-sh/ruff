@@ -512,19 +512,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     None
                 }
             }
-            (_, Type::BooleanLiteral(b)) => {
-                if b {
-                    Some(
-                        UnionType::from_elements(self.db, [rhs_ty, Type::IntLiteral(1)])
-                            .negate(self.db),
-                    )
-                } else {
-                    Some(
-                        UnionType::from_elements(self.db, [rhs_ty, Type::IntLiteral(0)])
-                            .negate(self.db),
-                    )
-                }
-            }
+            (_, Type::BooleanLiteral(b)) => Some(
+                UnionType::from_elements(self.db, [rhs_ty, Type::IntLiteral(i64::from(b))])
+                    .negate(self.db),
+            ),
             _ if rhs_ty.is_single_valued(self.db) => Some(rhs_ty.negate(self.db)),
             _ => None,
         }
