@@ -25,6 +25,14 @@ Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
 Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
 Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
+## Test split called on sliced string
+"1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
+Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
+"1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
+SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
+Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
+
 ## Test sep given as named argument
 "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
 "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
@@ -36,12 +44,42 @@ Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
 "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
 "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
 
+
 # OK
-## Don't suggest maxsplit=1 if not accessing the first or last element
+## Test not accessing the first or last element
+### Test split called directly on string literal
 "1,2,3".split(",")[1]
 "1,2,3".split(",")[-2]
+"1,2,3".rsplit(",")[1]
+"1,2,3".rsplit(",")[-2]
 
-## Test varying maxsplit argument -- all these will be okay
+### Test split called on string variable
+SEQ.split(",")[1]
+SEQ.split(",")[-2]
+SEQ.rsplit(",")[1]
+SEQ.rsplit(",")[-2]
+
+### Test split called on class attribute
+Foo.class_str.split(",")[1]
+Foo.class_str.split(",")[-2]
+Foo.class_str.rsplit(",")[1]
+Foo.class_str.rsplit(",")[-2]
+
+### Test split called on sliced string
+"1,2,3"[::-1].split(",")[1]  # [missing-maxsplit-arg]
+SEQ[:3].split(",")[1]  # [missing-maxsplit-arg]
+Foo.class_str[1:3].split(",")[-2]  # [missing-maxsplit-arg]
+"1,2,3"[::-1].rsplit(",")[1]  # [missing-maxsplit-arg]
+SEQ[:3].rsplit(",")[1]  # [missing-maxsplit-arg]
+Foo.class_str[1:3].rsplit(",")[-2]  # [missing-maxsplit-arg]
+
+### Test sep given as named argument
+"1,2,3".split(sep=",")[1]
+"1,2,3".split(sep=",")[-2]
+"1,2,3".rsplit(sep=",")[1]
+"1,2,3".rsplit(sep=",")[-2]
+
+## Test varying maxsplit argument
 ### str.split() tests
 "1,2,3".split(sep=",", maxsplit=1)[-1]
 "1,2,3".split(sep=",", maxsplit=1)[0]
@@ -56,13 +94,14 @@ Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
 "1,2,3".rsplit(sep=",", maxsplit=2)[0]
 "1,2,3".rsplit(sep=",", maxsplit=2)[1]
 
-## Test class attributes
-Foo.class_str.split(",")[1]
-Foo.class_str.split(",")[-2]
-
 ## Test user-defined split
 Foo("1,2,3").split(",")[0]
 Foo("1,2,3").split(",")[-1]
+Foo("1,2,3").rsplit(",")[0]
+Foo("1,2,3").rsplit(",")[-1]
+
+## Test split called on sliced list
+["1", "2", "3"][::-1].split(",")[0]
 
 
 # TODO
@@ -79,8 +118,6 @@ Foo("1,2,3").split(",")[-1]
 #     split = "1,2,3"
 
 # Errors
-## Test split called on reverse sliced string
-# "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
 ## Test sep arg from unpacked dict (without maxsplit arg)
 # "1,2,3".split(**{"sep": ","})
 ## Test accessor

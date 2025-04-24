@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprCall, ExprNumberLiteral, ExprUnaryOp, Number, UnaryOp,
+    Expr, ExprAttribute, ExprCall, ExprNumberLiteral, ExprSubscript, ExprUnaryOp, Number, UnaryOp,
 };
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -81,10 +81,15 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
             return;
         }
 
+        let mut target_instance = value;
+        if let Expr::Subscript(ExprSubscript { value, .. }) = value.as_ref() {
+            target_instance = value;
+        }
+
         let semantic = checker.semantic();
 
         // Check the function is called on a string
-        if let Expr::Name(name) = value.as_ref() {
+        if let Expr::Name(name) = target_instance.as_ref() {
             let Some(binding_id) = semantic.only_binding(name) else {
                 return;
             };
@@ -93,12 +98,12 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
             if !typing::is_string(binding, semantic) {
                 return;
             }
-        } else if let Some(binding_id) = semantic.lookup_attribute(value) {
+        } else if let Some(binding_id) = semantic.lookup_attribute(target_instance) {
             let binding = semantic.binding(binding_id);
             if !typing::is_string(binding, semantic) {
                 return;
             }
-        } else if let Expr::StringLiteral(_) = value.as_ref() {
+        } else if let Expr::StringLiteral(_) = target_instance.as_ref() {
             // pass
         } else {
             return;
