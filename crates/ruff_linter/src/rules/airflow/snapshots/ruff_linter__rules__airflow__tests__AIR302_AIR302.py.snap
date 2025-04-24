@@ -9,7 +9,7 @@ AIR302.py:226:1: AIR302 `airflow.hooks.S3_hook.provide_bucket_name` is moved int
 227 | GCSToS3Operator()
 228 | GoogleApiToS3Operator()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.hooks.s3.provide_bucket_name` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.hooks.s3.provide_bucket_name` instead.
 
 AIR302.py:227:1: AIR302 `airflow.operators.gcs_to_s3.GCSToS3Operator` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -20,7 +20,7 @@ AIR302.py:227:1: AIR302 `airflow.operators.gcs_to_s3.GCSToS3Operator` is moved i
 228 | GoogleApiToS3Operator()
 229 | GoogleApiToS3Transfer()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.gcs_to_s3.GCSToS3Operator` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.gcs_to_s3.GCSToS3Operator` instead.
 
 AIR302.py:228:1: AIR302 `airflow.operators.google_api_to_s3_transfer.GoogleApiToS3Operator` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -31,7 +31,7 @@ AIR302.py:228:1: AIR302 `airflow.operators.google_api_to_s3_transfer.GoogleApiTo
 229 | GoogleApiToS3Transfer()
 230 | RedshiftToS3Operator()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.google_api_to_s3.GoogleApiToS3Operator` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.google_api_to_s3.GoogleApiToS3Operator` instead.
 
 AIR302.py:229:1: AIR302 `airflow.operators.google_api_to_s3_transfer.GoogleApiToS3Transfer` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -42,7 +42,7 @@ AIR302.py:229:1: AIR302 `airflow.operators.google_api_to_s3_transfer.GoogleApiTo
 230 | RedshiftToS3Operator()
 231 | RedshiftToS3Transfer()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.google_api_to_s3.GoogleApiToS3Operator` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.google_api_to_s3.GoogleApiToS3Operator` instead.
 
 AIR302.py:230:1: AIR302 `airflow.operators.redshift_to_s3_operator.RedshiftToS3Operator` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -53,7 +53,7 @@ AIR302.py:230:1: AIR302 `airflow.operators.redshift_to_s3_operator.RedshiftToS3O
 231 | RedshiftToS3Transfer()
 232 | S3FileTransformOperator()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.redshift_to_s3.RedshiftToS3Operator` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.redshift_to_s3.RedshiftToS3Operator` instead.
 
 AIR302.py:231:1: AIR302 `airflow.operators.redshift_to_s3_operator.RedshiftToS3Transfer` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -64,7 +64,7 @@ AIR302.py:231:1: AIR302 `airflow.operators.redshift_to_s3_operator.RedshiftToS3T
 232 | S3FileTransformOperator()
 233 | S3Hook()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.redshift_to_s3.RedshiftToS3Operator` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.redshift_to_s3.RedshiftToS3Operator` instead.
 
 AIR302.py:232:1: AIR302 `airflow.operators.s3_file_transform_operator.S3FileTransformOperator` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -75,7 +75,7 @@ AIR302.py:232:1: AIR302 `airflow.operators.s3_file_transform_operator.S3FileTran
 233 | S3Hook()
 234 | SSQLTableCheckOperator3KeySensor()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.operators.s3_file_transform.S3FileTransformOperator` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.operators.s3_file_transform.S3FileTransformOperator` instead.
 
 AIR302.py:233:1: AIR302 `airflow.hooks.S3_hook.S3Hook` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -86,7 +86,7 @@ AIR302.py:233:1: AIR302 `airflow.hooks.S3_hook.S3Hook` is moved into `amazon` pr
 234 | SSQLTableCheckOperator3KeySensor()
 235 | S3ToRedshiftOperator()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.hooks.s3.S3Hook` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.hooks.s3.S3Hook` instead.
 
 AIR302.py:235:1: AIR302 `airflow.operators.s3_to_redshift_operator.S3ToRedshiftOperator` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -96,7 +96,7 @@ AIR302.py:235:1: AIR302 `airflow.operators.s3_to_redshift_operator.S3ToRedshiftO
     | ^^^^^^^^^^^^^^^^^^^^ AIR302
 236 | S3ToRedshiftTransfer()
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator` instead.
 
 AIR302.py:236:1: AIR302 `airflow.operators.s3_to_redshift_operator.S3ToRedshiftTransfer` is moved into `amazon` provider in Airflow 3.0;
     |
@@ -107,7 +107,7 @@ AIR302.py:236:1: AIR302 `airflow.operators.s3_to_redshift_operator.S3ToRedshiftT
 237 |
 238 | # apache-airflow-providers-celery
     |
-    = help: Install `apache-airflow-provider-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator` instead.
+    = help: Install `apache-airflow-providers-amazon>=1.0.0` and use `airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator` instead.
 
 AIR302.py:239:1: AIR302 `airflow.config_templates.default_celery.DEFAULT_CELERY_CONFIG` is moved into `celery` provider in Airflow 3.0;
     |
@@ -117,7 +117,7 @@ AIR302.py:239:1: AIR302 `airflow.config_templates.default_celery.DEFAULT_CELERY_
 240 | app
 241 | CeleryExecutor()
     |
-    = help: Install `apache-airflow-provider-celery>=3.3.0` and use `airflow.providers.celery.executors.default_celery.DEFAULT_CELERY_CONFIG` instead.
+    = help: Install `apache-airflow-providers-celery>=3.3.0` and use `airflow.providers.celery.executors.default_celery.DEFAULT_CELERY_CONFIG` instead.
 
 AIR302.py:240:1: AIR302 `airflow.executors.celery_executor.app` is moved into `celery` provider in Airflow 3.0;
     |
@@ -128,7 +128,7 @@ AIR302.py:240:1: AIR302 `airflow.executors.celery_executor.app` is moved into `c
 241 | CeleryExecutor()
 242 | CeleryKubernetesExecutor()
     |
-    = help: Install `apache-airflow-provider-celery>=3.3.0` and use `airflow.providers.celery.executors.celery_executor_utils.app` instead.
+    = help: Install `apache-airflow-providers-celery>=3.3.0` and use `airflow.providers.celery.executors.celery_executor_utils.app` instead.
 
 AIR302.py:241:1: AIR302 `airflow.executors.celery_executor.CeleryExecutor` is moved into `celery` provider in Airflow 3.0;
     |
@@ -138,7 +138,7 @@ AIR302.py:241:1: AIR302 `airflow.executors.celery_executor.CeleryExecutor` is mo
     | ^^^^^^^^^^^^^^ AIR302
 242 | CeleryKubernetesExecutor()
     |
-    = help: Install `apache-airflow-provider-celery>=3.3.0` and use `airflow.providers.celery.executors.celery_executor.CeleryExecutor` instead.
+    = help: Install `apache-airflow-providers-celery>=3.3.0` and use `airflow.providers.celery.executors.celery_executor.CeleryExecutor` instead.
 
 AIR302.py:242:1: AIR302 `airflow.executors.celery_kubernetes_executor.CeleryKubernetesExecutor` is moved into `celery` provider in Airflow 3.0;
     |
@@ -149,7 +149,7 @@ AIR302.py:242:1: AIR302 `airflow.executors.celery_kubernetes_executor.CeleryKube
 243 |
 244 | # apache-airflow-providers-common-sql
     |
-    = help: Install `apache-airflow-provider-celery>=3.3.0` and use `airflow.providers.celery.executors.celery_kubernetes_executor.CeleryKubernetesExecutor` instead.
+    = help: Install `apache-airflow-providers-celery>=3.3.0` and use `airflow.providers.celery.executors.celery_kubernetes_executor.CeleryKubernetesExecutor` instead.
 
 AIR302.py:245:1: AIR302 `airflow.operators.sql._convert_to_float_if_possible` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -159,7 +159,7 @@ AIR302.py:245:1: AIR302 `airflow.operators.sql._convert_to_float_if_possible` is
 246 | parse_boolean()
 247 | BaseSQLOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql._convert_to_float_if_possible` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql._convert_to_float_if_possible` instead.
 
 AIR302.py:246:1: AIR302 `airflow.operators.sql.parse_boolean` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -170,7 +170,7 @@ AIR302.py:246:1: AIR302 `airflow.operators.sql.parse_boolean` is moved into `com
 247 | BaseSQLOperator()
 248 | BashOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql.parse_boolean` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql.parse_boolean` instead.
 
 AIR302.py:247:1: AIR302 `airflow.operators.sql.BaseSQLOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -181,7 +181,7 @@ AIR302.py:247:1: AIR302 `airflow.operators.sql.BaseSQLOperator` is moved into `c
 248 | BashOperator()
 249 | LegacyBashOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.BaseSQLOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.BaseSQLOperator` instead.
 
 AIR302.py:249:1: AIR302 `airflow.operators.bash_operator.BashOperator` is moved into `standard` provider in Airflow 3.0;
     |
@@ -192,7 +192,7 @@ AIR302.py:249:1: AIR302 `airflow.operators.bash_operator.BashOperator` is moved 
 250 | BranchSQLOperator()
 251 | CheckOperator()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.1` and use `airflow.providers.standard.operators.bash.BashOperator` instead.
+    = help: Install `apache-airflow-providers-standard>=0.0.1` and use `airflow.providers.standard.operators.bash.BashOperator` instead.
 
 AIR302.py:250:1: AIR302 `airflow.operators.sql.BranchSQLOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -203,7 +203,7 @@ AIR302.py:250:1: AIR302 `airflow.operators.sql.BranchSQLOperator` is moved into 
 251 | CheckOperator()
 252 | ConnectorProtocol()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.BranchSQLOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.BranchSQLOperator` instead.
 
 AIR302.py:251:1: AIR302 `airflow.operators.check_operator.CheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -214,7 +214,7 @@ AIR302.py:251:1: AIR302 `airflow.operators.check_operator.CheckOperator` is move
 252 | ConnectorProtocol()
 253 | DbApiHook()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
 
 AIR302.py:252:1: AIR302 `airflow.hooks.dbapi.ConnectorProtocol` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -225,7 +225,7 @@ AIR302.py:252:1: AIR302 `airflow.hooks.dbapi.ConnectorProtocol` is moved into `c
 253 | DbApiHook()
 254 | DbApiHook2()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.hooks.sql.ConnectorProtocol` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.hooks.sql.ConnectorProtocol` instead.
 
 AIR302.py:253:1: AIR302 `airflow.hooks.dbapi.DbApiHook` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -236,7 +236,7 @@ AIR302.py:253:1: AIR302 `airflow.hooks.dbapi.DbApiHook` is moved into `common-sq
 254 | DbApiHook2()
 255 | IntervalCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.hooks.sql.DbApiHook` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.hooks.sql.DbApiHook` instead.
 
 AIR302.py:254:1: AIR302 `airflow.hooks.dbapi_hook.DbApiHook` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -247,7 +247,7 @@ AIR302.py:254:1: AIR302 `airflow.hooks.dbapi_hook.DbApiHook` is moved into `comm
 255 | IntervalCheckOperator()
 256 | PrestoCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.hooks.sql.DbApiHook` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.hooks.sql.DbApiHook` instead.
 
 AIR302.py:255:1: AIR302 `airflow.operators.check_operator.IntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -258,7 +258,7 @@ AIR302.py:255:1: AIR302 `airflow.operators.check_operator.IntervalCheckOperator`
 256 | PrestoCheckOperator()
 257 | PrestoIntervalCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
 
 AIR302.py:256:1: AIR302 `airflow.operators.presto_check_operator.PrestoCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -269,7 +269,7 @@ AIR302.py:256:1: AIR302 `airflow.operators.presto_check_operator.PrestoCheckOper
 257 | PrestoIntervalCheckOperator()
 258 | PrestoValueCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
 
 AIR302.py:257:1: AIR302 `airflow.operators.presto_check_operator.PrestoIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -280,7 +280,7 @@ AIR302.py:257:1: AIR302 `airflow.operators.presto_check_operator.PrestoIntervalC
 258 | PrestoValueCheckOperator()
 259 | SQLCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
 
 AIR302.py:258:1: AIR302 `airflow.operators.presto_check_operator.PrestoValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -291,7 +291,7 @@ AIR302.py:258:1: AIR302 `airflow.operators.presto_check_operator.PrestoValueChec
 259 | SQLCheckOperator()
 260 | SQLCheckOperator2()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
 
 AIR302.py:259:1: AIR302 `airflow.operators.check_operator.SQLCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -302,7 +302,7 @@ AIR302.py:259:1: AIR302 `airflow.operators.check_operator.SQLCheckOperator` is m
 260 | SQLCheckOperator2()
 261 | SQLCheckOperator3()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
 
 AIR302.py:260:1: AIR302 `airflow.operators.presto_check_operator.SQLCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -313,7 +313,7 @@ AIR302.py:260:1: AIR302 `airflow.operators.presto_check_operator.SQLCheckOperato
 261 | SQLCheckOperator3()
 262 | SQLColumnCheckOperator2()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
 
 AIR302.py:261:1: AIR302 `airflow.operators.sql.SQLCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -324,7 +324,7 @@ AIR302.py:261:1: AIR302 `airflow.operators.sql.SQLCheckOperator` is moved into `
 262 | SQLColumnCheckOperator2()
 263 | SQLIntervalCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLCheckOperator` instead.
 
 AIR302.py:262:1: AIR302 `airflow.operators.sql.SQLColumnCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -335,7 +335,7 @@ AIR302.py:262:1: AIR302 `airflow.operators.sql.SQLColumnCheckOperator` is moved 
 263 | SQLIntervalCheckOperator()
 264 | SQLIntervalCheckOperator2()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql.SQLColumnCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql.SQLColumnCheckOperator` instead.
 
 AIR302.py:263:1: AIR302 `airflow.operators.check_operator.SQLIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -346,7 +346,7 @@ AIR302.py:263:1: AIR302 `airflow.operators.check_operator.SQLIntervalCheckOperat
 264 | SQLIntervalCheckOperator2()
 265 | SQLIntervalCheckOperator3()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
 
 AIR302.py:264:1: AIR302 `airflow.operators.presto_check_operator.SQLIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -357,7 +357,7 @@ AIR302.py:264:1: AIR302 `airflow.operators.presto_check_operator.SQLIntervalChec
 265 | SQLIntervalCheckOperator3()
 266 | SQLTableCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
 
 AIR302.py:265:1: AIR302 `airflow.operators.sql.SQLIntervalCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -368,7 +368,7 @@ AIR302.py:265:1: AIR302 `airflow.operators.sql.SQLIntervalCheckOperator` is move
 266 | SQLTableCheckOperator()
 267 | SQLThresholdCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator` instead.
 
 AIR302.py:267:1: AIR302 `airflow.operators.check_operator.SQLThresholdCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -379,7 +379,7 @@ AIR302.py:267:1: AIR302 `airflow.operators.check_operator.SQLThresholdCheckOpera
 268 | SQLThresholdCheckOperator2()
 269 | SQLValueCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator` instead.
 
 AIR302.py:268:1: AIR302 `airflow.operators.sql.SQLThresholdCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -390,7 +390,7 @@ AIR302.py:268:1: AIR302 `airflow.operators.sql.SQLThresholdCheckOperator` is mov
 269 | SQLValueCheckOperator()
 270 | SQLValueCheckOperator2()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator` instead.
 
 AIR302.py:269:1: AIR302 `airflow.operators.check_operator.SQLValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -401,7 +401,7 @@ AIR302.py:269:1: AIR302 `airflow.operators.check_operator.SQLValueCheckOperator`
 270 | SQLValueCheckOperator2()
 271 | SQLValueCheckOperator3()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
 
 AIR302.py:270:1: AIR302 `airflow.operators.presto_check_operator.SQLValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -412,7 +412,7 @@ AIR302.py:270:1: AIR302 `airflow.operators.presto_check_operator.SQLValueCheckOp
 271 | SQLValueCheckOperator3()
 272 | SqlSensor()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
 
 AIR302.py:271:1: AIR302 `airflow.operators.sql.SQLValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -423,7 +423,7 @@ AIR302.py:271:1: AIR302 `airflow.operators.sql.SQLValueCheckOperator` is moved i
 272 | SqlSensor()
 273 | SqlSensor2()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
 
 AIR302.py:272:1: AIR302 `airflow.sensors.sql.SqlSensor` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -434,7 +434,7 @@ AIR302.py:272:1: AIR302 `airflow.sensors.sql.SqlSensor` is moved into `common-sq
 273 | SqlSensor2()
 274 | ThresholdCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.0.0` and use `airflow.providers.common.sql.sensors.sql.SqlSensor` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.0.0` and use `airflow.providers.common.sql.sensors.sql.SqlSensor` instead.
 
 AIR302.py:274:1: AIR302 `airflow.operators.check_operator.ThresholdCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -444,7 +444,7 @@ AIR302.py:274:1: AIR302 `airflow.operators.check_operator.ThresholdCheckOperator
     | ^^^^^^^^^^^^^^^^^^^^^^ AIR302
 275 | ValueCheckOperator()
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator` instead.
 
 AIR302.py:275:1: AIR302 `airflow.operators.check_operator.ValueCheckOperator` is moved into `common-sql` provider in Airflow 3.0;
     |
@@ -455,7 +455,7 @@ AIR302.py:275:1: AIR302 `airflow.operators.check_operator.ValueCheckOperator` is
 276 |
 277 | # apache-airflow-providers-daskexecutor
     |
-    = help: Install `apache-airflow-provider-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
+    = help: Install `apache-airflow-providers-common-sql>=1.1.0` and use `airflow.providers.common.sql.operators.sql.SQLValueCheckOperator` instead.
 
 AIR302.py:278:1: AIR302 `airflow.executors.dask_executor.DaskExecutor` is moved into `daskexecutor` provider in Airflow 3.0;
     |
@@ -465,7 +465,7 @@ AIR302.py:278:1: AIR302 `airflow.executors.dask_executor.DaskExecutor` is moved 
 279 |
 280 | # apache-airflow-providers-docker
     |
-    = help: Install `apache-airflow-provider-daskexecutor>=1.0.0` and use `airflow.providers.daskexecutor.executors.dask_executor.DaskExecutor` instead.
+    = help: Install `apache-airflow-providers-daskexecutor>=1.0.0` and use `airflow.providers.daskexecutor.executors.dask_executor.DaskExecutor` instead.
 
 AIR302.py:281:1: AIR302 `airflow.hooks.docker_hook.DockerHook` is moved into `docker` provider in Airflow 3.0;
     |
@@ -474,7 +474,7 @@ AIR302.py:281:1: AIR302 `airflow.hooks.docker_hook.DockerHook` is moved into `do
     | ^^^^^^^^^^ AIR302
 282 | DockerOperator()
     |
-    = help: Install `apache-airflow-provider-docker>=1.0.0` and use `airflow.providers.docker.hooks.docker.DockerHook` instead.
+    = help: Install `apache-airflow-providers-docker>=1.0.0` and use `airflow.providers.docker.hooks.docker.DockerHook` instead.
 
 AIR302.py:282:1: AIR302 `airflow.operators.docker_operator.DockerOperator` is moved into `docker` provider in Airflow 3.0;
     |
@@ -485,7 +485,7 @@ AIR302.py:282:1: AIR302 `airflow.operators.docker_operator.DockerOperator` is mo
 283 |
 284 | # apache-airflow-providers-apache-druid
     |
-    = help: Install `apache-airflow-provider-docker>=1.0.0` and use `airflow.providers.docker.operators.docker.DockerOperator` instead.
+    = help: Install `apache-airflow-providers-docker>=1.0.0` and use `airflow.providers.docker.operators.docker.DockerOperator` instead.
 
 AIR302.py:285:1: AIR302 `airflow.hooks.druid_hook.DruidDbApiHook` is moved into `apache-druid` provider in Airflow 3.0;
     |
@@ -495,7 +495,7 @@ AIR302.py:285:1: AIR302 `airflow.hooks.druid_hook.DruidDbApiHook` is moved into 
 286 | DruidHook()
 287 | DruidCheckOperator()
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidDbApiHook` instead.
+    = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidDbApiHook` instead.
 
 AIR302.py:286:1: AIR302 `airflow.hooks.druid_hook.DruidHook` is moved into `apache-druid` provider in Airflow 3.0;
     |
@@ -505,7 +505,7 @@ AIR302.py:286:1: AIR302 `airflow.hooks.druid_hook.DruidHook` is moved into `apac
     | ^^^^^^^^^ AIR302
 287 | DruidCheckOperator()
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidHook` instead.
+    = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.hooks.druid.DruidHook` instead.
 
 AIR302.py:287:1: AIR302 `airflow.operators.druid_check_operator.DruidCheckOperator` is moved into `apache-druid` provider in Airflow 3.0;
     |
@@ -516,7 +516,7 @@ AIR302.py:287:1: AIR302 `airflow.operators.druid_check_operator.DruidCheckOperat
 288 |
 289 | # apache-airflow-providers-apache-hdfs
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `DruidCheckOperator` instead.
+    = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `DruidCheckOperator` instead.
 
 AIR302.py:290:1: AIR302 `airflow.hooks.webhdfs_hook.WebHDFSHook` is moved into `apache-hdfs` provider in Airflow 3.0;
     |
@@ -525,7 +525,7 @@ AIR302.py:290:1: AIR302 `airflow.hooks.webhdfs_hook.WebHDFSHook` is moved into `
     | ^^^^^^^^^^^ AIR302
 291 | WebHdfsSensor()
     |
-    = help: Install `apache-airflow-provider-apache-hdfs>=1.0.0` and use `airflow.providers.apache.hdfs.hooks.webhdfs.WebHDFSHook` instead.
+    = help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `airflow.providers.apache.hdfs.hooks.webhdfs.WebHDFSHook` instead.
 
 AIR302.py:291:1: AIR302 `airflow.sensors.web_hdfs_sensor.WebHdfsSensor` is moved into `apache-hdfs` provider in Airflow 3.0;
     |
@@ -536,7 +536,7 @@ AIR302.py:291:1: AIR302 `airflow.sensors.web_hdfs_sensor.WebHdfsSensor` is moved
 292 |
 293 | # apache-airflow-providers-apache-hive
     |
-    = help: Install `apache-airflow-provider-apache-hdfs>=1.0.0` and use `airflow.providers.apache.hdfs.sensors.web_hdfs.WebHdfsSensor` instead.
+    = help: Install `apache-airflow-providers-apache-hdfs>=1.0.0` and use `airflow.providers.apache.hdfs.sensors.web_hdfs.WebHdfsSensor` instead.
 
 AIR302.py:294:1: AIR302 `airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -546,7 +546,7 @@ AIR302.py:294:1: AIR302 `airflow.hooks.hive_hooks.HIVE_QUEUE_PRIORITIES` is move
 295 | closest_ds_partition()
 296 | max_partition()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.hooks.hive.HIVE_QUEUE_PRIORITIES` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.hooks.hive.HIVE_QUEUE_PRIORITIES` instead.
 
 AIR302.py:295:1: AIR302 `airflow.macros.hive.closest_ds_partition` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -557,7 +557,7 @@ AIR302.py:295:1: AIR302 `airflow.macros.hive.closest_ds_partition` is moved into
 296 | max_partition()
 297 | HiveCliHook()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=5.1.0` and use `airflow.providers.apache.hive.macros.hive.closest_ds_partition` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=5.1.0` and use `airflow.providers.apache.hive.macros.hive.closest_ds_partition` instead.
 
 AIR302.py:296:1: AIR302 `airflow.macros.hive.max_partition` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -568,7 +568,7 @@ AIR302.py:296:1: AIR302 `airflow.macros.hive.max_partition` is moved into `apach
 297 | HiveCliHook()
 298 | HiveMetastoreHook()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=5.1.0` and use `airflow.providers.apache.hive.macros.hive.max_partition` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=5.1.0` and use `airflow.providers.apache.hive.macros.hive.max_partition` instead.
 
 AIR302.py:297:1: AIR302 `airflow.hooks.hive_hooks.HiveCliHook` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -579,7 +579,7 @@ AIR302.py:297:1: AIR302 `airflow.hooks.hive_hooks.HiveCliHook` is moved into `ap
 298 | HiveMetastoreHook()
 299 | HiveOperator()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.hooks.hive.HiveCliHook` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.hooks.hive.HiveCliHook` instead.
 
 AIR302.py:298:1: AIR302 `airflow.hooks.hive_hooks.HiveMetastoreHook` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -590,7 +590,7 @@ AIR302.py:298:1: AIR302 `airflow.hooks.hive_hooks.HiveMetastoreHook` is moved in
 299 | HiveOperator()
 300 | HivePartitionSensor()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.hooks.hive.HiveMetastoreHook` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.hooks.hive.HiveMetastoreHook` instead.
 
 AIR302.py:299:1: AIR302 `airflow.operators.hive_operator.HiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -601,7 +601,7 @@ AIR302.py:299:1: AIR302 `airflow.operators.hive_operator.HiveOperator` is moved 
 300 | HivePartitionSensor()
 301 | HiveServer2Hook()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.operators.hive.HiveOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.operators.hive.HiveOperator` instead.
 
 AIR302.py:300:1: AIR302 `airflow.sensors.hive_partition_sensor.HivePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -612,7 +612,7 @@ AIR302.py:300:1: AIR302 `airflow.sensors.hive_partition_sensor.HivePartitionSens
 301 | HiveServer2Hook()
 302 | HiveStatsCollectionOperator()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.sensors.hive_partition.HivePartitionSensor` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.sensors.hive_partition.HivePartitionSensor` instead.
 
 AIR302.py:301:1: AIR302 `airflow.hooks.hive_hooks.HiveServer2Hook` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -623,7 +623,7 @@ AIR302.py:301:1: AIR302 `airflow.hooks.hive_hooks.HiveServer2Hook` is moved into
 302 | HiveStatsCollectionOperator()
 303 | HiveToDruidOperator()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.hooks.hive.HiveServer2Hook` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.hooks.hive.HiveServer2Hook` instead.
 
 AIR302.py:302:1: AIR302 `airflow.operators.hive_stats_operator.HiveStatsCollectionOperator` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -634,7 +634,7 @@ AIR302.py:302:1: AIR302 `airflow.operators.hive_stats_operator.HiveStatsCollecti
 303 | HiveToDruidOperator()
 304 | HiveToDruidTransfer()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.operators.hive_stats.HiveStatsCollectionOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.operators.hive_stats.HiveStatsCollectionOperator` instead.
 
 AIR302.py:303:1: AIR302 `airflow.operators.hive_to_druid.HiveToDruidOperator` is moved into `apache-druid` provider in Airflow 3.0;
     |
@@ -645,7 +645,7 @@ AIR302.py:303:1: AIR302 `airflow.operators.hive_to_druid.HiveToDruidOperator` is
 304 | HiveToDruidTransfer()
 305 | HiveToSambaOperator()
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.transfers.hive_to_druid.HiveToDruidOperator` instead.
+    = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.transfers.hive_to_druid.HiveToDruidOperator` instead.
 
 AIR302.py:304:1: AIR302 `airflow.operators.hive_to_druid.HiveToDruidTransfer` is moved into `apache-druid` provider in Airflow 3.0;
     |
@@ -656,7 +656,7 @@ AIR302.py:304:1: AIR302 `airflow.operators.hive_to_druid.HiveToDruidTransfer` is
 305 | HiveToSambaOperator()
 306 | S3ToHiveOperator()
     |
-    = help: Install `apache-airflow-provider-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.transfers.hive_to_druid.HiveToDruidOperator` instead.
+    = help: Install `apache-airflow-providers-apache-druid>=1.0.0` and use `airflow.providers.apache.druid.transfers.hive_to_druid.HiveToDruidOperator` instead.
 
 AIR302.py:305:1: AIR302 `airflow.operators.hive_to_samba_operator.HiveToSambaOperator` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -667,7 +667,7 @@ AIR302.py:305:1: AIR302 `airflow.operators.hive_to_samba_operator.HiveToSambaOpe
 306 | S3ToHiveOperator()
 307 | S3ToHiveTransfer()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `HiveToSambaOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `HiveToSambaOperator` instead.
 
 AIR302.py:306:1: AIR302 `airflow.operators.s3_to_hive_operator.S3ToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -678,7 +678,7 @@ AIR302.py:306:1: AIR302 `airflow.operators.s3_to_hive_operator.S3ToHiveOperator`
 307 | S3ToHiveTransfer()
 308 | MetastorePartitionSensor()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.s3_to_hive.S3ToHiveOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.s3_to_hive.S3ToHiveOperator` instead.
 
 AIR302.py:307:1: AIR302 `airflow.operators.s3_to_hive_operator.S3ToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -689,7 +689,7 @@ AIR302.py:307:1: AIR302 `airflow.operators.s3_to_hive_operator.S3ToHiveTransfer`
 308 | MetastorePartitionSensor()
 309 | NamedHivePartitionSensor()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.s3_to_hive.S3ToHiveOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.s3_to_hive.S3ToHiveOperator` instead.
 
 AIR302.py:308:1: AIR302 `airflow.sensors.metastore_partition_sensor.MetastorePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -699,7 +699,7 @@ AIR302.py:308:1: AIR302 `airflow.sensors.metastore_partition_sensor.MetastorePar
     | ^^^^^^^^^^^^^^^^^^^^^^^^ AIR302
 309 | NamedHivePartitionSensor()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.sensors.metastore_partition.MetastorePartitionSensor` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.sensors.metastore_partition.MetastorePartitionSensor` instead.
 
 AIR302.py:309:1: AIR302 `airflow.sensors.named_hive_partition_sensor.NamedHivePartitionSensor` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -710,7 +710,7 @@ AIR302.py:309:1: AIR302 `airflow.sensors.named_hive_partition_sensor.NamedHivePa
 310 |
 311 | # apache-airflow-providers-http
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.sensors.named_hive_partition.NamedHivePartitionSensor` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.sensors.named_hive_partition.NamedHivePartitionSensor` instead.
 
 AIR302.py:312:1: AIR302 `airflow.hooks.http_hook.HttpHook` is moved into `http` provider in Airflow 3.0;
     |
@@ -720,7 +720,7 @@ AIR302.py:312:1: AIR302 `airflow.hooks.http_hook.HttpHook` is moved into `http` 
 313 | HttpSensor()
 314 | SimpleHttpOperator()
     |
-    = help: Install `apache-airflow-provider-http>=1.0.0` and use `airflow.providers.http.hooks.http.HttpHook` instead.
+    = help: Install `apache-airflow-providers-http>=1.0.0` and use `airflow.providers.http.hooks.http.HttpHook` instead.
 
 AIR302.py:313:1: AIR302 `airflow.sensors.http_sensor.HttpSensor` is moved into `http` provider in Airflow 3.0;
     |
@@ -730,7 +730,7 @@ AIR302.py:313:1: AIR302 `airflow.sensors.http_sensor.HttpSensor` is moved into `
     | ^^^^^^^^^^ AIR302
 314 | SimpleHttpOperator()
     |
-    = help: Install `apache-airflow-provider-http>=1.0.0` and use `airflow.providers.http.sensors.http.HttpSensor` instead.
+    = help: Install `apache-airflow-providers-http>=1.0.0` and use `airflow.providers.http.sensors.http.HttpSensor` instead.
 
 AIR302.py:314:1: AIR302 `airflow.operators.http_operator.SimpleHttpOperator` is moved into `http` provider in Airflow 3.0;
     |
@@ -741,7 +741,7 @@ AIR302.py:314:1: AIR302 `airflow.operators.http_operator.SimpleHttpOperator` is 
 315 |
 316 | # apache-airflow-providers-jdbc
     |
-    = help: Install `apache-airflow-provider-http>=1.0.0` and use `airflow.providers.http.operators.http.SimpleHttpOperator` instead.
+    = help: Install `apache-airflow-providers-http>=1.0.0` and use `airflow.providers.http.operators.http.SimpleHttpOperator` instead.
 
 AIR302.py:317:1: AIR302 `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `jdbc` provider in Airflow 3.0;
     |
@@ -751,7 +751,7 @@ AIR302.py:317:1: AIR302 `airflow.hooks.jdbc_hook.jaydebeapi` is moved into `jdbc
 318 | JdbcHook()
 319 | JdbcOperator()
     |
-    = help: Install `apache-airflow-provider-jdbc>=1.0.0` and use `airflow.providers.jdbc.hooks.jdbc.jaydebeapi` instead.
+    = help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `airflow.providers.jdbc.hooks.jdbc.jaydebeapi` instead.
 
 AIR302.py:318:1: AIR302 `airflow.hooks.jdbc_hook.JdbcHook` is moved into `jdbc` provider in Airflow 3.0;
     |
@@ -761,7 +761,7 @@ AIR302.py:318:1: AIR302 `airflow.hooks.jdbc_hook.JdbcHook` is moved into `jdbc` 
     | ^^^^^^^^ AIR302
 319 | JdbcOperator()
     |
-    = help: Install `apache-airflow-provider-jdbc>=1.0.0` and use `airflow.providers.jdbc.hooks.jdbc.JdbcHook` instead.
+    = help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `airflow.providers.jdbc.hooks.jdbc.JdbcHook` instead.
 
 AIR302.py:319:1: AIR302 `airflow.operators.jdbc_operator.JdbcOperator` is moved into `jdbc` provider in Airflow 3.0;
     |
@@ -772,7 +772,7 @@ AIR302.py:319:1: AIR302 `airflow.operators.jdbc_operator.JdbcOperator` is moved 
 320 |
 321 | # apache-airflow-providers-fab
     |
-    = help: Install `apache-airflow-provider-jdbc>=1.0.0` and use `airflow.providers.jdbc.operators.jdbc.JdbcOperator` instead.
+    = help: Install `apache-airflow-providers-jdbc>=1.0.0` and use `airflow.providers.jdbc.operators.jdbc.JdbcOperator` instead.
 
 AIR302.py:322:12: AIR302 `airflow.api.auth.backend.basic_auth.CLIENT_AUTH` is moved into `fab` provider in Airflow 3.0;
     |
@@ -782,7 +782,7 @@ AIR302.py:322:12: AIR302 `airflow.api.auth.backend.basic_auth.CLIENT_AUTH` is mo
 323 | basic_auth.init_app
 324 | basic_auth.auth_current_user
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.CLIENT_AUTH` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.CLIENT_AUTH` instead.
 
 AIR302.py:323:12: AIR302 `airflow.api.auth.backend.basic_auth.init_app` is moved into `fab` provider in Airflow 3.0;
     |
@@ -793,7 +793,7 @@ AIR302.py:323:12: AIR302 `airflow.api.auth.backend.basic_auth.init_app` is moved
 324 | basic_auth.auth_current_user
 325 | basic_auth.requires_authentication
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.init_app` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.init_app` instead.
 
 AIR302.py:324:12: AIR302 `airflow.api.auth.backend.basic_auth.auth_current_user` is moved into `fab` provider in Airflow 3.0;
     |
@@ -803,7 +803,7 @@ AIR302.py:324:12: AIR302 `airflow.api.auth.backend.basic_auth.auth_current_user`
     |            ^^^^^^^^^^^^^^^^^ AIR302
 325 | basic_auth.requires_authentication
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.auth_current_user` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.auth_current_user` instead.
 
 AIR302.py:325:12: AIR302 `airflow.api.auth.backend.basic_auth.requires_authentication` is moved into `fab` provider in Airflow 3.0;
     |
@@ -814,7 +814,7 @@ AIR302.py:325:12: AIR302 `airflow.api.auth.backend.basic_auth.requires_authentic
 326 |
 327 | kerberos_auth.log
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.requires_authentication` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.requires_authentication` instead.
 
 AIR302.py:327:15: AIR302 `airflow.api.auth.backend.kerberos_auth.log` is moved into `fab` provider in Airflow 3.0;
     |
@@ -825,7 +825,7 @@ AIR302.py:327:15: AIR302 `airflow.api.auth.backend.kerberos_auth.log` is moved i
 328 | kerberos_auth.CLIENT_AUTH
 329 | kerberos_auth.find_user
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.log` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.log` instead.
 
 AIR302.py:328:15: AIR302 `airflow.api.auth.backend.kerberos_auth.CLIENT_AUTH` is moved into `fab` provider in Airflow 3.0;
     |
@@ -835,7 +835,7 @@ AIR302.py:328:15: AIR302 `airflow.api.auth.backend.kerberos_auth.CLIENT_AUTH` is
 329 | kerberos_auth.find_user
 330 | kerberos_auth.init_app
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.CLIENT_AUTH` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.CLIENT_AUTH` instead.
 
 AIR302.py:329:15: AIR302 `airflow.api.auth.backend.kerberos_auth.find_user` is moved into `fab` provider in Airflow 3.0;
     |
@@ -846,7 +846,7 @@ AIR302.py:329:15: AIR302 `airflow.api.auth.backend.kerberos_auth.find_user` is m
 330 | kerberos_auth.init_app
 331 | kerberos_auth.requires_authentication
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.find_user` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.find_user` instead.
 
 AIR302.py:330:15: AIR302 `airflow.api.auth.backend.kerberos_auth.init_app` is moved into `fab` provider in Airflow 3.0;
     |
@@ -857,7 +857,7 @@ AIR302.py:330:15: AIR302 `airflow.api.auth.backend.kerberos_auth.init_app` is mo
 331 | kerberos_auth.requires_authentication
 332 | auth_current_user
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.init_app` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.init_app` instead.
 
 AIR302.py:331:15: AIR302 `airflow.api.auth.backend.kerberos_auth.requires_authentication` is moved into `fab` provider in Airflow 3.0;
     |
@@ -868,7 +868,7 @@ AIR302.py:331:15: AIR302 `airflow.api.auth.backend.kerberos_auth.requires_authen
 332 | auth_current_user
 333 | backend_kerberos_auth
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.requires_authentication` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.kerberos_auth.requires_authentication` instead.
 
 AIR302.py:332:1: AIR302 `airflow.api.auth.backend.basic_auth.auth_current_user` is moved into `fab` provider in Airflow 3.0;
     |
@@ -879,7 +879,7 @@ AIR302.py:332:1: AIR302 `airflow.api.auth.backend.basic_auth.auth_current_user` 
 333 | backend_kerberos_auth
 334 | fab_override
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.auth_current_user` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.auth_current_user` instead.
 
 AIR302.py:335:1: AIR302 `airflow.auth.managers.fab.fab_auth_manager.FabAuthManager` is moved into `fab` provider in Airflow 3.0;
     |
@@ -889,7 +889,7 @@ AIR302.py:335:1: AIR302 `airflow.auth.managers.fab.fab_auth_manager.FabAuthManag
     | ^^^^^^^^^^^^^^ AIR302
 336 | FabAirflowSecurityManagerOverride()
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.FabAuthManager` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.FabAuthManager` instead.
 
 AIR302.py:336:1: AIR302 `airflow.www.security.FabAirflowSecurityManagerOverride` is moved into `fab` provider in Airflow 3.0;
     |
@@ -900,7 +900,7 @@ AIR302.py:336:1: AIR302 `airflow.www.security.FabAirflowSecurityManagerOverride`
 337 |
 338 | # check whether attribute access
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.security_manager.override.FabAirflowSecurityManagerOverride` instead.
 
 AIR302.py:339:12: AIR302 `airflow.api.auth.backend.basic_auth.auth_current_user` is moved into `fab` provider in Airflow 3.0;
     |
@@ -910,7 +910,7 @@ AIR302.py:339:12: AIR302 `airflow.api.auth.backend.basic_auth.auth_current_user`
 340 |
 341 | # apache-airflow-providers-cncf-kubernetes
     |
-    = help: Install `apache-airflow-provider-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.auth_current_user` instead.
+    = help: Install `apache-airflow-providers-fab>=1.0.0` and use `airflow.providers.fab.auth_manager.api.auth.backend.basic_auth.auth_current_user` instead.
 
 AIR302.py:342:1: AIR302 `airflow.executors.kubernetes_executor_types.ALL_NAMESPACES` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -920,7 +920,7 @@ AIR302.py:342:1: AIR302 `airflow.executors.kubernetes_executor_types.ALL_NAMESPA
 343 | POD_EXECUTOR_DONE_KEY
 344 | _disable_verify_ssl()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.ALL_NAMESPACES` instead.
 
 AIR302.py:343:1: AIR302 `airflow.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -931,7 +931,7 @@ AIR302.py:343:1: AIR302 `airflow.executors.kubernetes_executor_types.POD_EXECUTO
 344 | _disable_verify_ssl()
 345 | _enable_tcp_keepalive()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.executors.kubernetes_executor_types.POD_EXECUTOR_DONE_KEY` instead.
 
 AIR302.py:344:1: AIR302 `airflow.kubernetes.kube_client._disable_verify_ssl` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -942,7 +942,7 @@ AIR302.py:344:1: AIR302 `airflow.kubernetes.kube_client._disable_verify_ssl` is 
 345 | _enable_tcp_keepalive()
 346 | append_to_pod()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client._disable_verify_ssl` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client._disable_verify_ssl` instead.
 
 AIR302.py:345:1: AIR302 `airflow.kubernetes.kube_client._enable_tcp_keepalive` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -953,7 +953,7 @@ AIR302.py:345:1: AIR302 `airflow.kubernetes.kube_client._enable_tcp_keepalive` i
 346 | append_to_pod()
 347 | annotations_for_logging_task_metadata()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client._enable_tcp_keepalive` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client._enable_tcp_keepalive` instead.
 
 AIR302.py:346:1: AIR302 `airflow.kubernetes.k8s_model.append_to_pod` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -964,7 +964,7 @@ AIR302.py:346:1: AIR302 `airflow.kubernetes.k8s_model.append_to_pod` is moved in
 347 | annotations_for_logging_task_metadata()
 348 | annotations_to_key()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.k8s_model.append_to_pod` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.k8s_model.append_to_pod` instead.
 
 AIR302.py:347:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.annotations_for_logging_task_metadata` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -975,7 +975,7 @@ AIR302.py:347:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.annotati
 348 | annotations_to_key()
 349 | create_pod_id()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.annotations_for_logging_task_metadata` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.annotations_for_logging_task_metadata` instead.
 
 AIR302.py:348:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.annotations_to_key` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -986,7 +986,7 @@ AIR302.py:348:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.annotati
 349 | create_pod_id()
 350 | datetime_to_label_safe_datestring()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.annotations_to_key` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.annotations_to_key` instead.
 
 AIR302.py:349:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.create_pod_id` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -997,7 +997,7 @@ AIR302.py:349:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.create_p
 350 | datetime_to_label_safe_datestring()
 351 | extend_object_field()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.create_pod_id` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.create_pod_id` instead.
 
 AIR302.py:350:1: AIR302 `airflow.kubernetes.pod_generator.datetime_to_label_safe_datestring` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1008,7 +1008,7 @@ AIR302.py:350:1: AIR302 `airflow.kubernetes.pod_generator.datetime_to_label_safe
 351 | extend_object_field()
 352 | get_logs_task_metadata()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.datetime_to_label_safe_datestring` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.datetime_to_label_safe_datestring` instead.
 
 AIR302.py:351:1: AIR302 `airflow.kubernetes.pod_generator.extend_object_field` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1019,7 +1019,7 @@ AIR302.py:351:1: AIR302 `airflow.kubernetes.pod_generator.extend_object_field` i
 352 | get_logs_task_metadata()
 353 | label_safe_datestring_to_datetime()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.extend_object_field` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.extend_object_field` instead.
 
 AIR302.py:352:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.get_logs_task_metadata` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1030,7 +1030,7 @@ AIR302.py:352:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.get_logs
 353 | label_safe_datestring_to_datetime()
 354 | merge_objects()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.get_logs_task_metadata` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.get_logs_task_metadata` instead.
 
 AIR302.py:353:1: AIR302 `airflow.kubernetes.pod_generator.label_safe_datestring_to_datetime` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1041,7 +1041,7 @@ AIR302.py:353:1: AIR302 `airflow.kubernetes.pod_generator.label_safe_datestring_
 354 | merge_objects()
 355 | Port()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.label_safe_datestring_to_datetime` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.label_safe_datestring_to_datetime` instead.
 
 AIR302.py:354:1: AIR302 `airflow.kubernetes.pod_generator.merge_objects` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1052,7 +1052,7 @@ AIR302.py:354:1: AIR302 `airflow.kubernetes.pod_generator.merge_objects` is move
 355 | Port()
 356 | Resources()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.merge_objects` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.merge_objects` instead.
 
 AIR302.py:355:1: AIR302 `airflow.kubernetes.pod.Port` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1063,7 +1063,7 @@ AIR302.py:355:1: AIR302 `airflow.kubernetes.pod.Port` is moved into `cncf-kubern
 356 | Resources()
 357 | PodRuntimeInfoEnv()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1ContainerPort` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1ContainerPort` instead.
 
 AIR302.py:356:1: AIR302 `airflow.kubernetes.pod.Resources` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1074,7 +1074,7 @@ AIR302.py:356:1: AIR302 `airflow.kubernetes.pod.Resources` is moved into `cncf-k
 357 | PodRuntimeInfoEnv()
 358 | PodGeneratorDeprecated()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1ResourceRequirements` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1ResourceRequirements` instead.
 
 AIR302.py:357:1: AIR302 `airflow.kubernetes.pod_runtime_info_env.PodRuntimeInfoEnv` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1085,7 +1085,7 @@ AIR302.py:357:1: AIR302 `airflow.kubernetes.pod_runtime_info_env.PodRuntimeInfoE
 358 | PodGeneratorDeprecated()
 359 | Volume()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1EnvVar` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1EnvVar` instead.
 
 AIR302.py:358:1: AIR302 `airflow.kubernetes.pod_generator.PodGeneratorDeprecated` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1096,7 +1096,7 @@ AIR302.py:358:1: AIR302 `airflow.kubernetes.pod_generator.PodGeneratorDeprecated
 359 | Volume()
 360 | VolumeMount()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.PodGenerator` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.PodGenerator` instead.
 
 AIR302.py:359:1: AIR302 `airflow.kubernetes.volume.Volume` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1107,7 +1107,7 @@ AIR302.py:359:1: AIR302 `airflow.kubernetes.volume.Volume` is moved into `cncf-k
 360 | VolumeMount()
 361 | Secret()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1Volume` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1Volume` instead.
 
 AIR302.py:360:1: AIR302 `airflow.kubernetes.volume_mount.VolumeMount` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1117,7 +1117,7 @@ AIR302.py:360:1: AIR302 `airflow.kubernetes.volume_mount.VolumeMount` is moved i
     | ^^^^^^^^^^^ AIR302
 361 | Secret()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1VolumeMount` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `kubernetes.client.models.V1VolumeMount` instead.
 
 AIR302.py:361:1: AIR302 `airflow.kubernetes.secret.Secret` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1128,7 +1128,7 @@ AIR302.py:361:1: AIR302 `airflow.kubernetes.secret.Secret` is moved into `cncf-k
 362 |
 363 | add_pod_suffix()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.secret.Secret` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.secret.Secret` instead.
 
 AIR302.py:363:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.add_pod_suffix` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1139,7 +1139,7 @@ AIR302.py:363:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.add_pod_
 364 | add_pod_suffix2()
 365 | get_kube_client()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.add_pod_suffix` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.add_pod_suffix` instead.
 
 AIR302.py:364:1: AIR302 `airflow.kubernetes.pod_generator.add_pod_suffix` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1149,7 +1149,7 @@ AIR302.py:364:1: AIR302 `airflow.kubernetes.pod_generator.add_pod_suffix` is mov
 365 | get_kube_client()
 366 | get_kube_client2()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.add_pod_suffix` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.add_pod_suffix` instead.
 
 AIR302.py:365:1: AIR302 `airflow.kubernetes.kube_client.get_kube_client` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1160,7 +1160,7 @@ AIR302.py:365:1: AIR302 `airflow.kubernetes.kube_client.get_kube_client` is move
 366 | get_kube_client2()
 367 | make_safe_label_value()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client.get_kube_client` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client.get_kube_client` instead.
 
 AIR302.py:366:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.get_kube_client` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1171,7 +1171,7 @@ AIR302.py:366:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.get_kube_cli
 367 | make_safe_label_value()
 368 | make_safe_label_value2()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kube_client.get_kube_client` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kube_client.get_kube_client` instead.
 
 AIR302.py:367:1: AIR302 `airflow.kubernetes.pod_generator.make_safe_label_value` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1182,7 +1182,7 @@ AIR302.py:367:1: AIR302 `airflow.kubernetes.pod_generator.make_safe_label_value`
 368 | make_safe_label_value2()
 369 | rand_str()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.make_safe_label_value` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.make_safe_label_value` instead.
 
 AIR302.py:368:1: AIR302 `airflow.kubernetes.pod_generator_deprecated.make_safe_label_value` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1193,7 +1193,7 @@ AIR302.py:368:1: AIR302 `airflow.kubernetes.pod_generator_deprecated.make_safe_l
 369 | rand_str()
 370 | rand_str2()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator_deprecated.make_safe_label_value` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator_deprecated.make_safe_label_value` instead.
 
 AIR302.py:369:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.rand_str` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1204,7 +1204,7 @@ AIR302.py:369:1: AIR302 `airflow.kubernetes.kubernetes_helper_functions.rand_str
 370 | rand_str2()
 371 | K8SModel()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.rand_str` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.rand_str` instead.
 
 AIR302.py:370:1: AIR302 `airflow.kubernetes.pod_generator.rand_str` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1215,7 +1215,7 @@ AIR302.py:370:1: AIR302 `airflow.kubernetes.pod_generator.rand_str` is moved int
 371 | K8SModel()
 372 | K8SModel2()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.rand_str` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.kubernetes_helper_functions.rand_str` instead.
 
 AIR302.py:371:1: AIR302 `airflow.kubernetes.k8s_model.K8SModel` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1226,7 +1226,7 @@ AIR302.py:371:1: AIR302 `airflow.kubernetes.k8s_model.K8SModel` is moved into `c
 372 | K8SModel2()
 373 | PodLauncher()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.k8s_model.K8SModel` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.k8s_model.K8SModel` instead.
 
 AIR302.py:373:1: AIR302 `airflow.kubernetes.pod_launcher.PodLauncher` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1237,7 +1237,7 @@ AIR302.py:373:1: AIR302 `airflow.kubernetes.pod_launcher.PodLauncher` is moved i
 374 | PodLauncher2()
 375 | PodStatus()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodLauncher` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodLauncher` instead.
 
 AIR302.py:374:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodLauncher` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1248,7 +1248,7 @@ AIR302.py:374:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodLauncher`
 375 | PodStatus()
 376 | PodStatus2()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodLauncher` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodLauncher` instead.
 
 AIR302.py:375:1: AIR302 `airflow.kubernetes.pod_launcher.PodStatus` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1259,7 +1259,7 @@ AIR302.py:375:1: AIR302 `airflow.kubernetes.pod_launcher.PodStatus` is moved int
 376 | PodStatus2()
 377 | PodDefaults()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodStatus` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodStatus` instead.
 
 AIR302.py:376:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodStatus` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1270,7 +1270,7 @@ AIR302.py:376:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodStatus` i
 377 | PodDefaults()
 378 | PodDefaults2()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodStatus` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodStatus` instead.
 
 AIR302.py:377:1: AIR302 `airflow.kubernetes.pod_generator.PodDefaults` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1281,7 +1281,7 @@ AIR302.py:377:1: AIR302 `airflow.kubernetes.pod_generator.PodDefaults` is moved 
 378 | PodDefaults2()
 379 | PodDefaults3()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.PodDefaults` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.PodDefaults` instead.
 
 AIR302.py:378:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodDefaults` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1292,7 +1292,7 @@ AIR302.py:378:1: AIR302 `airflow.kubernetes.pod_launcher_deprecated.PodDefaults`
 379 | PodDefaults3()
 380 | PodGenerator()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodDefaults` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_launcher_deprecated.PodDefaults` instead.
 
 AIR302.py:379:1: AIR302 `airflow.kubernetes.pod_generator_deprecated.PodDefaults` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1303,7 +1303,7 @@ AIR302.py:379:1: AIR302 `airflow.kubernetes.pod_generator_deprecated.PodDefaults
 380 | PodGenerator()
 381 | PodGenerator2()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodDefaults` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodDefaults` instead.
 
 AIR302.py:380:1: AIR302 `airflow.kubernetes.pod_generator.PodGenerator` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1313,7 +1313,7 @@ AIR302.py:380:1: AIR302 `airflow.kubernetes.pod_generator.PodGenerator` is moved
     | ^^^^^^^^^^^^ AIR302
 381 | PodGenerator2()
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.PodGenerator` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator.PodGenerator` instead.
 
 AIR302.py:381:1: AIR302 `airflow.kubernetes.pod_generator_deprecated.PodGenerator` is moved into `cncf-kubernetes` provider in Airflow 3.0;
     |
@@ -1322,7 +1322,7 @@ AIR302.py:381:1: AIR302 `airflow.kubernetes.pod_generator_deprecated.PodGenerato
 381 | PodGenerator2()
     | ^^^^^^^^^^^^^ AIR302
     |
-    = help: Install `apache-airflow-provider-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodGenerator` instead.
+    = help: Install `apache-airflow-providers-cncf-kubernetes>=7.4.0` and use `airflow.providers.cncf.kubernetes.pod_generator_deprecated.PodGenerator` instead.
 
 AIR302.py:385:1: AIR302 `airflow.hooks.mssql_hook.MsSqlHook` is moved into `microsoft-mssql` provider in Airflow 3.0;
     |
@@ -1332,7 +1332,7 @@ AIR302.py:385:1: AIR302 `airflow.hooks.mssql_hook.MsSqlHook` is moved into `micr
 386 | MsSqlOperator()
 387 | MsSqlToHiveOperator()
     |
-    = help: Install `apache-airflow-provider-microsoft-mssql>=1.0.0` and use `airflow.providers.microsoft.mssql.hooks.mssql.MsSqlHook` instead.
+    = help: Install `apache-airflow-providers-microsoft-mssql>=1.0.0` and use `airflow.providers.microsoft.mssql.hooks.mssql.MsSqlHook` instead.
 
 AIR302.py:386:1: AIR302 `airflow.operators.mssql_operator.MsSqlOperator` is moved into `microsoft-mssql` provider in Airflow 3.0;
     |
@@ -1343,7 +1343,7 @@ AIR302.py:386:1: AIR302 `airflow.operators.mssql_operator.MsSqlOperator` is move
 387 | MsSqlToHiveOperator()
 388 | MsSqlToHiveTransfer()
     |
-    = help: Install `apache-airflow-provider-microsoft-mssql>=1.0.0` and use `airflow.providers.microsoft.mssql.operators.mssql.MsSqlOperator` instead.
+    = help: Install `apache-airflow-providers-microsoft-mssql>=1.0.0` and use `airflow.providers.microsoft.mssql.operators.mssql.MsSqlOperator` instead.
 
 AIR302.py:387:1: AIR302 `airflow.operators.mssql_to_hive.MsSqlToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -1353,7 +1353,7 @@ AIR302.py:387:1: AIR302 `airflow.operators.mssql_to_hive.MsSqlToHiveOperator` is
     | ^^^^^^^^^^^^^^^^^^^ AIR302
 388 | MsSqlToHiveTransfer()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.mssql_to_hive.MsSqlToHiveOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.mssql_to_hive.MsSqlToHiveOperator` instead.
 
 AIR302.py:388:1: AIR302 `airflow.operators.mssql_to_hive.MsSqlToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -1364,7 +1364,7 @@ AIR302.py:388:1: AIR302 `airflow.operators.mssql_to_hive.MsSqlToHiveTransfer` is
 389 |
 390 | # apache-airflow-providers-mysql
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.mssql_to_hive.MsSqlToHiveOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.mssql_to_hive.MsSqlToHiveOperator` instead.
 
 AIR302.py:391:1: AIR302 `airflow.operators.hive_to_mysql.HiveToMySqlOperator` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -1374,7 +1374,7 @@ AIR302.py:391:1: AIR302 `airflow.operators.hive_to_mysql.HiveToMySqlOperator` is
 392 | HiveToMySqlTransfer()
 393 | MySqlHook()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.hive_to_mysql.HiveToMySqlOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.hive_to_mysql.HiveToMySqlOperator` instead.
 
 AIR302.py:392:1: AIR302 `airflow.operators.hive_to_mysql.HiveToMySqlTransfer` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -1385,7 +1385,7 @@ AIR302.py:392:1: AIR302 `airflow.operators.hive_to_mysql.HiveToMySqlTransfer` is
 393 | MySqlHook()
 394 | MySqlOperator()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.hive_to_mysql.HiveToMySqlOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.hive_to_mysql.HiveToMySqlOperator` instead.
 
 AIR302.py:393:1: AIR302 `airflow.hooks.mysql_hook.MySqlHook` is moved into `mysql` provider in Airflow 3.0;
     |
@@ -1396,7 +1396,7 @@ AIR302.py:393:1: AIR302 `airflow.hooks.mysql_hook.MySqlHook` is moved into `mysq
 394 | MySqlOperator()
 395 | MySqlToHiveOperator()
     |
-    = help: Install `apache-airflow-provider-mysql>=1.0.0` and use `airflow.providers.mysql.hooks.mysql.MySqlHook` instead.
+    = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `airflow.providers.mysql.hooks.mysql.MySqlHook` instead.
 
 AIR302.py:394:1: AIR302 `airflow.operators.mysql_operator.MySqlOperator` is moved into `mysql` provider in Airflow 3.0;
     |
@@ -1407,7 +1407,7 @@ AIR302.py:394:1: AIR302 `airflow.operators.mysql_operator.MySqlOperator` is move
 395 | MySqlToHiveOperator()
 396 | MySqlToHiveTransfer()
     |
-    = help: Install `apache-airflow-provider-mysql>=1.0.0` and use `airflow.providers.mysql.operators.mysql.MySqlOperator` instead.
+    = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `airflow.providers.mysql.operators.mysql.MySqlOperator` instead.
 
 AIR302.py:395:1: AIR302 `airflow.operators.mysql_to_hive.MySqlToHiveOperator` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -1418,7 +1418,7 @@ AIR302.py:395:1: AIR302 `airflow.operators.mysql_to_hive.MySqlToHiveOperator` is
 396 | MySqlToHiveTransfer()
 397 | PrestoToMySqlOperator()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.mysql_to_hive.MySqlToHiveOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.mysql_to_hive.MySqlToHiveOperator` instead.
 
 AIR302.py:396:1: AIR302 `airflow.operators.mysql_to_hive.MySqlToHiveTransfer` is moved into `apache-hive` provider in Airflow 3.0;
     |
@@ -1429,7 +1429,7 @@ AIR302.py:396:1: AIR302 `airflow.operators.mysql_to_hive.MySqlToHiveTransfer` is
 397 | PrestoToMySqlOperator()
 398 | PrestoToMySqlTransfer()
     |
-    = help: Install `apache-airflow-provider-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.mysql_to_hive.MySqlToHiveOperator` instead.
+    = help: Install `apache-airflow-providers-apache-hive>=1.0.0` and use `airflow.providers.apache.hive.transfers.mysql_to_hive.MySqlToHiveOperator` instead.
 
 AIR302.py:397:1: AIR302 `airflow.operators.presto_to_mysql.PrestoToMySqlOperator` is moved into `mysql` provider in Airflow 3.0;
     |
@@ -1439,7 +1439,7 @@ AIR302.py:397:1: AIR302 `airflow.operators.presto_to_mysql.PrestoToMySqlOperator
     | ^^^^^^^^^^^^^^^^^^^^^ AIR302
 398 | PrestoToMySqlTransfer()
     |
-    = help: Install `apache-airflow-provider-mysql>=1.0.0` and use `airflow.providers.mysql.transfers.presto_to_mysql.PrestoToMySqlOperator` instead.
+    = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `airflow.providers.mysql.transfers.presto_to_mysql.PrestoToMySqlOperator` instead.
 
 AIR302.py:398:1: AIR302 `airflow.operators.presto_to_mysql.PrestoToMySqlTransfer` is moved into `mysql` provider in Airflow 3.0;
     |
@@ -1450,7 +1450,7 @@ AIR302.py:398:1: AIR302 `airflow.operators.presto_to_mysql.PrestoToMySqlTransfer
 399 |
 400 | # apache-airflow-providers-oracle
     |
-    = help: Install `apache-airflow-provider-mysql>=1.0.0` and use `airflow.providers.mysql.transfers.presto_to_mysql.PrestoToMySqlOperator` instead.
+    = help: Install `apache-airflow-providers-mysql>=1.0.0` and use `airflow.providers.mysql.transfers.presto_to_mysql.PrestoToMySqlOperator` instead.
 
 AIR302.py:401:1: AIR302 `airflow.hooks.oracle_hook.OracleHook` is moved into `oracle` provider in Airflow 3.0;
     |
@@ -1459,7 +1459,7 @@ AIR302.py:401:1: AIR302 `airflow.hooks.oracle_hook.OracleHook` is moved into `or
     | ^^^^^^^^^^ AIR302
 402 | OracleOperator()
     |
-    = help: Install `apache-airflow-provider-oracle>=1.0.0` and use `airflow.providers.oracle.hooks.oracle.OracleHook` instead.
+    = help: Install `apache-airflow-providers-oracle>=1.0.0` and use `airflow.providers.oracle.hooks.oracle.OracleHook` instead.
 
 AIR302.py:402:1: AIR302 `airflow.operators.oracle_operator.OracleOperator` is moved into `oracle` provider in Airflow 3.0;
     |
@@ -1470,7 +1470,7 @@ AIR302.py:402:1: AIR302 `airflow.operators.oracle_operator.OracleOperator` is mo
 403 |
 404 | # apache-airflow-providers-papermill
     |
-    = help: Install `apache-airflow-provider-oracle>=1.0.0` and use `airflow.providers.oracle.operators.oracle.OracleOperator` instead.
+    = help: Install `apache-airflow-providers-oracle>=1.0.0` and use `airflow.providers.oracle.operators.oracle.OracleOperator` instead.
 
 AIR302.py:405:1: AIR302 `airflow.operators.papermill_operator.PapermillOperator` is moved into `papermill` provider in Airflow 3.0;
     |
@@ -1480,7 +1480,7 @@ AIR302.py:405:1: AIR302 `airflow.operators.papermill_operator.PapermillOperator`
 406 |
 407 | # apache-airflow-providers-apache-pig
     |
-    = help: Install `apache-airflow-provider-papermill>=1.0.0` and use `airflow.providers.papermill.operators.papermill.PapermillOperator` instead.
+    = help: Install `apache-airflow-providers-papermill>=1.0.0` and use `airflow.providers.papermill.operators.papermill.PapermillOperator` instead.
 
 AIR302.py:408:1: AIR302 `airflow.hooks.pig_hook.PigCliHook` is moved into `apache-pig` provider in Airflow 3.0;
     |
@@ -1489,7 +1489,7 @@ AIR302.py:408:1: AIR302 `airflow.hooks.pig_hook.PigCliHook` is moved into `apach
     | ^^^^^^^^^^ AIR302
 409 | PigOperator()
     |
-    = help: Install `apache-airflow-provider-apache-pig>=1.0.0` and use `airflow.providers.apache.pig.hooks.pig.PigCliHook` instead.
+    = help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `airflow.providers.apache.pig.hooks.pig.PigCliHook` instead.
 
 AIR302.py:409:1: AIR302 `airflow.operators.pig_operator.PigOperator` is moved into `apache-pig` provider in Airflow 3.0;
     |
@@ -1500,7 +1500,7 @@ AIR302.py:409:1: AIR302 `airflow.operators.pig_operator.PigOperator` is moved in
 410 |
 411 | # apache-airflow-providers-postgres
     |
-    = help: Install `apache-airflow-provider-apache-pig>=1.0.0` and use `airflow.providers.apache.pig.operators.pig.PigOperator` instead.
+    = help: Install `apache-airflow-providers-apache-pig>=1.0.0` and use `airflow.providers.apache.pig.operators.pig.PigOperator` instead.
 
 AIR302.py:412:1: AIR302 `airflow.operators.postgres_operator.Mapping` is moved into `postgres` provider in Airflow 3.0;
     |
@@ -1510,7 +1510,7 @@ AIR302.py:412:1: AIR302 `airflow.operators.postgres_operator.Mapping` is moved i
 413 | PostgresHook()
 414 | PostgresOperator()
     |
-    = help: Install `apache-airflow-provider-postgres>=1.0.0` and use `airflow.providers.postgres.operators.postgres.Mapping` instead.
+    = help: Install `apache-airflow-providers-postgres>=1.0.0` and use `airflow.providers.postgres.operators.postgres.Mapping` instead.
 
 AIR302.py:413:1: AIR302 `airflow.hooks.postgres_hook.PostgresHook` is moved into `postgres` provider in Airflow 3.0;
     |
@@ -1520,7 +1520,7 @@ AIR302.py:413:1: AIR302 `airflow.hooks.postgres_hook.PostgresHook` is moved into
     | ^^^^^^^^^^^^ AIR302
 414 | PostgresOperator()
     |
-    = help: Install `apache-airflow-provider-postgres>=1.0.0` and use `airflow.providers.postgres.hooks.postgres.PostgresHook` instead.
+    = help: Install `apache-airflow-providers-postgres>=1.0.0` and use `airflow.providers.postgres.hooks.postgres.PostgresHook` instead.
 
 AIR302.py:414:1: AIR302 `airflow.operators.postgres_operator.PostgresOperator` is moved into `postgres` provider in Airflow 3.0;
     |
@@ -1531,7 +1531,7 @@ AIR302.py:414:1: AIR302 `airflow.operators.postgres_operator.PostgresOperator` i
 415 |
 416 | # apache-airflow-providers-presto
     |
-    = help: Install `apache-airflow-provider-postgres>=1.0.0` and use `airflow.providers.postgres.operators.postgres.PostgresOperator` instead.
+    = help: Install `apache-airflow-providers-postgres>=1.0.0` and use `airflow.providers.postgres.operators.postgres.PostgresOperator` instead.
 
 AIR302.py:417:1: AIR302 `airflow.hooks.presto_hook.PrestoHook` is moved into `presto` provider in Airflow 3.0;
     |
@@ -1541,7 +1541,7 @@ AIR302.py:417:1: AIR302 `airflow.hooks.presto_hook.PrestoHook` is moved into `pr
 418 |
 419 | # apache-airflow-providers-samba
     |
-    = help: Install `apache-airflow-provider-presto>=1.0.0` and use `airflow.providers.presto.hooks.presto.PrestoHook` instead.
+    = help: Install `apache-airflow-providers-presto>=1.0.0` and use `airflow.providers.presto.hooks.presto.PrestoHook` instead.
 
 AIR302.py:420:1: AIR302 `airflow.hooks.samba_hook.SambaHook` is moved into `samba` provider in Airflow 3.0;
     |
@@ -1551,7 +1551,7 @@ AIR302.py:420:1: AIR302 `airflow.hooks.samba_hook.SambaHook` is moved into `samb
 421 |
 422 | # apache-airflow-providers-slack
     |
-    = help: Install `apache-airflow-provider-samba>=1.0.0` and use `airflow.providers.samba.hooks.samba.SambaHook` instead.
+    = help: Install `apache-airflow-providers-samba>=1.0.0` and use `airflow.providers.samba.hooks.samba.SambaHook` instead.
 
 AIR302.py:423:1: AIR302 `airflow.hooks.slack_hook.SlackHook` is moved into `slack` provider in Airflow 3.0;
     |
@@ -1561,7 +1561,7 @@ AIR302.py:423:1: AIR302 `airflow.hooks.slack_hook.SlackHook` is moved into `slac
 424 | SlackAPIOperator()
 425 | SlackAPIPostOperator()
     |
-    = help: Install `apache-airflow-provider-slack>=1.0.0` and use `airflow.providers.slack.hooks.slack.SlackHook` instead.
+    = help: Install `apache-airflow-providers-slack>=1.0.0` and use `airflow.providers.slack.hooks.slack.SlackHook` instead.
 
 AIR302.py:424:1: AIR302 `airflow.operators.slack_operator.SlackAPIOperator` is moved into `slack` provider in Airflow 3.0;
     |
@@ -1571,7 +1571,7 @@ AIR302.py:424:1: AIR302 `airflow.operators.slack_operator.SlackAPIOperator` is m
     | ^^^^^^^^^^^^^^^^ AIR302
 425 | SlackAPIPostOperator()
     |
-    = help: Install `apache-airflow-provider-slack>=1.0.0` and use `airflow.providers.slack.operators.slack.SlackAPIOperator` instead.
+    = help: Install `apache-airflow-providers-slack>=1.0.0` and use `airflow.providers.slack.operators.slack.SlackAPIOperator` instead.
 
 AIR302.py:425:1: AIR302 `airflow.operators.slack_operator.SlackAPIPostOperator` is moved into `slack` provider in Airflow 3.0;
     |
@@ -1582,7 +1582,7 @@ AIR302.py:425:1: AIR302 `airflow.operators.slack_operator.SlackAPIPostOperator` 
 426 |
 427 | # apache-airflow-providers-sqlite
     |
-    = help: Install `apache-airflow-provider-slack>=1.0.0` and use `airflow.providers.slack.operators.slack.SlackAPIPostOperator` instead.
+    = help: Install `apache-airflow-providers-slack>=1.0.0` and use `airflow.providers.slack.operators.slack.SlackAPIPostOperator` instead.
 
 AIR302.py:428:1: AIR302 `airflow.hooks.sqlite_hook.SqliteHook` is moved into `sqlite` provider in Airflow 3.0;
     |
@@ -1591,7 +1591,7 @@ AIR302.py:428:1: AIR302 `airflow.hooks.sqlite_hook.SqliteHook` is moved into `sq
     | ^^^^^^^^^^ AIR302
 429 | SqliteOperator()
     |
-    = help: Install `apache-airflow-provider-sqlite>=1.0.0` and use `airflow.providers.sqlite.hooks.sqlite.SqliteHook` instead.
+    = help: Install `apache-airflow-providers-sqlite>=1.0.0` and use `airflow.providers.sqlite.hooks.sqlite.SqliteHook` instead.
 
 AIR302.py:429:1: AIR302 `airflow.operators.sqlite_operator.SqliteOperator` is moved into `sqlite` provider in Airflow 3.0;
     |
@@ -1602,7 +1602,7 @@ AIR302.py:429:1: AIR302 `airflow.operators.sqlite_operator.SqliteOperator` is mo
 430 |
 431 | # apache-airflow-providers-zendesk
     |
-    = help: Install `apache-airflow-provider-sqlite>=1.0.0` and use `airflow.providers.sqlite.operators.sqlite.SqliteOperator` instead.
+    = help: Install `apache-airflow-providers-sqlite>=1.0.0` and use `airflow.providers.sqlite.operators.sqlite.SqliteOperator` instead.
 
 AIR302.py:432:1: AIR302 `airflow.hooks.zendesk_hook.ZendeskHook` is moved into `zendesk` provider in Airflow 3.0;
     |
@@ -1612,7 +1612,7 @@ AIR302.py:432:1: AIR302 `airflow.hooks.zendesk_hook.ZendeskHook` is moved into `
 433 |
 434 | # apache-airflow-providers-smtp
     |
-    = help: Install `apache-airflow-provider-zendesk>=1.0.0` and use `airflow.providers.zendesk.hooks.zendesk.ZendeskHook` instead.
+    = help: Install `apache-airflow-providers-zendesk>=1.0.0` and use `airflow.providers.zendesk.hooks.zendesk.ZendeskHook` instead.
 
 AIR302.py:435:1: AIR302 `airflow.operators.email_operator.EmailOperator` is moved into `smtp` provider in Airflow 3.0;
     |
@@ -1622,7 +1622,7 @@ AIR302.py:435:1: AIR302 `airflow.operators.email_operator.EmailOperator` is move
 436 |
 437 | # apache-airflow-providers-standard
     |
-    = help: Install `apache-airflow-provider-smtp>=1.0.0` and use `airflow.providers.smtp.operators.smtp.EmailOperator` instead.
+    = help: Install `apache-airflow-providers-smtp>=1.0.0` and use `airflow.providers.smtp.operators.smtp.EmailOperator` instead.
 
 AIR302.py:451:1: AIR302 `airflow.operators.dummy.DummyOperator` is moved into `standard` provider in Airflow 3.0;
     |
@@ -1633,7 +1633,7 @@ AIR302.py:451:1: AIR302 `airflow.operators.dummy.DummyOperator` is moved into `s
 452 | EmptyOperator()
 453 | ExternalTaskMarker()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.2` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
+    = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
 
 AIR302.py:452:1: AIR302 `airflow.operators.dummy.EmptyOperator` is moved into `standard` provider in Airflow 3.0;
     |
@@ -1644,4 +1644,4 @@ AIR302.py:452:1: AIR302 `airflow.operators.dummy.EmptyOperator` is moved into `s
 453 | ExternalTaskMarker()
 454 | ExternalTaskSensor()
     |
-    = help: Install `apache-airflow-provider-standard>=0.0.2` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
+    = help: Install `apache-airflow-providers-standard>=0.0.2` and use `airflow.providers.standard.operators.empty.EmptyOperator` instead.
