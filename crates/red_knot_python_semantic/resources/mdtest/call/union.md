@@ -179,12 +179,15 @@ static_assert(is_subtype_of(Literal["a", ""], Union[Not[Literal[""]], Literal["a
 static_assert(is_subtype_of(Not[Literal[""]], Union[Not[Literal[""]], Literal["a", ""]]))
 
 def _(
-    x: Union[Literal["a", ""], Not[AlwaysFalsy]],
-    y: Union[Literal["a", ""], Not[Literal[""]]],
+    a: Union[Literal["a", ""], Not[AlwaysFalsy]],
+    b: Union[Literal["a", ""], Not[Literal[""]]],
+    c: Union[Literal[""], Not[Literal[""]]],
+    d: Union[Not[Literal[""]], Literal[""]],
 ):
-    reveal_type(x)  # revealed: Literal[""] | ~AlwaysFalsy
-    # TODO should be `object`
-    reveal_type(y)  # revealed: Literal[""] | ~Literal[""]
+    reveal_type(a)  # revealed: Literal[""] | ~AlwaysFalsy
+    reveal_type(b)  # revealed: object
+    reveal_type(c)  # revealed: object
+    reveal_type(d)  # revealed: object
 ```
 
 ## Cannot use an argument as both a value and a type form
