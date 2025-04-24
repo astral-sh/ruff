@@ -31,17 +31,14 @@ def _(flag1: bool, flag2: bool):
     if x != 1:
         reveal_type(x)  # revealed: Literal[2, 3]
         if x == 2:
-            # TODO should be `Literal[2]`
-            reveal_type(x)  # revealed: Literal[2, 3]
+            reveal_type(x)  # revealed: Literal[2]
         elif x == 3:
             reveal_type(x)  # revealed: Literal[3]
         else:
             reveal_type(x)  # revealed: Never
 
     elif x != 2:
-        # TODO should be Literal[1]
-        reveal_type(x)  # revealed: Literal[1, 3]
+        reveal_type(x)  # revealed: Literal[1]
     else:
-        # TODO should be Never
-        reveal_type(x)  # revealed: Literal[1, 2, 3]
+        reveal_type(x)  # revealed: Never
 ```

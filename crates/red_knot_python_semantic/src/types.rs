@@ -542,6 +542,11 @@ impl<'db> Type<'db> {
             .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
     }
 
+    fn is_bool(&self, db: &'db dyn Db) -> bool {
+        self.into_instance()
+            .is_some_and(|instance| instance.class().is_known(db, KnownClass::Bool))
+    }
+
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.into_instance().is_some_and(|instance| {
             instance
@@ -776,8 +781,13 @@ impl<'db> Type<'db> {
     }
 
     pub fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.into_union()
-            .is_some_and(|union| union.elements(db).iter().all(|ty| ty.is_single_valued(db)))
+        self.into_union().is_some_and(|union| {
+            union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_single_valued(db) || ty.is_bool(db) || ty.is_literal_string())
+        }) || self.is_bool(db)
+            || self.is_literal_string()
     }
 
     pub const fn into_int_literal(self) -> Option<i64> {
