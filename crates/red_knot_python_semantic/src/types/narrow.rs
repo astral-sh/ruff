@@ -433,9 +433,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     // Boolean literals and int literals are disjoint, and single valued, and yet
                     // `True == 1` and `False == 0`.
                     (Type::BooleanLiteral(b), Type::IntLiteral(i))
-                    | (Type::IntLiteral(i), Type::BooleanLiteral(b)) => {
-                        (b && (i == 1)) || (!b && (i == 0))
-                    }
+                    | (Type::IntLiteral(i), Type::BooleanLiteral(b)) => i64::from(b) == i,
                     // Other than the above cases, two single-valued disjoint types cannot compare
                     // equal.
                     _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
