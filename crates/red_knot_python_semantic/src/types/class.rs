@@ -37,9 +37,11 @@ use crate::{
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
+use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashSet, FxHasher};
 
 type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
@@ -1724,6 +1726,28 @@ impl<'db> ClassLiteralType<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
     pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClassLiteral<'db>> {
         self.is_protocol(db).then_some(ProtocolClassLiteral(self))
+    }
+
+    /// Returns the [`Span`] of the class's "header": the class name
+    /// and any arguments passed to the `class` statement. E.g.
+    ///
+    /// ```ignore
+    /// class Foo(Bar, metaclass=Baz): ...
+    ///       ^^^^^^^^^^^^^^^^^^^^^^^
+    /// ```
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        let class_scope = self.body_scope(db);
+        let class_node = class_scope.node(db).expect_class();
+        let class_name = &class_node.name;
+        let header_range = TextRange::new(
+            class_name.start(),
+            class_node
+                .arguments
+                .as_deref()
+                .map(Ranged::end)
+                .unwrap_or_else(|| class_name.end()),
+        );
+        Span::from(class_scope.file(db)).with_range(header_range)
     }
 }
 

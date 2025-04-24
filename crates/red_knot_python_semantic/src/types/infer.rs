@@ -96,8 +96,8 @@ use crate::Db;
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
-    report_bad_argument_to_get_protocol_members, report_index_out_of_bounds,
-    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_attempted_protocol_instantiation, report_bad_argument_to_get_protocol_members,
+    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
@@ -4292,6 +4292,20 @@ impl<'db> TypeInferenceBuilder<'db> {
         // are assignable to any parameter annotations.
         let mut call_arguments = Self::parse_arguments(arguments);
         let callable_type = self.infer_expression(func);
+
+        // It might look odd here that we emit an error for class-literals but not `type[]` types.
+        // But it's deliberate! The typing spec explicitly mandates that `type[]` types can be called
+        // even though class-literals cannot. This is because even though a protocol class `SomeProtocol`
+        // is always an abstract class, `type[SomeProtocol]` can be a concrete subclass of that protocol
+        // -- and indeed, according to the spec, type checkers must disallow abstract subclasses of the
+        // protocol to be passed to parameters that accept `type[SomeProtocol]`.
+        // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
+        if let Some(protocol_class) = callable_type
+            .into_class_literal()
+            .and_then(|class| class.into_protocol_class(self.db()))
+        {
+            report_attempted_protocol_instantiation(&self.context, call_expression, protocol_class);
+        }
 
         // For class literals we model the entire class instantiation logic, so it is handled
         // in a separate function. For some known classes we have manual signatures defined and use
