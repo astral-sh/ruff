@@ -22,6 +22,7 @@ We can then place custom stub files in `/typeshed/stdlib`, for example:
 `/typeshed/stdlib/builtins.pyi`:
 
 ```pyi
+class object: ...
 class BuiltinClass: ...
 
 builtin_symbol: BuiltinClass

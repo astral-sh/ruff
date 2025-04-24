@@ -12,10 +12,10 @@ x = [1, 2, 3]
 reveal_type(x)  # revealed: list
 
 # TODO reveal int
-reveal_type(x[0])  # revealed: Unknown | @Todo(Support for `typing.TypeVar` instances in type expressions)
+reveal_type(x[0])  # revealed: @Todo(Support for `typing.TypeVar` instances in type expressions)
 
 # TODO reveal list
-reveal_type(x[0:1])  # revealed: @Todo(generics)
+reveal_type(x[0:1])  # revealed: @Todo(specialized non-generic class)
 
 # error: [call-non-callable]
 reveal_type(x["a"])  # revealed: Unknown

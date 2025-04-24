@@ -47,6 +47,13 @@ static_assert(is_assignable_to(Unknown, Literal[1]))
 static_assert(is_assignable_to(Any, Literal[1]))
 static_assert(is_assignable_to(Literal[1], Unknown))
 static_assert(is_assignable_to(Literal[1], Any))
+
+class SubtypeOfAny(Any): ...
+
+static_assert(is_assignable_to(SubtypeOfAny, Any))
+static_assert(is_assignable_to(SubtypeOfAny, int))
+static_assert(is_assignable_to(Any, SubtypeOfAny))
+static_assert(not is_assignable_to(int, SubtypeOfAny))
 ```
 
 ## Literal types
@@ -551,6 +558,32 @@ c: Callable[..., int] = overloaded
 
 # error: [invalid-assignment]
 c: Callable[[int], str] = overloaded
+```
+
+### Classes with `__call__`
+
+```py
+from typing import Callable, Any
+from knot_extensions import static_assert, is_assignable_to
+
+class TakesAny:
+    def __call__(self, a: Any) -> str:
+        return ""
+
+class ReturnsAny:
+    def __call__(self, a: str) -> Any: ...
+
+static_assert(is_assignable_to(TakesAny, Callable[[int], str]))
+static_assert(not is_assignable_to(TakesAny, Callable[[int], int]))
+
+static_assert(is_assignable_to(ReturnsAny, Callable[[str], int]))
+static_assert(not is_assignable_to(ReturnsAny, Callable[[int], int]))
+
+from functools import partial
+
+def f(x: int, y: str) -> None: ...
+
+c1: Callable[[int], None] = partial(f, y="a")
 ```
 
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

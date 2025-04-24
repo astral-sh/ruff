@@ -181,28 +181,137 @@ impl<'db> Specialization<'db> {
             .find(|(var, _)| **var == typevar)
             .map(|(_, ty)| *ty)
     }
+
+    pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
+        let generic_context = self.generic_context(db);
+        if generic_context != other.generic_context(db) {
+            return false;
+        }
+
+        for ((_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+            .zip(self.types(db))
+            .zip(other.types(db))
+        {
+            if matches!(self_type, Type::Dynamic(_)) || matches!(other_type, Type::Dynamic(_)) {
+                return false;
+            }
+
+            // TODO: We currently treat all typevars as invariant. Once we track the actual
+            // variance of each typevar, these checks should change:
+            //   - covariant: verify that self_type <: other_type
+            //   - contravariant: verify that other_type <: self_type
+            //   - invariant: verify that self_type == other_type
+            //   - bivariant: skip, can't make subtyping false
+            if !self_type.is_equivalent_to(db, *other_type) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
+        let generic_context = self.generic_context(db);
+        if generic_context != other.generic_context(db) {
+            return false;
+        }
+
+        for ((_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+            .zip(self.types(db))
+            .zip(other.types(db))
+        {
+            if matches!(self_type, Type::Dynamic(_)) || matches!(other_type, Type::Dynamic(_)) {
+                return false;
+            }
+
+            // TODO: We currently treat all typevars as invariant. Once we track the actual
+            // variance of each typevar, these checks should change:
+            //   - covariant: verify that self_type == other_type
+            //   - contravariant: verify that other_type == self_type
+            //   - invariant: verify that self_type == other_type
+            //   - bivariant: skip, can't make equivalence false
+            if !self_type.is_equivalent_to(db, *other_type) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub(crate) fn is_assignable_to(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
+        let generic_context = self.generic_context(db);
+        if generic_context != other.generic_context(db) {
+            return false;
+        }
+
+        for ((_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+            .zip(self.types(db))
+            .zip(other.types(db))
+        {
+            if matches!(self_type, Type::Dynamic(_)) || matches!(other_type, Type::Dynamic(_)) {
+                continue;
+            }
+
+            // TODO: We currently treat all typevars as invariant. Once we track the actual
+            // variance of each typevar, these checks should change:
+            //   - covariant: verify that self_type <: other_type
+            //   - contravariant: verify that other_type <: self_type
+            //   - invariant: verify that self_type == other_type
+            //   - bivariant: skip, can't make assignability false
+            if !self_type.is_gradual_equivalent_to(db, *other_type) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub(crate) fn is_gradual_equivalent_to(
+        self,
+        db: &'db dyn Db,
+        other: Specialization<'db>,
+    ) -> bool {
+        let generic_context = self.generic_context(db);
+        if generic_context != other.generic_context(db) {
+            return false;
+        }
+
+        for ((_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+            .zip(self.types(db))
+            .zip(other.types(db))
+        {
+            // TODO: We currently treat all typevars as invariant. Once we track the actual
+            // variance of each typevar, these checks should change:
+            //   - covariant: verify that self_type == other_type
+            //   - contravariant: verify that other_type == self_type
+            //   - invariant: verify that self_type == other_type
+            //   - bivariant: skip, can't make equivalence false
+            if !self_type.is_gradual_equivalent_to(db, *other_type) {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 /// Performs type inference between parameter annotations and argument types, producing a
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
-    generic_context: GenericContext<'db>,
     types: FxHashMap<TypeVarInstance<'db>, UnionBuilder<'db>>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db, generic_context: GenericContext<'db>) -> Self {
+    pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
-            generic_context,
             types: FxHashMap::default(),
         }
     }
 
-    pub(crate) fn build(mut self) -> Specialization<'db> {
-        let types: Box<[_]> = self
-            .generic_context
+    pub(crate) fn build(&mut self, generic_context: GenericContext<'db>) -> Specialization<'db> {
+        let types: Box<[_]> = generic_context
             .variables(self.db)
             .iter()
             .map(|variable| {
@@ -212,7 +321,7 @@ impl<'db> SpecializationBuilder<'db> {
                     .unwrap_or(variable.default_ty(self.db).unwrap_or(Type::unknown()))
             })
             .collect();
-        Specialization::new(self.db, self.generic_context, types)
+        Specialization::new(self.db, generic_context, types)
     }
 
     fn add_type_mapping(&mut self, typevar: TypeVarInstance<'db>, ty: Type<'db>) {

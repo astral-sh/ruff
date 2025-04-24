@@ -1,16 +1,20 @@
 use std::hash::BuildHasherDefault;
+use std::ops::Deref;
 use std::sync::{LazyLock, Mutex};
 
 use super::{
     class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
     KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator, SubclassOfType, Truthiness,
-    Type, TypeAliasType, TypeQualifiers, TypeVarInstance,
+    Type, TypeQualifiers,
 };
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::DeclarationWithConstraint;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters};
-use crate::types::{CallableType, DataclassMetadata, Signature};
+use crate::types::{
+    CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
+};
+use crate::FxOrderSet;
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
@@ -33,9 +37,11 @@ use crate::{
 };
 use indexmap::IndexSet;
 use itertools::Itertools as _;
+use ruff_db::diagnostic::Span;
 use ruff_db::files::File;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashSet, FxHasher};
 
 type FxOrderMap<K, V> = ordermap::map::OrderMap<K, V, BuildHasherDefault<FxHasher>>;
@@ -106,7 +112,8 @@ pub struct Class<'db> {
 
     pub(crate) known: Option<KnownClass>,
 
-    pub(crate) dataclass_metadata: Option<DataclassMetadata>,
+    pub(crate) dataclass_params: Option<DataclassParams>,
+    pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams>,
 }
 
 impl<'db> Class<'db> {
@@ -246,7 +253,7 @@ impl<'db> ClassType<'db> {
     /// cases rather than simply iterating over the inferred resolution order for the class.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    pub(super) fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+    pub(super) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal.iter_mro(db, specialization)
     }
@@ -257,11 +264,115 @@ impl<'db> ClassType<'db> {
         class_literal.is_final(db)
     }
 
+    /// If `self` and `other` are generic aliases of the same generic class, returns their
+    /// corresponding specializations.
+    fn compatible_specializations(
+        self,
+        db: &'db dyn Db,
+        other: ClassType<'db>,
+    ) -> Option<(Specialization<'db>, Specialization<'db>)> {
+        match (self, other) {
+            (ClassType::Generic(self_generic), ClassType::Generic(other_generic)) => {
+                if self_generic.origin(db) == other_generic.origin(db) {
+                    Some((
+                        self_generic.specialization(db),
+                        other_generic.specialization(db),
+                    ))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
-        self.iter_mro(db).contains(&ClassBase::Class(other))
+        if self.iter_mro(db).contains(&ClassBase::Class(other)) {
+            return true;
+        }
+
+        // `self` is a subclass of `other` if they are both generic aliases of the same generic
+        // class, and their specializations are compatible, taking into account the variance of the
+        // class's typevars.
+        if let Some((self_specialization, other_specialization)) =
+            self.compatible_specializations(db, other)
+        {
+            if self_specialization.is_subtype_of(db, other_specialization) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        if self == other {
+            return true;
+        }
+
+        // `self` is equivalent to `other` if they are both generic aliases of the same generic
+        // class, and their specializations are compatible, taking into account the variance of the
+        // class's typevars.
+        if let Some((self_specialization, other_specialization)) =
+            self.compatible_specializations(db, other)
+        {
+            if self_specialization.is_equivalent_to(db, other_specialization) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        if self.is_subclass_of(db, other) {
+            return true;
+        }
+
+        // `self` is assignable to `other` if they are both generic aliases of the same generic
+        // class, and their specializations are compatible, taking into account the variance of the
+        // class's typevars.
+        if let Some((self_specialization, other_specialization)) =
+            self.compatible_specializations(db, other)
+        {
+            if self_specialization.is_assignable_to(db, other_specialization) {
+                return true;
+            }
+        }
+
+        if self.iter_mro(db).any(|base| {
+            matches!(
+                base,
+                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
+            )
+        }) && !other.is_final(db)
+        {
+            return true;
+        }
+
+        false
+    }
+
+    pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
+        if self == other {
+            return true;
+        }
+
+        // `self` is equivalent to `other` if they are both generic aliases of the same generic
+        // class, and their specializations are compatible, taking into account the variance of the
+        // class's typevars.
+        if let Some((self_specialization, other_specialization)) =
+            self.compatible_specializations(db, other)
+        {
+            if self_specialization.is_gradual_equivalent_to(db, other_specialization) {
+                return true;
+            }
+        }
+
+        false
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
@@ -373,8 +484,8 @@ impl<'db> ClassLiteralType<'db> {
         self.class(db).known
     }
 
-    pub(crate) fn dataclass_metadata(self, db: &'db dyn Db) -> Option<DataclassMetadata> {
-        self.class(db).dataclass_metadata
+    pub(crate) fn dataclass_params(self, db: &'db dyn Db) -> Option<DataclassParams> {
+        self.class(db).dataclass_params
     }
 
     /// Return `true` if this class represents `known_class`
@@ -486,6 +597,17 @@ impl<'db> ClassLiteralType<'db> {
             .collect()
     }
 
+    /// Determine if this class is a protocol.
+    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+        self.explicit_bases(db).iter().any(|base| {
+            matches!(
+                base,
+                Type::KnownInstance(KnownInstanceType::Protocol)
+                    | Type::Dynamic(DynamicType::SubscriptedProtocol)
+            )
+        })
+    }
+
     /// Return the types of the decorators on this class
     #[salsa::tracked(return_ref)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
@@ -509,12 +631,20 @@ impl<'db> ClassLiteralType<'db> {
             .collect()
     }
 
-    /// Is this class final?
-    pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
+    fn known_function_decorators(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = KnownFunction> + 'db {
         self.decorators(db)
             .iter()
             .filter_map(|deco| deco.into_function_literal())
-            .any(|decorator| decorator.is_known(db, KnownFunction::Final))
+            .filter_map(|decorator| decorator.known(db))
+    }
+
+    /// Is this class final?
+    pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
+        self.known_function_decorators(db)
+            .contains(&KnownFunction::Final)
     }
 
     /// Attempt to resolve the [method resolution order] ("MRO") for this class.
@@ -549,7 +679,7 @@ impl<'db> ClassLiteralType<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-    ) -> impl Iterator<Item = ClassBase<'db>> {
+    ) -> MroIterator<'db> {
         MroIterator::new(db, self, specialization)
     }
 
@@ -592,6 +722,7 @@ impl<'db> ClassLiteralType<'db> {
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         self.try_metaclass(db)
+            .map(|(ty, _)| ty)
             .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
     }
 
@@ -605,7 +736,10 @@ impl<'db> ClassLiteralType<'db> {
 
     /// Return the metaclass of this class, or an error if the metaclass cannot be inferred.
     #[salsa::tracked]
-    pub(super) fn try_metaclass(self, db: &'db dyn Db) -> Result<Type<'db>, MetaclassError<'db>> {
+    pub(super) fn try_metaclass(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<(Type<'db>, Option<DataclassTransformerParams>), MetaclassError<'db>> {
         let class = self.class(db);
         tracing::trace!("ClassLiteralType::try_metaclass: {}", class.name);
 
@@ -616,7 +750,7 @@ impl<'db> ClassLiteralType<'db> {
             // We emit diagnostics for cyclic class definitions elsewhere.
             // Avoid attempting to infer the metaclass if the class is cyclically defined:
             // it would be easy to enter an infinite loop.
-            return Ok(SubclassOfType::subclass_of_unknown());
+            return Ok((SubclassOfType::subclass_of_unknown(), None));
         }
 
         let explicit_metaclass = self.explicit_metaclass(db);
@@ -661,7 +795,7 @@ impl<'db> ClassLiteralType<'db> {
                 }),
             };
 
-            return return_ty_result.map(|ty| ty.to_meta_type(db));
+            return return_ty_result.map(|ty| (ty.to_meta_type(db), None));
         };
 
         // Reconcile all base classes' metaclasses with the candidate metaclass.
@@ -698,7 +832,47 @@ impl<'db> ClassLiteralType<'db> {
             });
         }
 
-        Ok(candidate.metaclass.into())
+        Ok((
+            candidate.metaclass.into(),
+            candidate.metaclass.class(db).dataclass_transformer_params,
+        ))
+    }
+
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let self_ty = Type::from(self);
+        let metaclass_call_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__call__".into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        if let Symbol::Type(Type::BoundMethod(metaclass_call_function), _) =
+            metaclass_call_function_symbol
+        {
+            // TODO: this intentionally diverges from step 1 in
+            // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
+            // by always respecting the signature of the metaclass `__call__`, rather than
+            // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
+            return Some(metaclass_call_function.into_callable_type(db));
+        }
+
+        let new_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__new__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+            return Some(new_function.into_bound_method_type(db, self.into()));
+        }
+        // TODO handle `__init__` also
+        None
     }
 
     /// Returns the class member of this class named `name`.
@@ -750,7 +924,11 @@ impl<'db> ClassLiteralType<'db> {
 
         for superclass in mro_iter {
             match superclass {
-                ClassBase::Dynamic(DynamicType::TodoProtocol) => {
+                ClassBase::Dynamic(
+                    DynamicType::SubscriptedGeneric | DynamicType::SubscriptedProtocol,
+                )
+                | ClassBase::Generic
+                | ClassBase::Protocol => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
                     // result from looking up attributes on builtin types like `str`, `list`, `tuple`
@@ -769,7 +947,12 @@ impl<'db> ClassLiteralType<'db> {
                         continue;
                     }
 
-                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
+                    // HACK: we should implement some more general logic here that supports arbitrary custom
+                    // metaclasses, not just `type` and `ABCMeta`.
+                    if matches!(
+                        class.known(db),
+                        Some(KnownClass::Type | KnownClass::ABCMeta)
+                    ) && policy.meta_class_no_type_fallback()
                     {
                         continue;
                     }
@@ -846,19 +1029,15 @@ impl<'db> ClassLiteralType<'db> {
                     Some(_),
                     "__new__" | "__init__",
                 ) => Type::FunctionLiteral(
-                    function.with_generic_context(db, origin.generic_context(db)),
+                    function.with_inherited_generic_context(db, origin.generic_context(db)),
                 ),
                 _ => ty,
             }
         });
 
         if symbol.symbol.is_unbound() {
-            if let Some(metadata) = self.dataclass_metadata(db) {
-                if let Some(dataclass_member) =
-                    self.own_dataclass_member(db, specialization, metadata, name)
-                {
-                    return Symbol::bound(dataclass_member).into();
-                }
+            if let Some(dataclass_member) = self.own_dataclass_member(db, specialization, name) {
+                return Symbol::bound(dataclass_member).into();
             }
         }
 
@@ -870,70 +1049,97 @@ impl<'db> ClassLiteralType<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
-        metadata: DataclassMetadata,
         name: &str,
     ) -> Option<Type<'db>> {
-        if name == "__init__" && metadata.contains(DataclassMetadata::INIT) {
-            let mut parameters = vec![];
+        let params = self.dataclass_params(db);
+        let has_dataclass_param = |param| params.is_some_and(|params| params.contains(param));
 
-            for (name, (mut attr_ty, mut default_ty)) in self.dataclass_fields(db, specialization) {
-                // The descriptor handling below is guarded by this fully-static check, because dynamic
-                // types like `Any` are valid (data) descriptors: since they have all possible attributes,
-                // they also have a (callable) `__set__` method. The problem is that we can't determine
-                // the type of the value parameter this way. Instead, we want to use the dynamic type
-                // itself in this case, so we skip the special descriptor handling.
-                if attr_ty.is_fully_static(db) {
-                    let dunder_set = attr_ty.class_member(db, "__set__".into());
-                    if let Some(dunder_set) = dunder_set.symbol.ignore_possibly_unbound() {
-                        // This type of this attribute is a data descriptor. Instead of overwriting the
-                        // descriptor attribute, data-classes will (implicitly) call the `__set__` method
-                        // of the descriptor. This means that the synthesized `__init__` parameter for
-                        // this attribute is determined by possible `value` parameter types with which
-                        // the `__set__` method can be called. We build a union of all possible options
-                        // to account for possible overloads.
-                        let mut value_types = UnionBuilder::new(db);
-                        for signature in &dunder_set.signatures(db) {
-                            for overload in signature {
-                                if let Some(value_param) = overload.parameters().get_positional(2) {
-                                    value_types = value_types.add(
-                                        value_param.annotated_type().unwrap_or_else(Type::unknown),
-                                    );
-                                } else if overload.parameters().is_gradual() {
-                                    value_types = value_types.add(Type::unknown());
+        match name {
+            "__init__" => {
+                let has_synthesized_dunder_init = has_dataclass_param(DataclassParams::INIT)
+                    || self
+                        .try_metaclass(db)
+                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some());
+
+                if !has_synthesized_dunder_init {
+                    return None;
+                }
+
+                let mut parameters = vec![];
+
+                for (name, (mut attr_ty, mut default_ty)) in
+                    self.dataclass_fields(db, specialization)
+                {
+                    // The descriptor handling below is guarded by this fully-static check, because dynamic
+                    // types like `Any` are valid (data) descriptors: since they have all possible attributes,
+                    // they also have a (callable) `__set__` method. The problem is that we can't determine
+                    // the type of the value parameter this way. Instead, we want to use the dynamic type
+                    // itself in this case, so we skip the special descriptor handling.
+                    if attr_ty.is_fully_static(db) {
+                        let dunder_set = attr_ty.class_member(db, "__set__".into());
+                        if let Some(dunder_set) = dunder_set.symbol.ignore_possibly_unbound() {
+                            // This type of this attribute is a data descriptor. Instead of overwriting the
+                            // descriptor attribute, data-classes will (implicitly) call the `__set__` method
+                            // of the descriptor. This means that the synthesized `__init__` parameter for
+                            // this attribute is determined by possible `value` parameter types with which
+                            // the `__set__` method can be called. We build a union of all possible options
+                            // to account for possible overloads.
+                            let mut value_types = UnionBuilder::new(db);
+                            for signature in &dunder_set.signatures(db) {
+                                for overload in signature {
+                                    if let Some(value_param) =
+                                        overload.parameters().get_positional(2)
+                                    {
+                                        value_types = value_types.add(
+                                            value_param
+                                                .annotated_type()
+                                                .unwrap_or_else(Type::unknown),
+                                        );
+                                    } else if overload.parameters().is_gradual() {
+                                        value_types = value_types.add(Type::unknown());
+                                    }
                                 }
                             }
-                        }
-                        attr_ty = value_types.build();
+                            attr_ty = value_types.build();
 
-                        // The default value of the attribute is *not* determined by the right hand side
-                        // of the class-body assignment. Instead, the runtime invokes `__get__` on the
-                        // descriptor, as if it had been called on the class itself, i.e. it passes `None`
-                        // for the `instance` argument.
+                            // The default value of the attribute is *not* determined by the right hand side
+                            // of the class-body assignment. Instead, the runtime invokes `__get__` on the
+                            // descriptor, as if it had been called on the class itself, i.e. it passes `None`
+                            // for the `instance` argument.
 
-                        if let Some(ref mut default_ty) = default_ty {
-                            *default_ty = default_ty
-                                .try_call_dunder_get(db, Type::none(db), Type::ClassLiteral(self))
-                                .map(|(return_ty, _)| return_ty)
-                                .unwrap_or_else(Type::unknown);
+                            if let Some(ref mut default_ty) = default_ty {
+                                *default_ty = default_ty
+                                    .try_call_dunder_get(
+                                        db,
+                                        Type::none(db),
+                                        Type::ClassLiteral(self),
+                                    )
+                                    .map(|(return_ty, _)| return_ty)
+                                    .unwrap_or_else(Type::unknown);
+                            }
                         }
                     }
+
+                    let mut parameter =
+                        Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
+
+                    if let Some(default_ty) = default_ty {
+                        parameter = parameter.with_default_type(default_ty);
+                    }
+
+                    parameters.push(parameter);
                 }
 
-                let mut parameter =
-                    Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
+                let init_signature =
+                    Signature::new(Parameters::new(parameters), Some(Type::none(db)));
 
-                if let Some(default_ty) = default_ty {
-                    parameter = parameter.with_default_type(default_ty);
-                }
-
-                parameters.push(parameter);
+                Some(Type::Callable(CallableType::single(db, init_signature)))
             }
+            "__lt__" | "__le__" | "__gt__" | "__ge__" => {
+                if !has_dataclass_param(DataclassParams::ORDER) {
+                    return None;
+                }
 
-            let init_signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
-
-            return Some(Type::Callable(CallableType::single(db, init_signature)));
-        } else if matches!(name, "__lt__" | "__le__" | "__gt__" | "__ge__") {
-            if metadata.contains(DataclassMetadata::ORDER) {
                 let signature = Signature::new(
                     Parameters::new([Parameter::positional_or_keyword(Name::new_static("other"))
                         // TODO: could be `Self`.
@@ -943,11 +1149,17 @@ impl<'db> ClassLiteralType<'db> {
                     Some(KnownClass::Bool.to_instance(db)),
                 );
 
-                return Some(Type::Callable(CallableType::single(db, signature)));
+                Some(Type::Callable(CallableType::single(db, signature)))
             }
+            _ => None,
         }
+    }
 
-        None
+    fn is_dataclass(self, db: &'db dyn Db) -> bool {
+        self.dataclass_params(db).is_some()
+            || self
+                .try_metaclass(db)
+                .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
     }
 
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
@@ -963,7 +1175,7 @@ impl<'db> ClassLiteralType<'db> {
             .filter_map(|superclass| {
                 if let Some(class) = superclass.into_class() {
                     let class_literal = class.class_literal(db).0;
-                    if class_literal.dataclass_metadata(db).is_some() {
+                    if class_literal.is_dataclass(db) {
                         Some(class_literal)
                     } else {
                         None
@@ -1062,8 +1274,12 @@ impl<'db> ClassLiteralType<'db> {
 
         for superclass in self.iter_mro(db, specialization) {
             match superclass {
-                ClassBase::Dynamic(DynamicType::TodoProtocol) => {
-                    // TODO: We currently skip `Protocol` when looking up instance members, in order to
+                ClassBase::Dynamic(
+                    DynamicType::SubscriptedProtocol | DynamicType::SubscriptedGeneric,
+                )
+                | ClassBase::Generic
+                | ClassBase::Protocol => {
+                    // TODO: We currently skip these when looking up instance members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
                     // result from looking up attributes on builtin types like `str`, `list`, `tuple`
                 }
@@ -1307,14 +1523,42 @@ impl<'db> ClassLiteralType<'db> {
                             }
                         }
                     }
-                    DefinitionKind::Comprehension(_) => {
-                        // TODO:
+                    DefinitionKind::Comprehension(comprehension) => {
+                        match comprehension.target_kind() {
+                            TargetKind::Sequence(_, unpack) => {
+                                // We found an unpacking assignment like:
+                                //
+                                //     [... for .., self.name, .. in <iterable>]
+
+                                let unpacked = infer_unpack_types(db, unpack);
+                                let target_ast_id = comprehension
+                                    .target()
+                                    .scoped_expression_id(db, unpack.target_scope(db));
+                                let inferred_ty = unpacked.expression_type(target_ast_id);
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                            TargetKind::NameOrAttribute => {
+                                // We found an attribute assignment like:
+                                //
+                                //     [... for self.name in <iterable>]
+
+                                let iterable_ty = infer_expression_type(
+                                    db,
+                                    index.expression(comprehension.iterable()),
+                                );
+                                // TODO: Potential diagnostics resulting from the iterable are currently not reported.
+                                let inferred_ty = iterable_ty.iterate(db);
+
+                                union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
+                            }
+                        }
                     }
                     DefinitionKind::AugmentedAssignment(_) => {
                         // TODO:
                     }
                     DefinitionKind::NamedExpression(_) => {
-                        // TODO:
+                        // A named expression whose target is an attribute is syntactically prohibited
                     }
                     _ => {}
                 }
@@ -1478,6 +1722,33 @@ impl<'db> ClassLiteralType<'db> {
             Some(InheritanceCycle::Inherited)
         }
     }
+
+    /// Returns `Some` if this is a protocol class, `None` otherwise.
+    pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClassLiteral<'db>> {
+        self.is_protocol(db).then_some(ProtocolClassLiteral(self))
+    }
+
+    /// Returns the [`Span`] of the class's "header": the class name
+    /// and any arguments passed to the `class` statement. E.g.
+    ///
+    /// ```ignore
+    /// class Foo(Bar, metaclass=Baz): ...
+    ///       ^^^^^^^^^^^^^^^^^^^^^^^
+    /// ```
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        let class_scope = self.body_scope(db);
+        let class_node = class_scope.node(db).expect_class();
+        let class_name = &class_node.name;
+        let header_range = TextRange::new(
+            class_name.start(),
+            class_node
+                .arguments
+                .as_deref()
+                .map(Ranged::end)
+                .unwrap_or_else(|| class_name.end()),
+        );
+        Span::from(class_scope.file(db)).with_range(header_range)
+    }
 }
 
 impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
@@ -1486,6 +1757,130 @@ impl<'db> From<ClassLiteralType<'db>> for Type<'db> {
             ClassLiteralType::NonGeneric(non_generic) => non_generic.into(),
             ClassLiteralType::Generic(generic) => generic.into(),
         }
+    }
+}
+
+/// Representation of a single `Protocol` class definition.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(super) struct ProtocolClassLiteral<'db>(ClassLiteralType<'db>);
+
+impl<'db> ProtocolClassLiteral<'db> {
+    /// Returns the protocol members of this class.
+    ///
+    /// A protocol's members define the interface declared by the protocol.
+    /// They therefore determine how the protocol should behave with regards to
+    /// assignability and subtyping.
+    ///
+    /// The list of members consists of all bindings and declarations that take place
+    /// in the protocol's class body, except for a list of excluded attributes which should
+    /// not be taken into account. (This list includes `__init__` and `__new__`, which can
+    /// legally be defined on protocol classes but do not constitute protocol members.)
+    ///
+    /// It is illegal for a protocol class to have any instance attributes that are not declared
+    /// in the protocol's class body. If any are assigned to, they are not taken into account in
+    /// the protocol's list of members.
+    pub(super) fn protocol_members(self, db: &'db dyn Db) -> &'db ordermap::set::Slice<Name> {
+        /// The list of excluded members is subject to change between Python versions,
+        /// especially for dunders, but it probably doesn't matter *too* much if this
+        /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
+        /// (<https://github.com/python/cpython/blob/87b1ea016b1454b1e83b9113fa9435849b7743aa/Lib/typing.py#L1776-L1791>)
+        fn excluded_from_proto_members(member: &str) -> bool {
+            matches!(
+                member,
+                "_is_protocol"
+                    | "__non_callable_proto_members__"
+                    | "__static_attributes__"
+                    | "__orig_class__"
+                    | "__match_args__"
+                    | "__weakref__"
+                    | "__doc__"
+                    | "__parameters__"
+                    | "__module__"
+                    | "_MutableMapping__marker"
+                    | "__slots__"
+                    | "__dict__"
+                    | "__new__"
+                    | "__protocol_attrs__"
+                    | "__init__"
+                    | "__class_getitem__"
+                    | "__firstlineno__"
+                    | "__abstractmethods__"
+                    | "__orig_bases__"
+                    | "_is_runtime_protocol"
+                    | "__subclasshook__"
+                    | "__type_params__"
+                    | "__annotations__"
+                    | "__annotate__"
+                    | "__annotate_func__"
+                    | "__annotations_cache__"
+            )
+        }
+
+        #[salsa::tracked(return_ref)]
+        fn cached_protocol_members<'db>(
+            db: &'db dyn Db,
+            class: ClassLiteralType<'db>,
+        ) -> Box<ordermap::set::Slice<Name>> {
+            let mut members = FxOrderSet::default();
+
+            for parent_protocol in class
+                .iter_mro(db, None)
+                .filter_map(ClassBase::into_class)
+                .filter_map(|class| class.class_literal(db).0.into_protocol_class(db))
+            {
+                let parent_scope = parent_protocol.body_scope(db);
+                let use_def_map = use_def_map(db, parent_scope);
+                let symbol_table = symbol_table(db, parent_scope);
+
+                members.extend(
+                    use_def_map
+                        .all_public_declarations()
+                        .flat_map(|(symbol_id, declarations)| {
+                            symbol_from_declarations(db, declarations)
+                                .map(|symbol| (symbol_id, symbol))
+                        })
+                        .filter_map(|(symbol_id, symbol)| {
+                            symbol.symbol.ignore_possibly_unbound().map(|_| symbol_id)
+                        })
+                        // Bindings in the class body that are not declared in the class body
+                        // are not valid protocol members, and we plan to emit diagnostics for them
+                        // elsewhere. Invalid or not, however, it's important that we still consider
+                        // them to be protocol members. The implementation of `issubclass()` and
+                        // `isinstance()` for runtime-checkable protocols considers them to be protocol
+                        // members at runtime, and it's important that we accurately understand
+                        // type narrowing that uses `isinstance()` or `issubclass()` with
+                        // runtime-checkable protocols.
+                        .chain(use_def_map.all_public_bindings().filter_map(
+                            |(symbol_id, bindings)| {
+                                symbol_from_bindings(db, bindings)
+                                    .ignore_possibly_unbound()
+                                    .map(|_| symbol_id)
+                            },
+                        ))
+                        .map(|symbol_id| symbol_table.symbol(symbol_id).name())
+                        .filter(|name| !excluded_from_proto_members(name))
+                        .cloned(),
+                );
+            }
+
+            members.sort();
+            members.into_boxed_slice()
+        }
+
+        cached_protocol_members(db, *self)
+    }
+
+    pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
+        self.known_function_decorators(db)
+            .contains(&KnownFunction::RuntimeCheckable)
+    }
+}
+
+impl<'db> Deref for ProtocolClassLiteral<'db> {
+    type Target = ClassLiteralType<'db>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -1505,24 +1900,6 @@ impl InheritanceCycle {
     }
 }
 
-/// A type representing the set of runtime objects which are instances of a certain class.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
-pub struct InstanceType<'db> {
-    pub class: ClassType<'db>,
-}
-
-impl<'db> InstanceType<'db> {
-    pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: InstanceType<'db>) -> bool {
-        // N.B. The subclass relation is fully static
-        self.class.is_subclass_of(db, other.class)
-    }
-}
-
-impl<'db> From<InstanceType<'db>> for Type<'db> {
-    fn from(value: InstanceType<'db>) -> Self {
-        Self::Instance(value)
-    }
-}
 /// Non-exhaustive enumeration of known classes (e.g. `builtins.int`, `typing.Any`, ...) to allow
 /// for easier syntax when interacting with very common classes.
 ///
@@ -1559,6 +1936,8 @@ pub(crate) enum KnownClass {
     Super,
     // enum
     Enum,
+    // abc
+    ABCMeta,
     // Types
     GenericAlias,
     ModuleType,
@@ -1668,6 +2047,7 @@ impl<'db> KnownClass {
             | Self::Float
             | Self::Sized
             | Self::Enum
+            | Self::ABCMeta
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -1724,6 +2104,7 @@ impl<'db> KnownClass {
             Self::Sized => "Sized",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
@@ -1880,6 +2261,7 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::Property => KnownModule::Builtins,
             Self::VersionInfo => KnownModule::Sys,
+            Self::ABCMeta => KnownModule::Abc,
             Self::Enum => KnownModule::Enum,
             Self::GenericAlias
             | Self::ModuleType
@@ -1984,6 +2366,7 @@ impl<'db> KnownClass {
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
+            | Self::ABCMeta
             | Self::Super
             | Self::NewType => false,
         }
@@ -2043,6 +2426,7 @@ impl<'db> KnownClass {
             | Self::TypeVarTuple
             | Self::Sized
             | Self::Enum
+            | Self::ABCMeta
             | Self::Super
             | Self::UnionType
             | Self::NewType => false,
@@ -2104,6 +2488,7 @@ impl<'db> KnownClass {
             "SupportsIndex" => Self::SupportsIndex,
             "Sized" => Self::Sized,
             "Enum" => Self::Enum,
+            "ABCMeta" => Self::ABCMeta,
             "super" => Self::Super,
             "_version_info" => Self::VersionInfo,
             "ellipsis" if Program::get(db).python_version(db) <= PythonVersion::PY39 => {
@@ -2159,6 +2544,7 @@ impl<'db> KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::ABCMeta
             | Self::Super
             | Self::NotImplementedType
             | Self::UnionType
@@ -2233,350 +2619,6 @@ impl<'db> KnownClassLookupError<'db> {
             db,
             class,
             error: *self,
-        }
-    }
-}
-
-/// Enumeration of specific runtime that are special enough to be considered their own type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
-pub enum KnownInstanceType<'db> {
-    /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
-    Annotated,
-    /// The symbol `typing.Literal` (which can also be found as `typing_extensions.Literal`)
-    Literal,
-    /// The symbol `typing.LiteralString` (which can also be found as `typing_extensions.LiteralString`)
-    LiteralString,
-    /// The symbol `typing.Optional` (which can also be found as `typing_extensions.Optional`)
-    Optional,
-    /// The symbol `typing.Union` (which can also be found as `typing_extensions.Union`)
-    Union,
-    /// The symbol `typing.NoReturn` (which can also be found as `typing_extensions.NoReturn`)
-    NoReturn,
-    /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
-    Never,
-    /// The symbol `typing.Any` (which can also be found as `typing_extensions.Any`)
-    /// This is not used since typeshed switched to representing `Any` as a class; now we use
-    /// `KnownClass::Any` instead. But we still support the old `Any = object()` representation, at
-    /// least for now. TODO maybe remove?
-    Any,
-    /// The symbol `typing.Tuple` (which can also be found as `typing_extensions.Tuple`)
-    Tuple,
-    /// The symbol `typing.List` (which can also be found as `typing_extensions.List`)
-    List,
-    /// The symbol `typing.Dict` (which can also be found as `typing_extensions.Dict`)
-    Dict,
-    /// The symbol `typing.Set` (which can also be found as `typing_extensions.Set`)
-    Set,
-    /// The symbol `typing.FrozenSet` (which can also be found as `typing_extensions.FrozenSet`)
-    FrozenSet,
-    /// The symbol `typing.ChainMap` (which can also be found as `typing_extensions.ChainMap`)
-    ChainMap,
-    /// The symbol `typing.Counter` (which can also be found as `typing_extensions.Counter`)
-    Counter,
-    /// The symbol `typing.DefaultDict` (which can also be found as `typing_extensions.DefaultDict`)
-    DefaultDict,
-    /// The symbol `typing.Deque` (which can also be found as `typing_extensions.Deque`)
-    Deque,
-    /// The symbol `typing.OrderedDict` (which can also be found as `typing_extensions.OrderedDict`)
-    OrderedDict,
-    /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
-    Protocol,
-    /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
-    Type,
-    /// A single instance of `typing.TypeVar`
-    TypeVar(TypeVarInstance<'db>),
-    /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
-    TypeAliasType(TypeAliasType<'db>),
-    /// The symbol `knot_extensions.Unknown`
-    Unknown,
-    /// The symbol `knot_extensions.AlwaysTruthy`
-    AlwaysTruthy,
-    /// The symbol `knot_extensions.AlwaysFalsy`
-    AlwaysFalsy,
-    /// The symbol `knot_extensions.Not`
-    Not,
-    /// The symbol `knot_extensions.Intersection`
-    Intersection,
-    /// The symbol `knot_extensions.TypeOf`
-    TypeOf,
-    /// The symbol `knot_extensions.CallableTypeOf`
-    CallableTypeOf,
-
-    // Various special forms, special aliases and type qualifiers that we don't yet understand
-    // (all currently inferred as TODO in most contexts):
-    TypingSelf,
-    Final,
-    ClassVar,
-    Callable,
-    Concatenate,
-    Unpack,
-    Required,
-    NotRequired,
-    TypeAlias,
-    TypeGuard,
-    TypeIs,
-    ReadOnly,
-    // TODO: fill this enum out with more special forms, etc.
-}
-
-impl<'db> KnownInstanceType<'db> {
-    /// Evaluate the known instance in boolean context
-    pub(crate) const fn bool(self) -> Truthiness {
-        match self {
-            Self::Annotated
-            | Self::Literal
-            | Self::LiteralString
-            | Self::Optional
-            | Self::TypeVar(_)
-            | Self::Union
-            | Self::NoReturn
-            | Self::Never
-            | Self::Any
-            | Self::Tuple
-            | Self::Type
-            | Self::TypingSelf
-            | Self::Final
-            | Self::ClassVar
-            | Self::Callable
-            | Self::Concatenate
-            | Self::Unpack
-            | Self::Required
-            | Self::NotRequired
-            | Self::TypeAlias
-            | Self::TypeGuard
-            | Self::TypeIs
-            | Self::List
-            | Self::Dict
-            | Self::DefaultDict
-            | Self::Set
-            | Self::FrozenSet
-            | Self::Counter
-            | Self::Deque
-            | Self::ChainMap
-            | Self::OrderedDict
-            | Self::Protocol
-            | Self::ReadOnly
-            | Self::TypeAliasType(_)
-            | Self::Unknown
-            | Self::AlwaysTruthy
-            | Self::AlwaysFalsy
-            | Self::Not
-            | Self::Intersection
-            | Self::TypeOf
-            | Self::CallableTypeOf => Truthiness::AlwaysTrue,
-        }
-    }
-
-    /// Return the repr of the symbol at runtime
-    pub(crate) fn repr(self, db: &'db dyn Db) -> &'db str {
-        match self {
-            Self::Annotated => "typing.Annotated",
-            Self::Literal => "typing.Literal",
-            Self::LiteralString => "typing.LiteralString",
-            Self::Optional => "typing.Optional",
-            Self::Union => "typing.Union",
-            Self::NoReturn => "typing.NoReturn",
-            Self::Never => "typing.Never",
-            Self::Any => "typing.Any",
-            Self::Tuple => "typing.Tuple",
-            Self::Type => "typing.Type",
-            Self::TypingSelf => "typing.Self",
-            Self::Final => "typing.Final",
-            Self::ClassVar => "typing.ClassVar",
-            Self::Callable => "typing.Callable",
-            Self::Concatenate => "typing.Concatenate",
-            Self::Unpack => "typing.Unpack",
-            Self::Required => "typing.Required",
-            Self::NotRequired => "typing.NotRequired",
-            Self::TypeAlias => "typing.TypeAlias",
-            Self::TypeGuard => "typing.TypeGuard",
-            Self::TypeIs => "typing.TypeIs",
-            Self::List => "typing.List",
-            Self::Dict => "typing.Dict",
-            Self::DefaultDict => "typing.DefaultDict",
-            Self::Set => "typing.Set",
-            Self::FrozenSet => "typing.FrozenSet",
-            Self::Counter => "typing.Counter",
-            Self::Deque => "typing.Deque",
-            Self::ChainMap => "typing.ChainMap",
-            Self::OrderedDict => "typing.OrderedDict",
-            Self::Protocol => "typing.Protocol",
-            Self::ReadOnly => "typing.ReadOnly",
-            Self::TypeVar(typevar) => typevar.name(db),
-            Self::TypeAliasType(_) => "typing.TypeAliasType",
-            Self::Unknown => "knot_extensions.Unknown",
-            Self::AlwaysTruthy => "knot_extensions.AlwaysTruthy",
-            Self::AlwaysFalsy => "knot_extensions.AlwaysFalsy",
-            Self::Not => "knot_extensions.Not",
-            Self::Intersection => "knot_extensions.Intersection",
-            Self::TypeOf => "knot_extensions.TypeOf",
-            Self::CallableTypeOf => "knot_extensions.CallableTypeOf",
-        }
-    }
-
-    /// Return the [`KnownClass`] which this symbol is an instance of
-    pub(crate) const fn class(self) -> KnownClass {
-        match self {
-            Self::Annotated => KnownClass::SpecialForm,
-            Self::Literal => KnownClass::SpecialForm,
-            Self::LiteralString => KnownClass::SpecialForm,
-            Self::Optional => KnownClass::SpecialForm,
-            Self::Union => KnownClass::SpecialForm,
-            Self::NoReturn => KnownClass::SpecialForm,
-            Self::Never => KnownClass::SpecialForm,
-            Self::Any => KnownClass::Object,
-            Self::Tuple => KnownClass::SpecialForm,
-            Self::Type => KnownClass::SpecialForm,
-            Self::TypingSelf => KnownClass::SpecialForm,
-            Self::Final => KnownClass::SpecialForm,
-            Self::ClassVar => KnownClass::SpecialForm,
-            Self::Callable => KnownClass::SpecialForm,
-            Self::Concatenate => KnownClass::SpecialForm,
-            Self::Unpack => KnownClass::SpecialForm,
-            Self::Required => KnownClass::SpecialForm,
-            Self::NotRequired => KnownClass::SpecialForm,
-            Self::TypeAlias => KnownClass::SpecialForm,
-            Self::TypeGuard => KnownClass::SpecialForm,
-            Self::TypeIs => KnownClass::SpecialForm,
-            Self::ReadOnly => KnownClass::SpecialForm,
-            Self::List => KnownClass::StdlibAlias,
-            Self::Dict => KnownClass::StdlibAlias,
-            Self::DefaultDict => KnownClass::StdlibAlias,
-            Self::Set => KnownClass::StdlibAlias,
-            Self::FrozenSet => KnownClass::StdlibAlias,
-            Self::Counter => KnownClass::StdlibAlias,
-            Self::Deque => KnownClass::StdlibAlias,
-            Self::ChainMap => KnownClass::StdlibAlias,
-            Self::OrderedDict => KnownClass::StdlibAlias,
-            Self::Protocol => KnownClass::SpecialForm,
-            Self::TypeVar(_) => KnownClass::TypeVar,
-            Self::TypeAliasType(_) => KnownClass::TypeAliasType,
-            Self::TypeOf => KnownClass::SpecialForm,
-            Self::Not => KnownClass::SpecialForm,
-            Self::Intersection => KnownClass::SpecialForm,
-            Self::CallableTypeOf => KnownClass::SpecialForm,
-            Self::Unknown => KnownClass::Object,
-            Self::AlwaysTruthy => KnownClass::Object,
-            Self::AlwaysFalsy => KnownClass::Object,
-        }
-    }
-
-    /// Return the instance type which this type is a subtype of.
-    ///
-    /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
-    /// so `KnownInstanceType::Literal.instance_fallback(db)`
-    /// returns `Type::Instance(InstanceType { class: <typing._SpecialForm> })`.
-    pub(super) fn instance_fallback(self, db: &dyn Db) -> Type {
-        self.class().to_instance(db)
-    }
-
-    /// Return `true` if this symbol is an instance of `class`.
-    pub(super) fn is_instance_of(self, db: &'db dyn Db, class: ClassType<'db>) -> bool {
-        self.class().is_subclass_of(db, class)
-    }
-
-    pub(super) fn try_from_file_and_name(
-        db: &'db dyn Db,
-        file: File,
-        symbol_name: &str,
-    ) -> Option<Self> {
-        let candidate = match symbol_name {
-            "Any" => Self::Any,
-            "ClassVar" => Self::ClassVar,
-            "Deque" => Self::Deque,
-            "List" => Self::List,
-            "Dict" => Self::Dict,
-            "DefaultDict" => Self::DefaultDict,
-            "Set" => Self::Set,
-            "FrozenSet" => Self::FrozenSet,
-            "Counter" => Self::Counter,
-            "ChainMap" => Self::ChainMap,
-            "OrderedDict" => Self::OrderedDict,
-            "Protocol" => Self::Protocol,
-            "Optional" => Self::Optional,
-            "Union" => Self::Union,
-            "NoReturn" => Self::NoReturn,
-            "Tuple" => Self::Tuple,
-            "Type" => Self::Type,
-            "Callable" => Self::Callable,
-            "Annotated" => Self::Annotated,
-            "Literal" => Self::Literal,
-            "Never" => Self::Never,
-            "Self" => Self::TypingSelf,
-            "Final" => Self::Final,
-            "Unpack" => Self::Unpack,
-            "Required" => Self::Required,
-            "TypeAlias" => Self::TypeAlias,
-            "TypeGuard" => Self::TypeGuard,
-            "TypeIs" => Self::TypeIs,
-            "ReadOnly" => Self::ReadOnly,
-            "Concatenate" => Self::Concatenate,
-            "NotRequired" => Self::NotRequired,
-            "LiteralString" => Self::LiteralString,
-            "Unknown" => Self::Unknown,
-            "AlwaysTruthy" => Self::AlwaysTruthy,
-            "AlwaysFalsy" => Self::AlwaysFalsy,
-            "Not" => Self::Not,
-            "Intersection" => Self::Intersection,
-            "TypeOf" => Self::TypeOf,
-            "CallableTypeOf" => Self::CallableTypeOf,
-            _ => return None,
-        };
-
-        candidate
-            .check_module(file_to_module(db, file)?.known()?)
-            .then_some(candidate)
-    }
-
-    /// Return `true` if `module` is a module from which this `KnownInstance` variant can validly originate.
-    ///
-    /// Most variants can only exist in one module, which is the same as `self.class().canonical_module()`.
-    /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
-    pub(super) fn check_module(self, module: KnownModule) -> bool {
-        match self {
-            Self::Any
-            | Self::ClassVar
-            | Self::Deque
-            | Self::List
-            | Self::Dict
-            | Self::DefaultDict
-            | Self::Set
-            | Self::FrozenSet
-            | Self::Counter
-            | Self::ChainMap
-            | Self::OrderedDict
-            | Self::Optional
-            | Self::Union
-            | Self::NoReturn
-            | Self::Tuple
-            | Self::Type
-            | Self::Callable => module.is_typing(),
-            Self::Annotated
-            | Self::Protocol
-            | Self::Literal
-            | Self::LiteralString
-            | Self::Never
-            | Self::TypingSelf
-            | Self::Final
-            | Self::Concatenate
-            | Self::Unpack
-            | Self::Required
-            | Self::NotRequired
-            | Self::TypeAlias
-            | Self::TypeGuard
-            | Self::TypeIs
-            | Self::ReadOnly
-            | Self::TypeAliasType(_)
-            | Self::TypeVar(_) => {
-                matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
-            }
-            Self::Unknown
-            | Self::AlwaysTruthy
-            | Self::AlwaysFalsy
-            | Self::Not
-            | Self::Intersection
-            | Self::TypeOf
-            | Self::CallableTypeOf => module.is_knot_extensions(),
         }
     }
 }

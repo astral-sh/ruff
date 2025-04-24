@@ -359,7 +359,7 @@ if_stmt_min_max.py:119:1: PLR1730 [*] Replace `if` statement with `A2 = max(A2, 
     |
     = help: Replace with `A2 = max(A2, A1)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 116 116 | A1 = AA(0)
 117 117 | A2 = AA(3)
 118 118 | 
@@ -382,7 +382,7 @@ if_stmt_min_max.py:122:1: PLR1730 [*] Replace `if` statement with `A2 = max(A1, 
     |
     = help: Replace with `A2 = max(A1, A2)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 119 119 | if A2 < A1:  # [max-instead-of-if]
 120 120 |     A2 = A1
 121 121 | 
@@ -405,7 +405,7 @@ if_stmt_min_max.py:125:1: PLR1730 [*] Replace `if` statement with `A2 = min(A2, 
     |
     = help: Replace with `A2 = min(A2, A1)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 122 122 | if A2 <= A1:  # [max-instead-of-if]
 123 123 |     A2 = A1
 124 124 | 
@@ -428,7 +428,7 @@ if_stmt_min_max.py:128:1: PLR1730 [*] Replace `if` statement with `A2 = min(A1, 
     |
     = help: Replace with `A2 = min(A1, A2)`
 
-ℹ Safe fix
+ℹ Unsafe fix
 125 125 | if A2 > A1:  # [min-instead-of-if]
 126 126 |     A2 = A1
 127 127 | 
@@ -721,6 +721,8 @@ if_stmt_min_max.py:238:1: PLR1730 [*] Replace `if` statement with `counter["b"] 
 238 | / if counter["a"] > counter["b"]:
 239 | |     counter["b"] = counter["a"]
     | |_______________________________^ PLR1730
+240 |
+241 |   # https://github.com/astral-sh/ruff/issues/17311
     |
     = help: Replace with `counter["b"] = max(counter["b"], counter["a"])`
 
@@ -731,3 +733,48 @@ if_stmt_min_max.py:238:1: PLR1730 [*] Replace `if` statement with `counter["b"] 
 238     |-if counter["a"] > counter["b"]:
 239     |-    counter["b"] = counter["a"]
     238 |+counter["b"] = max(counter["b"], counter["a"])
+240 239 | 
+241 240 | # https://github.com/astral-sh/ruff/issues/17311
+242 241 | 
+
+if_stmt_min_max.py:245:1: PLR1730 [*] Replace `if` statement with `a = min(b, a)`
+    |
+243 |   # fix marked unsafe as delete comments
+244 |   a, b = [], []
+245 | / if a >= b:
+246 | |     # very important comment
+247 | |     a = b
+    | |_________^ PLR1730
+248 |
+249 |   # fix marked safe as preserve comments
+    |
+    = help: Replace with `a = min(b, a)`
+
+ℹ Unsafe fix
+242 242 | 
+243 243 | # fix marked unsafe as delete comments
+244 244 | a, b = [], []
+245     |-if a >= b:
+246     |-    # very important comment
+247     |-    a = b
+    245 |+a = min(b, a)
+248 246 | 
+249 247 | # fix marked safe as preserve comments
+250 248 | if a >= b:
+
+if_stmt_min_max.py:250:1: PLR1730 [*] Replace `if` statement with `a = min(b, a)`
+    |
+249 |   # fix marked safe as preserve comments
+250 | / if a >= b:
+251 | |     a = b  # very important comment
+    | |_________^ PLR1730
+    |
+    = help: Replace with `a = min(b, a)`
+
+ℹ Safe fix
+247 247 |     a = b
+248 248 | 
+249 249 | # fix marked safe as preserve comments
+250     |-if a >= b:
+251     |-    a = b  # very important comment
+    250 |+a = min(b, a)  # very important comment

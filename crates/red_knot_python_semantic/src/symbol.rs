@@ -593,8 +593,18 @@ fn symbol_by_id<'db>(
                 "__slots__" | "TYPE_CHECKING"
             );
 
-            widen_type_for_undeclared_public_symbol(db, inferred, is_considered_non_modifiable)
-                .into()
+            if scope.file(db).is_stub(db.upcast()) {
+                // We generally trust module-level undeclared symbols in stubs and do not union
+                // with `Unknown`. If we don't do this, simple aliases like `IOError = OSError` in
+                // stubs would result in `IOError` being a union of `OSError` and `Unknown`, which
+                // leads to all sorts of downstream problems. Similarly, type variables are often
+                // defined as `_T = TypeVar("_T")`, without being declared.
+
+                inferred.into()
+            } else {
+                widen_type_for_undeclared_public_symbol(db, inferred, is_considered_non_modifiable)
+                    .into()
+            }
         }
         // Symbol has conflicting declared types
         Err((declared, _)) => {

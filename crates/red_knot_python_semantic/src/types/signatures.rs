@@ -166,6 +166,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
         let signature = Signature {
             generic_context: None,
+            inherited_generic_context: None,
             parameters: Parameters::gradual_form(),
             return_ty: Some(signature_type),
         };
@@ -178,6 +179,7 @@ impl<'db> CallableSignature<'db> {
         let signature_type = todo_type!(reason);
         let signature = Signature {
             generic_context: None,
+            inherited_generic_context: None,
             parameters: Parameters::todo(),
             return_ty: Some(signature_type),
         };
@@ -215,6 +217,11 @@ pub struct Signature<'db> {
     /// The generic context for this overload, if it is generic.
     pub(crate) generic_context: Option<GenericContext<'db>>,
 
+    /// The inherited generic context, if this function is a class method being used to infer the
+    /// specialization of its generic class. If the method is itself generic, this is in addition
+    /// to its own generic context.
+    pub(crate) inherited_generic_context: Option<GenericContext<'db>>,
+
     /// Parameters, in source order.
     ///
     /// The ordering of parameters in a valid signature must be: first positional-only parameters,
@@ -233,6 +240,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Option<Type<'db>>) -> Self {
         Self {
             generic_context: None,
+            inherited_generic_context: None,
             parameters,
             return_ty,
         }
@@ -245,6 +253,7 @@ impl<'db> Signature<'db> {
     ) -> Self {
         Self {
             generic_context,
+            inherited_generic_context: None,
             parameters,
             return_ty,
         }
@@ -254,6 +263,7 @@ impl<'db> Signature<'db> {
     pub(super) fn from_function(
         db: &'db dyn Db,
         generic_context: Option<GenericContext<'db>>,
+        inherited_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
     ) -> Self {
@@ -267,6 +277,7 @@ impl<'db> Signature<'db> {
 
         Self {
             generic_context,
+            inherited_generic_context,
             parameters: Parameters::from_parameters(
                 db,
                 definition,
@@ -279,6 +290,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
             generic_context: self.generic_context,
+            inherited_generic_context: self.inherited_generic_context,
             parameters: self
                 .parameters
                 .iter()
@@ -295,6 +307,7 @@ impl<'db> Signature<'db> {
     ) -> Self {
         Self {
             generic_context: self.generic_context,
+            inherited_generic_context: self.inherited_generic_context,
             parameters: self.parameters.apply_specialization(db, specialization),
             return_ty: self
                 .return_ty
@@ -310,6 +323,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn bind_self(&self) -> Self {
         Self {
             generic_context: self.generic_context,
+            inherited_generic_context: self.inherited_generic_context,
             parameters: Parameters::new(self.parameters().iter().skip(1).cloned()),
             return_ty: self.return_ty,
         }
@@ -1631,10 +1645,7 @@ mod tests {
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
         // Parameter resolution deferred; we should see B
-        assert_eq!(
-            a_annotated_ty.unwrap().display(&db).to_string(),
-            "Unknown | B"
-        );
+        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "B");
         assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T");
     }
 

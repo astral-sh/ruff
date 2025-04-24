@@ -191,9 +191,9 @@ def _(
     i2: Intersection[P | Q | R, S],
     i3: Intersection[P | Q, R | S],
 ) -> None:
-    reveal_type(i1)  # revealed: P & Q | P & R | P & S
-    reveal_type(i2)  # revealed: P & S | Q & S | R & S
-    reveal_type(i3)  # revealed: P & R | Q & R | P & S | Q & S
+    reveal_type(i1)  # revealed: (P & Q) | (P & R) | (P & S)
+    reveal_type(i2)  # revealed: (P & S) | (Q & S) | (R & S)
+    reveal_type(i3)  # revealed: (P & R) | (Q & R) | (P & S) | (Q & S)
 
 def simplifications_for_same_elements(
     i1: Intersection[P, Q | P],
@@ -216,7 +216,7 @@ def simplifications_for_same_elements(
     # = P & Q | P & R | Q | Q & R
     # = Q | P & R
     # (again, because Q is a supertype of P & Q and of Q & R)
-    reveal_type(i3)  # revealed: Q | P & R
+    reveal_type(i3)  # revealed: Q | (P & R)
 
     #   (P | Q) & (P | Q)
     # = P & P | P & Q | Q & P | Q & Q
@@ -842,7 +842,7 @@ def unknown(
 
 ### Mixed dynamic types
 
-We currently do not simplify mixed dynamic types, but might consider doing so in the future:
+Gradually-equivalent types can be simplified out of intersections:
 
 ```py
 from typing import Any
@@ -854,10 +854,10 @@ def mixed(
     i3: Intersection[Not[Any], Unknown],
     i4: Intersection[Not[Any], Not[Unknown]],
 ) -> None:
-    reveal_type(i1)  # revealed: Any & Unknown
-    reveal_type(i2)  # revealed: Any & Unknown
-    reveal_type(i3)  # revealed: Any & Unknown
-    reveal_type(i4)  # revealed: Any & Unknown
+    reveal_type(i1)  # revealed: Any
+    reveal_type(i2)  # revealed: Any
+    reveal_type(i3)  # revealed: Any
+    reveal_type(i4)  # revealed: Any
 ```
 
 ## Invalid

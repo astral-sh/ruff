@@ -7,12 +7,11 @@ use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
 use crate::types::class::{ClassType, GenericAlias, GenericClass};
-use crate::types::class_base::ClassBase;
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    FunctionSignature, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
-    StringLiteralType, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
+    FunctionSignature, IntersectionType, KnownClass, MethodWrapperKind, StringLiteralType,
+    SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
     WrapperDescriptorKind,
 };
 use crate::Db;
@@ -74,7 +73,7 @@ impl Display for DisplayRepresentation<'_> {
         match self.ty {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Instance(InstanceType { class }) => match (class, class.known(self.db)) {
+            Type::Instance(instance) => match (instance.class(), instance.class().known(self.db)) {
                 (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                 (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
                 (ClassType::NonGeneric(class), _) => f.write_str(&class.class(self.db).name),
@@ -92,8 +91,8 @@ impl Display for DisplayRepresentation<'_> {
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].
-                ClassBase::Class(class) => write!(f, "type[{}]", class.name(self.db)),
-                ClassBase::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
+                SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
+                SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
             Type::KnownInstance(known_instance) => f.write_str(known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => {
@@ -196,7 +195,10 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
             }
             Type::DataclassDecorator(_) => {
-                f.write_str("<decorator produced by dataclasses.dataclass>")
+                f.write_str("<decorator produced by dataclass-like function>")
+            }
+            Type::DataclassTransformer(_) => {
+                f.write_str("<decorator produced by typing.dataclass_transform>")
             }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
@@ -677,14 +679,17 @@ struct DisplayMaybeParenthesizedType<'db> {
 
 impl Display for DisplayMaybeParenthesizedType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Type::Callable(_)
-        | Type::MethodWrapper(_)
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_) = self.ty
-        {
-            write!(f, "({})", self.ty.display(self.db))
-        } else {
-            self.ty.display(self.db).fmt(f)
+        let write_parentheses = |f: &mut Formatter<'_>| write!(f, "({})", self.ty.display(self.db));
+        match self.ty {
+            Type::Callable(_)
+            | Type::MethodWrapper(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::Union(_) => write_parentheses(f),
+            Type::Intersection(intersection) if !intersection.has_one_element(self.db) => {
+                write_parentheses(f)
+            }
+            _ => self.ty.display(self.db).fmt(f),
         }
     }
 }

@@ -237,13 +237,13 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
         with:
           tool: cargo-insta
       - name: Red-knot mdtests (GitHub annotations)
@@ -291,13 +291,13 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -320,7 +320,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
         with:
           tool: cargo-nextest
       - name: "Run tests"
@@ -346,7 +346,7 @@ jobs:
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 20
           cache: "npm"
@@ -376,7 +376,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Build"
         run: cargo build --release --locked
 
@@ -401,13 +401,13 @@ jobs:
           MSRV: ${{ steps.msrv.outputs.value }}
         run: rustup default "${MSRV}"
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -433,7 +433,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo-binstall"
-        uses: cargo-bins/cargo-binstall@main
+        uses: cargo-bins/cargo-binstall@63aaa5c1932cebabc34eceda9d92a70215dcead6 # v1.12.3
         with:
           tool: cargo-fuzz@0.11.2
       - name: "Install cargo-fuzz"
@@ -455,7 +455,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
       - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
         name: Download Ruff binary to test
         id: download-cached-binary
@@ -641,7 +641,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: cargo-bins/cargo-binstall@main
+      - uses: cargo-bins/cargo-binstall@63aaa5c1932cebabc34eceda9d92a70215dcead6 # v1.12.3
       - run: cargo binstall --no-confirm cargo-shear
       - run: cargo shear
 
@@ -681,7 +681,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
       - name: "Cache pre-commit"
         uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
         with:
@@ -720,7 +720,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Install uv
-        uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
       - name: "Install Insiders dependencies"
         if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
         run: uv pip install -r docs/requirements-insiders.txt --system
@@ -821,7 +821,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
-      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: "npm"
@@ -857,7 +857,7 @@ jobs:
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@be7c31b6745feec79dec5eb79178466c0670bb2d # v2
+        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
         with:
           tool: cargo-codspeed
 

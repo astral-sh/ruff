@@ -41,12 +41,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Iterable1` is not iterable because its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method (expected `def __next__(self): ...`)
   --> /src/mdtest_snippet.py:19:10
    |
 18 | # error: [not-iterable]
 19 | for x in Iterable1():
-   |          ^^^^^^^^^^^ Object of type `Iterable1` is not iterable because its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method (expected `def __next__(self): ...`)
+   |          ^^^^^^^^^^^
 20 |     reveal_type(x)  # revealed: int
    |
 
@@ -67,12 +67,12 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Iterable2` is not iterable because its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
   --> /src/mdtest_snippet.py:23:10
    |
 22 | # error: [not-iterable]
 23 | for y in Iterable2():
-   |          ^^^^^^^^^^^ Object of type `Iterable2` is not iterable because its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
+   |          ^^^^^^^^^^^
 24 |     reveal_type(y)  # revealed: Unknown
    |
 

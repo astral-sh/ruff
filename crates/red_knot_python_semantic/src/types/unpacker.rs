@@ -18,16 +18,22 @@ use super::{TupleType, UnionType};
 /// Unpacks the value expression type to their respective targets.
 pub(crate) struct Unpacker<'db> {
     context: InferContext<'db>,
-    scope: ScopeId<'db>,
+    target_scope: ScopeId<'db>,
+    value_scope: ScopeId<'db>,
     targets: FxHashMap<ScopedExpressionId, Type<'db>>,
 }
 
 impl<'db> Unpacker<'db> {
-    pub(crate) fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        target_scope: ScopeId<'db>,
+        value_scope: ScopeId<'db>,
+    ) -> Self {
         Self {
-            context: InferContext::new(db, scope),
+            context: InferContext::new(db, target_scope),
             targets: FxHashMap::default(),
-            scope,
+            target_scope,
+            value_scope,
         }
     }
 
@@ -43,7 +49,7 @@ impl<'db> Unpacker<'db> {
         );
 
         let value_type = infer_expression_types(self.db(), value.expression())
-            .expression_type(value.scoped_expression_id(self.db(), self.scope));
+            .expression_type(value.scoped_expression_id(self.db(), self.value_scope));
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -79,8 +85,10 @@ impl<'db> Unpacker<'db> {
     ) {
         match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
-                self.targets
-                    .insert(target.scoped_expression_id(self.db(), self.scope), value_ty);
+                self.targets.insert(
+                    target.scoped_expression_id(self.db(), self.target_scope),
+                    value_ty,
+                );
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
                 self.unpack_inner(value, value_expr, value_ty);
@@ -126,35 +134,45 @@ impl<'db> Unpacker<'db> {
                     };
 
                     if let Some(tuple_ty) = ty.into_tuple() {
-                        let tuple_ty_elements = self.tuple_ty_elements(target, elts, tuple_ty);
+                        let tuple_ty_elements =
+                            self.tuple_ty_elements(target, elts, tuple_ty, value_expr);
 
-                        let length_mismatch = match elts.len().cmp(&tuple_ty_elements.len()) {
-                            Ordering::Less => {
-                                self.context.report_lint_old(
-                                    &INVALID_ASSIGNMENT,
-                                    target,
-                                    format_args!(
-                                        "Too many values to unpack (expected {}, got {})",
-                                        elts.len(),
-                                        tuple_ty_elements.len()
-                                    ),
-                                );
-                                true
-                            }
-                            Ordering::Greater => {
-                                self.context.report_lint_old(
-                                    &INVALID_ASSIGNMENT,
-                                    target,
-                                    format_args!(
-                                        "Not enough values to unpack (expected {}, got {})",
-                                        elts.len(),
-                                        tuple_ty_elements.len()
-                                    ),
-                                );
-                                true
-                            }
-                            Ordering::Equal => false,
-                        };
+                        let length_mismatch =
+                            match elts.len().cmp(&tuple_ty_elements.len()) {
+                                Ordering::Less => {
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                    {
+                                        let mut diag =
+                                            builder.into_diagnostic("Too many values to unpack");
+                                        diag.set_primary_message(format_args!(
+                                            "Expected {}",
+                                            elts.len(),
+                                        ));
+                                        diag.annotate(self.context.secondary(value_expr).message(
+                                            format_args!("Got {}", tuple_ty_elements.len()),
+                                        ));
+                                    }
+                                    true
+                                }
+                                Ordering::Greater => {
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                                    {
+                                        let mut diag =
+                                            builder.into_diagnostic("Not enough values to unpack");
+                                        diag.set_primary_message(format_args!(
+                                            "Expected {}",
+                                            elts.len(),
+                                        ));
+                                        diag.annotate(self.context.secondary(value_expr).message(
+                                            format_args!("Got {}", tuple_ty_elements.len()),
+                                        ));
+                                    }
+                                    true
+                                }
+                                Ordering::Equal => false,
+                            };
 
                         for (index, ty) in tuple_ty_elements.iter().enumerate() {
                             if let Some(element_types) = target_types.get_mut(index) {
@@ -195,11 +213,15 @@ impl<'db> Unpacker<'db> {
 
     /// Returns the [`Type`] elements inside the given [`TupleType`] taking into account that there
     /// can be a starred expression in the `elements`.
+    ///
+    /// `value_expr` is an AST reference to the value being unpacked. It is
+    /// only used for diagnostics.
     fn tuple_ty_elements(
         &self,
         expr: &ast::Expr,
         targets: &[ast::Expr],
         tuple_ty: TupleType<'db>,
+        value_expr: AnyNodeRef<'_>,
     ) -> Cow<'_, [Type<'db>]> {
         // If there is a starred expression, it will consume all of the types at that location.
         let Some(starred_index) = targets.iter().position(ast::Expr::is_starred_expr) else {
@@ -246,15 +268,15 @@ impl<'db> Unpacker<'db> {
 
             Cow::Owned(element_types)
         } else {
-            self.context.report_lint_old(
-                &INVALID_ASSIGNMENT,
-                expr,
-                format_args!(
-                    "Not enough values to unpack (expected {} or more, got {})",
-                    targets.len() - 1,
-                    tuple_ty.len(self.db())
-                ),
-            );
+            if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, expr) {
+                let mut diag = builder.into_diagnostic("Not enough values to unpack");
+                diag.set_primary_message(format_args!("Expected {} or more", targets.len() - 1));
+                diag.annotate(
+                    self.context
+                        .secondary(value_expr)
+                        .message(format_args!("Got {}", tuple_ty.len(self.db()))),
+                );
+            }
 
             Cow::Owned(vec![Type::unknown(); targets.len()])
         }

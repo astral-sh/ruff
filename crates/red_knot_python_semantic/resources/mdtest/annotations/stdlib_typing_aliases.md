@@ -67,21 +67,24 @@ import typing
 
 ####################
 ### Built-ins
+####################
 
 class ListSubclass(typing.List): ...
 
-# revealed: tuple[Literal[ListSubclass], Literal[list], Literal[MutableSequence], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(protocol), Literal[object]]
+# TODO: generic protocols
+# revealed: tuple[Literal[ListSubclass], Literal[list], Literal[MutableSequence], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), @Todo(`Generic[]` subscript), Literal[object]]
 reveal_type(ListSubclass.__mro__)
 
 class DictSubclass(typing.Dict): ...
 
-# TODO: should have `Generic`, should not have `Unknown`
-# revealed: tuple[Literal[DictSubclass], Literal[dict], Unknown, Literal[object]]
+# TODO: generic protocols
+# revealed: tuple[Literal[DictSubclass], Literal[dict], Literal[MutableMapping], Literal[Mapping], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), @Todo(`Generic[]` subscript), Literal[object]]
 reveal_type(DictSubclass.__mro__)
 
 class SetSubclass(typing.Set): ...
 
-# revealed: tuple[Literal[SetSubclass], Literal[set], Literal[MutableSet], Literal[AbstractSet], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(protocol), Literal[object]]
+# TODO: generic protocols
+# revealed: tuple[Literal[SetSubclass], Literal[set], Literal[MutableSet], Literal[AbstractSet], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), @Todo(`Generic[]` subscript), Literal[object]]
 reveal_type(SetSubclass.__mro__)
 
 class FrozenSetSubclass(typing.FrozenSet): ...
@@ -92,33 +95,35 @@ reveal_type(FrozenSetSubclass.__mro__)
 
 ####################
 ### `collections`
+####################
 
 class ChainMapSubclass(typing.ChainMap): ...
 
-# TODO: Should be (ChainMapSubclass, ChainMap, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[ChainMapSubclass], Literal[ChainMap], Unknown, Literal[object]]
+# TODO: generic protocols
+# revealed: tuple[Literal[ChainMapSubclass], Literal[ChainMap], Literal[MutableMapping], Literal[Mapping], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), @Todo(`Generic[]` subscript), Literal[object]]
 reveal_type(ChainMapSubclass.__mro__)
 
 class CounterSubclass(typing.Counter): ...
 
 # TODO: Should be (CounterSubclass, Counter, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[CounterSubclass], Literal[Counter], Unknown, Literal[object]]
+# revealed: tuple[Literal[CounterSubclass], Literal[Counter], @Todo(GenericAlias instance), @Todo(`Generic[]` subscript), Literal[object]]
 reveal_type(CounterSubclass.__mro__)
 
 class DefaultDictSubclass(typing.DefaultDict): ...
 
 # TODO: Should be (DefaultDictSubclass, defaultdict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[DefaultDictSubclass], Literal[defaultdict], Unknown, Literal[object]]
+# revealed: tuple[Literal[DefaultDictSubclass], Literal[defaultdict], @Todo(GenericAlias instance), Literal[object]]
 reveal_type(DefaultDictSubclass.__mro__)
 
 class DequeSubclass(typing.Deque): ...
 
-# revealed: tuple[Literal[DequeSubclass], Literal[deque], Literal[MutableSequence], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(protocol), Literal[object]]
+# TODO: generic protocols
+# revealed: tuple[Literal[DequeSubclass], Literal[deque], Literal[MutableSequence], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), @Todo(`Generic[]` subscript), Literal[object]]
 reveal_type(DequeSubclass.__mro__)
 
 class OrderedDictSubclass(typing.OrderedDict): ...
 
 # TODO: Should be (OrderedDictSubclass, OrderedDict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[OrderedDictSubclass], Literal[OrderedDict], Unknown, Literal[object]]
+# revealed: tuple[Literal[OrderedDictSubclass], Literal[OrderedDict], @Todo(GenericAlias instance), Literal[object]]
 reveal_type(OrderedDictSubclass.__mro__)
 ```

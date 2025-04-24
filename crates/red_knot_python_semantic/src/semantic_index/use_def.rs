@@ -437,6 +437,15 @@ impl<'db> UseDefMap<'db> {
             .map(|symbol_id| (symbol_id, self.public_declarations(symbol_id)))
     }
 
+    pub(crate) fn all_public_bindings<'map>(
+        &'map self,
+    ) -> impl Iterator<Item = (ScopedSymbolId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
+    {
+        (0..self.public_symbols.len())
+            .map(ScopedSymbolId::from_usize)
+            .map(|symbol_id| (symbol_id, self.public_bindings(symbol_id)))
+    }
+
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicit_return(&self, db: &dyn crate::Db) -> bool {
         !self
@@ -775,7 +784,16 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_and_constraint(self.scope_start_visibility, constraint);
     }
 
-    /// This method exists solely as a fast path for handling `*`-import visibility constraints.
+    /// Snapshot the state of a single symbol at the current point in control flow.
+    ///
+    /// This is only used for `*`-import visibility constraints, which are handled differently
+    /// to most other visibility constraints. See the doc-comment for
+    /// [`Self::record_and_negate_star_import_visibility_constraint`] for more details.
+    pub(super) fn single_symbol_snapshot(&self, symbol: ScopedSymbolId) -> SymbolState {
+        self.symbol_states[symbol].clone()
+    }
+
+    /// This method exists solely for handling `*`-import visibility constraints.
     ///
     /// The reason why we add visibility constraints for [`Definition`]s created by `*` imports
     /// is laid out in the doc-comment for [`StarImportPlaceholderPredicate`]. But treating these
@@ -784,12 +802,11 @@ impl<'db> UseDefMapBuilder<'db> {
     /// dominates. (Although `*` imports are not common generally, they are used in several
     /// important places by typeshed.)
     ///
-    /// To solve these regressions, it was observed that we could add a fast path for `*`-import
-    /// definitions which added a new symbol to the global scope (as opposed to `*`-import definitions
-    /// that provided redefinitions for *pre-existing* global-scope symbols). The fast path does a
-    /// number of things differently to our normal handling of visibility constraints:
+    /// To solve these regressions, it was observed that we could do significantly less work for
+    /// `*`-import definitions. We do a number of things differently here to our normal handling of
+    /// visibility constraints:
     ///
-    /// - It only applies and negates the visibility constraints to a single symbol, rather than to
+    /// - We only apply and negate the visibility constraints to a single symbol, rather than to
     ///   all symbols. This is possible here because, unlike most definitions, we know in advance that
     ///   exactly one definition occurs inside the "if-true" predicate branch, and we know exactly
     ///   which definition it is.
@@ -800,9 +817,9 @@ impl<'db> UseDefMapBuilder<'db> {
     ///   the visibility constraints is only important for symbols that did not have any new
     ///   definitions inside either the "if-predicate-true" branch or the "if-predicate-false" branch.
     ///
-    /// - It avoids multiple expensive calls to [`Self::snapshot`]. This is possible because we know
-    ///   the symbol is newly added, so we know the prior state of the symbol was
-    ///   [`SymbolState::undefined`].
+    /// - We only snapshot the state for a single symbol prior to the definition, rather than doing
+    ///   expensive calls to [`Self::snapshot`]. Again, this is possible because we know
+    ///   that only a single definition occurs inside the "if-predicate-true" predicate branch.
     ///
     /// - Normally we take care to check whether an "if-predicate-true" branch or an
     ///   "if-predicate-false" branch contains a terminal statement: these can affect the visibility
@@ -815,6 +832,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         star_import: StarImportPlaceholderPredicate<'db>,
         symbol: ScopedSymbolId,
+        pre_definition_state: SymbolState,
     ) {
         let predicate_id = self.add_predicate(star_import.into());
         let visibility_id = self.visibility_constraints.add_atom(predicate_id);
@@ -822,10 +840,9 @@ impl<'db> UseDefMapBuilder<'db> {
             .visibility_constraints
             .add_not_constraint(visibility_id);
 
-        let mut post_definition_state = std::mem::replace(
-            &mut self.symbol_states[symbol],
-            SymbolState::undefined(self.scope_start_visibility),
-        );
+        let mut post_definition_state =
+            std::mem::replace(&mut self.symbol_states[symbol], pre_definition_state);
+
         post_definition_state
             .record_visibility_constraint(&mut self.visibility_constraints, visibility_id);
 

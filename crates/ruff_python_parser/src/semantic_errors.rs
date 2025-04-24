@@ -13,7 +13,7 @@ use ruff_python_ast::{
     StmtImportFrom,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 #[derive(Debug, Default)]
 pub struct SemanticSyntaxChecker {
@@ -32,6 +32,10 @@ pub struct SemanticSyntaxChecker {
     /// Python considers it a syntax error to import from `__future__` after any other
     /// non-`__future__`-importing statements.
     seen_futures_boundary: bool,
+
+    /// The checker has traversed past the module docstring boundary (i.e. seen any statement in the
+    /// module).
+    seen_module_docstring_boundary: bool,
 }
 
 impl SemanticSyntaxChecker {
@@ -70,8 +74,17 @@ impl SemanticSyntaxChecker {
                     visitor.visit_pattern(&case.pattern);
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef { type_params, .. })
-            | Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
+            Stmt::FunctionDef(ast::StmtFunctionDef {
+                type_params,
+                parameters,
+                ..
+            }) => {
+                if let Some(type_params) = type_params {
+                    Self::duplicate_type_parameter_name(type_params, ctx);
+                }
+                Self::duplicate_parameter_name(parameters, ctx);
+            }
+            Stmt::ClassDef(ast::StmtClassDef { type_params, .. })
             | Stmt::TypeAlias(ast::StmtTypeAlias { type_params, .. }) => {
                 if let Some(type_params) = type_params {
                     Self::duplicate_type_parameter_name(type_params, ctx);
@@ -449,6 +462,32 @@ impl SemanticSyntaxChecker {
         }
     }
 
+    fn duplicate_parameter_name<Ctx: SemanticSyntaxContext>(
+        parameters: &ast::Parameters,
+        ctx: &Ctx,
+    ) {
+        if parameters.len() < 2 {
+            return;
+        }
+
+        let mut all_arg_names =
+            FxHashSet::with_capacity_and_hasher(parameters.len(), FxBuildHasher);
+
+        for parameter in parameters {
+            let range = parameter.name().range();
+            let param_name = parameter.name().as_str();
+            if !all_arg_names.insert(param_name) {
+                // test_err params_duplicate_names
+                // def foo(a, a=10, *a, a, a: str, **a): ...
+                Self::add_error(
+                    ctx,
+                    SemanticSyntaxErrorKind::DuplicateParameter(param_name.to_string()),
+                    range,
+                );
+            }
+        }
+    }
+
     fn irrefutable_match_case<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
         // test_ok irrefutable_case_pattern_at_end
         // match x:
@@ -506,7 +545,7 @@ impl SemanticSyntaxChecker {
         // update internal state
         match stmt {
             Stmt::Expr(StmtExpr { value, .. })
-                if !ctx.seen_docstring_boundary() && value.is_string_literal_expr() => {}
+                if !self.seen_module_docstring_boundary && value.is_string_literal_expr() => {}
             Stmt::ImportFrom(StmtImportFrom { module, .. }) => {
                 // Allow __future__ imports until we see a non-__future__ import.
                 if !matches!(module.as_deref(), Some("__future__")) {
@@ -520,6 +559,8 @@ impl SemanticSyntaxChecker {
                 self.seen_futures_boundary = true;
             }
         }
+
+        self.seen_module_docstring_boundary = true;
     }
 
     /// Check `expr` for semantic syntax errors and update the checker's internal state.
@@ -639,6 +680,12 @@ impl SemanticSyntaxChecker {
             Expr::Await(_) => {
                 Self::yield_outside_function(ctx, expr, YieldOutsideFunctionKind::Await);
                 Self::await_outside_async_function(ctx, expr, AwaitOutsideAsyncFunctionKind::Await);
+            }
+            Expr::Lambda(ast::ExprLambda {
+                parameters: Some(parameters),
+                ..
+            }) => {
+                Self::duplicate_parameter_name(parameters, ctx);
             }
             _ => {}
         }
@@ -881,7 +928,10 @@ impl Display for SemanticSyntaxError {
                 f.write_str("`return` statement outside of a function")
             }
             SemanticSyntaxErrorKind::AwaitOutsideAsyncFunction(kind) => {
-                write!(f, "`{kind}` outside of an asynchronous function")
+                write!(f, "{kind} outside of an asynchronous function")
+            }
+            SemanticSyntaxErrorKind::DuplicateParameter(name) => {
+                write!(f, r#"Duplicate parameter "{name}""#)
             }
         }
     }
@@ -1194,6 +1244,16 @@ pub enum SemanticSyntaxErrorKind {
     ///     async with x: ...      # error
     /// ```
     AwaitOutsideAsyncFunction(AwaitOutsideAsyncFunctionKind),
+
+    /// Represents a duplicate parameter name in a function or lambda expression.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f(x, x): ...
+    /// lambda x, x: ...
+    /// ```
+    DuplicateParameter(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1207,9 +1267,9 @@ pub enum AwaitOutsideAsyncFunctionKind {
 impl Display for AwaitOutsideAsyncFunctionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            AwaitOutsideAsyncFunctionKind::Await => "await",
-            AwaitOutsideAsyncFunctionKind::AsyncFor => "async for",
-            AwaitOutsideAsyncFunctionKind::AsyncWith => "async with",
+            AwaitOutsideAsyncFunctionKind::Await => "`await`",
+            AwaitOutsideAsyncFunctionKind::AsyncFor => "`async for`",
+            AwaitOutsideAsyncFunctionKind::AsyncWith => "`async with`",
             AwaitOutsideAsyncFunctionKind::AsyncComprehension => "asynchronous comprehension",
         })
     }
@@ -1584,9 +1644,6 @@ where
 ///         x  # here, classes break function scopes
 /// ```
 pub trait SemanticSyntaxContext {
-    /// Returns `true` if a module's docstring boundary has been passed.
-    fn seen_docstring_boundary(&self) -> bool;
-
     /// Returns `true` if `__future__`-style type annotations are enabled.
     fn future_annotations_or_stub(&self) -> bool;
 

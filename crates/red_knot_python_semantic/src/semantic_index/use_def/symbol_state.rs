@@ -314,7 +314,7 @@ impl SymbolBindings {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(super) struct SymbolState {
+pub(in crate::semantic_index) struct SymbolState {
     declarations: SymbolDeclarations,
     bindings: SymbolBindings,
 }

@@ -127,7 +127,7 @@ class B: ...
 
 def _[T](x: A | B):
     if type(x) is A[str]:
-        reveal_type(x)  # revealed: A[int] & A[Unknown] | B & A[Unknown]
+        reveal_type(x)  # revealed: (A[int] & A[Unknown]) | (B & A[Unknown])
     else:
         reveal_type(x)  # revealed: A[int] | B
 ```
@@ -143,4 +143,14 @@ def _(x: Base):
         # Ideally, this could be narrower, but there is now way to
         # express a constraint like `Base & ~ProperSubtypeOf[Base]`.
         reveal_type(x)  # revealed: Base
+```
+
+## Assignment expressions
+
+```py
+def _(x: object):
+    if (y := type(x)) is bool:
+        reveal_type(y)  # revealed: Literal[bool]
+    if (type(y := x)) is bool:
+        reveal_type(y)  # revealed: bool
 ```

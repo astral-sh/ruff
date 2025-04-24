@@ -30,7 +30,9 @@ use crate::Db;
 pub(crate) struct Unpack<'db> {
     pub(crate) file: File,
 
-    pub(crate) file_scope: FileScopeId,
+    pub(crate) value_file_scope: FileScopeId,
+
+    pub(crate) target_file_scope: FileScopeId,
 
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
     /// expression is `(a, b)`.
@@ -47,9 +49,19 @@ pub(crate) struct Unpack<'db> {
 }
 
 impl<'db> Unpack<'db> {
-    /// Returns the scope where the unpacking is happening.
-    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+    /// Returns the scope in which the unpack value expression belongs.
+    ///
+    /// The scope in which the target and value expression belongs to are usually the same
+    /// except in generator expressions and comprehensions (list/dict/set), where the value
+    /// expression of the first generator is evaluated in the outer scope, while the ones in the subsequent
+    /// generators are evaluated in the comprehension scope.
+    pub(crate) fn value_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        self.value_file_scope(db).to_scope_id(db, self.file(db))
+    }
+
+    /// Returns the scope where the unpack target expression belongs to.
+    pub(crate) fn target_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+        self.target_file_scope(db).to_scope_id(db, self.file(db))
     }
 
     /// Returns the range of the unpack target expression.

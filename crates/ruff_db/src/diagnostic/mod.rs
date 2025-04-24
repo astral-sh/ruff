@@ -3,7 +3,7 @@ use std::{fmt::Formatter, sync::Arc};
 use thiserror::Error;
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 pub use self::render::DisplayDiagnostic;
 use crate::files::File;
@@ -601,6 +601,12 @@ impl From<File> for Span {
     }
 }
 
+impl From<crate::files::FileRange> for Span {
+    fn from(file_range: crate::files::FileRange) -> Span {
+        Span::from(file_range.file()).with_range(file_range.range())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
 pub enum Severity {
     Info,
@@ -839,6 +845,19 @@ pub fn create_parse_diagnostic(file: File, err: &ruff_python_parser::ParseError)
 pub fn create_unsupported_syntax_diagnostic(
     file: File,
     err: &ruff_python_parser::UnsupportedSyntaxError,
+) -> Diagnostic {
+    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+    let span = Span::from(file).with_range(err.range);
+    diag.annotate(Annotation::primary(span).message(err.to_string()));
+    diag
+}
+
+/// Creates a `Diagnostic` from a semantic syntax error.
+///
+/// See [`create_parse_diagnostic`] for more details.
+pub fn create_semantic_syntax_diagnostic(
+    file: File,
+    err: &ruff_python_parser::semantic_errors::SemanticSyntaxError,
 ) -> Diagnostic {
     let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
     let span = Span::from(file).with_range(err.range);

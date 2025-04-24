@@ -45,8 +45,6 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
-# TODO: no error
-# error: [invalid-base]
 class C(Generic[T]): ...
 ```
 
@@ -164,12 +162,12 @@ consistent with each other.
 
 ```py
 class C[T]:
-    def __new__(cls, x: T) -> "C"[T]:
+    def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -181,7 +179,7 @@ class C[T]:
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -189,14 +187,14 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
-    def __new__(cls, x: T) -> "C"[T]:
+    def __new__(cls, x: T) -> "C[T]":
         return object.__new__(cls)
 
     def __init__(self, x: T) -> None: ...
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -204,25 +202,25 @@ wrong_innards: C[int] = C("five")
 
 ```py
 class C[T]:
-    def __new__(cls, *args, **kwargs) -> "C"[T]:
+    def __new__(cls, *args, **kwargs) -> "C[T]":
         return object.__new__(cls)
 
     def __init__(self, x: T) -> None: ...
 
 reveal_type(C(1))  # revealed: C[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
 class D[T]:
-    def __new__(cls, x: T) -> "D"[T]:
+    def __new__(cls, x: T) -> "D[T]":
         return object.__new__(cls)
 
     def __init__(self, *args, **kwargs) -> None: ...
 
 reveal_type(D(1))  # revealed: D[Literal[1]]
 
-# TODO: error: [invalid-argument-type]
+# error: [invalid-assignment] "Object of type `D[Literal["five"]]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -234,21 +232,11 @@ TODO: These do not currently work yet, because we don't correctly model the nest
 class C[T]:
     def __init__[S](self, x: T, y: S) -> None: ...
 
-# TODO: no error
-# TODO: revealed: C[Literal[1]]
-# error: [invalid-argument-type]
-reveal_type(C(1, 1))  # revealed: C[Unknown]
-# TODO: no error
-# TODO: revealed: C[Literal[1]]
-# error: [invalid-argument-type]
-reveal_type(C(1, "string"))  # revealed: C[Unknown]
-# TODO: no error
-# TODO: revealed: C[Literal[1]]
-# error: [invalid-argument-type]
-reveal_type(C(1, True))  # revealed: C[Unknown]
+reveal_type(C(1, 1))  # revealed: C[Literal[1]]
+reveal_type(C(1, "string"))  # revealed: C[Literal[1]]
+reveal_type(C(1, True))  # revealed: C[Literal[1]]
 
-# TODO: error for the correct reason
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `S`, found `Literal[1]`"
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 
@@ -328,8 +316,6 @@ class Sub(Base[Sub]): ...
 ## Another cyclic case
 
 ```pyi
-# TODO no error (generics)
-# error: [invalid-base]
 class Derived[T](list[Derived[T]]): ...
 ```
 

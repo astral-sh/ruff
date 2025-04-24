@@ -30,12 +30,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
+error: lint:not-iterable: Object of type `Iterable` is not iterable because its `__iter__` method has an invalid signature (expected `def __iter__(self): ...`)
   --> /src/mdtest_snippet.py:12:10
    |
 11 | # error: [not-iterable]
 12 | for x in Iterable():
-   |          ^^^^^^^^^^ Object of type `Iterable` is not iterable because its `__iter__` method has an invalid signature (expected `def __iter__(self): ...`)
+   |          ^^^^^^^^^^
 13 |     reveal_type(x)  # revealed: int
    |
 

@@ -162,6 +162,44 @@ def _(flag: bool):
     reveal_type(f("string"))  # revealed: Literal["string", "'string'"]
 ```
 
+## Unions with literals and negations
+
+```py
+from typing import Literal
+from knot_extensions import Not, AlwaysFalsy, static_assert, is_subtype_of, is_assignable_to
+
+static_assert(is_subtype_of(Literal["a", ""], Literal["a", ""] | Not[AlwaysFalsy]))
+static_assert(is_subtype_of(Not[AlwaysFalsy], Literal["", "a"] | Not[AlwaysFalsy]))
+static_assert(is_subtype_of(Literal["a", ""], Not[AlwaysFalsy] | Literal["a", ""]))
+static_assert(is_subtype_of(Not[AlwaysFalsy], Not[AlwaysFalsy] | Literal["a", ""]))
+
+static_assert(is_subtype_of(Literal["a", ""], Literal["a", ""] | Not[Literal[""]]))
+static_assert(is_subtype_of(Not[Literal[""]], Literal["a", ""] | Not[Literal[""]]))
+static_assert(is_subtype_of(Literal["a", ""], Not[Literal[""]] | Literal["a", ""]))
+static_assert(is_subtype_of(Not[Literal[""]], Not[Literal[""]] | Literal["a", ""]))
+
+def _(
+    a: Literal["a", ""] | Not[AlwaysFalsy],
+    b: Literal["a", ""] | Not[Literal[""]],
+    c: Literal[""] | Not[Literal[""]],
+    d: Not[Literal[""]] | Literal[""],
+    e: Literal["a"] | Not[Literal["a"]],
+    f: Literal[b"b"] | Not[Literal[b"b"]],
+    g: Not[Literal[b"b"]] | Literal[b"b"],
+    h: Literal[42] | Not[Literal[42]],
+    i: Not[Literal[42]] | Literal[42],
+):
+    reveal_type(a)  # revealed: Literal[""] | ~AlwaysFalsy
+    reveal_type(b)  # revealed: object
+    reveal_type(c)  # revealed: object
+    reveal_type(d)  # revealed: object
+    reveal_type(e)  # revealed: object
+    reveal_type(f)  # revealed: object
+    reveal_type(g)  # revealed: object
+    reveal_type(h)  # revealed: object
+    reveal_type(i)  # revealed: object
+```
+
 ## Cannot use an argument as both a value and a type form
 
 ```py
@@ -200,4 +238,16 @@ def _(literals_2: Literal[0, 1], b: bool, flag: bool):
 
     # Now union the two:
     reveal_type(bool_and_literals_128 if flag else literals_128_shifted)  # revealed: int
+```
+
+## Simplifying gradually-equivalent types
+
+If two types are gradually equivalent, we can keep just one of them in a union:
+
+```py
+from typing import Any, Union
+from knot_extensions import Intersection, Not
+
+def _(x: Union[Intersection[Any, Not[int]], Intersection[Any, Not[int]]]):
+    reveal_type(x)  # revealed: Any & ~int
 ```

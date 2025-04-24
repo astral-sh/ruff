@@ -65,7 +65,7 @@ impl Violation for Airflow3MovedToProvider {
                 version,
             } => {
                 Some(format!(
-                    "Install `apache-airflow-provider-{provider}>={version}` and use `{name}` instead."
+                    "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` instead."
                 ))
             },
             ProviderReplacement::SourceModuleMovedToProvider {
@@ -74,7 +74,7 @@ impl Violation for Airflow3MovedToProvider {
                 provider,
                 version,
             } => {
-                Some(format!("Install `apache-airflow-provider-{provider}>={version}` and use `{module}.{name}` instead."))
+                Some(format!("Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."))
             } ,
         }
     }

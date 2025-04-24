@@ -166,3 +166,51 @@ def _(
     reveal_type(i1)  # revealed: P & Q
     reveal_type(i2)  # revealed: P & Q
 ```
+
+## Unions of literals with `AlwaysTruthy` and `AlwaysFalsy`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+from knot_extensions import AlwaysTruthy, AlwaysFalsy
+
+type strings = Literal["foo", ""]
+type ints = Literal[0, 1]
+type bytes = Literal[b"foo", b""]
+
+def _(
+    strings_or_truthy: strings | AlwaysTruthy,
+    truthy_or_strings: AlwaysTruthy | strings,
+    strings_or_falsy: strings | AlwaysFalsy,
+    falsy_or_strings: AlwaysFalsy | strings,
+    ints_or_truthy: ints | AlwaysTruthy,
+    truthy_or_ints: AlwaysTruthy | ints,
+    ints_or_falsy: ints | AlwaysFalsy,
+    falsy_or_ints: AlwaysFalsy | ints,
+    bytes_or_truthy: bytes | AlwaysTruthy,
+    truthy_or_bytes: AlwaysTruthy | bytes,
+    bytes_or_falsy: bytes | AlwaysFalsy,
+    falsy_or_bytes: AlwaysFalsy | bytes,
+):
+    reveal_type(strings_or_truthy)  # revealed: Literal[""] | AlwaysTruthy
+    reveal_type(truthy_or_strings)  # revealed: AlwaysTruthy | Literal[""]
+
+    reveal_type(strings_or_falsy)  # revealed: Literal["foo"] | AlwaysFalsy
+    reveal_type(falsy_or_strings)  # revealed: AlwaysFalsy | Literal["foo"]
+
+    reveal_type(ints_or_truthy)  # revealed: Literal[0] | AlwaysTruthy
+    reveal_type(truthy_or_ints)  # revealed: AlwaysTruthy | Literal[0]
+
+    reveal_type(ints_or_falsy)  # revealed: Literal[1] | AlwaysFalsy
+    reveal_type(falsy_or_ints)  # revealed: AlwaysFalsy | Literal[1]
+
+    reveal_type(bytes_or_truthy)  # revealed: Literal[b""] | AlwaysTruthy
+    reveal_type(truthy_or_bytes)  # revealed: AlwaysTruthy | Literal[b""]
+
+    reveal_type(bytes_or_falsy)  # revealed: Literal[b"foo"] | AlwaysFalsy
+    reveal_type(falsy_or_bytes)  # revealed: AlwaysFalsy | Literal[b"foo"]
+```

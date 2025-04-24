@@ -231,6 +231,10 @@ unused_peekable = "warn"
 # Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
 large_stack_arrays = "allow"
 
+# Salsa generates functions with parameters for each field of a `salsa::interned` struct.
+# If we don't allow this, we get warnings for structs with too many fields.
+too_many_arguments = "allow"
+
 [profile.release]
 # Note that we set these explicitly, and these values
 # were chosen based on a trade-off between compile times
@@ -272,7 +276,9 @@ inherits = "release"
 # Config for 'dist'
 [workspace.metadata.dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.4-prerelease.1"
+cargo-dist-version = "0.28.4"
+# Make distability of apps opt-in instead of opt-out
+dist = false
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
@@ -306,7 +312,7 @@ auto-includes = false
 # Whether dist should create a Github Release or use an existing draft
 create-release = true
 # Which actions to run on pull requests
-pr-run-mode = "skip"
+pr-run-mode = "plan"
 # Whether CI should trigger releases with dispatches instead of tag pushes
 dispatch-releases = true
 # Which phase dist should use to create the GitHub release
@@ -334,7 +340,7 @@ install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 global = "depot-ubuntu-latest-4"
 
 [workspace.metadata.dist.github-action-commits]
-"actions/checkout" = "11bd71901bbe5b1630ceea73d27597364c9af683" # v4
-"actions/upload-artifact" = "ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
+"actions/checkout" = "85e6279cec87321a52edac9c87bce653a07cf6c2" # v4
+"actions/upload-artifact" = "6027e3dd177782cd8ab9af838c04fd81a07f1d47" # v4.6.2
 "actions/download-artifact" = "95815c38cf2ff2164869cbab79da8d1f422bc89e" # v4.2.1
 "actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3

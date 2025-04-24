@@ -33,6 +33,12 @@ use crate::fix::edits::{remove_argument, Parentheses};
 /// subprocess.run(["foo"], capture_output=True)
 /// ```
 ///
+/// ## Fix safety
+///
+/// This rule's fix is marked as unsafe because replacing `stdout=subprocess.PIPE` and
+/// `stderr=subprocess.PIPE` with `capture_output=True` may delete comments attached
+/// to the original arguments.
+///
 /// ## References
 /// - [Python 3.7 release notes](https://docs.python.org/3/whatsnew/3.7.html#subprocess)
 /// - [Python documentation: `subprocess.run`](https://docs.python.org/3/library/subprocess.html#subprocess.run)
