@@ -73,12 +73,14 @@ impl Display for DisplayRepresentation<'_> {
         match self.ty {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Instance(instance) => match (instance.class(), instance.class().known(self.db)) {
-                (_, Some(KnownClass::NoneType)) => f.write_str("None"),
-                (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
-                (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
-                (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
-            },
+            Type::NominalInstance(instance) => {
+                match (instance.class(), instance.class().known(self.db)) {
+                    (_, Some(KnownClass::NoneType)) => f.write_str("None"),
+                    (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
+                    (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
+                    (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
+                }
+            }
             Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())

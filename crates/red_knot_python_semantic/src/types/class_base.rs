@@ -78,12 +78,14 @@ impl<'db> ClassBase<'db> {
                 Self::Class(literal.default_specialization(db))
             }),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
-            Type::Instance(instance) if instance.class().is_known(db, KnownClass::GenericAlias) => {
+            Type::NominalInstance(instance)
+                if instance.class().is_known(db, KnownClass::GenericAlias) =>
+            {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"))
             }
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
-            Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
+            Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
             Type::PropertyInstance(_) => None,
             Type::Never
             | Type::BooleanLiteral(_)

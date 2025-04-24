@@ -5,12 +5,12 @@ use crate::Db;
 
 impl<'db> Type<'db> {
     pub(crate) const fn instance(class: ClassType<'db>) -> Self {
-        Self::Instance(InstanceType { class })
+        Self::NominalInstance(NominalInstanceType { class })
     }
 
-    pub(crate) const fn into_instance(self) -> Option<InstanceType<'db>> {
+    pub(crate) const fn into_instance(self) -> Option<NominalInstanceType<'db>> {
         match self {
-            Type::Instance(instance_type) => Some(instance_type),
+            Type::NominalInstance(instance_type) => Some(instance_type),
             _ => None,
         }
     }
@@ -18,13 +18,13 @@ impl<'db> Type<'db> {
 
 /// A type representing the set of runtime objects which are instances of a certain nominal class.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update)]
-pub struct InstanceType<'db> {
-    // Keep this field private, so that the only way of constructing `InstanceType` instances
+pub struct NominalInstanceType<'db> {
+    // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
     // is through the `Type::instance` constructor function.
     class: ClassType<'db>,
 }
 
-impl<'db> InstanceType<'db> {
+impl<'db> NominalInstanceType<'db> {
     pub(super) fn class(self) -> ClassType<'db> {
         self.class
     }
@@ -87,8 +87,8 @@ impl<'db> InstanceType<'db> {
     }
 }
 
-impl<'db> From<InstanceType<'db>> for Type<'db> {
-    fn from(value: InstanceType<'db>) -> Self {
-        Self::Instance(value)
+impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
+    fn from(value: NominalInstanceType<'db>) -> Self {
+        Self::NominalInstance(value)
     }
 }

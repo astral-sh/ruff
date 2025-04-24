@@ -611,7 +611,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         Type::AlwaysFalsy if addition_is_bool_instance => {
                             new_positive = Type::BooleanLiteral(false);
                         }
-                        Type::Instance(instance)
+                        Type::NominalInstance(instance)
                             if instance.class().is_known(db, KnownClass::Bool) =>
                         {
                             match new_positive {
@@ -722,7 +722,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::Instance(instance) if instance.class().is_object(db) => {
+            Type::NominalInstance(instance) if instance.class().is_object(db) => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
