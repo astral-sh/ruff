@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
-import { FileHandle, Workspace } from "red_knot_wasm";
+import { FileHandle, PositionEncoding, Workspace } from "red_knot_wasm";
 import { persist, persistLocal, restore } from "./Editor/persist";
 import { loader } from "@monaco-editor/react";
 import knotSchema from "../../../knot.schema.json";
@@ -30,7 +30,7 @@ export default function Playground() {
     workspacePromiseRef.current = workspacePromise = startPlayground().then(
       (fetched) => {
         setVersion(fetched.version);
-        const workspace = new Workspace("/", {});
+        const workspace = new Workspace("/", PositionEncoding.Utf16, {});
         restoreWorkspace(workspace, fetched.workspace, dispatchFiles, setError);
         setWorkspace(workspace);
         return workspace;
