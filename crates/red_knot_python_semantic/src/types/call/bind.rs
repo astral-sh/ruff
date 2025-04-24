@@ -584,7 +584,23 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    Some(KnownFunction::Override) => {
+                        // TODO: This can be removed once we understand legacy generics because the
+                        // typeshed definition for `typing.overload` is an identity function.
+                        if let [Some(ty)] = overload.parameter_types() {
+                            overload.set_return_type(*ty);
+                        }
+                    }
+
                     Some(KnownFunction::AbstractMethod) => {
+                        // TODO: This can be removed once we understand legacy generics because the
+                        // typeshed definition for `abc.abstractmethod` is an identity function.
+                        if let [Some(ty)] = overload.parameter_types() {
+                            overload.set_return_type(*ty);
+                        }
+                    }
+
+                    Some(KnownFunction::Final) => {
                         // TODO: This can be removed once we understand legacy generics because the
                         // typeshed definition for `abc.abstractmethod` is an identity function.
                         if let [Some(ty)] = overload.parameter_types() {

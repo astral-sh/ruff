@@ -1,5 +1,4 @@
 AutoSplit
-Expression
 PyGithub
 PyWinCtl
 SinbadCogs
