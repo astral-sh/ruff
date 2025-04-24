@@ -1061,6 +1061,7 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::LateFutureImport, Path::new("late_future_import.py"))]
     #[test_case(Rule::YieldOutsideFunction, Path::new("yield_scope.py"))]
     #[test_case(Rule::ReturnOutsideFunction, Path::new("return_outside_function.py"))]
     fn test_syntax_errors(rule: Rule, path: &Path) -> Result<()> {
