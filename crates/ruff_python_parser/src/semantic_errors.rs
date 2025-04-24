@@ -142,6 +142,22 @@ impl SemanticSyntaxChecker {
                     AwaitOutsideAsyncFunctionKind::AsyncWith,
                 );
             }
+            Stmt::Nonlocal(ast::StmtNonlocal { range, .. }) => {
+                // test_ok nonlocal_declaration_at_module_level
+                // def _():
+                //     nonlocal x
+
+                // test_err nonlocal_declaration_at_module_level
+                // nonlocal x
+                // nonlocal x, y
+                if ctx.in_module_scope() {
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel,
+                        *range,
+                    );
+                }
+            }
             _ => {}
         }
 
@@ -933,6 +949,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::DuplicateParameter(name) => {
                 write!(f, r#"Duplicate parameter "{name}""#)
             }
+            SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
+                write!(f, "nonlocal declaration not allowed at module level")
+            }
         }
     }
 }
@@ -1254,6 +1273,9 @@ pub enum SemanticSyntaxErrorKind {
     /// lambda x, x: ...
     /// ```
     DuplicateParameter(String),
+
+    /// Represents a nonlocal declaration at module level
+    NonlocalDeclarationAtModuleLevel,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

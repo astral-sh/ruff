@@ -538,7 +538,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
     }
 
     fn in_module_scope(&self) -> bool {
-        true
+        self.scopes.len() == 1
     }
 
     fn in_function_scope(&self) -> bool {
