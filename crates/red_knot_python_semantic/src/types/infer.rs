@@ -1065,7 +1065,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> bool {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
-            Type::Instance(instance)
+            Type::NominalInstance(instance)
                 if matches!(
                     instance.class().known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
@@ -2517,7 +2517,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Super instances do not allow attribute assignment
-            Type::Instance(instance) if instance.class().is_known(db, KnownClass::Super) => {
+            Type::NominalInstance(instance) if instance.class().is_known(db, KnownClass::Super) => {
                 if emit_diagnostics {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
@@ -2542,7 +2542,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             Type::Dynamic(..) | Type::Never => true,
 
-            Type::Instance(..)
+            Type::NominalInstance(..)
             | Type::BooleanLiteral(..)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
@@ -3033,7 +3033,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // Handle various singletons.
-        if let Type::Instance(instance) = declared_ty.inner_type() {
+        if let Type::NominalInstance(instance) = declared_ty.inner_type() {
             if instance
                 .class()
                 .is_known(self.db(), KnownClass::SpecialForm)
@@ -5125,7 +5125,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
-                | Type::Instance(_)
+                | Type::NominalInstance(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Union(_)
@@ -5405,7 +5405,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
-                | Type::Instance(_)
+                | Type::NominalInstance(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
@@ -5430,7 +5430,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
-                | Type::Instance(_)
+                | Type::NominalInstance(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
@@ -5863,13 +5863,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     right_ty: right,
                 }),
             },
-            (Type::IntLiteral(_), Type::Instance(_)) => self.infer_binary_type_comparison(
+            (Type::IntLiteral(_), Type::NominalInstance(_)) => self.infer_binary_type_comparison(
                 KnownClass::Int.to_instance(self.db()),
                 op,
                 right,
                 range,
             ),
-            (Type::Instance(_), Type::IntLiteral(_)) => self.infer_binary_type_comparison(
+            (Type::NominalInstance(_), Type::IntLiteral(_)) => self.infer_binary_type_comparison(
                 left,
                 op,
                 KnownClass::Int.to_instance(self.db()),
@@ -5995,7 +5995,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 KnownClass::Bytes.to_instance(self.db()),
                 range,
             ),
-            (Type::Tuple(_), Type::Instance(instance))
+            (Type::Tuple(_), Type::NominalInstance(instance))
                 if instance
                     .class()
                     .is_known(self.db(), KnownClass::VersionInfo) =>
@@ -6007,7 +6007,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     range,
                 )
             }
-            (Type::Instance(instance), Type::Tuple(_))
+            (Type::NominalInstance(instance), Type::Tuple(_))
                 if instance
                     .class()
                     .is_known(self.db(), KnownClass::VersionInfo) =>
@@ -6393,7 +6393,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         match (value_ty, slice_ty) {
             (
-                Type::Instance(instance),
+                Type::NominalInstance(instance),
                 Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
             ) if instance
                 .class()
@@ -6699,7 +6699,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Err(_) => SliceArg::Unsupported,
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::Instance(instance))
+            Some(Type::NominalInstance(instance))
                 if instance.class().is_known(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)

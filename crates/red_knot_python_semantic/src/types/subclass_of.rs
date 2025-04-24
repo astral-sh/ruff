@@ -16,8 +16,8 @@ impl<'db> SubclassOfType<'db> {
     /// This method does not always return a [`Type::SubclassOf`] variant.
     /// If the class object is known to be a final class,
     /// this method will return a [`Type::ClassLiteral`] variant; this is a more precise type.
-    /// If the class object is `builtins.object`, `Type::Instance(<builtins.type>)` will be returned;
-    /// this is no more precise, but it is exactly equivalent to `type[object]`.
+    /// If the class object is `builtins.object`, `Type::NominalInstance(<builtins.type>)`
+    /// will be returned; this is no more precise, but it is exactly equivalent to `type[object]`.
     ///
     /// The eager normalization here means that we do not need to worry elsewhere about distinguishing
     /// between `@final` classes and other classes when dealing with [`Type::SubclassOf`] variants.
