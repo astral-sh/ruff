@@ -5230,11 +5230,7 @@ impl<'db> InvalidTypeExpression<'db> {
 /// typevar represents as an annotation: that is, an unknown set of objects, constrained by the
 /// upper-bound/constraints on this type var, defaulting to the default type of this type var when
 /// not otherwise bound to a type.
-///
-/// This must be a tracked struct, not an interned one, because typevar equivalence is by identity,
-/// not by value. Two typevars that have the same name, bound/constraints, and default, are still
-/// different typevars: if used in the same scope, they may be bound to different types.
-#[salsa::tracked(debug)]
+#[salsa::interned(debug)]
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
     #[return_ref]
