@@ -237,7 +237,7 @@ fn create_diagnostic(
             PythonVersion::PY39,
         )?
         else {
-            return Ok(None);
+            return Ok(Fixable::NoTypingExtensions);
         };
 
         // Each of these classes takes a single, optional default
@@ -278,7 +278,7 @@ fn create_diagnostic(
             }
             _ => {
                 if seen_default {
-                    return Ok(None);
+                    return Ok(Fixable::NoSeenDefault);
                 }
                 format!(
                     "{parameter_name}: {binding}[{annotation}, {default_}]",
@@ -289,19 +289,46 @@ fn create_diagnostic(
             }
         };
         let parameter_edit = Edit::range_replacement(content, parameter.range);
-        Ok(Some(Fix::unsafe_edits(import_edit, [parameter_edit])))
+        Ok(Fixable::Yes(Fix::unsafe_edits(
+            import_edit,
+            [parameter_edit],
+        )))
     };
 
     // make sure we set `seen_default` if we bail out of `try_generate_fix` early. we could
     // `match` on the result directly, but still calling `try_set_optional_fix` avoids
     // duplicating the debug logging here
-    let fix: anyhow::Result<Option<Fix>> = try_generate_fix();
+    let fix: anyhow::Result<Fixable> = try_generate_fix();
     if fix.is_err() {
         seen_default = true;
+    } else if matches!(fix, Ok(Fixable::NoTypingExtensions)) {
+        return seen_default;
     }
-    diagnostic.try_set_optional_fix(|| fix);
+    diagnostic.try_set_optional_fix(|| fix.map(Option::<Fix>::from));
 
     checker.report_diagnostic(diagnostic);
 
     seen_default
+}
+
+/// A three-arm `Option` to differentiate between a missing `Fix` caused by already seeing a
+/// default value and by `typing_extensions` being unavailable.
+///
+/// In the former case, we still want to emit a `Diagnostic` because the user can manually rearrange
+/// parameters to fix the issue. In the latter case, the lint is unactionable because
+/// `typing_extensions` imports have been explicitly disallowed, and we should return without a
+/// `Diagnostic`.
+enum Fixable {
+    Yes(Fix),
+    NoTypingExtensions,
+    NoSeenDefault,
+}
+
+impl From<Fixable> for Option<Fix> {
+    fn from(value: Fixable) -> Self {
+        match value {
+            Fixable::Yes(fix) => Some(fix),
+            Fixable::NoTypingExtensions | Fixable::NoSeenDefault => None,
+        }
+    }
 }

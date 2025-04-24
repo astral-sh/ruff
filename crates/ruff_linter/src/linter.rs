@@ -1151,7 +1151,24 @@ mod tests {
 			..LinterSettings::for_rule(Rule::NonSelfReturnType)
 		}
     )]
-    fn test_disabled_typing_extensions(name: &str, contents: &str, settings: LinterSettings) {
+    #[test_case(
+        "fast002_disabled",
+		r#"
+		from fastapi import Depends, FastAPI
+
+		app = FastAPI()
+
+		@app.get("/items/")
+		async def read_items(commons: dict = Depends(common_parameters)):
+			return commons
+		"#,
+		&LinterSettings {
+			unresolved_target_version: PythonVersion { major: 3, minor: 8 },
+			disable_typing_extensions: true,
+			..LinterSettings::for_rule(Rule::FastApiNonAnnotatedDependency)
+		}
+    )]
+    fn test_disabled_typing_extensions(name: &str, contents: &str, settings: &LinterSettings) {
         let snapshot = format!("disabled_typing_extensions_{name}");
         let messages = test_snippet(contents, &settings);
         assert_messages!(snapshot, messages);
