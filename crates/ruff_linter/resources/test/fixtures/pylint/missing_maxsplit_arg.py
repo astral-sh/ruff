@@ -6,6 +6,9 @@ class Foo(str):
     def split(self, sep=None, maxsplit=-1) -> list[str]:
         return super().split(sep, maxsplit)
 
+class Bar():
+    split = "1,2,3"
+
 # Errors
 ## Test split called directly on string literal
 "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
@@ -44,6 +47,12 @@ Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
 "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
 "1,2,3".split("split")[-1]  # [missing-maxsplit-arg]
 "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
+
+## Test class attribute named split
+Bar.split.split(",")[0]  # [missing-maxsplit-arg]
+Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
+Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
+Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
 
 # OK
@@ -104,31 +113,28 @@ Foo("1,2,3").rsplit(",")[-1]
 ## Test split called on sliced list
 ["1", "2", "3"][::-1].split(",")[0]
 
+## Test class attribute named split
+Bar.split[0]  # [missing-maxsplit-arg]
+Bar.split[-1]  # [missing-maxsplit-arg]
+Bar.split[0]  # [missing-maxsplit-arg]
+Bar.split[-1]  # [missing-maxsplit-arg]
+
 
 # TODO
 
-# class Bar():
+# class Baz():
 #     def __init__(self):
 #         self.my_str = "1,2,3"
 
 #     def get_string(self) -> str:
 #         return self.my_str
 
-
-# class Baz():
-#     split = "1,2,3"
-
 # Errors
 ## Test sep arg from unpacked dict (without maxsplit arg)
 # "1,2,3".split(**{"sep": ","})
 ## Test accessor
-# Bar().get_string().split(",")[0]  # [use-maxsplit-arg]
-# Bar().get_string().split(",")[-1]  # [use-maxsplit-arg]
-## Error message should show Bar.split.split(",", maxsplit=1) or Bar.split.rsplit(",", maxsplit=1)
-# print(Baz.split.split(",")[0])  # [missing-maxsplit-arg]
-# print(Baz.split.split(",")[-1])  # [missing-maxsplit-arg]
-# print(Baz.split.rsplit(",")[0])  # [missing-maxsplit-arg]
-# print(Baz.split.rsplit(",")[-1])  # [missing-maxsplit-arg]
+# Baz().get_string().split(",")[0]  # [use-maxsplit-arg]
+# Baz().get_string().split(",")[-1]  # [use-maxsplit-arg]
 
 # OK
 ## Test maxsplit arg modified in loop
@@ -141,5 +147,5 @@ Foo("1,2,3").rsplit(",")[-1]
 ## Test split args from unpacked dict
 # "1,2,3".split(**{"sep": ",", "maxsplit": 2})[0]
 ## Test accessor
-# Bar().get_string().split(",")[1]
-# Bar().get_string().split(",")[-2]
+# Baz().get_string().split(",")[1]
+# Baz().get_string().split(",")[-2]
