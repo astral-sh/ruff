@@ -1,7 +1,9 @@
 //! Instance types: both nominal and structural.
 
+use ruff_python_ast::name::Name;
+
 use super::{ClassType, KnownClass, SubclassOfType, Type};
-use crate::Db;
+use crate::{Db, FxOrderSet};
 
 impl<'db> Type<'db> {
     pub(crate) const fn instance(class: ClassType<'db>) -> Self {
@@ -91,4 +93,95 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     fn from(value: NominalInstanceType<'db>) -> Self {
         Self::NominalInstance(value)
     }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, salsa::Supertype)]
+pub enum ProtocolInstanceType<'db> {
+    FromClass(ClassType<'db>),
+    Synthesized(SynthesizedProtocolType<'db>),
+}
+
+#[salsa::tracked]
+impl<'db> ProtocolInstanceType<'db> {
+    #[salsa::tracked(return_ref)]
+    fn protocol_members(self, db: &'db dyn Db) -> FxOrderSet<Name> {
+        match self {
+            Self::FromClass(class) => class
+                .class_literal(db)
+                .0
+                .into_protocol_class(db)
+                .expect("Protocol class literal should be a protocol class")
+                .protocol_members(db),
+            Self::Synthesized(synthesized) => synthesized.members(db),
+        }
+    }
+
+    pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::FromClass(class) => SubclassOfType::from(db, class),
+
+            // TODO: we can and should do better here.
+            //
+            // This is supported by mypy, and should be supported by us as well.
+            // We'll need to come up with a better solution for the meta-type of
+            // synthesized protocols to solve this:
+            //
+            // ```py
+            // from typing import Callable
+            //
+            // def foo(x: Callable[[], int]) -> None:
+            //     reveal_type(type(x))                 # mypy: "type[def (builtins.int) -> builtins.str]"
+            //     reveal_type(type(x).__call__)        # mypy: "def (*args: Any, **kwds: Any) -> Any"
+            // ```
+            Self::Synthesized(_) => KnownClass::Type.to_instance(db),
+        }
+    }
+
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        match self {
+            Self::FromClass(_) => {
+                Self::Synthesized(SynthesizedProtocolType::new(db, self.protocol_members(db)))
+            }
+            Self::Synthesized(_) => self,
+        }
+    }
+
+    /// TODO: should not be considered fully static if any members do not have fully static types
+    #[expect(clippy::unused_self)]
+    pub(super) fn is_fully_static(self) -> bool {
+        true
+    }
+
+    /// TODO: consider the types of the members as well as their existence
+    pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
+        self.protocol_members(db)
+            .is_subset(other.protocol_members(db))
+    }
+
+    /// TODO: consider the types of the members as well as their existence
+    pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_subtype_of(db, other)
+    }
+
+    /// TODO: consider the types of the members as well as their existence
+    pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.protocol_members(db).set_eq(other.protocol_members(db))
+    }
+
+    /// TODO: consider the types of the members as well as their existence
+    pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
+        self.is_equivalent_to(db, other)
+    }
+
+    /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
+    /// have a member with the same name but disjoint types
+    #[expect(clippy::unused_self)]
+    pub(super) fn is_disjoint_from(self, _db: &'db dyn Db, _other: Self) -> bool {
+        false
+    }
+}
+
+#[salsa::interned(debug)]
+pub struct SynthesizedProtocolType<'db> {
+    members: FxOrderSet<Name>,
 }
