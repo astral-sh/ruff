@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: unsupported_bool_conversion.md - Different ways that `UNSUPPORTED_BOOL_CONVERSION` can occur - Has a `__bool__` method, but has an incorrect return type
+mdtest name: unsupported_bool_conversion.md - Different ways that `unsupported-bool-conversion` can occur - Has a `__bool__` method, but has incorrect parameters
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unsupported_bool_conversion.md
 ---
 
@@ -13,8 +13,8 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unsupp
 
 ```
 1 | class NotBoolable:
-2 |     def __bool__(self) -> str:
-3 |         return "wat"
+2 |     def __bool__(self, foo):
+3 |         return False
 4 | 
 5 | a = NotBoolable()
 6 | 
@@ -32,15 +32,15 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for t
 8 | 10 and a and True
   |        ^
   |
-info: `str` is not assignable to `bool`
+info: `__bool__` methods must only have a `self` parameter
  --> /src/mdtest_snippet.py:2:9
   |
 1 | class NotBoolable:
-2 |     def __bool__(self) -> str:
-  |         --------          ^^^ Incorrect return type
+2 |     def __bool__(self, foo):
+  |         --------^^^^^^^^^^^ Incorrect parameters
   |         |
   |         Method defined here
-3 |         return "wat"
+3 |         return False
   |
 
 ```

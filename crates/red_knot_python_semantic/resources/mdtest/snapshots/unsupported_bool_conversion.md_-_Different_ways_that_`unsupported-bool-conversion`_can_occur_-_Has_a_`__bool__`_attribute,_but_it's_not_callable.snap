@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: unsupported_bool_conversion.md - Different ways that `UNSUPPORTED_BOOL_CONVERSION` can occur - Has a `__bool__` attribute, but it's not callable
+mdtest name: unsupported_bool_conversion.md - Different ways that `unsupported-bool-conversion` can occur - Has a `__bool__` attribute, but it's not callable
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unsupported_bool_conversion.md
 ---
 
@@ -31,6 +31,6 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for t
 7 | 10 and a and True
   |        ^
   |
-info: `__bool__` must be callable
+info: `__bool__` on `NotBoolable` must be callable
 
 ```
