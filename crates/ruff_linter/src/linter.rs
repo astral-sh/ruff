@@ -1093,7 +1093,7 @@ mod tests {
         Ok(())
     }
 
-    const TYPING_EXTENSIONS_EXAMPLE: &str = r#"
+    const PYI019_EXAMPLE: &str = r#"
 		from typing import TypeVar
 
 		T = TypeVar("T", bound="_NiceReprEnum")
@@ -1104,8 +1104,8 @@ mod tests {
 		"#;
 
     #[test_case(
-        "adds_typing_extensions",
-		TYPING_EXTENSIONS_EXAMPLE,
+        "pyi019_adds_typing_extensions",
+		PYI019_EXAMPLE,
 		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY310,
 			disable_typing_extensions: false,
@@ -1113,8 +1113,8 @@ mod tests {
 		}
     )]
     #[test_case(
-        "does_not_add_typing_extensions",
-		TYPING_EXTENSIONS_EXAMPLE,
+        "pyi019_does_not_add_typing_extensions",
+		PYI019_EXAMPLE,
 		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY310,
 			disable_typing_extensions: true,
@@ -1122,8 +1122,8 @@ mod tests {
 		}
     )]
     #[test_case(
-        "adds_typing_without_extensions_disabled",
-		TYPING_EXTENSIONS_EXAMPLE,
+        "pyi019_adds_typing_without_extensions_disabled",
+		PYI019_EXAMPLE,
 		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY311,
 			disable_typing_extensions: false,
@@ -1131,8 +1131,8 @@ mod tests {
 		}
     )]
     #[test_case(
-        "adds_typing_with_extensions_disabled",
-		TYPING_EXTENSIONS_EXAMPLE,
+        "pyi019_adds_typing_with_extensions_disabled",
+		PYI019_EXAMPLE,
 		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY311,
 			disable_typing_extensions: true,
