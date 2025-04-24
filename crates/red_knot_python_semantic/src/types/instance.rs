@@ -6,11 +6,15 @@ use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::{Db, FxOrderSet};
 
 impl<'db> Type<'db> {
-    pub(crate) const fn instance(class: ClassType<'db>) -> Self {
-        Self::NominalInstance(NominalInstanceType { class })
+    pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        if class.is_protocol(db) {
+            Self::ProtocolInstance(ProtocolInstanceType(Protocol::FromClass(class)))
+        } else {
+            Self::NominalInstance(NominalInstanceType { class })
+        }
     }
 
-    pub(crate) const fn into_instance(self) -> Option<NominalInstanceType<'db>> {
+    pub(crate) const fn into_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self {
             Type::NominalInstance(instance_type) => Some(instance_type),
             _ => None,
@@ -95,30 +99,26 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, salsa::Supertype)]
-pub enum ProtocolInstanceType<'db> {
-    FromClass(ClassType<'db>),
-    Synthesized(SynthesizedProtocolType<'db>),
-}
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, salsa::Update)]
+pub struct ProtocolInstanceType<'db>(
+    // Keep the inner field here private,
+    // so that the only way of constructing `ProtocolInstanceType` instances
+    // is through the `Type::instance` constructor function.
+    Protocol<'db>,
+);
 
-#[salsa::tracked]
 impl<'db> ProtocolInstanceType<'db> {
-    #[salsa::tracked(return_ref)]
-    fn protocol_members(self, db: &'db dyn Db) -> FxOrderSet<Name> {
-        match self {
-            Self::FromClass(class) => class
-                .class_literal(db)
-                .0
-                .into_protocol_class(db)
-                .expect("Protocol class literal should be a protocol class")
-                .protocol_members(db),
-            Self::Synthesized(synthesized) => synthesized.members(db),
-        }
+    pub(super) fn protocol_members(self, db: &'db dyn Db) -> &'db FxOrderSet<Name> {
+        self.0.protocol_members(db)
+    }
+
+    pub(super) fn inner(self) -> Protocol<'db> {
+        self.0
     }
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Self::FromClass(class) => SubclassOfType::from(db, class),
+        match self.0 {
+            Protocol::FromClass(class) => SubclassOfType::from(db, class),
 
             // TODO: we can and should do better here.
             //
@@ -133,17 +133,32 @@ impl<'db> ProtocolInstanceType<'db> {
             //     reveal_type(type(x))                 # mypy: "type[def (builtins.int) -> builtins.str]"
             //     reveal_type(type(x).__call__)        # mypy: "def (*args: Any, **kwds: Any) -> Any"
             // ```
-            Self::Synthesized(_) => KnownClass::Type.to_instance(db),
+            Protocol::Synthesized(_) => KnownClass::Type.to_instance(db),
         }
     }
 
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        match self {
-            Self::FromClass(_) => {
-                Self::Synthesized(SynthesizedProtocolType::new(db, self.protocol_members(db)))
-            }
-            Self::Synthesized(_) => self,
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
+        let members = self.protocol_members(db);
+        let object = KnownClass::Object.to_instance(db);
+        if members
+            .iter()
+            .all(|member| !object.member(db, member).symbol.is_unbound())
+        {
+            return object;
         }
+        match self.0 {
+            Protocol::FromClass(_) => Type::ProtocolInstance(Self(Protocol::Synthesized(
+                SynthesizedProtocolType::new(db, self.protocol_members(db)),
+            ))),
+            Protocol::Synthesized(_) => Type::ProtocolInstance(self),
+        }
+    }
+
+    /// TODO: should iterate over the types of the members
+    /// and check if any of them contain `Todo` types
+    #[expect(clippy::unused_self)]
+    pub(super) fn contains_todo(self) -> bool {
+        false
     }
 
     /// TODO: should not be considered fully static if any members do not have fully static types
@@ -181,7 +196,35 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 }
 
+/// Private inner enum to represent the two kinds of protocol types.
+/// This is not exposed publicly, so that the only way of constructing `Protocol` instances
+/// is through the [`Type::instance`] constructor function.
+#[derive(
+    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, salsa::Supertype, PartialOrd, Ord,
+)]
+pub(super) enum Protocol<'db> {
+    FromClass(ClassType<'db>),
+    Synthesized(SynthesizedProtocolType<'db>),
+}
+
+#[salsa::tracked]
+impl<'db> Protocol<'db> {
+    #[salsa::tracked(return_ref)]
+    fn protocol_members(self, db: &'db dyn Db) -> FxOrderSet<Name> {
+        match self {
+            Self::FromClass(class) => class
+                .class_literal(db)
+                .0
+                .into_protocol_class(db)
+                .expect("Protocol class literal should be a protocol class")
+                .protocol_members(db),
+            Self::Synthesized(synthesized) => synthesized.members(db).clone(),
+        }
+    }
+}
+
 #[salsa::interned(debug)]
-pub struct SynthesizedProtocolType<'db> {
-    members: FxOrderSet<Name>,
+pub(super) struct SynthesizedProtocolType<'db> {
+    #[return_ref]
+    pub(super) members: FxOrderSet<Name>,
 }

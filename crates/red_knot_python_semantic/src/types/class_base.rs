@@ -106,6 +106,7 @@ impl<'db> ClassBase<'db> {
             | Type::SubclassOf(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
+            | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy => None,
             Type::KnownInstance(known_instance) => match known_instance {

@@ -17,6 +17,7 @@ use crate::types::{
 use crate::Db;
 use rustc_hash::FxHashMap;
 
+use super::instance::Protocol;
 use super::CallableType;
 
 impl<'db> Type<'db> {
@@ -81,6 +82,25 @@ impl Display for DisplayRepresentation<'_> {
                     (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
                 }
             }
+            Type::ProtocolInstance(protocol) => match protocol.inner() {
+                Protocol::FromClass(ClassType::NonGeneric(class)) => {
+                    f.write_str(class.name(self.db))
+                }
+                Protocol::FromClass(ClassType::Generic(alias)) => alias.display(self.db).fmt(f),
+                Protocol::Synthesized(synthetic) => {
+                    f.write_str("<Protocol with members ")?;
+                    let member_list = synthetic.members(self.db);
+                    let num_members = member_list.len();
+                    for (i, member) in member_list.iter().enumerate() {
+                        let is_last = i == num_members - 1;
+                        write!(f, "'{member}'")?;
+                        if !is_last {
+                            f.write_str(", ")?;
+                        }
+                    }
+                    f.write_char('>')
+                }
+            },
             Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())

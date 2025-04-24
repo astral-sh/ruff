@@ -591,7 +591,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
             _ => {
                 let known_instance = new_positive
-                    .into_instance()
+                    .into_nominal_instance()
                     .and_then(|instance| instance.class().known(db));
 
                 if known_instance == Some(KnownClass::Object) {
@@ -705,7 +705,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let contains_bool = || {
             self.positive
                 .iter()
-                .filter_map(|ty| ty.into_instance())
+                .filter_map(|ty| ty.into_nominal_instance())
                 .filter_map(|instance| instance.class().known(db))
                 .any(KnownClass::is_bool)
         };
