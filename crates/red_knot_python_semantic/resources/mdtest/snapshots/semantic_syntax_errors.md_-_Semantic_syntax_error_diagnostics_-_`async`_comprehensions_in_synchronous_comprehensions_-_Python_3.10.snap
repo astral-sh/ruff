@@ -16,7 +16,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/semant
  2 |     yield n
  3 | 
  4 | async def f():
- 5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)"
+ 5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)"
  6 |     return {n: [x async for x in elements(n)] for n in range(3)}
  7 | async def test():
  8 |     return [[x async for x in elements(n)] async for n in range(3)]
@@ -36,9 +36,9 @@ error: invalid-syntax
  --> /src/mdtest_snippet.py:6:19
   |
 4 | async def f():
-5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax...
+5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (synt...
 6 |     return {n: [x async for x in elements(n)] for n in range(3)}
-  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)
+  |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^ cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)
 7 | async def test():
 8 |     return [[x async for x in elements(n)] async for n in range(3)]
   |
