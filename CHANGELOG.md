@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.11.7
+
+### Preview features
+
+- \[`airflow`\] Apply auto fixes to cases where the names have changed in Airflow 3 (`AIR301`) ([#17355](https://github.com/astral-sh/ruff/pull/17355))
+- \[`perflint`\] Implement fix for `manual-dict-comprehension` (`PERF403`) ([#16719](https://github.com/astral-sh/ruff/pull/16719))
+- [syntax-errors] Make duplicate parameter names a semantic error ([#17131](https://github.com/astral-sh/ruff/pull/17131))
+
+### Bug fixes
+
+- Fixes how the checker visits `typing.cast`/`typing.NewType` arguments ([#17538](https://github.com/astral-sh/ruff/pull/17538))
+- \[`airflow`\] fix typos (`AIR302`, `AIR312`) ([#17574](https://github.com/astral-sh/ruff/pull/17574))
+- \[`pyupgrade`\] Preserve parenthesis when fixing native literals containing newlines (`UP018`) ([#17220](https://github.com/astral-sh/ruff/pull/17220))
+- \[`refurb`\] Mark the `FURB161` fix unsafe except for integers and booleans ([#17240](https://github.com/astral-sh/ruff/pull/17240))
+
+### Rule changes
+
+- \[`perflint`\] Allow list function calls to be replaced with a comprehension (`PERF401`) ([#17519](https://github.com/astral-sh/ruff/pull/17519))
+- \[`pycodestyle`\] Auto-fix redundant boolean comparison (`E712`) ([#17090](https://github.com/astral-sh/ruff/pull/17090))
+- \[`pylint`\] make fix unsafe if delete comments (`PLR1730`) ([#17459](https://github.com/astral-sh/ruff/pull/17459))
+
+### Documentation
+
+- \[`pyflakes`\] Add fix safety section (`F841`) ([#17410](https://github.com/astral-sh/ruff/pull/17410))
+- \[`pyflakes`\] Add fix safety section to docs (`F601`, `F602`) ([#17440](https://github.com/astral-sh/ruff/pull/17440))
+- \[`pyupgrade`\] Add fix safety section to docs (`UP008`, `UP022`) ([#17441](https://github.com/astral-sh/ruff/pull/17441))
+- \[`pyupgrade`\] Add fix safety section to docs (`UP030`) ([#17443](https://github.com/astral-sh/ruff/pull/17443))
+- \[`pyupgrade`\] Add fix safety section to docs (`UP036`) ([#17444](https://github.com/astral-sh/ruff/pull/17444))
+
+### Other changes
+
+- Fix stale diagnostics in Ruff playground ([#17583](https://github.com/astral-sh/ruff/pull/17583))
+- [red-knot] allow assignment expression in call compare narrowing ([#17461](https://github.com/astral-sh/ruff/pull/17461))
+
 ## 0.11.6
 
 ### Preview features
