@@ -672,6 +672,11 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         TypingModule::TypingExtensions
     };
 
+    let res = checker.import_from_typing("TypeAlias", target.start(), PythonVersion::PY310);
+    if matches!(res, Ok(None)) {
+        return;
+    }
+
     let mut diagnostic = Diagnostic::new(
         TypeAliasWithoutAnnotation {
             module,
@@ -681,9 +686,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         target.range(),
     );
     diagnostic.try_set_optional_fix(|| {
-        let Some((import_edit, binding)) =
-            checker.import_from_typing("TypeAlias", target.start(), PythonVersion::PY310)?
-        else {
+        let Some((import_edit, binding)) = res? else {
             return Ok(None);
         };
         Ok(Some(Fix::safe_edits(

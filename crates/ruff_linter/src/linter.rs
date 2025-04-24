@@ -1156,4 +1156,21 @@ mod tests {
         let messages = test_snippet(contents, &settings);
         assert_messages!(snapshot, messages);
     }
+
+    #[test_case(
+		"pyi026_disabled",
+		"Vector = list[float]",
+		&LinterSettings {
+			unresolved_target_version: PythonVersion { major: 3, minor: 9 },
+			disable_typing_extensions: true,
+			..LinterSettings::for_rule(Rule::TypeAliasWithoutAnnotation)
+		}
+	)]
+    fn test_disabled_typing_extensions_pyi(name: &str, contents: &str, settings: &LinterSettings) {
+        let snapshot = format!("disabled_typing_extensions_pyi_{name}");
+        let path = Path::new("<filename>.pyi");
+        let contents = dedent(contents);
+        let messages = test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0;
+        assert_messages!(snapshot, messages);
+    }
 }
