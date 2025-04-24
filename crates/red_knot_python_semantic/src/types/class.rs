@@ -144,6 +144,10 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+        self.class_literal(db).0.is_protocol(db)
+    }
+
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         let (class_literal, _) = self.class_literal(db);
         class_literal.name(db)
@@ -1076,6 +1080,7 @@ impl<'db> ClassLiteral<'db> {
                     Parameters::new([Parameter::positional_or_keyword(Name::new_static("other"))
                         // TODO: could be `Self`.
                         .with_annotated_type(Type::instance(
+                            db,
                             self.apply_optional_specialization(db, specialization),
                         ))]),
                     Some(KnownClass::Bool.to_instance(db)),
@@ -2084,7 +2089,7 @@ impl<'db> KnownClass {
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
             .to_class_type(db)
-            .map(Type::instance)
+            .map(|class| Type::instance(db, class))
             .unwrap_or_else(Type::unknown)
     }
 

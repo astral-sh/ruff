@@ -1,3 +1,4 @@
+use instance::{Protocol, ProtocolInstanceType};
 use itertools::Either;
 
 use std::slice::Iter;
@@ -476,6 +477,8 @@ pub enum Type<'db> {
     /// The set of Python objects with the given class in their __class__'s method resolution order.
     /// Construct this variant using the `Type::instance` constructor function.
     NominalInstance(NominalInstanceType<'db>),
+    /// The set of Python objects that conform to the interface described by a given protocol.
+    ProtocolInstance(ProtocolInstanceType<'db>),
     /// A single Python object that requires special treatment in the type system
     KnownInstance(KnownInstanceType<'db>),
     /// An instance of `builtins.property`
@@ -543,17 +546,17 @@ impl<'db> Type<'db> {
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
-        self.into_instance()
+        self.into_nominal_instance()
             .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
     }
 
     fn is_bool(&self, db: &'db dyn Db) -> bool {
-        self.into_instance()
+        self.into_nominal_instance()
             .is_some_and(|instance| instance.class().is_known(db, KnownClass::Bool))
     }
 
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
-        self.into_instance().is_some_and(|instance| {
+        self.into_nominal_instance().is_some_and(|instance| {
             instance
                 .class()
                 .is_known(db, KnownClass::NotImplementedType)
@@ -561,7 +564,7 @@ impl<'db> Type<'db> {
     }
 
     pub fn is_object(&self, db: &'db dyn Db) -> bool {
-        self.into_instance()
+        self.into_nominal_instance()
             .is_some_and(|instance| instance.class().is_object(db))
     }
 
@@ -667,6 +670,8 @@ impl<'db> Type<'db> {
                         .iter()
                         .any(|ty| ty.contains_todo(db))
             }
+
+            Self::ProtocolInstance(protocol) => protocol.contains_todo(),
         }
     }
 
@@ -887,6 +892,7 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => Type::Intersection(intersection.normalized(db)),
             Type::Tuple(tuple) => Type::Tuple(tuple.normalized(db)),
             Type::Callable(callable) => Type::Callable(callable.normalized(db)),
+            Type::ProtocolInstance(protocol) => protocol.normalized(db),
             Type::LiteralString
             | Type::NominalInstance(_)
             | Type::PropertyInstance(_)
@@ -1149,6 +1155,14 @@ impl<'db> Type<'db> {
                 // function literals, bound methods, class literals, `type[]`, etc.)
                 false
             }
+
+            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
+                left.is_subtype_of(db, right)
+            }
+            // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
+            // TODO: `Callable` types are also structural types.
+            (Type::ProtocolInstance(_), _) => false,
+            (_, Type::ProtocolInstance(protocol)) => self.satisfies_protocol(db, protocol),
 
             // A fully static heterogeneous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype
@@ -1499,6 +1513,16 @@ impl<'db> Type<'db> {
                 .into_callable_type(db)
                 .is_assignable_to(db, target),
 
+            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
+                left.is_assignable_to(db, right)
+            }
+            // Other than the dynamic types such as `Any`/`Unknown`/`Todo` handled above,
+            // a protocol instance can never be assignable to a nominal type,
+            // with the *sole* exception of `object`.
+            // TODO: `Callable` types are also structural types.
+            (Type::ProtocolInstance(_), _) => false,
+            (_, Type::ProtocolInstance(protocol)) => self.satisfies_protocol(db, protocol),
+
             // TODO other types containing gradual forms
             _ => self.is_subtype_of(db, target),
         }
@@ -1521,6 +1545,13 @@ impl<'db> Type<'db> {
             (Type::Callable(left), Type::Callable(right)) => left.is_equivalent_to(db, right),
             (Type::NominalInstance(left), Type::NominalInstance(right)) => {
                 left.is_equivalent_to(db, right)
+            }
+            (Type::ProtocolInstance(first), Type::ProtocolInstance(right)) => {
+                first.is_equivalent_to(db, right)
+            }
+            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
+            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
+                n.class().is_object(db) && protocol.normalized(db) == nominal
             }
             _ => self == other && self.is_fully_static(db) && other.is_fully_static(db),
         }
@@ -1572,8 +1603,22 @@ impl<'db> Type<'db> {
                 first.is_gradual_equivalent_to(db, second)
             }
 
+            (Type::ProtocolInstance(first), Type::ProtocolInstance(right)) => {
+                first.is_gradual_equivalent_to(db, right)
+            }
+            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
+            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
+                n.class().is_object(db) && protocol.normalized(db) == nominal
+            }
             _ => false,
         }
+    }
+
+    fn satisfies_protocol(self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) -> bool {
+        protocol
+            .protocol_members(db)
+            .iter()
+            .all(|member| !self.member(db, member).symbol.is_unbound())
     }
 
     /// Return true if this type and `other` have no common elements.
@@ -1770,6 +1815,68 @@ impl<'db> Type<'db> {
             (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
                 // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
                 ty.bool(db).is_always_true()
+            }
+
+            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
+                left.is_disjoint_from(db, right)
+            }
+
+            // TODO: we could also consider `protocol` to be disjoint from `nominal` if `nominal`
+            // has the right member but the type of its member is disjoint from the type of the
+            // member on `protocol`.
+            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
+            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
+                n.class().is_final(db) && !nominal.satisfies_protocol(db, protocol)
+            }
+
+            (
+                ty @ (Type::LiteralString
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::ClassLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::GenericAlias(..)
+                | Type::IntLiteral(..)),
+                Type::ProtocolInstance(protocol),
+            )
+            | (
+                Type::ProtocolInstance(protocol),
+                ty @ (Type::LiteralString
+                | Type::StringLiteral(..)
+                | Type::BytesLiteral(..)
+                | Type::BooleanLiteral(..)
+                | Type::SliceLiteral(..)
+                | Type::ClassLiteral(..)
+                | Type::FunctionLiteral(..)
+                | Type::ModuleLiteral(..)
+                | Type::GenericAlias(..)
+                | Type::IntLiteral(..)),
+            ) => !ty.satisfies_protocol(db, protocol),
+
+            (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
+            | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => {
+                !known_instance
+                    .instance_fallback(db)
+                    .satisfies_protocol(db, protocol)
+            }
+
+            (Type::Callable(_), Type::ProtocolInstance(_))
+            | (Type::ProtocolInstance(_), Type::Callable(_)) => {
+                // TODO disjointness between `Callable` and `ProtocolInstance`
+                false
+            }
+
+            (Type::Tuple(..), Type::ProtocolInstance(..))
+            | (Type::ProtocolInstance(..), Type::Tuple(..)) => {
+                // Currently we do not make any general assumptions about the disjointness of a `Tuple` type
+                // and a `ProtocolInstance` type because a `Tuple` type can be an instance of a tuple
+                // subclass.
+                //
+                // TODO when we capture the types of the protocol members, we can improve on this.
+                false
             }
 
             // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
@@ -1977,6 +2084,8 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::PropertyInstance(_) => true,
 
+            Type::ProtocolInstance(protocol) => protocol.is_fully_static(),
+
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 None => true,
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.is_fully_static(db),
@@ -2039,6 +2148,26 @@ impl<'db> Type<'db> {
                 // Note: The literal types included in this pattern are not true singletons.
                 // There can be multiple Python objects (at different memory locations) that
                 // are both of type Literal[345], for example.
+                false
+            }
+
+            Type::ProtocolInstance(..) => {
+                // It *might* be possible to have a singleton protocol-instance type...?
+                //
+                // E.g.:
+                //
+                // ```py
+                // from typing import Protocol, Callable
+                //
+                // class WeirdAndWacky(Protocol):
+                //     @property
+                //     def __class__(self) -> Callable[[], None]: ...
+                // ```
+                //
+                // `WeirdAndWacky` only has a single possible inhabitant: `None`!
+                // It is thus a singleton type.
+                // However, going out of our way to recognise it as such is probably not worth it.
+                // Such cases should anyway be exceedingly rare and/or contrived.
                 false
             }
 
@@ -2143,6 +2272,11 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(..)
             | Type::SliceLiteral(..)
             | Type::KnownInstance(..) => true,
+
+            Type::ProtocolInstance(..) => {
+                // See comment in the `Type::ProtocolInstance` branch for `Type::is_singleton`.
+                false
+            }
 
             // An unbounded, unconstrained typevar is not single-valued, because it can be
             // specialized to a multiple-valued type. A bounded typevar is not single-valued, even
@@ -2337,6 +2471,7 @@ impl<'db> Type<'db> {
             | Type::Tuple(_)
             | Type::TypeVar(_)
             | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_) => None,
         }
     }
@@ -2402,6 +2537,17 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Never => Symbol::bound(self).into(),
 
             Type::NominalInstance(instance) => instance.class().instance_member(db, name),
+
+            Type::ProtocolInstance(protocol) => match protocol.inner() {
+                Protocol::FromClass(class) => class.instance_member(db, name),
+                Protocol::Synthesized(synthesized) => {
+                    if synthesized.members(db).contains(name) {
+                        SymbolAndQualifiers::todo("Capture type of synthesized protocol members")
+                    } else {
+                        Symbol::Unbound.into()
+                    }
+                }
+            },
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
                 .to_instance(db)
@@ -2885,6 +3031,7 @@ impl<'db> Type<'db> {
             ),
 
             Type::NominalInstance(..)
+            | Type::ProtocolInstance(..)
             | Type::BooleanLiteral(..)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
@@ -2915,7 +3062,7 @@ impl<'db> Type<'db> {
                     // It will need a special handling, so it remember the origin type to properly
                     // resolve the attribute.
                     if matches!(
-                        self.into_instance()
+                        self.into_nominal_instance()
                             .and_then(|instance| instance.class().known(db)),
                         Some(KnownClass::ModuleType | KnownClass::GenericAlias)
                     ) {
@@ -3180,6 +3327,8 @@ impl<'db> Type<'db> {
                 Some(known_class) => known_class.bool(),
                 None => try_dunder_bool()?,
             },
+
+            Type::ProtocolInstance(_) => try_dunder_bool()?,
 
             Type::KnownInstance(known_instance) => known_instance.bool(),
 
@@ -4315,11 +4464,14 @@ impl<'db> Type<'db> {
                 };
                 let specialized = specialization
                     .map(|specialization| {
-                        Type::instance(ClassType::Generic(GenericAlias::new(
+                        Type::instance(
                             db,
-                            generic_origin,
-                            specialization,
-                        )))
+                            ClassType::Generic(GenericAlias::new(
+                                db,
+                                generic_origin,
+                                specialization,
+                            )),
+                        )
                     })
                     .unwrap_or(instance_ty);
                 Ok(specialized)
@@ -4350,9 +4502,9 @@ impl<'db> Type<'db> {
     pub fn to_instance(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Type::Dynamic(_) | Type::Never => Some(*self),
-            Type::ClassLiteral(class) => Some(Type::instance(class.default_specialization(db))),
-            Type::GenericAlias(alias) => Some(Type::instance(ClassType::from(*alias))),
-            Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance()),
+            Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
+            Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(*alias))),
+            Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
                 for element in union.elements(db) {
@@ -4371,6 +4523,7 @@ impl<'db> Type<'db> {
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
             | Type::KnownInstance(_)
             | Type::PropertyInstance(_)
             | Type::ModuleLiteral(_)
@@ -4417,11 +4570,11 @@ impl<'db> Type<'db> {
                             KnownClass::Float.to_instance(db),
                         ],
                     ),
-                    _ => Type::instance(class.default_specialization(db)),
+                    _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) => Ok(Type::instance(ClassType::from(*alias))),
+            Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
             | Type::BooleanLiteral(_)
@@ -4444,6 +4597,7 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::FunctionLiteral(_)
             | Type::BoundSuper(_)
+            | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_) => Err(InvalidTypeExpressionError {
                 invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(*self)],
                 fallback_type: Type::unknown(),
@@ -4691,6 +4845,7 @@ impl<'db> Type<'db> {
             ),
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
+            Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
         }
     }
 
@@ -4812,9 +4967,11 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::BoundSuper(_)
-            // Instance contains a ClassType, which has already been specialized if needed, like
-            // above with BoundMethod's self_instance.
+            // `NominalInstance` contains a ClassType, which has already been specialized if needed,
+            // like above with BoundMethod's self_instance.
             | Type::NominalInstance(_)
+            // Same for `ProtocolInstance`
+            | Type::ProtocolInstance(_)
             | Type::KnownInstance(_) => self,
         }
     }
@@ -4911,6 +5068,11 @@ impl<'db> Type<'db> {
             | Self::Tuple(_) => self.to_meta_type(db).definition(db),
 
             Self::TypeVar(var) => Some(TypeDefinition::TypeVar(var.definition(db))),
+
+            Self::ProtocolInstance(protocol) => match protocol.inner() {
+                Protocol::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
+                Protocol::Synthesized(_) => None,
+            },
 
             Self::Union(_) | Self::Intersection(_) => None,
 

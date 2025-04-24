@@ -2541,6 +2541,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Type::Dynamic(..) | Type::Never => true,
 
             Type::NominalInstance(..)
+            | Type::ProtocolInstance(_)
             | Type::BooleanLiteral(..)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
@@ -5008,6 +5009,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Union(_)
@@ -5288,6 +5290,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
@@ -5313,6 +5316,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
                 | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
