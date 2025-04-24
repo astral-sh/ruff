@@ -82,7 +82,7 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         }
 
         let mut target_instance = value;
-        if let Expr::Subscript(ExprSubscript { value, .. }) = value.as_ref() {
+        while let Expr::Subscript(ExprSubscript { value, .. }) = target_instance.as_ref() {
             target_instance = value;
         }
 

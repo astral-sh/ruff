@@ -27,6 +27,7 @@ Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
 ## Test split called on sliced string
 "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
+"1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
 SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
 Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
 "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
