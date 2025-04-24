@@ -538,6 +538,12 @@ impl<'a> Checker<'a> {
     /// On Python <`version_added_to_typing`, `member` is imported from `typing_extensions`, while
     /// on Python >=`version_added_to_typing`, it is imported from `typing`.
     ///
+    /// If the Python version is less than `version_added_to_typing` but
+    /// `LinterSettings::disable_typing_extensions` is set, this method returns `Ok(None)`. In this
+    /// case, you will typically want to return early without emitting a `Diagnostic` rather than
+    /// pass the result of this method to `Diagnostic::try_set_optional_fix` because the user has
+    /// explicitly disabled `typing_extensions` imports, and thus the lint will not be actionable.
+    ///
     /// See [`Importer::get_or_import_symbol`] for more details on the returned values.
     pub(crate) fn import_from_typing(
         &self,
