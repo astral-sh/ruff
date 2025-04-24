@@ -492,20 +492,6 @@ dependencies = [
 
 [[package]]
 name = "compact_str"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b79c4069c6cad78e2e0cdfcbd26275770669fb39fd308a752dc110e83b9af32"
-dependencies = [
- "castaway",
- "cfg-if",
- "itoa",
- "rustversion",
- "ryu",
- "static_assertions",
-]
-
-[[package]]
-name = "compact_str"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3fdb1325a1cece981e8a296ab8f0f9b63ae357bd0784a9faaf548cc7b480707a"
@@ -2572,7 +2558,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.0",
  "camino",
- "compact_str 0.9.0",
+ "compact_str",
  "countme",
  "dir-test",
  "drop_bomb",
@@ -3101,7 +3087,7 @@ version = "0.0.0"
 dependencies = [
  "aho-corasick",
  "bitflags 2.9.0",
- "compact_str 0.9.0",
+ "compact_str",
  "is-macro",
  "itertools 0.14.0",
  "memchr",
@@ -3199,7 +3185,7 @@ dependencies = [
  "anyhow",
  "bitflags 2.9.0",
  "bstr",
- "compact_str 0.9.0",
+ "compact_str",
  "insta",
  "memchr",
  "ruff_annotate_snippets",
@@ -3457,11 +3443,11 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "salsa"
-version = "0.19.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=87bf6b6c2d5f6479741271da73bd9d30c2580c26#87bf6b6c2d5f6479741271da73bd9d30c2580c26"
+version = "0.20.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=b918b7f0ef6f7364fee4114ff8376b39d592e4f4#b918b7f0ef6f7364fee4114ff8376b39d592e4f4"
 dependencies = [
  "boxcar",
- "compact_str 0.8.1",
+ "compact_str",
  "crossbeam-queue",
  "dashmap 6.1.0",
  "hashbrown 0.15.2",
@@ -3480,13 +3466,13 @@ dependencies = [
 
 [[package]]
 name = "salsa-macro-rules"
-version = "0.19.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=87bf6b6c2d5f6479741271da73bd9d30c2580c26#87bf6b6c2d5f6479741271da73bd9d30c2580c26"
+version = "0.20.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=b918b7f0ef6f7364fee4114ff8376b39d592e4f4#b918b7f0ef6f7364fee4114ff8376b39d592e4f4"
 
 [[package]]
 name = "salsa-macros"
-version = "0.19.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=87bf6b6c2d5f6479741271da73bd9d30c2580c26#87bf6b6c2d5f6479741271da73bd9d30c2580c26"
+version = "0.20.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=b918b7f0ef6f7364fee4114ff8376b39d592e4f4#b918b7f0ef6f7364fee4114ff8376b39d592e4f4"
 dependencies = [
  "heck",
  "proc-macro2",
