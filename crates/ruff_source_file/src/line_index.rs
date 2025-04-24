@@ -108,33 +108,18 @@ impl LineIndex {
     ///
     /// If the offset is out of bounds.
     pub fn line_column(&self, offset: TextSize, content: &str) -> LineColumn {
-        match self.line_starts().binary_search(&offset) {
-            // Offset is at the start of a line
-            Ok(line) => LineColumn {
-                line: OneIndexed::from_zero_indexed(line),
-                column: OneIndexed::from_zero_indexed(0),
-            },
-            Err(next_row) => {
-                // SAFETY: Safe because the index always contains an entry for the offset 0
-                let row = next_row - 1;
-                let mut line_start = self.line_starts()[row];
+        let location = self.source_location(offset, content, PositionEncoding::Utf32);
 
-                let column = if self.kind().is_ascii() {
-                    usize::from(offset) - usize::from(line_start)
-                } else {
-                    // Don't count the BOM character as a column.
-                    if line_start == TextSize::from(0) && content.starts_with('\u{feff}') {
-                        line_start = '\u{feff}'.text_len();
-                    }
+        // Don't count the BOM character as a column, but only on the first line.
+        let column = if location.line.to_zero_indexed() == 0 && content.starts_with('\u{feff}') {
+            location.character_offset.saturating_sub(1)
+        } else {
+            location.character_offset
+        };
 
-                    content[TextRange::new(line_start, offset)].chars().count()
-                };
-
-                LineColumn {
-                    line: OneIndexed::from_zero_indexed(row),
-                    column: OneIndexed::from_zero_indexed(column),
-                }
-            }
+        LineColumn {
+            line: location.line,
+            column,
         }
     }
 
@@ -489,8 +474,9 @@ impl LineIndex {
 
         let line_range = self.line_range(position.line, text);
 
-        let character_offset = if self.is_ascii() {
-            TextSize::try_from(position.character_offset.to_zero_indexed()).unwrap()
+        let character_offset = position.character_offset.to_zero_indexed();
+        let character_byte_offset = if self.is_ascii() {
+            TextSize::try_from(character_offset).unwrap()
         } else {
             let line = &text[line_range];
 
@@ -499,21 +485,20 @@ impl LineIndex {
                     TextSize::try_from(position.character_offset.to_zero_indexed()).unwrap()
                 }
                 PositionEncoding::Utf16 => {
-                    let mut utf8_code_unit_offset = TextSize::new(0);
-
-                    let mut i = 0;
+                    let mut byte_offset = TextSize::new(0);
+                    let mut utf16_code_unit_offset = 0;
 
                     for c in line.chars() {
-                        if i >= position.character_offset.to_zero_indexed() {
+                        if utf16_code_unit_offset >= character_offset {
                             break;
                         }
 
                         // Count characters encoded as two 16 bit words as 2 characters.
-                        utf8_code_unit_offset += c.text_len();
-                        i += c.len_utf16();
+                        byte_offset += c.text_len();
+                        utf16_code_unit_offset += c.len_utf16();
                     }
 
-                    utf8_code_unit_offset
+                    byte_offset
                 }
                 PositionEncoding::Utf32 => line
                     .chars()
@@ -523,7 +508,7 @@ impl LineIndex {
             }
         };
 
-        line_range.start() + character_offset.clamp(TextSize::new(0), line_range.len())
+        line_range.start() + character_byte_offset.clamp(TextSize::new(0), line_range.len())
     }
 
     /// Returns the [byte offsets](TextSize) for every line
