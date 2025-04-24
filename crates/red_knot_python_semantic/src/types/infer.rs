@@ -73,9 +73,9 @@ use crate::types::diagnostic::{
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
-    UNSUPPORTED_OPERATOR,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
@@ -4572,70 +4572,125 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 _ => {}
                             }
                         }
-                        Type::ClassLiteral(class)
-                            if class.is_known(self.db(), KnownClass::Super) =>
-                        {
-                            // Handle the case where `super()` is called with no arguments.
-                            // In this case, we need to infer the two arguments:
-                            //   1. The nearest enclosing class
-                            //   2. The first parameter of the current function (typically `self` or `cls`)
-                            match overload.parameter_types() {
-                                [] => {
-                                    let scope = self.scope();
 
-                                    let Some(enclosing_class) = self.enclosing_class_symbol(scope)
+                        Type::ClassLiteral(class) => {
+                            let Some(known_class) = class.known(self.db()) else {
+                                continue;
+                            };
+
+                            match known_class {
+                                KnownClass::Super => {
+                                    // Handle the case where `super()` is called with no arguments.
+                                    // In this case, we need to infer the two arguments:
+                                    //   1. The nearest enclosing class
+                                    //   2. The first parameter of the current function (typically `self` or `cls`)
+                                    match overload.parameter_types() {
+                                        [] => {
+                                            let scope = self.scope();
+
+                                            let Some(enclosing_class) =
+                                                self.enclosing_class_symbol(scope)
+                                            else {
+                                                overload.set_return_type(Type::unknown());
+                                                BoundSuperError::UnavailableImplicitArguments
+                                                    .report_diagnostic(
+                                                        &self.context,
+                                                        call_expression.into(),
+                                                    );
+                                                continue;
+                                            };
+
+                                            let Some(first_param) =
+                                                self.first_param_type_in_scope(scope)
+                                            else {
+                                                overload.set_return_type(Type::unknown());
+                                                BoundSuperError::UnavailableImplicitArguments
+                                                    .report_diagnostic(
+                                                        &self.context,
+                                                        call_expression.into(),
+                                                    );
+                                                continue;
+                                            };
+
+                                            let bound_super = BoundSuperType::build(
+                                                self.db(),
+                                                enclosing_class,
+                                                first_param,
+                                            )
+                                            .unwrap_or_else(|err| {
+                                                err.report_diagnostic(
+                                                    &self.context,
+                                                    call_expression.into(),
+                                                );
+                                                Type::unknown()
+                                            });
+
+                                            overload.set_return_type(bound_super);
+                                        }
+                                        [Some(pivot_class_type), Some(owner_type)] => {
+                                            let bound_super = BoundSuperType::build(
+                                                self.db(),
+                                                *pivot_class_type,
+                                                *owner_type,
+                                            )
+                                            .unwrap_or_else(|err| {
+                                                err.report_diagnostic(
+                                                    &self.context,
+                                                    call_expression.into(),
+                                                );
+                                                Type::unknown()
+                                            });
+
+                                            overload.set_return_type(bound_super);
+                                        }
+                                        _ => (),
+                                    }
+                                }
+
+                                KnownClass::TypeVar => {
+                                    let Some(DefinitionKind::Assignment(containing_assignment)) =
+                                        containing_assignment
+                                            .map(|definition| definition.kind(self.db()))
                                     else {
-                                        overload.set_return_type(Type::unknown());
-                                        BoundSuperError::UnavailableImplicitArguments
-                                            .report_diagnostic(
-                                                &self.context,
-                                                call_expression.into(),
-                                            );
+                                        if let Some(builder) = self.context.report_lint(
+                                            &INVALID_LEGACY_TYPE_VARIABLE,
+                                            call_expression,
+                                        ) {
+                                            builder.into_diagnostic(format_args!(
+                                                    "A legacy `typing.TypeVar` must be immediately assigned to a variable",
+                                                ));
+                                        }
                                         continue;
                                     };
 
-                                    let Some(first_param) = self.first_param_type_in_scope(scope)
+                                    let assigned_name = match containing_assignment.target() {
+                                        ast::Expr::Name(name) => Some(&name.id),
+                                        _ => None,
+                                    };
+
+                                    // Note that this check must come after we verify that there's
+                                    // a containing assignment, because the special constructor
+                                    // logic in `Bindings::evaluate_known_cases` doesn't kick in if
+                                    // there isn't.
+                                    let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                                        overload.return_type()
                                     else {
-                                        overload.set_return_type(Type::unknown());
-                                        BoundSuperError::UnavailableImplicitArguments
-                                            .report_diagnostic(
-                                                &self.context,
-                                                call_expression.into(),
-                                            );
                                         continue;
                                     };
 
-                                    let bound_super = BoundSuperType::build(
-                                        self.db(),
-                                        enclosing_class,
-                                        first_param,
-                                    )
-                                    .unwrap_or_else(|err| {
-                                        err.report_diagnostic(
-                                            &self.context,
-                                            call_expression.into(),
-                                        );
-                                        Type::unknown()
-                                    });
-
-                                    overload.set_return_type(bound_super);
+                                    if Some(typevar.name(self.db())) != assigned_name {
+                                        if let Some(builder) = self.context.report_lint(
+                                            &INVALID_LEGACY_TYPE_VARIABLE,
+                                            call_expression,
+                                        ) {
+                                            builder.into_diagnostic(format_args!(
+                                                "The name of a legacy `typing.TypeVar` must match \
+                                                the name of the variable it is assigned to"
+                                            ));
+                                        }
+                                    }
                                 }
-                                [Some(pivot_class_type), Some(owner_type)] => {
-                                    let bound_super = BoundSuperType::build(
-                                        self.db(),
-                                        *pivot_class_type,
-                                        *owner_type,
-                                    )
-                                    .unwrap_or_else(|err| {
-                                        err.report_diagnostic(
-                                            &self.context,
-                                            call_expression.into(),
-                                        );
-                                        Type::unknown()
-                                    });
 
-                                    overload.set_return_type(bound_super);
-                                }
                                 _ => (),
                             }
                         }

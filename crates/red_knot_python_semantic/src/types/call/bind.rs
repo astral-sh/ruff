@@ -10,7 +10,7 @@ use super::{
     InferContext, Signature, Signatures, Type,
 };
 use crate::db::Db;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::definition::Definition;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
@@ -753,27 +753,20 @@ impl<'db> Bindings<'db> {
 
                     Some(KnownClass::TypeVar) => {
                         let Some(containing_assignment) = containing_assignment else {
-                            // TODO: Raise a diagnostic if TypeVar is called without being
-                            // immediately assigned to local variable.
+                            // We raise a diagnostic if TypeVar is called without being immediately
+                            // assigned to local variable, but this is handled in `infer.rs` since
+                            // it requires accessing the definition's `kind` field.
                             continue;
                         };
 
-                        let [Some(_name), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
+                        let [Some(name), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
                             overload.parameter_types()
                         else {
                             continue;
                         };
 
-                        // TypeVar can only be called when the result is immediately assigned to a
-                        // variable. Reuse the name that is being assigned to.
-                        // TODO: Raise a diagnostic if the name parameter doesn't match the name
-                        // being assigned to.
-                        let name = match containing_assignment.kind(db) {
-                            DefinitionKind::Assignment(assignment) => match assignment.target() {
-                                ast::Expr::Name(name) => name.id.clone(),
-                                _ => continue,
-                            },
-                            _ => continue,
+                        let Some(name) = name.into_string_literal() else {
+                            continue;
                         };
 
                         let bound_or_constraint = match (bound, constraints) {
@@ -808,7 +801,7 @@ impl<'db> Bindings<'db> {
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
                             TypeVarInstance::new(
                                 db,
-                                name,
+                                name.value(db).as_ref().into(),
                                 containing_assignment,
                                 bound_or_constraint,
                                 *default,
