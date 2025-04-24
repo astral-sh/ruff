@@ -47,9 +47,7 @@ use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
-pub(crate) use class::{
-    Class, ClassLiteralType, ClassType, GenericAlias, GenericClass, KnownClass, NonGenericClass,
-};
+pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
 pub(crate) use instance::InstanceType;
 pub(crate) use known_instance::KnownInstanceType;
 
@@ -468,7 +466,7 @@ pub enum Type<'db> {
     /// A specific module object
     ModuleLiteral(ModuleLiteralType<'db>),
     /// A specific class object
-    ClassLiteral(ClassLiteralType<'db>),
+    ClassLiteral(ClassLiteral<'db>),
     /// A specialization of a generic class
     GenericAlias(GenericAlias<'db>),
     /// The set of all class objects that are subclasses of the given class (C), spelled `type[C]`.
@@ -660,7 +658,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub const fn into_class_literal(self) -> Option<ClassLiteralType<'db>> {
+    pub const fn into_class_literal(self) -> Option<ClassLiteral<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
             _ => None,
@@ -668,7 +666,7 @@ impl<'db> Type<'db> {
     }
 
     #[track_caller]
-    pub fn expect_class_literal(self) -> ClassLiteralType<'db> {
+    pub fn expect_class_literal(self) -> ClassLiteral<'db> {
         self.into_class_literal()
             .expect("Expected a Type::ClassLiteral variant")
     }
@@ -681,10 +679,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub const fn into_class_type(self) -> Option<ClassType<'db>> {
+    pub fn into_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
-            Type::ClassLiteral(ClassLiteralType::NonGeneric(non_generic)) => {
-                Some(ClassType::NonGeneric(non_generic))
+            Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
+                Some(ClassType::NonGeneric(class))
             }
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
             _ => None,
@@ -692,16 +690,17 @@ impl<'db> Type<'db> {
     }
 
     #[track_caller]
-    pub fn expect_class_type(self) -> ClassType<'db> {
-        self.into_class_type()
+    pub fn expect_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        self.into_class_type(db)
             .expect("Expected a Type::GenericAlias or non-generic Type::ClassLiteral variant")
     }
 
-    pub const fn is_class_type(&self) -> bool {
-        matches!(
-            self,
-            Type::ClassLiteral(ClassLiteralType::NonGeneric(_)) | Type::GenericAlias(_)
-        )
+    pub fn is_class_type(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::ClassLiteral(class) if class.generic_context(db).is_none() => true,
+            Type::GenericAlias(_) => true,
+            _ => false,
+        }
     }
 
     pub const fn is_property_instance(&self) -> bool {
@@ -4180,13 +4179,16 @@ impl<'db> Type<'db> {
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
         let (generic_origin, self_type) = match self {
-            Type::ClassLiteral(ClassLiteralType::Generic(generic)) => {
-                let specialization = generic.generic_context(db).identity_specialization(db);
-                (
-                    Some(generic),
-                    Type::GenericAlias(GenericAlias::new(db, generic, specialization)),
-                )
-            }
+            Type::ClassLiteral(class) => match class.generic_context(db) {
+                Some(generic_context) => {
+                    let specialization = generic_context.identity_specialization(db);
+                    (
+                        Some(class),
+                        Type::GenericAlias(GenericAlias::new(db, class, specialization)),
+                    )
+                }
+                _ => (None, self),
+            },
             _ => (None, self),
         };
 
@@ -6667,7 +6669,7 @@ impl<'db> TypeAliasType<'db> {
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update)]
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: ClassType<'db>,
-    explicit_metaclass_of: ClassLiteralType<'db>,
+    explicit_metaclass_of: ClassLiteral<'db>,
 }
 
 #[salsa::interned(debug)]
@@ -7516,11 +7518,9 @@ impl<'db> BoundSuperType<'db> {
         //  super(B, b_int)
         //  super(B[int], b_unknown)
         //  ```
-        match class_literal {
-            ClassLiteralType::Generic(_) => {
-                Symbol::bound(todo_type!("super in generic class")).into()
-            }
-            ClassLiteralType::NonGeneric(_) => class_literal.class_member_from_mro(
+        match class_literal.generic_context(db) {
+            Some(_) => Symbol::bound(todo_type!("super in generic class")).into(),
+            None => class_literal.class_member_from_mro(
                 db,
                 name,
                 policy,

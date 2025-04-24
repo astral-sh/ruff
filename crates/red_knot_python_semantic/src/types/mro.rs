@@ -5,13 +5,13 @@ use rustc_hash::FxHashSet;
 
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
-use crate::types::{ClassLiteralType, ClassType, Type};
+use crate::types::{ClassLiteral, ClassType, Type};
 use crate::Db;
 
 /// The inferred method resolution order of a given class.
 ///
 /// An MRO cannot contain non-specialized generic classes. (This is why [`ClassBase`] contains a
-/// [`ClassType`], not a [`ClassLiteralType`].) Any generic classes in a base class list are always
+/// [`ClassType`], not a [`ClassLiteral`].) Any generic classes in a base class list are always
 /// specialized — either because the class is explicitly specialized if there is a subscript
 /// expression, or because we create the default specialization if there isn't.
 ///
@@ -33,7 +33,7 @@ pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
 impl<'db> Mro<'db> {
     /// Attempt to resolve the MRO of a given class. Because we derive the MRO from the list of
     /// base classes in the class definition, this operation is performed on a [class
-    /// literal][ClassLiteralType], not a [class type][ClassType]. (You can _also_ get the MRO of a
+    /// literal][ClassLiteral], not a [class type][ClassType]. (You can _also_ get the MRO of a
     /// class type, but this is done by first getting the MRO of the underlying class literal, and
     /// specializing each base class as needed if the class type is a generic alias.)
     ///
@@ -47,7 +47,7 @@ impl<'db> Mro<'db> {
     /// [`super::infer::TypeInferenceBuilder::infer_region_scope`].)
     pub(super) fn of_class(
         db: &'db dyn Db,
-        class: ClassLiteralType<'db>,
+        class: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroError<'db>> {
         Self::of_class_impl(db, class, specialization).map_err(|err| {
@@ -65,7 +65,7 @@ impl<'db> Mro<'db> {
 
     fn of_class_impl(
         db: &'db dyn Db,
-        class: ClassLiteralType<'db>,
+        class: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroErrorKind<'db>> {
         let class_bases = class.explicit_bases(db);
@@ -220,12 +220,12 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 ///
 /// Even for first-party code, where we will have to resolve the MRO for every class we encounter,
 /// loading the cached MRO comes with a certain amount of overhead, so it's best to avoid calling the
-/// Salsa-tracked [`ClassLiteralType::try_mro`] method unless it's absolutely necessary.
+/// Salsa-tracked [`ClassLiteral::try_mro`] method unless it's absolutely necessary.
 pub(super) struct MroIterator<'db> {
     db: &'db dyn Db,
 
     /// The class whose MRO we're iterating over
-    class: ClassLiteralType<'db>,
+    class: ClassLiteral<'db>,
 
     /// The specialization to apply to each MRO element, if any
     specialization: Option<Specialization<'db>>,
@@ -244,7 +244,7 @@ pub(super) struct MroIterator<'db> {
 impl<'db> MroIterator<'db> {
     pub(super) fn new(
         db: &'db dyn Db,
-        class: ClassLiteralType<'db>,
+        class: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         Self {
@@ -326,11 +326,11 @@ pub(super) enum MroErrorKind<'db> {
 
     /// The class has one or more duplicate bases.
     ///
-    /// This variant records the indices and [`ClassLiteralType`]s
+    /// This variant records the indices and [`ClassLiteral`]s
     /// of the duplicate bases. The indices are the indices of nodes
     /// in the bases list of the class's [`StmtClassDef`](ruff_python_ast::StmtClassDef) node.
     /// Each index is the index of a node representing a duplicate base.
-    DuplicateBases(Box<[(usize, ClassLiteralType<'db>)]>),
+    DuplicateBases(Box<[(usize, ClassLiteral<'db>)]>),
 
     /// The MRO is otherwise unresolvable through the C3-merge algorithm.
     ///

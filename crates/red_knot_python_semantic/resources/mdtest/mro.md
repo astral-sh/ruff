@@ -191,7 +191,7 @@ reveal_type(AA.__mro__)  # revealed: tuple[Literal[AA], Literal[Z], Unknown, Lit
 
 ## `__bases__` includes a `Union`
 
-We don't support union types in a class's bases; a base must resolve to a single `ClassLiteralType`.
+We don't support union types in a class's bases; a base must resolve to a single `ClassType`.
 If we find a union type in a class's bases, we infer the class's `__mro__` as being
 `[<class>, Unknown, object]`, the same as for MROs that cause errors at runtime.
 
