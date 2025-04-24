@@ -10,8 +10,8 @@
 
 ### Bug fixes
 
-- \[`flake8-type-checking`\] Visit keyword arguments in checks involving `typing.cast`/`typing.NewType` arguments ([#17538](https://github.com/astral-sh/ruff/pull/17538))
 - \[`airflow`\] Fix typos in provider package names (`AIR302`, `AIR312`) ([#17574](https://github.com/astral-sh/ruff/pull/17574))
+- \[`flake8-type-checking`\] Visit keyword arguments in checks involving `typing.cast`/`typing.NewType` arguments ([#17538](https://github.com/astral-sh/ruff/pull/17538))
 - \[`pyupgrade`\] Preserve parenthesis when fixing native literals containing newlines (`UP018`) ([#17220](https://github.com/astral-sh/ruff/pull/17220))
 - \[`refurb`\] Mark the `FURB161` fix unsafe except for integers and booleans ([#17240](https://github.com/astral-sh/ruff/pull/17240))
 
