@@ -107,7 +107,7 @@ from typing import Any
 
 def _(x: Any | None, y: Any | None):
     if x != 1:
-        reveal_type(x)  # revealed: Any & ~Literal[1] | None
+        reveal_type(x)  # revealed: (Any & ~Literal[1]) | None
     if y == 1:
         reveal_type(y)  # revealed: Any & ~None
 ```
@@ -115,10 +115,35 @@ def _(x: Any | None, y: Any | None):
 ## Booleans and integers
 
 ```py
-def _(b: bool):
+from typing import Literal
+
+def _(b: bool, i: Literal[1, 2]):
     if b == 1:
         reveal_type(b)  # revealed: Literal[True]
     else:
         # TODO could be Literal[False]
         reveal_type(b)  # revealed: bool
+
+    if i == True:
+        reveal_type(i)  # revealed: Literal[1]
+    else:
+        # TODO could be Literal[2]
+        reveal_type(i)  # revealed: Literal[1, 2]
+```
+
+## Narrowing `LiteralString` in union
+
+```py
+from typing_extensions import Literal, LiteralString, Any
+
+def _(s: LiteralString | None, t: LiteralString | Any):
+    if s == "foo":
+        reveal_type(s)  # revealed: Literal["foo"]
+
+    if s == 1:
+        reveal_type(s)  # revealed: Never
+
+    if t == "foo":
+        # TODO could be `Literal["foo"] | Any`
+        reveal_type(t)  # revealed: LiteralString | Any
 ```

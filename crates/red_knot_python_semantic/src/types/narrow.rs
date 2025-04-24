@@ -407,7 +407,63 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             // something that is not a type, and handle this not-a-type in `symbol_from_bindings`,
             // instead of intersecting with a type.)
 
-            // Filter the `lhs_ty` to just the types that cannot be equal to `rhs_ty`.
+            // Return `true` if it is possible for any two inhabitants of the given types to
+            // compare equal to each other; otherwise return `false`.
+            fn could_compare_equal<'db>(
+                db: &'db dyn Db,
+                left_ty: Type<'db>,
+                right_ty: Type<'db>,
+            ) -> bool {
+                if !left_ty.is_disjoint_from(db, right_ty) {
+                    // If types overlap, they have inhabitants in common; it's definitely possible
+                    // for an object to compare equal to itself.
+                    return true;
+                }
+                match (left_ty, right_ty) {
+                    // In order to be sure a union type cannot compare equal to another type, it
+                    // must be true that no element of the union can compare equal to that type.
+                    (Type::Union(union), _) => union
+                        .elements(db)
+                        .iter()
+                        .any(|ty| could_compare_equal(db, *ty, right_ty)),
+                    (_, Type::Union(union)) => union
+                        .elements(db)
+                        .iter()
+                        .any(|ty| could_compare_equal(db, left_ty, *ty)),
+                    // Boolean literals and int literals are disjoint, and single valued, and yet
+                    // `True == 1` and `False == 0`.
+                    (Type::BooleanLiteral(b), Type::IntLiteral(i))
+                    | (Type::IntLiteral(i), Type::BooleanLiteral(b)) => {
+                        (b && (i == 1)) || (!b && (i == 0))
+                    }
+                    // Other than the above cases, two single-valued disjoint types cannot compare
+                    // equal.
+                    _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
+                }
+            }
+
+            // Return `true` if `lhs_ty` consists only of `LiteralString` and types that cannot
+            // compare equal to `rhs_ty`.
+            fn can_narrow_to_rhs<'db>(
+                db: &'db dyn Db,
+                lhs_ty: Type<'db>,
+                rhs_ty: Type<'db>,
+            ) -> bool {
+                match lhs_ty {
+                    Type::Union(union) => union
+                        .elements(db)
+                        .iter()
+                        .all(|ty| can_narrow_to_rhs(db, *ty, rhs_ty)),
+                    // Either `rhs_ty` is a string literal, in which case we can narrow to it (no
+                    // other string literal could compare equal to it), or it is not a string
+                    // literal, in which case (given that it is single-valued), LiteralString
+                    // cannot compare equal to it.
+                    Type::LiteralString => true,
+                    _ => !could_compare_equal(db, lhs_ty, rhs_ty),
+                }
+            }
+
+            // Filter `ty` to just the types that cannot be equal to `rhs_ty`.
             fn filter_to_cannot_be_equal<'db>(
                 db: &'db dyn Db,
                 ty: Type<'db>,
@@ -417,17 +473,18 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     Type::Union(union) => {
                         union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty))
                     }
+                    // Treat `bool` as `Literal[True, False]`.
                     Type::Instance(instance) if instance.class().is_known(db, KnownClass::Bool) => {
-                        if !Type::BooleanLiteral(false).is_subtype_of(db, rhs_ty) {
+                        if !could_compare_equal(db, Type::BooleanLiteral(false), rhs_ty) {
                             Type::BooleanLiteral(false)
-                        } else if !Type::BooleanLiteral(true).is_subtype_of(db, rhs_ty) {
+                        } else if !could_compare_equal(db, Type::BooleanLiteral(true), rhs_ty) {
                             Type::BooleanLiteral(true)
                         } else {
                             Type::Never
                         }
                     }
                     _ => {
-                        if ty.is_single_valued(db) && !ty.is_subtype_of(db, rhs_ty) {
+                        if ty.is_single_valued(db) && !could_compare_equal(db, ty, rhs_ty) {
                             ty
                         } else {
                             Type::Never
@@ -435,11 +492,10 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     }
                 }
             }
-            Some(match lhs_ty {
-                // We cannot put this inside `filter_to_cannot_be_equal` because intersecting with
-                // `rhs_ty` is not valid if there are any non-single-valued types in the LHS.
-                Type::LiteralString => rhs_ty,
-                _ => filter_to_cannot_be_equal(self.db, lhs_ty, rhs_ty).negate(self.db),
+            Some(if can_narrow_to_rhs(self.db, lhs_ty, rhs_ty) {
+                rhs_ty
+            } else {
+                filter_to_cannot_be_equal(self.db, lhs_ty, rhs_ty).negate(self.db)
             })
         } else {
             None
