@@ -121,8 +121,17 @@ def _(b: bool, i: Literal[1, 2]):
     if b == 1:
         reveal_type(b)  # revealed: Literal[True]
     else:
-        # TODO could be Literal[False]
+        reveal_type(b)  # revealed: Literal[False]
+
+    if b == 6:
+        reveal_type(b)  # revealed: Never
+    else:
         reveal_type(b)  # revealed: bool
+
+    if b == 0:
+        reveal_type(b)  # revealed: Literal[False]
+    else:
+        reveal_type(b)  # revealed: Literal[True]
 
     if i == True:
         reveal_type(i)  # revealed: Literal[1]

@@ -473,13 +473,12 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                     }
                     // Treat `bool` as `Literal[True, False]`.
                     Type::Instance(instance) if instance.class().is_known(db, KnownClass::Bool) => {
-                        if !could_compare_equal(db, Type::BooleanLiteral(false), rhs_ty) {
-                            Type::BooleanLiteral(false)
-                        } else if !could_compare_equal(db, Type::BooleanLiteral(true), rhs_ty) {
-                            Type::BooleanLiteral(true)
-                        } else {
-                            Type::Never
-                        }
+                        UnionType::from_elements(
+                            db,
+                            [Type::BooleanLiteral(true), Type::BooleanLiteral(false)]
+                                .into_iter()
+                                .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
+                        )
                     }
                     _ => {
                         if ty.is_single_valued(db) && !could_compare_equal(db, ty, rhs_ty) {
@@ -500,7 +499,16 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
         }
     }
 
-    fn evaluate_expr_ne(&mut self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+    fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        if lhs_ty.is_bool(self.db) {
+            if let Type::IntLiteral(i) = rhs_ty {
+                match i {
+                    0 => return Some(Type::BooleanLiteral(true)),
+                    1 => return Some(Type::BooleanLiteral(false)),
+                    _ => {}
+                }
+            }
+        }
         if rhs_ty.is_single_valued(self.db) {
             Some(rhs_ty.negate(self.db))
         } else {
@@ -550,7 +558,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
             }
             ast::CmpOp::Is => Some(rhs_ty),
             ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
-            ast::CmpOp::NotEq => self.evaluate_expr_ne(rhs_ty),
+            ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self
                 .evaluate_expr_in(lhs_ty, rhs_ty)
