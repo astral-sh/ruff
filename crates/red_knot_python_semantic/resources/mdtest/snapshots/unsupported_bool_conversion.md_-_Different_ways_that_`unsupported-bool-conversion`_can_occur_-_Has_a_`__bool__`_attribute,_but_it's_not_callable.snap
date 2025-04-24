@@ -3,8 +3,8 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: instances.md - Binary operations on instances - Operations involving types with invalid `__bool__` methods
-mdtest path: crates/red_knot_python_semantic/resources/mdtest/binary/instances.md
+mdtest name: unsupported_bool_conversion.md - Different ways that `unsupported-bool-conversion` can occur - Has a `__bool__` attribute, but it's not callable
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unsupported_bool_conversion.md
 ---
 
 # Python source files

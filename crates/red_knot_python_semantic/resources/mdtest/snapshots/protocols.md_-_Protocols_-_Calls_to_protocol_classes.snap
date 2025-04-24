@@ -1,0 +1,117 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: protocols.md - Protocols - Calls to protocol classes
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/protocols.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import Protocol, reveal_type
+ 2 | 
+ 3 | # error: [call-non-callable]
+ 4 | reveal_type(Protocol())  # revealed: Unknown
+ 5 | 
+ 6 | class MyProtocol(Protocol):
+ 7 |     x: int
+ 8 | 
+ 9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
+10 | reveal_type(MyProtocol())  # revealed: MyProtocol
+11 | class SubclassOfMyProtocol(MyProtocol): ...
+12 | 
+13 | reveal_type(SubclassOfMyProtocol())  # revealed: SubclassOfMyProtocol
+14 | def f(x: type[MyProtocol]):
+15 |     reveal_type(x())  # revealed: MyProtocol
+```
+
+# Diagnostics
+
+```
+error: lint:call-non-callable: Object of type `typing.Protocol` is not callable
+ --> /src/mdtest_snippet.py:4:13
+  |
+3 | # error: [call-non-callable]
+4 | reveal_type(Protocol())  # revealed: Unknown
+  |             ^^^^^^^^^^
+5 |
+6 | class MyProtocol(Protocol):
+  |
+
+```
+
+```
+info: revealed-type: Revealed type
+ --> /src/mdtest_snippet.py:4:1
+  |
+3 | # error: [call-non-callable]
+4 | reveal_type(Protocol())  # revealed: Unknown
+  | ^^^^^^^^^^^^^^^^^^^^^^^ `Unknown`
+5 |
+6 | class MyProtocol(Protocol):
+  |
+
+```
+
+```
+error: lint:call-non-callable: Cannot instantiate class `MyProtocol`
+  --> /src/mdtest_snippet.py:10:13
+   |
+ 9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
+10 | reveal_type(MyProtocol())  # revealed: MyProtocol
+   |             ^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+11 | class SubclassOfMyProtocol(MyProtocol): ...
+   |
+info: Protocol classes cannot be instantiated
+ --> /src/mdtest_snippet.py:6:7
+  |
+4 | reveal_type(Protocol())  # revealed: Unknown
+5 |
+6 | class MyProtocol(Protocol):
+  |       ^^^^^^^^^^^^^^^^^^^^ `MyProtocol` declared as a protocol here
+7 |     x: int
+  |
+
+```
+
+```
+info: revealed-type: Revealed type
+  --> /src/mdtest_snippet.py:10:1
+   |
+ 9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
+10 | reveal_type(MyProtocol())  # revealed: MyProtocol
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ `MyProtocol`
+11 | class SubclassOfMyProtocol(MyProtocol): ...
+   |
+
+```
+
+```
+info: revealed-type: Revealed type
+  --> /src/mdtest_snippet.py:13:1
+   |
+11 | class SubclassOfMyProtocol(MyProtocol): ...
+12 |
+13 | reveal_type(SubclassOfMyProtocol())  # revealed: SubclassOfMyProtocol
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `SubclassOfMyProtocol`
+14 | def f(x: type[MyProtocol]):
+15 |     reveal_type(x())  # revealed: MyProtocol
+   |
+
+```
+
+```
+info: revealed-type: Revealed type
+  --> /src/mdtest_snippet.py:15:5
+   |
+13 | reveal_type(SubclassOfMyProtocol())  # revealed: SubclassOfMyProtocol
+14 | def f(x: type[MyProtocol]):
+15 |     reveal_type(x())  # revealed: MyProtocol
+   |     ^^^^^^^^^^^^^^^^ `MyProtocol`
+   |
+
+```

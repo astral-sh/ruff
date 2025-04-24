@@ -4,6 +4,7 @@ use std::str::FromStr;
 use ruff_diagnostics::{AlwaysFixableViolation, Applicability, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, Int, LiteralExpressionRef, OperatorPrecedence, UnaryOp};
+use ruff_source_file::find_newline;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -244,6 +245,9 @@ pub(crate) fn native_literals(
             let arg_code = checker.locator().slice(arg);
 
             let content = match (parent_expr, literal_type, has_unary_op) {
+                // Expressions including newlines must be parenthesised to be valid syntax
+                (_, _, true) if find_newline(arg_code).is_some() => format!("({arg_code})"),
+
                 // Attribute access on an integer requires the integer to be parenthesized to disambiguate from a float
                 // Ex) `(7).denominator` is valid but `7.denominator` is not
                 // Note that floats do not have this problem

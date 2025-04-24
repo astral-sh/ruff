@@ -589,7 +589,7 @@ impl SemanticSyntaxChecker {
                 elt, generators, ..
             }) => {
                 Self::check_generator_expr(elt, generators, ctx);
-                Self::async_comprehension_outside_async_function(ctx, generators);
+                Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
                         ctx,
@@ -606,7 +606,7 @@ impl SemanticSyntaxChecker {
             }) => {
                 Self::check_generator_expr(key, generators, ctx);
                 Self::check_generator_expr(value, generators, ctx);
-                Self::async_comprehension_outside_async_function(ctx, generators);
+                Self::async_comprehension_in_sync_comprehension(ctx, generators);
                 for generator in generators.iter().filter(|g| g.is_async) {
                     Self::await_outside_async_function(
                         ctx,
@@ -817,7 +817,7 @@ impl SemanticSyntaxChecker {
         }
     }
 
-    fn async_comprehension_outside_async_function<Ctx: SemanticSyntaxContext>(
+    fn async_comprehension_in_sync_comprehension<Ctx: SemanticSyntaxContext>(
         ctx: &Ctx,
         generators: &[ast::Comprehension],
     ) {
@@ -829,7 +829,7 @@ impl SemanticSyntaxChecker {
         if ctx.in_notebook() && ctx.in_module_scope() {
             return;
         }
-        if ctx.in_async_context() && !ctx.in_sync_comprehension() {
+        if !ctx.in_sync_comprehension() {
             return;
         }
         for generator in generators.iter().filter(|gen| gen.is_async) {
@@ -861,7 +861,7 @@ impl SemanticSyntaxChecker {
             // async def j(): return [([y for y in range(1)], [z async for z in range(2)]) for x in range(5)]
             Self::add_error(
                 ctx,
-                SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version),
+                SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(python_version),
                 generator.range,
             );
         }
@@ -930,11 +930,11 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::InvalidStarExpression => {
                 f.write_str("can't use starred expression here")
             }
-            SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(python_version) => {
+            SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(python_version) => {
                 write!(
                     f,
-                    "cannot use an asynchronous comprehension outside of an asynchronous \
-                                function on Python {python_version} (syntax was added in 3.11)",
+                    "cannot use an asynchronous comprehension inside of a synchronous comprehension \
+                        on Python {python_version} (syntax was added in 3.11)",
                 )
             }
             SemanticSyntaxErrorKind::YieldOutsideFunction(kind) => {
@@ -1206,7 +1206,7 @@ pub enum SemanticSyntaxErrorKind {
     /// This was discussed in [BPO 33346] and fixed in Python 3.11.
     ///
     /// [BPO 33346]: https://github.com/python/cpython/issues/77527
-    AsyncComprehensionOutsideAsyncFunction(PythonVersion),
+    AsyncComprehensionInSyncComprehension(PythonVersion),
 
     /// Represents the use of `yield`, `yield from`, or `await` outside of a function scope.
     ///

@@ -23,9 +23,8 @@ use crate::types::{
     KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType, TupleType,
     UnionType, WrapperDescriptorKind,
 };
-use ruff_db::diagnostic::{Annotation, Severity, Span, SubDiagnostic};
+use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
-use ruff_text_size::Ranged;
 
 /// Binding information for a possible union of callables. At a call site, the arguments must be
 /// compatible with _all_ of the types in the union for the call to be valid.
@@ -1386,47 +1385,6 @@ pub(crate) enum BindingError<'db> {
 }
 
 impl<'db> BindingError<'db> {
-    /// Returns a tuple of two spans. The first is
-    /// the span for the identifier of the function
-    /// definition for `callable_ty`. The second is
-    /// the span for the parameter in the function
-    /// definition for `callable_ty`.
-    ///
-    /// If there are no meaningful spans, then this
-    /// returns `None`.
-    fn parameter_span_from_index(
-        db: &'db dyn Db,
-        callable_ty: Type<'db>,
-        parameter_index: usize,
-    ) -> Option<(Span, Span)> {
-        match callable_ty {
-            Type::FunctionLiteral(function) => {
-                let function_scope = function.body_scope(db);
-                let span = Span::from(function_scope.file(db));
-                let node = function_scope.node(db);
-                if let Some(func_def) = node.as_function() {
-                    let range = func_def
-                        .parameters
-                        .iter()
-                        .nth(parameter_index)
-                        .map(|param| param.range())
-                        .unwrap_or(func_def.parameters.range);
-                    let name_span = span.clone().with_range(func_def.name.range);
-                    let parameter_span = span.with_range(range);
-                    Some((name_span, parameter_span))
-                } else {
-                    None
-                }
-            }
-            Type::BoundMethod(bound_method) => Self::parameter_span_from_index(
-                db,
-                Type::FunctionLiteral(bound_method.function(db)),
-                parameter_index,
-            ),
-            _ => None,
-        }
-    }
-
     pub(super) fn report_diagnostic(
         &self,
         context: &InferContext<'db>,
@@ -1454,7 +1412,7 @@ impl<'db> BindingError<'db> {
                     "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
                 ));
                 if let Some((name_span, parameter_span)) =
-                    Self::parameter_span_from_index(context.db(), callable_ty, parameter.index)
+                    callable_ty.parameter_span(context.db(), Some(parameter.index))
                 {
                     let mut sub = SubDiagnostic::new(Severity::Info, "Function defined here");
                     sub.annotate(Annotation::primary(name_span));

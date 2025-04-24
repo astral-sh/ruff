@@ -19,7 +19,7 @@ async def elements(n):
     yield n
 
 async def f():
-    # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension outside of an asynchronous function on Python 3.10 (syntax was added in 3.11)"
+    # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (syntax was added in 3.11)"
     return {n: [x async for x in elements(n)] for n in range(3)}
 ```
 

@@ -242,7 +242,7 @@ def f(
 Nonetheless, `Protocol` can still be used as the second argument to `issubclass()` at runtime:
 
 ```py
-# TODO: should be `Literal[True]`
+# Could also be `Literal[True]`, but `bool` is fine:
 reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```
 
@@ -304,10 +304,12 @@ reveal_type(typing.Protocol is not typing_extensions.Protocol)  # revealed: bool
 
 ## Calls to protocol classes
 
+<!-- snapshot-diagnostics -->
+
 Neither `Protocol`, nor any protocol class, can be directly instantiated:
 
 ```py
-from typing import Protocol
+from typing_extensions import Protocol, reveal_type
 
 # error: [call-non-callable]
 reveal_type(Protocol())  # revealed: Unknown
@@ -315,7 +317,7 @@ reveal_type(Protocol())  # revealed: Unknown
 class MyProtocol(Protocol):
     x: int
 
-# TODO: should emit error
+# error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
 reveal_type(MyProtocol())  # revealed: MyProtocol
 ```
 
@@ -665,7 +667,11 @@ reveal_type(get_protocol_members(LotsOfBindings))
 
 Attribute members are allowed to have assignments in methods on the protocol class, just like
 non-protocol classes. Unlike other classes, however, instance attributes that are not declared in
-the class body are disallowed:
+the class body are disallowed. This is mandated by [the spec][spec_protocol_members]:
+
+> Additional attributes *only* defined in the body of a method by assignment via `self` are not
+> allowed. The rationale for this is that the protocol class implementation is often not shared by
+> subtypes, so the interface should not depend on the default implementation.
 
 ```py
 class Foo(Protocol):
@@ -686,6 +692,21 @@ class Foo(Protocol):
 #
 # TODO: actually a frozenset
 reveal_type(get_protocol_members(Foo))  # revealed: tuple[Literal["non_init_method"], Literal["x"], Literal["y"]]
+```
+
+If a member is declared in a superclass of a protocol class, it is fine for it to be assigned to in
+the sub-protocol class without a redeclaration:
+
+```py
+class Super(Protocol):
+    x: int
+
+class Sub(Super, Protocol):
+    x = 42  # no error here, since it's declared in the superclass
+
+# TODO: actually frozensets
+reveal_type(get_protocol_members(Super))  # revealed: tuple[Literal["x"]]
+reveal_type(get_protocol_members(Sub))  # revealed: tuple[Literal["x"]]
 ```
 
 If a protocol has 0 members, then all other types are assignable to it, and all fully static types
@@ -1263,6 +1284,140 @@ def f(arg1: type, arg2: type):
         reveal_type(arg2)  # revealed: type & ~type[OnlyMethodMembers]
 ```
 
+## Truthiness of protocol instance
+
+An instance of a protocol type generally has ambiguous truthiness:
+
+```py
+from typing import Protocol
+
+class Foo(Protocol):
+    x: int
+
+def f(foo: Foo):
+    reveal_type(bool(foo))  # revealed: bool
+```
+
+But this is not the case if the protocol has a `__bool__` method member that returns `Literal[True]`
+or `Literal[False]`:
+
+```py
+from typing import Literal
+
+class Truthy(Protocol):
+    def __bool__(self) -> Literal[True]: ...
+
+class FalsyFoo(Foo, Protocol):
+    def __bool__(self) -> Literal[False]: ...
+
+class FalsyFooSubclass(FalsyFoo, Protocol):
+    y: str
+
+def g(a: Truthy, b: FalsyFoo, c: FalsyFooSubclass):
+    reveal_type(bool(a))  # revealed: Literal[True]
+    reveal_type(bool(b))  # revealed: Literal[False]
+    reveal_type(bool(c))  # revealed: Literal[False]
+```
+
+It is not sufficient for a protocol to have a callable `__bool__` instance member that returns
+`Literal[True]` for it to be considered always truthy. Dunder methods are looked up on the class
+rather than the instance. If a protocol `X` has an instance-attribute `__bool__` member, it is
+unknowable whether that attribute can be accessed on the type of an object that satisfies `X`'s
+interface:
+
+```py
+from typing import Callable
+
+class InstanceAttrBool(Protocol):
+    __bool__: Callable[[], Literal[True]]
+
+def h(obj: InstanceAttrBool):
+    reveal_type(bool(obj))  # revealed: bool
+```
+
+## Fully static protocols; gradual protocols
+
+A protocol is only fully static if all of its members are fully static:
+
+```py
+from typing import Protocol, Any
+from knot_extensions import is_fully_static, static_assert
+
+class FullyStatic(Protocol):
+    x: int
+
+class NotFullyStatic(Protocol):
+    x: Any
+
+static_assert(is_fully_static(FullyStatic))
+
+# TODO: should pass
+static_assert(not is_fully_static(NotFullyStatic))  # error: [static-assert-error]
+```
+
+Non-fully-static protocols do not participate in subtyping, only assignability:
+
+```py
+from knot_extensions import is_subtype_of, is_assignable_to
+
+class NominalWithX:
+    x: int = 42
+
+# TODO: these should pass
+static_assert(is_assignable_to(NominalWithX, FullyStatic))  # error: [static-assert-error]
+static_assert(is_assignable_to(NominalWithX, NotFullyStatic))  # error: [static-assert-error]
+static_assert(is_subtype_of(NominalWithX, FullyStatic))  # error: [static-assert-error]
+
+static_assert(not is_subtype_of(NominalWithX, NotFullyStatic))
+```
+
+Empty protocols are fully static; this follows from the fact that an empty protocol is equivalent to
+the nominal type `object` (as described above):
+
+```py
+class Empty(Protocol): ...
+
+static_assert(is_fully_static(Empty))
+```
+
+A method member is only considered fully static if all its parameter annotations and its return
+annotation are fully static:
+
+```py
+class FullyStaticMethodMember(Protocol):
+    def method(self, x: int) -> str: ...
+
+class DynamicParameter(Protocol):
+    def method(self, x: Any) -> str: ...
+
+class DynamicReturn(Protocol):
+    def method(self, x: int) -> Any: ...
+
+static_assert(is_fully_static(FullyStaticMethodMember))
+
+# TODO: these should pass
+static_assert(not is_fully_static(DynamicParameter))  # error: [static-assert-error]
+static_assert(not is_fully_static(DynamicReturn))  # error: [static-assert-error]
+```
+
+The [typing spec][spec_protocol_members] states:
+
+> If any parameters of a protocol method are not annotated, then their types are assumed to be `Any`
+
+Thus, a partially unannotated method member can also not be considered to be fully static:
+
+```py
+class NoParameterAnnotation(Protocol):
+    def method(self, x) -> str: ...
+
+class NoReturnAnnotation(Protocol):
+    def method(self, x: int): ...
+
+# TODO: these should pass
+static_assert(not is_fully_static(NoParameterAnnotation))  # error: [static-assert-error]
+static_assert(not is_fully_static(NoReturnAnnotation))  # error: [static-assert-error]
+```
+
 ## `typing.SupportsIndex` and `typing.Sized`
 
 `typing.SupportsIndex` is already somewhat supported through some special-casing in red-knot.
@@ -1292,7 +1447,9 @@ def _(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
 Add tests for:
 
 - More tests for protocols inside `type[]`. [Spec reference][protocols_inside_type_spec].
-- Protocols with instance-method members
+- Protocols with instance-method members, including:
+    - Protocols with methods that have parameters or the return type unannotated
+    - Protocols with methods that have parameters or the return type annotated with `Any`
 - Protocols with `@classmethod` and `@staticmethod`
 - Assignability of non-instance types to protocols with instance-method members (e.g. a
     class-literal type can be a subtype of `Sized` if its metaclass has a `__len__` method)
@@ -1306,9 +1463,6 @@ Add tests for:
 - Protocols with instance attributes annotated with `Callable` (can a nominal type with a method
     satisfy that protocol, and if so in what cases?)
 - Protocols decorated with `@final`
-- Protocols with attribute members annotated with `Any`
-- Protocols with methods that have parameters or the return type unannotated
-- Protocols with methods that have parameters or the return type annotated with `Any`
 - Equivalence and subtyping between `Callable` types and protocols that define `__call__`
 
 [mypy_protocol_docs]: https://mypy.readthedocs.io/en/stable/protocols.html#protocols-and-structural-subtyping
@@ -1317,4 +1471,5 @@ Add tests for:
 [protocols_inside_type_spec]: https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols
 [recursive_protocols_spec]: https://typing.python.org/en/latest/spec/protocol.html#recursive-protocols
 [self_types_protocols_spec]: https://typing.python.org/en/latest/spec/protocol.html#self-types-in-protocols
+[spec_protocol_members]: https://typing.python.org/en/latest/spec/protocol.html#protocol-members
 [typing_spec_protocols]: https://typing.python.org/en/latest/spec/protocol.html
