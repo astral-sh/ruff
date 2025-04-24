@@ -75,12 +75,8 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let Some(target_version) = checker.target_version() else {
-        return;
-    };
-
     // If this is an allowed dunder method, abort.
-    if allowed_dunder_constants(attr, target_version) {
+    if allowed_dunder_constants(attr, checker.target_version()) {
         return;
     }
 
@@ -218,7 +214,7 @@ pub(crate) fn unnecessary_dunder_call(checker: &Checker, call: &ast::ExprCall) {
 }
 
 /// Return `true` if this is a dunder method that is allowed to be called explicitly.
-fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) -> bool {
+fn allowed_dunder_constants(dunder_method: &str, target_version: Option<PythonVersion>) -> bool {
     if matches!(
         dunder_method,
         "__aexit__"
@@ -252,7 +248,9 @@ fn allowed_dunder_constants(dunder_method: &str, target_version: PythonVersion) 
         return true;
     }
 
-    if target_version < PythonVersion::PY310 && matches!(dunder_method, "__aiter__" | "__anext__") {
+    if target_version.is_none_or(|v| v < PythonVersion::PY310)
+        && matches!(dunder_method, "__aiter__" | "__anext__")
+    {
         return true;
     }
 
