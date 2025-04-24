@@ -6027,6 +6027,10 @@ bitflags! {
         const OVERLOAD = 1 << 2;
         /// `@abc.abstractmethod`
         const ABSTRACT_METHOD = 1 << 3;
+        /// `@typing.final`
+        const FINAL = 1 << 4;
+        /// `@typing.override`
+        const OVERRIDE = 1 << 6;
     }
 }
 
@@ -6400,6 +6404,8 @@ pub enum KnownFunction {
     Cast,
     /// `typing(_extensions).overload`
     Overload,
+    /// `typing(_extensions).override`
+    Override,
     /// `typing(_extensions).is_protocol`
     IsProtocol,
     /// `typing(_extensions).get_protocol_members`
@@ -6467,6 +6473,7 @@ impl KnownFunction {
             | Self::AssertNever
             | Self::Cast
             | Self::Overload
+            | Self::Override
             | Self::RevealType
             | Self::Final
             | Self::IsProtocol
@@ -7844,6 +7851,7 @@ pub(crate) mod tests {
                 KnownFunction::Cast
                 | KnownFunction::Final
                 | KnownFunction::Overload
+                | KnownFunction::Override
                 | KnownFunction::RevealType
                 | KnownFunction::AssertType
                 | KnownFunction::AssertNever

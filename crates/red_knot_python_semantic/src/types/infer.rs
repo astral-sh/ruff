@@ -1500,6 +1500,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                             function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
                             continue;
                         }
+                        Some(KnownFunction::Final) => {
+                            function_decorators |= FunctionDecorators::FINAL;
+                            continue;
+                        }
+                        Some(KnownFunction::Override) => {
+                            function_decorators |= FunctionDecorators::OVERRIDE;
+                            continue;
+                        }
                         _ => {}
                     }
                 }
