@@ -96,7 +96,18 @@ impl SemanticDb for Db {
 
 #[salsa::db]
 impl salsa::Database for Db {
-    fn salsa_event(&self, _event: &dyn Fn() -> salsa::Event) {}
+    fn salsa_event(&self, event: &dyn Fn() -> salsa::Event) {
+        if !tracing::enabled!(tracing::Level::TRACE) {
+            return;
+        }
+
+        let event = event();
+        if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
+            return;
+        }
+
+        tracing::trace!("Salsa event: {event:?}");
+    }
 }
 
 impl DbWithWritableSystem for Db {

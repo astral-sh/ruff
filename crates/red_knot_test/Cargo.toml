@@ -34,6 +34,7 @@ serde = { workspace = true }
 tempfile = { workspace = true }
 toml = { workspace = true }
 thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [lints]
 workspace = true
