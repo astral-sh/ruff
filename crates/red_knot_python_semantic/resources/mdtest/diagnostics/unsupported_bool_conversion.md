@@ -1,6 +1,6 @@
 <!-- snapshot-diagnostics -->
 
-# Different ways that `UNSUPPORTED_BOOL_CONVERSION` can occur
+# Different ways that `unsupported-bool-conversion` can occur
 
 ## Has a `__bool__` method, but has incorrect parameters
 

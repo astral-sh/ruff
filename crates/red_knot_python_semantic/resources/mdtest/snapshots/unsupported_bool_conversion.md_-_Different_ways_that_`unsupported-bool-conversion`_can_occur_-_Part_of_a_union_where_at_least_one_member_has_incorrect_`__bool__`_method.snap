@@ -3,7 +3,7 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: unsupported_bool_conversion.md - Different ways that `UNSUPPORTED_BOOL_CONVERSION` can occur - Part of a union where at least one member has incorrect `__bool__` method
+mdtest name: unsupported_bool_conversion.md - Different ways that `unsupported-bool-conversion` can occur - Part of a union where at least one member has incorrect `__bool__` method
 mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unsupported_bool_conversion.md
 ---
 
