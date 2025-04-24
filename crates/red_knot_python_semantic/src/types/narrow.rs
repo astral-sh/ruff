@@ -500,19 +500,33 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
     }
 
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        if lhs_ty.is_bool(self.db) {
-            if let Type::IntLiteral(i) = rhs_ty {
-                match i {
-                    0 => return Some(Type::BooleanLiteral(true)),
-                    1 => return Some(Type::BooleanLiteral(false)),
-                    _ => {}
+        match (lhs_ty, rhs_ty) {
+            (Type::Instance(instance), Type::IntLiteral(i))
+                if instance.class().is_known(self.db, KnownClass::Bool) =>
+            {
+                if i == 0 {
+                    Some(Type::BooleanLiteral(false).negate(self.db))
+                } else if i == 1 {
+                    Some(Type::BooleanLiteral(true).negate(self.db))
+                } else {
+                    None
                 }
             }
-        }
-        if rhs_ty.is_single_valued(self.db) {
-            Some(rhs_ty.negate(self.db))
-        } else {
-            None
+            (_, Type::BooleanLiteral(b)) => {
+                if b {
+                    Some(
+                        UnionType::from_elements(self.db, [rhs_ty, Type::IntLiteral(1)])
+                            .negate(self.db),
+                    )
+                } else {
+                    Some(
+                        UnionType::from_elements(self.db, [rhs_ty, Type::IntLiteral(0)])
+                            .negate(self.db),
+                    )
+                }
+            }
+            _ if rhs_ty.is_single_valued(self.db) => Some(rhs_ty.negate(self.db)),
+            _ => None,
         }
     }
 

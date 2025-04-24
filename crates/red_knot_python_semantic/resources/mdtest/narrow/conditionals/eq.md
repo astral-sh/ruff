@@ -136,8 +136,7 @@ def _(b: bool, i: Literal[1, 2]):
     if i == True:
         reveal_type(i)  # revealed: Literal[1]
     else:
-        # TODO could be Literal[2]
-        reveal_type(i)  # revealed: Literal[1, 2]
+        reveal_type(i)  # revealed: Literal[2]
 ```
 
 ## Narrowing `LiteralString` in union
