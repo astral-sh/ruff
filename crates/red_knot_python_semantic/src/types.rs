@@ -6966,11 +6966,22 @@ impl<'db> CallableType<'db> {
     fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         match (&**self.signatures(db), &**other.signatures(db)) {
             ([self_signature], [other_signature]) => {
+                // Common case: both callable types contain a single signature, use the custom
+                // equivalence check instead of delegating it to the subtype check.
                 self_signature.is_equivalent_to(db, other_signature)
             }
-            _ => {
-                // TODO: overloads
-                false
+            (self_signatures, other_signatures) => {
+                if !self_signatures
+                    .iter()
+                    .chain(other_signatures.iter())
+                    .all(|signature| signature.is_fully_static(db))
+                {
+                    return false;
+                }
+                if self == other {
+                    return true;
+                }
+                self.is_subtype_of(db, other) && other.is_subtype_of(db, self)
             }
         }
     }
