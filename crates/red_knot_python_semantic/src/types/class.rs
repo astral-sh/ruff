@@ -508,12 +508,13 @@ impl<'db> ClassLiteral<'db> {
         self.explicit_bases_query(db)
     }
 
-    /// Iterate over this class's explicit bases, filtering out any bases that are not class objects.
+    /// Iterate over this class's explicit bases, filtering out any bases that are not class
+    /// objects, and applying default specialization to any unspecialized generic class literals.
     fn fully_static_explicit_bases(self, db: &'db dyn Db) -> impl Iterator<Item = ClassType<'db>> {
         self.explicit_bases(db)
             .iter()
             .copied()
-            .filter_map(|ty| ty.into_class_type(db))
+            .filter_map(|ty| ty.to_class_type(db))
     }
 
     #[salsa::tracked(return_ref, cycle_fn=explicit_bases_cycle_recover, cycle_initial=explicit_bases_cycle_initial)]
@@ -693,7 +694,7 @@ impl<'db> ClassLiteral<'db> {
             (KnownClass::Type.to_class_literal(db), self)
         };
 
-        let mut candidate = if let Some(metaclass_ty) = metaclass.into_class_type(db) {
+        let mut candidate = if let Some(metaclass_ty) = metaclass.to_class_type(db) {
             MetaclassCandidate {
                 metaclass: metaclass_ty,
                 explicit_metaclass_of: class_metaclass_was_from,
@@ -735,7 +736,7 @@ impl<'db> ClassLiteral<'db> {
         // - https://github.com/python/cpython/blob/83ba8c2bba834c0b92de669cac16fcda17485e0e/Objects/typeobject.c#L3629-L3663
         for base_class in base_classes {
             let metaclass = base_class.metaclass(db);
-            let Some(metaclass) = metaclass.into_class_type(db) else {
+            let Some(metaclass) = metaclass.to_class_type(db) else {
                 continue;
             };
             if metaclass.is_subclass_of(db, candidate.metaclass) {
@@ -1621,8 +1622,12 @@ impl<'db> ClassLiteral<'db> {
             visited_classes: &mut IndexSet<ClassLiteral<'db>>,
         ) -> bool {
             let mut result = false;
-            for explicit_base_class in class.fully_static_explicit_bases(db) {
-                let (explicit_base_class_literal, _) = explicit_base_class.class_literal(db);
+            for explicit_base in class.explicit_bases(db) {
+                let explicit_base_class_literal = match explicit_base {
+                    Type::ClassLiteral(class_literal) => *class_literal,
+                    Type::GenericAlias(generic_alias) => generic_alias.origin(db),
+                    _ => continue,
+                };
                 if !classes_on_stack.insert(explicit_base_class_literal) {
                     return true;
                 }
@@ -1636,7 +1641,6 @@ impl<'db> ClassLiteral<'db> {
                         visited_classes,
                     );
                 }
-
                 classes_on_stack.pop();
             }
             result
@@ -2085,7 +2089,7 @@ impl<'db> KnownClass {
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
-            .into_class_type(db)
+            .to_class_type(db)
             .map(Type::instance)
             .unwrap_or_else(Type::unknown)
     }
@@ -2152,7 +2156,7 @@ impl<'db> KnownClass {
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn to_subclass_of(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
-            .into_class_type(db)
+            .to_class_type(db)
             .map(|class| SubclassOfType::from(db, class))
             .unwrap_or_else(SubclassOfType::subclass_of_unknown)
     }

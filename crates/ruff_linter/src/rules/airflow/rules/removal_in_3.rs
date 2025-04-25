@@ -672,6 +672,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         ["airflow", "operators", "subdag", ..] => {
             Replacement::Message("The whole `airflow.subdag` module has been removed.")
         }
+        ["airflow", "operators", "python", "get_current_context"] => Replacement::AutoImport {
+            module: "airflow.sdk",
+            name: "get_current_context",
+        },
 
         // airflow.secrets
         ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::AutoImport {

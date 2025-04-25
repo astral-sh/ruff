@@ -40,6 +40,9 @@ impl Violation for Airflow3MovedToProvider {
             replacement,
         } = self;
         match replacement {
+            ProviderReplacement::None => {
+                format!("`{deprecated}` is removed in Airflow 3.0")
+            }
             ProviderReplacement::ProviderName {
                 name: _,
                 provider,
@@ -59,6 +62,7 @@ impl Violation for Airflow3MovedToProvider {
     fn fix_title(&self) -> Option<String> {
         let Airflow3MovedToProvider { replacement, .. } = self;
         match replacement {
+            ProviderReplacement::None => {None}
             ProviderReplacement::ProviderName {
                 name,
                 provider,
@@ -128,9 +132,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "operators", "s3_file_transform_operator", "S3FileTransformOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.amazon.aws.operators.s3_file_transform.S3FileTransformOperator",
+            name: "airflow.providers.amazon.aws.operators.s3.S3FileTransformOperator",
             provider: "amazon",
-            version: "1.0.0"
+            version: "3.0.0"
         },
         ["airflow", "operators", "s3_to_redshift_operator", "S3ToRedshiftOperator" | "S3ToRedshiftTransfer"] => ProviderReplacement::ProviderName {
             name: "airflow.providers.amazon.aws.transfers.s3_to_redshift.S3ToRedshiftOperator",
@@ -183,63 +187,48 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "common-sql",
             version: "1.0.0"
         },
-        ["airflow", "operators", "check_operator", rest] => match *rest {
-            "SQLCheckOperator" | "CheckOperator" => ProviderReplacement::ProviderName {
+        ["airflow", "operators", "check_operator" | "sql", "SQLCheckOperator"]
+        | ["airflow", "operators", "check_operator" | "druid_check_operator" | "presto_check_operator", "CheckOperator"]
+        | ["airflow", "operators", "druid_check_operator", "DruidCheckOperator"]
+        | ["airflow", "operators", "presto_check_operator", "PrestoCheckOperator"] => {
+            ProviderReplacement::ProviderName {
                 name: "airflow.providers.common.sql.operators.sql.SQLCheckOperator",
                 provider: "common-sql",
                 version: "1.1.0"
-            },
-            "SQLIntervalCheckOperator" | "IntervalCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            "SQLThresholdCheckOperator" | "ThresholdCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            "SQLValueCheckOperator" | "ValueCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLValueCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            _ => return
+            }
         },
-        ["airflow", "operators", "presto_check_operator", rest] => match *rest {
-            "SQLCheckOperator" | "PrestoCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            "SQLIntervalCheckOperator" | "PrestoIntervalCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            "SQLValueCheckOperator" | "PrestoValueCheckOperator" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.common.sql.operators.sql.SQLValueCheckOperator",
-                provider: "common-sql",
-                version: "1.1.0"
-            },
-            _ => return
-        }
+        ["airflow", "operators", "check_operator" | "presto_check_operator", "IntervalCheckOperator"]
+        | ["airflow", "operators", "check_operator" | "sql", "SQLIntervalCheckOperator"]
+        | ["airflow", "operators", "presto_check_operator", "PrestoIntervalCheckOperator"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.common.sql.operators.sql.SQLIntervalCheckOperator",
+            provider: "common-sql",
+            version: "1.1.0"
+        },
+        ["airflow", "operators", "check_operator" | "sql" , "SQLThresholdCheckOperator"]
+        | ["airflow", "operators", "check_operator", "ThresholdCheckOperator"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.common.sql.operators.sql.SQLThresholdCheckOperator",
+            provider: "common-sql",
+            version: "1.1.0"
+        },
+        ["airflow", "operators", "check_operator" | "presto_check_operator", "ValueCheckOperator"]
+        | ["airflow", "operators", "presto_check_operator", "PrestoValueCheckOperator"]
+        | ["airflow", "operators", "check_operator" | "sql", "SQLValueCheckOperator"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.common.sql.operators.sql.SQLValueCheckOperator",
+            provider: "common-sql",
+            version: "1.1.0"
+        },
         ["airflow", "operators", "sql", rest] => match *rest {
-            "BaseSQLOperator" |
-            "BranchSQLOperator" |
-            "SQLCheckOperator" |
-            "SQLIntervalCheckOperator" |
-            "SQLTablecheckOperator"  |
-            "SQLThresholdCheckOperator" => ProviderReplacement::SourceModuleMovedToProvider {
+            "BaseSQLOperator"
+            | "BranchSQLOperator"
+            | "SQLTablecheckOperator" => ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
                 module: "airflow.providers.common.sql.operators.sql",
                 provider: "common-sql",
                 version: "1.1.0"
             },
-            "SQLColumnCheckOperator" |
-            "SQLValueCheckOperator" |
-            "_convert_to_float_if_possible" |
-            "parse_boolean" => ProviderReplacement::SourceModuleMovedToProvider {
+            "SQLColumnCheckOperator"
+            | "_convert_to_float_if_possible"
+            | "parse_boolean" => ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
                 module: "airflow.providers.common.sql.operators.sql",
                 provider: "common-sql",
@@ -251,6 +240,16 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             name: "airflow.providers.common.sql.sensors.sql.SqlSensor",
             provider: "common-sql",
             version: "1.0.0"
+        },
+        ["airflow", "operators", "jdbc_operator", "JdbcOperator"]
+        | ["airflow", "operators", "mssql_operator", "MsSqlOperator"]
+        | ["airflow", "operators", "mysql_operator", "MySqlOperator"]
+        | ["airflow", "operators", "oracle_operator", "OracleOperator"]
+        | ["airflow", "operators", "postgres_operator", "PostgresOperator"]
+        | ["airflow", "operators", "sqlite_operator", "SqliteOperator"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.common.sql.operators.sql.SQLExecuteQueryOperator",
+            provider: "common-sql",
+            version: "1.3.0"
         },
 
         // apache-airflow-providers-daskexecutor
@@ -279,11 +278,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.apache.druid.hooks.druid",
-            provider: "apache-druid",
-            version: "1.0.0"
-        },
-        ["airflow", "operators", "druid_check_operator", "DruidCheckOperator"] => ProviderReplacement::ProviderName {
-            name: "DruidCheckOperator",
             provider: "apache-druid",
             version: "1.0.0"
         },
@@ -330,7 +324,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "auth", "managers", "fab", "fab_auth_manager", "FabAuthManager"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.fab.auth_manager.security_manager.FabAuthManager",
+            name: "airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager",
             provider: "fab",
             version: "1.0.0"
         },
@@ -398,7 +392,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "operators", "hive_to_samba_operator", "HiveToSambaOperator"] => ProviderReplacement::ProviderName {
-            name: "HiveToSambaOperator",
+            name: "airflow.providers.apache.hive.transfers.hive_to_samba.HiveToSambaOperator",
             provider: "apache-hive",
             version: "1.0.0"
         },
@@ -440,9 +434,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "1.0.0"
         },
         ["airflow", "operators", "http_operator", "SimpleHttpOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.http.operators.http.SimpleHttpOperator",
+            name: "airflow.providers.http.operators.http.HttpOperator",
             provider: "http",
-            version: "1.0.0"
+            version: "5.0.0"
         },
         ["airflow", "sensors", "http_sensor", "HttpSensor"] => ProviderReplacement::ProviderName {
             name: "airflow.providers.http.sensors.http.HttpSensor",
@@ -457,11 +451,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
             module: "airflow.providers.jdbc.hooks.jdbc",
-            provider: "jdbc",
-            version: "1.0.0"
-        },
-        ["airflow", "operators", "jdbc_operator", "JdbcOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.jdbc.operators.jdbc.JdbcOperator",
             provider: "jdbc",
             version: "1.0.0"
         },
@@ -491,15 +480,23 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             | "get_kube_client"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
-            module: "airflow.kubernetes.airflow.providers.cncf.kubernetes.kube_client",
+            module: "airflow.providers.cncf.kubernetes.kube_client",
             provider: "cncf-kubernetes",
             version: "7.4.0"
         },
+        ["airflow", "kubernetes", "kubernetes_helper_functions", "add_pod_suffix"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.add_unique_suffix",
+            provider: "cncf-kubernetes",
+            version: "10.0.0"
+        },
+        ["airflow", "kubernetes", "kubernetes_helper_functions", "create_pod_id"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.create_unique_id",
+            provider: "cncf-kubernetes",
+            version: "10.0.0"
+        },
         ["airflow", "kubernetes", "kubernetes_helper_functions", rest @ (
-            "add_pod_suffix"
             | "annotations_for_logging_task_metadata"
             | "annotations_to_key"
-            | "create_pod_id"
             | "get_logs_task_metadata"
             | "rand_str"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
@@ -522,15 +519,19 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             _ => return
         },
         ["airflow", "kubernetes", "pod_generator", rest ] => match *rest {
-            "datetime_to_label_safe_datestring" |
-            "extend_object_field" |
-            "label_safe_datestring_to_datetime" |
-            "make_safe_label_value" |
-            "merge_objects" |
-            "PodGenerator" |
-            "PodDefaults" => ProviderReplacement::SourceModuleMovedToProvider {
+            "datetime_to_label_safe_datestring"
+            | "extend_object_field"
+            | "label_safe_datestring_to_datetime"
+            | "make_safe_label_value"
+            | "merge_objects"
+            | "PodGenerator" => ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
                 module: "airflow.providers.cncf.kubernetes.pod_generator",
+                provider: "cncf-kubernetes",
+                version: "7.4.0"
+            },
+            "PodDefaults" => ProviderReplacement::ProviderName {
+                name: "airflow.providers.cncf.kubernetes.utils.xcom_sidecar.PodDefaults",
                 provider: "cncf-kubernetes",
                 version: "7.4.0"
             },
@@ -539,10 +540,14 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 provider: "cncf-kubernetes",
                 version: "7.4.0"
             },
-            "add_pod_suffix" |
+            "add_pod_suffix" => ProviderReplacement::ProviderName {
+                name: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions.add_unique_suffix",
+                provider: "cncf-kubernetes",
+                version: "10.0.0"
+            },
             "rand_str" => ProviderReplacement::SourceModuleMovedToProvider {
-                name: (*rest).to_string(),
                 module: "airflow.providers.cncf.kubernetes.kubernetes_helper_functions",
+                name: "rand_str".to_string(),
                 provider: "cncf-kubernetes",
                 version: "7.4.0"
             },
@@ -550,37 +555,33 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
         ["airflow", "kubernetes", "pod_generator_deprecated", rest @ (
             "make_safe_label_value"
-            | "PodDefaults"
             | "PodGenerator"
         )] => ProviderReplacement::SourceModuleMovedToProvider {
             name: (*rest).to_string(),
-            module: "airflow.providers.cncf.kubernetes.pod_generator_deprecated",
+            module: "airflow.providers.cncf.kubernetes.pod_generator",
             provider: "cncf-kubernetes",
             version: "7.4.0"
         },
-        ["airflow", "kubernetes", "pod_launcher", rest @(
-            "PodLauncher"
-            | "PodStatus"
-        )] => ProviderReplacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.cncf.kubernetes.pod_launcher_deprecated",
+        ["airflow", "kubernetes", "pod_generator_deprecated" | "pod_launcher_deprecated", "PodDefaults"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.cncf.kubernetes.utils.xcom_sidecar.PodDefaults",
             provider: "cncf-kubernetes",
             version: "7.4.0"
         },
-        ["airflow", "kubernetes", "pod_launcher_deprecated", rest] => match *rest {
-            "PodLauncher" | "PodStatus" | "PodDefaults" => ProviderReplacement::SourceModuleMovedToProvider {
-                name: (*rest).to_string(),
-                module: "airflow.providers.cncf.kubernetes.pod_launcher_deprecated",
-                provider: "cncf-kubernetes",
-                version: "7.4.0"
-            },
-            "get_kube_client" => ProviderReplacement::ProviderName {
-                name: "airflow.providers.cncf.kubernetes.kube_client.get_kube_client",
-                provider: "cncf-kubernetes",
-                version: "7.4.0"
-            },
-            _ => return,
-        }
+        ["airflow", "kubernetes", "pod_launcher_deprecated", "get_kube_client"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.cncf.kubernetes.kube_client.get_kube_client",
+            provider: "cncf-kubernetes",
+            version: "7.4.0"
+        },
+        ["airflow", "kubernetes", "pod_launcher" | "pod_launcher_deprecated", "PodLauncher"] => ProviderReplacement::ProviderName {
+            name: "airflow.providers.cncf.kubernetes.utils.pod_manager.PodManager",
+            provider: "cncf-kubernetes",
+            version: "3.0.0"
+        },
+        ["airflow", "kubernetes", "pod_launcher" | "pod_launcher_deprecated", "PodStatus"] => ProviderReplacement::ProviderName {
+            name: " airflow.providers.cncf.kubernetes.utils.pod_manager.PodPhase",
+            provider: "cncf-kubernetes",
+            version: "3.0.0"
+        },
         ["airflow", "kubernetes", "pod_runtime_info_env", "PodRuntimeInfoEnv"] => ProviderReplacement::ProviderName {
             name: "kubernetes.client.models.V1EnvVar",
             provider: "cncf-kubernetes",
@@ -616,20 +617,10 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "microsoft-mssql",
             version: "1.0.0"
         },
-        ["airflow", "operators", "mssql_operator", "MsSqlOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.microsoft.mssql.operators.mssql.MsSqlOperator",
-            provider: "microsoft-mssql",
-            version: "1.0.0"
-        },
 
         // apache-airflow-providers-mysql
         ["airflow", "hooks", "mysql_hook", "MySqlHook"] => ProviderReplacement::ProviderName {
             name: "airflow.providers.mysql.hooks.mysql.MySqlHook",
-            provider: "mysql",
-            version: "1.0.0"
-        },
-        ["airflow", "operators", "mysql_operator", "MySqlOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.mysql.operators.mysql.MySqlOperator",
             provider: "mysql",
             version: "1.0.0"
         },
@@ -642,11 +633,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         // apache-airflow-providers-oracle
         ["airflow", "hooks", "oracle_hook", "OracleHook"] => ProviderReplacement::ProviderName {
             name: "airflow.providers.oracle.hooks.oracle.OracleHook",
-            provider: "oracle",
-            version: "1.0.0"
-        },
-        ["airflow", "operators", "oracle_operator", "OracleOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.oracle.operators.oracle.OracleOperator",
             provider: "oracle",
             version: "1.0.0"
         },
@@ -676,15 +662,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             provider: "postgres",
             version: "1.0.0"
         },
-        ["airflow", "operators", "postgres_operator", rest @ (
-            "Mapping"
-            | "PostgresOperator"
-        )] => ProviderReplacement::SourceModuleMovedToProvider {
-            name: (*rest).to_string(),
-            module: "airflow.providers.postgres.operators.postgres",
-            provider: "postgres",
-            version: "1.0.0"
-        },
+        ["airflow", "operators", "postgres_operator", "Mapping"] => ProviderReplacement::None,
 
         // apache-airflow-providers-presto
         ["airflow", "hooks", "presto_hook", "PrestoHook"] => ProviderReplacement::ProviderName {
@@ -726,11 +704,6 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         // apache-airflow-providers-sqlite
         ["airflow", "hooks", "sqlite_hook", "SqliteHook"] => ProviderReplacement::ProviderName {
             name: "airflow.providers.sqlite.hooks.sqlite.SqliteHook",
-            provider: "sqlite",
-            version: "1.0.0"
-        },
-        ["airflow", "operators", "sqlite_operator", "SqliteOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.sqlite.operators.sqlite.SqliteOperator",
             provider: "sqlite",
             version: "1.0.0"
         },

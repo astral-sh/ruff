@@ -10,7 +10,9 @@ use diagnostic::{
     CALL_POSSIBLY_UNBOUND_METHOD, INVALID_CONTEXT_MANAGER, INVALID_SUPER_ARGUMENT, NOT_ITERABLE,
     UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS,
 };
-use ruff_db::diagnostic::create_semantic_syntax_diagnostic;
+use ruff_db::diagnostic::{
+    create_semantic_syntax_diagnostic, Annotation, Severity, Span, SubDiagnostic,
+};
 use ruff_db::files::{File, FileRange};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -540,6 +542,11 @@ impl<'db> Type<'db> {
             .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
     }
 
+    fn is_bool(&self, db: &'db dyn Db) -> bool {
+        self.into_instance()
+            .is_some_and(|instance| instance.class().is_known(db, KnownClass::Bool))
+    }
+
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.into_instance().is_some_and(|instance| {
             instance
@@ -679,11 +686,12 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub fn into_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+    /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
+    /// Since a `ClassType` must be specialized, apply the default specialization to any
+    /// unspecialized generic class literal.
+    pub fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
-            Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
-                Some(ClassType::NonGeneric(class))
-            }
+            Type::ClassLiteral(class_literal) => Some(class_literal.default_specialization(db)),
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
             _ => None,
         }
@@ -691,8 +699,8 @@ impl<'db> Type<'db> {
 
     #[track_caller]
     pub fn expect_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
-        self.into_class_type(db)
-            .expect("Expected a Type::GenericAlias or non-generic Type::ClassLiteral variant")
+        self.to_class_type(db)
+            .expect("Expected a Type::GenericAlias or Type::ClassLiteral variant")
     }
 
     pub fn is_class_type(&self, db: &'db dyn Db) -> bool {
@@ -775,8 +783,13 @@ impl<'db> Type<'db> {
     }
 
     pub fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.into_union()
-            .is_some_and(|union| union.elements(db).iter().all(|ty| ty.is_single_valued(db)))
+        self.into_union().is_some_and(|union| {
+            union
+                .elements(db)
+                .iter()
+                .all(|ty| ty.is_single_valued(db) || ty.is_bool(db) || ty.is_literal_string())
+        }) || self.is_bool(db)
+            || self.is_literal_string()
     }
 
     pub const fn into_int_literal(self) -> Option<i64> {
@@ -4895,6 +4908,99 @@ impl<'db> Type<'db> {
             | Self::AlwaysFalsy => None,
         }
     }
+
+    /// Returns a tuple of two spans. The first is
+    /// the span for the identifier of the function
+    /// definition for `self`. The second is
+    /// the span for the return type in the function
+    /// definition for `self`.
+    ///
+    /// If there are no meaningful spans, then this
+    /// returns `None`. For example, when this type
+    /// isn't callable or if the function has no
+    /// declared return type.
+    ///
+    /// # Performance
+    ///
+    /// Note that this may introduce cross-module
+    /// dependencies. This can have an impact on
+    /// the effectiveness of incremental caching
+    /// and should therefore be used judiciously.
+    ///
+    /// An example of a good use case is to improve
+    /// a diagnostic.
+    fn return_type_span(&self, db: &'db dyn Db) -> Option<(Span, Span)> {
+        match *self {
+            Type::FunctionLiteral(function) => {
+                let function_scope = function.body_scope(db);
+                let span = Span::from(function_scope.file(db));
+                let node = function_scope.node(db);
+                let func_def = node.as_function()?;
+                let return_type_range = func_def.returns.as_ref()?.range();
+                let name_span = span.clone().with_range(func_def.name.range);
+                let return_type_span = span.with_range(return_type_range);
+                Some((name_span, return_type_span))
+            }
+            Type::BoundMethod(bound_method) => {
+                Type::FunctionLiteral(bound_method.function(db)).return_type_span(db)
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns a tuple of two spans. The first is
+    /// the span for the identifier of the function
+    /// definition for `self`. The second is
+    /// the span for the parameter in the function
+    /// definition for `self`.
+    ///
+    /// If there are no meaningful spans, then this
+    /// returns `None`. For example, when this type
+    /// isn't callable.
+    ///
+    /// When `parameter_index` is `None`, then the
+    /// second span returned covers the entire parameter
+    /// list.
+    ///
+    /// # Performance
+    ///
+    /// Note that this may introduce cross-module
+    /// dependencies. This can have an impact on
+    /// the effectiveness of incremental caching
+    /// and should therefore be used judiciously.
+    ///
+    /// An example of a good use case is to improve
+    /// a diagnostic.
+    fn parameter_span(
+        &self,
+        db: &'db dyn Db,
+        parameter_index: Option<usize>,
+    ) -> Option<(Span, Span)> {
+        match *self {
+            Type::FunctionLiteral(function) => {
+                let function_scope = function.body_scope(db);
+                let span = Span::from(function_scope.file(db));
+                let node = function_scope.node(db);
+                let func_def = node.as_function()?;
+                let range = parameter_index
+                    .and_then(|parameter_index| {
+                        func_def
+                            .parameters
+                            .iter()
+                            .nth(parameter_index)
+                            .map(|param| param.range())
+                    })
+                    .unwrap_or(func_def.parameters.range);
+                let name_span = span.clone().with_range(func_def.name.range);
+                let parameter_span = span.with_range(range);
+                Some((name_span, parameter_span))
+            }
+            Type::BoundMethod(bound_method) => {
+                Type::FunctionLiteral(bound_method.function(db)).parameter_span(db, parameter_index)
+            }
+            _ => None,
+        }
+    }
 }
 
 impl<'db> From<&Type<'db>> for Type<'db> {
@@ -5127,11 +5233,7 @@ impl<'db> InvalidTypeExpression<'db> {
 /// typevar represents as an annotation: that is, an unknown set of objects, constrained by the
 /// upper-bound/constraints on this type var, defaulting to the default type of this type var when
 /// not otherwise bound to a type.
-///
-/// This must be a tracked struct, not an interned one, because typevar equivalence is by identity,
-/// not by value. Two typevars that have the same name, bound/constraints, and default, are still
-/// different typevars: if used in the same scope, they may be bound to different types.
-#[salsa::tracked(debug)]
+#[salsa::interned(debug)]
 pub struct TypeVarInstance<'db> {
     /// The name of this TypeVar (e.g. `T`)
     #[return_ref]
@@ -5662,31 +5764,71 @@ impl<'db> BoolError<'db> {
             Self::IncorrectArguments {
                 not_boolable_type, ..
             } => {
-                builder.into_diagnostic(
-                    format_args!(
-                        "Boolean conversion is unsupported for type `{}`; it incorrectly implements `__bool__`",
-                        not_boolable_type.display(context.db())
-                    ),
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{}`",
+                    not_boolable_type.display(context.db())
+                ));
+                let mut sub = SubDiagnostic::new(
+                    Severity::Info,
+                    "`__bool__` methods must only have a `self` parameter",
                 );
+                if let Some((func_span, parameter_span)) = not_boolable_type
+                    .member(context.db(), "__bool__")
+                    .into_lookup_result()
+                    .ok()
+                    .and_then(|quals| quals.inner_type().parameter_span(context.db(), None))
+                {
+                    sub.annotate(
+                        Annotation::primary(parameter_span).message("Incorrect parameters"),
+                    );
+                    sub.annotate(Annotation::secondary(func_span).message("Method defined here"));
+                }
+                diag.sub(sub);
             }
             Self::IncorrectReturnType {
                 not_boolable_type,
                 return_type,
             } => {
-                builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{not_boolable}`; \
-                     the return type of its bool method (`{return_type}`) \
-                     isn't assignable to `bool",
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{not_boolable}`",
                     not_boolable = not_boolable_type.display(context.db()),
-                    return_type = return_type.display(context.db())
                 ));
+                let mut sub = SubDiagnostic::new(
+                    Severity::Info,
+                    format_args!(
+                        "`{return_type}` is not assignable to `bool`",
+                        return_type = return_type.display(context.db()),
+                    ),
+                );
+                if let Some((func_span, return_type_span)) = not_boolable_type
+                    .member(context.db(), "__bool__")
+                    .into_lookup_result()
+                    .ok()
+                    .and_then(|quals| quals.inner_type().return_type_span(context.db()))
+                {
+                    sub.annotate(
+                        Annotation::primary(return_type_span).message("Incorrect return type"),
+                    );
+                    sub.annotate(Annotation::secondary(func_span).message("Method defined here"));
+                }
+                diag.sub(sub);
             }
             Self::NotCallable { not_boolable_type } => {
-                builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{}`; \
-                     its `__bool__` method isn't callable",
+                let mut diag = builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type `{}`",
                     not_boolable_type.display(context.db())
                 ));
+                let sub = SubDiagnostic::new(
+                    Severity::Info,
+                    format_args!(
+                        "`__bool__` on `{}` must be callable",
+                        not_boolable_type.display(context.db())
+                    ),
+                );
+                // TODO: It would be nice to create an annotation here for
+                // where `__bool__` is defined. At time of writing, I couldn't
+                // figure out a straight-forward way of doing this. ---AG
+                diag.sub(sub);
             }
             Self::Union { union, .. } => {
                 let first_error = union
@@ -5884,6 +6026,10 @@ bitflags! {
         const OVERLOAD = 1 << 2;
         /// `@abc.abstractmethod`
         const ABSTRACT_METHOD = 1 << 3;
+        /// `@typing.final`
+        const FINAL = 1 << 4;
+        /// `@typing.override`
+        const OVERRIDE = 1 << 6;
     }
 }
 
@@ -6165,64 +6311,54 @@ impl<'db> FunctionType<'db> {
             db: &'db dyn Db,
             function: FunctionType<'db>,
         ) -> Option<OverloadedFunction<'db>> {
-            // The semantic model records a use for each function on the name node. This is used here
-            // to get the previous function definition with the same name.
-            let scope = function.definition(db).scope(db);
-            let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
-            let use_id = function
-                .body_scope(db)
-                .node(db)
-                .expect_function()
-                .name
-                .scoped_use_id(db, scope);
+            let mut current = function;
+            let mut overloads = vec![];
 
-            if let Symbol::Type(Type::FunctionLiteral(function_literal), Boundness::Bound) =
-                symbol_from_bindings(db, use_def.bindings_at_use(use_id))
-            {
-                match function_literal.to_overloaded(db) {
-                    None => {
-                        debug_assert!(
-                        !function_literal.has_known_decorator(db, FunctionDecorators::OVERLOAD),
-                        "Expected `Some(OverloadedFunction)` if the previous function was an overload"
-                    );
-                    }
-                    Some(OverloadedFunction {
-                        implementation: Some(_),
-                        ..
-                    }) => {
-                        // If the previous overloaded function already has an implementation, then this
-                        // new signature completely replaces it.
-                    }
-                    Some(OverloadedFunction {
-                        overloads,
-                        implementation: None,
-                    }) => {
-                        return Some(
-                            if function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-                                let mut overloads = overloads.clone();
-                                overloads.push(function);
-                                OverloadedFunction {
-                                    overloads,
-                                    implementation: None,
-                                }
-                            } else {
-                                OverloadedFunction {
-                                    overloads: overloads.clone(),
-                                    implementation: Some(function),
-                                }
-                            },
-                        );
-                    }
+            loop {
+                // The semantic model records a use for each function on the name node. This is used
+                // here to get the previous function definition with the same name.
+                let scope = current.definition(db).scope(db);
+                let use_def =
+                    semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+                let use_id = current
+                    .body_scope(db)
+                    .node(db)
+                    .expect_function()
+                    .name
+                    .scoped_use_id(db, scope);
+
+                let Symbol::Type(Type::FunctionLiteral(previous), Boundness::Bound) =
+                    symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+                else {
+                    break;
+                };
+
+                if previous.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+                    overloads.push(previous);
+                } else {
+                    break;
                 }
+
+                current = previous;
             }
 
-            if function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
-                Some(OverloadedFunction {
-                    overloads: vec![function],
-                    implementation: None,
-                })
-            } else {
+            // Overloads are inserted in reverse order, from bottom to top.
+            overloads.reverse();
+
+            let implementation = if function.has_known_decorator(db, FunctionDecorators::OVERLOAD) {
+                overloads.push(function);
                 None
+            } else {
+                Some(function)
+            };
+
+            if overloads.is_empty() {
+                None
+            } else {
+                Some(OverloadedFunction {
+                    overloads,
+                    implementation,
+                })
             }
         }
 
@@ -6267,6 +6403,8 @@ pub enum KnownFunction {
     Cast,
     /// `typing(_extensions).overload`
     Overload,
+    /// `typing(_extensions).override`
+    Override,
     /// `typing(_extensions).is_protocol`
     IsProtocol,
     /// `typing(_extensions).get_protocol_members`
@@ -6334,6 +6472,7 @@ impl KnownFunction {
             | Self::AssertNever
             | Self::Cast
             | Self::Overload
+            | Self::Override
             | Self::RevealType
             | Self::Final
             | Self::IsProtocol
@@ -7709,6 +7848,7 @@ pub(crate) mod tests {
                 KnownFunction::Cast
                 | KnownFunction::Final
                 | KnownFunction::Overload
+                | KnownFunction::Override
                 | KnownFunction::RevealType
                 | KnownFunction::AssertType
                 | KnownFunction::AssertNever

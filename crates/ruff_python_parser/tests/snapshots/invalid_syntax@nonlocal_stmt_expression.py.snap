@@ -1,43 +1,65 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
 input_file: crates/ruff_python_parser/resources/inline/err/nonlocal_stmt_expression.py
-snapshot_kind: text
 ---
 ## AST
 
 ```
 Module(
     ModModule {
-        range: 0..15,
+        range: 0..28,
         body: [
-            Nonlocal(
-                StmtNonlocal {
-                    range: 0..10,
-                    names: [
-                        Identifier {
-                            id: Name("x"),
-                            range: 9..10,
-                        },
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..27,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("_"),
+                        range: 4..5,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 5..7,
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Nonlocal(
+                            StmtNonlocal {
+                                range: 13..23,
+                                names: [
+                                    Identifier {
+                                        id: Name("x"),
+                                        range: 22..23,
+                                    },
+                                ],
+                            },
+                        ),
+                        Expr(
+                            StmtExpr {
+                                range: 24..27,
+                                value: UnaryOp(
+                                    ExprUnaryOp {
+                                        range: 24..27,
+                                        op: UAdd,
+                                        operand: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 26..27,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
                     ],
-                },
-            ),
-            Expr(
-                StmtExpr {
-                    range: 11..14,
-                    value: UnaryOp(
-                        ExprUnaryOp {
-                            range: 11..14,
-                            op: UAdd,
-                            operand: NumberLiteral(
-                                ExprNumberLiteral {
-                                    range: 13..14,
-                                    value: Int(
-                                        1,
-                                    ),
-                                },
-                            ),
-                        },
-                    ),
                 },
             ),
         ],
@@ -47,6 +69,7 @@ Module(
 ## Errors
 
   |
-1 | nonlocal x + 1
-  |            ^ Syntax Error: Simple statements must be separated by newlines or semicolons
+1 | def _():
+2 |     nonlocal x + 1
+  |                ^ Syntax Error: Simple statements must be separated by newlines or semicolons
   |
