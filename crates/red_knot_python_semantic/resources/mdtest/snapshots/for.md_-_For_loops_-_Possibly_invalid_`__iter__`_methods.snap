@@ -47,7 +47,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `Iterable1` may not be iterable because its `__iter__` method (with type `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`) may have an invalid signature (expected `def __iter__(self): ...`)
+error: lint:not-iterable: Object of type `Iterable1` may not be iterable
   --> /src/mdtest_snippet.py:17:14
    |
 16 |     # error: [not-iterable]
@@ -55,6 +55,9 @@ error: lint:not-iterable: Object of type `Iterable1` may not be iterable because
    |              ^^^^^^^^^^^
 18 |         reveal_type(x)  # revealed: int
    |
+info: Its `__iter__` method may have an invalid signature
+info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
+info: Expected signature for `__iter__` is `def __iter__(self): ...`
 
 ```
 
@@ -73,7 +76,7 @@ info: revealed-type: Revealed type
 ```
 
 ```
-error: lint:not-iterable: Object of type `Iterable2` may not be iterable because its `__iter__` attribute (with type `(bound method Iterable2.__iter__() -> Iterator) | None`) may not be callable
+error: lint:not-iterable: Object of type `Iterable2` may not be iterable
   --> /src/mdtest_snippet.py:28:14
    |
 27 |     # error: [not-iterable]
@@ -82,6 +85,7 @@ error: lint:not-iterable: Object of type `Iterable2` may not be iterable because
 29 |         # TODO: `int` would probably be better here:
 30 |         reveal_type(x)  # revealed: int | Unknown
    |
+info: Its `__iter__` attribute (with type `(bound method Iterable2.__iter__() -> Iterator) | None`) may not be callable
 
 ```
 
