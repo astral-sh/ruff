@@ -174,6 +174,10 @@ impl<'db> GenericAlias<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).class(db).definition(db)
     }
+
+    pub(crate) fn class_literal(self, db: &'db dyn Db) -> ClassLiteralType<'db> {
+        ClassLiteralType::Generic(self.origin(db))
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
@@ -1690,8 +1694,12 @@ impl<'db> ClassLiteralType<'db> {
             visited_classes: &mut IndexSet<ClassLiteralType<'db>>,
         ) -> bool {
             let mut result = false;
-            for explicit_base_class in class.fully_static_explicit_bases(db) {
-                let (explicit_base_class_literal, _) = explicit_base_class.class_literal(db);
+            for explicit_base in class.explicit_bases(db) {
+                let explicit_base_class_literal = match explicit_base {
+                    Type::ClassLiteral(class_literal) => *class_literal,
+                    Type::GenericAlias(generic_alias) => generic_alias.class_literal(db),
+                    _ => continue,
+                };
                 if !classes_on_stack.insert(explicit_base_class_literal) {
                     return true;
                 }
@@ -1705,7 +1713,6 @@ impl<'db> ClassLiteralType<'db> {
                         visited_classes,
                     );
                 }
-
                 classes_on_stack.pop();
             }
             result
