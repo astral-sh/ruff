@@ -935,13 +935,6 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
-     --> <temp_dir>/project/tests/test_main.py:2:8
-      |
-    2 | import does_not_exist  # error: unresolved-import
-      |        ^^^^^^^^^^^^^^
-      |
-
     error: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
      --> <temp_dir>/project/main.py:2:5
       |
@@ -958,6 +951,13 @@ fn check_specific_paths() -> anyhow::Result<()> {
     4 | print(z)
       |
 
+    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
+     --> <temp_dir>/project/tests/test_main.py:2:8
+      |
+    2 | import does_not_exist  # error: unresolved-import
+      |        ^^^^^^^^^^^^^^
+      |
+
     Found 3 diagnostics
 
     ----- stderr -----
@@ -972,13 +972,6 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
-     --> <temp_dir>/project/tests/test_main.py:2:8
-      |
-    2 | import does_not_exist  # error: unresolved-import
-      |        ^^^^^^^^^^^^^^
-      |
-
     error: lint:unresolved-import: Cannot resolve import `main2`
      --> <temp_dir>/project/other.py:2:6
       |
@@ -986,6 +979,13 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |      ^^^^^
     3 |
     4 | print(z)
+      |
+
+    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
+     --> <temp_dir>/project/tests/test_main.py:2:8
+      |
+    2 | import does_not_exist  # error: unresolved-import
+      |        ^^^^^^^^^^^^^^
       |
 
     Found 2 diagnostics
