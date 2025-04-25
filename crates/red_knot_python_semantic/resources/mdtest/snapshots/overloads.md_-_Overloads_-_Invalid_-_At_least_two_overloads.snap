@@ -29,7 +29,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error: lint:invalid-overload: Function `func1` requires at least two overloads
+error: lint:invalid-overload: Overloaded function `func1` requires at least two overloads
  --> /src/mdtest_snippet.py:4:5
   |
 3 | @overload
@@ -45,7 +45,7 @@ error: lint:invalid-overload: Function `func1` requires at least two overloads
 ```
 
 ```
-error: lint:invalid-overload: Function `func2` requires at least two overloads
+error: lint:invalid-overload: Overloaded function `func2` requires at least two overloads
   --> /src/mdtest_snippet.py:12:5
    |
 10 | @overload

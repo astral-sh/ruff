@@ -1039,7 +1039,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     .report_lint(&INVALID_OVERLOAD, &function_node.name)
                 {
                     let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Function `{}` requires at least two overloads",
+                        "Overloaded function `{}` requires at least two overloads",
                         &function_node.name
                     ));
                     if let Some(first_overload) = overloaded.overloads.first() {
