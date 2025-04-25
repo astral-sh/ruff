@@ -16,13 +16,14 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/overloads.md
  2 | 
  3 | @overload
  4 | def func1(x: int) -> int: ...
- 5 | # error: [invalid-overload]
- 6 | def func1(x: int | str) -> int | str:
- 7 |     return x
- 8 | 
- 9 | @overload
-10 | # error: [invalid-overload]
-11 | def func2(x: int) -> int: ...
+ 5 | 
+ 6 | # error: [invalid-overload]
+ 7 | def func1(x: int | str) -> int | str:
+ 8 |     return x
+ 9 | 
+10 | @overload
+11 | # error: [invalid-overload]
+12 | def func2(x: int) -> int: ...
 ```
 
 # Diagnostics
@@ -34,21 +35,22 @@ error: lint:invalid-overload: Function `func1` requires at least two overloads
 3 | @overload
 4 | def func1(x: int) -> int: ...
   |     ----- Only one overload defined here
-5 | # error: [invalid-overload]
-6 | def func1(x: int | str) -> int | str:
+5 |
+6 | # error: [invalid-overload]
+7 | def func1(x: int | str) -> int | str:
   |     ^^^^^
-7 |     return x
+8 |     return x
   |
 
 ```
 
 ```
 error: lint:invalid-overload: Function `func2` requires at least two overloads
-  --> /src/mdtest_snippet.py:11:5
+  --> /src/mdtest_snippet.py:12:5
    |
- 9 | @overload
-10 | # error: [invalid-overload]
-11 | def func2(x: int) -> int: ...
+10 | @overload
+11 | # error: [invalid-overload]
+12 | def func2(x: int) -> int: ...
    |     -----
    |     |
    |     Only one overload defined here

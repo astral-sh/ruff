@@ -318,6 +318,7 @@ from typing import overload
 
 @overload
 def func1(x: int) -> int: ...
+
 # error: [invalid-overload]
 def func1(x: int | str) -> int | str:
     return x
