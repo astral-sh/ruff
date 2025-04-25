@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/valid/statement/assignment.py
 ```
 Module(
     ModModule {
-        range: 0..723,
+        range: 0..701,
         body: [
             Assign(
                 StmtAssign {
@@ -802,77 +802,22 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 682..692,
-                    targets: [
-                        List(
-                            ExprList {
-                                range: 682..684,
-                                elts: [],
-                                ctx: Store,
-                            },
-                        ),
-                    ],
-                    value: Starred(
-                        ExprStarred {
-                            range: 687..692,
-                            value: Name(
-                                ExprName {
-                                    range: 688..692,
-                                    id: Name("data"),
-                                    ctx: Load,
-                                },
-                            ),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    range: 693..703,
+                    range: 682..691,
                     targets: [
                         Tuple(
                             ExprTuple {
-                                range: 693..695,
-                                elts: [],
-                                ctx: Store,
-                                parenthesized: true,
-                            },
-                        ),
-                    ],
-                    value: Starred(
-                        ExprStarred {
-                            range: 698..703,
-                            value: Name(
-                                ExprName {
-                                    range: 699..703,
-                                    id: Name("data"),
-                                    ctx: Load,
-                                },
-                            ),
-                            ctx: Load,
-                        },
-                    ),
-                },
-            ),
-            Assign(
-                StmtAssign {
-                    range: 704..713,
-                    targets: [
-                        Tuple(
-                            ExprTuple {
-                                range: 704..708,
+                                range: 682..686,
                                 elts: [
                                     Name(
                                         ExprName {
-                                            range: 704..705,
+                                            range: 682..683,
                                             id: Name("a"),
                                             ctx: Store,
                                         },
                                     ),
                                     Name(
                                         ExprName {
-                                            range: 707..708,
+                                            range: 685..686,
                                             id: Name("b"),
                                             ctx: Store,
                                         },
@@ -885,7 +830,7 @@ Module(
                     ],
                     value: Name(
                         ExprName {
-                            range: 711..713,
+                            range: 689..691,
                             id: Name("ab"),
                             ctx: Load,
                         },
@@ -894,18 +839,18 @@ Module(
             ),
             Assign(
                 StmtAssign {
-                    range: 714..723,
+                    range: 692..701,
                     targets: [
                         Name(
                             ExprName {
-                                range: 714..715,
+                                range: 692..693,
                                 id: Name("a"),
                                 ctx: Store,
                             },
                         ),
                         Name(
                             ExprName {
-                                range: 718..719,
+                                range: 696..697,
                                 id: Name("b"),
                                 ctx: Store,
                             },
@@ -913,7 +858,7 @@ Module(
                     ],
                     value: Name(
                         ExprName {
-                            range: 722..723,
+                            range: 700..701,
                             id: Name("c"),
                             ctx: Load,
                         },

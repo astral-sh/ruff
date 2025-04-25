@@ -1,0 +1,67 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/single_starred_assignment_value.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..14,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..5,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 0..1,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 4..5,
+                            value: Int(
+                                4,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 6..13,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 6..7,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: List(
+                        ExprList {
+                            range: 10..13,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 11..12,
+                                        value: Int(
+                                            4,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

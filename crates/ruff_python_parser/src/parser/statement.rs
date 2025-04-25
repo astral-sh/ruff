@@ -1126,11 +1126,11 @@ impl<'src> Parser<'src> {
         // a = b = pass = c
         // a + b
 
-        // test_err assign_stmt_invalid_value_expr
-        // x = *a and b
-        // x = *yield x
-        // x = *yield from x
-        // x = *lambda x: x
+        // test_err invalid_value_expr
+        // *a and b
+        // *yield x
+        // *yield from x
+        // *lambda x: x
         // x = x := 1
 
         let mut value =
