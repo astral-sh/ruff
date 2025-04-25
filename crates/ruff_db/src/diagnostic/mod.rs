@@ -461,6 +461,8 @@ impl PartialEq<&str> for LintName {
 /// Uniquely identifies the kind of a diagnostic.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum DiagnosticId {
+    Panic,
+
     /// Some I/O operation failed
     Io,
 
@@ -521,6 +523,7 @@ impl DiagnosticId {
 
     pub fn as_str(&self) -> Result<&str, DiagnosticAsStrError> {
         Ok(match self {
+            DiagnosticId::Panic => "panic",
             DiagnosticId::Io => "io",
             DiagnosticId::InvalidSyntax => "invalid-syntax",
             DiagnosticId::Lint(name) => {
