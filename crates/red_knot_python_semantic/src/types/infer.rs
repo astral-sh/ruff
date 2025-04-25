@@ -988,8 +988,6 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// For (1), this has the consequence of not checking an overloaded function that is being
     /// shadowed by another function with the same name in this scope.
     fn check_overloaded_functions(&mut self) {
-        let mut functions_to_check = self.called_functions.clone();
-
         // Collect all the unique overloaded function symbols in this scope. This requires a set
         // because an overloaded function uses the same symbol for each of the overloads and the
         // implementation.
@@ -1016,6 +1014,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
 
+        let mut public_functions = FxHashSet::default();
+
         for symbol in overloaded_function_symbols {
             if let Symbol::Type(Type::FunctionLiteral(function), Boundness::Bound) =
                 symbol_from_bindings(self.db(), use_def.public_bindings(symbol))
@@ -1023,17 +1023,17 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // Extend the functions that we need to check with the publicly visible overloaded
                 // function. This is always going to be either the implementation or the last
                 // overload if the implementation doesn't exists.
-                functions_to_check.insert(function);
+                public_functions.insert(function);
             }
         }
 
-        for function in functions_to_check {
+        for function in self.called_functions.union(&public_functions) {
             let Some(overloaded) = function.to_overloaded(self.db()) else {
                 continue;
             };
 
             if overloaded.overloads.len() < 2 {
-                let function_node = function.node(self.db());
+                let function_node = function.node(self.db(), self.file());
                 if let Some(builder) = self
                     .context
                     .report_lint(&INVALID_OVERLOAD, &function_node.name)
