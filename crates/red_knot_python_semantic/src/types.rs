@@ -1196,10 +1196,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
-                if let Some(callable) = class_literal.into_callable(db) {
-                    return callable.is_subtype_of(db, target);
-                }
-                false
+                class_literal.into_callable(db).is_subtype_of(db, target)
             }
 
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.

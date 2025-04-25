@@ -1216,6 +1216,60 @@ static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
 static_assert(not is_subtype_of(TypeOf[F], Callable[[], str]))
 ```
 
+#### Classes with `__init__`
+
+```py
+from typing import Callable, overload
+from knot_extensions import TypeOf, static_assert, is_subtype_of
+
+class A:
+    def __init__(self, a: int) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[A], Callable[[int], A]))
+static_assert(not is_subtype_of(TypeOf[A], Callable[[], A]))
+
+class B:
+    @overload
+    def __init__(self, a: int) -> None: ...
+    @overload
+    def __init__(self) -> None: ...
+    def __init__(self, a: int | None = None) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[B], Callable[[int], B]))
+static_assert(is_subtype_of(TypeOf[B], Callable[[], B]))
+
+class C: ...
+
+# TODO: This assertion should be true once we understand `Self`
+# error: [static-assert-error] "Static assertion error: argument evaluates to `False`"
+static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
+```
+
+#### Classes with `__init__` and `__new__`
+
+```py
+from typing import Callable
+from knot_extensions import TypeOf, static_assert, is_subtype_of
+
+class A:
+    def __new__(cls, a: int) -> "A":
+        return super().__new__(cls)
+
+    def __init__(self, a: int) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[A], Callable[[int], A]))
+static_assert(not is_subtype_of(TypeOf[A], Callable[[], A]))
+
+class B:
+    def __new__(cls, a: int) -> int:
+        return super().__new__(cls)
+
+    def __init__(self, a: str) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[B], Callable[[int], int]))
+static_assert(not is_subtype_of(TypeOf[B], Callable[[str], int]))
+```
+
 ### Bound methods
 
 ```py

@@ -2,6 +2,7 @@ use std::hash::BuildHasherDefault;
 use std::ops::Deref;
 use std::sync::{LazyLock, Mutex};
 
+use super::FunctionSignature;
 use super::{
     class_base::ClassBase, infer_expression_type, infer_unpack_types, IntersectionBuilder,
     KnownFunction, MemberLookupPolicy, Mro, MroError, MroIterator, SubclassOfType, Truthiness,
@@ -770,7 +771,7 @@ impl<'db> ClassLiteral<'db> {
         ))
     }
 
-    pub(super) fn into_callable(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    pub(super) fn into_callable(self, db: &'db dyn Db) -> Type<'db> {
         let self_ty = Type::from(self);
         let metaclass_call_function_symbol = self_ty
             .member_lookup_with_policy(
@@ -788,7 +789,7 @@ impl<'db> ClassLiteral<'db> {
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
             // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return Some(metaclass_call_function.into_callable_type(db));
+            return metaclass_call_function.into_callable_type(db);
         }
 
         let new_function_symbol = self_ty
@@ -800,11 +801,88 @@ impl<'db> ClassLiteral<'db> {
             )
             .symbol;
 
-        if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-            return Some(new_function.into_bound_method_type(db, self.into()));
+        let new_function =
+            if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+                let new_return_ty = match new_function.signature(db) {
+                    FunctionSignature::Single(signature)
+                    | FunctionSignature::Overloaded(_, Some(signature)) => signature.return_ty,
+                    FunctionSignature::Overloaded(..) => None,
+                };
+                if let Some(new_return_ty) = new_return_ty {
+                    if !self_ty.is_subtype_of(db, new_return_ty) {
+                        return new_function.into_bound_method_type(db, self_ty);
+                    }
+                }
+                Some(new_function)
+            } else {
+                None
+            };
+
+        let init_function_symbol = self_ty
+            .member_lookup_with_policy(
+                db,
+                "__init__".into(),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            )
+            .symbol;
+
+        let synthesized_init_function =
+            if let Symbol::Type(Type::FunctionLiteral(init_function), _) = init_function_symbol {
+                // TODO: should be the concrete value of `Self`
+                let correct_return_type = Type::instance(ClassType::NonGeneric(self));
+
+                let synthesized_signature = |signature: Signature<'db>| {
+                    Signature::new(signature.parameters().clone(), Some(correct_return_type))
+                        .bind_self()
+                };
+
+                let new_function_signature = match init_function.signature(db) {
+                    FunctionSignature::Single(signature) => {
+                        CallableType::single(db, synthesized_signature(signature.clone()))
+                    }
+                    FunctionSignature::Overloaded(overloads, _) => CallableType::from_overloads(
+                        db,
+                        overloads
+                            .iter()
+                            .map(Clone::clone)
+                            .map(synthesized_signature),
+                    ),
+                };
+                Some(Type::Callable(new_function_signature))
+            } else {
+                if new_function.is_none() {
+                    let new_function_symbol = self_ty
+                        .member_lookup_with_policy(
+                            db,
+                            "__new__".into(),
+                            MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                        )
+                        .symbol;
+
+                    if let Symbol::Type(Type::FunctionLiteral(new_function), _) =
+                        new_function_symbol
+                    {
+                        return new_function.into_bound_method_type(db, self_ty);
+                    }
+                }
+                None
+            };
+
+        match (new_function, synthesized_init_function) {
+            (Some(new_function), Some(synthesized_init_function)) => UnionType::from_elements(
+                db,
+                [
+                    new_function.into_bound_method_type(db, self_ty),
+                    synthesized_init_function,
+                ],
+            ),
+            (Some(new_function), None) => new_function.into_bound_method_type(db, self_ty),
+            (None, Some(synthesized_init_function)) => synthesized_init_function,
+            (None, None) => {
+                unreachable!("`object` should have found __new__ method");
+            }
         }
-        // TODO handle `__init__` also
-        None
     }
 
     /// Returns the class member of this class named `name`.
