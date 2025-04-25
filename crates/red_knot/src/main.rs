@@ -246,11 +246,16 @@ impl MainLoop {
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        if let Ok(result) = db.check() {
-                            // Send the result back to the main loop for printing.
-                            sender
-                                .send(MainLoopMessage::CheckCompleted { result, revision })
-                                .unwrap();
+                        match db.check() {
+                            Ok(result) => {
+                                // Send the result back to the main loop for printing.
+                                sender
+                                    .send(MainLoopMessage::CheckCompleted { result, revision })
+                                    .unwrap();
+                            }
+                            Err(cancelled) => {
+                                tracing::debug!("Check has been cancelled: {cancelled:?}");
+                            }
                         }
                     });
                 }

@@ -20,6 +20,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
+use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -205,8 +206,20 @@ impl Project {
                             tracing::debug_span!(parent: &project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
-                        let file_diagnostics = check_file_impl(&db, file);
-                        result.lock().unwrap().extend(file_diagnostics);
+                        let db = AssertUnwindSafe(db);
+
+                        // Catch salsa panics either because the work was cancelled or a dependent thread
+                        // panicked. This is largely redundant to what we do in `db.check` but
+                        // it helps to surface the most relevant panic in case multiple threads panic
+                        // (which is very likely if two threads need the same query result), in which case
+                        // rayon surfaces an arbitrary one. Catching the salsa errors here ensures that only
+                        // real panics get propagated.
+                        // Future: Capture the panic and create a diagnostic instead of aborting the thread.
+                        // SAFETY: All captured variables aren't used outside the catch.
+                        let _ = salsa::Cancelled::catch(move || {
+                            let file_diagnostics = check_file_impl(&*db, file);
+                            result.lock().unwrap().extend(file_diagnostics);
+                        });
                     });
                 }
             });
