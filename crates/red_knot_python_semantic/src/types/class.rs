@@ -62,28 +62,6 @@ fn explicit_bases_cycle_initial<'db>(
     Box::default()
 }
 
-fn try_mro_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Result<Mro<'db>, MroError<'db>>,
-    _count: u32,
-    _self: ClassLiteralType<'db>,
-    _specialization: Option<Specialization<'db>>,
-) -> salsa::CycleRecoveryAction<Result<Mro<'db>, MroError<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn try_mro_cycle_initial<'db>(
-    db: &'db dyn Db,
-    self_: ClassLiteralType<'db>,
-    specialization: Option<Specialization<'db>>,
-) -> Result<Mro<'db>, MroError<'db>> {
-    Ok(Mro::from_error(
-        db,
-        self_.apply_optional_specialization(db, specialization),
-    ))
-}
-
 #[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
 fn inheritance_cycle_recover<'db>(
     _db: &'db dyn Db,
@@ -661,7 +639,7 @@ impl<'db> ClassLiteralType<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(return_ref, cycle_fn=try_mro_cycle_recover, cycle_initial=try_mro_cycle_initial)]
+    #[salsa::tracked(return_ref)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
