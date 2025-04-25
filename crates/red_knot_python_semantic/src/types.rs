@@ -6396,8 +6396,22 @@ impl<'db> FunctionType<'db> {
         Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
     }
 
-    pub(crate) fn node(self, db: &'db dyn Db) -> &'db ast::StmtFunctionDef {
-        self.body_scope(db).node(db).expect_function()
+    /// Returns the AST node for this function.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the file passed in does not match the one where this function is defined.
+    pub(crate) fn node(self, db: &'db dyn Db, file: File) -> &'db ast::StmtFunctionDef {
+        let body_scope = self.body_scope(db);
+
+        assert_eq!(
+            file,
+            body_scope.file(db),
+            "FunctionType::node() must be called with the same file as the one where \
+            the function is defined."
+        );
+
+        body_scope.node(db).expect_function()
     }
 
     /// Returns the [`FileRange`] of the function's name.
@@ -6415,6 +6429,13 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    /// Returns the [`Definition`] of this function.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency which might lead to cache invalidation.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.file(db));
