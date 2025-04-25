@@ -537,6 +537,11 @@ impl<'db> Type<'db> {
         matches!(self, Type::Never)
     }
 
+    /// Returns `true` if `self` is [`Type::Callable`].
+    pub const fn is_callable_type(&self) -> bool {
+        matches!(self, Type::Callable(..))
+    }
+
     fn is_none(&self, db: &'db dyn Db) -> bool {
         self.into_instance()
             .is_some_and(|instance| instance.class().is_known(db, KnownClass::NoneType))
@@ -6569,6 +6574,18 @@ impl<'db> CallableType<'db> {
             db,
             Signature::new(Parameters::unknown(), Some(Type::unknown())),
         )
+    }
+
+    /// Create a callable type which represents a fully-static "bottom" callable.
+    ///
+    /// Specifically, this represents a callable type with a single signature:
+    /// `(*args: object, **kwargs: object) -> Never`.
+    #[cfg(test)]
+    pub(crate) fn bottom(db: &'db dyn Db) -> Type<'db> {
+        Type::Callable(CallableType::single(
+            db,
+            Signature::new(Parameters::object(db), Some(Type::Never)),
+        ))
     }
 
     /// Return a "normalized" version of this `Callable` type.
