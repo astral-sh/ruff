@@ -170,7 +170,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
         self.protocol_members(db)
-            .is_subset(other.protocol_members(db))
+            .is_superset(other.protocol_members(db))
     }
 
     /// TODO: consider the types of the members as well as their existence
