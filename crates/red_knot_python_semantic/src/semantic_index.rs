@@ -28,6 +28,7 @@ pub mod ast_ids;
 mod builder;
 pub mod definition;
 pub mod expression;
+pub mod globals;
 mod narrowing_constraints;
 pub(crate) mod predicate;
 mod re_exports;

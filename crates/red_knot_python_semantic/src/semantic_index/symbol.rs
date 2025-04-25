@@ -16,6 +16,8 @@ use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
 use crate::semantic_index::{semantic_index, SymbolMap};
 use crate::Db;
 
+use super::globals::GlobalsId;
+
 #[derive(Eq, PartialEq, Debug)]
 pub struct Symbol {
     name: Name,
@@ -178,6 +180,7 @@ pub struct Scope {
     node: NodeWithScopeKind,
     descendants: Range<FileScopeId>,
     reachability: ScopedVisibilityConstraintId,
+    globals_id: Option<GlobalsId>,
 }
 
 impl Scope {
@@ -192,6 +195,7 @@ impl Scope {
             node,
             descendants,
             reachability,
+            globals_id: None,
         }
     }
 
@@ -221,6 +225,16 @@ impl Scope {
 
     pub(crate) fn reachability(&self) -> ScopedVisibilityConstraintId {
         self.reachability
+    }
+
+    /// Set the globals pointer for this scope.
+    pub(crate) fn set_globals_id(&mut self, globals: GlobalsId) {
+        self.globals_id = Some(globals);
+    }
+
+    /// Returns the globals pointer for this scope.
+    pub(crate) fn globals_id(&self) -> Option<GlobalsId> {
+        self.globals_id
     }
 }
 

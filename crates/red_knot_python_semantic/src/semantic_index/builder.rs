@@ -32,6 +32,7 @@ use crate::semantic_index::definition::{
     TargetKind, WithItemDefinitionKind, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::globals::Globals;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
     StarImportPlaceholderPredicate,
@@ -50,6 +51,8 @@ use crate::semantic_index::visibility_constraints::{
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
+
+use super::globals::GlobalsArena;
 
 mod except_handlers;
 
@@ -112,6 +115,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
+    globals: GlobalsArena<'db>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -149,6 +153,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             source_text: OnceCell::new(),
             semantic_checker: SemanticSyntaxChecker::default(),
             semantic_syntax_errors: RefCell::default(),
+            globals: GlobalsArena::default(),
         };
 
         builder.push_scope_with_parent(
@@ -1038,7 +1043,12 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
         let module = self.module;
-        self.visit_body(module.suite());
+        let suite = module.suite();
+        if let Some(globals) = Globals::from_body(suite) {
+            let scope_id = self.current_scope();
+            self.scopes[scope_id].set_globals_id(self.globals.push(globals));
+        }
+        self.visit_body(suite);
 
         // Pop the root scope
         self.pop_scope();
@@ -1146,6 +1156,11 @@ where
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
+                        if let Some(globals) = Globals::from_body(body) {
+                            let scope_id = builder.current_scope();
+                            builder.scopes[scope_id].set_globals_id(builder.globals.push(globals));
+                        }
+
                         builder.declare_parameters(parameters);
 
                         let mut first_parameter_name = parameters
@@ -1226,6 +1241,12 @@ where
                         }
 
                         builder.push_scope(NodeWithScopeRef::Class(class));
+
+                        if let Some(globals) = Globals::from_body(&class.body) {
+                            let scope_id = builder.current_scope();
+                            builder.scopes[scope_id].set_globals_id(builder.globals.push(globals));
+                        }
+
                         builder.visit_body(&class.body);
 
                         builder.pop_scope()
@@ -2375,9 +2396,9 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         self.source_text().as_str()
     }
 
-    // TODO(brent) handle looking up `global` bindings
-    fn global(&self, _name: &str) -> Option<TextRange> {
-        None
+    fn global(&self, name: &str) -> Option<TextRange> {
+        let global_id = self.scopes[self.current_scope()].globals_id()?;
+        self.globals[global_id].get(name)
     }
 
     fn in_async_context(&self) -> bool {

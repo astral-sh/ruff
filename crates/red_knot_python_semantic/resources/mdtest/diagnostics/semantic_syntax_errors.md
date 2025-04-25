@@ -210,12 +210,8 @@ def _():
 
 ## Load before `global` declaration
 
-This should be an error, but it's not yet.
-
-TODO implement `SemanticSyntaxContext::global`
-
 ```py
 def f():
-    x = 1
+    x = 1  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     global x
 ```
