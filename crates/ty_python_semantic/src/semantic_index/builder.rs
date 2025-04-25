@@ -1935,6 +1935,24 @@ where
                     let use_id = self.current_ast_ids().record_use(expr);
                     self.current_use_def_map_mut()
                         .record_use(symbol, use_id, node_key);
+                    // We also mark symbols in the outer scopes as used
+                    // to perform cross-scope type narrowing.
+                    for scope in self.scope_stack.iter().rev().skip(1) {
+                        if !self.scopes[scope.file_scope_id]
+                            .node()
+                            .scope_kind()
+                            .is_eager()
+                        {
+                            break;
+                        }
+                        let symbol_table = &mut self.symbol_tables[scope.file_scope_id];
+                        if let Some(symbol) = symbol_table.symbol_id_by_name(id) {
+                            symbol_table.mark_symbol_used(symbol);
+                            let use_id = self.ast_ids[scope.file_scope_id].record_use(expr);
+                            self.use_def_maps[scope.file_scope_id]
+                                .record_use(symbol, use_id, node_key);
+                        }
+                    }
                 }
 
                 if is_definition {

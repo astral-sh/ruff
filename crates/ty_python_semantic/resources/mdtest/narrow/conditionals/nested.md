@@ -42,3 +42,46 @@ def _(flag1: bool, flag2: bool):
     else:
         reveal_type(x)  # revealed: Never
 ```
+
+## Cross-scope narrowing
+
+```py
+from typing import Literal
+
+def f(x: str | None):
+    def _():
+        if x is not None:
+            reveal_type(x)  # revealed: str
+
+    class C:
+        if x is not None:
+            reveal_type(x)  # revealed: str
+
+    # TODO: should be str
+    [reveal_type(x) for _ in range(1) if x is not None]  # revealed: str | None
+
+    if x is not None:
+        def _():
+            # If there is a possibility that `x` may be rewritten after this function definition,
+            # the constraint `x is not None` outside the function is no longer be applicable for narrowing.
+            reveal_type(x)  # revealed: str | None
+
+        class C:
+            reveal_type(x)  # revealed: str
+
+        [reveal_type(x) for _ in range(1)]  # revealed: str
+
+def g(x: str | Literal[1] | None):
+    class C:
+        if x is not None:
+            def _():
+                if x != 1:
+                    reveal_type(x)  # revealed: str | None
+
+            class D:
+                if x != 1:
+                    reveal_type(x)  # revealed: str
+
+            # TODO: should be str
+            [reveal_type(x) for _ in range(1) if x != 1]  # revealed: str | Literal[1]
+```

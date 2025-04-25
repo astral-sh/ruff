@@ -5146,6 +5146,33 @@ impl<'db> TypeInferenceBuilder<'db> {
         let symbol_table = self.index.symbol_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
 
+        // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
+        let narrow_with_applicable_constraints = |mut ty, enclosing_scope_id| {
+            let mut scope = scope;
+            loop {
+                if let Some(use_id) = name_node.try_scoped_use_id(db, scope) {
+                    let use_def = self.index.use_def_map(scope.file_scope_id(db));
+                    let mut bindings = use_def.bindings_at_use(use_id);
+                    // "Unbound binding" exists even if there are no actual bindings in the scope.
+                    let first_binding = bindings.next().unwrap();
+                    let symbol_table = self.index.symbol_table(scope.file_scope_id(db));
+                    let symbol = symbol_table.symbol_id_by_name(symbol_name).unwrap();
+                    ty = first_binding.narrowing_constraint.narrow(db, ty, symbol);
+                }
+                // Constraints outside a lazy scope are not applicable.
+                // TODO: If the symbol has never been rewritten, it is applicable.
+                if !scope.node(db).scope_kind().is_eager() || scope == enclosing_scope_id {
+                    break;
+                }
+                if let Some(parent) = scope.scope(db).parent() {
+                    scope = parent.to_scope_id(db, self.file());
+                } else {
+                    break;
+                }
+            }
+            ty
+        };
+
         // If we're inferring types of deferred expressions, always treat them as public symbols
         let local_scope_symbol = if self.is_deferred() {
             if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
@@ -5222,7 +5249,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         file_scope_id,
                     ) {
                         EagerBindingsResult::Found(bindings) => {
-                            return symbol_from_bindings(db, bindings).into();
+                            return symbol_from_bindings(db, bindings)
+                                .map_type(|ty| {
+                                    narrow_with_applicable_constraints(ty, enclosing_scope_id)
+                                })
+                                .into();
                         }
                         // There are no visible bindings here.
                         // Don't fall back to non-eager symbol resolution.
@@ -5244,7 +5275,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // runtime, it is the scope that creates the cell for our closure.) If the name
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
-                    return symbol(db, enclosing_scope_id, symbol_name);
+                    return symbol(db, enclosing_scope_id, symbol_name)
+                        .map_type(|ty| narrow_with_applicable_constraints(ty, enclosing_scope_id));
                 }
             }
 

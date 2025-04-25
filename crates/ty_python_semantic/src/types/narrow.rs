@@ -1,5 +1,4 @@
 use crate::semantic_index::ast_ids::HasScopedExpressionId;
-use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::predicate::{
     PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
@@ -40,7 +39,7 @@ use super::UnionType;
 pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
-    definition: Definition<'db>,
+    symbol: ScopedSymbolId,
 ) -> Option<Type<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
@@ -60,7 +59,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
-        constraints.get(&definition.symbol(db)).copied()
+        constraints.get(&symbol).copied()
     } else {
         None
     }
