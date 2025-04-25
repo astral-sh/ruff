@@ -997,7 +997,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .iter()
             .filter_map(|(definition, ty)| {
                 // Filter out function literals that result from anything other than a function
-                // definition e.g., imports.
+                // definition e.g., imports which would create a cross-module AST dependency.
                 if !matches!(definition.kind(self.db()), DefinitionKind::Function(_)) {
                     return None;
                 }
@@ -1030,9 +1030,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 continue;
             };
 
-            let function_node = function.node(self.db());
-
             if overloaded.overloads.len() < 2 {
+                let function_node = function.node(self.db());
                 if let Some(builder) = self
                     .context
                     .report_lint(&INVALID_OVERLOAD, &function_node.name)
@@ -4400,7 +4399,13 @@ impl<'db> TypeInferenceBuilder<'db> {
         let callable_type = self.infer_expression(func);
 
         if let Type::FunctionLiteral(function) = callable_type {
-            if function.definition(self.db()).scope(self.db()) == self.scope() {
+            // Make sure that the `function.definition` is only called when the function is defined
+            // in the same file as the one we're currently inferring the types for. This is because
+            // the `definition` method accesses the semantic index, which could create a
+            // cross-module AST dependency.
+            if function.body_scope(self.db()).file(self.db()) == self.file()
+                && function.definition(self.db()).scope(self.db()) == self.scope()
+            {
                 self.called_functions.insert(function);
             }
         }
