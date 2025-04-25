@@ -545,6 +545,8 @@ pub(super) struct TypeInferenceBuilder<'db> {
     /// def foo(x: int) -> int:
     ///     return x
     /// ```
+    ///
+    /// [`check_overloaded_functions`]: TypeInferenceBuilder::check_overloaded_functions
     called_functions: FxHashSet<FunctionType<'db>>,
 
     /// The deferred state of inferring types of certain expressions within the region.
