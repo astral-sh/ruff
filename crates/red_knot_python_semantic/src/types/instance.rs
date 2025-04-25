@@ -7,7 +7,7 @@ use crate::{Db, FxOrderSet};
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.is_protocol(db) {
+        if class.known(db).is_some_and(KnownClass::is_protocol) {
             Self::ProtocolInstance(ProtocolInstanceType(Protocol::FromClass(class)))
         } else {
             Self::NominalInstance(NominalInstanceType { class })

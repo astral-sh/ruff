@@ -144,9 +144,9 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
-        self.class_literal(db).0.is_protocol(db)
-    }
+    // pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+    //     self.class_literal(db).0.is_protocol(db)
+    // }
 
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         let (class_literal, _) = self.class_literal(db);
@@ -1891,9 +1891,26 @@ pub enum KnownClass {
     TypeAliasType,
     NoDefaultType,
     NewType,
-    Sized,
-    // TODO: This can probably be removed when we have support for protocols
+    // TODO: These can probably be removed when we have support for protocols
     SupportsIndex,
+    Sized,
+    SupportsInt,
+    SupportsFloat,
+    SupportsComplex,
+    SupportsBytes,
+    Hashable,
+    SupportsAbs,
+    SupportsRound,
+    Awaitable,
+    Iterable,
+    Iterator,
+    Generator,
+    Reversible,
+    AsyncIterable,
+    AsyncIterator,
+    AsyncGenerator,
+    Container,
+    Collection,
     // Collections
     ChainMap,
     Counter,
@@ -1957,7 +1974,27 @@ impl<'db> KnownClass {
             | Self::GenericAlias
             | Self::NewType
             | Self::StdlibAlias
+
             | Self::SupportsIndex
+            | Self::SupportsInt
+            | Self::SupportsFloat
+            | Self::SupportsComplex
+            | Self::SupportsBytes
+            | Self::Hashable
+            | Self::Sized
+            | Self::SupportsAbs
+            | Self::SupportsRound
+            | Self::Awaitable
+            | Self::Iterable
+            | Self::Iterator
+            | Self::Generator
+            | Self::Reversible
+            | Self::AsyncIterable
+            | Self::AsyncIterator
+            | Self::AsyncGenerator
+            | Self::Container
+            | Self::Collection
+
             | Self::Set
             | Self::Tuple
             | Self::Int
@@ -1976,7 +2013,6 @@ impl<'db> KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::Float
-            | Self::Sized
             | Self::Enum
             | Self::ABCMeta
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
@@ -2027,12 +2063,31 @@ impl<'db> KnownClass {
             Self::TypeAliasType => "TypeAliasType",
             Self::NoDefaultType => "_NoDefaultType",
             Self::NewType => "NewType",
+
             Self::SupportsIndex => "SupportsIndex",
+            Self::SupportsInt => "SupportsInt",
+            Self::SupportsFloat => "SupportsFloat",
+            Self::SupportsComplex => "SupportsComplex",
+            Self::SupportsBytes => "SupportsBytes",
+            Self::Hashable => "Hashable",
+            Self::Sized => "Sized",
+            Self::SupportsAbs => "SupportsAbs",
+            Self::SupportsRound => "SupportsRound",
+            Self::Awaitable => "Awaitable",
+            Self::Iterable => "Iterable",
+            Self::Iterator => "Iterator",
+            Self::Generator => "Generator",
+            Self::Reversible => "Reversible",
+            Self::AsyncIterable => "AsyncIterable",
+            Self::AsyncIterator => "AsyncIterator",
+            Self::AsyncGenerator => "AsyncGenerator",
+            Self::Container => "Container",
+            Self::Collection => "Collection",
+
             Self::ChainMap => "ChainMap",
             Self::Counter => "Counter",
             Self::DefaultDict => "defaultdict",
             Self::Deque => "deque",
-            Self::Sized => "Sized",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
             Self::ABCMeta => "ABCMeta",
@@ -2207,6 +2262,23 @@ impl<'db> KnownClass {
             | Self::TypeVar
             | Self::StdlibAlias
             | Self::SupportsIndex
+            | Self::SupportsInt
+            | Self::SupportsFloat
+            | Self::SupportsComplex
+            | Self::SupportsBytes
+            | Self::Hashable
+            | Self::SupportsAbs
+            | Self::SupportsRound
+            | Self::Awaitable
+            | Self::Iterable
+            | Self::Iterator
+            | Self::Generator
+            | Self::Reversible
+            | Self::AsyncIterable
+            | Self::AsyncIterator
+            | Self::AsyncGenerator
+            | Self::Container
+            | Self::Collection
             | Self::Sized => KnownModule::Typing,
             Self::TypeAliasType
             | Self::TypeVarTuple
@@ -2289,13 +2361,30 @@ impl<'db> KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::SupportsIndex
+            | Self::SupportsInt
+            | Self::SupportsFloat
+            | Self::SupportsComplex
+            | Self::SupportsBytes
+            | Self::Hashable
+            | Self::Sized
+            | Self::SupportsAbs
+            | Self::SupportsRound
+            | Self::Awaitable
+            | Self::Iterable
+            | Self::Iterator
+            | Self::Generator
+            | Self::Reversible
+            | Self::AsyncIterable
+            | Self::AsyncIterator
+            | Self::AsyncGenerator
+            | Self::Container
+            | Self::Collection
             | Self::StdlibAlias
             | Self::TypeVar
             | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::Sized
             | Self::Enum
             | Self::ABCMeta
             | Self::Super
@@ -2347,6 +2436,24 @@ impl<'db> KnownClass {
             | Self::OrderedDict
             | Self::StdlibAlias
             | Self::SupportsIndex
+            | Self::SupportsInt
+            | Self::SupportsFloat
+            | Self::SupportsComplex
+            | Self::SupportsBytes
+            | Self::Hashable
+            | Self::Sized
+            | Self::SupportsAbs
+            | Self::SupportsRound
+            | Self::Awaitable
+            | Self::Iterable
+            | Self::Iterator
+            | Self::Generator
+            | Self::Reversible
+            | Self::AsyncIterable
+            | Self::AsyncIterator
+            | Self::AsyncGenerator
+            | Self::Container
+            | Self::Collection
             | Self::BaseException
             | Self::BaseExceptionGroup
             | Self::Classmethod
@@ -2355,7 +2462,6 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::Sized
             | Self::Enum
             | Self::ABCMeta
             | Self::Super
@@ -2416,8 +2522,27 @@ impl<'db> KnownClass {
             "_Alias" => Self::StdlibAlias,
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
+
             "SupportsIndex" => Self::SupportsIndex,
             "Sized" => Self::Sized,
+            "SupportsInt" => Self::SupportsInt,
+            "SupportsFloat" => Self::SupportsFloat,
+            "SupportsComplex" => Self::SupportsComplex,
+            "SupportsBytes" => Self::SupportsBytes,
+            "Hashable" => Self::Hashable,
+            "SupportsAbs" => Self::SupportsAbs,
+            "SupportsRound" => Self::SupportsRound,
+            "Awaitable" => Self::Awaitable,
+            "Iterable" => Self::Iterable,
+            "Iterator" => Self::Iterator,
+            "Generator" => Self::Generator,
+            "Reversible" => Self::Reversible,
+            "AsyncIterable" => Self::AsyncIterable,
+            "AsyncIterator" => Self::AsyncIterator,
+            "AsyncGenerator" => Self::AsyncGenerator,
+            "Container" => Self::Container,
+            "Collection" => Self::Collection,
+
             "Enum" => Self::Enum,
             "ABCMeta" => Self::ABCMeta,
             "super" => Self::Super,
@@ -2485,13 +2610,107 @@ impl<'db> KnownClass {
             | Self::TypeVar
             | Self::TypeAliasType
             | Self::NoDefaultType
+
             | Self::SupportsIndex
+            | Self::SupportsInt
+            | Self::SupportsFloat
+            | Self::SupportsComplex
+            | Self::SupportsBytes
+            | Self::Hashable
+            | Self::Sized
+            | Self::SupportsAbs
+            | Self::SupportsRound
+            | Self::Awaitable
+            | Self::Iterable
+            | Self::Iterator
+            | Self::Generator
+            | Self::Reversible
+            | Self::AsyncIterable
+            | Self::AsyncIterator
+            | Self::AsyncGenerator
+            | Self::Container
+            | Self::Collection
+
             | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::Sized
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
+        }
+    }
+
+    pub(super) const fn is_protocol(self) -> bool {
+        match self {
+            Self::SupportsBytes
+            | Self::SupportsIndex
+            | Self::SupportsInt
+            | Self::SupportsFloat
+            | Self::SupportsComplex
+            | Self::Hashable
+            | Self::SupportsAbs
+            | Self::SupportsRound
+            | Self::Awaitable
+            | Self::Iterable
+            | Self::Iterator
+            | Self::Generator
+            | Self::Reversible
+            | Self::AsyncIterable
+            | Self::AsyncIterator
+            | Self::AsyncGenerator
+            | Self::Container
+            | Self::Collection
+            | Self::Sized => true,
+
+            Self::Any
+            | Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Type
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::Str
+            | Self::List
+            | Self::Tuple
+            | Self::Set
+            | Self::FrozenSet
+            | Self::Dict
+            | Self::Slice
+            | Self::Range
+            | Self::Property
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::UnionType
+            | Self::BaseException
+            | Self::BaseExceptionGroup
+            | Self::Classmethod
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::TypeVarTuple
+            | Self::TypeAliasType
+            | Self::NoDefaultType
+            | Self::NewType
+            | Self::Enum
+            | Self::ABCMeta
+            | Self::Super
+            | Self::StdlibAlias
+            | Self::VersionInfo
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::NoneType
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::WrapperDescriptorType => false,
         }
     }
 }
