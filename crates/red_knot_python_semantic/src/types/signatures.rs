@@ -934,6 +934,19 @@ impl<'db> Parameters<'db> {
         }
     }
 
+    /// Return parameters that represents `(*args: object, **kwargs: object)`.
+    #[cfg(test)]
+    pub(crate) fn object(db: &'db dyn Db) -> Self {
+        Self {
+            value: vec![
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object(db)),
+                Parameter::keyword_variadic(Name::new_static("kwargs"))
+                    .with_annotated_type(Type::object(db)),
+            ],
+            is_gradual: false,
+        }
+    }
+
     fn from_parameters(
         db: &'db dyn Db,
         definition: Definition<'db>,
