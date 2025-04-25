@@ -26,7 +26,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `Bad` is not iterable because its `__iter__` method returns an object of type `int`, which has no `__next__` method
+error: lint:not-iterable: Object of type `Bad` is not iterable
  --> /src/mdtest_snippet.py:8:10
   |
 7 | # error: [not-iterable]
@@ -34,6 +34,7 @@ error: lint:not-iterable: Object of type `Bad` is not iterable because its `__it
   |          ^^^^^
 9 |     reveal_type(x)  # revealed: Unknown
   |
+info: Its `__iter__` method returns an object of type `int`, which has no `__next__` method
 
 ```
 

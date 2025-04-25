@@ -33,7 +33,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `NotIterable` is not iterable because its `__iter__` attribute has type `int | None`, which is not callable
+error: lint:not-iterable: Object of type `NotIterable` is not iterable
   --> /src/mdtest_snippet.py:11:14
    |
 10 |     # error: [not-iterable]
@@ -41,6 +41,7 @@ error: lint:not-iterable: Object of type `NotIterable` is not iterable because i
    |              ^^^^^^^^^^^^^
 12 |         pass
    |
+info: Its `__iter__` attribute has type `int | None`, which is not callable
 
 ```
 
