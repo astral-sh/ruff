@@ -62,23 +62,6 @@ fn explicit_bases_cycle_initial<'db>(
     Box::default()
 }
 
-#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
-fn inheritance_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<InheritanceCycle>,
-    _count: u32,
-    _self: ClassLiteralType<'db>,
-) -> salsa::CycleRecoveryAction<Option<InheritanceCycle>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn inheritance_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: ClassLiteralType<'db>,
-) -> Option<InheritanceCycle> {
-    None
-}
-
 /// Representation of a class definition statement in the AST. This does not in itself represent a
 /// type, but is used as the inner data for several structs that *do* represent types.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update)]
@@ -1661,7 +1644,7 @@ impl<'db> ClassLiteralType<'db> {
     ///
     /// A class definition like this will fail at runtime,
     /// but we must be resilient to it or we could panic.
-    #[salsa::tracked(cycle_fn=inheritance_cycle_recover, cycle_initial=inheritance_cycle_initial)]
+    #[salsa::tracked]
     pub(super) fn inheritance_cycle(self, db: &'db dyn Db) -> Option<InheritanceCycle> {
         /// Return `true` if the class is cyclically defined.
         ///
