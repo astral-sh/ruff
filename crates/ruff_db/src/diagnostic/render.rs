@@ -286,8 +286,7 @@ impl<'a> ResolvedAnnotation<'a> {
         let source = input.as_source_code();
         let (range, line_start, line_end) = match (ann.span.range(), ann.message.is_some()) {
             // An annotation with no range AND no message is probably(?)
-            // meaningless, so just ignore it.
-            (None, false) => return None,
+            // meaningless, but we should try to render it anyway.
             (None, _) => (
                 TextRange::empty(TextSize::new(0)),
                 OneIndexed::MIN,
@@ -810,6 +809,50 @@ watermelon
           | ^^^^^^^^
         6 | finch
         7 | gorilla
+          |
+        ",
+        );
+    }
+
+    #[test]
+    fn no_range() {
+        let mut env = TestEnvironment::new();
+        env.add("animals", ANIMALS);
+
+        let mut builder = env.err();
+        builder
+            .diag
+            .annotate(Annotation::primary(builder.env.path("animals")));
+        let diag = builder.build();
+        insta::assert_snapshot!(
+            env.render(&diag),
+            @r"
+        error: lint:test-diagnostic: main diagnostic message
+         --> /animals:1:1
+          |
+        1 | aardvark
+          | ^
+        2 | beetle
+        3 | canary
+          |
+        ",
+        );
+
+        let mut builder = env.err();
+        builder.diag.annotate(
+            Annotation::primary(builder.env.path("animals")).message("primary annotation message"),
+        );
+        let diag = builder.build();
+        insta::assert_snapshot!(
+            env.render(&diag),
+            @r"
+        error: lint:test-diagnostic: main diagnostic message
+         --> /animals:1:1
+          |
+        1 | aardvark
+          | ^ primary annotation message
+        2 | beetle
+        3 | canary
           |
         ",
         );
@@ -2082,10 +2125,10 @@ watermelon
         /// otherwise, the span will end where the next line begins, and this
         /// confuses `ruff_annotate_snippets` as of 2025-03-13.)
         fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
-            let file = system_path_to_file(&self.db, path).unwrap();
+            let span = self.path(path);
 
-            let text = source_text(&self.db, file);
-            let line_index = line_index(&self.db, file);
+            let text = source_text(&self.db, span.file());
+            let line_index = line_index(&self.db, span.file());
             let source = SourceCode::new(text.as_str(), &line_index);
 
             let (line_start, offset_start) = parse_line_offset(line_offset_start);
@@ -2099,7 +2142,13 @@ watermelon
                 None => source.line_end(line_end) - TextSize::from(1),
                 Some(offset) => source.line_start(line_end) + offset,
             };
-            Span::from(file).with_range(TextRange::new(start, end))
+            span.with_range(TextRange::new(start, end))
+        }
+
+        /// Like `span`, but only attaches a file path.
+        fn path(&self, path: &str) -> Span {
+            let file = system_path_to_file(&self.db, path).unwrap();
+            Span::from(file)
         }
 
         /// A convenience function for returning a builder for a diagnostic
