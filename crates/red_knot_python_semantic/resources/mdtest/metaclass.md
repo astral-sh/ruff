@@ -53,6 +53,25 @@ class B(A): ...
 reveal_type(B.__class__)  # revealed: Literal[M]
 ```
 
+## Linear inheritance with PEP 695 generic class
+
+The same is true if the base with the metaclass is a generic class.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class M(type): ...
+class A[T](metaclass=M): ...
+class B(A): ...
+class C(A[int]): ...
+
+reveal_type(B.__class__)  # revealed: Literal[M]
+reveal_type(C.__class__)  # revealed: Literal[M]
+```
+
 ## Conflict (1)
 
 The metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all its

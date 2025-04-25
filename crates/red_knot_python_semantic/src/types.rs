@@ -688,20 +688,21 @@ impl<'db> Type<'db> {
         matches!(self, Type::ClassLiteral(..))
     }
 
-    pub const fn into_class_type(self) -> Option<ClassType<'db>> {
+    /// Turn a class literal (`Type::ClassLiteral` or `Type::GenericAlias`) into a `ClassType`.
+    /// Since a `ClassType` must be specialized, apply the default specialization to any
+    /// unspecialized generic class literal.
+    pub fn to_class_type(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
-            Type::ClassLiteral(ClassLiteralType::NonGeneric(non_generic)) => {
-                Some(ClassType::NonGeneric(non_generic))
-            }
+            Type::ClassLiteral(class_literal) => Some(class_literal.default_specialization(db)),
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
             _ => None,
         }
     }
 
     #[track_caller]
-    pub fn expect_class_type(self) -> ClassType<'db> {
-        self.into_class_type()
-            .expect("Expected a Type::GenericAlias or non-generic Type::ClassLiteral variant")
+    pub fn expect_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+        self.to_class_type(db)
+            .expect("Expected a Type::GenericAlias or Type::ClassLiteral variant")
     }
 
     pub const fn is_class_type(&self) -> bool {

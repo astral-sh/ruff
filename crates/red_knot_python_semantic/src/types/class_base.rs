@@ -62,7 +62,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
             .to_class_literal(db)
-            .into_class_type()
+            .to_class_type(db)
             .map_or(Self::unknown(), Self::Class)
     }
 
