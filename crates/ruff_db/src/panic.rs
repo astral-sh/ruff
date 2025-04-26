@@ -36,7 +36,7 @@ fn install_hook() {
     ONCE.get_or_init(|| {
         let prev = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            OUR_HOOK_RAN.with(|cell| cell.set(true));
+            OUR_HOOK_RAN.set(true);
             let should_capture = CAPTURE_PANIC_INFO.with(Cell::get);
             if !should_capture {
                 return (*prev)(info);
@@ -47,12 +47,19 @@ fn install_hook() {
                 info.payload().downcast_ref::<String>().cloned()
             };
             let location = info.location().map(Location::to_string);
-            let backtrace = std::backtrace::Backtrace::force_capture();
+
+            let backtrace = if info.payload().downcast_ref::<salsa::Cancelled>().is_some() {
+                // Don't capture a backtrace for cancelled queries because we suppress does anyway.
+                None
+            } else {
+                Some(std::backtrace::Backtrace::force_capture())
+            };
+
             LAST_PANIC.with(|cell| {
                 cell.set(Some(PanicError {
                     payload,
                     location,
-                    backtrace: Some(backtrace),
+                    backtrace,
                 }));
             });
         }));
@@ -78,15 +85,15 @@ where
     F: FnOnce() -> R + std::panic::UnwindSafe,
 {
     install_hook();
-    OUR_HOOK_RAN.with(|cell| cell.set(false));
-    let prev_should_capture = CAPTURE_PANIC_INFO.with(|cell| cell.replace(true));
+    OUR_HOOK_RAN.set(false);
+    let prev_should_capture = CAPTURE_PANIC_INFO.replace(true);
     let result = std::panic::catch_unwind(f).map_err(|_| {
-        let our_hook_ran = OUR_HOOK_RAN.with(Cell::get);
+        let our_hook_ran = OUR_HOOK_RAN.get();
         if !our_hook_ran {
             panic!("detected a competing panic hook");
         }
         LAST_PANIC.with(Cell::take).unwrap_or_default()
     });
-    CAPTURE_PANIC_INFO.with(|cell| cell.set(prev_should_capture));
+    CAPTURE_PANIC_INFO.set(prev_should_capture);
     result
 }
