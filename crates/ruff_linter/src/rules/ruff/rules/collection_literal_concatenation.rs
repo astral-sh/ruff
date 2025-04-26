@@ -37,7 +37,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 ///
 /// The fix is always marked as unsafe because the `+` operator uses the `__add__` magic method and
 /// `*`-unpacking uses the `__iter__` magic method. Both of these could have custom
-/// implementations making the fix changing the program behaviour.
+/// implementations, causing the fix to change program behaviour.
 ///
 /// ## References
 /// - [PEP 448 – Additional Unpacking Generalizations](https://peps.python.org/pep-0448/)
