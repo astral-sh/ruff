@@ -201,7 +201,9 @@ fn match_sources<'a>(
         }
         MatchSourceStrategy::FullPath => {
             let relative_path: PathBuf = name.split('.').collect();
-            relative_path.components().next()?;
+            if relative_path.components().next().is_none() {
+                return None;
+            }
             for root in paths {
                 let candidate = root.join(&relative_path);
                 if candidate.is_dir() {
