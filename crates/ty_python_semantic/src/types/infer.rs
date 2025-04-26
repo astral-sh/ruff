@@ -5408,13 +5408,16 @@ impl<'db> TypeInferenceBuilder<'db> {
             let db = self.db();
             let scope = self.scope();
 
-            let use_id = name.scoped_use_id(db, scope);
-            let use_def = use_def_map(db, scope);
-            let mut bindings = use_def.bindings_at_use(use_id);
-            let binding = bindings.next().unwrap();
-            binding
-                .narrowing_constraint
-                .narrow(db, ty, DefinitionTarget::Expr(target))
+            if let Some(use_id) = name.try_scoped_use_id(db, scope) {
+                let use_def = use_def_map(db, scope);
+                let mut bindings = use_def.bindings_at_use(use_id);
+                let binding = bindings.next().unwrap();
+                binding
+                    .narrowing_constraint
+                    .narrow(db, ty, DefinitionTarget::Expr(target))
+            } else {
+                ty
+            }
         } else {
             ty
         }

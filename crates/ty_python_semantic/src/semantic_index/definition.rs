@@ -546,7 +546,7 @@ impl DefinitionTarget<'_> {
     ///
     /// A definition target would mainly be the node representing the symbol being defined i.e.,
     /// [`ast::ExprName`] or [`ast::Identifier`] but could also be other nodes.
-    pub(crate) fn range(&self) -> TextRange {
+    pub(crate) fn range(self) -> TextRange {
         match self {
             Self::Ident(ident) => ident.range,
             Self::Expr(expr) => expr.range(),
