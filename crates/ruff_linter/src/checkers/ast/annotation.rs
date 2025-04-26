@@ -1,4 +1,4 @@
-use ruff_python_ast::StmtFunctionDef;
+use ruff_python_ast::{PythonVersion, StmtFunctionDef};
 use ruff_python_semantic::{ScopeKind, SemanticModel};
 
 use crate::rules::flake8_type_checking;
@@ -29,7 +29,11 @@ pub(super) enum AnnotationContext {
 impl AnnotationContext {
     /// Determine the [`AnnotationContext`] for an annotation based on the current scope of the
     /// semantic model.
-    pub(super) fn from_model(semantic: &SemanticModel, settings: &LinterSettings) -> Self {
+    pub(super) fn from_model(
+        semantic: &SemanticModel,
+        settings: &LinterSettings,
+        version: PythonVersion,
+    ) -> Self {
         // If the annotation is in a class scope (e.g., an annotated assignment for a
         // class field) or a function scope, and that class or function is marked as
         // runtime-required, treat the annotation as runtime-required.
@@ -59,7 +63,7 @@ impl AnnotationContext {
         // If `__future__` annotations are enabled or it's a stub file,
         // then annotations are never evaluated at runtime,
         // so we can treat them as typing-only.
-        if semantic.future_annotations_or_stub() {
+        if semantic.future_annotations_or_stub() || version.defers_annotations() {
             return Self::TypingOnly;
         }
 
@@ -81,6 +85,7 @@ impl AnnotationContext {
         function_def: &StmtFunctionDef,
         semantic: &SemanticModel,
         settings: &LinterSettings,
+        version: PythonVersion,
     ) -> Self {
         if flake8_type_checking::helpers::runtime_required_function(
             function_def,
@@ -88,7 +93,7 @@ impl AnnotationContext {
             semantic,
         ) {
             Self::RuntimeRequired
-        } else if semantic.future_annotations_or_stub() {
+        } else if semantic.future_annotations_or_stub() || version.defers_annotations() {
             Self::TypingOnly
         } else {
             Self::RuntimeEvaluated
