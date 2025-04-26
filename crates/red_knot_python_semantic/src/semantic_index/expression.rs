@@ -53,7 +53,6 @@ pub(crate) struct Expression<'db> {
     /// to the target, and so have `None` for this field.)
     #[no_eq]
     #[tracked]
-    #[return_ref]
     pub(crate) assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
 
     /// Should this expression be inferred as a normal expression or a type expression?

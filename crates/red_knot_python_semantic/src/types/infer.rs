@@ -4632,14 +4632,16 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 KnownClass::TypeVar => {
                                     let assigned_to = (self.index)
                                         .try_expression(call_expression_node)
-                                        .and_then(|expr| expr.assigned_to(self.db()).as_ref());
+                                        .and_then(|expr| expr.assigned_to(self.db()));
 
-                                    let Some(target) = assigned_to.and_then(|assigned_to| {
-                                        match assigned_to.node().targets.as_slice() {
-                                            [ast::Expr::Name(target)] => Some(target),
-                                            _ => None,
-                                        }
-                                    }) else {
+                                    let Some(target) =
+                                        assigned_to.as_ref().and_then(|assigned_to| {
+                                            match assigned_to.node().targets.as_slice() {
+                                                [ast::Expr::Name(target)] => Some(target),
+                                                _ => None,
+                                            }
+                                        })
+                                    else {
                                         if let Some(builder) = self.context.report_lint(
                                             &INVALID_LEGACY_TYPE_VARIABLE,
                                             call_expression,
@@ -4660,8 +4662,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                     let name_param = name_param
                                         .into_string_literal()
                                         .map(|name| name.value(self.db()).as_ref());
-                                    if !name_param.is_some_and(|name_param| name_param == target.id)
-                                    {
+                                    if name_param.is_none_or(|name_param| name_param != target.id) {
                                         if let Some(builder) = self.context.report_lint(
                                             &INVALID_LEGACY_TYPE_VARIABLE,
                                             call_expression,
