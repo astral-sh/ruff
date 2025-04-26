@@ -597,7 +597,7 @@ where
                 file = file.path(db)
             );
 
-            if let Some(payload) = error.payload {
+            if let Some(payload) = error.payload.as_str() {
                 let _ = write!(&mut message, ": `{payload}`");
             }
 
@@ -609,6 +609,21 @@ where
 
             let report_message = "If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bred-knot%5D:%20panic we'd be very appreciative!";
             diagnostic.sub(SubDiagnostic::new(Severity::Info, report_message));
+            diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                format!(
+                    "Platform: {os} {arch}",
+                    os = std::env::consts::OS,
+                    arch = std::env::consts::ARCH
+                ),
+            ));
+            diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                format!(
+                    "Args: {args:?}",
+                    args = std::env::args().collect::<Vec<_>>()
+                ),
+            ));
 
             if let Some(backtrace) = error.backtrace {
                 diagnostic.sub(SubDiagnostic::new(
