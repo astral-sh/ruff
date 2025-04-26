@@ -32,6 +32,11 @@ reveal_type(T.__name__)  # revealed: Literal["T"]
 ```py
 from typing import TypeVar
 
+T = TypeVar("T")
+# TODO: no error
+# error: [invalid-legacy-type-variable]
+U: TypeVar = TypeVar("U")
+
 # error: [invalid-legacy-type-variable] "A legacy `typing.TypeVar` must be immediately assigned to a variable"
 TestList = list[TypeVar("W")]
 ```
