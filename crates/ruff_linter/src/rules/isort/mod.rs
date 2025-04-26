@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use annotate::annotate_imports;
 use block::{Block, Trailer};
 pub(crate) use categorize::categorize;
-use categorize::{categorize_imports, MatchSourceStrategy};
+use categorize::categorize_imports;
 pub use categorize::{ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
@@ -173,12 +173,6 @@ fn format_import_block(
         Inserted,
     }
 
-    // Categorize by type (e.g., first-party vs. third-party).
-    let match_source_strategy = if preview.is_enabled() {
-        MatchSourceStrategy::FullPath
-    } else {
-        MatchSourceStrategy::Root
-    };
     let mut block_by_type = categorize_imports(
         block,
         src,
@@ -189,7 +183,7 @@ fn format_import_block(
         settings.no_sections,
         &settings.section_order,
         &settings.default_section,
-        match_source_strategy,
+        preview,
     );
 
     let mut output = String::new();
