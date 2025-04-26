@@ -56,6 +56,7 @@ impl TryFrom<ast::PythonVersion> for PythonVersion {
             ast::PythonVersion::PY311 => Ok(Self::Py311),
             ast::PythonVersion::PY312 => Ok(Self::Py312),
             ast::PythonVersion::PY313 => Ok(Self::Py313),
+            ast::PythonVersion::PY314 => Ok(Self::Py314),
             _ => Err(format!("unrecognized python version {value}")),
         }
     }
