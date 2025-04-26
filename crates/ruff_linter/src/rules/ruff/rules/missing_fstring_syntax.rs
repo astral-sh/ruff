@@ -55,8 +55,8 @@ use crate::Locator;
 ///
 /// ## Fix safety
 ///
-/// The fix is always marked as unsafe, because it is possible to find a string literal which
-/// doesn't fall in one of the cases listed in the `details` section.
+/// This fix will always change the behavior of the program and, despite the precautions detailed
+/// above, this may be undesired. As such the fix is always marked as unsafe.
 ///
 /// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [gettext]: https://docs.python.org/3/library/gettext.html
