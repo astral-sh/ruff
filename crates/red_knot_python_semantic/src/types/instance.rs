@@ -138,12 +138,8 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        let members = self.protocol_members(db);
         let object = KnownClass::Object.to_instance(db);
-        if members
-            .iter()
-            .all(|member| !object.member(db, member).symbol.is_unbound())
-        {
+        if object.satisfies_protocol(db, self) {
             return object;
         }
         match self.0 {
@@ -180,7 +176,7 @@ impl<'db> ProtocolInstanceType<'db> {
 
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.protocol_members(db).set_eq(other.protocol_members(db))
+        self.normalized(db) == other.normalized(db)
     }
 
     /// TODO: consider the types of the members as well as their existence
