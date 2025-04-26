@@ -105,19 +105,6 @@ pub(crate) struct CheckCommand {
     /// Watch files for changes and recheck files related to the changed files.
     #[arg(long, short = 'W')]
     pub(crate) watch: bool,
-
-    /// Respect file exclusions via `.gitignore` and other standard ignore files.
-    /// Use `--no-respect-gitignore` to disable.
-    #[arg(
-        long,
-        overrides_with("no_respect_ignore_files"),
-        help_heading = "File selection",
-        default_missing_value = "true",
-        num_args = 0..1
-    )]
-    respect_ignore_files: Option<bool>,
-    #[clap(long, overrides_with("respect_ignore_files"), hide = true)]
-    no_respect_ignore_files: bool,
 }
 
 impl CheckCommand {
@@ -133,13 +120,6 @@ impl CheckCommand {
             )
         };
 
-        // --no-respect-gitignore defaults to false and is set true by CLI flag. If passed, override config file
-        // Otherwise, only pass this through if explicitly set (don't default to anything here to
-        // make sure that doesn't take precedence over an explicitly-set config file value)
-        let respect_ignore_files = self
-            .no_respect_ignore_files
-            .then_some(false)
-            .or(self.respect_ignore_files);
         Options {
             environment: Some(EnvironmentOptions {
                 python_version: self
@@ -164,7 +144,6 @@ impl CheckCommand {
                 error_on_warning: self.error_on_warning,
             }),
             rules,
-            respect_ignore_files,
             ..Default::default()
         }
     }
