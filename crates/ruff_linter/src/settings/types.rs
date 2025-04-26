@@ -34,6 +34,7 @@ pub enum PythonVersion {
     Py311,
     Py312,
     Py313,
+    Py314,
 }
 
 impl Default for PythonVersion {
@@ -84,6 +85,7 @@ impl PythonVersion {
             Self::Py311 => (3, 11),
             Self::Py312 => (3, 12),
             Self::Py313 => (3, 13),
+            Self::Py314 => (3, 14),
         }
     }
 }
