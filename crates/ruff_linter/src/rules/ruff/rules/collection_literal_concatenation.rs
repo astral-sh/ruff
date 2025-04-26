@@ -36,7 +36,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// ## Fix safety
 ///
 /// The fix is always marked as unsafe because the `+` operator uses the `__add__` magic method and
-/// the `*` uses the `__iter__` magic method, and these two could have custom
+/// `*`-unpacking uses the `__iter__` magic method. Both of these could have custom
 /// implementations making the fix changing the program behaviour.
 ///
 /// ## References
