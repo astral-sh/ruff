@@ -34,6 +34,10 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 /// async def func():
 ///     await trio.sleep_forever()
 /// ```
+///
+/// ## Fix safety
+///
+/// This fix is marked as unsafe as it changes program behavior.
 #[derive(ViolationMetadata)]
 pub(crate) struct LongSleepNotForever {
     module: AsyncModule,
