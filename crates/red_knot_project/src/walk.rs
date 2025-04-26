@@ -129,7 +129,10 @@ impl<'a> ProjectFilesWalker<'a> {
     {
         let mut paths = paths.into_iter();
 
-        let mut walker = db.system().walk_directory(paths.next()?.as_ref());
+        let mut walker = db
+            .system()
+            .walk_directory(paths.next()?.as_ref())
+            .standard_filters(db.project().settings(db).respect_ignore_files());
 
         for path in paths {
             walker = walker.add(path);
