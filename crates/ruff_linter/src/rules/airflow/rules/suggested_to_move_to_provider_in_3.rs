@@ -41,6 +41,9 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
             replacement,
         } = self;
         match replacement {
+            ProviderReplacement::None => {
+                format!("`{deprecated}` is removed in Airflow 3.0")
+            }
             ProviderReplacement::ProviderName {
                 name: _,
                 provider,
@@ -62,18 +65,19 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
     fn fix_title(&self) -> Option<String> {
         let Airflow3SuggestedToMoveToProvider { replacement, .. } = self;
         match replacement {
-         ProviderReplacement::ProviderName {
-            name,
-            provider,
-            version,
-        } => {
-            Some(format!(
-                "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` instead."
-            ))
-        },
-        ProviderReplacement::SourceModuleMovedToProvider {
+            ProviderReplacement::None => None,
+            ProviderReplacement::ProviderName {
                 name,
+                provider,
+                version,
+            } => {
+                Some(format!(
+                    "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` instead."
+                ))
+            },
+            ProviderReplacement::SourceModuleMovedToProvider {
                 module,
+                name,
                 provider,
                 version,
             } => {

@@ -3,7 +3,7 @@ use std::{fmt::Formatter, sync::Arc};
 use thiserror::Error;
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
-use ruff_text_size::TextRange;
+use ruff_text_size::{Ranged, TextRange};
 
 pub use self::render::DisplayDiagnostic;
 use crate::files::File;
@@ -598,6 +598,12 @@ impl Span {
 impl From<File> for Span {
     fn from(file: File) -> Span {
         Span { file, range: None }
+    }
+}
+
+impl From<crate::files::FileRange> for Span {
+    fn from(file_range: crate::files::FileRange) -> Span {
+        Span::from(file_range.file()).with_range(file_range.range())
     }
 }
 

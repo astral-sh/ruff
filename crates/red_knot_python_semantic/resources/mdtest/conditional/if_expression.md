@@ -42,6 +42,6 @@ def _(flag: bool):
 class NotBoolable:
     __bool__: int = 3
 
-# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`; its `__bool__` method isn't callable"
+# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
 3 if NotBoolable() else 4
 ```

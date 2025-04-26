@@ -58,7 +58,7 @@ macro_rules! type_property_test {
 
 mod stable {
     use super::union;
-    use crate::types::Type;
+    use crate::types::{CallableType, Type};
 
     // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
@@ -167,6 +167,14 @@ mod stable {
     type_property_test!(
         never_subtype_of_every_fully_static_type, db,
         forall types t. t.is_fully_static(db) => Type::Never.is_subtype_of(db, t)
+    );
+
+    // Similar to `Never`, a fully-static "bottom" callable type should be a subtype of all
+    // fully-static callable types
+    type_property_test!(
+        bottom_callable_is_subtype_of_all_fully_static_callable, db,
+        forall types t. t.is_callable_type() && t.is_fully_static(db)
+            => CallableType::bottom(db).is_subtype_of(db, t)
     );
 
     // For any two fully static types, each type in the pair must be a subtype of their union.

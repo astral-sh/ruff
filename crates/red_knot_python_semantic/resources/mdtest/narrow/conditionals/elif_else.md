@@ -20,11 +20,9 @@ def _(flag1: bool, flag2: bool):
     x = 1 if flag1 else 2 if flag2 else 3
 
     if x == 1:
-        # TODO should be Literal[1]
-        reveal_type(x)  # revealed: Literal[1, 2, 3]
+        reveal_type(x)  # revealed: Literal[1]
     elif x == 2:
-        # TODO should be Literal[2]
-        reveal_type(x)  # revealed: Literal[2, 3]
+        reveal_type(x)  # revealed: Literal[2]
     else:
         reveal_type(x)  # revealed: Literal[3]
 ```
@@ -38,14 +36,11 @@ def _(flag1: bool, flag2: bool):
     if x != 1:
         reveal_type(x)  # revealed: Literal[2, 3]
     elif x != 2:
-        # TODO should be `Literal[1]`
-        reveal_type(x)  # revealed: Literal[1, 3]
+        reveal_type(x)  # revealed: Literal[1]
     elif x == 3:
-        # TODO should be Never
-        reveal_type(x)  # revealed: Literal[1, 2, 3]
+        reveal_type(x)  # revealed: Never
     else:
-        # TODO should be Never
-        reveal_type(x)  # revealed: Literal[1, 2]
+        reveal_type(x)  # revealed: Never
 ```
 
 ## Assignment expressions

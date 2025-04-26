@@ -21,6 +21,7 @@ pub(crate) enum Replacement {
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum ProviderReplacement {
+    None,
     ProviderName {
         name: &'static str,
         provider: &'static str,

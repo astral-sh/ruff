@@ -897,12 +897,14 @@ impl<'src> Parser<'src> {
         self.bump(TokenKind::Nonlocal);
 
         // test_err nonlocal_stmt_trailing_comma
-        // nonlocal ,
-        // nonlocal x,
-        // nonlocal x, y,
+        // def _():
+        //     nonlocal ,
+        //     nonlocal x,
+        //     nonlocal x, y,
 
         // test_err nonlocal_stmt_expression
-        // nonlocal x + 1
+        // def _():
+        //     nonlocal x + 1
         let names = self.parse_comma_separated_list_into_vec(
             RecoveryContextKind::Identifiers,
             Parser::parse_identifier,
@@ -910,7 +912,8 @@ impl<'src> Parser<'src> {
 
         if names.is_empty() {
             // test_err nonlocal_stmt_empty
-            // nonlocal
+            // def _():
+            //     nonlocal
             self.add_error(
                 ParseErrorType::EmptyNonlocalNames,
                 self.current_token_range(),
@@ -918,8 +921,9 @@ impl<'src> Parser<'src> {
         }
 
         // test_ok nonlocal_stmt
-        // nonlocal x
-        // nonlocal x, y, z
+        // def _():
+        //     nonlocal x
+        //     nonlocal x, y, z
         ast::StmtNonlocal {
             range: self.node_range(start),
             names,

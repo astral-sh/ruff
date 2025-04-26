@@ -139,18 +139,18 @@ from airflow.operators.papermill_operator import PapermillOperator
 from airflow.operators.pig_operator import PigOperator
 from airflow.operators.postgres_operator import Mapping, PostgresOperator
 from airflow.operators.presto_check_operator import (
+    CheckOperator as SQLCheckOperator2,
+)
+from airflow.operators.presto_check_operator import (
+    IntervalCheckOperator as SQLIntervalCheckOperator2,
+)
+from airflow.operators.presto_check_operator import (
     PrestoCheckOperator,
     PrestoIntervalCheckOperator,
     PrestoValueCheckOperator,
 )
 from airflow.operators.presto_check_operator import (
-    SQLCheckOperator as SQLCheckOperator2,
-)
-from airflow.operators.presto_check_operator import (
-    SQLIntervalCheckOperator as SQLIntervalCheckOperator2,
-)
-from airflow.operators.presto_check_operator import (
-    SQLValueCheckOperator as SQLValueCheckOperator2,
+    ValueCheckOperator as SQLValueCheckOperator2,
 )
 from airflow.operators.presto_to_mysql import (
     PrestoToMySqlOperator,

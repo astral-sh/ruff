@@ -150,3 +150,8 @@ has_access
 # airflow.www.utils
 get_sensitive_variables_fields
 should_hide_value_for_key
+
+# airflow.operators.python
+from airflow.operators.python import get_current_context
+
+get_current_context()

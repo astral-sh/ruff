@@ -187,30 +187,66 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
-        let result = Arc::new(std::sync::Mutex::new(diagnostics));
-        let inner_result = Arc::clone(&result);
+        let file_diagnostics = Arc::new(std::sync::Mutex::new(vec![]));
 
-        let db = db.clone();
-        let project_span = project_span.clone();
+        {
+            let file_diagnostics = Arc::clone(&file_diagnostics);
+            let db = db.clone();
+            let project_span = project_span.clone();
 
-        rayon::scope(move |scope| {
-            for file in &files {
-                let result = inner_result.clone();
-                let db = db.clone();
-                let project_span = project_span.clone();
+            rayon::scope(move |scope| {
+                for file in &files {
+                    let result = Arc::clone(&file_diagnostics);
+                    let db = db.clone();
+                    let project_span = project_span.clone();
 
-                scope.spawn(move |_| {
-                    let check_file_span =
-                        tracing::debug_span!(parent: &project_span, "check_file", ?file);
-                    let _entered = check_file_span.entered();
+                    scope.spawn(move |_| {
+                        let check_file_span =
+                            tracing::debug_span!(parent: &project_span, "check_file", ?file);
+                        let _entered = check_file_span.entered();
 
-                    let file_diagnostics = check_file_impl(&db, file);
-                    result.lock().unwrap().extend(file_diagnostics);
-                });
+                        let file_diagnostics = check_file_impl(&db, file);
+                        result.lock().unwrap().extend(file_diagnostics);
+                    });
+                }
+            });
+        }
+
+        let mut file_diagnostics = Arc::into_inner(file_diagnostics)
+            .unwrap()
+            .into_inner()
+            .unwrap();
+        // We sort diagnostics in a way that keeps them in source order
+        // and grouped by file. After that, we fall back to severity
+        // (with fatal messages sorting before info messages) and then
+        // finally the diagnostic ID.
+        file_diagnostics.sort_by(|d1, d2| {
+            if let (Some(span1), Some(span2)) = (d1.primary_span(), d2.primary_span()) {
+                let order = span1
+                    .file()
+                    .path(db)
+                    .as_str()
+                    .cmp(span2.file().path(db).as_str());
+                if order.is_ne() {
+                    return order;
+                }
+
+                if let (Some(range1), Some(range2)) = (span1.range(), span2.range()) {
+                    let order = range1.start().cmp(&range2.start());
+                    if order.is_ne() {
+                        return order;
+                    }
+                }
             }
+            // Reverse so that, e.g., Fatal sorts before Info.
+            let order = d1.severity().cmp(&d2.severity()).reverse();
+            if order.is_ne() {
+                return order;
+            }
+            d1.id().cmp(&d2.id())
         });
-
-        Arc::into_inner(result).unwrap().into_inner().unwrap()
+        diagnostics.extend(file_diagnostics);
+        diagnostics
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {

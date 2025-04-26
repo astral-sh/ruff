@@ -6,7 +6,7 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::class::{ClassType, GenericAlias, GenericClass};
+use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
@@ -76,7 +76,7 @@ impl Display for DisplayRepresentation<'_> {
             Type::Instance(instance) => match (instance.class(), instance.class().known(self.db)) {
                 (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                 (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
-                (ClassType::NonGeneric(class), _) => f.write_str(&class.class(self.db).name),
+                (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
                 (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
             },
             Type::PropertyInstance(_) => f.write_str("property"),
@@ -272,7 +272,7 @@ impl<'db> GenericAlias<'db> {
 }
 
 pub(crate) struct DisplayGenericAlias<'db> {
-    origin: GenericClass<'db>,
+    origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
     db: &'db dyn Db,
 }
@@ -282,7 +282,7 @@ impl Display for DisplayGenericAlias<'_> {
         write!(
             f,
             "{origin}{specialization}",
-            origin = self.origin.class(self.db).name,
+            origin = self.origin.name(self.db),
             specialization = self.specialization.display_short(self.db),
         )
     }

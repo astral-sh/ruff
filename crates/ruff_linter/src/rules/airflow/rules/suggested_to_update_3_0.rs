@@ -194,9 +194,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
     let replacement = match qualified_name.segments() {
         // airflow.datasets.metadata
-        ["airflow", "datasets", "metadata", "Metadata"] => {
-            Replacement::Name("airflow.sdk.Metadata")
-        }
+        ["airflow", "datasets", "metadata", "Metadata"] => Replacement::AutoImport {
+            module: "airflow.sdk",
+            name: "Metadata",
+        },
         // airflow.datasets
         ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::AutoImport {
             module: "airflow.sdk",
@@ -204,10 +205,22 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
         ["airflow", "datasets", rest] => match *rest {
             "DatasetAliasEvent" => Replacement::None,
-            "DatasetAlias" => Replacement::Name("airflow.sdk.AssetAlias"),
-            "DatasetAll" => Replacement::Name("airflow.sdk.AssetAll"),
-            "DatasetAny" => Replacement::Name("airflow.sdk.AssetAny"),
-            "expand_alias_to_datasets" => Replacement::Name("airflow.sdk.expand_alias_to_assets"),
+            "DatasetAlias" => Replacement::AutoImport {
+                module: "airflow.sdk",
+                name: "AssetAlias",
+            },
+            "DatasetAll" => Replacement::AutoImport {
+                module: "airflow.sdk",
+                name: "AssetAll",
+            },
+            "DatasetAny" => Replacement::AutoImport {
+                module: "airflow.sdk",
+                name: "AssetAny",
+            },
+            "expand_alias_to_datasets" => Replacement::AutoImport {
+                module: "airflow.sdk",
+                name: "expand_alias_to_assets",
+            },
             _ => return,
         },
 
@@ -235,9 +248,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 module: "airflow.sdk",
                 name: (*rest).to_string(),
             },
-            "BaseOperatorLink" => {
-                Replacement::Name("airflow.sdk.definitions.baseoperatorlink.BaseOperatorLink")
-            }
+            "BaseOperatorLink" => Replacement::AutoImport {
+                module: "airflow.sdk.definitions.baseoperatorlink",
+                name: "BaseOperatorLink",
+            },
             _ => return,
         },
         // airflow.model..DAG
@@ -246,12 +260,16 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             name: "DAG".to_string(),
         },
         // airflow.timetables
-        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => {
-            Replacement::Name("airflow.timetables.assets.AssetOrTimeSchedule")
-        }
+        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::AutoImport {
+            module: "airflow.timetables.assets",
+            name: "AssetOrTimeSchedule",
+        },
         // airflow.utils
         ["airflow", "utils", "dag_parsing_context", "get_parsing_context"] => {
-            Replacement::Name("airflow.sdk.get_parsing_context")
+            Replacement::AutoImport {
+                module: "airflow.sdk",
+                name: "get_parsing_context",
+            }
         }
 
         _ => return,

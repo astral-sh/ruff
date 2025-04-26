@@ -81,14 +81,14 @@ use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    binding_type, todo_type, CallDunderError, CallableSignature, CallableType, Class,
-    ClassLiteralType, ClassType, DataclassParams, DynamicType, FunctionDecorators, FunctionType,
-    GenericAlias, GenericClass, IntersectionBuilder, IntersectionType, KnownClass, KnownFunction,
-    KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, NonGenericClass, Parameter,
-    ParameterForm, Parameters, Signature, Signatures, SliceLiteralType, StringLiteralType,
-    SubclassOfType, Symbol, SymbolAndQualifiers, Truthiness, TupleType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeArrayDisplay, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarInstance, TypeVarKind, UnionBuilder, UnionType,
+    binding_type, todo_type, CallDunderError, CallableSignature, CallableType, ClassLiteral,
+    ClassType, DataclassParams, DynamicType, FunctionDecorators, FunctionType, GenericAlias,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownFunction, KnownInstanceType,
+    MemberLookupPolicy, MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature,
+    Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
+    Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, UnionBuilder,
+    UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -1500,6 +1500,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                             function_decorators |= FunctionDecorators::ABSTRACT_METHOD;
                             continue;
                         }
+                        Some(KnownFunction::Final) => {
+                            function_decorators |= FunctionDecorators::FINAL;
+                            continue;
+                        }
+                        Some(KnownFunction::Override) => {
+                            function_decorators |= FunctionDecorators::OVERRIDE;
+                            continue;
+                        }
                         _ => {}
                     }
                 }
@@ -1825,10 +1833,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        let generic_context = type_params.as_ref().map(|type_params| {
-            GenericContext::from_type_params(self.db(), self.index, type_params)
-        });
-
         let body_scope = self
             .index
             .node_scope(NodeWithScopeRef::Class(class_node))
@@ -1836,20 +1840,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let class = Class {
-            name: name.id.clone(),
+        let class_ty = Type::from(ClassLiteral::new(
+            self.db(),
+            name.id.clone(),
             body_scope,
-            known: maybe_known_class,
+            maybe_known_class,
             dataclass_params,
             dataclass_transformer_params,
-        };
-        let class_literal = match generic_context {
-            Some(generic_context) => {
-                ClassLiteralType::Generic(GenericClass::new(self.db(), class, generic_context))
-            }
-            None => ClassLiteralType::NonGeneric(NonGenericClass::new(self.db(), class)),
-        };
-        let class_ty = Type::from(class_literal);
+        ));
 
         self.add_declaration_with_binding(
             class_node.into(),
@@ -6327,8 +6325,15 @@ impl<'db> TypeInferenceBuilder<'db> {
         // updating all of the subscript logic below to use custom callables for all of the _other_
         // special cases, too.
         let value_ty = self.infer_expression(value);
-        if let Type::ClassLiteral(ClassLiteralType::Generic(generic_class)) = value_ty {
-            return self.infer_explicit_class_specialization(subscript, value_ty, generic_class);
+        if let Type::ClassLiteral(class) = value_ty {
+            if let Some(generic_context) = class.generic_context(self.db()) {
+                return self.infer_explicit_class_specialization(
+                    subscript,
+                    value_ty,
+                    class,
+                    generic_context,
+                );
+            }
         }
 
         let slice_ty = self.infer_expression(slice);
@@ -6339,7 +6344,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-        generic_class: GenericClass<'db>,
+        generic_class: ClassLiteral<'db>,
+        generic_context: GenericContext<'db>,
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
         let mut call_argument_types = match slice_node {
@@ -6348,7 +6354,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             ),
             _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
         };
-        let generic_context = generic_class.generic_context(self.db());
         let signatures = Signatures::single(CallableSignature::single(
             value_ty,
             generic_context.signature(self.db()),
@@ -6620,7 +6625,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             return KnownClass::GenericAlias.to_instance(self.db());
                         }
 
-                        if let ClassLiteralType::Generic(_) = class {
+                        if class.generic_context(self.db()).is_some() {
                             // TODO: specialize the generic class using these explicit type
                             // variable assignments. This branch is only encountered when an
                             // explicit class specialization appears inside of some other subscript
@@ -7483,18 +7488,26 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(slice);
                 value_ty
             }
-            Type::ClassLiteral(ClassLiteralType::Generic(generic_class)) => {
-                let specialized_class =
-                    self.infer_explicit_class_specialization(subscript, value_ty, generic_class);
-                specialized_class
-                    .in_type_expression(self.db())
-                    .unwrap_or(Type::unknown())
-            }
-            Type::ClassLiteral(ClassLiteralType::NonGeneric(_)) => {
-                // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
-                // specialize a non-generic class.
-                self.infer_type_expression(slice);
-                todo_type!("specialized non-generic class")
+            Type::ClassLiteral(class) => {
+                match class.generic_context(self.db()) {
+                    Some(generic_context) => {
+                        let specialized_class = self.infer_explicit_class_specialization(
+                            subscript,
+                            value_ty,
+                            class,
+                            generic_context,
+                        );
+                        specialized_class
+                            .in_type_expression(self.db())
+                            .unwrap_or(Type::unknown())
+                    }
+                    None => {
+                        // TODO: Once we know that e.g. `list` is generic, emit a diagnostic if you try to
+                        // specialize a non-generic class.
+                        self.infer_type_expression(slice);
+                        todo_type!("specialized non-generic class")
+                    }
+                }
             }
             _ => {
                 // TODO: Emit a diagnostic once we've implemented all valid subscript type

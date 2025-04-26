@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::ClassLiteralType;
+use super::ClassLiteral;
 use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
@@ -1350,7 +1350,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
 pub(crate) fn report_bad_argument_to_get_protocol_members(
     context: &InferContext,
     call: &ast::ExprCall,
-    class: ClassLiteralType,
+    class: ClassLiteral,
 ) {
     let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
         return;
