@@ -313,6 +313,28 @@ looking for a corresponding Python module (in reality, a directory named `foo` o
 the default behavior is to search only for a directory named `foo` or a file
 named `foo.py`. However, if `preview` is enabled, Ruff will require that the full relative path `foo/bar` exists as a directory, or that `foo/bar.py` or `foo/bar.pyi` exist as files. Finally, imports of the form `from foo import bar`, Ruff will only use `foo` when determining whether a module is first-party or third-party. 
 
+If there is a directory
+whose name matches a third-party package, but does not contain Python code,
+it could happen that the above algorithm incorrectly infers an import to be first-party.
+To prevent this, you can modify the [`known-third-party`](settings.md#lint_isort_known-third-party) setting. For example, if you import
+the package `wandb` but also have a subdirectory of your `src` with
+the same name, you can add the following:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff.lint.isort]
+    known-third-party = ["wandb"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    [lint.isort]
+    known-third-party = ["wandb"]
+    ```
+
+
 If the `src` field is omitted, Ruff will default to using the "project root", along with a `"src"`
 subdirectory, as the first-party sources, to support both flat and nested project layouts.
 The "project root" is typically the directory containing your `pyproject.toml`, `ruff.toml`, or
