@@ -308,7 +308,7 @@ impl Printer {
                 self.write_summary_text(writer, diagnostics)?;
             }
             OutputFormat::Github => {
-                GithubEmitter.emit(writer, &diagnostics.messages, &context)?;
+                GithubEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
             OutputFormat::Gitlab => {
                 GitlabEmitter::default().emit(writer, &diagnostics.messages, &context)?;

@@ -363,7 +363,8 @@ if call(foo
         pass
 ";
         let locator = Locator::new(source);
-        let source_file = SourceFileBuilder::new("syntax_errors.py", source).finish();
+        let source_file =
+            SourceFileBuilder::new("/projects/project/syntax_errors.py", source).finish();
         parse_unchecked(source, ParseOptions::from(Mode::Module))
             .errors()
             .iter()
@@ -401,7 +402,7 @@ def fibonacci(n):
             TextSize::from(10),
         ))));
 
-        let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
+        let fib_source = SourceFileBuilder::new("/projects/project/fib.py", fib).finish();
 
         let unused_variable = Diagnostic::new(
             DiagnosticKind {
@@ -427,7 +428,7 @@ def fibonacci(n):
             TextRange::new(TextSize::from(3), TextSize::from(4)),
         );
 
-        let file_2_source = SourceFileBuilder::new("undef.py", file_2).finish();
+        let file_2_source = SourceFileBuilder::new("/projects/project/undef.py", file_2).finish();
 
         let unused_import_start = unused_import.start();
         let unused_variable_start = unused_variable.start();

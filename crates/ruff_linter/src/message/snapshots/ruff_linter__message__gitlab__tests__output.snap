@@ -12,7 +12,7 @@ expression: redact_fingerprint(&content)
         "begin": 1,
         "end": 1
       },
-      "path": "fib.py"
+      "path": "/projects/project/fib.py"
     },
     "severity": "major"
   },
@@ -25,7 +25,7 @@ expression: redact_fingerprint(&content)
         "begin": 6,
         "end": 6
       },
-      "path": "fib.py"
+      "path": "/projects/project/fib.py"
     },
     "severity": "major"
   },
@@ -38,7 +38,7 @@ expression: redact_fingerprint(&content)
         "begin": 1,
         "end": 1
       },
-      "path": "undef.py"
+      "path": "/projects/project/undef.py"
     },
     "severity": "major"
   }
