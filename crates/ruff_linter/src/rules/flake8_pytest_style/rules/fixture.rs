@@ -2,23 +2,24 @@ use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::name::UnqualifiedName;
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::Decorator;
 use ruff_python_ast::{self as ast, Expr, Parameters, Stmt};
+use ruff_python_ast::{visitor, ArgOrKeyword};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::{TextLen, TextRange};
+use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::registry::Rule;
 
 use super::helpers::{
-    get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
-    Parentheses,
+    get_mark_decorators, get_parametrize_decorators, is_pytest_fixture, is_pytest_yield_fixture,
+    keyword_is_literal, Parentheses,
 };
 
 /// ## What it does
@@ -807,10 +808,39 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
 }
 
 /// PT019
-fn check_test_function_args(checker: &Checker, parameters: &Parameters) {
+fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorators: &[Decorator]) {
+    let mut named_parametrize = FxHashSet::default();
+    for decorator in get_parametrize_decorators(decorators) {
+        let Some(call_expr) = decorator.expression.as_call_expr() else {
+            continue;
+        };
+        let first_arg = call_expr
+            .arguments
+            .arguments_source_order()
+            .next()
+            .and_then(|arg| {
+                if let ArgOrKeyword::Arg(expr) = arg {
+                    expr.as_string_literal_expr()
+                } else {
+                    None
+                }
+            });
+
+        if let Some(arg) = first_arg {
+            for param_name in arg
+                .value
+                .to_str()
+                .split(',')
+                .filter(|param| !param.is_empty() && param.starts_with('_'))
+            {
+                named_parametrize.insert(param_name);
+            }
+        }
+    }
+
     for parameter in parameters.iter_non_variadic_params() {
         let name = parameter.name();
-        if name.starts_with('_') {
+        if name.starts_with('_') && !named_parametrize.contains(name.as_str()) {
             checker.report_diagnostic(Diagnostic::new(
                 PytestFixtureParamWithoutValue {
                     name: name.to_string(),
@@ -915,6 +945,6 @@ pub(crate) fn fixture(
     }
 
     if checker.enabled(Rule::PytestFixtureParamWithoutValue) && name.starts_with("test_") {
-        check_test_function_args(checker, parameters);
+        check_test_function_args(checker, parameters, decorators);
     }
 }

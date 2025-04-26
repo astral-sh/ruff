@@ -19,6 +19,19 @@ pub(super) fn get_mark_decorators(
     })
 }
 
+pub(super) fn get_parametrize_decorators(
+    decorators: &[Decorator],
+) -> impl Iterator<Item = &Decorator> {
+    decorators.iter().filter_map(|decorator| {
+        let name = UnqualifiedName::from_expr(map_callable(&decorator.expression))?;
+        let ["pytest", "mark", "parametrize"] = name.segments() else {
+            return None;
+        };
+
+        Some(decorator)
+    })
+}
+
 pub(super) fn is_pytest_fail(call: &Expr, semantic: &SemanticModel) -> bool {
     semantic
         .resolve_qualified_name(call)
