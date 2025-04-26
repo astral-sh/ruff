@@ -10,7 +10,6 @@ use ruff_text_size::{TextRange, TextSize};
 use crate::comments::shebang::ShebangDirective;
 use crate::fs;
 use crate::package::PackageRoot;
-use crate::settings::types::PreviewMode;
 use crate::Locator;
 
 /// ## What it does
@@ -60,7 +59,7 @@ pub(crate) fn implicit_namespace_package(
     comment_ranges: &CommentRanges,
     project_root: &Path,
     src: &[PathBuf],
-    preview: PreviewMode,
+    allow_nested_roots: bool,
 ) -> Option<Diagnostic> {
     if package.is_none()
         // Ignore non-`.py` files, which don't require an `__init__.py`.
@@ -93,7 +92,7 @@ pub(crate) fn implicit_namespace_package(
         ));
     }
 
-    if preview.is_enabled() {
+    if allow_nested_roots {
         if let Some(PackageRoot::Nested { path: root }) = package.as_ref() {
             if path.ends_with("__init__.py") {
                 // Identify the intermediary package that's missing the `__init__.py` file.

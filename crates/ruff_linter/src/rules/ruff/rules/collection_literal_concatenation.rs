@@ -5,6 +5,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
+use crate::preview::is_support_slices_in_literal_concatenation_enabled;
 
 /// ## What it does
 /// Checks for uses of the `+` operator to concatenate collections.
@@ -191,7 +192,8 @@ pub(crate) fn collection_literal_concatenation(checker: &Checker, expr: &Expr) {
         return;
     }
 
-    let should_support_slices = checker.settings.preview.is_enabled();
+    let should_support_slices =
+        is_support_slices_in_literal_concatenation_enabled(checker.settings);
 
     let Some((new_expr, type_)) = concatenate_expressions(expr, should_support_slices) else {
         return;
