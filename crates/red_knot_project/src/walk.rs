@@ -132,7 +132,8 @@ impl<'a> ProjectFilesWalker<'a> {
         let mut walker = db
             .system()
             .walk_directory(paths.next()?.as_ref())
-            .standard_filters(db.project().settings(db).respect_ignore_files());
+            .standard_filters(db.project().settings(db).respect_ignore_files())
+            .ignore_hidden(false);
 
         for path in paths {
             walker = walker.add(path);

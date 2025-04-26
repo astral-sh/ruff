@@ -6,6 +6,26 @@ use std::process::Command;
 use tempfile::TempDir;
 
 #[test]
+fn test_include_hidden_files_by_default() -> anyhow::Result<()> {
+    let case = TestCase::with_files([(".test.py", "~")])?;
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: invalid-syntax
+     --> <temp_dir>/.test.py:1:2
+      |
+    1 | ~
+      |  ^ Expected an expression
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+#[test]
 fn test_respect_ignore_files() -> anyhow::Result<()> {
     // First test that the default option works correctly (the file is skipped)
     let case = TestCase::with_files([(".ignore", "test.py"), ("test.py", "~")])?;
