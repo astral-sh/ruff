@@ -827,11 +827,11 @@ impl<'db> ClassLiteral<'db> {
             )
             .symbol;
 
+        // TODO: should be the concrete value of `Self`
+        let correct_return_type = Type::instance(ClassType::NonGeneric(self));
+
         let synthesized_init_function =
             if let Symbol::Type(Type::FunctionLiteral(init_function), _) = init_function_symbol {
-                // TODO: should be the concrete value of `Self`
-                let correct_return_type = Type::instance(ClassType::NonGeneric(self));
-
                 let synthesized_signature = |signature: Signature<'db>| {
                     Signature::new(signature.parameters().clone(), Some(correct_return_type))
                         .bind_self()
@@ -851,36 +851,35 @@ impl<'db> ClassLiteral<'db> {
                 };
                 Some(Type::Callable(new_function_signature))
             } else {
-                if new_function.is_none() {
-                    let new_function_symbol = self_ty
-                        .member_lookup_with_policy(
-                            db,
-                            "__new__".into(),
-                            MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                        )
-                        .symbol;
-
-                    if let Symbol::Type(Type::FunctionLiteral(new_function), _) =
-                        new_function_symbol
-                    {
-                        return new_function.into_bound_method_type(db, self_ty);
-                    }
-                }
                 None
             };
 
+        let new_function =
+            new_function.map(|new_function| new_function.into_bound_method_type(db, self_ty));
+
         match (new_function, synthesized_init_function) {
-            (Some(new_function), Some(synthesized_init_function)) => UnionType::from_elements(
-                db,
-                [
-                    new_function.into_bound_method_type(db, self_ty),
-                    synthesized_init_function,
-                ],
-            ),
-            (Some(new_function), None) => new_function.into_bound_method_type(db, self_ty),
+            (Some(new_function), Some(synthesized_init_function)) => {
+                UnionType::from_elements(db, [new_function, synthesized_init_function])
+            }
+            (Some(new_function), None) => new_function,
             (None, Some(synthesized_init_function)) => synthesized_init_function,
             (None, None) => {
-                unreachable!("`object` should have found __new__ method");
+                let new_function_symbol = self_ty
+                    .member_lookup_with_policy(
+                        db,
+                        "__new__".into(),
+                        MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .symbol;
+
+                if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+                    new_function.into_bound_method_type(db, self_ty)
+                } else {
+                    Type::Callable(CallableType::single(
+                        db,
+                        Signature::new(Parameters::empty(), Some(correct_return_type)),
+                    ))
+                }
             }
         }
     }
