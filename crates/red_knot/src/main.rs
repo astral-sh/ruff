@@ -269,12 +269,6 @@ impl MainLoop {
                         .format(terminal_settings.output_format)
                         .color(colored::control::SHOULD_COLORIZE.should_colorize());
 
-                    let min_error_severity = if terminal_settings.error_on_warning {
-                        Severity::Warning
-                    } else {
-                        Severity::Error
-                    };
-
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {
                             tracing::warn!("No python files found under the given path(s)");
@@ -289,13 +283,13 @@ impl MainLoop {
                                 return Ok(ExitStatus::Success);
                             }
                         } else {
-                            let mut failed = false;
+                            let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
                             for diagnostic in result {
                                 write!(stdout, "{}", diagnostic.display(db, &display_config))?;
 
-                                failed |= diagnostic.severity() >= min_error_severity;
+                                max_severity = max_severity.max(diagnostic.severity());
                             }
 
                             writeln!(
@@ -306,10 +300,17 @@ impl MainLoop {
                             )?;
 
                             if self.watcher.is_none() {
-                                return Ok(if failed {
-                                    ExitStatus::Failure
-                                } else {
-                                    ExitStatus::Success
+                                return Ok(match max_severity {
+                                    Severity::Info => ExitStatus::Success,
+                                    Severity::Warning => {
+                                        if terminal_settings.error_on_warning {
+                                            ExitStatus::Failure
+                                        } else {
+                                            ExitStatus::Success
+                                        }
+                                    }
+                                    Severity::Error => ExitStatus::Failure,
+                                    Severity::Fatal => ExitStatus::Error,
                                 });
                             }
                         }
