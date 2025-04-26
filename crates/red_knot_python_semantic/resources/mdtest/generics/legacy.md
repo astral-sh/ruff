@@ -43,7 +43,7 @@ TestList = list[TypeVar("W")]
 ```py
 from typing import TypeVar
 
-# error: [invalid-legacy-type-variable] "The name of a legacy `typing.TypeVar` must match the name of the variable it is assigned to"
+# error: [invalid-legacy-type-variable] "The name of a legacy `typing.TypeVar` (`Q`) must match the name of the variable it is assigned to (`T`)"
 T = TypeVar("Q")
 ```
 

@@ -10,7 +10,6 @@ use super::{
     InferContext, Signature, Signatures, Type,
 };
 use crate::db::Db;
-use crate::semantic_index::definition::Definition;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
@@ -22,7 +21,7 @@ use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators, KnownClass,
     KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType, TupleType,
-    TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, UnionType, WrapperDescriptorKind,
+    UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Severity, Span, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -95,13 +94,12 @@ impl<'db> Bindings<'db> {
         mut self,
         db: &'db dyn Db,
         argument_types: &mut CallArgumentTypes<'_, 'db>,
-        containing_assignment: Option<Definition<'db>>,
     ) -> Result<Self, CallError<'db>> {
         for (signature, element) in self.signatures.iter().zip(&mut self.elements) {
             element.check_types(db, signature, argument_types);
         }
 
-        self.evaluate_known_cases(db, argument_types, containing_assignment);
+        self.evaluate_known_cases(db);
 
         // In order of precedence:
         //
@@ -211,12 +209,7 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(
-        &mut self,
-        db: &'db dyn Db,
-        argument_types: &CallArgumentTypes<'_, 'db>,
-        containing_assignment: Option<Definition<'db>>,
-    ) {
+    fn evaluate_known_cases(&mut self, db: &'db dyn Db) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
             if let Some(Type::BooleanLiteral(value)) = ty {
                 *value
@@ -773,65 +766,6 @@ impl<'db> Bindings<'db> {
                         if let [Some(arg)] = overload.parameter_types() {
                             overload.set_return_type(arg.to_meta_type(db));
                         }
-                    }
-
-                    Some(KnownClass::TypeVar) => {
-                        let Some(containing_assignment) = containing_assignment else {
-                            // We raise a diagnostic if TypeVar is called without being immediately
-                            // assigned to local variable, but this is handled in `infer.rs` since
-                            // it requires accessing the definition's `kind` field.
-                            continue;
-                        };
-
-                        let [Some(name), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
-                            overload.parameter_types()
-                        else {
-                            continue;
-                        };
-
-                        let Some(name) = name.into_string_literal() else {
-                            continue;
-                        };
-
-                        let bound_or_constraint = match (bound, constraints) {
-                            (Some(bound), None) => {
-                                Some(TypeVarBoundOrConstraints::UpperBound(*bound))
-                            }
-
-                            (None, Some(_constraints)) => {
-                                // We don't use UnionType::from_elements or UnionBuilder here,
-                                // because we don't want to simplify the list of constraints like
-                                // we do with the elements of an actual union type.
-                                // TODO: Consider using a new `OneOfType` connective here instead,
-                                // since that more accurately represents the actual semantics of
-                                // typevar constraints.
-                                let elements = UnionType::new(
-                                    db,
-                                    overload
-                                        .arguments_for_parameter(argument_types, 1)
-                                        .map(|(_, ty)| ty)
-                                        .collect::<Box<_>>(),
-                                );
-                                Some(TypeVarBoundOrConstraints::Constraints(elements))
-                            }
-
-                            // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
-                            // constrained
-                            (Some(_), Some(_)) => continue,
-
-                            (None, None) => None,
-                        };
-
-                        overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeVar(
-                            TypeVarInstance::new(
-                                db,
-                                name.value(db).as_ref().into(),
-                                containing_assignment,
-                                bound_or_constraint,
-                                *default,
-                                TypeVarKind::Legacy,
-                            ),
-                        )));
                     }
 
                     Some(KnownClass::Property) => {

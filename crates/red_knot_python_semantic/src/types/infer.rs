@@ -3802,7 +3802,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::If(if_expression) => self.infer_if_expression(if_expression),
             ast::Expr::Lambda(lambda_expression) => self.infer_lambda_expression(lambda_expression),
             ast::Expr::Call(call_expression) => {
-                self.infer_call_expression(call_expression, containing_assignment)
+                self.infer_call_expression(expression, call_expression, containing_assignment)
             }
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
@@ -4349,8 +4349,9 @@ impl<'db> TypeInferenceBuilder<'db> {
 
     fn infer_call_expression(
         &mut self,
+        call_expression_node: &ast::Expr,
         call_expression: &ast::ExprCall,
-        containing_assignment: Option<Definition<'db>>,
+        _containing_assignment: Option<Definition<'db>>,
     ) -> Type<'db> {
         let ast::ExprCall {
             range: _,
@@ -4427,7 +4428,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let mut call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
-        match bindings.check_types(self.db(), &mut call_argument_types, containing_assignment) {
+        match bindings.check_types(self.db(), &mut call_argument_types) {
             Ok(mut bindings) => {
                 for binding in &mut bindings {
                     let binding_type = binding.callable_type;
@@ -4694,47 +4695,100 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 }
 
                                 KnownClass::TypeVar => {
-                                    let Some(DefinitionKind::Assignment(containing_assignment)) =
-                                        containing_assignment
-                                            .map(|definition| definition.kind(self.db()))
-                                    else {
-                                        if let Some(builder) = self.context.report_lint(
-                                            &INVALID_LEGACY_TYPE_VARIABLE,
-                                            call_expression,
-                                        ) {
-                                            builder.into_diagnostic(format_args!(
-                                                    "A legacy `typing.TypeVar` must be immediately assigned to a variable",
-                                                ));
+                                    let assigned_to = (self.index)
+                                        .try_expression(call_expression_node)
+                                        .and_then(|expr| expr.assigned_to(self.db()).as_ref());
+
+                                    let Some(target) = assigned_to.and_then(|assigned_to| {
+                                        match assigned_to.node().targets.as_slice() {
+                                            [ast::Expr::Name(target)] => Some(target),
+                                            _ => None,
                                         }
-                                        continue;
-                                    };
-
-                                    let assigned_name = match containing_assignment.target() {
-                                        ast::Expr::Name(name) => Some(&name.id),
-                                        _ => None,
-                                    };
-
-                                    // Note that this check must come after we verify that there's
-                                    // a containing assignment, because the special constructor
-                                    // logic in `Bindings::evaluate_known_cases` doesn't kick in if
-                                    // there isn't.
-                                    let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                                        overload.return_type()
-                                    else {
-                                        continue;
-                                    };
-
-                                    if Some(typevar.name(self.db())) != assigned_name {
+                                    }) else {
                                         if let Some(builder) = self.context.report_lint(
                                             &INVALID_LEGACY_TYPE_VARIABLE,
                                             call_expression,
                                         ) {
                                             builder.into_diagnostic(format_args!(
-                                                "The name of a legacy `typing.TypeVar` must match \
-                                                the name of the variable it is assigned to"
+                                                "A legacy `typing.TypeVar` must be immediately assigned to a variable",
                                             ));
                                         }
+                                        continue;
+                                    };
+
+                                    let [Some(name_param), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
+                                        overload.parameter_types()
+                                    else {
+                                        continue;
+                                    };
+
+                                    let name_param = name_param
+                                        .into_string_literal()
+                                        .map(|name| name.value(self.db()).as_ref());
+                                    if !name_param.is_some_and(|name_param| name_param == target.id)
+                                    {
+                                        if let Some(builder) = self.context.report_lint(
+                                            &INVALID_LEGACY_TYPE_VARIABLE,
+                                            call_expression,
+                                        ) {
+                                            builder.into_diagnostic(format_args!(
+                                                "The name of a legacy `typing.TypeVar`{} must match \
+                                                the name of the variable it is assigned to (`{}`)",
+                                                if let Some(name_param) = name_param {
+                                                    format!(" (`{name_param}`)")
+                                                } else {
+                                                    String::new()
+                                                },
+                                                target.id,
+                                            ));
+                                        }
+                                        continue;
                                     }
+
+                                    let bound_or_constraint = match (bound, constraints) {
+                                        (Some(bound), None) => {
+                                            Some(TypeVarBoundOrConstraints::UpperBound(*bound))
+                                        }
+
+                                        (None, Some(_constraints)) => {
+                                            // We don't use UnionType::from_elements or UnionBuilder here,
+                                            // because we don't want to simplify the list of constraints like
+                                            // we do with the elements of an actual union type.
+                                            // TODO: Consider using a new `OneOfType` connective here instead,
+                                            // since that more accurately represents the actual semantics of
+                                            // typevar constraints.
+                                            let elements = UnionType::new(
+                                                self.db(),
+                                                overload
+                                                    .arguments_for_parameter(
+                                                        &call_argument_types,
+                                                        1,
+                                                    )
+                                                    .map(|(_, ty)| ty)
+                                                    .collect::<Box<_>>(),
+                                            );
+                                            Some(TypeVarBoundOrConstraints::Constraints(elements))
+                                        }
+
+                                        // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
+                                        // constrained
+                                        (Some(_), Some(_)) => continue,
+
+                                        (None, None) => None,
+                                    };
+
+                                    let containing_assignment =
+                                        self.index.expect_single_definition(target);
+                                    overload.set_return_type(Type::KnownInstance(
+                                        KnownInstanceType::TypeVar(TypeVarInstance::new(
+                                            self.db(),
+                                            target.id.clone(),
+                                            containing_assignment,
+                                            bound_or_constraint,
+                                            *default,
+                                            TypeVarKind::Legacy,
+                                        )),
+                                    ));
                                 }
 
                                 _ => (),
@@ -6359,7 +6413,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_class: GenericClass<'db>,
-        containing_assignment: Option<Definition<'db>>,
+        _containing_assignment: Option<Definition<'db>>,
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
         let mut call_argument_types = match slice_node {
@@ -6374,7 +6428,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             generic_context.signature(self.db()),
         ));
         let bindings = match Bindings::match_parameters(signatures, &mut call_argument_types)
-            .check_types(self.db(), &mut call_argument_types, containing_assignment)
+            .check_types(self.db(), &mut call_argument_types)
         {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
@@ -7249,7 +7303,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             ast::Expr::Call(call_expr) => {
-                self.infer_call_expression(call_expr, None);
+                self.infer_call_expression(expression, call_expr, None);
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Function calls are not allowed in type expressions"),

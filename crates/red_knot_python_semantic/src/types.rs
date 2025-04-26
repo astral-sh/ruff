@@ -4018,11 +4018,8 @@ impl<'db> Type<'db> {
         mut argument_types: CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, &mut argument_types).check_types(
-            db,
-            &mut argument_types,
-            None,
-        )
+        Bindings::match_parameters(signatures, &mut argument_types)
+            .check_types(db, &mut argument_types)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -4060,11 +4057,8 @@ impl<'db> Type<'db> {
         {
             Symbol::Type(dunder_callable, boundness) => {
                 let signatures = dunder_callable.signatures(db);
-                let bindings = Bindings::match_parameters(signatures, argument_types).check_types(
-                    db,
-                    argument_types,
-                    None,
-                )?;
+                let bindings = Bindings::match_parameters(signatures, argument_types)
+                    .check_types(db, argument_types)?;
                 if boundness == Boundness::PossiblyUnbound {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
                 }
