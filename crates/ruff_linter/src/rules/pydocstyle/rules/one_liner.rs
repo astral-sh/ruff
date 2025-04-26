@@ -27,6 +27,11 @@ use crate::docstrings::Docstring;
 ///     """Return the mean of the given values."""
 /// ```
 ///
+/// ## Fix safety
+/// The fix is marked as unsafe because it could affect tools that parse docstrings,
+/// documentation generators, or custom introspection utilities that rely on
+/// specific docstring formatting.
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 ///
