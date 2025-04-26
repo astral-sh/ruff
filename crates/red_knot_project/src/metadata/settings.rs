@@ -21,25 +21,18 @@ pub struct Settings {
     rules: Arc<RuleSelection>,
 
     terminal: TerminalSettings,
-
-    respect_ignore_files: bool,
 }
 
 impl Settings {
-    pub fn new(rules: RuleSelection, respect_ignore_files: Option<bool>) -> Self {
+    pub fn new(rules: RuleSelection) -> Self {
         Self {
             rules: Arc::new(rules),
             terminal: TerminalSettings::default(),
-            respect_ignore_files: respect_ignore_files.unwrap_or(true),
         }
     }
 
     pub fn rules(&self) -> &RuleSelection {
         &self.rules
-    }
-
-    pub fn respect_ignore_files(&self) -> bool {
-        self.respect_ignore_files
     }
 
     pub fn to_rules(&self) -> Arc<RuleSelection> {

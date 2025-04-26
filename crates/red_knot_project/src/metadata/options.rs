@@ -32,9 +32,6 @@ pub struct Options {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminal: Option<TerminalOptions>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub respect_ignore_files: Option<bool>,
 }
 
 impl Options {
@@ -136,7 +133,7 @@ impl Options {
     pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
         let (rules, diagnostics) = self.to_rule_selection(db);
 
-        let mut settings = Settings::new(rules, self.respect_ignore_files);
+        let mut settings = Settings::new(rules);
 
         if let Some(terminal) = self.terminal.as_ref() {
             settings.set_terminal(TerminalSettings {

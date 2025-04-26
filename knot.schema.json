@@ -15,12 +15,6 @@
         }
       ]
     },
-    "respect-ignore-files": {
-      "type": [
-        "boolean",
-        "null"
-      ]
-    },
     "rules": {
       "description": "Configures the enabled lints and their severity.",
       "anyOf": [
