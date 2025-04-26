@@ -37,9 +37,7 @@ use crate::rules::flake8_async::helpers::AsyncModule;
 ///
 /// ## Fix safety
 ///
-/// This fix is marked as unsafe if it changes a finite sleep to an indefinite one.
-/// If the original code intended to eventually resume execution, this fix may
-/// introduce unintended permanent suspension.
+/// This fix is marked as unsafe as it changes program behavior.
 #[derive(ViolationMetadata)]
 pub(crate) struct LongSleepNotForever {
     module: AsyncModule,
