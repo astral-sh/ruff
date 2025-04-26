@@ -1469,38 +1469,6 @@ impl<'db> Type<'db> {
                 true
             }
 
-            // TODO: This is a workaround to avoid false positives (e.g. when checking function calls
-            // with `SupportsIndex` parameters), which should be removed when we understand protocols.
-            (lhs, Type::NominalInstance(instance))
-                if instance.class().is_known(db, KnownClass::SupportsIndex) =>
-            {
-                match lhs {
-                    Type::NominalInstance(instance)
-                        if matches!(
-                            instance.class().known(db),
-                            Some(KnownClass::Int | KnownClass::SupportsIndex)
-                        ) =>
-                    {
-                        true
-                    }
-                    Type::IntLiteral(_) => true,
-                    _ => false,
-                }
-            }
-
-            // TODO: ditto for avoiding false positives when checking function calls with `Sized` parameters.
-            (lhs, Type::NominalInstance(instance))
-                if instance.class().is_known(db, KnownClass::Sized) =>
-            {
-                matches!(
-                    lhs.to_meta_type(db).member(db, "__len__"),
-                    SymbolAndQualifiers {
-                        symbol: Symbol::Type(..),
-                        ..
-                    }
-                )
-            }
-
             (Type::NominalInstance(self_instance), Type::NominalInstance(target_instance)) => {
                 self_instance.is_assignable_to(db, target_instance)
             }
