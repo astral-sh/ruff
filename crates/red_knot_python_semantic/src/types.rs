@@ -7724,7 +7724,6 @@ pub(crate) mod tests {
     use crate::symbol::{
         global_symbol, known_module_symbol, typing_extensions_symbol, typing_symbol,
     };
-    use crate::types::infer::{infer_expression_types_impl, InferExpressionTypes};
     use ruff_db::files::system_path_to_file;
     use ruff_db::parsed::parsed_module;
     use ruff_db::system::DbWithWritableSystem as _;
@@ -7824,12 +7823,7 @@ pub(crate) mod tests {
             .value;
         let foo_call = semantic_index(&db, bar).expression(call);
 
-        assert_function_query_was_not_run(
-            &db,
-            infer_expression_types_impl,
-            InferExpressionTypes::new(&db, foo_call, None),
-            &events,
-        );
+        assert_function_query_was_not_run(&db, infer_expression_types, foo_call, &events);
 
         Ok(())
     }

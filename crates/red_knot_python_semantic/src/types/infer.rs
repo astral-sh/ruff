@@ -215,36 +215,11 @@ fn deferred_cycle_initial<'db>(db: &'db dyn Db, definition: Definition<'db>) -> 
 /// Use rarely; only for cases where we'd otherwise risk double-inferring an expression: RHS of an
 /// assignment, which might be unpacking/multi-target and thus part of multiple definitions, or a
 /// type narrowing guard expression (e.g. if statement test node).
+#[salsa::tracked(return_ref, cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial)]
 pub(crate) fn infer_expression_types<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-    containing_assignment: Option<Definition<'db>>,
-) -> &'db TypeInference<'db> {
-    infer_expression_types_impl(
-        db,
-        InferExpressionTypes::new(db, expression, containing_assignment),
-    )
-}
-
-/// We would normally let Salsa create an interned tuple for the multiple arguments to
-/// [`infer_expression_types`]. However, we have tests below that rely on being able to construct
-/// an instance of the function ingredient, to verify which queries are executed. The Salsa-created
-/// interned tuple is not externally visible, and can't be constructed outside of the query
-/// function. To get around, we create our own named struct for the tuple function ingredient.
-#[salsa::interned(debug)]
-pub(super) struct InferExpressionTypes<'db> {
-    expression: Expression<'db>,
-    containing_assignment: Option<Definition<'db>>,
-}
-
-#[salsa::tracked(return_ref, cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial)]
-pub(super) fn infer_expression_types_impl<'db>(
-    db: &'db dyn Db,
-    arguments: InferExpressionTypes<'db>,
 ) -> TypeInference<'db> {
-    let expression = arguments.expression(db);
-    let containing_assignment = arguments.containing_assignment(db);
-
     let file = expression.file(db);
     let _span = tracing::trace_span!(
         "infer_expression_types",
@@ -256,31 +231,23 @@ pub(super) fn infer_expression_types_impl<'db>(
 
     let index = semantic_index(db, file);
 
-    TypeInferenceBuilder::new(
-        db,
-        InferenceRegion::Expression {
-            expression,
-            containing_assignment,
-        },
-        index,
-    )
-    .finish()
+    TypeInferenceBuilder::new(db, InferenceRegion::Expression(expression), index).finish()
 }
 
 fn expression_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &TypeInference<'db>,
     _count: u32,
-    _arguments: InferExpressionTypes<'db>,
+    _expression: Expression<'db>,
 ) -> salsa::CycleRecoveryAction<TypeInference<'db>> {
     salsa::CycleRecoveryAction::Iterate
 }
 
 fn expression_cycle_initial<'db>(
     db: &'db dyn Db,
-    arguments: InferExpressionTypes<'db>,
+    expression: Expression<'db>,
 ) -> TypeInference<'db> {
-    TypeInference::cycle_fallback(arguments.expression(db).scope(db), Type::Never)
+    TypeInference::cycle_fallback(expression.scope(db), Type::Never)
 }
 
 /// Infers the type of an `expression` that is guaranteed to be in the same file as the calling query.
@@ -292,7 +259,7 @@ pub(super) fn infer_same_file_expression_type<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
 ) -> Type<'db> {
-    let inference = infer_expression_types(db, expression, None);
+    let inference = infer_expression_types(db, expression);
     let scope = expression.scope(db);
     inference.expression_type(expression.node_ref(db).scoped_expression_id(db, scope))
 }
@@ -350,10 +317,7 @@ pub(super) fn infer_unpack_types<'db>(db: &'db dyn Db, unpack: Unpack<'db>) -> U
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InferenceRegion<'db> {
     /// infer types for a standalone [`Expression`]
-    Expression {
-        expression: Expression<'db>,
-        containing_assignment: Option<Definition<'db>>,
-    },
+    Expression(Expression<'db>),
     /// infer types for a [`Definition`]
     Definition(Definition<'db>),
     /// infer deferred types for a [`Definition`]
@@ -365,7 +329,7 @@ pub(crate) enum InferenceRegion<'db> {
 impl<'db> InferenceRegion<'db> {
     fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
-            InferenceRegion::Expression { expression, .. } => expression.scope(db),
+            InferenceRegion::Expression(expression) => expression.scope(db),
             InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
                 definition.scope(db)
             }
@@ -702,10 +666,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             InferenceRegion::Scope(scope) => self.infer_region_scope(scope),
             InferenceRegion::Definition(definition) => self.infer_region_definition(definition),
             InferenceRegion::Deferred(definition) => self.infer_region_deferred(definition),
-            InferenceRegion::Expression {
-                expression,
-                containing_assignment,
-            } => self.infer_region_expression(expression, containing_assignment),
+            InferenceRegion::Expression(expression) => self.infer_region_expression(expression),
         }
     }
 
@@ -1082,14 +1043,10 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    fn infer_region_expression(
-        &mut self,
-        expression: Expression<'db>,
-        containing_assignment: Option<Definition<'db>>,
-    ) {
+    fn infer_region_expression(&mut self, expression: Expression<'db>) {
         match expression.kind(self.db()) {
             ExpressionKind::Normal => {
-                self.infer_expression_impl(expression.node_ref(self.db()), containing_assignment);
+                self.infer_expression_impl(expression.node_ref(self.db()));
             }
             ExpressionKind::TypeExpression => {
                 self.infer_type_expression(expression.node_ref(self.db()));
@@ -2972,7 +2929,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let value = assignment.value();
         let target = assignment.target();
 
-        let value_ty = self.infer_assigned_standalone_expression(value, definition);
+        let value_ty = self.infer_standalone_expression(value);
 
         let mut target_ty = match assignment.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
@@ -3740,36 +3697,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             "Calling `self.infer_expression` on a standalone-expression is not allowed because it can lead to double-inference. Use `self.infer_standalone_expression` instead."
         );
 
-        self.infer_expression_impl(expression, None)
+        self.infer_expression_impl(expression)
     }
 
     fn infer_standalone_expression(&mut self, expression: &ast::Expr) -> Type<'db> {
         let standalone_expression = self.index.expression(expression);
-        let types = infer_expression_types(self.db(), standalone_expression, None);
+        let types = infer_expression_types(self.db(), standalone_expression);
         self.extend(types);
         self.expression_type(expression)
     }
 
-    fn infer_assigned_standalone_expression(
-        &mut self,
-        expression: &ast::Expr,
-        containing_assignment: Definition<'db>,
-    ) -> Type<'db> {
-        let standalone_expression = self.index.expression(expression);
-        let types = infer_expression_types(
-            self.db(),
-            standalone_expression,
-            Some(containing_assignment),
-        );
-        self.extend(types);
-        self.expression_type(expression)
-    }
-
-    fn infer_expression_impl(
-        &mut self,
-        expression: &ast::Expr,
-        containing_assignment: Option<Definition<'db>>,
-    ) -> Type<'db> {
+    fn infer_expression_impl(&mut self, expression: &ast::Expr) -> Type<'db> {
         let ty = match expression {
             ast::Expr::NoneLiteral(ast::ExprNoneLiteral { range: _ }) => Type::none(self.db()),
             ast::Expr::NumberLiteral(literal) => self.infer_number_literal_expression(literal),
@@ -3794,15 +3732,13 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::BinOp(binary) => self.infer_binary_expression(binary),
             ast::Expr::BoolOp(bool_op) => self.infer_boolean_expression(bool_op),
             ast::Expr::Compare(compare) => self.infer_compare_expression(compare),
-            ast::Expr::Subscript(subscript) => {
-                self.infer_subscript_expression(subscript, containing_assignment)
-            }
+            ast::Expr::Subscript(subscript) => self.infer_subscript_expression(subscript),
             ast::Expr::Slice(slice) => self.infer_slice_expression(slice),
             ast::Expr::Named(named) => self.infer_named_expression(named),
             ast::Expr::If(if_expression) => self.infer_if_expression(if_expression),
             ast::Expr::Lambda(lambda_expression) => self.infer_lambda_expression(lambda_expression),
             ast::Expr::Call(call_expression) => {
-                self.infer_call_expression(expression, call_expression, containing_assignment)
+                self.infer_call_expression(expression, call_expression)
             }
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
@@ -4132,7 +4068,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         let target = comprehension.target();
 
         let expression = self.index.expression(iterable);
-        let result = infer_expression_types(self.db(), expression, None);
+        let result = infer_expression_types(self.db(), expression);
 
         // Two things are different if it's the first comprehension:
         // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
@@ -4351,7 +4287,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         &mut self,
         call_expression_node: &ast::Expr,
         call_expression: &ast::ExprCall,
-        _containing_assignment: Option<Definition<'db>>,
     ) -> Type<'db> {
         let ast::ExprCall {
             range: _,
@@ -6376,11 +6311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         Ok(builder.build())
     }
 
-    fn infer_subscript_expression(
-        &mut self,
-        subscript: &ast::ExprSubscript,
-        containing_assignment: Option<Definition<'db>>,
-    ) -> Type<'db> {
+    fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
         let ast::ExprSubscript {
             range: _,
             value,
@@ -6396,12 +6327,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // special cases, too.
         let value_ty = self.infer_expression(value);
         if let Type::ClassLiteral(ClassLiteralType::Generic(generic_class)) = value_ty {
-            return self.infer_explicit_class_specialization(
-                subscript,
-                value_ty,
-                generic_class,
-                containing_assignment,
-            );
+            return self.infer_explicit_class_specialization(subscript, value_ty, generic_class);
         }
 
         let slice_ty = self.infer_expression(slice);
@@ -6413,7 +6339,6 @@ impl<'db> TypeInferenceBuilder<'db> {
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
         generic_class: GenericClass<'db>,
-        _containing_assignment: Option<Definition<'db>>,
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
         let mut call_argument_types = match slice_node {
@@ -7303,7 +7228,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             ast::Expr::Call(call_expr) => {
-                self.infer_call_expression(expression, call_expr, None);
+                self.infer_call_expression(expression, call_expr);
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Function calls are not allowed in type expressions"),
@@ -7558,12 +7483,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 value_ty
             }
             Type::ClassLiteral(ClassLiteralType::Generic(generic_class)) => {
-                let specialized_class = self.infer_explicit_class_specialization(
-                    subscript,
-                    value_ty,
-                    generic_class,
-                    None,
-                );
+                let specialized_class =
+                    self.infer_explicit_class_specialization(subscript, value_ty, generic_class);
                 specialized_class
                     .in_type_expression(self.db())
                     .unwrap_or(Type::unknown())
@@ -8666,19 +8587,15 @@ mod tests {
 
     #[test]
     fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
-        fn x_arguments(db: &TestDb) -> InferExpressionTypes<'_> {
+        fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
             let ast = parsed_module(db, file_main);
-            // Get the second statement in `main.py` (x = …) and extract the definition and the
-            // expression node on the right-hand side:
-            let x_stmt = &ast.syntax().body[1].as_assign_stmt().unwrap();
-            let x_target = x_stmt.targets[0].as_name_expr().unwrap();
-            let x_rhs_node = &x_stmt.value;
+            // Get the second statement in `main.py` (x = …) and extract the expression
+            // node on the right-hand side:
+            let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
 
             let index = semantic_index(db, file_main);
-            let x_def = index.expect_single_definition(x_target);
-            let x_rhs_expr = index.expression(x_rhs_node.as_ref());
-            InferExpressionTypes::new(db, x_rhs_expr, Some(x_def))
+            index.expression(x_rhs_node.as_ref())
         }
 
         let mut db = setup_db();
@@ -8719,7 +8636,7 @@ mod tests {
             assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
             db.take_salsa_events()
         };
-        assert_function_query_was_run(&db, infer_expression_types_impl, x_arguments(&db), &events);
+        assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
 
         // Add a comment; this should not trigger the type of `x` to be re-inferred
         db.write_dedented(
@@ -8741,8 +8658,8 @@ mod tests {
 
         assert_function_query_was_not_run(
             &db,
-            infer_expression_types_impl,
-            x_arguments(&db),
+            infer_expression_types,
+            x_rhs_expression(&db),
             &events,
         );
 
@@ -8753,19 +8670,15 @@ mod tests {
     /// doesn't trigger type inference for expressions that depend on the class's members.
     #[test]
     fn dependency_own_instance_member() -> anyhow::Result<()> {
-        fn x_arguments(db: &TestDb) -> InferExpressionTypes<'_> {
+        fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
             let file_main = system_path_to_file(db, "/src/main.py").unwrap();
             let ast = parsed_module(db, file_main);
-            // Get the second statement in `main.py` (x = …) and extract the definition and the
-            // expression node on the right-hand side:
-            let x_stmt = &ast.syntax().body[1].as_assign_stmt().unwrap();
-            let x_target = x_stmt.targets[0].as_name_expr().unwrap();
-            let x_rhs_node = &x_stmt.value;
+            // Get the second statement in `main.py` (x = …) and extract the expression
+            // node on the right-hand side:
+            let x_rhs_node = &ast.syntax().body[1].as_assign_stmt().unwrap().value;
 
             let index = semantic_index(db, file_main);
-            let x_def = index.expect_single_definition(x_target);
-            let x_rhs_expr = index.expression(x_rhs_node.as_ref());
-            InferExpressionTypes::new(db, x_rhs_expr, Some(x_def))
+            index.expression(x_rhs_node.as_ref())
         }
 
         let mut db = setup_db();
@@ -8810,7 +8723,7 @@ mod tests {
             assert_eq!(attr_ty.display(&db).to_string(), "Unknown | str | None");
             db.take_salsa_events()
         };
-        assert_function_query_was_run(&db, infer_expression_types_impl, x_arguments(&db), &events);
+        assert_function_query_was_run(&db, infer_expression_types, x_rhs_expression(&db), &events);
 
         // Add a comment; this should not trigger the type of `x` to be re-inferred
         db.write_dedented(
@@ -8834,8 +8747,8 @@ mod tests {
 
         assert_function_query_was_not_run(
             &db,
-            infer_expression_types_impl,
-            x_arguments(&db),
+            infer_expression_types,
+            x_rhs_expression(&db),
             &events,
         );
 
