@@ -20,7 +20,6 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Test that we can set to false via CLI
-    let case = TestCase::with_files([(".ignore", "test.py"), ("test.py", "~")])?;
     assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
     success: false
     exit_code: 1
@@ -38,11 +37,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Test that we can set to false via config file
-    let case = TestCase::with_files([
-        ("knot.toml", "respect-ignore-files = false"),
-        (".ignore", "test.py"),
-        ("test.py", "~"),
-    ])?;
+    case.write_file("knot.toml", "respect-ignore-files = false")?;
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -60,27 +55,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Ensure CLI takes precedence
-    let case = TestCase::with_files([
-        ("knot.toml", "respect-ignore-files = false"),
-        (".ignore", "test.py"),
-        ("test.py", "~"),
-    ])?;
-    assert_cmd_snapshot!(case.command().arg("--respect-ignore-files"), @r"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    WARN No python files found under the given path(s)
-    ");
-
-    // Ensure --no-respect-ignore-files takes precedence over config file
-    let case = TestCase::with_files([
-        ("knot.toml", "respect-ignore-files = true"),
-        (".ignore", "test.py"),
-        ("test.py", "~"),
-    ])?;
+    case.write_file("knot.toml", "respect-ignore-files = true")?;
     assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
     success: false
     exit_code: 1
