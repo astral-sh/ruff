@@ -38,7 +38,7 @@ use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::{walk_expr, Visitor};
-use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprContext, Identifier};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa;
@@ -50,7 +50,7 @@ use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId, ScopedExpressionId};
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
-    Definition, DefinitionKind, DefinitionNodeKey, ExceptHandlerDefinitionKind,
+    Definition, DefinitionKind, DefinitionNodeKey, DefinitionTarget, ExceptHandlerDefinitionKind,
     ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
@@ -58,7 +58,7 @@ use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
-use crate::semantic_index::{semantic_index, EagerSnapshotResult, SemanticIndex};
+use crate::semantic_index::{semantic_index, use_def_map, EagerSnapshotResult, SemanticIndex};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -151,7 +151,7 @@ pub(crate) fn infer_definition_types<'db>(
     let file = definition.file(db);
     let _span = tracing::trace_span!(
         "infer_definition_types",
-        range = ?definition.kind(db).target_range(),
+        range = ?definition.kind(db).target().range(),
         ?file
     )
     .entered();
@@ -190,7 +190,7 @@ pub(crate) fn infer_deferred_types<'db>(
     let _span = tracing::trace_span!(
         "infer_deferred_types",
         definition = ?definition.as_id(),
-        range = ?definition.kind(db).target_range(),
+        range = ?definition.kind(db).target().range(),
         ?file
     )
     .entered();
@@ -5136,7 +5136,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Infer the type of a [`ast::ExprName`] expression, assuming a load context.
     fn infer_name_load(&mut self, name_node: &ast::ExprName) -> Type<'db> {
         let ast::ExprName {
-            range: _,
+            range,
             id: symbol_name,
             ctx: _,
         } = name_node;
@@ -5153,10 +5153,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             for (enclosing_scope_file_id, constraint_key) in constraint_keys {
                 let use_def = self.index.use_def_map(*enclosing_scope_file_id);
                 let constraints = use_def.narrowing_constraints_at_use(*constraint_key);
-                let symbol_table = self.index.symbol_table(*enclosing_scope_file_id);
-                let symbol = symbol_table.symbol_id_by_name(symbol_name).unwrap();
+                let ident = Identifier::new(symbol_name.clone(), *range);
+                let target = DefinitionTarget::Ident(&ident);
 
-                ty = constraints.narrow(db, ty, symbol);
+                ty = constraints.narrow(db, ty, target);
             }
             ty
         };
@@ -5386,6 +5386,40 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    fn narrow<'r>(&self, target: impl Into<ast::ExprRef<'r>>, ty: Type<'db>) -> Type<'db> {
+        fn root_name<'r>(expr: impl Into<ast::ExprRef<'r>>) -> Option<&'r ast::ExprName> {
+            match expr.into() {
+                ast::ExprRef::Name(name) => Some(name),
+                ast::ExprRef::Attribute(attr) => root_name(&attr.value),
+                ast::ExprRef::Subscript(subscript)
+                    if subscript.slice.is_string_literal_expr()
+                        || subscript.slice.is_number_literal_expr() =>
+                {
+                    root_name(&subscript.value)
+                }
+                ast::ExprRef::Named(named) => root_name(&named.target),
+                _ => None,
+            }
+        }
+
+        let target = target.into();
+
+        if let Some(name) = root_name(target) {
+            let db = self.db();
+            let scope = self.scope();
+
+            let use_id = name.scoped_use_id(db, scope);
+            let use_def = use_def_map(db, scope);
+            let mut bindings = use_def.bindings_at_use(use_id);
+            let binding = bindings.next().unwrap();
+            binding
+                .narrowing_constraint
+                .narrow(db, ty, DefinitionTarget::Expr(target))
+        } else {
+            ty
+        }
+    }
+
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
         let ast::ExprAttribute {
@@ -5400,6 +5434,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         value_type
             .member(db, &attr.id)
+            .map_type(|ty| self.narrow(attribute, ty))
             .unwrap_with_diagnostic(|lookup_error| match lookup_error {
                 LookupError::Unbound(_) => {
                     let report_unresolved_attribute = self.is_reachable(attribute);
@@ -6740,7 +6775,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         let slice_ty = self.infer_expression(slice);
-        self.infer_subscript_expression_types(value, value_ty, slice_ty)
+        let result_ty = self.infer_subscript_expression_types(value, value_ty, slice_ty);
+        self.narrow(subscript, result_ty)
     }
 
     fn infer_explicit_class_specialization(

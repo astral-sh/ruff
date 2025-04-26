@@ -792,7 +792,7 @@ fn symbol_from_bindings_impl<'db>(
             }
 
             let binding_ty = binding_type(db, binding);
-            Some(narrowing_constraint.narrow(db, binding_ty, binding.symbol(db)))
+            Some(narrowing_constraint.narrow(db, binding_ty, binding.kind(db).target()))
         },
     );
 
