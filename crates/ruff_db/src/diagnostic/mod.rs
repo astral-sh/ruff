@@ -227,6 +227,11 @@ impl Diagnostic {
     pub fn primary_span(&self) -> Option<Span> {
         self.primary_annotation().map(|ann| ann.span.clone())
     }
+
+    /// Returns the tags from the primary annotation of this diagnostic if it exists.
+    pub fn primary_tags(&self) -> Option<&[DiagnosticTag]> {
+        self.primary_annotation().map(|ann| ann.tags.as_slice())
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -338,6 +343,8 @@ pub struct Annotation {
     /// Whether this annotation is "primary" or not. When it isn't primary, an
     /// annotation is said to be "secondary."
     is_primary: bool,
+    /// The diagnostic tags associated with this annotation.
+    tags: Vec<DiagnosticTag>,
 }
 
 impl Annotation {
@@ -355,6 +362,7 @@ impl Annotation {
             span,
             message: None,
             is_primary: true,
+            tags: Vec::new(),
         }
     }
 
@@ -370,6 +378,7 @@ impl Annotation {
             span,
             message: None,
             is_primary: false,
+            tags: Vec::new(),
         }
     }
 
@@ -412,6 +421,23 @@ impl Annotation {
     pub fn get_span(&self) -> &Span {
         &self.span
     }
+
+    /// Returns the tags associated with this annotation.
+    pub fn get_tags(&self) -> &[DiagnosticTag] {
+        &self.tags
+    }
+}
+
+/// Tags that can be associated with an annotation.
+///
+/// These tags are used to provide additional information about the annotation.
+/// and are passed through to the language server protocol.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DiagnosticTag {
+    /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
+    Unnecessary,
+    /// Deprecated or obsolete code.
+    Deprecated,
 }
 
 /// A string identifier for a lint rule.

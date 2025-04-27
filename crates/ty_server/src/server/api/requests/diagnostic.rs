@@ -2,9 +2,9 @@ use std::borrow::Cow;
 
 use lsp_types::request::DocumentDiagnosticRequest;
 use lsp_types::{
-    Diagnostic, DiagnosticSeverity, DocumentDiagnosticParams, DocumentDiagnosticReport,
-    DocumentDiagnosticReportResult, FullDocumentDiagnosticReport, NumberOrString, Range,
-    RelatedFullDocumentDiagnosticReport, Url,
+    Diagnostic, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticParams,
+    DocumentDiagnosticReport, DocumentDiagnosticReportResult, FullDocumentDiagnosticReport,
+    NumberOrString, Range, RelatedFullDocumentDiagnosticReport, Url,
 };
 
 use crate::document::ToRangeExt;
@@ -92,10 +92,22 @@ fn to_lsp_diagnostic(
         Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,
     };
 
+    let tags = diagnostic
+        .primary_tags()
+        .map(|tags| {
+            tags.iter()
+                .map(|tag| match tag {
+                    ruff_db::diagnostic::DiagnosticTag::Unnecessary => DiagnosticTag::UNNECESSARY,
+                    ruff_db::diagnostic::DiagnosticTag::Deprecated => DiagnosticTag::DEPRECATED,
+                })
+                .collect::<Vec<DiagnosticTag>>()
+        })
+        .filter(|mapped_tags| !mapped_tags.is_empty());
+
     Diagnostic {
         range,
         severity: Some(severity),
-        tags: None,
+        tags,
         code: Some(NumberOrString::String(diagnostic.id().to_string())),
         code_description: None,
         source: Some("ty".into()),
