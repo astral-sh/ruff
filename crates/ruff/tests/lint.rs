@@ -3475,7 +3475,7 @@ requires-python = ">= 3.11"
         &inner_pyproject,
         r#"
 [tool.ruff]
-target-version = "py310"        
+target-version = "py310"
 "#,
     )?;
 
@@ -4978,6 +4978,27 @@ fn flake8_import_convention_unused_aliased_import_no_conflict() {
         .arg("--fix")
         .arg("-")
         .pass_stdin("1"));
+}
+
+// See: https://github.com/astral-sh/ruff/issues/16177
+#[test]
+fn flake8_pyi_redundant_none_literal() {
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select", "PYI061"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("--preview")
+        .arg("--fix")
+        .arg("-")
+        .pass_stdin(
+            r#"
+from typing import Literal
+
+# Ruff offers a fix for one of these, but not both of them, as if both were autofixed
+# it would result in a `TypeError` at runtime.
+x: Literal[None,] | Literal[None,]
+"#
+        ));
 }
 
 /// Test that private, old-style `TypeVar` generics

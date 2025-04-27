@@ -1,6 +1,5 @@
 from typing import Literal, Union
 
-
 def func1(arg1: Literal[None]): ...
 
 
@@ -54,7 +53,3 @@ c: (None | Literal[None]) | None
 d: None | (Literal[None] | None)
 e: None | ((None | Literal[None]) | None) | None
 f: Literal[None] | Literal[None]
-
-
-# https://github.com/astral-sh/ruff/issues/16177
-g: Literal[None,] | Literal[None,]
