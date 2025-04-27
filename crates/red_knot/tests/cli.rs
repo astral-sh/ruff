@@ -5,6 +5,74 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
 
+#[test]
+fn test_respect_ignore_files() -> anyhow::Result<()> {
+    // First test that the default option works correctly (the file is skipped)
+    let case = TestCase::with_files([(".ignore", "test.py"), ("test.py", "~")])?;
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    // Test that we can set to false via CLI
+    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: invalid-syntax
+     --> <temp_dir>/test.py:1:2
+      |
+    1 | ~
+      |  ^ Expected an expression
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // Test that we can set to false via config file
+    case.write_file("knot.toml", "respect-ignore-files = false")?;
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: invalid-syntax
+     --> <temp_dir>/test.py:1:2
+      |
+    1 | ~
+      |  ^ Expected an expression
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // Ensure CLI takes precedence
+    case.write_file("knot.toml", "respect-ignore-files = true")?;
+    assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error: invalid-syntax
+     --> <temp_dir>/test.py:1:2
+      |
+    1 | ~
+      |  ^ Expected an expression
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
 /// Specifying an option on the CLI should take precedence over the same setting in the
 /// project's configuration. Here, this is tested for the Python version.
 #[test]
