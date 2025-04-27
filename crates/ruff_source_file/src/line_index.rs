@@ -65,14 +65,16 @@ impl LineIndex {
         self.inner.kind
     }
 
-    /// Returns the line and column number for an offset, skipping the BOM character (if any) because
-    /// it's uncommon for editors and other tools to count it as a column.
+    /// Returns the line and column number for an UTF-8 byte offset.
+    ///
+    /// The `column` number is the nth-character of the line, except for the first line
+    /// where it doesn't include the UTF-8 BOM marker at the start of the file.
     ///
     /// ### BOM handling
     ///
-    /// Offsets before the end of the BOM character are all mapped to the first line and column. This means,
-    /// that converting the position back to an offset always returns the offset AFTER the BOM character.
-    /// The operation isn't reversible, but it is consistent.
+    /// For files starting with a UTF-8 BOM marker, the byte offsets
+    /// in the range `0...3` are all mapped to line 0 and column 0.
+    /// Because of this, the conversion isn't losless.
     ///
     /// ## Examples
     ///
@@ -106,7 +108,7 @@ impl LineIndex {
     ///
     /// ## Panics
     ///
-    /// If the offset is out of bounds.
+    /// If the byte offset isn't within the bounds of `content`.
     pub fn line_column(&self, offset: TextSize, content: &str) -> LineColumn {
         let location = self.source_location(offset, content, PositionEncoding::Utf32);
 
@@ -123,12 +125,12 @@ impl LineIndex {
         }
     }
 
-    /// Returns the line and character offset according to the given encoding.
+    /// Given a UTF-8 byte offset, returns the line and character offset according to the given encoding.
     ///
     /// ### BOM handling
     ///
-    /// Unlike [`Self::line_column`], this method does not skip the BOM character. This allows for
-    /// bidirectional mapping between `LineCharacter` and `TextSize`.
+    /// Unlike [`Self::line_column`], this method does not skip the BOM character at the start of the file.
+    /// This allows for bidirectional mapping between [`SourceLocation`] and [`TextSize`] (see [`Self::offset`]).
     ///
     /// ## Examples
     ///
@@ -162,7 +164,7 @@ impl LineIndex {
     ///
     /// ## Panics
     ///
-    /// If the offset is out of bounds.
+    /// If the UTF-8 byte offset is out of bounds of `text`.
     pub fn source_location(
         &self,
         offset: TextSize,
@@ -304,11 +306,11 @@ impl LineIndex {
         }
     }
 
-    /// Returns the [byte offset](TextSize) at `line` and `character` where character is counted using the given encoding.
+    /// Returns the [UTF-8 byte offset](TextSize) at `line` and `character` where character is counted using the given encoding.
     ///
     /// ## Examples
     ///
-    /// ### ASCII
+    /// ### ASCII only source text
     ///
     /// ```
     /// # use ruff_source_file::{SourceLocation, LineIndex, OneIndexed, PositionEncoding};
@@ -371,7 +373,7 @@ impl LineIndex {
     ///  );
     /// ```
     ///
-    /// ### UTF8
+    /// ### Non-ASCII source text
     ///
     /// ```
     /// use ruff_source_file::{LineIndex, OneIndexed, SourceLocation, PositionEncoding};
