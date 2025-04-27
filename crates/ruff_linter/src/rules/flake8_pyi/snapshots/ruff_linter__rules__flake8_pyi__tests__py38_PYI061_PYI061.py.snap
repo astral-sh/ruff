@@ -500,7 +500,7 @@ PYI061.py:81:28: PYI061 Use `None` rather than `Literal[None]`
    |
    = help: Replace with `None`
 
-PYI061.py:84:12: PYI061 Use `None` rather than `Literal[None]`
+PYI061.py:84:12: PYI061 [*] Use `None` rather than `Literal[None]`
    |
 83 | # https://github.com/astral-sh/ruff/issues/16177
 84 | g: Literal[None,] | Literal[None,]
@@ -508,10 +508,24 @@ PYI061.py:84:12: PYI061 Use `None` rather than `Literal[None]`
    |
    = help: Replace with `None`
 
-PYI061.py:84:29: PYI061 Use `None` rather than `Literal[None]`
+ℹ Safe fix
+81 81 | f: Literal[None] | Literal[None]
+82 82 | 
+83 83 | # https://github.com/astral-sh/ruff/issues/16177
+84    |-g: Literal[None,] | Literal[None,]
+   84 |+g: None | Literal[None,]
+
+PYI061.py:84:29: PYI061 [*] Use `None` rather than `Literal[None]`
    |
 83 | # https://github.com/astral-sh/ruff/issues/16177
 84 | g: Literal[None,] | Literal[None,]
    |                             ^^^^ PYI061
    |
    = help: Replace with `None`
+
+ℹ Safe fix
+81 81 | f: Literal[None] | Literal[None]
+82 82 | 
+83 83 | # https://github.com/astral-sh/ruff/issues/16177
+84    |-g: Literal[None,] | Literal[None,]
+   84 |+g: Literal[None,] | None
