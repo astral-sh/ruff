@@ -269,7 +269,7 @@ E712.py:31:4: E712 [*] Avoid equality comparisons to `True`; use `if yield i:` f
 E712.py:58:4: E712 [*] Avoid equality comparisons to `True`; use `if True:` for truth checks
    |
 57 | # https://github.com/astral-sh/ruff/issues/17582
-58 | if True == True: # No duplicate error
+58 | if True == True: # No duplicated diagnostic
    |    ^^^^^^^^^^^^ E712
 59 |     pass
    |
@@ -279,6 +279,6 @@ E712.py:58:4: E712 [*] Avoid equality comparisons to `True`; use `if True:` for 
 55 55 | assert [42, not foo] in bar
 56 56 | 
 57 57 | # https://github.com/astral-sh/ruff/issues/17582
-58    |-if True == True: # No duplicate error
-   58 |+if True: # No duplicate error
+58    |-if True == True: # No duplicated diagnostic
+   58 |+if True: # No duplicated diagnostic
 59 59 |     pass
