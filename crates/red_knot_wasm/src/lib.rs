@@ -19,7 +19,7 @@ use ruff_db::system::{
 use ruff_db::Upcast;
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
-use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
+use ruff_source_file::{LineColumn, LineIndex, OneIndexed, PositionEncoding, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use wasm_bindgen::prelude::*;
 
@@ -408,8 +408,8 @@ impl Range {
     }
 }
 
-impl From<(SourceLocation, SourceLocation)> for Range {
-    fn from((start, end): (SourceLocation, SourceLocation)) -> Self {
+impl From<(LineColumn, LineColumn)> for Range {
+    fn from((start, end): (LineColumn, LineColumn)) -> Self {
         Self {
             start: start.into(),
             end: end.into(),
@@ -438,29 +438,34 @@ impl Position {
 impl Position {
     fn to_text_size(self, text: &str, index: &LineIndex) -> Result<TextSize, Error> {
         let text_size = index.offset(
-            OneIndexed::new(self.line).ok_or_else(|| {
-                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
-            })?,
-            OneIndexed::new(self.column).ok_or_else(|| {
-                Error::new(
-                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
-                )
-            })?,
+            SourceLocation {
+                line: OneIndexed::new(self.line).ok_or_else(|| {
+                    Error::new(
+                        "Invalid value `0` for `position.line`. The line index is 1-indexed.",
+                    )
+                })?,
+                character_offset: OneIndexed::new(self.column).ok_or_else(|| {
+                    Error::new(
+                        "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                    )
+                })?,
+            },
             text,
+            PositionEncoding::Utf32,
         );
 
         Ok(text_size)
     }
 
     fn from_text_size(offset: TextSize, line_index: &LineIndex, source: &str) -> Self {
-        line_index.source_location(offset, source).into()
+        line_index.line_column(offset, source).into()
     }
 }
 
-impl From<SourceLocation> for Position {
-    fn from(location: SourceLocation) -> Self {
+impl From<LineColumn> for Position {
+    fn from(location: LineColumn) -> Self {
         Self {
-            line: location.row.get(),
+            line: location.line.get(),
             column: location.column.get(),
         }
     }

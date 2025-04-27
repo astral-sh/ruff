@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 
+use crate::commands::completions::config::{OptionString, OptionStringParser};
 use anyhow::bail;
 use clap::builder::{TypedValueParser, ValueParserFactory};
 use clap::{command, Parser, Subcommand};
@@ -22,7 +23,7 @@ use ruff_linter::settings::types::{
 };
 use ruff_linter::{RuleParser, RuleSelector, RuleSelectorParser};
 use ruff_python_ast as ast;
-use ruff_source_file::{LineIndex, OneIndexed};
+use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding};
 use ruff_text_size::TextRange;
 use ruff_workspace::configuration::{Configuration, RuleSelection};
 use ruff_workspace::options::{Options, PycodestyleOptions};
@@ -30,8 +31,6 @@ use ruff_workspace::options_base::{OptionEntry, OptionsMetadata};
 use ruff_workspace::resolver::ConfigurationTransformer;
 use rustc_hash::FxHashMap;
 use toml;
-
-use crate::commands::completions::config::{OptionString, OptionStringParser};
 
 /// All configuration options that can be passed "globally",
 /// i.e., can be passed to all subcommands
@@ -1070,8 +1069,9 @@ impl FormatRange {
     ///
     /// Returns an empty range if the start range is past the end of `source`.
     pub(super) fn to_text_range(self, source: &str, line_index: &LineIndex) -> TextRange {
-        let start_byte_offset = line_index.offset(self.start.line, self.start.column, source);
-        let end_byte_offset = line_index.offset(self.end.line, self.end.column, source);
+        let start_byte_offset =
+            line_index.offset(self.start.into(), source, PositionEncoding::Utf32);
+        let end_byte_offset = line_index.offset(self.end.into(), source, PositionEncoding::Utf32);
 
         TextRange::new(start_byte_offset, end_byte_offset)
     }
@@ -1140,6 +1140,15 @@ impl std::error::Error for FormatRangeParseError {}
 pub struct LineColumn {
     pub line: OneIndexed,
     pub column: OneIndexed,
+}
+
+impl From<LineColumn> for ruff_source_file::SourceLocation {
+    fn from(value: LineColumn) -> Self {
+        Self {
+            line: value.line,
+            character_offset: value.column,
+        }
+    }
 }
 
 impl std::fmt::Display for LineColumn {

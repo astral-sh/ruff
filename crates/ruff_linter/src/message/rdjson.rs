@@ -8,7 +8,7 @@ use ruff_diagnostics::Edit;
 use ruff_source_file::SourceCode;
 use ruff_text_size::Ranged;
 
-use crate::message::{Emitter, EmitterContext, Message, SourceLocation};
+use crate::message::{Emitter, EmitterContext, LineColumn, Message};
 
 #[derive(Default)]
 pub struct RdjsonEmitter;
@@ -59,15 +59,15 @@ impl Serialize for ExpandedMessages<'_> {
 fn message_to_rdjson_value(message: &Message) -> Value {
     let source_code = message.source_file().to_source_code();
 
-    let start_location = source_code.source_location(message.start());
-    let end_location = source_code.source_location(message.end());
+    let start_location = source_code.line_column(message.start());
+    let end_location = source_code.line_column(message.end());
 
     if let Some(fix) = message.fix() {
         json!({
             "message": message.body(),
             "location": {
                 "path": message.filename(),
-                "range": rdjson_range(&start_location, &end_location),
+                "range": rdjson_range(start_location, end_location),
             },
             "code": {
                 "value": message.rule().map(|rule| rule.noqa_code().to_string()),
@@ -80,7 +80,7 @@ fn message_to_rdjson_value(message: &Message) -> Value {
             "message": message.body(),
             "location": {
                 "path": message.filename(),
-                "range": rdjson_range(&start_location, &end_location),
+                "range": rdjson_range(start_location, end_location),
             },
             "code": {
                 "value": message.rule().map(|rule| rule.noqa_code().to_string()),
@@ -95,11 +95,11 @@ fn rdjson_suggestions(edits: &[Edit], source_code: &SourceCode) -> Value {
         edits
             .iter()
             .map(|edit| {
-                let location = source_code.source_location(edit.start());
-                let end_location = source_code.source_location(edit.end());
+                let location = source_code.line_column(edit.start());
+                let end_location = source_code.line_column(edit.end());
 
                 json!({
-                    "range": rdjson_range(&location, &end_location),
+                    "range": rdjson_range(location, end_location),
                     "text": edit.content().unwrap_or_default(),
                 })
             })
@@ -107,16 +107,10 @@ fn rdjson_suggestions(edits: &[Edit], source_code: &SourceCode) -> Value {
     )
 }
 
-fn rdjson_range(start: &SourceLocation, end: &SourceLocation) -> Value {
+fn rdjson_range(start: LineColumn, end: LineColumn) -> Value {
     json!({
-        "start": {
-            "line": start.row,
-            "column": start.column,
-        },
-        "end": {
-            "line": end.row,
-            "column": end.column,
-        },
+        "start": start,
+        "end": end,
     })
 }
 

@@ -430,10 +430,10 @@ fn ensure_unchanged_ast(
             formatted_unsupported_syntax_errors
                 .into_values()
                 .map(|error| {
-                    let location = index.source_location(error.start(), formatted_code);
+                    let location = index.line_column(error.start(), formatted_code);
                     format!(
                         "{row}:{col} {error}",
-                        row = location.row,
+                        row = location.line,
                         col = location.column
                     )
                 })

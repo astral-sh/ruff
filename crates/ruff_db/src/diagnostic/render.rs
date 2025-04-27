@@ -71,8 +71,8 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 write!(f, " {path}", path = self.resolver.path(span.file()))?;
                 if let Some(range) = span.range() {
                     let input = self.resolver.input(span.file());
-                    let start = input.as_source_code().source_location(range.start());
-                    write!(f, ":{line}:{col}", line = start.row, col = start.column)?;
+                    let start = input.as_source_code().line_column(range.start());
+                    write!(f, ":{line}:{col}", line = start.line, col = start.column)?;
                 }
                 write!(f, ":")?;
             }

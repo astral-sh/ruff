@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 
 use ruff_diagnostics::Edit;
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{OneIndexed, SourceCode, SourceLocation};
+use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
 use ruff_text_size::Ranged;
 
 use crate::message::{Emitter, EmitterContext, Message};
@@ -60,22 +60,23 @@ pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext)
         })
     });
 
-    let mut start_location = source_code.source_location(message.start());
-    let mut end_location = source_code.source_location(message.end());
+    let mut start_location = source_code.line_column(message.start());
+    let mut end_location = source_code.line_column(message.end());
     let mut noqa_location = message
         .noqa_offset()
-        .map(|offset| source_code.source_location(offset));
+        .map(|offset| source_code.line_column(offset));
     let mut notebook_cell_index = None;
 
     if let Some(notebook_index) = notebook_index {
         notebook_cell_index = Some(
             notebook_index
-                .cell(start_location.row)
+                .cell(start_location.line)
                 .unwrap_or(OneIndexed::MIN),
         );
-        start_location = notebook_index.translate_location(&start_location);
-        end_location = notebook_index.translate_location(&end_location);
-        noqa_location = noqa_location.map(|location| notebook_index.translate_location(&location));
+        start_location = notebook_index.translate_line_column(&start_location);
+        end_location = notebook_index.translate_line_column(&end_location);
+        noqa_location =
+            noqa_location.map(|location| notebook_index.translate_line_column(&location));
     }
 
     json!({
@@ -84,10 +85,17 @@ pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext)
         "message": message.body(),
         "fix": fix,
         "cell": notebook_cell_index,
-        "location": start_location,
-        "end_location": end_location,
+        "location": location_to_json(start_location),
+        "end_location": location_to_json(end_location),
         "filename": message.filename(),
-        "noqa_row": noqa_location.map(|location| location.row)
+        "noqa_row": noqa_location.map(|location| location.line)
+    })
+}
+
+fn location_to_json(location: LineColumn) -> serde_json::Value {
+    json!({
+        "row": location.line,
+        "column": location.column
     })
 }
 
@@ -105,8 +113,8 @@ impl Serialize for ExpandedEdits<'_> {
         let mut s = serializer.serialize_seq(Some(self.edits.len()))?;
 
         for edit in self.edits {
-            let mut location = self.source_code.source_location(edit.start());
-            let mut end_location = self.source_code.source_location(edit.end());
+            let mut location = self.source_code.line_column(edit.start());
+            let mut end_location = self.source_code.line_column(edit.end());
 
             if let Some(notebook_index) = self.notebook_index {
                 // There exists a newline between each cell's source code in the
@@ -118,44 +126,44 @@ impl Serialize for ExpandedEdits<'_> {
                 // If it does, we need to translate the end location to the last
                 // character of the previous cell.
                 match (
-                    notebook_index.cell(location.row),
-                    notebook_index.cell(end_location.row),
+                    notebook_index.cell(location.line),
+                    notebook_index.cell(end_location.line),
                 ) {
                     (Some(start_cell), Some(end_cell)) if start_cell != end_cell => {
                         debug_assert_eq!(end_location.column.get(), 1);
 
-                        let prev_row = end_location.row.saturating_sub(1);
-                        end_location = SourceLocation {
-                            row: notebook_index.cell_row(prev_row).unwrap_or(OneIndexed::MIN),
+                        let prev_row = end_location.line.saturating_sub(1);
+                        end_location = LineColumn {
+                            line: notebook_index.cell_row(prev_row).unwrap_or(OneIndexed::MIN),
                             column: self
                                 .source_code
-                                .source_location(self.source_code.line_end_exclusive(prev_row))
+                                .line_column(self.source_code.line_end_exclusive(prev_row))
                                 .column,
                         };
                     }
                     (Some(_), None) => {
                         debug_assert_eq!(end_location.column.get(), 1);
 
-                        let prev_row = end_location.row.saturating_sub(1);
-                        end_location = SourceLocation {
-                            row: notebook_index.cell_row(prev_row).unwrap_or(OneIndexed::MIN),
+                        let prev_row = end_location.line.saturating_sub(1);
+                        end_location = LineColumn {
+                            line: notebook_index.cell_row(prev_row).unwrap_or(OneIndexed::MIN),
                             column: self
                                 .source_code
-                                .source_location(self.source_code.line_end_exclusive(prev_row))
+                                .line_column(self.source_code.line_end_exclusive(prev_row))
                                 .column,
                         };
                     }
                     _ => {
-                        end_location = notebook_index.translate_location(&end_location);
+                        end_location = notebook_index.translate_line_column(&end_location);
                     }
                 }
-                location = notebook_index.translate_location(&location);
+                location = notebook_index.translate_line_column(&location);
             }
 
             let value = json!({
                 "content": edit.content().unwrap_or_default(),
-                "location": location,
-                "end_location": end_location
+                "location": location_to_json(location),
+                "end_location": location_to_json(end_location)
             });
 
             s.serialize_element(&value)?;
