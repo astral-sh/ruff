@@ -643,10 +643,9 @@ impl FromStr for OneIndexed {
     }
 }
 
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum PositionEncoding {
     /// Character offsets count the number of bytes from the start of the line.
-    #[default]
     Utf8,
 
     /// Character offsets count the number of UTF-16 code units from the start of the line.
