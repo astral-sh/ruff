@@ -130,6 +130,9 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
                 literal_elements.clone(),
                 union_kind,
             )
+            // Isolate the fix to ensure multiple fixes on the same expression (like
+            // `Literal[None,] | Literal[None,]` -> `None | None`) happen across separate passes,
+            // preventing the production of invalid code.
             .map(|fix| {
                 fix.map(|fix| fix.isolate(Checker::isolation(semantic.current_statement_id())))
             })
