@@ -1,0 +1,144 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_unparenthesized_tuple_no_as_py313.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..117,
+        body: [
+            Try(
+                StmtTry {
+                    range: 44..79,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 53..57,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 58..79,
+                                type_: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 65..69,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 65..66,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 68..69,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 75..79,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: false,
+                },
+            ),
+            Try(
+                StmtTry {
+                    range: 80..116,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                range: 89..93,
+                            },
+                        ),
+                    ],
+                    handlers: [
+                        ExceptHandler(
+                            ExceptHandlerExceptHandler {
+                                range: 94..116,
+                                type_: Some(
+                                    Tuple(
+                                        ExprTuple {
+                                            range: 102..106,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        range: 102..103,
+                                                        id: Name("x"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        range: 105..106,
+                                                        id: Name("y"),
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Load,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                ),
+                                name: None,
+                                body: [
+                                    Pass(
+                                        StmtPass {
+                                            range: 112..116,
+                                        },
+                                    ),
+                                ],
+                            },
+                        ),
+                    ],
+                    orelse: [],
+                    finalbody: [],
+                    is_star: true,
+                },
+            ),
+        ],
+    },
+)
+```
+## Unsupported Syntax Errors
+
+  |
+2 | try:
+3 |     pass
+4 | except x, y:
+  |        ^^^^ Syntax Error: Multiple exception types must be parenthesized on Python 3.13 (syntax was added in Python 3.14)
+5 |     pass
+6 | try:
+  |
+
+
+  |
+6 | try:
+7 |     pass
+8 | except* x, y:
+  |         ^^^^ Syntax Error: Multiple exception types must be parenthesized on Python 3.13 (syntax was added in Python 3.14)
+9 |     pass
+  |
