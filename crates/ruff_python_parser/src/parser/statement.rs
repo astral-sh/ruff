@@ -1581,25 +1581,50 @@ impl<'src> Parser<'src> {
                     ..
                 })
             ) {
-                // test_err except_stmt_unparenthesized_tuple
-                // try:
-                //     pass
-                // except x, y:
-                //     pass
-                // except x, y as exc:
-                //     pass
-                // try:
-                //     pass
-                // except* x, y:
-                //     pass
-                // except* x, y as eg:
-                //     pass
-                self.add_error(
-                    ParseErrorType::OtherError(
-                        "Multiple exception types must be parenthesized".to_string(),
-                    ),
-                    &parsed_expr,
-                );
+                if self.at(TokenKind::As) {
+                    // test_err except_stmt_unparenthesized_tuple_as
+                    // try:
+                    //     pass
+                    // except x, y as exc:
+                    //     pass
+                    // try:
+                    //     pass
+                    // except* x, y as eg:
+                    //     pass
+                    self.add_error(
+                        ParseErrorType::OtherError(
+                            "Multiple exception types must be parenthesized if bound with `as`"
+                                .to_string(),
+                        ),
+                        &parsed_expr,
+                    );
+                } else {
+                    // test_err except_stmt_unparenthesized_tuple_no_as_py313
+                    // # parse_options: {"target-version": "3.13"}
+                    // try:
+                    //     pass
+                    // except x, y:
+                    //     pass
+                    // try:
+                    //     pass
+                    // except* x, y:
+                    //     pass
+
+                    // test_ok except_stmt_unparenthesized_tuple_no_as_py314
+                    // # parse_options: {"target-version": "3.14"}
+                    // try:
+                    //     pass
+                    // except x, y:
+                    //     pass
+                    // try:
+                    //     pass
+                    // except* x, y:
+                    //     pass
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::UnparenthesizedExceptExpression,
+                        parsed_expr.range(),
+                    );
+                }
             }
             Some(Box::new(parsed_expr.expr))
         } else {
