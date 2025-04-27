@@ -418,7 +418,7 @@ impl<'db> TypeInference<'db> {
             .copied()
             .or(self.cycle_fallback_type)
             .expect(
-                "definition should belong to this TypeInference region and
+                "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
     }
@@ -430,7 +430,7 @@ impl<'db> TypeInference<'db> {
             .copied()
             .or(self.cycle_fallback_type.map(Into::into))
             .expect(
-                "definition should belong to this TypeInference region and
+                "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
     }
@@ -1032,6 +1032,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 continue;
             };
 
+            // Check that the overloaded function has at least two overloads
             if let [single_overload] = overloaded.overloads.as_slice() {
                 let function_node = function.node(self.db(), self.file());
                 if let Some(builder) = self

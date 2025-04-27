@@ -317,15 +317,19 @@ At least two `@overload`-decorated definitions must be present.
 from typing import overload
 
 @overload
-def func1(x: int) -> int: ...
+def func(x: int) -> int: ...
 
 # error: [invalid-overload]
-def func1(x: int | str) -> int | str:
+def func(x: int | str) -> int | str:
     return x
+```
+
+```pyi
+from typing import overload
 
 @overload
 # error: [invalid-overload]
-def func2(x: int) -> int: ...
+def func(x: int) -> int: ...
 ```
 
 ### Overload without an implementation
