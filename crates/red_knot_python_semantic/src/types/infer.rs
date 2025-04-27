@@ -1032,7 +1032,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 continue;
             };
 
-            if overloaded.overloads.len() < 2 {
+            if let [single_overload] = overloaded.overloads.as_slice() {
                 let function_node = function.node(self.db(), self.file());
                 if let Some(builder) = self
                     .context
@@ -1042,13 +1042,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         "Overloaded function `{}` requires at least two overloads",
                         &function_node.name
                     ));
-                    if let Some(first_overload) = overloaded.overloads.first() {
-                        diagnostic.annotate(
-                            self.context
-                                .secondary(first_overload.focus_range(self.db()))
-                                .message(format_args!("Only one overload defined here")),
-                        );
-                    }
+                    diagnostic.annotate(
+                        self.context
+                            .secondary(single_overload.focus_range(self.db()))
+                            .message(format_args!("Only one overload defined here")),
+                    );
                 }
             }
         }
