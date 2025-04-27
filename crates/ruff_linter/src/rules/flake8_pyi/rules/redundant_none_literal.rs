@@ -130,6 +130,9 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
                 literal_elements.clone(),
                 union_kind,
             )
+            .map(|fix| {
+                fix.map(|fix| fix.isolate(Checker::isolation(semantic.current_statement_id())))
+            })
         });
         checker.report_diagnostic(diagnostic);
     }
@@ -178,7 +181,7 @@ fn create_fix(
                 if expr != literal_expr {
                     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
                         if semantic.match_typing_expr(value, "Literal")
-                            && is_slice_none_literal(slice)
+                            && matches!(**slice, Expr::NoneLiteral(_))
                         {
                             is_fixable = false;
                         }
@@ -257,16 +260,4 @@ enum UnionKind {
     NoUnion,
     TypingOptional,
     BitOr,
-}
-
-fn is_slice_none_literal(slice: &Expr) -> bool {
-    match slice {
-        Expr::NoneLiteral(_) => true,
-        // If the slice contains a single-element tuple, e.g. `Literal[None,]`,
-        // check the first element.
-        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-            matches!(&**elts, [Expr::NoneLiteral(_)])
-        }
-        _ => false,
-    }
 }
