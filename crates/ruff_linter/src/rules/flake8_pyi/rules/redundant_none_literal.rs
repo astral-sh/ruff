@@ -178,7 +178,7 @@ fn create_fix(
                 if expr != literal_expr {
                     if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
                         if semantic.match_typing_expr(value, "Literal")
-                            && matches!(**slice, Expr::NoneLiteral(_))
+                            && is_slice_none_literal(slice)
                         {
                             is_fixable = false;
                         }
@@ -257,4 +257,16 @@ enum UnionKind {
     NoUnion,
     TypingOptional,
     BitOr,
+}
+
+fn is_slice_none_literal(slice: &Expr) -> bool {
+    match slice {
+        Expr::NoneLiteral(_) => true,
+        // If the slice contains a tuple, e.g. `Literal[None,]` we are only interested in the first
+        // element.
+        Expr::Tuple(ast::ExprTuple { elts, .. }) if elts.len() == 1 => elts
+            .first()
+            .is_some_and(|expr| matches!(expr, Expr::NoneLiteral(_))),
+        _ => false,
+    }
 }
