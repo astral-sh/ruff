@@ -23,6 +23,7 @@ use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
+use crate::rules::flake8_return::visitor::NestedFunctionVisitor;
 use crate::Locator;
 
 use super::super::branch::Branch;
@@ -562,7 +563,16 @@ fn implicit_return(checker: &Checker, function_def: &ast::StmtFunctionDef, stmt:
 }
 
 /// RET504
-fn unnecessary_assign(checker: &Checker, stack: &Stack) {
+fn unnecessary_assign(checker: &Checker, body: &[Stmt], stack: &Stack) {
+    let nested_ids = {
+        let mut visitor = NestedFunctionVisitor::new();
+        for stmt in body {
+            visitor.visit_stmt(stmt);
+        }
+
+        visitor.nested_ids
+    };
+
     for (assign, return_, stmt) in &stack.assignment_return {
         // Identify, e.g., `return x`.
         let Some(value) = return_.value.as_ref() else {
@@ -603,6 +613,11 @@ fn unnecessary_assign(checker: &Checker, stack: &Stack) {
 
         // Ignore `nonlocal` and `global` variables.
         if stack.non_locals.contains(assigned_id.as_str()) {
+            continue;
+        }
+
+        // Ignore identifiers used inside nested functions.
+        if nested_ids.contains(assigned_id.as_str()) {
             continue;
         }
 
@@ -812,7 +827,7 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
         }
 
         if checker.enabled(Rule::UnnecessaryAssign) {
-            unnecessary_assign(checker, &stack);
+            unnecessary_assign(checker, body, &stack);
         }
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {

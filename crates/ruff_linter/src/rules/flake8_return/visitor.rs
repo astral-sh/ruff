@@ -186,6 +186,45 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
     }
 }
 
+pub(super) struct NestedFunctionVisitor<'data> {
+    /// Identifiers used inside nested functions.
+    pub(super) nested_ids: FxHashSet<&'data str>,
+}
+
+impl NestedFunctionVisitor<'_> {
+    pub(super) fn new() -> Self {
+        Self {
+            nested_ids: FxHashSet::default(),
+        }
+    }
+}
+
+impl<'a> Visitor<'a> for NestedFunctionVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match stmt {
+            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
+                for stmt in body {
+                    visitor::walk_stmt(self, stmt);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        match expr {
+            Expr::Name(ast::ExprName {
+                ctx: ast::ExprContext::Load,
+                id,
+                ..
+            }) => {
+                self.nested_ids.insert(id.as_str());
+            }
+            _ => visitor::walk_expr(self, expr),
+        }
+    }
+}
+
 /// Returns `true` if the [`With`] statement is known to have a conditional body. In other words:
 /// if the [`With`] statement's body may or may not run.
 ///
