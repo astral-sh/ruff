@@ -201,13 +201,10 @@ impl NestedFunctionVisitor<'_> {
 
 impl<'a> Visitor<'a> for NestedFunctionVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
-                for stmt in body {
-                    visitor::walk_stmt(self, stmt);
-                }
+        if let Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) = stmt {
+            for stmt in body {
+                visitor::walk_stmt(self, stmt);
             }
-            _ => {}
         }
     }
 
