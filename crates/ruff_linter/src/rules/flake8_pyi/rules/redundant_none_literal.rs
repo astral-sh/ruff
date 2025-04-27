@@ -262,11 +262,11 @@ enum UnionKind {
 fn is_slice_none_literal(slice: &Expr) -> bool {
     match slice {
         Expr::NoneLiteral(_) => true,
-        // If the slice contains a tuple, e.g. `Literal[None,]` we are only interested in the first
-        // element.
-        Expr::Tuple(ast::ExprTuple { elts, .. }) if elts.len() == 1 => elts
-            .first()
-            .is_some_and(|expr| matches!(expr, Expr::NoneLiteral(_))),
+        // If the slice contains a single-element tuple, e.g. `Literal[None,]`,
+        // check the first element.
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            matches!(&**elts, [Expr::NoneLiteral(_)])
+        }
         _ => false,
     }
 }
