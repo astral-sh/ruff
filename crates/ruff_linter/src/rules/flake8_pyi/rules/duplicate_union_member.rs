@@ -1,21 +1,17 @@
 use std::collections::HashSet;
 
-use anyhow::Result;
-
-use ruff_python_codegen::Generator;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::name::Name;
-use ruff_python_ast::{
-    Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, ExprTuple, Operator, PythonVersion,
-};
+use ruff_python_ast::{Expr, ExprBinOp, Operator, PythonVersion};
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::{Checker, TypingImporter};
+use crate::checkers::ast::Checker;
+
+use super::generate_union_fix;
 
 /// ## What it does
 /// Checks for duplicate union members.
@@ -183,40 +179,4 @@ fn generate_pep604_fix(
         Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
         applicability,
     )
-}
-
-/// Generate a [`Fix`] for two or more type expressions, e.g. `typing.Union[int, float, complex]`.
-fn generate_union_fix(
-    generator: Generator,
-    importer: &TypingImporter,
-    nodes: Vec<&Expr>,
-    annotation: &Expr,
-    applicability: Applicability,
-) -> Result<Fix> {
-    debug_assert!(nodes.len() >= 2, "At least two nodes required");
-
-    let (import_edit, binding) = importer.import(annotation.start())?;
-
-    // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
-    let new_expr = Expr::Subscript(ExprSubscript {
-        range: TextRange::default(),
-        value: Box::new(Expr::Name(ExprName {
-            id: Name::new(binding),
-            ctx: ExprContext::Store,
-            range: TextRange::default(),
-        })),
-        slice: Box::new(Expr::Tuple(ExprTuple {
-            elts: nodes.into_iter().cloned().collect(),
-            range: TextRange::default(),
-            ctx: ExprContext::Load,
-            parenthesized: false,
-        })),
-        ctx: ExprContext::Load,
-    });
-
-    Ok(Fix::applicable_edits(
-        Edit::range_replacement(generator.expr(&new_expr), annotation.range()),
-        [import_edit],
-        applicability,
-    ))
 }
