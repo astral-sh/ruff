@@ -1,4 +1,4 @@
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, TypingImporter};
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast as ast;
@@ -202,11 +202,9 @@ fn add_diagnostic(
     class_def: &ast::StmtClassDef,
     method_name: &str,
 ) {
-    let fix = replace_with_self_fix(checker, stmt, returns, class_def);
-
-    if matches!(fix, Ok(None)) {
+    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
         return;
-    }
+    };
 
     let mut diagnostic = Diagnostic::new(
         NonSelfReturnType {
@@ -216,22 +214,20 @@ fn add_diagnostic(
         stmt.identifier(),
     );
 
-    diagnostic.try_set_optional_fix(|| fix);
+    diagnostic.try_set_fix(|| {
+        replace_with_self_fix(checker.semantic(), &importer, stmt, returns, class_def)
+    });
 
     checker.report_diagnostic(diagnostic);
 }
 
 fn replace_with_self_fix(
-    checker: &Checker,
+    semantic: &SemanticModel,
+    importer: &TypingImporter,
     stmt: &ast::Stmt,
     returns: &ast::Expr,
     class_def: &ast::StmtClassDef,
-) -> anyhow::Result<Option<Fix>> {
-    let semantic = checker.semantic();
-
-    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
-        return Ok(None);
-    };
+) -> anyhow::Result<Fix> {
     let (self_import, self_binding) = importer.import(returns.start())?;
 
     let mut others = Vec::with_capacity(2);
@@ -248,17 +244,13 @@ fn replace_with_self_fix(
     others.extend(remove_first_argument_type_hint());
     others.push(Edit::range_replacement(self_binding, returns.range()));
 
-    let applicability = if might_be_generic(class_def, checker.semantic()) {
+    let applicability = if might_be_generic(class_def, semantic) {
         Applicability::DisplayOnly
     } else {
         Applicability::Unsafe
     };
 
-    Ok(Some(Fix::applicable_edits(
-        self_import,
-        others,
-        applicability,
-    )))
+    Ok(Fix::applicable_edits(self_import, others, applicability))
 }
 
 /// Return true if `annotation` is either `ClassName` or `type[ClassName]`
