@@ -879,6 +879,13 @@ impl<'db> ClassLiteral<'db> {
                         continue;
                     }
 
+                    // Some meta-class methods such as `__call__` need special treatment depending on
+                    // whether they are explicitly defined, or inherited from `type.__call__`.
+                    // We use `MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK` flag and it's getter
+                    // `policy.meta_class_no_type_fallback` to allow downstream code to check whether
+                    // a custom implementation of such symbol exists on a type.
+                    // E.g. this is currently used in `ClassLiteral::into_callable` which passes this
+                    // policy here through a chain of calls.
                     if matches!(class.known(db), Some(KnownClass::Type))
                         && policy.meta_class_no_type_fallback()
                     {
