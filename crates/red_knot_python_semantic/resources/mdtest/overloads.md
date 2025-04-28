@@ -490,35 +490,38 @@ class CheckStaticMethod:
 class CheckClassMethod:
     def __init__(self, x: int) -> None:
         self.x = x
-    # TODO: error because `@classmethod` does not exist on all overloads
+
     @overload
     @classmethod
     def try_from1(cls, x: int) -> CheckClassMethod: ...
     @overload
     def try_from1(cls, x: str) -> None: ...
     @classmethod
+    # error: [invalid-overload]
     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
         return None
-    # TODO: error because `@classmethod` does not exist on all overloads
+
     @overload
     def try_from2(cls, x: int) -> CheckClassMethod: ...
     @overload
     @classmethod
     def try_from2(cls, x: str) -> None: ...
     @classmethod
+    # error: [invalid-overload]
     def try_from2(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
         return None
-    # TODO: error because `@classmethod` does not exist on the implementation
+
     @overload
     @classmethod
     def try_from3(cls, x: int) -> CheckClassMethod: ...
     @overload
     @classmethod
     def try_from3(cls, x: str) -> None: ...
+    # error: [invalid-overload]
     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
@@ -553,20 +556,22 @@ class Foo:
     @final
     def method1(self, x: int | str) -> int | str:
         return x
-    # TODO: error because `@final` is not on the implementation
+
     @overload
     @final
     def method2(self, x: int) -> int: ...
     @overload
     def method2(self, x: str) -> str: ...
+    # error: [invalid-overload]
     def method2(self, x: int | str) -> int | str:
         return x
-    # TODO: error because `@final` is not on the implementation
+
     @overload
     def method3(self, x: int) -> int: ...
     @overload
     @final
     def method3(self, x: str) -> str: ...
+    # error: [invalid-overload]
     def method3(self, x: int | str) -> int | str:
         return x
 
@@ -588,22 +593,22 @@ class Sub1(Base):
         return x
 
 class Sub2(Base):
-    # TODO: error because `@override` is not on the implementation
     @overload
     def method(self, x: int) -> int: ...
     @overload
     @override
     def method(self, x: str) -> str: ...
+    # error: [invalid-overload]
     def method(self, x: int | str) -> int | str:
         return x
 
 class Sub3(Base):
-    # TODO: error because `@override` is not on the implementation
     @overload
     @override
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
+    # error: [invalid-overload]
     def method(self, x: int | str) -> int | str:
         return x
 ```
@@ -623,11 +628,11 @@ class Foo:
     @overload
     def method1(self, x: str) -> str: ...
 
-    # TODO: error because `@final` is not on the first overload
     @overload
     def method2(self, x: int) -> int: ...
     @final
     @overload
+    # error: [invalid-overload]
     def method2(self, x: str) -> str: ...
 
 class Base:
@@ -644,10 +649,10 @@ class Sub1(Base):
     def method(self, x: str) -> str: ...
 
 class Sub2(Base):
-    # TODO: error because `@override` is not on the first overload
     @overload
     def method(self, x: int) -> int: ...
     @overload
     @override
+    # error: [invalid-overload]
     def method(self, x: str) -> str: ...
 ```
