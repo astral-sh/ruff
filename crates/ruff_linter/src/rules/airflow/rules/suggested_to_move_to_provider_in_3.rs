@@ -137,7 +137,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "operators", "datetime", rest @ ("BranchDateTimeOperator" | "target_times_as_dates")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
-                module: "airflow.providers.standard.time.operators.datetime",
+                module: "airflow.providers.standard.operators.datetime",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -173,7 +173,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
         ["airflow", "operators", "weekday", "BranchDayOfWeekOperator"] => {
             ProviderReplacement::ProviderName {
-                name: "airflow.providers.standard.time.operators.weekday.BranchDayOfWeekOperator",
+                name: "airflow.providers.standard.operators.weekday.BranchDayOfWeekOperator",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -181,7 +181,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "sensors", "date_time", rest @ ("DateTimeSensor" | "DateTimeSensorAsync")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
-                module: "airflow.providers.standard.time.sensors.date_time",
+                module: "airflow.providers.standard.sensors.date_time",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -202,7 +202,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "sensors", "time_sensor", rest @ ("TimeSensor" | "TimeSensorAsync")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
-                module: "airflow.providers.standard.time.sensors.time",
+                module: "airflow.providers.standard.sensors.time",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -210,13 +210,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "sensors", "time_delta", rest @ ("TimeDeltaSensor" | "TimeDeltaSensorAsync" | "WaitSensor")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
-                module: "airflow.providers.standard.time.sensors.time_delta",
+                module: "airflow.providers.standard.sensors.time_delta",
                 provider: "standard",
                 version: "0.0.1",
             }
         }
         ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.standard.time.sensors.weekday.DayOfWeekSensor",
+            name: "airflow.providers.standard.sensors.weekday.DayOfWeekSensor",
             provider: "standard",
             version: "0.0.1",
         },
