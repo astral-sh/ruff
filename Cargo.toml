@@ -231,10 +231,6 @@ unused_peekable = "warn"
 # Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
 large_stack_arrays = "allow"
 
-# Salsa generates functions with parameters for each field of a `salsa::interned` struct.
-# If we don't allow this, we get warnings for structs with too many fields.
-too_many_arguments = "allow"
-
 [profile.release]
 # Note that we set these explicitly, and these values
 # were chosen based on a trade-off between compile times
