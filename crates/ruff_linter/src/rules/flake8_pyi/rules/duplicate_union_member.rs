@@ -2,6 +2,7 @@ use std::collections::HashSet;
 
 use anyhow::Result;
 
+use ruff_python_codegen::Generator;
 use rustc_hash::FxHashSet;
 
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
@@ -14,7 +15,7 @@ use ruff_python_ast::{
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, TypingImporter};
 
 /// ## What it does
 /// Checks for duplicate union members.
@@ -118,11 +119,19 @@ pub(crate) fn duplicate_union_member<'a>(checker: &Checker, expr: &'a Expr) {
                 applicability,
             )),
             UnionKind::TypingUnion => {
-                let Ok(Some(fix)) = generate_union_fix(checker, unique_nodes, expr, applicability)
+                // Request `typing.Union`
+                let Some(importer) = checker.typing_importer("Union", PythonVersion::lowest())
                 else {
                     return;
                 };
-                Some(fix)
+                generate_union_fix(
+                    checker.generator(),
+                    &importer,
+                    unique_nodes,
+                    expr,
+                    applicability,
+                )
+                .ok()
             }
         }
     };
@@ -178,17 +187,14 @@ fn generate_pep604_fix(
 
 /// Generate a [`Fix`] for two or more type expressions, e.g. `typing.Union[int, float, complex]`.
 fn generate_union_fix(
-    checker: &Checker,
+    generator: Generator,
+    importer: &TypingImporter,
     nodes: Vec<&Expr>,
     annotation: &Expr,
     applicability: Applicability,
-) -> Result<Option<Fix>> {
+) -> Result<Fix> {
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
 
-    // Request `typing.Union`
-    let Some(importer) = checker.typing_importer("Union", PythonVersion::lowest()) else {
-        return Ok(None);
-    };
     let (import_edit, binding) = importer.import(annotation.start())?;
 
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
@@ -208,9 +214,9 @@ fn generate_union_fix(
         ctx: ExprContext::Load,
     });
 
-    Ok(Some(Fix::applicable_edits(
-        Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
+    Ok(Fix::applicable_edits(
+        Edit::range_replacement(generator.expr(&new_expr), annotation.range()),
         [import_edit],
         applicability,
-    )))
+    ))
 }
