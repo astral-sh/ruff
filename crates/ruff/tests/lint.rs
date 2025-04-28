@@ -4983,22 +4983,38 @@ fn flake8_import_convention_unused_aliased_import_no_conflict() {
 // See: https://github.com/astral-sh/ruff/issues/16177
 #[test]
 fn flake8_pyi_redundant_none_literal() {
+    let snippet = r#"
+from typing import Literal
+
+# Ruff offers a fix for one of these, but not both of them, as if both were autofixed
+# it would result in `None | None`, which leads to a `TypeError` at runtime.
+x: Literal[None,] | Literal[None,]
+"#;
+
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args(["--select", "PYI061"])
         .args(["--stdin-filename", "test.py"])
         .arg("--preview")
-        .arg("--fix")
+        .arg("--diff")
         .arg("-")
-        .pass_stdin(
-            r#"
-from typing import Literal
+        .pass_stdin(snippet), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- test.py
+    +++ test.py
+    @@ -3,4 +3,4 @@
+     
+     # Ruff offers a fix for one of these, but not both of them, as if both were autofixed
+     # it would result in `None | None`, which leads to a `TypeError` at runtime.
+    -x: Literal[None,] | Literal[None,]
+    +x: None | Literal[None,]
 
-# Ruff offers a fix for one of these, but not both of them, as if both were autofixed
-# it would result in a `TypeError` at runtime.
-x: Literal[None,] | Literal[None,]
-"#
-        ));
+
+    ----- stderr -----
+    Would fix 1 error.
+    ");
 }
 
 /// Test that private, old-style `TypeVar` generics

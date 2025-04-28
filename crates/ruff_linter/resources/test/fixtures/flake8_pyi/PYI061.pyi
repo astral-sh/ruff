@@ -1,5 +1,6 @@
 from typing import Literal, Union
 
+
 def func1(arg1: Literal[None]): ...
 
 
