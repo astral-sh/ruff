@@ -583,6 +583,8 @@ from functools import partial
 
 def f(x: int, y: str) -> None: ...
 
+# TODO: no error
+# error: [invalid-assignment] "Object of type `partial` is not assignable to `(int, /) -> None`"
 c1: Callable[[int], None] = partial(f, y="a")
 ```
 

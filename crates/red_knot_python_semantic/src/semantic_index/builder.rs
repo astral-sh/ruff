@@ -754,19 +754,35 @@ impl<'db> SemanticIndexBuilder<'db> {
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal)
+        self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None)
+    }
+
+    /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa
+    /// ingredient, because we need to infer its type standalone (type narrowing tests, RHS of an
+    /// assignment.)
+    fn add_standalone_assigned_expression(
+        &mut self,
+        expression_node: &ast::Expr,
+        assigned_to: &ast::StmtAssign,
+    ) -> Expression<'db> {
+        self.add_standalone_expression_impl(
+            expression_node,
+            ExpressionKind::Normal,
+            Some(assigned_to),
+        )
     }
 
     /// Same as [`SemanticIndexBuilder::add_standalone_expression`], but marks the expression as a
     /// *type* expression, which makes sure that it will later be inferred as such.
     fn add_standalone_type_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, ExpressionKind::TypeExpression)
+        self.add_standalone_expression_impl(expression_node, ExpressionKind::TypeExpression, None)
     }
 
     fn add_standalone_expression_impl(
         &mut self,
         expression_node: &ast::Expr,
         expression_kind: ExpressionKind,
+        assigned_to: Option<&ast::StmtAssign>,
     ) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
@@ -776,6 +792,9 @@ impl<'db> SemanticIndexBuilder<'db> {
             unsafe {
                 AstNodeRef::new(self.module.clone(), expression_node)
             },
+            #[allow(unsafe_code)]
+            assigned_to
+                .map(|assigned_to| unsafe { AstNodeRef::new(self.module.clone(), assigned_to) }),
             expression_kind,
             countme::Count::default(),
         );
@@ -1377,7 +1396,7 @@ where
                 debug_assert_eq!(&self.current_assignments, &[]);
 
                 self.visit_expr(&node.value);
-                let value = self.add_standalone_expression(&node.value);
+                let value = self.add_standalone_assigned_expression(&node.value, node);
 
                 for target in &node.targets {
                     self.add_unpackable_assignment(&Unpackable::Assign(node), target, value);

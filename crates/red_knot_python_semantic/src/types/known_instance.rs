@@ -109,6 +109,10 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Literal
             | Self::LiteralString
             | Self::Optional
+            // This is a legacy `TypeVar` _outside_ of any generic class or function, so it's
+            // AlwaysTrue. The truthiness of a typevar inside of a generic class or function
+            // depends on its bounds and constraints; but that's represented by `Type::TypeVar` and
+            // handled in elsewhere.
             | Self::TypeVar(_)
             | Self::Union
             | Self::NoReturn
@@ -152,7 +156,7 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return the repr of the symbol at runtime
-    pub(crate) fn repr(self, db: &'db dyn Db) -> &'db str {
+    pub(crate) fn repr(self) -> &'db str {
         match self {
             Self::Annotated => "typing.Annotated",
             Self::Literal => "typing.Literal",
@@ -188,7 +192,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::Protocol => "typing.Protocol",
             Self::Generic => "typing.Generic",
             Self::ReadOnly => "typing.ReadOnly",
-            Self::TypeVar(typevar) => typevar.name(db),
+            // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
+            // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
+            // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
+            Self::TypeVar(_) => "typing.TypeVar",
             Self::TypeAliasType(_) => "typing.TypeAliasType",
             Self::Unknown => "knot_extensions.Unknown",
             Self::AlwaysTruthy => "knot_extensions.AlwaysTruthy",
