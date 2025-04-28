@@ -533,35 +533,50 @@ impl<'a> Checker<'a> {
         self.semantic_checker = checker;
     }
 
-    /// Attempt to create an [`Edit`] that imports `member`.
+    /// Create a [`TypingImporter`] that will import `member` from either `typing` or
+    /// `typing_extensions`.
     ///
     /// On Python <`version_added_to_typing`, `member` is imported from `typing_extensions`, while
     /// on Python >=`version_added_to_typing`, it is imported from `typing`.
     ///
     /// If the Python version is less than `version_added_to_typing` but
-    /// `LinterSettings::disable_typing_extensions` is set, this method returns `Ok(None)`. In this
-    /// case, you will typically want to return early without emitting a `Diagnostic` rather than
-    /// pass the result of this method to `Diagnostic::try_set_optional_fix` because the user has
-    /// explicitly disabled `typing_extensions` imports, and thus the lint will not be actionable.
-    ///
-    /// See [`Importer::get_or_import_symbol`] for more details on the returned values.
-    pub(crate) fn import_from_typing(
-        &self,
-        member: &str,
-        position: TextSize,
+    /// `LinterSettings::disable_typing_extensions` is set, this method returns `None`.
+    pub(crate) fn typing_importer<'b>(
+        &'b self,
+        member: &'b str,
         version_added_to_typing: PythonVersion,
-    ) -> Result<Option<(Edit, String)>, ResolutionError> {
+    ) -> Option<TypingImporter<'b, 'a>> {
         let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
         } else if self.settings.disable_typing_extensions {
-            return Ok(None);
+            return None;
         } else {
             "typing_extensions"
         };
-        let request = ImportRequest::import_from(source_module, member);
-        self.importer()
-            .get_or_import_symbol(&request, position, self.semantic())
-            .map(Some)
+        Some(TypingImporter {
+            checker: self,
+            source_module,
+            member,
+        })
+    }
+}
+
+pub(crate) struct TypingImporter<'a, 'b> {
+    checker: &'a Checker<'b>,
+    source_module: &'static str,
+    member: &'a str,
+}
+
+impl TypingImporter<'_, '_> {
+    /// Create an [`Edit`] that makes the requested symbol available at `position`.
+    ///
+    /// See [`Importer::get_or_import_symbol`] for more details on the returned values and
+    /// [`Checker::typing_importer`] for a way to construct a [`TypingImporter`].
+    pub(crate) fn import(&self, position: TextSize) -> Result<(Edit, String), ResolutionError> {
+        let request = ImportRequest::import_from(self.source_module, self.member);
+        self.checker
+            .importer
+            .get_or_import_symbol(&request, position, self.checker.semantic())
     }
 }
 

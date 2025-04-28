@@ -273,11 +273,10 @@ fn generate_union_fix(
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
 
     // Request `typing.Union`
-    let Some((import_edit, binding)) =
-        checker.import_from_typing("Optional", annotation.start(), PythonVersion::lowest())?
-    else {
+    let Some(importer) = checker.typing_importer("Optional", PythonVersion::lowest()) else {
         return Ok(None);
     };
+    let (import_edit, binding) = importer.import(annotation.start())?;
 
     // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
     let new_expr = Expr::Subscript(ExprSubscript {

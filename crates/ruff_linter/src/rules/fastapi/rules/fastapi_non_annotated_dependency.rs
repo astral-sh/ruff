@@ -231,14 +231,11 @@ fn create_diagnostic(
     );
 
     let try_generate_fix = || {
-        let Some((import_edit, binding)) = checker.import_from_typing(
-            "Annotated",
-            parameter.range.start(),
-            PythonVersion::PY39,
-        )?
-        else {
+        let Some(importer) = checker.typing_importer("Annotated", PythonVersion::PY39) else {
             return Ok(Fixable::NoTypingExtensions);
         };
+
+        let (import_edit, binding) = importer.import(parameter.range.start())?;
 
         // Each of these classes takes a single, optional default
         // argument, followed by kw-only arguments

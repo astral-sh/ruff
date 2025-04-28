@@ -219,11 +219,10 @@ fn replace_with_self_fix(
 ) -> anyhow::Result<Option<Fix>> {
     let semantic = checker.semantic();
 
-    let Some((self_import, self_binding)) =
-        checker.import_from_typing("Self", returns.start(), PythonVersion::PY311)?
-    else {
+    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
         return Ok(None);
     };
+    let (self_import, self_binding) = importer.import(returns.start())?;
 
     let mut others = Vec::with_capacity(2);
 

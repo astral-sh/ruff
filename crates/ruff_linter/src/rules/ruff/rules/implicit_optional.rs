@@ -140,11 +140,11 @@ fn generate_fix(
             ))))
         }
         ConversionType::Optional => {
-            let Some((import_edit, binding)) =
-                checker.import_from_typing("Optional", expr.start(), PythonVersion::lowest())?
+            let Some(importer) = checker.typing_importer("Optional", PythonVersion::lowest())
             else {
                 return Ok(None);
             };
+            let (import_edit, binding) = importer.import(expr.start())?;
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 value: Box::new(Expr::Name(ast::ExprName {

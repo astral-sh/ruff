@@ -320,11 +320,11 @@ fn replace_custom_typevar_with_self(
     self_or_cls_annotation: &ast::Expr,
 ) -> anyhow::Result<Option<Fix>> {
     // (1) Import `Self` (if necessary)
-    let Some((import_edit, self_symbol_binding)) =
-        checker.import_from_typing("Self", function_def.start(), PythonVersion::PY311)?
-    else {
+    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
         return Ok(None);
     };
+
+    let (import_edit, self_symbol_binding) = importer.import(function_def.start())?;
 
     // (2) Remove the first parameter's annotation
     let mut other_edits = vec![Edit::deletion(
