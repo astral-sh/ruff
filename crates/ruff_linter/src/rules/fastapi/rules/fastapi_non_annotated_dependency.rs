@@ -59,6 +59,16 @@ use ruff_python_ast::PythonVersion;
 ///     return commons
 /// ```
 ///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.9, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
+///
 /// [FastAPI documentation]: https://fastapi.tiangolo.com/tutorial/query-params-str-validations/?h=annotated#advantages-of-annotated
 /// [typing-annotated]: https://docs.python.org/3/library/typing.html#typing.Annotated
 /// [typing-extensions]: https://typing-extensions.readthedocs.io/en/stable/

@@ -75,6 +75,16 @@ use ruff_text_size::Ranged;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe as it changes the meaning of your type annotations.
 ///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.11, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
+///
 /// ## References
 /// - [Python documentation: `typing.Self`](https://docs.python.org/3/library/typing.html#typing.Self)
 #[derive(ViolationMetadata)]

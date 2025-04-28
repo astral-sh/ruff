@@ -70,6 +70,16 @@ use ruff_python_ast::PythonVersion;
 /// The fix is only marked as unsafe if there is the possibility that it might delete a comment
 /// from your code.
 ///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.11, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
+///
 /// [PEP 673]: https://peps.python.org/pep-0673/#motivation
 /// [PEP-695]: https://peps.python.org/pep-0695/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
