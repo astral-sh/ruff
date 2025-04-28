@@ -514,21 +514,21 @@ pub struct LintOptions {
     )]
     pub preview: Option<bool>,
 
-    /// Whether to disable imports from the third-party `typing_extensions` module for Python
-    /// versions before a symbol was added to the first-party `typing` module.
+    /// Whether to allow imports from the third-party `typing_extensions` module for Python versions
+    /// before a symbol was added to the first-party `typing` module.
     ///
     /// Many rules try to import symbols from the `typing` module but fall back to
     /// `typing_extensions` for earlier versions of Python. This option can be used to disable this
     /// fallback behavior in cases where `typing_extensions` is not installed.
     #[option(
-        default = "false",
+        default = "true",
         value_type = "bool",
         example = r#"
             # Disable `typing_extensions` imports
-            disable-typing-extensions = true
+            typing-extensions = false
         "#
     )]
-    pub disable_typing_extensions: Option<bool>,
+    pub typing_extensions: Option<bool>,
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
@@ -3892,7 +3892,7 @@ pub struct LintOptionsWire {
     pydoclint: Option<PydoclintOptions>,
     ruff: Option<RuffOptions>,
     preview: Option<bool>,
-    disable_typing_extensions: Option<bool>,
+    typing_extensions: Option<bool>,
 }
 
 impl From<LintOptionsWire> for LintOptions {
@@ -3947,7 +3947,7 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
-            disable_typing_extensions,
+            typing_extensions,
         } = value;
 
         LintOptions {
@@ -4003,7 +4003,7 @@ impl From<LintOptionsWire> for LintOptions {
             pydoclint,
             ruff,
             preview,
-            disable_typing_extensions,
+            typing_extensions,
         }
     }
 }

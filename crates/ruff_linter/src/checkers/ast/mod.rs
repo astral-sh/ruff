@@ -540,7 +540,7 @@ impl<'a> Checker<'a> {
     /// on Python >=`version_added_to_typing`, it is imported from `typing`.
     ///
     /// If the Python version is less than `version_added_to_typing` but
-    /// `LinterSettings::disable_typing_extensions` is set, this method returns `None`.
+    /// `LinterSettings::typing_extensions` is `false`, this method returns `None`.
     pub(crate) fn typing_importer<'b>(
         &'b self,
         member: &'b str,
@@ -548,7 +548,7 @@ impl<'a> Checker<'a> {
     ) -> Option<TypingImporter<'b, 'a>> {
         let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
-        } else if self.settings.disable_typing_extensions {
+        } else if !self.settings.typing_extensions {
             return None;
         } else {
             "typing_extensions"

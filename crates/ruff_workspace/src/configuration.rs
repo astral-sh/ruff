@@ -430,7 +430,7 @@ impl Configuration {
                     .ruff
                     .map(RuffOptions::into_settings)
                     .unwrap_or_default(),
-                disable_typing_extensions: lint.disable_typing_extensions.unwrap_or_default(),
+                typing_extensions: lint.typing_extensions.unwrap_or(true),
             },
 
             formatter,
@@ -634,7 +634,7 @@ pub struct LintConfiguration {
     pub logger_objects: Option<Vec<String>>,
     pub task_tags: Option<Vec<String>>,
     pub typing_modules: Option<Vec<String>>,
-    pub disable_typing_extensions: Option<bool>,
+    pub typing_extensions: Option<bool>,
 
     // Plugins
     pub flake8_annotations: Option<Flake8AnnotationsOptions>,
@@ -748,7 +748,7 @@ impl LintConfiguration {
             task_tags: options.common.task_tags,
             logger_objects: options.common.logger_objects,
             typing_modules: options.common.typing_modules,
-            disable_typing_extensions: options.disable_typing_extensions,
+            typing_extensions: options.typing_extensions,
 
             // Plugins
             flake8_annotations: options.common.flake8_annotations,
@@ -1173,7 +1173,7 @@ impl LintConfiguration {
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
             ruff: self.ruff.combine(config.ruff),
-            disable_typing_extensions: self.disable_typing_extensions,
+            typing_extensions: self.typing_extensions,
         }
     }
 }

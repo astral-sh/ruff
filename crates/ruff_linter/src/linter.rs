@@ -1108,7 +1108,7 @@ mod tests {
 		PYI019_EXAMPLE,
 		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY310,
-			disable_typing_extensions: false,
+			typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
     )]
@@ -1117,7 +1117,7 @@ mod tests {
 		PYI019_EXAMPLE,
 		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY310,
-			disable_typing_extensions: true,
+			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
     )]
@@ -1126,7 +1126,7 @@ mod tests {
 		PYI019_EXAMPLE,
 		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY311,
-			disable_typing_extensions: false,
+			typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
     )]
@@ -1135,7 +1135,7 @@ mod tests {
 		PYI019_EXAMPLE,
 		&LinterSettings {
 			unresolved_target_version: PythonVersion::PY311,
-			disable_typing_extensions: true,
+			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
     )]
@@ -1147,7 +1147,7 @@ mod tests {
 		",
 		&LinterSettings {
 			unresolved_target_version: PythonVersion { major: 3, minor: 10 },
-			disable_typing_extensions: true,
+			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::NonSelfReturnType)
 		}
     )]
@@ -1164,7 +1164,7 @@ mod tests {
 		"#,
 		&LinterSettings {
 			unresolved_target_version: PythonVersion { major: 3, minor: 8 },
-			disable_typing_extensions: true,
+			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::FastApiNonAnnotatedDependency)
 		}
     )]
@@ -1179,7 +1179,7 @@ mod tests {
 		"Vector = list[float]",
 		&LinterSettings {
 			unresolved_target_version: PythonVersion { major: 3, minor: 9 },
-			disable_typing_extensions: true,
+			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::TypeAliasWithoutAnnotation)
 		}
 	)]

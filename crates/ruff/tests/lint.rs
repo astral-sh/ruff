@@ -994,7 +994,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.extend-per-file-ignores`
     - `lint.exclude`
     - `lint.preview`
-    - `lint.disable-typing-extensions`
+    - `lint.typing-extensions`
 
     For more information, try '--help'.
     ");
@@ -2208,7 +2208,7 @@ requires-python = ">= 3.11"
         	XXX,
         ]
         linter.typing_modules = []
-        linter.disable_typing_extensions = false
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -2520,7 +2520,7 @@ requires-python = ">= 3.11"
         	XXX,
         ]
         linter.typing_modules = []
-        linter.disable_typing_extensions = false
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -2884,7 +2884,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
-        linter.disable_typing_extensions = false
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -3264,7 +3264,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
-        linter.disable_typing_extensions = false
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -3592,7 +3592,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
-        linter.disable_typing_extensions = false
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -3920,7 +3920,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
-        linter.disable_typing_extensions = false
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -4205,7 +4205,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
-        linter.disable_typing_extensions = false
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false
@@ -4543,7 +4543,7 @@ from typing import Union;foo: Union[int, str] = 1
         	XXX,
         ]
         linter.typing_modules = []
-        linter.disable_typing_extensions = false
+        linter.typing_extensions = true
 
         # Linter Plugins
         linter.flake8_annotations.mypy_init_return = false

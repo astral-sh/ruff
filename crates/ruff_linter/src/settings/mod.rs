@@ -250,7 +250,7 @@ pub struct LinterSettings {
     pub line_length: LineLength,
     pub task_tags: Vec<String>,
     pub typing_modules: Vec<String>,
-    pub disable_typing_extensions: bool,
+    pub typing_extensions: bool,
 
     // Plugins
     pub flake8_annotations: flake8_annotations::settings::Settings,
@@ -314,7 +314,7 @@ impl Display for LinterSettings {
                 self.line_length,
                 self.task_tags | array,
                 self.typing_modules | array,
-                self.disable_typing_extensions,
+                self.typing_extensions,
             ]
         }
         writeln!(f, "\n# Linter Plugins")?;
@@ -452,7 +452,7 @@ impl LinterSettings {
             preview: PreviewMode::default(),
             explicit_preview_rules: false,
             extension: ExtensionMapping::default(),
-            disable_typing_extensions: false,
+            typing_extensions: true,
         }
     }
 
