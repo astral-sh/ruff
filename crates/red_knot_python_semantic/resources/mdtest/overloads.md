@@ -438,11 +438,10 @@ class PartialFoo(ABC):
 
 ### Inconsistent decorators
 
-#### `@staticmethod` / `@classmethod`
+#### `@staticmethod`
 
-If one overload signature is decorated with `@staticmethod` or `@classmethod`, all overload
-signatures must be similarly decorated. The implementation, if present, must also have a consistent
-decorator.
+If one overload signature is decorated with `@staticmethod`, all overload signatures must be
+similarly decorated. The implementation, if present, must also have a consistent decorator.
 
 ```py
 from __future__ import annotations
@@ -486,6 +485,18 @@ class CheckStaticMethod:
     @staticmethod
     def method4(x: int | str) -> int | str:
         return x
+```
+
+#### `@classmethod`
+
+<!-- snapshot-diagnostics -->
+
+The same rules apply for `@classmethod` as for [`@staticmethod`](#staticmethod).
+
+```py
+from __future__ import annotations
+
+from typing import overload
 
 class CheckClassMethod:
     def __init__(self, x: int) -> None:
@@ -497,7 +508,7 @@ class CheckClassMethod:
     @overload
     def try_from1(cls, x: str) -> None: ...
     @classmethod
-    # error: [invalid-overload]
+    # error: [invalid-overload] "Overloaded function `try_from1` does not use the `@classmethod` decorator consistently"
     def try_from1(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
             return cls(x)
@@ -540,13 +551,15 @@ class CheckClassMethod:
         return None
 ```
 
-#### `@final` / `@override`
+#### `@final`
 
-If a `@final` or `@override` decorator is supplied for a function with overloads, the decorator
-should be applied only to the overload implementation if it is present.
+<!-- snapshot-diagnostics -->
+
+If a `@final` decorator is supplied for a function with overloads, the decorator should be applied
+only to the overload implementation if it is present.
 
 ```py
-from typing_extensions import final, overload, override
+from typing_extensions import final, overload
 
 class Foo:
     @overload
@@ -574,6 +587,37 @@ class Foo:
     # error: [invalid-overload]
     def method3(self, x: int | str) -> int | str:
         return x
+```
+
+If an overload implementation isn't present (for example, in a stub file), the `@final` decorator
+should be applied only to the first overload.
+
+```pyi
+from typing_extensions import final, overload
+
+class Foo:
+    @overload
+    @final
+    def method1(self, x: int) -> int: ...
+    @overload
+    def method1(self, x: str) -> str: ...
+
+    @overload
+    def method2(self, x: int) -> int: ...
+    @final
+    @overload
+    # error: [invalid-overload]
+    def method2(self, x: str) -> str: ...
+```
+
+#### `@override`
+
+<!-- snapshot-diagnostics -->
+
+The same rules apply for `@override` as for [`@final`](#final).
+
+```py
+from typing_extensions import overload, override
 
 class Base:
     @overload
@@ -613,27 +657,10 @@ class Sub3(Base):
         return x
 ```
 
-#### `@final` / `@override` in stub files
-
-If an overload implementation isn’t present (for example, in a stub file), the `@final` or
-`@override` decorator should be applied only to the first overload.
+And, similarly, in stub files:
 
 ```pyi
-from typing_extensions import final, overload, override
-
-class Foo:
-    @overload
-    @final
-    def method1(self, x: int) -> int: ...
-    @overload
-    def method1(self, x: str) -> str: ...
-
-    @overload
-    def method2(self, x: int) -> int: ...
-    @final
-    @overload
-    # error: [invalid-overload]
-    def method2(self, x: str) -> str: ...
+from typing_extensions import overload, override
 
 class Base:
     @overload
