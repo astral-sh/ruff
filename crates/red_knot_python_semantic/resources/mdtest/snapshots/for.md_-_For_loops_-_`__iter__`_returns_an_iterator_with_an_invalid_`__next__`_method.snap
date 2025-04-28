@@ -42,7 +42,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 
 ```
 error: lint:not-iterable: Object of type `Iterable1` is not iterable
-  --> /src/mdtest_snippet.py:19:10
+  --> src/mdtest_snippet.py:19:10
    |
 18 | # error: [not-iterable]
 19 | for x in Iterable1():
@@ -56,7 +56,7 @@ info: Expected signature for `__next__` is `def __next__(self): ...`
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:20:5
+  --> src/mdtest_snippet.py:20:5
    |
 18 | # error: [not-iterable]
 19 | for x in Iterable1():
@@ -70,7 +70,7 @@ info: revealed-type: Revealed type
 
 ```
 error: lint:not-iterable: Object of type `Iterable2` is not iterable
-  --> /src/mdtest_snippet.py:23:10
+  --> src/mdtest_snippet.py:23:10
    |
 22 | # error: [not-iterable]
 23 | for y in Iterable2():
@@ -83,7 +83,7 @@ info: Its `__iter__` method returns an object of type `Iterator2`, which has a `
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:24:5
+  --> src/mdtest_snippet.py:24:5
    |
 22 | # error: [not-iterable]
 23 | for y in Iterable2():

@@ -37,7 +37,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 
 ```
 error: lint:not-iterable: Object of type `Iterable` may not be iterable
-  --> /src/mdtest_snippet.py:18:14
+  --> src/mdtest_snippet.py:18:14
    |
 17 |     # error: [not-iterable]
 18 |     for x in Iterable():
@@ -51,7 +51,7 @@ info: `__getitem__` must be at least as permissive as `def __getitem__(self, key
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:19:9
+  --> src/mdtest_snippet.py:19:9
    |
 17 |     # error: [not-iterable]
 18 |     for x in Iterable():

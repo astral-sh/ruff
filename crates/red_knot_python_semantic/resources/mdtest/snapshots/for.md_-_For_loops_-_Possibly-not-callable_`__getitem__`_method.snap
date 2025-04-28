@@ -47,7 +47,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 
 ```
 error: lint:not-iterable: Object of type `Iterable1` may not be iterable
-  --> /src/mdtest_snippet.py:22:14
+  --> src/mdtest_snippet.py:22:14
    |
 21 |     # error: [not-iterable]
 22 |     for x in Iterable1():
@@ -62,7 +62,7 @@ info: `__getitem__` has type `CustomCallable`, which is not callable
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:24:9
+  --> src/mdtest_snippet.py:24:9
    |
 22 |     for x in Iterable1():
 23 |         # TODO... `int` might be ideal here?
@@ -76,7 +76,7 @@ info: revealed-type: Revealed type
 
 ```
 error: lint:not-iterable: Object of type `Iterable2` may not be iterable
-  --> /src/mdtest_snippet.py:27:14
+  --> src/mdtest_snippet.py:27:14
    |
 26 |     # error: [not-iterable]
 27 |     for y in Iterable2():
@@ -91,7 +91,7 @@ info: `__getitem__` has type `(bound method Iterable2.__getitem__(key: int) -> i
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:29:9
+  --> src/mdtest_snippet.py:29:9
    |
 27 |     for y in Iterable2():
 28 |         # TODO... `int` might be ideal here?

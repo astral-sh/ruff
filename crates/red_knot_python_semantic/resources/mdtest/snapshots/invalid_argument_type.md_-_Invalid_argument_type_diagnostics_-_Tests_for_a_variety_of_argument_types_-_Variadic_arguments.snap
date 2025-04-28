@@ -22,7 +22,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invali
 
 ```
 error: lint:invalid-argument-type: Argument to this function is incorrect
- --> /src/mdtest_snippet.py:4:14
+ --> src/mdtest_snippet.py:4:14
   |
 2 |     return len(numbers)
 3 |
@@ -30,7 +30,7 @@ error: lint:invalid-argument-type: Argument to this function is incorrect
   |              ^^^^^^^ Expected `int`, found `Literal["hello"]`
   |
 info: Function defined here
- --> /src/mdtest_snippet.py:1:5
+ --> src/mdtest_snippet.py:1:5
   |
 1 | def foo(*numbers: int) -> int:
   |     ^^^ ------------- Parameter declared here
