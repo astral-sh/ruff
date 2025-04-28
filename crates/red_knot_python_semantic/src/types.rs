@@ -6375,6 +6375,13 @@ pub struct FunctionType<'db> {
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
+    /// Returns the [`File`] in which this function is defined.
+    pub(crate) fn file(self, db: &'db dyn Db) -> File {
+        // NOTE: Do not use `self.definition(db).file(db)` here, as that could create a
+        // cross-module dependency on the full AST.
+        self.body_scope(db).file(db)
+    }
+
     pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.decorators(db).contains(decorator)
     }
@@ -6398,29 +6405,27 @@ impl<'db> FunctionType<'db> {
 
     /// Returns the AST node for this function.
     pub(crate) fn node(self, db: &'db dyn Db, file: File) -> &'db ast::StmtFunctionDef {
-        let body_scope = self.body_scope(db);
-
         debug_assert_eq!(
             file,
-            body_scope.file(db),
+            self.file(db),
             "FunctionType::node() must be called with the same file as the one where \
             the function is defined."
         );
 
-        body_scope.node(db).expect_function()
+        self.body_scope(db).node(db).expect_function()
     }
 
     /// Returns the [`FileRange`] of the function's name.
     pub fn focus_range(self, db: &dyn Db) -> FileRange {
         FileRange::new(
-            self.body_scope(db).file(db),
+            self.file(db),
             self.body_scope(db).node(db).expect_function().name.range,
         )
     }
 
     pub fn full_range(self, db: &dyn Db) -> FileRange {
         FileRange::new(
-            self.body_scope(db).file(db),
+            self.file(db),
             self.body_scope(db).node(db).expect_function().range,
         )
     }

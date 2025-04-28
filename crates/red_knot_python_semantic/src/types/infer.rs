@@ -4404,7 +4404,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // in the same file as the one we're currently inferring the types for. This is because
             // the `definition` method accesses the semantic index, which could create a
             // cross-module AST dependency.
-            if function.body_scope(self.db()).file(self.db()) == self.file()
+            if function.file(self.db()) == self.file()
                 && function.definition(self.db()).scope(self.db()) == self.scope()
             {
                 self.called_functions.insert(function);
