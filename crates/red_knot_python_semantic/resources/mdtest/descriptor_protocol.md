@@ -459,7 +459,7 @@ class Descriptor:
 class C:
     d: Descriptor = Descriptor()
 
-reveal_type(C.d)  # revealed: Literal["called on class object"]
+reveal_type(C.d)  # revealed: Never
 
 reveal_type(C().d)  # revealed: Literal["called on instance"]
 ```
