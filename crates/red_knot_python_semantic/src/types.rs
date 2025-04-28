@@ -3890,6 +3890,28 @@ impl<'db> Type<'db> {
                 }
             },
 
+            Type::KnownInstance(KnownInstanceType::TypedDict) => {
+                Signatures::single(CallableSignature::single(
+                    self,
+                    Signature::new(
+                        Parameters::new([
+                            Parameter::positional_only(Some(Name::new_static("typename")))
+                                .with_annotated_type(KnownClass::Str.to_instance(db)),
+                            Parameter::positional_only(Some(Name::new_static("fields")))
+                                .with_annotated_type(KnownClass::Dict.to_instance(db))
+                                .with_default_type(Type::any()),
+                            Parameter::keyword_only(Name::new_static("total"))
+                                .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                .with_default_type(Type::BooleanLiteral(true)),
+                            // Future compatibility, in case new keyword arguments will be added:
+                            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                .with_annotated_type(Type::any()),
+                        ]),
+                        None,
+                    ),
+                ))
+            }
+
             Type::GenericAlias(_) => {
                 // TODO annotated return type on `__new__` or metaclass `__call__`
                 // TODO check call vs signatures of `__new__` and/or `__init__`
@@ -4471,6 +4493,7 @@ impl<'db> Type<'db> {
 
                 KnownInstanceType::TypingSelf => Ok(todo_type!("Support for `typing.Self`")),
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
+                KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
                 KnownInstanceType::Protocol => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
