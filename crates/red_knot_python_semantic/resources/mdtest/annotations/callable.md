@@ -225,14 +225,16 @@ Using `Concatenate` as the first argument to `Callable`:
 from typing_extensions import Callable, Concatenate
 
 def _(c: Callable[Concatenate[int, str, ...], int]):
-    reveal_type(c)  # revealed: (*args: @Todo(todo signature *args), **kwargs: @Todo(todo signature **kwargs)) -> int
+    # TODO: Should reveal the correct signature
+    reveal_type(c)  # revealed: (...) -> int
 ```
 
 And, as one of the parameter types:
 
 ```py
 def _(c: Callable[[Concatenate[int, str, ...], int], int]):
-    reveal_type(c)  # revealed: (*args: @Todo(todo signature *args), **kwargs: @Todo(todo signature **kwargs)) -> int
+    # TODO: Should reveal the correct signature
+    reveal_type(c)  # revealed: (...) -> int
 ```
 
 ## Using `typing.ParamSpec`
@@ -276,7 +278,8 @@ from typing_extensions import Callable, TypeVarTuple
 Ts = TypeVarTuple("Ts")
 
 def _(c: Callable[[int, *Ts], int]):
-    reveal_type(c)  # revealed: (*args: @Todo(todo signature *args), **kwargs: @Todo(todo signature **kwargs)) -> int
+    # TODO: Should reveal the correct signature
+    reveal_type(c)  # revealed: (...) -> int
 ```
 
 And, using the legacy syntax using `Unpack`:
@@ -285,7 +288,8 @@ And, using the legacy syntax using `Unpack`:
 from typing_extensions import Unpack
 
 def _(c: Callable[[int, Unpack[Ts]], int]):
-    reveal_type(c)  # revealed: (*args: @Todo(todo signature *args), **kwargs: @Todo(todo signature **kwargs)) -> int
+    # TODO: Should reveal the correct signature
+    reveal_type(c)  # revealed: (...) -> int
 ```
 
 ## Member lookup
