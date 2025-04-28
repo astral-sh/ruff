@@ -145,6 +145,16 @@ impl<'db> ClassType<'db> {
     }
 
     pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+        // We need to construct the types "instance of `str`" and "instance of `_version_info`"
+        // very eagerly when type-checking a variety of things. That means we can't go through the normal
+        // `ClassLiteral::is_protocol` path, because that would require us to evaluate the types of the bases
+        // of these classes, which would cause Salsa cycles (or other, more exotic kinds of Salsa panics!).
+        if matches!(
+            self.known(db),
+            Some(KnownClass::Str | KnownClass::VersionInfo)
+        ) {
+            return false;
+        }
         self.class_literal(db).0.is_protocol(db)
     }
 

@@ -1299,12 +1299,9 @@ class FalsyFooSubclass(FalsyFoo, Protocol):
     y: str
 
 def g(a: Truthy, b: FalsyFoo, c: FalsyFooSubclass):
-    # TODO should be `Literal[True]
-    reveal_type(bool(a))  # revealed: bool
-    # TODO should be `Literal[False]
-    reveal_type(bool(b))  # revealed: bool
-    # TODO should be `Literal[False]
-    reveal_type(bool(c))  # revealed: bool
+    reveal_type(bool(a))  # revealed: Literal[True]
+    reveal_type(bool(b))  # revealed: Literal[False]
+    reveal_type(bool(c))  # revealed: Literal[False]
 ```
 
 It is not sufficient for a protocol to have a callable `__bool__` instance member that returns
