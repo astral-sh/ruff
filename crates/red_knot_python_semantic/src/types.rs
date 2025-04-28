@@ -3903,6 +3903,9 @@ impl<'db> Type<'db> {
                             Parameter::keyword_only(Name::new_static("total"))
                                 .with_annotated_type(KnownClass::Bool.to_instance(db))
                                 .with_default_type(Type::BooleanLiteral(true)),
+                            // Future compatibility, in case new keyword arguments will be added:
+                            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                .with_annotated_type(Type::any()),
                         ]),
                         None,
                     ),

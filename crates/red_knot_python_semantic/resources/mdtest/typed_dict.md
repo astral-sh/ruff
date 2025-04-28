@@ -15,7 +15,10 @@ class Person(TypedDict):
 p1: Person = {"name": "Alice", "age": 30}
 
 # Alternative syntax
-Message = TypedDict("Message", {"id": int, "content": str})
+Message = TypedDict("Message", {"id": int, "content": str}, total=False)
 
 p2 = Message(name="Bob", age=25)
+
+# No errors for yet-unsupported features:
+OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 ```
