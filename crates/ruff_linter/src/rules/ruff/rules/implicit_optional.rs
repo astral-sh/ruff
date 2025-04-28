@@ -1,6 +1,6 @@
 use std::fmt;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
@@ -136,8 +136,10 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
             )))
         }
         ConversionType::Optional => {
-            let (import_edit, binding) =
-                checker.import_from_typing("Optional", expr.start(), PythonVersion::lowest())?;
+            let importer = checker
+                .typing_importer("Optional", PythonVersion::lowest())
+                .context("Optional should be available on all supported Python versions")?;
+            let (import_edit, binding) = importer.import(expr.start())?;
             let new_expr = Expr::Subscript(ast::ExprSubscript {
                 range: TextRange::default(),
                 value: Box::new(Expr::Name(ast::ExprName {
