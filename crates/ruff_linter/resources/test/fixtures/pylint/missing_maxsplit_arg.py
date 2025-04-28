@@ -54,6 +54,9 @@ Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
 Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
 Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
+## Test unpacked dict literal kwargs 
+"1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
+
 
 # OK
 ## Test not accessing the first or last element
@@ -119,6 +122,10 @@ Bar.split[-1]  # [missing-maxsplit-arg]
 Bar.split[0]  # [missing-maxsplit-arg]
 Bar.split[-1]  # [missing-maxsplit-arg]
 
+## Test unpacked dict literal kwargs 
+"1,2,3".split(",", **{"maxsplit": 1})[0]
+"1,2,3".split(**{"sep": ",", "maxsplit": 1})[0]
+
 
 # TODO
 
@@ -130,8 +137,6 @@ Bar.split[-1]  # [missing-maxsplit-arg]
 #         return self.my_str
 
 # Errors
-## Test sep arg from unpacked dict (without maxsplit arg)
-# "1,2,3".split(**{"sep": ","})
 ## Test accessor
 # Baz().get_string().split(",")[0]  # [use-maxsplit-arg]
 # Baz().get_string().split(",")[-1]  # [use-maxsplit-arg]
@@ -142,10 +147,6 @@ Bar.split[-1]  # [missing-maxsplit-arg]
 # for j in range(3):
 #     print(SEQ.split(",")[i])
 #     i = i + 1
-## Test maxsplit arg from unpacked dict
-# "1,2,3".split(",", **{"maxsplit": 2})[0]
-## Test split args from unpacked dict
-# "1,2,3".split(**{"sep": ",", "maxsplit": 2})[0]
 ## Test accessor
 # Baz().get_string().split(",")[1]
 # Baz().get_string().split(",")[-2]

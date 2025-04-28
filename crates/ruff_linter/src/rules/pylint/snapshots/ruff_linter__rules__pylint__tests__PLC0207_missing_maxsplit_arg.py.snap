@@ -284,4 +284,13 @@ missing_maxsplit_arg.py:55:1: PLC0207 Accessing only the first or last element o
 54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
 55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
+56 |
+57 | ## Test unpacked dict literal kwargs 
+   |
+
+missing_maxsplit_arg.py:58:1: PLC0207 Accessing only the first or last element of `str.split()` without setting `maxsplit=1`
+   |
+57 | ## Test unpacked dict literal kwargs 
+58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLC0207
    |

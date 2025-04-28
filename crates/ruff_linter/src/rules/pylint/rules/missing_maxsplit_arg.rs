@@ -1,7 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprCall, ExprNumberLiteral, ExprSubscript, ExprUnaryOp, Number, UnaryOp,
+    DictItem, Expr, ExprAttribute, ExprCall, ExprDict, ExprNumberLiteral, ExprStringLiteral,
+    ExprSubscript, ExprUnaryOp, Keyword, Number, UnaryOp,
 };
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -115,6 +116,22 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     // Check the function does not have maxsplit set
     if arguments.find_argument_value("maxsplit", 1).is_some() {
         return;
+    }
+
+    // Check maxsplit kwarg not set via unpacked dict literal
+    for keyword in &*arguments.keywords {
+        let Keyword { value, .. } = keyword;
+
+        if let Expr::Dict(ExprDict { items, .. }) = value {
+            for item in items {
+                let DictItem { key, .. } = item;
+                if let Some(Expr::StringLiteral(ExprStringLiteral { value, .. })) = key {
+                    if value.to_str() == "maxsplit" {
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     checker.report_diagnostic(Diagnostic::new(MissingMaxsplitArg, expr.range()));
