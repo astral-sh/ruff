@@ -311,6 +311,16 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                 if let Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) = next {
                     match op {
                         EqCmpOp::Eq => {
+                            if let Expr::BooleanLiteral(ast::ExprBooleanLiteral {
+                                value: comparator_value,
+                                ..
+                            }) = comparator
+                            {
+                                if value == comparator_value {
+                                    continue;
+                                }
+                            }
+
                             let cond = if compare.ops.len() == 1 {
                                 Some(SourceCodeSnippet::from_str(
                                     checker.locator().slice(comparator),
