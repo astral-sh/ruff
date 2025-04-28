@@ -3475,7 +3475,7 @@ requires-python = ">= 3.11"
         &inner_pyproject,
         r#"
 [tool.ruff]
-target-version = "py310"        
+target-version = "py310"
 "#,
     )?;
 
@@ -4978,6 +4978,53 @@ fn flake8_import_convention_unused_aliased_import_no_conflict() {
         .arg("--fix")
         .arg("-")
         .pass_stdin("1"));
+}
+
+// See: https://github.com/astral-sh/ruff/issues/16177
+#[test]
+fn flake8_pyi_redundant_none_literal() {
+    let snippet = r#"
+from typing import Literal
+
+# For each of these expressions, Ruff provides a fix for one of the `Literal[None]` elements
+# but not both, as if both were autofixed it would result in `None | None`,
+# which leads to a `TypeError` at runtime.
+a: Literal[None,] | Literal[None,]
+b: Literal[None] | Literal[None]
+c: Literal[None] | Literal[None,]
+d: Literal[None,] | Literal[None]
+"#;
+
+    assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+        .args(STDIN_BASE_OPTIONS)
+        .args(["--select", "PYI061"])
+        .args(["--stdin-filename", "test.py"])
+        .arg("--preview")
+        .arg("--diff")
+        .arg("-")
+        .pass_stdin(snippet), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- test.py
+    +++ test.py
+    @@ -4,7 +4,7 @@
+     # For each of these expressions, Ruff provides a fix for one of the `Literal[None]` elements
+     # but not both, as if both were autofixed it would result in `None | None`,
+     # which leads to a `TypeError` at runtime.
+    -a: Literal[None,] | Literal[None,]
+    -b: Literal[None] | Literal[None]
+    -c: Literal[None] | Literal[None,]
+    -d: Literal[None,] | Literal[None]
+    +a: None | Literal[None,]
+    +b: None | Literal[None]
+    +c: None | Literal[None,]
+    +d: None | Literal[None]
+
+
+    ----- stderr -----
+    Would fix 4 errors.
+    ");
 }
 
 /// Test that private, old-style `TypeVar` generics
