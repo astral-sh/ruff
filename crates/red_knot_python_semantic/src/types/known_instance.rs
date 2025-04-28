@@ -95,6 +95,7 @@ pub enum KnownInstanceType<'db> {
     NotRequired,
     TypeAlias,
     TypeGuard,
+    TypedDict,
     TypeIs,
     ReadOnly,
     // TODO: fill this enum out with more special forms, etc.
@@ -129,6 +130,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::NotRequired
             | Self::TypeAlias
             | Self::TypeGuard
+            | Self::TypedDict
             | Self::TypeIs
             | Self::List
             | Self::Dict
@@ -176,6 +178,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NotRequired => "typing.NotRequired",
             Self::TypeAlias => "typing.TypeAlias",
             Self::TypeGuard => "typing.TypeGuard",
+            Self::TypedDict => "typing.TypedDict",
             Self::TypeIs => "typing.TypeIs",
             Self::List => "typing.List",
             Self::Dict => "typing.Dict",
@@ -227,6 +230,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NotRequired => KnownClass::SpecialForm,
             Self::TypeAlias => KnownClass::SpecialForm,
             Self::TypeGuard => KnownClass::SpecialForm,
+            Self::TypedDict => KnownClass::SpecialForm,
             Self::TypeIs => KnownClass::SpecialForm,
             Self::ReadOnly => KnownClass::SpecialForm,
             Self::List => KnownClass::StdlibAlias,
@@ -300,6 +304,7 @@ impl<'db> KnownInstanceType<'db> {
             "Required" => Self::Required,
             "TypeAlias" => Self::TypeAlias,
             "TypeGuard" => Self::TypeGuard,
+            "TypedDict" => Self::TypedDict,
             "TypeIs" => Self::TypeIs,
             "ReadOnly" => Self::ReadOnly,
             "Concatenate" => Self::Concatenate,
@@ -357,6 +362,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::NotRequired
             | Self::TypeAlias
             | Self::TypeGuard
+            | Self::TypedDict
             | Self::TypeIs
             | Self::ReadOnly
             | Self::TypeAliasType(_)

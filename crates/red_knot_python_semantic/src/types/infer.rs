@@ -7833,6 +7833,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             | KnownInstanceType::Any
             | KnownInstanceType::AlwaysTruthy
             | KnownInstanceType::AlwaysFalsy => {
+                self.infer_type_expression(arguments_slice);
+
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "Type `{}` expected no type parameter",
@@ -7843,7 +7845,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             KnownInstanceType::TypingSelf
             | KnownInstanceType::TypeAlias
+            | KnownInstanceType::TypedDict
             | KnownInstanceType::Unknown => {
+                self.infer_type_expression(arguments_slice);
+
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "Special form `{}` expected no type parameter",
@@ -7853,6 +7858,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::unknown()
             }
             KnownInstanceType::LiteralString => {
+                self.infer_type_expression(arguments_slice);
+
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Type `{}` expected no type parameter",

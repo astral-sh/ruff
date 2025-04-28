@@ -42,13 +42,18 @@ pub fn run() {
 #[wasm_bindgen]
 pub struct Workspace {
     db: ProjectDatabase,
+    position_encoding: PositionEncoding,
     system: WasmSystem,
 }
 
 #[wasm_bindgen]
 impl Workspace {
     #[wasm_bindgen(constructor)]
-    pub fn new(root: &str, options: JsValue) -> Result<Workspace, Error> {
+    pub fn new(
+        root: &str,
+        position_encoding: PositionEncoding,
+        options: JsValue,
+    ) -> Result<Workspace, Error> {
         let options = Options::deserialize_with(
             ValueSource::Cli,
             serde_wasm_bindgen::Deserializer::from(options),
@@ -62,7 +67,11 @@ impl Workspace {
 
         let db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
 
-        Ok(Self { db, system })
+        Ok(Self {
+            db,
+            position_encoding,
+            system,
+        })
     }
 
     #[wasm_bindgen(js_name = "updateOptions")]
@@ -216,13 +225,18 @@ impl Workspace {
         let source = source_text(&self.db, file_id.file);
         let index = line_index(&self.db, file_id.file);
 
-        let offset = position.to_text_size(&source, &index)?;
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
         let Some(targets) = goto_type_definition(&self.db, file_id.file, offset) else {
             return Ok(Vec::new());
         };
 
-        let source_range = Range::from_text_range(targets.file_range().range(), &index, &source);
+        let source_range = Range::from_text_range(
+            targets.file_range().range(),
+            &index,
+            &source,
+            self.position_encoding,
+        );
 
         let links: Vec<_> = targets
             .into_iter()
@@ -231,10 +245,12 @@ impl Workspace {
                 full_range: Range::from_file_range(
                     &self.db,
                     FileRange::new(target.file(), target.full_range()),
+                    self.position_encoding,
                 ),
                 selection_range: Some(Range::from_file_range(
                     &self.db,
                     FileRange::new(target.file(), target.focus_range()),
+                    self.position_encoding,
                 )),
                 origin_selection_range: Some(source_range),
             })
@@ -248,13 +264,18 @@ impl Workspace {
         let source = source_text(&self.db, file_id.file);
         let index = line_index(&self.db, file_id.file);
 
-        let offset = position.to_text_size(&source, &index)?;
+        let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
         let Some(range_info) = hover(&self.db, file_id.file, offset) else {
             return Ok(None);
         };
 
-        let source_range = Range::from_text_range(range_info.file_range().range(), &index, &source);
+        let source_range = Range::from_text_range(
+            range_info.file_range().range(),
+            &index,
+            &source,
+            self.position_encoding,
+        );
 
         Ok(Some(Hover {
             markdown: range_info
@@ -272,14 +293,19 @@ impl Workspace {
         let result = inlay_hints(
             &self.db,
             file_id.file,
-            range.to_text_range(&index, &source)?,
+            range.to_text_range(&index, &source, self.position_encoding)?,
         );
 
         Ok(result
             .into_iter()
             .map(|hint| InlayHint {
                 markdown: hint.display(&self.db).to_string(),
-                position: Position::from_text_size(hint.position, &index, &source),
+                position: Position::from_text_size(
+                    hint.position,
+                    &index,
+                    &source,
+                    self.position_encoding,
+                ),
             })
             .collect())
     }
@@ -348,6 +374,7 @@ impl Diagnostic {
             Some(Range::from_file_range(
                 &workspace.db,
                 FileRange::new(span.file(), span.range()?),
+                workspace.position_encoding,
             ))
         })
     }
@@ -378,21 +405,31 @@ impl Range {
 }
 
 impl Range {
-    fn from_file_range(db: &dyn Db, file_range: FileRange) -> Self {
+    fn from_file_range(
+        db: &dyn Db,
+        file_range: FileRange,
+        position_encoding: PositionEncoding,
+    ) -> Self {
         let index = line_index(db.upcast(), file_range.file());
         let source = source_text(db.upcast(), file_range.file());
 
-        Self::from_text_range(file_range.range(), &index, &source)
+        Self::from_text_range(file_range.range(), &index, &source, position_encoding)
     }
 
     fn from_text_range(
         text_range: ruff_text_size::TextRange,
         line_index: &LineIndex,
         source: &str,
+        position_encoding: PositionEncoding,
     ) -> Self {
         Self {
-            start: Position::from_text_size(text_range.start(), line_index, source),
-            end: Position::from_text_size(text_range.end(), line_index, source),
+            start: Position::from_text_size(
+                text_range.start(),
+                line_index,
+                source,
+                position_encoding,
+            ),
+            end: Position::from_text_size(text_range.end(), line_index, source, position_encoding),
         }
     }
 
@@ -400,20 +437,16 @@ impl Range {
         self,
         line_index: &LineIndex,
         source: &str,
+        position_encoding: PositionEncoding,
     ) -> Result<ruff_text_size::TextRange, Error> {
-        let start = self.start.to_text_size(source, line_index)?;
-        let end = self.end.to_text_size(source, line_index)?;
+        let start = self
+            .start
+            .to_text_size(source, line_index, position_encoding)?;
+        let end = self
+            .end
+            .to_text_size(source, line_index, position_encoding)?;
 
         Ok(ruff_text_size::TextRange::new(start, end))
-    }
-}
-
-impl From<(SourceLocation, SourceLocation)> for Range {
-    fn from((start, end): (SourceLocation, SourceLocation)) -> Self {
-        Self {
-            start: start.into(),
-            end: end.into(),
-        }
     }
 }
 
@@ -436,32 +469,42 @@ impl Position {
 }
 
 impl Position {
-    fn to_text_size(self, text: &str, index: &LineIndex) -> Result<TextSize, Error> {
+    fn to_text_size(
+        self,
+        text: &str,
+        index: &LineIndex,
+        position_encoding: PositionEncoding,
+    ) -> Result<TextSize, Error> {
         let text_size = index.offset(
-            OneIndexed::new(self.line).ok_or_else(|| {
-                Error::new("Invalid value `0` for `position.line`. The line index is 1-indexed.")
-            })?,
-            OneIndexed::new(self.column).ok_or_else(|| {
-                Error::new(
-                    "Invalid value `0` for `position.column`. The column index is 1-indexed.",
-                )
-            })?,
+            SourceLocation {
+                line: OneIndexed::new(self.line).ok_or_else(|| {
+                    Error::new(
+                        "Invalid value `0` for `position.line`. The line index is 1-indexed.",
+                    )
+                })?,
+                character_offset: OneIndexed::new(self.column).ok_or_else(|| {
+                    Error::new(
+                        "Invalid value `0` for `position.column`. The column index is 1-indexed.",
+                    )
+                })?,
+            },
             text,
+            position_encoding.into(),
         );
 
         Ok(text_size)
     }
 
-    fn from_text_size(offset: TextSize, line_index: &LineIndex, source: &str) -> Self {
-        line_index.source_location(offset, source).into()
-    }
-}
-
-impl From<SourceLocation> for Position {
-    fn from(location: SourceLocation) -> Self {
+    fn from_text_size(
+        offset: TextSize,
+        line_index: &LineIndex,
+        source: &str,
+        position_encoding: PositionEncoding,
+    ) -> Self {
+        let location = line_index.source_location(offset, source, position_encoding.into());
         Self {
-            line: location.row.get(),
-            column: location.column.get(),
+            line: location.line.get(),
+            column: location.character_offset.get(),
         }
     }
 }
@@ -497,6 +540,25 @@ impl From<ruff_text_size::TextRange> for TextRange {
         Self {
             start: value.start().into(),
             end: value.end().into(),
+        }
+    }
+}
+
+#[derive(Default, Copy, Clone)]
+#[wasm_bindgen]
+pub enum PositionEncoding {
+    #[default]
+    Utf8,
+    Utf16,
+    Utf32,
+}
+
+impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
+    fn from(value: PositionEncoding) -> Self {
+        match value {
+            PositionEncoding::Utf8 => Self::Utf8,
+            PositionEncoding::Utf16 => Self::Utf16,
+            PositionEncoding::Utf32 => Self::Utf32,
         }
     }
 }

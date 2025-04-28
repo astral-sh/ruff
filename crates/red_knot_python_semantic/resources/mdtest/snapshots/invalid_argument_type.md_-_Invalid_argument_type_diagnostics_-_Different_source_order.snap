@@ -23,7 +23,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invali
 
 ```
 error: lint:invalid-argument-type: Argument to this function is incorrect
- --> /src/mdtest_snippet.py:2:9
+ --> src/mdtest_snippet.py:2:9
   |
 1 | def bar():
 2 |     foo("hello")  # error: [invalid-argument-type]
@@ -32,7 +32,7 @@ error: lint:invalid-argument-type: Argument to this function is incorrect
 4 | def foo(x: int) -> int:
   |
 info: Function defined here
- --> /src/mdtest_snippet.py:4:5
+ --> src/mdtest_snippet.py:4:5
   |
 2 |     foo("hello")  # error: [invalid-argument-type]
 3 |

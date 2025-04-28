@@ -21,7 +21,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invali
 
 ```
 error: lint:invalid-argument-type: Argument to this function is incorrect
- --> /src/mdtest_snippet.py:3:12
+ --> src/mdtest_snippet.py:3:12
   |
 1 | import json
 2 |

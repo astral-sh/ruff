@@ -30,6 +30,7 @@ use crate::fix::{fix_file, FixResult};
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
+use crate::preview::is_unsupported_syntax_enabled;
 use crate::registry::{AsRule, Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
@@ -360,7 +361,7 @@ pub fn check_path(
         }
     }
 
-    let syntax_errors = if settings.preview.is_enabled() {
+    let syntax_errors = if is_unsupported_syntax_enabled(settings) {
         parsed.unsupported_syntax_errors()
     } else {
         &[]
@@ -790,8 +791,9 @@ mod tests {
     use crate::linter::check_path;
     use crate::message::Message;
     use crate::registry::Rule;
+    use crate::settings::LinterSettings;
     use crate::source_kind::SourceKind;
-    use crate::test::{assert_notebook_path, test_contents, TestedNotebook};
+    use crate::test::{assert_notebook_path, test_contents, test_snippet, TestedNotebook};
     use crate::{assert_messages, directives, settings, Locator};
 
     /// Construct a path to a Jupyter notebook in the `resources/test/fixtures/jupyter` directory.
@@ -810,7 +812,7 @@ mod tests {
         } = assert_notebook_path(
             &actual,
             expected,
-            &settings::LinterSettings::for_rule(Rule::UnsortedImports),
+            &LinterSettings::for_rule(Rule::UnsortedImports),
         )?;
         assert_messages!(messages, actual, source_notebook);
         Ok(())
@@ -827,7 +829,7 @@ mod tests {
         } = assert_notebook_path(
             &actual,
             expected,
-            &settings::LinterSettings::for_rule(Rule::UnusedImport),
+            &LinterSettings::for_rule(Rule::UnusedImport),
         )?;
         assert_messages!(messages, actual, source_notebook);
         Ok(())
@@ -844,7 +846,7 @@ mod tests {
         } = assert_notebook_path(
             &actual,
             expected,
-            &settings::LinterSettings::for_rule(Rule::UnusedVariable),
+            &LinterSettings::for_rule(Rule::UnusedVariable),
         )?;
         assert_messages!(messages, actual, source_notebook);
         Ok(())
@@ -861,7 +863,7 @@ mod tests {
         } = assert_notebook_path(
             &actual,
             expected,
-            &settings::LinterSettings::for_rule(Rule::UndefinedName),
+            &LinterSettings::for_rule(Rule::UndefinedName),
         )?;
         assert_messages!(messages, actual, source_notebook);
         Ok(())
@@ -878,7 +880,7 @@ mod tests {
         } = assert_notebook_path(
             actual_path,
             &expected_path,
-            &settings::LinterSettings::for_rule(Rule::UnusedImport),
+            &LinterSettings::for_rule(Rule::UnusedImport),
         )?;
         let mut writer = Vec::new();
         fixed_notebook.write(&mut writer)?;
@@ -899,7 +901,7 @@ mod tests {
         } = assert_notebook_path(
             &actual,
             expected,
-            &settings::LinterSettings::for_rule(Rule::UnusedImport),
+            &LinterSettings::for_rule(Rule::UnusedImport),
         )?;
         assert_messages!(messages, actual, source_notebook);
         Ok(())
@@ -929,7 +931,7 @@ mod tests {
         let (_, transformed) = test_contents(
             &source_kind,
             path,
-            &settings::LinterSettings::for_rule(Rule::UnusedImport),
+            &LinterSettings::for_rule(Rule::UnusedImport),
         );
         let linted_notebook = transformed.into_owned().expect_ipy_notebook();
         let mut writer = Vec::new();
@@ -945,10 +947,7 @@ mod tests {
 
     /// Wrapper around `test_contents_syntax_errors` for testing a snippet of code instead of a
     /// file.
-    fn test_snippet_syntax_errors(
-        contents: &str,
-        settings: &settings::LinterSettings,
-    ) -> Vec<Message> {
+    fn test_snippet_syntax_errors(contents: &str, settings: &LinterSettings) -> Vec<Message> {
         let contents = dedent(contents);
         test_contents_syntax_errors(
             &SourceKind::Python(contents.to_string()),
@@ -962,7 +961,7 @@ mod tests {
     fn test_contents_syntax_errors(
         source_kind: &SourceKind,
         path: &Path,
-        settings: &settings::LinterSettings,
+        settings: &LinterSettings,
     ) -> Vec<Message> {
         let source_type = PySourceType::from(path);
         let options =
@@ -1031,7 +1030,7 @@ mod tests {
         let snapshot = format!("async_comprehension_in_sync_comprehension_{name}_{python_version}");
         let messages = test_snippet_syntax_errors(
             contents,
-            &settings::LinterSettings {
+            &LinterSettings {
                 rules: settings::rule_table::RuleTable::empty(),
                 unresolved_target_version: python_version,
                 preview: settings::types::PreviewMode::Enabled,
@@ -1050,7 +1049,7 @@ mod tests {
         let messages = test_contents_syntax_errors(
             &SourceKind::IpyNotebook(Notebook::from_path(path)?),
             path,
-            &settings::LinterSettings {
+            &LinterSettings {
                 unresolved_target_version: python_version,
                 rules: settings::rule_table::RuleTable::empty(),
                 preview: settings::types::PreviewMode::Enabled,
@@ -1075,7 +1074,7 @@ mod tests {
         let messages = test_contents_syntax_errors(
             &SourceKind::Python(std::fs::read_to_string(&path)?),
             &path,
-            &settings::LinterSettings::for_rule(rule),
+            &LinterSettings::for_rule(rule),
         );
         insta::with_settings!({filters => vec![(r"\\", "/")]}, {
             assert_messages!(snapshot, messages);
@@ -1094,10 +1093,108 @@ mod tests {
         } = assert_notebook_path(
             path,
             path,
-            &settings::LinterSettings::for_rule(Rule::YieldOutsideFunction),
+            &LinterSettings::for_rule(Rule::YieldOutsideFunction),
         )?;
         assert_messages!(messages, path, source_notebook);
 
         Ok(())
+    }
+
+    const PYI019_EXAMPLE: &str = r#"
+		from typing import TypeVar
+
+		T = TypeVar("T", bound="_NiceReprEnum")
+
+		class C:
+			def __new__(cls: type[T]) -> T:
+                return cls
+		"#;
+
+    #[test_case(
+        "pyi019_adds_typing_extensions",
+		PYI019_EXAMPLE,
+		&LinterSettings {
+			unresolved_target_version: PythonVersion::PY310,
+			typing_extensions: true,
+			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
+		}
+    )]
+    #[test_case(
+        "pyi019_does_not_add_typing_extensions",
+		PYI019_EXAMPLE,
+		&LinterSettings {
+			unresolved_target_version: PythonVersion::PY310,
+			typing_extensions: false,
+			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
+		}
+    )]
+    #[test_case(
+        "pyi019_adds_typing_without_extensions_disabled",
+		PYI019_EXAMPLE,
+		&LinterSettings {
+			unresolved_target_version: PythonVersion::PY311,
+			typing_extensions: true,
+			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
+		}
+    )]
+    #[test_case(
+        "pyi019_adds_typing_with_extensions_disabled",
+		PYI019_EXAMPLE,
+		&LinterSettings {
+			unresolved_target_version: PythonVersion::PY311,
+			typing_extensions: false,
+			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
+		}
+    )]
+    #[test_case(
+        "pyi034_disabled",
+		"
+		class C:
+			def __new__(cls) -> C: ...
+		",
+		&LinterSettings {
+			unresolved_target_version: PythonVersion { major: 3, minor: 10 },
+			typing_extensions: false,
+			..LinterSettings::for_rule(Rule::NonSelfReturnType)
+		}
+    )]
+    #[test_case(
+        "fast002_disabled",
+		r#"
+		from fastapi import Depends, FastAPI
+
+		app = FastAPI()
+
+		@app.get("/items/")
+		async def read_items(commons: dict = Depends(common_parameters)):
+			return commons
+		"#,
+		&LinterSettings {
+			unresolved_target_version: PythonVersion { major: 3, minor: 8 },
+			typing_extensions: false,
+			..LinterSettings::for_rule(Rule::FastApiNonAnnotatedDependency)
+		}
+    )]
+    fn test_disabled_typing_extensions(name: &str, contents: &str, settings: &LinterSettings) {
+        let snapshot = format!("disabled_typing_extensions_{name}");
+        let messages = test_snippet(contents, settings);
+        assert_messages!(snapshot, messages);
+    }
+
+    #[test_case(
+		"pyi026_disabled",
+		"Vector = list[float]",
+		&LinterSettings {
+			unresolved_target_version: PythonVersion { major: 3, minor: 9 },
+			typing_extensions: false,
+			..LinterSettings::for_rule(Rule::TypeAliasWithoutAnnotation)
+		}
+	)]
+    fn test_disabled_typing_extensions_pyi(name: &str, contents: &str, settings: &LinterSettings) {
+        let snapshot = format!("disabled_typing_extensions_pyi_{name}");
+        let path = Path::new("<filename>.pyi");
+        let contents = dedent(contents);
+        let messages = test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0;
+        assert_messages!(snapshot, messages);
     }
 }

@@ -11,7 +11,7 @@ use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
 use ruff_db::diagnostic::{
     create_parse_diagnostic, create_unsupported_syntax_diagnostic, Annotation, Diagnostic,
-    DiagnosticId, Severity, Span,
+    DiagnosticId, Severity, Span, SubDiagnostic,
 };
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -20,8 +20,10 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
+use std::panic::{catch_unwind, AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
+use tracing::error;
 
 pub mod combine;
 
@@ -471,7 +473,16 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
             .map(|error| create_unsupported_syntax_diagnostic(file, error)),
     );
 
-    diagnostics.extend(check_types(db.upcast(), file).into_iter().cloned());
+    {
+        let db = AssertUnwindSafe(db);
+        match catch(&**db, file, || check_types(db.upcast(), file)) {
+            Ok(Some(type_check_diagnostics)) => {
+                diagnostics.extend(type_check_diagnostics.into_iter().cloned());
+            }
+            Ok(None) => {}
+            Err(diagnostic) => diagnostics.push(diagnostic),
+        }
+    }
 
     diagnostics.sort_unstable_by_key(|diagnostic| {
         diagnostic
@@ -560,6 +571,45 @@ enum IOErrorKind {
 
     #[error(transparent)]
     SourceText(#[from] SourceTextError),
+}
+
+fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<Option<R>, Diagnostic>
+where
+    F: FnOnce() -> R + UnwindSafe,
+{
+    match catch_unwind(|| {
+        // Ignore salsa errors
+        salsa::Cancelled::catch(f).ok()
+    }) {
+        Ok(result) => Ok(result),
+        Err(error) => {
+            let payload = if let Some(s) = error.downcast_ref::<&str>() {
+                Some((*s).to_string())
+            } else {
+                error.downcast_ref::<String>().cloned()
+            };
+
+            let message = if let Some(payload) = payload {
+                format!(
+                    "Panicked while checking `{file}`: `{payload}`",
+                    file = file.path(db)
+                )
+            } else {
+                format!("Panicked while checking `{file}`", file = { file.path(db) })
+            };
+
+            let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
+            diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                "This indicates a bug in Red Knot.",
+            ));
+
+            let report_message = "If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bred-knot%5D:%20panic we'd be very appreciative!";
+            diagnostic.sub(SubDiagnostic::new(Severity::Info, report_message));
+
+            Err(diagnostic)
+        }
+    }
 }
 
 #[cfg(test)]

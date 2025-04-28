@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use ruff_source_file::SourceLocation;
+use ruff_source_file::LineColumn;
 
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext, Message};
@@ -22,9 +22,9 @@ impl Emitter for GithubEmitter {
             let location = if context.is_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
-                SourceLocation::default()
+                LineColumn::default()
             } else {
-                source_location.clone()
+                source_location
             };
 
             let end_location = message.compute_end_location();
@@ -34,9 +34,9 @@ impl Emitter for GithubEmitter {
                 "::error title=Ruff{code},file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
                 code = message.rule().map_or_else(String::new, |rule| format!(" ({})", rule.noqa_code())),
                 file = message.filename(),
-                row = source_location.row,
+                row = source_location.line,
                 column = source_location.column,
-                end_row = end_location.row,
+                end_row = end_location.line,
                 end_column = end_location.column,
             )?;
 
@@ -44,7 +44,7 @@ impl Emitter for GithubEmitter {
                 writer,
                 "{path}:{row}:{column}:",
                 path = relativize_path(message.filename()),
-                row = location.row,
+                row = location.line,
                 column = location.column,
             )?;
 

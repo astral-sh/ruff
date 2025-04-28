@@ -32,7 +32,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/function/return_ty
 
 ```
 error: lint:invalid-return-type: Return type does not match returned value
- --> /src/mdtest_snippet.py:1:22
+ --> src/mdtest_snippet.py:1:22
   |
 1 | def f(cond: bool) -> str:
   |                      --- Expected `str` because of return type
@@ -50,7 +50,7 @@ error: lint:invalid-return-type: Return type does not match returned value
 
 ```
 error: lint:invalid-return-type: Return type does not match returned value
-  --> /src/mdtest_snippet.py:8:22
+  --> src/mdtest_snippet.py:8:22
    |
  6 |         return 1
  7 |
@@ -68,14 +68,14 @@ error: lint:invalid-return-type: Return type does not match returned value
 
 ```
 error: lint:invalid-return-type: Return type does not match returned value
-  --> /src/mdtest_snippet.py:14:16
+  --> src/mdtest_snippet.py:14:16
    |
 12 |     else:
 13 |         # error: [invalid-return-type]
 14 |         return 2
    |                ^ Expected `str`, found `Literal[2]`
    |
-  ::: /src/mdtest_snippet.py:8:22
+  ::: src/mdtest_snippet.py:8:22
    |
  6 |         return 1
  7 |

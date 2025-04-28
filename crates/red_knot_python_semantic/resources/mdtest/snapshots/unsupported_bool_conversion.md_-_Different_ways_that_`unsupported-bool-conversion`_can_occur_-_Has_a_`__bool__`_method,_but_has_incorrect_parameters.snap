@@ -26,14 +26,14 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unsupp
 
 ```
 error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`
- --> /src/mdtest_snippet.py:8:8
+ --> src/mdtest_snippet.py:8:8
   |
 7 | # error: [unsupported-bool-conversion]
 8 | 10 and a and True
   |        ^
   |
 info: `__bool__` methods must only have a `self` parameter
- --> /src/mdtest_snippet.py:2:9
+ --> src/mdtest_snippet.py:2:9
   |
 1 | class NotBoolable:
 2 |     def __bool__(self, foo):

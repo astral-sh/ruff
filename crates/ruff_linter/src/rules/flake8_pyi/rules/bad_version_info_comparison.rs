@@ -5,6 +5,7 @@ use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_bad_version_info_in_non_stub_enabled;
 use crate::registry::Rule;
 
 /// ## What it does
@@ -140,7 +141,7 @@ pub(crate) fn bad_version_info_comparison(checker: &Checker, test: &Expr, has_el
     if matches!(op, CmpOp::Lt) {
         if checker.enabled(Rule::BadVersionInfoOrder)
             // See https://github.com/astral-sh/ruff/issues/15347
-            && (checker.source_type.is_stub() || checker.settings.preview.is_enabled())
+            && (checker.source_type.is_stub() || is_bad_version_info_in_non_stub_enabled(checker.settings))
         {
             if has_else_clause {
                 checker.report_diagnostic(Diagnostic::new(BadVersionInfoOrder, test.range()));
