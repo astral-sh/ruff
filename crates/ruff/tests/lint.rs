@@ -4989,6 +4989,7 @@ from typing import Literal
 # Ruff offers a fix for one of these, but not both of them, as if both were autofixed
 # it would result in `None | None`, which leads to a `TypeError` at runtime.
 x: Literal[None,] | Literal[None,]
+y: Literal[None] | Literal[None]
 "#;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
@@ -5004,16 +5005,18 @@ x: Literal[None,] | Literal[None,]
     ----- stdout -----
     --- test.py
     +++ test.py
-    @@ -3,4 +3,4 @@
+    @@ -3,5 +3,5 @@
      
      # Ruff offers a fix for one of these, but not both of them, as if both were autofixed
      # it would result in `None | None`, which leads to a `TypeError` at runtime.
     -x: Literal[None,] | Literal[None,]
+    -y: Literal[None] | Literal[None]
     +x: None | Literal[None,]
+    +y: None | Literal[None]
 
 
     ----- stderr -----
-    Would fix 1 error.
+    Would fix 2 errors.
     ");
 }
 
