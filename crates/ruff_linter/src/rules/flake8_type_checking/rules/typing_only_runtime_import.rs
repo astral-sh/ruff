@@ -12,6 +12,7 @@ use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::fix;
 use crate::importer::ImportedMembers;
+use crate::preview::is_full_path_match_source_strategy_enabled;
 use crate::rules::flake8_type_checking::helpers::{
     filter_contained, is_typing_reference, quote_annotation,
 };
@@ -314,11 +315,12 @@ pub(crate) fn typing_only_runtime_import(
             let source_name = import.source_name().join(".");
 
             // Categorize the import, using coarse-grained categorization.
-            let match_source_strategy = if checker.settings.preview.is_enabled() {
-                MatchSourceStrategy::FullPath
-            } else {
-                MatchSourceStrategy::Root
-            };
+            let match_source_strategy =
+                if is_full_path_match_source_strategy_enabled(checker.settings) {
+                    MatchSourceStrategy::FullPath
+                } else {
+                    MatchSourceStrategy::Root
+                };
 
             let import_type = match categorize(
                 &source_name,

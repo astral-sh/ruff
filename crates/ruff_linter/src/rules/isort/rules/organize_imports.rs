@@ -15,6 +15,8 @@ use super::super::block::Block;
 use super::super::{comments, format_imports};
 use crate::line_width::LineWidthBuilder;
 use crate::package::PackageRoot;
+use crate::preview::is_full_path_match_source_strategy_enabled;
+use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::settings::LinterSettings;
 use crate::Locator;
 
@@ -124,6 +126,12 @@ pub(crate) fn organize_imports(
         trailing_lines_end(block.imports.last().unwrap(), locator.contents())
     };
 
+    let match_source_strategy = if is_full_path_match_source_strategy_enabled(settings) {
+        MatchSourceStrategy::FullPath
+    } else {
+        MatchSourceStrategy::Root
+    };
+
     // Generate the sorted import block.
     let expected = format_imports(
         block,
@@ -137,7 +145,7 @@ pub(crate) fn organize_imports(
         source_type,
         target_version,
         &settings.isort,
-        settings.preview,
+        match_source_strategy,
         tokens,
     );
 

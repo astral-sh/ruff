@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 
 use crate::package::PackageRoot;
-use crate::settings::types::PreviewMode;
 use crate::warn_user_once;
 use ruff_macros::CacheKey;
 use ruff_python_ast::PythonVersion;
@@ -230,15 +229,8 @@ pub(crate) fn categorize_imports<'a>(
     no_sections: bool,
     section_order: &'a [ImportSection],
     default_section: &'a ImportSection,
-    preview: PreviewMode,
+    match_source_strategy: MatchSourceStrategy,
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
-    // Categorize by type (e.g., first-party vs. third-party).
-    let match_source_strategy = if preview.is_enabled() {
-        MatchSourceStrategy::FullPath
-    } else {
-        MatchSourceStrategy::Root
-    };
-
     let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
     // Categorize `Stmt::Import`.
     for (alias, comments) in block.import {

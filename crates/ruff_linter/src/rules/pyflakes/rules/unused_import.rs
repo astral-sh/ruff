@@ -16,7 +16,9 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::preview::is_dunder_init_fix_unused_import_enabled;
+use crate::preview::{
+    is_dunder_init_fix_unused_import_enabled, is_full_path_match_source_strategy_enabled,
+};
 use crate::registry::Rule;
 use crate::rules::isort::categorize::MatchSourceStrategy;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
@@ -229,7 +231,7 @@ enum UnusedImportContext {
 
 fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
     let source_name = import.source_name().join(".");
-    let match_source_strategy = if checker.settings.preview.is_enabled() {
+    let match_source_strategy = if is_full_path_match_source_strategy_enabled(checker.settings) {
         MatchSourceStrategy::FullPath
     } else {
         MatchSourceStrategy::Root
