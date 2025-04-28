@@ -150,12 +150,6 @@ fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<S
 
     let inner_source = checker.locator().slice(arg);
 
-    // Trying to replace an `arg` that contains a brace would create a `SyntaxError`
-    // in the f-string.
-    if inner_source.contains('{') {
-        return None;
-    }
-
     // On Python 3.11 and earlier, trying to replace an `arg` that contains a backslash
     // would create a `SyntaxError` in the f-string.
     if checker.target_version() <= PythonVersion::PY311 && inner_source.contains('\\') {
@@ -180,7 +174,13 @@ fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<S
         quote = quote.opposite();
     }
 
-    Some(format!("f{quote}{{{inner_source}:{shorthand}}}{quote}"))
+    // If the `arg` contains a brace add an space before it to avoid a `SyntaxError`
+    // in the f-string.
+    if inner_source.contains('{') {
+        Some(format!("f{quote}{{ {inner_source}:{shorthand}}}{quote}"))
+    } else {
+        Some(format!("f{quote}{{{inner_source}:{shorthand}}}{quote}"))
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
