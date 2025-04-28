@@ -10,7 +10,7 @@ use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 use ruff_python_semantic::{Binding, ResolvedReference, ScopeId, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, TypingImporter};
 use ruff_python_ast::PythonVersion;
 
 /// ## What it does
@@ -119,6 +119,7 @@ pub(crate) fn custom_type_var_instead_of_self(
     let semantic = checker.semantic();
     let current_scope = &semantic.scopes[binding.scope];
     let function_def = binding.statement(semantic)?.as_function_def_stmt()?;
+    let importer = checker.typing_importer("Self", PythonVersion::PY311)?;
 
     let ast::StmtFunctionDef {
         name: function_name,
@@ -178,18 +179,6 @@ pub(crate) fn custom_type_var_instead_of_self(
         .map(Ranged::end)
         .unwrap_or_else(|| parameters.end());
 
-    let fix = replace_custom_typevar_with_self(
-        checker,
-        function_def,
-        custom_typevar,
-        self_or_cls_parameter,
-        self_or_cls_annotation,
-    );
-
-    if matches!(fix, Ok(None)) {
-        return None;
-    }
-
     let mut diagnostic = Diagnostic::new(
         CustomTypeVarForSelf {
             typevar_name: custom_typevar.name(checker.source()).to_string(),
@@ -197,7 +186,16 @@ pub(crate) fn custom_type_var_instead_of_self(
         TextRange::new(function_name.end(), function_header_end),
     );
 
-    diagnostic.try_set_optional_fix(|| fix);
+    diagnostic.try_set_fix(|| {
+        replace_custom_typevar_with_self(
+            checker,
+            &importer,
+            function_def,
+            custom_typevar,
+            self_or_cls_parameter,
+            self_or_cls_annotation,
+        )
+    });
 
     Some(diagnostic)
 }
@@ -324,16 +322,13 @@ fn custom_typevar<'a>(
 /// * If it was a PEP-695 type variable, removes that `TypeVar` from the PEP-695 type-parameter list
 fn replace_custom_typevar_with_self(
     checker: &Checker,
+    importer: &TypingImporter,
     function_def: &ast::StmtFunctionDef,
     custom_typevar: TypeVar,
     self_or_cls_parameter: &ast::ParameterWithDefault,
     self_or_cls_annotation: &ast::Expr,
-) -> anyhow::Result<Option<Fix>> {
+) -> anyhow::Result<Fix> {
     // (1) Import `Self` (if necessary)
-    let Some(importer) = checker.typing_importer("Self", PythonVersion::PY311) else {
-        return Ok(None);
-    };
-
     let (import_edit, self_symbol_binding) = importer.import(function_def.start())?;
 
     // (2) Remove the first parameter's annotation
@@ -377,11 +372,11 @@ fn replace_custom_typevar_with_self(
         Applicability::Safe
     };
 
-    Ok(Some(Fix::applicable_edits(
+    Ok(Fix::applicable_edits(
         import_edit,
         other_edits,
         applicability,
-    )))
+    ))
 }
 
 /// Returns a series of [`Edit`]s that modify all references to the given `typevar`.
