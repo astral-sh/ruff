@@ -79,12 +79,12 @@ Foo.class_str.rsplit(",")[1]
 Foo.class_str.rsplit(",")[-2]
 
 ### Test split called on sliced string
-"1,2,3"[::-1].split(",")[1]  # [missing-maxsplit-arg]
-SEQ[:3].split(",")[1]  # [missing-maxsplit-arg]
-Foo.class_str[1:3].split(",")[-2]  # [missing-maxsplit-arg]
-"1,2,3"[::-1].rsplit(",")[1]  # [missing-maxsplit-arg]
-SEQ[:3].rsplit(",")[1]  # [missing-maxsplit-arg]
-Foo.class_str[1:3].rsplit(",")[-2]  # [missing-maxsplit-arg]
+"1,2,3"[::-1].split(",")[1]
+SEQ[:3].split(",")[1]
+Foo.class_str[1:3].split(",")[-2]
+"1,2,3"[::-1].rsplit(",")[1]
+SEQ[:3].rsplit(",")[1]
+Foo.class_str[1:3].rsplit(",")[-2]
 
 ### Test sep given as named argument
 "1,2,3".split(sep=",")[1]
@@ -117,10 +117,10 @@ Foo("1,2,3").rsplit(",")[-1]
 ["1", "2", "3"][::-1].split(",")[0]
 
 ## Test class attribute named split
-Bar.split[0]  # [missing-maxsplit-arg]
-Bar.split[-1]  # [missing-maxsplit-arg]
-Bar.split[0]  # [missing-maxsplit-arg]
-Bar.split[-1]  # [missing-maxsplit-arg]
+Bar.split[0]
+Bar.split[-1]
+Bar.split[0]
+Bar.split[-1]
 
 ## Test unpacked dict literal kwargs 
 "1,2,3".split(",", **{"maxsplit": 1})[0]
