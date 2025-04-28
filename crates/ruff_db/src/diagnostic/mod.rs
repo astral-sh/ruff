@@ -11,6 +11,7 @@ use crate::Db;
 
 use self::render::FileResolver;
 mod render;
+mod sheet;
 
 /// A collection of information that can be rendered into a diagnostic.
 ///

@@ -2880,6 +2880,7 @@ dependencies = [
 name = "ruff_db"
 version = "0.0.0"
 dependencies = [
+ "anstyle",
  "camino",
  "colored 3.0.0",
  "countme",

@@ -9,6 +9,7 @@ use ruff_annotate_snippets::{
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::diagnostic::sheet::DiagnosticStylesheet;
 use crate::{
     files::File,
     source::{line_index, source_text, SourceText},
@@ -36,6 +37,7 @@ pub struct DisplayDiagnostic<'a> {
     resolver: FileResolver<'a>,
     annotate_renderer: AnnotateRenderer,
     diag: &'a Diagnostic,
+    stylesheet: DiagnosticStylesheet,
 }
 
 impl<'a> DisplayDiagnostic<'a> {
@@ -49,11 +51,17 @@ impl<'a> DisplayDiagnostic<'a> {
         } else {
             AnnotateRenderer::plain()
         };
+        let stylesheet = if config.color {
+            DiagnosticStylesheet::styled()
+        } else {
+            DiagnosticStylesheet::plain()
+        };
         DisplayDiagnostic {
             config,
             resolver,
             annotate_renderer,
             diag,
+            stylesheet,
         }
     }
 }
@@ -89,10 +97,21 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
             );
         }
 
+        let mut renderer = self.annotate_renderer.clone();
+        renderer = renderer
+            .error(self.stylesheet.error)
+            .warning(self.stylesheet.warning)
+            .info(self.stylesheet.info)
+            .note(self.stylesheet.note)
+            .help(self.stylesheet.help)
+            .line_no(self.stylesheet.line_no)
+            .emphasis(self.stylesheet.emphasis)
+            .none(self.stylesheet.none);
+
         let resolved = Resolved::new(&self.resolver, self.diag);
         let renderable = resolved.to_renderable(self.config.context);
         for diag in renderable.diagnostics.iter() {
-            writeln!(f, "{}", self.annotate_renderer.render(diag.to_annotate()))?;
+            writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
         }
         writeln!(f)
     }
