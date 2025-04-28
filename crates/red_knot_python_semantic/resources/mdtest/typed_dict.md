@@ -4,7 +4,7 @@ We do not support `TypedDict`s yet. This test mainly exists to make sure that we
 errors for the definition of a `TypedDict`.
 
 ```py
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, Required
 
 class Person(TypedDict):
     name: str
@@ -12,13 +12,13 @@ class Person(TypedDict):
 
 # TODO: This should not be an error:
 # error: [invalid-assignment]
-p1: Person = {"name": "Alice", "age": 30}
+alice: Person = {"name": "Alice", "age": 30}
 
 # Alternative syntax
-Message = TypedDict("Message", {"id": int, "content": str}, total=False)
+Message = TypedDict("Message", {"id": Required[int], "content": str}, total=False)
 
-p2 = Message(name="Bob", age=25)
+msg = Message(id=1, content="Hello")
 
-# No errors for yet-unsupported features:
+# No errors for yet-unsupported features (`closed`):
 OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
 ```
