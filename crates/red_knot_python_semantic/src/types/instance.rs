@@ -208,12 +208,18 @@ impl<'db> Protocol<'db> {
     #[salsa::tracked(return_ref)]
     fn protocol_members(self, db: &'db dyn Db) -> FxOrderSet<Name> {
         match self {
-            Self::FromClass(class) => class
-                .class_literal(db)
-                .0
-                .into_protocol_class(db)
-                .expect("Protocol class literal should be a protocol class")
-                .protocol_members(db),
+            Self::FromClass(class) => {
+                let class = class
+                    .class_literal(db)
+                    .0
+                    .into_protocol_class(db)
+                    .expect("Protocol class literal should be a protocol class");
+
+                let _span = tracing::trace_span!("protocol_members", "class='{}'", class.name(db))
+                    .entered();
+
+                class.protocol_members(db)
+            }
             Self::Synthesized(synthesized) => synthesized.members(db).clone(),
         }
     }
