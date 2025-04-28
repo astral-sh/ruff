@@ -21,7 +21,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/shadow
 
 ```
 error: lint:invalid-assignment: Implicit shadowing of function `f`
- --> /src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:3:1
   |
 1 | def f(): ...
 2 |

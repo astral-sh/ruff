@@ -31,7 +31,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/function/return_ty
 
 ```
 error: lint:invalid-return-type: Return type does not match returned value
- --> /src/mdtest_snippet.pyi:1:12
+ --> src/mdtest_snippet.pyi:1:12
   |
 1 | def f() -> int:
   |            --- Expected `int` because of return type
@@ -46,7 +46,7 @@ error: lint:invalid-return-type: Return type does not match returned value
 
 ```
 error: lint:invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `int`
- --> /src/mdtest_snippet.pyi:6:14
+ --> src/mdtest_snippet.pyi:6:14
   |
 5 | # error: [invalid-return-type]
 6 | def foo() -> int:
@@ -59,7 +59,7 @@ error: lint:invalid-return-type: Function can implicitly return `None`, which is
 
 ```
 error: lint:invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `int`
-  --> /src/mdtest_snippet.pyi:11:14
+  --> src/mdtest_snippet.pyi:11:14
    |
 10 | # error: [invalid-return-type]
 11 | def foo() -> int:

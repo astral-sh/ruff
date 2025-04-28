@@ -156,7 +156,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:4:9
+         --> main.py:4:9
           |
         2 |         a = 10
         3 |
@@ -192,7 +192,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-          --> /main.py:10:9
+          --> main.py:10:9
            |
          9 |         foo = Foo()
         10 |         foo.a
@@ -214,7 +214,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r###"
+        assert_snapshot!(test.hover(), @r"
         def foo(a, b) -> Unknown
         ---------------------------------------------
         ```text
@@ -222,7 +222,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:4:13
+         --> main.py:4:13
           |
         2 |             def foo(a, b): ...
         3 |
@@ -231,7 +231,7 @@ mod tests {
           |             |
           |             source
           |
-        "###);
+        ");
     }
 
     #[test]
@@ -251,7 +251,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:3:17
+         --> main.py:3:17
           |
         2 |             def foo(a: int, b: int, c: int):
         3 |                 a + b == c
@@ -282,7 +282,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:4:18
+         --> main.py:4:18
           |
         2 |             def test(a: int): ...
         3 |
@@ -312,7 +312,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.hover(), @r###"
+        assert_snapshot!(test.hover(), @r"
         (def foo(a, b) -> Unknown) | (def bar(a, b) -> Unknown)
         ---------------------------------------------
         ```text
@@ -320,7 +320,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-          --> /main.py:12:13
+          --> main.py:12:13
            |
         10 |                 a = bar
         11 |
@@ -329,7 +329,7 @@ mod tests {
            |             |
            |             source
            |
-        "###);
+        ");
     }
 
     #[test]
@@ -352,7 +352,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:4:13
+         --> main.py:4:13
           |
         2 |             import lib
         3 |
@@ -381,7 +381,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:2:46
+         --> main.py:2:46
           |
         2 |             type Alias[T: int = bool] = list[T]
           |                                              ^- Cursor offset
@@ -407,7 +407,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:2:53
+         --> main.py:2:53
           |
         2 |             type Alias[**P = [int, str]] = Callable[P, int]
           |                                                     ^- Cursor offset
@@ -433,7 +433,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:2:43
+         --> main.py:2:43
           |
         2 |             type Alias[*Ts = ()] = tuple[*Ts]
           |                                           ^^- Cursor offset
@@ -461,7 +461,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:3:13
+         --> main.py:3:13
           |
         2 |         class Foo:
         3 |             a: int
@@ -490,7 +490,7 @@ mod tests {
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
-         --> /main.py:4:27
+         --> main.py:4:27
           |
         2 |             def foo(a: str | None, b):
         3 |                 if a is not None:

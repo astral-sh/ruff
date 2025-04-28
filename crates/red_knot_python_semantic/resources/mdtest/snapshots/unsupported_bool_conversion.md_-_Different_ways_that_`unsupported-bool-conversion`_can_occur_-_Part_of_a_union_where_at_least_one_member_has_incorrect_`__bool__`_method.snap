@@ -33,7 +33,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unsupp
 
 ```
 error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for union `NotBoolable1 | NotBoolable2 | NotBoolable3` because `NotBoolable1` doesn't implement `__bool__` correctly
-  --> /src/mdtest_snippet.py:15:8
+  --> src/mdtest_snippet.py:15:8
    |
 14 | # error: [unsupported-bool-conversion]
 15 | 10 and get() and True

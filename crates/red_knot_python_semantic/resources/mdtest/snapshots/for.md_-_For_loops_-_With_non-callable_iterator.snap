@@ -34,7 +34,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 
 ```
 error: lint:not-iterable: Object of type `NotIterable` is not iterable
-  --> /src/mdtest_snippet.py:11:14
+  --> src/mdtest_snippet.py:11:14
    |
 10 |     # error: [not-iterable]
 11 |     for x in NotIterable():
@@ -47,7 +47,7 @@ info: Its `__iter__` attribute has type `int | None`, which is not callable
 
 ```
 warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-  --> /src/mdtest_snippet.py:16:17
+  --> src/mdtest_snippet.py:16:17
    |
 14 |     # revealed: Unknown
 15 |     # error: [possibly-unresolved-reference]
@@ -59,7 +59,7 @@ warning: lint:possibly-unresolved-reference: Name `x` used when possibly not def
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:16:5
+  --> src/mdtest_snippet.py:16:5
    |
 14 |     # revealed: Unknown
 15 |     # error: [possibly-unresolved-reference]

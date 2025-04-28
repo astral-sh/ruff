@@ -25,7 +25,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invali
 
 ```
 error: lint:invalid-argument-type: Argument to this function is incorrect
- --> /src/mdtest_snippet.py:7:5
+ --> src/mdtest_snippet.py:7:5
   |
 5 | # error: [invalid-argument-type]
 6 | # error: [invalid-argument-type]
@@ -33,7 +33,7 @@ error: lint:invalid-argument-type: Argument to this function is incorrect
   |     ^^^ Expected `int`, found `Literal["a"]`
   |
 info: Function defined here
- --> /src/mdtest_snippet.py:1:5
+ --> src/mdtest_snippet.py:1:5
   |
 1 | def foo(x: int, y: int, z: int) -> int:
   |     ^^^ ------ Parameter declared here
@@ -44,7 +44,7 @@ info: Function defined here
 
 ```
 error: lint:invalid-argument-type: Argument to this function is incorrect
- --> /src/mdtest_snippet.py:7:10
+ --> src/mdtest_snippet.py:7:10
   |
 5 | # error: [invalid-argument-type]
 6 | # error: [invalid-argument-type]
@@ -52,7 +52,7 @@ error: lint:invalid-argument-type: Argument to this function is incorrect
   |          ^^^ Expected `int`, found `Literal["b"]`
   |
 info: Function defined here
- --> /src/mdtest_snippet.py:1:5
+ --> src/mdtest_snippet.py:1:5
   |
 1 | def foo(x: int, y: int, z: int) -> int:
   |     ^^^         ------ Parameter declared here
@@ -63,7 +63,7 @@ info: Function defined here
 
 ```
 error: lint:invalid-argument-type: Argument to this function is incorrect
- --> /src/mdtest_snippet.py:7:15
+ --> src/mdtest_snippet.py:7:15
   |
 5 | # error: [invalid-argument-type]
 6 | # error: [invalid-argument-type]
@@ -71,7 +71,7 @@ error: lint:invalid-argument-type: Argument to this function is incorrect
   |               ^^^ Expected `int`, found `Literal["c"]`
   |
 info: Function defined here
- --> /src/mdtest_snippet.py:1:5
+ --> src/mdtest_snippet.py:1:5
   |
 1 | def foo(x: int, y: int, z: int) -> int:
   |     ^^^                 ------ Parameter declared here

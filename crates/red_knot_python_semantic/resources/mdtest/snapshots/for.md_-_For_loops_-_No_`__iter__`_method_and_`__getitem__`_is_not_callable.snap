@@ -26,7 +26,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 
 ```
 error: lint:not-iterable: Object of type `Bad` is not iterable
- --> /src/mdtest_snippet.py:7:10
+ --> src/mdtest_snippet.py:7:10
   |
 6 | # error: [not-iterable]
 7 | for x in Bad():
@@ -39,7 +39,7 @@ info: It has no `__iter__` method and its `__getitem__` attribute has type `None
 
 ```
 info: revealed-type: Revealed type
- --> /src/mdtest_snippet.py:8:5
+ --> src/mdtest_snippet.py:8:5
   |
 6 | # error: [not-iterable]
 7 | for x in Bad():

@@ -58,7 +58,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/protocols.md
 
 ```
 error: lint:invalid-argument-type: Class `HasX` cannot be used as the second argument to `isinstance`
- --> /src/mdtest_snippet.py:7:8
+ --> src/mdtest_snippet.py:7:8
   |
 6 | def f(arg: object, arg2: type):
 7 |     if isinstance(arg, HasX):  # error: [invalid-argument-type]
@@ -67,7 +67,7 @@ error: lint:invalid-argument-type: Class `HasX` cannot be used as the second arg
 9 |     else:
   |
 info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
- --> /src/mdtest_snippet.py:3:7
+ --> src/mdtest_snippet.py:3:7
   |
 1 | from typing_extensions import Protocol, reveal_type
 2 |
@@ -82,7 +82,7 @@ info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:8:9
+  --> src/mdtest_snippet.py:8:9
    |
  6 | def f(arg: object, arg2: type):
  7 |     if isinstance(arg, HasX):  # error: [invalid-argument-type]
@@ -96,7 +96,7 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:10:9
+  --> src/mdtest_snippet.py:10:9
    |
  8 |         reveal_type(arg)  # revealed: HasX
  9 |     else:
@@ -110,7 +110,7 @@ info: revealed-type: Revealed type
 
 ```
 error: lint:invalid-argument-type: Class `HasX` cannot be used as the second argument to `issubclass`
-  --> /src/mdtest_snippet.py:12:8
+  --> src/mdtest_snippet.py:12:8
    |
 10 |         reveal_type(arg)  # revealed: ~HasX
 11 |
@@ -120,7 +120,7 @@ error: lint:invalid-argument-type: Class `HasX` cannot be used as the second arg
 14 |     else:
    |
 info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
- --> /src/mdtest_snippet.py:3:7
+ --> src/mdtest_snippet.py:3:7
   |
 1 | from typing_extensions import Protocol, reveal_type
 2 |
@@ -135,7 +135,7 @@ info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:13:9
+  --> src/mdtest_snippet.py:13:9
    |
 12 |     if issubclass(arg2, HasX):  # error: [invalid-argument-type]
 13 |         reveal_type(arg2)  # revealed: type[HasX]
@@ -148,7 +148,7 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:15:9
+  --> src/mdtest_snippet.py:15:9
    |
 13 |         reveal_type(arg2)  # revealed: type[HasX]
 14 |     else:
@@ -161,7 +161,7 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:24:9
+  --> src/mdtest_snippet.py:24:9
    |
 22 | def f(arg: object):
 23 |     if isinstance(arg, RuntimeCheckableHasX):  # no error!
@@ -175,7 +175,7 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:26:9
+  --> src/mdtest_snippet.py:26:9
    |
 24 |         reveal_type(arg)  # revealed: RuntimeCheckableHasX
 25 |     else:
@@ -189,7 +189,7 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:33:9
+  --> src/mdtest_snippet.py:33:9
    |
 31 | def f(arg1: type, arg2: type):
 32 |     if issubclass(arg1, RuntimeCheckableHasX):  # TODO: should emit an error here (has non-method members)
@@ -203,7 +203,7 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:35:9
+  --> src/mdtest_snippet.py:35:9
    |
 33 |         reveal_type(arg1)  # revealed: type[RuntimeCheckableHasX]
 34 |     else:
@@ -217,7 +217,7 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:38:9
+  --> src/mdtest_snippet.py:38:9
    |
 37 |     if issubclass(arg2, OnlyMethodMembers):  # no error!
 38 |         reveal_type(arg2)  # revealed: type[OnlyMethodMembers]
@@ -230,7 +230,7 @@ info: revealed-type: Revealed type
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:40:9
+  --> src/mdtest_snippet.py:40:9
    |
 38 |         reveal_type(arg2)  # revealed: type[OnlyMethodMembers]
 39 |     else:
