@@ -82,7 +82,7 @@ error: lint:invalid-return-type: Return type does not match returned value
 
 ```
 error: lint:invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `T`
-  --> /src/mdtest_snippet.py:18:16
+  --> src/mdtest_snippet.py:18:16
    |
 17 | # error: [invalid-return-type]
 18 | def m(x: T) -> T: ...
