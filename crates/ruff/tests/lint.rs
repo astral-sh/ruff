@@ -4986,10 +4986,13 @@ fn flake8_pyi_redundant_none_literal() {
     let snippet = r#"
 from typing import Literal
 
-# Ruff offers a fix for one of these, but not both of them, as if both were autofixed
-# it would result in `None | None`, which leads to a `TypeError` at runtime.
-x: Literal[None,] | Literal[None,]
-y: Literal[None] | Literal[None]
+# For each of these expressions, Ruff provides a fix for one of the `Literal[None]` elements
+# but not both, as if both were autofixed it would result in `None | None`,
+# which leads to a `TypeError` at runtime.
+a: Literal[None,] | Literal[None,]
+b: Literal[None] | Literal[None]
+c: Literal[None] | Literal[None,]
+d: Literal[None,] | Literal[None]
 "#;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
@@ -5005,18 +5008,22 @@ y: Literal[None] | Literal[None]
     ----- stdout -----
     --- test.py
     +++ test.py
-    @@ -3,5 +3,5 @@
-     
-     # Ruff offers a fix for one of these, but not both of them, as if both were autofixed
-     # it would result in `None | None`, which leads to a `TypeError` at runtime.
-    -x: Literal[None,] | Literal[None,]
-    -y: Literal[None] | Literal[None]
-    +x: None | Literal[None,]
-    +y: None | Literal[None]
+    @@ -4,7 +4,7 @@
+     # For each of these expressions, Ruff provides a fix for one of the `Literal[None]` elements
+     # but not both, as if both were autofixed it would result in `None | None`,
+     # which leads to a `TypeError` at runtime.
+    -a: Literal[None,] | Literal[None,]
+    -b: Literal[None] | Literal[None]
+    -c: Literal[None] | Literal[None,]
+    -d: Literal[None,] | Literal[None]
+    +a: None | Literal[None,]
+    +b: None | Literal[None]
+    +c: None | Literal[None,]
+    +d: None | Literal[None]
 
 
     ----- stderr -----
-    Would fix 2 errors.
+    Would fix 4 errors.
     ");
 }
 
