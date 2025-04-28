@@ -116,3 +116,8 @@ pub(crate) const fn is_allow_nested_roots_enabled(settings: &LinterSettings) -> 
 pub(crate) const fn is_check_file_level_directives_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/17644
+pub(crate) const fn is_readlines_in_for_fix_safe(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
