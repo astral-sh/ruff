@@ -8,6 +8,7 @@ use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operato
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_suspicious_function_reference_enabled;
 use crate::registry::AsRule;
 
 /// ## What it does
@@ -936,7 +937,7 @@ pub(crate) fn suspicious_function_call(checker: &Checker, call: &ExprCall) {
 }
 
 pub(crate) fn suspicious_function_reference(checker: &Checker, func: &Expr) {
-    if checker.settings.preview.is_disabled() {
+    if !is_suspicious_function_reference_enabled(checker.settings) {
         return;
     }
 
@@ -1210,7 +1211,7 @@ fn suspicious_function(
 /// S308
 pub(crate) fn suspicious_function_decorator(checker: &Checker, decorator: &Decorator) {
     // In preview mode, references are handled collectively by `suspicious_function_reference`
-    if checker.settings.preview.is_disabled() {
+    if !is_suspicious_function_reference_enabled(checker.settings) {
         suspicious_function(checker, &decorator.expression, None, decorator.range);
     }
 }

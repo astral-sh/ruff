@@ -8,6 +8,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_fix_manual_dict_comprehension_enabled;
 use crate::rules::perflint::helpers::{comment_strings_in_range, statement_deletion_range};
 
 /// ## What it does
@@ -229,7 +230,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     }
 
-    if checker.settings.preview.is_enabled() {
+    if is_fix_manual_dict_comprehension_enabled(checker.settings) {
         let binding_stmt = binding.statement(checker.semantic());
         let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
             ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),

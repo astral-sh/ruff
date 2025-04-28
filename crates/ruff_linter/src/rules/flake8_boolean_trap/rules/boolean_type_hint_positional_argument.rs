@@ -8,6 +8,7 @@ use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_bool_subtype_of_annotation_enabled;
 use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 
 /// ## What it does
@@ -128,7 +129,7 @@ pub(crate) fn boolean_type_hint_positional_argument(
         let Some(annotation) = parameter.annotation() else {
             continue;
         };
-        if checker.settings.preview.is_enabled() {
+        if is_bool_subtype_of_annotation_enabled(checker.settings) {
             if !match_annotation_to_complex_bool(annotation, checker.semantic()) {
                 continue;
             }

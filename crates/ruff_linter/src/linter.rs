@@ -30,6 +30,7 @@ use crate::fix::{fix_file, FixResult};
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
+use crate::preview::is_unsupported_syntax_enabled;
 use crate::registry::{AsRule, Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
@@ -360,7 +361,7 @@ pub fn check_path(
         }
     }
 
-    let syntax_errors = if settings.preview.is_enabled() {
+    let syntax_errors = if is_unsupported_syntax_enabled(settings) {
         parsed.unsupported_syntax_errors()
     } else {
         &[]

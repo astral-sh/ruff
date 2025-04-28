@@ -6,6 +6,7 @@ use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_check_comprehensions_in_tuple_call_enabled;
 use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
@@ -100,7 +101,9 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     let argument_kind = match argument {
         Expr::Tuple(_) => TupleLiteralKind::Tuple,
         Expr::List(_) => TupleLiteralKind::List,
-        Expr::ListComp(_) if checker.settings.preview.is_enabled() => TupleLiteralKind::ListComp,
+        Expr::ListComp(_) if is_check_comprehensions_in_tuple_call_enabled(checker.settings) => {
+            TupleLiteralKind::ListComp
+        }
         _ => return,
     };
     if !checker.semantic().has_builtin_binding("tuple") {
