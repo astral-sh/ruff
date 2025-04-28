@@ -169,6 +169,9 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::OrderedDict => {
                     Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
+                KnownInstanceType::TypedDict => {
+                    Self::try_from_type(db, KnownClass::Dict.to_class_literal(db))
+                }
                 KnownInstanceType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }

@@ -221,6 +221,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (KnownInstanceType::TypeGuard, _) => Ordering::Less,
                 (_, KnownInstanceType::TypeGuard) => Ordering::Greater,
 
+                (KnownInstanceType::TypedDict, _) => Ordering::Less,
+                (_, KnownInstanceType::TypedDict) => Ordering::Greater,
+
                 (KnownInstanceType::List, _) => Ordering::Less,
                 (_, KnownInstanceType::List) => Ordering::Greater,
 

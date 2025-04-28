@@ -91,7 +91,9 @@ Some of these are not subscriptable:
 ```py
 from typing_extensions import Self, TypeAlias
 
-X: TypeAlias[T] = int  # error: [invalid-type-form]
+# error: [invalid-type-form] "Special form `typing.TypeAlias` expected no type parameter"
+# error: [unresolved-reference] "Name `T` used when not defined"
+X: TypeAlias[T] = int
 
 class Foo[T]:
     # error: [invalid-type-form] "Special form `typing.Self` expected no type parameter"

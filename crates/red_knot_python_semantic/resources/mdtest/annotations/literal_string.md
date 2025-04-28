@@ -38,8 +38,12 @@ bad_nesting: Literal[LiteralString]  # error: [invalid-type-form]
 ```py
 from typing_extensions import LiteralString
 
-a: LiteralString[str]  # error: [invalid-type-form]
-b: LiteralString["foo"]  # error: [invalid-type-form]
+# error: [invalid-type-form]
+a: LiteralString[str]
+
+# error: [invalid-type-form]
+# error: [unresolved-reference] "Name `foo` used when not defined"
+b: LiteralString["foo"]
 ```
 
 ### As a base class
