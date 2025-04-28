@@ -145,6 +145,12 @@ impl<'db> ClassType<'db> {
     }
 
     pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
+        // `str` requires some special-casing here because in order to construct the type "instance of `str`"
+        // we must evaluate a call to `TypeVar.__new__`, and `TypeVar.__new__` has a parameter annotated with `str`,
+        // causing a Salsa cycle.
+        if self.is_known(db, KnownClass::Str) {
+            return false;
+        }
         self.class_literal(db).0.is_protocol(db)
     }
 
