@@ -975,19 +975,13 @@ impl<'db> CallableBinding<'db> {
     pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let mut overloads = self.matching_overloads();
         if let Some(first) = overloads.next() {
-            let ty = std::iter::once(first)
+            return std::iter::once(first)
                 .chain(overloads)
                 .map(|(_, overload)| overload.return_type())
-                .fold(
-                    IntersectionBuilder::new(db),
-                    IntersectionBuilder::add_positive,
-                )
+                .fold(IntersectionBuilder::new(db), |builder, ty| {
+                    builder.add_positive(ty)
+                })
                 .build();
-            return if ty.is_never() {
-                first.1.return_type()
-            } else {
-                ty
-            };
         }
         if let [overload] = self.overloads.as_slice() {
             return overload.return_type();
