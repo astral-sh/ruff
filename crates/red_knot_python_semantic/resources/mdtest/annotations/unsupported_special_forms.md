@@ -89,10 +89,11 @@ python-version = "3.12"
 Some of these are not subscriptable:
 
 ```py
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self, TypeAlias, TypeVar
+
+T = TypeVar("T")
 
 # error: [invalid-type-form] "Special form `typing.TypeAlias` expected no type parameter"
-# error: [unresolved-reference] "Name `T` used when not defined"
 X: TypeAlias[T] = int
 
 class Foo[T]:
