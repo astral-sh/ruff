@@ -201,6 +201,7 @@ bitflags! {
 
         /// When looking up an attribute on a class, we sometimes need to avoid
         /// looking up attributes defined on `type` if this is the metaclass of the class.
+        /// For example, this is used to find if a meta-class implements a `__call__` method.
         ///
         /// This is similar to no object fallback above
         const META_CLASS_NO_TYPE_FALLBACK = 1 << 2;
@@ -2641,12 +2642,28 @@ impl<'db> Type<'db> {
                 qualifiers: meta_attr_qualifiers,
             },
             meta_attr_kind,
-        ) = Self::try_call_dunder_get_on_attribute(
-            db,
-            self.class_member_with_policy(db, name.into(), member_policy),
+        ) = if matches!(
             self,
-            self.to_meta_type(db),
-        );
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+        ) && member_policy.mro_no_object_fallback()
+        {
+            // When looking up the attribute on the meta-type with `NO_OBJECT_FALLBACK` policy, we
+            // imply that the looked up attribute exists on `object` even if we do not want to fall back
+            // back to it. This in turn means that descriptor protocol will not select same named
+            // data-descriptor on the meta-type - hence we return `SymbolAndQualifiers::default()` here,
+            // which is essentially a `Symbol::Unbound` with no qualifiers.
+            (
+                SymbolAndQualifiers::default(),
+                AttributeKind::NormalOrNonDataDescriptor,
+            )
+        } else {
+            Self::try_call_dunder_get_on_attribute(
+                db,
+                self.class_member_with_policy(db, name.into(), member_policy),
+                self,
+                self.to_meta_type(db),
+            )
+        };
 
         let SymbolAndQualifiers {
             symbol: fallback,

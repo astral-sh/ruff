@@ -879,12 +879,8 @@ impl<'db> ClassLiteral<'db> {
                         continue;
                     }
 
-                    // HACK: we should implement some more general logic here that supports arbitrary custom
-                    // metaclasses, not just `type` and `ABCMeta`.
-                    if matches!(
-                        class.known(db),
-                        Some(KnownClass::Type | KnownClass::ABCMeta)
-                    ) && policy.meta_class_no_type_fallback()
+                    if matches!(class.known(db), Some(KnownClass::Type))
+                        && policy.meta_class_no_type_fallback()
                     {
                         continue;
                     }

@@ -20,6 +20,7 @@ Since every class has `object` in it's MRO, the default implementations are `obj
 - If neither `__new__` nor `__init__` are defined anywhere in the MRO of class (except for `object`)
     \- no arguments are accepted and `TypeError` is raised if any are passed.
 - If `__new__` is defined, but `__init__` is not - `object.__init__` will allow arbitrary arguments!
+- If `__init__` is defined, but `__new__` is not - `object.__new__` will allow arbitrary arguments!
 
 As of today there are a number of behaviors that we do not support:
 
@@ -322,4 +323,24 @@ reveal_type(Foo(1))  # revealed: Foo
 
 # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
 reveal_type(Foo(1, 2))  # revealed: Foo
+```
+
+## `__new__` defined on a meta-class should not be used
+
+We lookup `__new__` method using descriptor protocol, which technically allows it to be found on a
+meta-class if `__new__` is not defined anywher in class MRO. At runtime this is never the case,
+since all classes have `object` in their MRO, which has a `__new__` method. However, for the
+purposes of type checking we use special lookup logic that ignores `object.__new__` as it's runtime
+behavior is not expressible in typeshed. This not cause false-positives when `__new__` is defined on
+a meta-class.
+
+```py
+class Meta(type):
+    def __new__(mcls, name, bases, namespace, /, **kwargs):
+        return super().__new__(mcls, name, bases, namespace)
+
+class Foo(metaclass=Meta): ...
+
+# This should not raise an error
+reveal_type(Foo())  # revealed: Foo
 ```
