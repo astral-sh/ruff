@@ -38,7 +38,7 @@ pub struct Options {
 }
 
 impl Options {
-    pub(crate) fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
+    pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let options = toml::from_str(content)?;
         Ok(options)
