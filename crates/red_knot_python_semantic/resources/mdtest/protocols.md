@@ -1403,25 +1403,34 @@ static_assert(not is_fully_static(NoParameterAnnotation))  # error: [static-asse
 static_assert(not is_fully_static(NoReturnAnnotation))  # error: [static-assert-error]
 ```
 
-## `typing.SupportsIndex` and `typing.Sized`
+## Callable protocols
 
-`typing.SupportsIndex` is already somewhat supported through some special-casing in red-knot.
+An instance of a protocol type is callable if the protocol defines a `__call__` method:
 
 ```py
-from typing import SupportsIndex, Literal
+from typing import Protocol
 
-def _(some_int: int, some_literal_int: Literal[1], some_indexable: SupportsIndex):
+class CallMeMaybe(Protocol):
+    def __call__(self, x: int) -> str: ...
+
+def _(obj: CallMeMaybe):
+    reveal_type(obj(42))  # revealed: str
+    obj("bar")  # error: [invalid-argument-type]
+```
+
+## Integration test: `typing.SupportsIndex` and `typing.Sized`
+
+`typing.SupportsIndex` and `typing.Sized` are two protocols that are very commonly used in the wild.
+
+```py
+from typing import SupportsIndex, Sized, Literal
+
+def one(some_int: int, some_literal_int: Literal[1], some_indexable: SupportsIndex):
     a: SupportsIndex = some_int
     b: SupportsIndex = some_literal_int
     c: SupportsIndex = some_indexable
-```
 
-The same goes for `typing.Sized`:
-
-```py
-from typing import Sized
-
-def _(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
+def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
     a: Sized = some_list
     b: Sized = some_tuple
     c: Sized = some_sized

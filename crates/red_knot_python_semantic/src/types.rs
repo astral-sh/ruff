@@ -4132,7 +4132,7 @@ impl<'db> Type<'db> {
                 SubclassOfInner::Class(class) => Type::from(class).signatures(db),
             },
 
-            Type::NominalInstance(_) => {
+            Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 // Note that for objects that have a (possibly not callable!) `__call__` attribute,
                 // we will get the signature of the `__call__` attribute, but will pass in the type
                 // of the original object as the "callable type". That ensures that we get errors
