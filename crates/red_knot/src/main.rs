@@ -169,8 +169,12 @@ pub enum ExitStatus {
     /// Checking was successful but there were errors.
     Failure = 1,
 
-    /// Checking failed.
+    /// Checking failed due to an invocation error (e.g. the current directory no longer exists, incorrect CLI arguments, ...)
     Error = 2,
+
+    /// Internal Red Knot error (panic, or any other error that isn't due to the user using the
+    /// program incorrectly or transient environment errors).
+    InternalError = 101,
 }
 
 impl Termination for ExitStatus {
@@ -310,7 +314,7 @@ impl MainLoop {
                                         }
                                     }
                                     Severity::Error => ExitStatus::Failure,
-                                    Severity::Fatal => ExitStatus::Error,
+                                    Severity::Fatal => ExitStatus::InternalError,
                                 });
                             }
                         }
