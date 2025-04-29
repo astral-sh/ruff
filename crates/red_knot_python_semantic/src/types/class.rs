@@ -101,6 +101,34 @@ fn inheritance_cycle_initial<'db>(
     None
 }
 
+#[derive(Clone, Copy, Debug)]
+enum DataclassFieldsPolicy {
+    Dataclass,
+    NamedTuple,
+}
+
+impl DataclassFieldsPolicy {
+    fn matches<'db>(
+        self,
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+        specialization: Option<Specialization<'db>>,
+    ) -> bool {
+        match self {
+            Self::Dataclass => {
+                class.dataclass_params(db).is_some()
+                    || class
+                        .try_metaclass(db)
+                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
+            }
+            Self::NamedTuple => KnownClass::NamedTuple
+                .to_class_literal(db)
+                .to_class_type(db)
+                .is_some_and(|named_tuple| class.is_subclass_of(db, specialization, named_tuple)),
+        }
+    }
+}
+
 /// A specialization of a generic class with a particular assignment of types to typevars.
 #[salsa::interned(debug)]
 pub struct GenericAlias<'db> {
@@ -987,6 +1015,12 @@ impl<'db> ClassLiteral<'db> {
 
         if symbol.symbol.is_unbound() {
             if let Some(dataclass_member) = self.own_dataclass_member(db, specialization, name) {
+                eprintln!(
+                    "==> dataclass {} {} {}",
+                    Type::from(self).display(db),
+                    name,
+                    dataclass_member.display(db)
+                );
                 return Symbol::bound(dataclass_member).into();
             }
         }
@@ -1006,19 +1040,22 @@ impl<'db> ClassLiteral<'db> {
 
         match name {
             "__init__" => {
-                let has_synthesized_dunder_init = has_dataclass_param(DataclassParams::INIT)
+                let field_policy = if has_dataclass_param(DataclassParams::INIT)
                     || self
                         .try_metaclass(db)
-                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some());
-
-                if !has_synthesized_dunder_init {
+                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
+                {
+                    DataclassFieldsPolicy::Dataclass
+                } else if DataclassFieldsPolicy::NamedTuple.matches(db, self, specialization) {
+                    DataclassFieldsPolicy::NamedTuple
+                } else {
                     return None;
-                }
+                };
 
                 let mut parameters = vec![];
 
                 for (name, (mut attr_ty, mut default_ty)) in
-                    self.dataclass_fields(db, specialization)
+                    self.dataclass_fields(db, specialization, field_policy)
                 {
                     // The descriptor handling below is guarded by this fully-static check, because dynamic
                     // types like `Any` are valid (data) descriptors: since they have all possible attributes,
@@ -1120,13 +1157,14 @@ impl<'db> ClassLiteral<'db> {
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        field_policy: DataclassFieldsPolicy,
     ) -> FxOrderMap<Name, (Type<'db>, Option<Type<'db>>)> {
         let dataclasses_in_mro: Vec<_> = self
             .iter_mro(db, specialization)
             .filter_map(|superclass| {
                 if let Some(class) = superclass.into_class() {
                     let class_literal = class.class_literal(db).0;
-                    if class_literal.is_dataclass(db) {
+                    if field_policy.matches(db, class_literal, specialization) {
                         Some(class_literal)
                     } else {
                         None
