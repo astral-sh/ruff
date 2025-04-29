@@ -362,6 +362,15 @@ def f():
     ExceptionGroup
 ```
 
+Similarly, assertions with statically-known falsy conditions can lead to unreachable code:
+
+```py
+def f():
+    assert sys.version_info > (3, 11)
+
+    ExceptionGroup
+```
+
 Finally, not that anyone would ever use it, but it also works for `while` loops:
 
 ```py

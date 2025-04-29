@@ -532,11 +532,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     /// Negates a predicate and adds it to the list of all predicates, does not record it.
     fn add_negated_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
-        let negated = Predicate {
-            node: predicate.node,
-            is_positive: false,
-        };
-        self.current_use_def_map_mut().add_predicate(negated)
+        self.current_use_def_map_mut()
+            .add_predicate(predicate.negated())
     }
 
     /// Records a previously added narrowing constraint by adding it to all live bindings.
@@ -1388,30 +1385,41 @@ where
                 msg,
                 range: _,
             }) => {
+                // We model an `assert test, msg` statement here. Conceptually, we can think of
+                // this as being equivalent to the following:
+                //
+                // ```py
+                // if not test:
+                //     msg
+                //     <halt>
+                //
+                // <whatever code comes after>
+                // ```
+                //
+                // Importantly, the `msg` expression is only evaluated if the `test` expression is
+                // falsy. This is why we apply the negated `test` predicate as a narrowing and
+                // reachability constraint on the `msg` expression.
+                //
+                // The other important part is the `<halt>`. This lets us skip the usual merging of
+                // flow states and simplification of visibility constraints, since there is no way
+                // of getting out of that `msg` branch. We simply restore to the post-test state.
+
                 self.visit_expr(test);
+                let predicate = self.build_predicate(test);
 
                 if let Some(msg) = msg {
-                    // A snapshot of the state after `test` has been evaluated, but before `msg` has been evaluated.
-                    // This is the state we need to return to after we've visited `msg`,
-                    // since all code following the assert statement can only be reached if test evaluated to `True`
-                    // (which means that the `msg` expression would not have been evaluated)
                     let post_test = self.flow_snapshot();
-
-                    let predicate = self.record_expression_narrowing_constraint(test);
-                    let reachability_constraint = self.record_reachability_constraint(predicate);
-                    let visibility_id = self.record_visibility_constraint(predicate);
-                    let post_assertion = self.flow_snapshot();
-                    self.flow_restore(post_test.clone());
-                    self.record_negated_narrowing_constraint(predicate);
-                    self.record_negated_reachability_constraint(reachability_constraint);
+                    let negated_predicate = predicate.negated();
+                    self.record_narrowing_constraint(negated_predicate);
+                    self.record_reachability_constraint(negated_predicate);
                     self.visit_expr(msg);
-                    self.record_negated_visibility_constraint(visibility_id);
-                    self.flow_restore(post_assertion);
-                    self.simplify_visibility_constraints(post_test);
-                } else {
-                    let predicate = self.record_expression_narrowing_constraint(test);
-                    self.record_visibility_constraint(predicate);
+                    self.record_visibility_constraint(negated_predicate);
+                    self.flow_restore(post_test);
                 }
+
+                self.record_narrowing_constraint(predicate);
+                self.record_visibility_constraint(predicate);
+                self.record_reachability_constraint(predicate);
             }
 
             ast::Stmt::Assign(node) => {
