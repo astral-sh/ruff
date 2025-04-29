@@ -139,7 +139,7 @@ Module(
 1 | try:
 2 |     pass
 3 | except x, y as exc:
-  |        ^^^^ Syntax Error: Multiple exception types must be parenthesized if bound with `as`
+  |        ^^^^ Syntax Error: Multiple exception types must be parenthesized when using `as`
 4 |     pass
 5 | try:
   |
@@ -149,6 +149,6 @@ Module(
 5 | try:
 6 |     pass
 7 | except* x, y as eg:
-  |         ^^^^ Syntax Error: Multiple exception types must be parenthesized if bound with `as`
+  |         ^^^^ Syntax Error: Multiple exception types must be parenthesized when using `as`
 8 |     pass
   |
