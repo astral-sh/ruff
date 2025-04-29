@@ -23,7 +23,6 @@ ruff_text_size = { workspace = true }
 anstyle = { workspace = true }
 camino = { workspace = true }
 countme = { workspace = true }
-colored = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
 filetime = { workspace = true }
