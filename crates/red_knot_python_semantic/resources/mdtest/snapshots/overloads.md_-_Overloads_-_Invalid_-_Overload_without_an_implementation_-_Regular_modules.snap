@@ -32,7 +32,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/overloads.md
 
 ```
 error: lint:invalid-overload: Overloaded function `func` must have an implementation outside a stub file
- --> /src/mdtest_snippet.py:7:5
+ --> src/mdtest_snippet.py:7:5
   |
 5 | @overload
 6 | # error: [invalid-overload] "Overloaded function `func` must have an implementation outside a stub file"
@@ -46,7 +46,7 @@ error: lint:invalid-overload: Overloaded function `func` must have an implementa
 
 ```
 error: lint:invalid-overload: Overloaded function `method` must have an implementation outside a stub file
-  --> /src/mdtest_snippet.py:14:9
+  --> src/mdtest_snippet.py:14:9
    |
 12 |     @overload
 13 |     # error: [invalid-overload] "Overloaded function `method` must have an implementation outside a stub file"
