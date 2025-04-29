@@ -1621,7 +1621,7 @@ impl<'src> Parser<'src> {
                     // except* x, y:
                     //     pass
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::UnparenthesizedExceptExpression,
+                        UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes,
                         parsed_expr.range(),
                     );
                 }

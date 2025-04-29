@@ -847,7 +847,7 @@ pub enum UnsupportedSyntaxErrorKind {
     ///
     ///
     /// [PEP 758]: https://peps.python.org/pep-0758/
-    UnparenthesizedExceptExpression,
+    UnparenthesizedExceptionTypes,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -923,7 +923,7 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 "Cannot use iterable unpacking in `for` statements"
             }
-            UnsupportedSyntaxErrorKind::UnparenthesizedExceptExpression => {
+            UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
                 "Multiple exception types must be parenthesized"
             }
         };
@@ -993,7 +993,7 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 Change::Added(PythonVersion::PY39)
             }
-            UnsupportedSyntaxErrorKind::UnparenthesizedExceptExpression => {
+            UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
                 Change::Added(PythonVersion::PY314)
             }
         }
