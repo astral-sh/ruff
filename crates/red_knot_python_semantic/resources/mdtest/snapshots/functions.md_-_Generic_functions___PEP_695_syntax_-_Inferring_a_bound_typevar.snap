@@ -3,8 +3,8 @@ source: crates/red_knot_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: functions.md - Generic functions - Inferring a bound typevar
-mdtest path: crates/red_knot_python_semantic/resources/mdtest/generics/functions.md
+mdtest name: functions.md - Generic functions: PEP 695 syntax - Inferring a bound typevar
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/generics/pep695/functions.md
 ---
 
 # Python source files

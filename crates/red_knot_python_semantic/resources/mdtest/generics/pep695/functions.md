@@ -1,4 +1,4 @@
-# Generic functions
+# Generic functions: PEP 695 syntax
 
 ```toml
 [environment]

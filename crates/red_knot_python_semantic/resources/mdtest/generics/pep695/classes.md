@@ -1,11 +1,11 @@
-# Generic classes
+# Generic classes: PEP 695 syntax
 
 ```toml
 [environment]
 python-version = "3.13"
 ```
 
-## PEP 695 syntax
+## Defining a generic class
 
 TODO: Add a `red_knot_extension` function that asserts whether a function or class is generic.
 
@@ -35,26 +35,6 @@ inherits from `C[Unknown]` and is not itself generic.
 ```py
 class F(C): ...
 ```
-
-## Legacy syntax
-
-This is a generic class defined using the legacy syntax:
-
-```py
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class C(Generic[T]): ...
-```
-
-A class that inherits from a generic class, and fills its type parameters with typevars, is generic.
-
-```py
-class D(C[T]): ...
-```
-
-(Examples `E` and `F` from above do not have analogues in the legacy syntax.)
 
 ## Specializing generic classes explicitly
 
