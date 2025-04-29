@@ -71,6 +71,39 @@ def f[T](x: list[T]) -> T:
 reveal_type(f([1.0, 2.0]))  # revealed: Unknown
 ```
 
+## Inferring a bound typevar
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing_extensions import reveal_type
+
+def f[T: int](x: T) -> T:
+    return x
+
+reveal_type(f(1))  # revealed: Literal[1]
+reveal_type(f(True))  # revealed: Literal[True]
+# error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy upper bound of type variable `T`"
+reveal_type(f("string"))  # revealed: Unknown
+```
+
+## Inferring a constrained typevar
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing_extensions import reveal_type
+
+def f[T: (int, None)](x: T) -> T:
+    return x
+
+reveal_type(f(1))  # revealed: int
+reveal_type(f(True))  # revealed: int
+reveal_type(f(None))  # revealed: None
+# error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy constraints of type variable `T`"
+reveal_type(f("string"))  # revealed: Unknown
+```
+
 ## Typevar constraints
 
 If a type parameter has an upper bound, that upper bound constrains which types can be used for that

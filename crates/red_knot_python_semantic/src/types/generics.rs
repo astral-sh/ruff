@@ -364,7 +364,11 @@ impl<'db> SpecializationBuilder<'db> {
             .or_insert(ty);
     }
 
-    pub(crate) fn infer(&mut self, formal: Type<'db>, actual: Type<'db>) {
+    pub(crate) fn infer(
+        &mut self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> Result<(), SpecializationError<'db>> {
         // If the actual type is a subtype of the formal type, then return without adding any new
         // type mappings. (Note that if the formal type contains any typevars, this check will
         // fail, since no non-typevar types are assignable to a typevar. Also note that we are
@@ -382,11 +386,36 @@ impl<'db> SpecializationBuilder<'db> {
         //
         // without specializing `T` to `None`.
         if !actual.is_never() && actual.is_subtype_of(self.db, formal) {
-            return;
+            return Ok(());
         }
 
         match (formal, actual) {
-            (Type::TypeVar(typevar), _) => self.add_type_mapping(typevar, actual),
+            (Type::TypeVar(typevar), _) => match typevar.bound_or_constraints(self.db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    if !actual.is_assignable_to(self.db, bound) {
+                        return Err(SpecializationError::MismatchedBound {
+                            typevar,
+                            argument: actual,
+                        });
+                    }
+                    self.add_type_mapping(typevar, actual);
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    for constraint in constraints.iter(self.db) {
+                        if actual.is_assignable_to(self.db, *constraint) {
+                            self.add_type_mapping(typevar, *constraint);
+                            return Ok(());
+                        }
+                    }
+                    return Err(SpecializationError::MismatchedConstraint {
+                        typevar,
+                        argument: actual,
+                    });
+                }
+                _ => {
+                    self.add_type_mapping(typevar, actual);
+                }
+            },
 
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
                 let formal_elements = formal_tuple.elements(self.db);
@@ -395,7 +424,7 @@ impl<'db> SpecializationBuilder<'db> {
                     for (formal_element, actual_element) in
                         formal_elements.iter().zip(actual_elements)
                     {
-                        self.infer(*formal_element, *actual_element);
+                        self.infer(*formal_element, *actual_element)?;
                     }
                 }
             }
@@ -428,12 +457,42 @@ impl<'db> SpecializationBuilder<'db> {
                 // actual type must also be disjoint from every negative element of the
                 // intersection, but that doesn't help us infer any type mappings.)
                 for positive in formal.iter_positive(self.db) {
-                    self.infer(positive, actual);
+                    self.infer(positive, actual)?;
                 }
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables
             _ => {}
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum SpecializationError<'db> {
+    MismatchedBound {
+        typevar: TypeVarInstance<'db>,
+        argument: Type<'db>,
+    },
+    MismatchedConstraint {
+        typevar: TypeVarInstance<'db>,
+        argument: Type<'db>,
+    },
+}
+
+impl<'db> SpecializationError<'db> {
+    pub(crate) fn typevar(&self) -> TypeVarInstance<'db> {
+        match self {
+            Self::MismatchedBound { typevar, .. } => *typevar,
+            Self::MismatchedConstraint { typevar, .. } => *typevar,
+        }
+    }
+
+    pub(crate) fn argument_type(&self) -> Type<'db> {
+        match self {
+            Self::MismatchedBound { argument, .. } => *argument,
+            Self::MismatchedConstraint { argument, .. } => *argument,
         }
     }
 }
