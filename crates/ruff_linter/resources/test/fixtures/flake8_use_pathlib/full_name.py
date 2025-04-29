@@ -55,3 +55,17 @@ x = 2
 open(x)
 def foo(y: int):
     open(y)
+
+# https://github.com/astral-sh/ruff/issues/17693
+os.stat(b"/foo")
+os.stat(1)
+os.stat(x)
+
+
+def func() -> int:
+    return 2
+os.stat(func())
+
+
+def bar(x: int):
+    os.stat(x)

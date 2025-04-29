@@ -54,7 +54,16 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             // PTH114
             ["os", "path", "islink"] => Some(OsPathIslink.into()),
             // PTH116
-            ["os", "stat"] => Some(OsStat.into()),
+            ["os", "stat"] => {
+                if call
+                    .arguments
+                    .find_positional(0)
+                    .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+                {
+                    return None;
+                }
+                Some(OsStat.into())
+            }
             // PTH117
             ["os", "path", "isabs"] => Some(OsPathIsabs.into()),
             // PTH118
@@ -175,12 +184,12 @@ fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(_),
             ..
-        })
+        }) | Expr::BytesLiteral(_)
     ) {
         return true;
     }
 
-    let Some(name) = expr.as_name_expr() else {
+    let Some(name) = get_name_expr(expr) else {
         return false;
     };
 
@@ -188,5 +197,13 @@ fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    typing::is_int(binding, semantic)
+    typing::is_int(binding, semantic) || typing::is_bytes(binding, semantic)
+}
+
+fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {
+    match expr {
+        Expr::Name(name) => Some(name),
+        Expr::Call(ast::ExprCall { func, .. }) => get_name_expr(func),
+        _ => None,
+    }
 }
