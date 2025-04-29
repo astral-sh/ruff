@@ -534,7 +534,7 @@ impl<'db> ClassLiteral<'db> {
 
     /// Determine if this class is a protocol.
     pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
-        self.explicit_bases(db).iter().any(|base| {
+        self.explicit_bases(db).iter().rev().take(3).any(|base| {
             matches!(
                 base,
                 Type::KnownInstance(KnownInstanceType::Protocol)
