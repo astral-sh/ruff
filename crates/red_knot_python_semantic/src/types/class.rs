@@ -62,6 +62,22 @@ fn explicit_bases_cycle_initial<'db>(
     Box::default()
 }
 
+fn generic_context_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &Option<GenericContext<'db>>,
+    _count: u32,
+    _self: ClassLiteral<'db>,
+) -> salsa::CycleRecoveryAction<Option<GenericContext<'db>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn generic_context_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _self: ClassLiteral<'db>,
+) -> Option<GenericContext<'db>> {
+    None
+}
+
 fn try_mro_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Result<Mro<'db>, MroError<'db>>,
@@ -414,7 +430,7 @@ impl<'db> ClassLiteral<'db> {
         self.known(db) == Some(known_class)
     }
 
-    #[salsa::tracked]
+    #[salsa::tracked(cycle_fn=generic_context_cycle_recover, cycle_initial=generic_context_cycle_initial)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         // Several typeshed definitions examine `sys.version_info`. To break cycles, we hard-code
         // the knowledge that this class is not generic.
