@@ -1172,6 +1172,15 @@ impl<'db> Type<'db> {
                 false
             }
 
+            (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
+                let call_symbol = self.member(db, "__call__").symbol;
+                match call_symbol {
+                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
+                        .into_callable_type(db)
+                        .is_subtype_of(db, target),
+                    _ => false,
+                }
+            }
             (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
                 left.is_subtype_of(db, right)
             }
@@ -1273,16 +1282,6 @@ impl<'db> Type<'db> {
             // which means that all instances of `bool` are also instances of `int`
             (Type::NominalInstance(self_instance), Type::NominalInstance(target_instance)) => {
                 self_instance.is_subtype_of(db, target_instance)
-            }
-
-            (Type::NominalInstance(_), Type::Callable(_)) => {
-                let call_symbol = self.member(db, "__call__").symbol;
-                match call_symbol {
-                    Symbol::Type(Type::BoundMethod(call_function), _) => call_function
-                        .into_callable_type(db)
-                        .is_subtype_of(db, target),
-                    _ => false,
-                }
             }
 
             (Type::PropertyInstance(_), _) => KnownClass::Property
@@ -1477,7 +1476,7 @@ impl<'db> Type<'db> {
                 self_callable.is_assignable_to(db, target_callable)
             }
 
-            (Type::NominalInstance(_), Type::Callable(_)) => {
+            (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
                 let call_symbol = self.member(db, "__call__").symbol;
                 match call_symbol {
                     Symbol::Type(Type::BoundMethod(call_function), _) => call_function

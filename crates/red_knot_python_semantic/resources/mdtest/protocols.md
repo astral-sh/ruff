@@ -1413,9 +1413,28 @@ from typing import Protocol
 class CallMeMaybe(Protocol):
     def __call__(self, x: int) -> str: ...
 
-def _(obj: CallMeMaybe):
+def f(obj: CallMeMaybe):
     reveal_type(obj(42))  # revealed: str
     obj("bar")  # error: [invalid-argument-type]
+```
+
+An instance of a protocol like this can be assignable to a `Callable` type, but only if it has the
+right signature:
+
+```py
+from typing import Callable
+from knot_extensions import is_subtype_of, is_assignable_to, static_assert
+
+static_assert(is_subtype_of(CallMeMaybe, Callable[[int], str]))
+static_assert(is_assignable_to(CallMeMaybe, Callable[[int], str]))
+static_assert(not is_subtype_of(CallMeMaybe, Callable[[str], str]))
+static_assert(not is_assignable_to(CallMeMaybe, Callable[[str], str]))
+static_assert(not is_subtype_of(CallMeMaybe, Callable[[CallMeMaybe, int], str]))
+static_assert(not is_assignable_to(CallMeMaybe, Callable[[CallMeMaybe, int], str]))
+
+def g(obj: Callable[[int], str], obj2: CallMeMaybe, obj3: Callable[[str], str]):
+    obj = obj2
+    obj3 = obj2  # error: [invalid-assignment]
 ```
 
 ## Integration test: `typing.SupportsIndex` and `typing.Sized`
