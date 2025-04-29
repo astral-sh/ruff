@@ -109,7 +109,7 @@ mod tests {
     use salsa::{Database, Durability};
 
     #[test]
-    #[ignore = "We don't want to change the default panic handler in tests"]
+    #[ignore = "super::catch_unwind installs a custom panic handler, which could effect test isolation"]
     fn no_backtrace_for_salsa_cancelled() {
         #[salsa::input]
         struct Input {
