@@ -55,6 +55,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
+    will color is yellow
     All checks passed!
 
     ----- stderr -----
