@@ -134,10 +134,9 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                             .arguments
                             .find_argument_value("opener", 7)
                             .is_some_and(|expr| !expr.is_none_literal_expr())
-                        || call
-                            .arguments
-                            .find_positional(0)
-                            .is_some_and(|expr| is_file_descriptor_or_bytes_str(expr, checker.semantic()))
+                        || call.arguments.find_positional(0).is_some_and(|expr| {
+                            is_file_descriptor_or_bytes_str(expr, checker.semantic())
+                        })
                     {
                         return None;
                     }
