@@ -89,11 +89,11 @@ postgres.sanitize_uri
 trino.sanitize_uri
 
 # airflow.secrets
-#SecretCache
-SecretCache()
 # get_connection
 LocalFilesystemBackend()
 
+# airflow.secrets.cache
+SecretCache()
 
 # airflow.sensors.base_sensor_operator
 BaseSensorOperator()
