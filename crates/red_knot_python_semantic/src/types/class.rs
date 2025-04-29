@@ -145,16 +145,6 @@ impl<'db> ClassType<'db> {
     }
 
     pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
-        // We need to construct the types "instance of `str`" and "instance of `_version_info`"
-        // very eagerly when type-checking a variety of things. That means we can't go through the normal
-        // `ClassLiteral::is_protocol` path, because that would require us to evaluate the types of the bases
-        // of these classes, which would cause Salsa cycles (or other, more exotic kinds of Salsa panics!).
-        if matches!(
-            self.known(db),
-            Some(KnownClass::Str | KnownClass::VersionInfo)
-        ) {
-            return false;
-        }
         self.class_literal(db).0.is_protocol(db)
     }
 
@@ -547,14 +537,22 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Determine if this class is a protocol.
+    ///
+    /// See the docs on [`KnownClass::is_protocol`] for why we hardcode knowledge
+    /// about certain special-cased classes, rather than treating all classes
+    /// the same way here.
     pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
-        self.explicit_bases(db).iter().rev().take(3).any(|base| {
-            matches!(
-                base,
-                Type::KnownInstance(KnownInstanceType::Protocol)
-                    | Type::Dynamic(DynamicType::SubscriptedProtocol)
-            )
-        })
+        self.known(db)
+            .map(KnownClass::is_protocol)
+            .unwrap_or_else(|| {
+                self.explicit_bases(db).iter().rev().take(3).any(|base| {
+                    matches!(
+                        base,
+                        Type::KnownInstance(KnownInstanceType::Protocol)
+                            | Type::Dynamic(DynamicType::SubscriptedProtocol)
+                    )
+                })
+            })
     }
 
     /// Return the types of the decorators on this class
@@ -2002,6 +2000,75 @@ impl<'db> KnownClass {
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
             | Self::Classmethod => Truthiness::Ambiguous,
+        }
+    }
+
+    /// Return `true` if this class is a protocol class.
+    ///
+    /// In an ideal world, perhaps we wouldn't hardcode this knowledge here;
+    /// instead, we'd just look at the bases for these classes, as we do for
+    /// all other classes. However, the special casing here helps us out in
+    /// two important ways:
+    ///
+    /// 1. It helps us avoid Salsa cycles when creating types such as "instance of `str`"
+    ///    and "instance of `sys._version_info`". These types are constructed very early
+    ///    on, but it causes problems if we attempt to infer the types of their bases
+    ///    too soon.
+    /// 2. It's probably more performant.
+    const fn is_protocol(self) -> bool {
+        match self {
+            Self::SupportsIndex | Self::Sized => true,
+
+            Self::Any
+            | Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Tuple
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::FrozenSet
+            | Self::Str
+            | Self::Set
+            | Self::Dict
+            | Self::List
+            | Self::Type
+            | Self::Slice
+            | Self::Range
+            | Self::Property
+            | Self::BaseException
+            | Self::BaseExceptionGroup
+            | Self::Classmethod
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::WrapperDescriptorType
+            | Self::NoneType
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::TypeVarTuple
+            | Self::TypeAliasType
+            | Self::NoDefaultType
+            | Self::NewType
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::Enum
+            | Self::ABCMeta
+            | Self::Super
+            | Self::StdlibAlias
+            | Self::VersionInfo
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::UnionType => false,
         }
     }
 
