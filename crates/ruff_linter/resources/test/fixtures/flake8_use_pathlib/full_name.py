@@ -56,6 +56,20 @@ open(x)
 def foo(y: int):
     open(y)
 
+
+# https://github.com/astral-sh/ruff/issues/17691
+def f() -> int:
+    return 1
+open(f())
+
+open(b"foo")
+byte_str = b"bar"
+open(byte_str)
+
+def bytes_str_func() -> bytes:
+    return b"foo"
+open(bytes_str_func())
+
 # https://github.com/astral-sh/ruff/issues/17693
 os.stat(b"/foo")
 os.stat(1)
