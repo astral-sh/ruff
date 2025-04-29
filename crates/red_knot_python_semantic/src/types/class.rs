@@ -1907,8 +1907,6 @@ pub enum KnownClass {
     TypeAliasType,
     NoDefaultType,
     NewType,
-    Sized,
-    // TODO: This can probably be removed when we have support for protocols
     SupportsIndex,
     // Collections
     ChainMap,
@@ -1992,7 +1990,6 @@ impl<'db> KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::Float
-            | Self::Sized
             | Self::Enum
             | Self::ABCMeta
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
@@ -2017,7 +2014,7 @@ impl<'db> KnownClass {
     /// 2. It's probably more performant.
     const fn is_protocol(self) -> bool {
         match self {
-            Self::SupportsIndex | Self::Sized => true,
+            Self::SupportsIndex => true,
 
             Self::Any
             | Self::Bool
@@ -2117,7 +2114,6 @@ impl<'db> KnownClass {
             Self::Counter => "Counter",
             Self::DefaultDict => "defaultdict",
             Self::Deque => "deque",
-            Self::Sized => "Sized",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
             Self::ABCMeta => "ABCMeta",
@@ -2291,8 +2287,7 @@ impl<'db> KnownClass {
             | Self::SpecialForm
             | Self::TypeVar
             | Self::StdlibAlias
-            | Self::SupportsIndex
-            | Self::Sized => KnownModule::Typing,
+            | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::TypeVarTuple
             | Self::ParamSpec
@@ -2380,7 +2375,6 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::Sized
             | Self::Enum
             | Self::ABCMeta
             | Self::Super
@@ -2440,7 +2434,6 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::Sized
             | Self::Enum
             | Self::ABCMeta
             | Self::Super
@@ -2502,7 +2495,6 @@ impl<'db> KnownClass {
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
-            "Sized" => Self::Sized,
             "Enum" => Self::Enum,
             "ABCMeta" => Self::ABCMeta,
             "super" => Self::Super,
@@ -2575,7 +2567,6 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::Sized
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }
