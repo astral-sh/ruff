@@ -987,27 +987,15 @@ fn user_configuration() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    warning: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
-     --> main.py:2:5
-      |
-    2 | y = 4 / 0
-      |     ^^^^^
-    3 |
-    4 | for a in range(0, int(y)):
-      |
+    will color is yellow
+    error: io: `<temp_dir>/project/main.py`: No such file or directory (os error 2)
 
-    error: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
-     --> main.py:7:7
-      |
-    5 |     x = a
-    6 |
-    7 | print(x)
-      |       ^
-      |
+    error: io: `<temp_dir>/project/tests`: No such file or directory (os error 2)
 
     Found 2 diagnostics
 
     ----- stderr -----
+    WARN No python files found under the given path(s)
     "
     );
 
