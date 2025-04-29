@@ -1,4 +1,35 @@
 use anstyle::{AnsiColor, Effects, Style};
+use std::fmt::Formatter;
+
+pub(super) const fn fmt_styled<'a, T>(
+    content: T,
+    style: anstyle::Style,
+) -> impl std::fmt::Display + 'a
+where
+    T: std::fmt::Display + 'a,
+{
+    struct FmtStyled<T> {
+        content: T,
+        style: anstyle::Style,
+    }
+
+    impl<T> std::fmt::Display for FmtStyled<T>
+    where
+        T: std::fmt::Display,
+    {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "{style_start}{content}{style_end}",
+                style_start = self.style.render(),
+                content = self.content,
+                style_end = self.style.render_reset()
+            )
+        }
+    }
+
+    FmtStyled { content, style }
+}
 
 #[derive(Clone, Debug)]
 pub struct DiagnosticStylesheet {

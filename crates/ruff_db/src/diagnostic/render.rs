@@ -7,7 +7,7 @@ use ruff_annotate_snippets::{
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::diagnostic::sheet::DiagnosticStylesheet;
+use crate::diagnostic::stylesheet::{fmt_styled, DiagnosticStylesheet};
 use crate::{
     files::File,
     source::{line_index, source_text, SourceText},
@@ -18,16 +18,6 @@ use crate::{
 use super::{
     Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, Severity, SubDiagnostic,
 };
-
-fn write_styled(
-    f: &mut std::fmt::Formatter,
-    text: &str,
-    style: &anstyle::Style,
-) -> std::fmt::Result {
-    write!(f, "{}", style.render())?;
-    write!(f, "{}", text)?;
-    write!(f, "{}", style.render_reset())
-}
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
 ///
@@ -46,7 +36,6 @@ pub struct DisplayDiagnostic<'a> {
     resolver: FileResolver<'a>,
     annotate_renderer: AnnotateRenderer,
     diag: &'a Diagnostic,
-    stylesheet: DiagnosticStylesheet,
 }
 
 impl<'a> DisplayDiagnostic<'a> {
@@ -60,66 +49,71 @@ impl<'a> DisplayDiagnostic<'a> {
         } else {
             AnnotateRenderer::plain()
         };
-        let stylesheet = if config.color {
-            DiagnosticStylesheet::styled()
-        } else {
-            DiagnosticStylesheet::plain()
-        };
+
         DisplayDiagnostic {
             config,
             resolver,
             annotate_renderer,
             diag,
-            stylesheet,
         }
     }
 }
 
 impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let stylesheet = if self.config.color {
+            DiagnosticStylesheet::styled()
+        } else {
+            DiagnosticStylesheet::plain()
+        };
+
         if matches!(self.config.format, DiagnosticFormat::Concise) {
             let (severity, severity_style) = match self.diag.severity() {
-                Severity::Info => ("info", &self.stylesheet.info),
-                Severity::Warning => ("warning", &self.stylesheet.warning),
-                Severity::Error => ("error", &self.stylesheet.error),
-                Severity::Fatal => ("fatal", &self.stylesheet.error),
+                Severity::Info => ("info", stylesheet.info),
+                Severity::Warning => ("warning", stylesheet.warning),
+                Severity::Error => ("error", stylesheet.error),
+                Severity::Fatal => ("fatal", stylesheet.error),
             };
-            write_styled(f, severity, severity_style)?;
 
-            let rule = format!("[{}]", self.diag.id());
-            write_styled(f, &rule, &self.stylesheet.emphasis)?;
+            write!(
+                f,
+                "{severity}[{id}]",
+                severity = fmt_styled(severity, severity_style),
+                id = fmt_styled(self.diag.id(), stylesheet.emphasis)
+            )?;
 
             if let Some(span) = self.diag.primary_span() {
-                let path = format!(" {}", self.resolver.path(span.file()));
-                write_styled(f, &path, &self.stylesheet.emphasis)?;
+                write!(
+                    f,
+                    " {path}",
+                    path = fmt_styled(self.resolver.path(span.file()), stylesheet.emphasis)
+                )?;
                 if let Some(range) = span.range() {
                     let input = self.resolver.input(span.file());
                     let start = input.as_source_code().line_column(range.start());
-                    let pos = format!(":{line}:{col}", line = start.line, col = start.column);
-                    write_styled(f, &pos, &self.stylesheet.emphasis)?;
+
+                    write!(
+                        f,
+                        ":{line}:{col}",
+                        line = fmt_styled(start.line, stylesheet.emphasis),
+                        col = fmt_styled(start.column, stylesheet.emphasis),
+                    )?;
                 }
                 write!(f, ":")?;
             }
-            write!(f, " ")?;
-            write_styled(
-                f,
-                &self.diag.concise_message().to_string(),
-                &self.stylesheet.error,
-            )?;
-            writeln!(f)?;
-            return Ok(());
+            return writeln!(f, " {message}", message = self.diag.concise_message());
         }
 
         let mut renderer = self.annotate_renderer.clone();
         renderer = renderer
-            .error(self.stylesheet.error)
-            .warning(self.stylesheet.warning)
-            .info(self.stylesheet.info)
-            .note(self.stylesheet.note)
-            .help(self.stylesheet.help)
-            .line_no(self.stylesheet.line_no)
-            .emphasis(self.stylesheet.emphasis)
-            .none(self.stylesheet.none);
+            .error(stylesheet.error)
+            .warning(stylesheet.warning)
+            .info(stylesheet.info)
+            .note(stylesheet.note)
+            .help(stylesheet.help)
+            .line_no(stylesheet.line_no)
+            .emphasis(stylesheet.emphasis)
+            .none(stylesheet.none);
 
         let resolved = Resolved::new(&self.resolver, self.diag);
         let renderable = resolved.to_renderable(self.config.context);
