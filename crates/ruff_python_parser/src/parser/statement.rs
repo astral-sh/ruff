@@ -1593,7 +1593,7 @@ impl<'src> Parser<'src> {
                     //     pass
                     self.add_error(
                         ParseErrorType::OtherError(
-                            "Multiple exception types must be parenthesized if bound with `as`"
+                            "Multiple exception types must be parenthesized when using `as`"
                                 .to_string(),
                         ),
                         &parsed_expr,
