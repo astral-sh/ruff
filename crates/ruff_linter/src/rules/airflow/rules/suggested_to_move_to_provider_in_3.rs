@@ -49,14 +49,21 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
                 provider,
                 version: _,
             }
+            | ProviderReplacement::AutoImport {
+                name: _,
+                module: _,
+                provider,
+                version: _,
+            }
             | ProviderReplacement::SourceModuleMovedToProvider {
                 name: _,
                 module: _,
                 provider,
                 version: _,
             } => {
-                format!("`{deprecated}` is deprecated and moved into `{provider}` provider in Airflow 3.0; \
-                         It still works in Airflow 3.0 but is expected to be removed in a future version."
+                format!(
+                    "`{deprecated}` is deprecated and moved into `{provider}` provider in Airflow 3.0; \
+                     It still works in Airflow 3.0 but is expected to be removed in a future version."
                 )
             }
         }
@@ -74,6 +81,14 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
                 Some(format!(
                     "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` instead."
                 ))
+            },
+            ProviderReplacement::AutoImport {
+                module,
+                name,
+                provider,
+                version,
+            } => {
+                Some(format!("Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."))
             },
             ProviderReplacement::SourceModuleMovedToProvider {
                 module,
