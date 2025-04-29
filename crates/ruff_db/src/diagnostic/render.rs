@@ -98,6 +98,7 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                     let pos = format!(":{line}:{col}", line = start.line, col = start.column);
                     write_styled(f, &pos, &self.stylesheet.emphasis)?;
                 }
+                write!(f, ":")?;
             }
             write!(f, " ")?;
             write_styled(
