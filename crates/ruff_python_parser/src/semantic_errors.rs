@@ -109,6 +109,8 @@ impl SemanticSyntaxChecker {
                 // test_ok single_starred_assignment_value
                 // _ = 4
                 // _ = [4]
+                // _ = (*[1],)
+                // _ = *[1],
 
                 // test_err single_starred_assignment_value
                 // _ = *[42]

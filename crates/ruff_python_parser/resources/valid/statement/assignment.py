@@ -37,5 +37,7 @@ foo.bar = 42
 
 foo = 42
 
+[] = (*data,)
+() = (*data,)
 a, b = ab
 a = b = c

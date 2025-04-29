@@ -7,7 +7,7 @@ input_file: crates/ruff_python_parser/resources/inline/ok/single_starred_assignm
 ```
 Module(
     ModModule {
-        range: 0..14,
+        range: 0..36,
         body: [
             Assign(
                 StmtAssign {
@@ -57,6 +57,96 @@ Module(
                                 ),
                             ],
                             ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 14..25,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 14..15,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            range: 18..25,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 19..23,
+                                        value: List(
+                                            ExprList {
+                                                range: 20..23,
+                                                elts: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 21..22,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 26..35,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 26..27,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            range: 30..35,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 30..34,
+                                        value: List(
+                                            ExprList {
+                                                range: 31..34,
+                                                elts: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 32..33,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
                         },
                     ),
                 },
