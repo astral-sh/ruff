@@ -142,38 +142,38 @@ pub(crate) fn parse_string_annotation(
     if let Some(string_literal) = string_expr.as_single_part_string() {
         let prefix = string_literal.flags.prefix();
         if prefix.is_raw() {
-            context.report_lint_old(
-                &RAW_STRING_TYPE_ANNOTATION,
-                string_literal,
-                format_args!("Type expressions cannot use raw string literal"),
-            );
+            if let Some(builder) = context.report_lint(&RAW_STRING_TYPE_ANNOTATION, string_literal)
+            {
+                builder.into_diagnostic("Type expressions cannot use raw string literal");
+            }
         // Compare the raw contents (without quotes) of the expression with the parsed contents
         // contained in the string literal.
         } else if &source[string_literal.content_range()] == string_literal.as_str() {
             match ruff_python_parser::parse_string_annotation(source.as_str(), string_literal) {
                 Ok(parsed) => return Some(parsed),
-                Err(parse_error) => context.report_lint_old(
-                    &INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
-                    string_literal,
-                    format_args!("Syntax error in forward annotation: {}", parse_error.error),
-                ),
+                Err(parse_error) => {
+                    if let Some(builder) =
+                        context.report_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION, string_literal)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Syntax error in forward annotation: {}",
+                            parse_error.error
+                        ));
+                    }
+                }
             }
-        } else {
+        } else if let Some(builder) =
+            context.report_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, string_expr)
+        {
             // The raw contents of the string doesn't match the parsed content. This could be the
             // case for annotations that contain escape sequences.
-            context.report_lint_old(
-                &ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION,
-                string_expr,
-                format_args!("Type expressions cannot contain escape characters"),
-            );
+            builder.into_diagnostic("Type expressions cannot contain escape characters");
         }
-    } else {
+    } else if let Some(builder) =
+        context.report_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, string_expr)
+    {
         // String is implicitly concatenated.
-        context.report_lint_old(
-            &IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION,
-            string_expr,
-            format_args!("Type expressions cannot span multiple string literals"),
-        );
+        builder.into_diagnostic("Type expressions cannot span multiple string literals");
     }
 
     None

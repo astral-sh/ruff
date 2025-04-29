@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.11.6"
+version = "0.11.7"
 publish = true
 authors = { workspace = true }
 edition = { workspace = true }
@@ -76,6 +76,9 @@ test-case = { workspace = true }
 [package.metadata.cargo-shear]
 # Used via macro expansion.
 ignored = ["jiff"]
+
+[package.metadata.dist]
+dist = true
 
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = { workspace = true }

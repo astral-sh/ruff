@@ -1,3 +1,4 @@
+use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
@@ -5,10 +6,15 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModule;
+use ruff_db::source::{source_text, SourceText};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{self as ast};
+use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_python_parser::semantic_errors::{
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+};
+use ruff_text_size::TextRange;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::module_name::ModuleName;
@@ -32,8 +38,8 @@ use crate::semantic_index::predicate::{
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
-    SymbolTableBuilder,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeKind, NodeWithScopeRef, Scope, ScopeId, ScopeKind,
+    ScopedSymbolId, SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
     EagerBindingsKey, FlowSnapshot, ScopedEagerBindingsId, UseDefMapBuilder,
@@ -43,7 +49,7 @@ use crate::semantic_index::visibility_constraints::{
 };
 use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
-use crate::Db;
+use crate::{Db, Program};
 
 mod except_handlers;
 
@@ -85,6 +91,11 @@ pub(super) struct SemanticIndexBuilder<'db> {
     /// Flags about the file's global scope
     has_future_annotations: bool,
 
+    // Used for checking semantic syntax errors
+    python_version: PythonVersion,
+    source_text: OnceCell<SourceText>,
+    semantic_checker: SemanticSyntaxChecker,
+
     // Semantic Index fields
     scopes: IndexVec<FileScopeId, Scope>,
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
@@ -98,6 +109,8 @@ pub(super) struct SemanticIndexBuilder<'db> {
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
+    /// Errors collected by the `semantic_checker`.
+    semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
 
 impl<'db> SemanticIndexBuilder<'db> {
@@ -129,6 +142,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             imported_modules: FxHashSet::default(),
 
             eager_bindings: FxHashMap::default(),
+
+            python_version: Program::get(db).python_version(db),
+            source_text: OnceCell::new(),
+            semantic_checker: SemanticSyntaxChecker::default(),
+            semantic_syntax_errors: RefCell::default(),
         };
 
         builder.push_scope_with_parent(
@@ -154,10 +172,6 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn current_scope(&self) -> FileScopeId {
         self.current_scope_info().file_scope_id
-    }
-
-    fn current_scope_is_global_scope(&self) -> bool {
-        self.scope_stack.len() == 1
     }
 
     /// Returns the scope ID of the surrounding class body scope if the current scope
@@ -355,15 +369,14 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.current_use_def_map_mut().merge(state);
     }
 
-    /// Return a 2-element tuple, where the first element is the [`ScopedSymbolId`] of the
-    /// symbol added, and the second element is a boolean indicating whether the symbol was *newly*
-    /// added or not
-    fn add_symbol(&mut self, name: Name) -> (ScopedSymbolId, bool) {
+    /// Add a symbol to the symbol table and the use-def map.
+    /// Return the [`ScopedSymbolId`] that uniquely identifies the symbol in both.
+    fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
         let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_symbol(symbol_id);
         }
-        (symbol_id, added)
+        symbol_id
     }
 
     fn add_attribute(&mut self, name: Name) -> ScopedSymbolId {
@@ -797,7 +810,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                         ..
                     }) => (name, &None, default),
                 };
-                let (symbol, _) = self.add_symbol(name.id.clone());
+                let symbol = self.add_symbol(name.id.clone());
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
                 // or not a name is "bound" by a typevar declaration; the latter is always true.
@@ -895,20 +908,20 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.declare_parameter(parameter);
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
-            let (symbol, _) = self.add_symbol(vararg.name.id().clone());
+            let symbol = self.add_symbol(vararg.name.id().clone());
             self.add_definition(
                 symbol,
                 DefinitionNodeRef::VariadicPositionalParameter(vararg),
             );
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
-            let (symbol, _) = self.add_symbol(kwarg.name.id().clone());
+            let symbol = self.add_symbol(kwarg.name.id().clone());
             self.add_definition(symbol, DefinitionNodeRef::VariadicKeywordParameter(kwarg));
         }
     }
 
     fn declare_parameter(&mut self, parameter: &'db ast::ParameterWithDefault) {
-        let (symbol, _) = self.add_symbol(parameter.name().id().clone());
+        let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol, parameter);
 
@@ -1051,7 +1064,19 @@ impl<'db> SemanticIndexBuilder<'db> {
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             eager_bindings: self.eager_bindings,
+            semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
         }
+    }
+
+    fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Self)) {
+        let mut checker = std::mem::take(&mut self.semantic_checker);
+        f(&mut checker, self);
+        self.semantic_checker = checker;
+    }
+
+    fn source_text(&self) -> &SourceText {
+        self.source_text
+            .get_or_init(|| source_text(self.db.upcast(), self.file))
     }
 }
 
@@ -1060,6 +1085,8 @@ where
     'ast: 'db,
 {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
+
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
                 let ast::StmtFunctionDef {
@@ -1139,7 +1166,7 @@ where
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let (symbol, _) = self.add_symbol(name.id.clone());
+                let symbol = self.add_symbol(name.id.clone());
 
                 // Record a use of the function name in the scope that it is defined in, so that it
                 // can be used to find previously defined functions with the same name. This is
@@ -1174,11 +1201,11 @@ where
                 );
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
-                let (symbol, _) = self.add_symbol(class.name.id.clone());
+                let symbol = self.add_symbol(class.name.id.clone());
                 self.add_definition(symbol, class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
-                let (symbol, _) = self.add_symbol(
+                let symbol = self.add_symbol(
                     type_alias
                         .name
                         .as_name_expr()
@@ -1215,7 +1242,7 @@ where
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
                     };
 
-                    let (symbol, _) = self.add_symbol(symbol_name);
+                    let symbol = self.add_symbol(symbol_name);
                     self.add_definition(
                         symbol,
                         ImportDefinitionNodeRef {
@@ -1255,7 +1282,7 @@ where
 
                         // Wildcard imports are invalid syntax everywhere except the top-level scope,
                         // and thus do not bind any definitions anywhere else
-                        if !self.current_scope_is_global_scope() {
+                        if !self.in_module_scope() {
                             continue;
                         }
 
@@ -1286,7 +1313,7 @@ where
                         //
                         // For more details, see the doc-comment on `StarImportPlaceholderPredicate`.
                         for export in exported_names(self.db, referenced_module) {
-                            let (symbol_id, newly_added) = self.add_symbol(export.clone());
+                            let symbol_id = self.add_symbol(export.clone());
                             let node_ref = StarImportDefinitionNodeRef { node, symbol_id };
                             let star_import = StarImportPlaceholderPredicate::new(
                                 self.db,
@@ -1295,28 +1322,15 @@ where
                                 referenced_module,
                             );
 
-                            // Fast path for if there were no previous definitions
-                            // of the symbol defined through the `*` import:
-                            // we can apply the visibility constraint to *only* the added definition,
-                            // rather than all definitions
-                            if newly_added {
-                                self.push_additional_definition(symbol_id, node_ref);
-                                self.current_use_def_map_mut()
-                                    .record_and_negate_star_import_visibility_constraint(
-                                        star_import,
-                                        symbol_id,
-                                    );
-                            } else {
-                                let pre_definition = self.flow_snapshot();
-                                self.push_additional_definition(symbol_id, node_ref);
-                                let constraint_id =
-                                    self.record_visibility_constraint(star_import.into());
-                                let post_definition = self.flow_snapshot();
-                                self.flow_restore(pre_definition.clone());
-                                self.record_negated_visibility_constraint(constraint_id);
-                                self.flow_merge(post_definition);
-                                self.simplify_visibility_constraints(pre_definition);
-                            }
+                            let pre_definition =
+                                self.current_use_def_map().single_symbol_snapshot(symbol_id);
+                            self.push_additional_definition(symbol_id, node_ref);
+                            self.current_use_def_map_mut()
+                                .record_and_negate_star_import_visibility_constraint(
+                                    star_import,
+                                    symbol_id,
+                                    pre_definition,
+                                );
                         }
 
                         continue;
@@ -1336,7 +1350,7 @@ where
                     self.has_future_annotations |= alias.name.id == "annotations"
                         && node.module.as_deref() == Some("__future__");
 
-                    let (symbol, _) = self.add_symbol(symbol_name.clone());
+                    let symbol = self.add_symbol(symbol_name.clone());
 
                     self.add_definition(
                         symbol,
@@ -1754,7 +1768,7 @@ where
                         // which is invalid syntax. However, it's still pretty obvious here that the user
                         // *wanted* `e` to be bound, so we should still create a definition here nonetheless.
                         if let Some(symbol_name) = symbol_name {
-                            let (symbol, _) = self.add_symbol(symbol_name.id.clone());
+                            let symbol = self.add_symbol(symbol_name.id.clone());
 
                             self.add_definition(
                                 symbol,
@@ -1823,6 +1837,8 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
+        self.with_semantic_checker(|semantic, context| semantic.visit_expr(expr, context));
+
         self.scopes_by_expression
             .insert(expr.into(), self.current_scope());
         self.current_ast_ids().record_expression(expr);
@@ -1841,7 +1857,7 @@ where
                     (ast::ExprContext::Del, _) => (false, true),
                     (ast::ExprContext::Invalid, _) => (false, false),
                 };
-                let (symbol, _) = self.add_symbol(id.clone());
+                let symbol = self.add_symbol(id.clone());
 
                 if is_use {
                     self.mark_symbol_used(symbol);
@@ -2245,7 +2261,7 @@ where
             range: _,
         }) = pattern
         {
-            let (symbol, _) = self.add_symbol(name.id().clone());
+            let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
@@ -2266,7 +2282,7 @@ where
             rest: Some(name), ..
         }) = pattern
         {
-            let (symbol, _) = self.add_symbol(name.id().clone());
+            let symbol = self.add_symbol(name.id().clone());
             let state = self.current_match_case.as_ref().unwrap();
             self.add_definition(
                 symbol,
@@ -2279,6 +2295,99 @@ where
         }
 
         self.current_match_case.as_mut().unwrap().index += 1;
+    }
+}
+
+impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
+    fn future_annotations_or_stub(&self) -> bool {
+        self.has_future_annotations
+    }
+
+    fn python_version(&self) -> PythonVersion {
+        self.python_version
+    }
+
+    fn source(&self) -> &str {
+        self.source_text().as_str()
+    }
+
+    // TODO(brent) handle looking up `global` bindings
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
+    }
+
+    fn in_async_context(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            match scope.kind() {
+                ScopeKind::Class | ScopeKind::Lambda => return false,
+                ScopeKind::Function => {
+                    return scope.node().expect_function().is_async;
+                }
+                ScopeKind::Comprehension
+                | ScopeKind::Module
+                | ScopeKind::TypeAlias
+                | ScopeKind::Annotation => {}
+            }
+        }
+        false
+    }
+
+    fn in_await_allowed_context(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            match scope.kind() {
+                ScopeKind::Class => return false,
+                ScopeKind::Function | ScopeKind::Lambda => return true,
+                ScopeKind::Comprehension
+                | ScopeKind::Module
+                | ScopeKind::TypeAlias
+                | ScopeKind::Annotation => {}
+            }
+        }
+        false
+    }
+
+    fn in_sync_comprehension(&self) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            let generators = match scope.node() {
+                NodeWithScopeKind::ListComprehension(node) => &node.generators,
+                NodeWithScopeKind::SetComprehension(node) => &node.generators,
+                NodeWithScopeKind::DictComprehension(node) => &node.generators,
+                _ => continue,
+            };
+            if generators.iter().all(|gen| !gen.is_async) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn in_module_scope(&self) -> bool {
+        self.scope_stack.len() == 1
+    }
+
+    fn in_function_scope(&self) -> bool {
+        let kind = self.scopes[self.current_scope()].kind();
+        matches!(kind, ScopeKind::Function | ScopeKind::Lambda)
+    }
+
+    fn in_generator_scope(&self) -> bool {
+        matches!(
+            self.scopes[self.current_scope()].node(),
+            NodeWithScopeKind::GeneratorExpression(_)
+        )
+    }
+
+    fn in_notebook(&self) -> bool {
+        self.source_text().is_notebook()
+    }
+
+    fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        if self.db.is_file_open(self.file) {
+            self.semantic_syntax_errors.borrow_mut().push(error);
+        }
     }
 }
 

@@ -6,13 +6,13 @@ use ruff_db::display::FormatterJoinExtension;
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 
-use crate::types::class::{ClassType, GenericAlias, GenericClass};
+use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    FunctionSignature, InstanceType, IntersectionType, KnownClass, MethodWrapperKind,
-    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
-    UnionType, WrapperDescriptorKind,
+    FunctionSignature, IntersectionType, KnownClass, MethodWrapperKind, StringLiteralType,
+    SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
+    WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
@@ -73,10 +73,10 @@ impl Display for DisplayRepresentation<'_> {
         match self.ty {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Instance(InstanceType { class }) => match (class, class.known(self.db)) {
+            Type::Instance(instance) => match (instance.class(), instance.class().known(self.db)) {
                 (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                 (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
-                (ClassType::NonGeneric(class), _) => f.write_str(&class.class(self.db).name),
+                (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
                 (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
             },
             Type::PropertyInstance(_) => f.write_str("property"),
@@ -195,7 +195,10 @@ impl Display for DisplayRepresentation<'_> {
                 write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
             }
             Type::DataclassDecorator(_) => {
-                f.write_str("<decorator produced by dataclasses.dataclass>")
+                f.write_str("<decorator produced by dataclass-like function>")
+            }
+            Type::DataclassTransformer(_) => {
+                f.write_str("<decorator produced by typing.dataclass_transform>")
             }
             Type::Union(union) => union.display(self.db).fmt(f),
             Type::Intersection(intersection) => intersection.display(self.db).fmt(f),
@@ -269,7 +272,7 @@ impl<'db> GenericAlias<'db> {
 }
 
 pub(crate) struct DisplayGenericAlias<'db> {
-    origin: GenericClass<'db>,
+    origin: ClassLiteral<'db>,
     specialization: Specialization<'db>,
     db: &'db dyn Db,
 }
@@ -279,7 +282,7 @@ impl Display for DisplayGenericAlias<'_> {
         write!(
             f,
             "{origin}{specialization}",
-            origin = self.origin.class(self.db).name,
+            origin = self.origin.name(self.db),
             specialization = self.specialization.display_short(self.db),
         )
     }
@@ -676,14 +679,17 @@ struct DisplayMaybeParenthesizedType<'db> {
 
 impl Display for DisplayMaybeParenthesizedType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Type::Callable(_)
-        | Type::MethodWrapper(_)
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_) = self.ty
-        {
-            write!(f, "({})", self.ty.display(self.db))
-        } else {
-            self.ty.display(self.db).fmt(f)
+        let write_parentheses = |f: &mut Formatter<'_>| write!(f, "({})", self.ty.display(self.db));
+        match self.ty {
+            Type::Callable(_)
+            | Type::MethodWrapper(_)
+            | Type::FunctionLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::Union(_) => write_parentheses(f),
+            Type::Intersection(intersection) if !intersection.has_one_element(self.db) => {
+                write_parentheses(f)
+            }
+            _ => self.ty.display(self.db).fmt(f),
         }
     }
 }

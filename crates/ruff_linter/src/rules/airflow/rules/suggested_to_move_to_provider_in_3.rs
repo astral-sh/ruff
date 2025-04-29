@@ -41,8 +41,17 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
             replacement,
         } = self;
         match replacement {
+            ProviderReplacement::None => {
+                format!("`{deprecated}` is removed in Airflow 3.0")
+            }
             ProviderReplacement::ProviderName {
                 name: _,
+                provider,
+                version: _,
+            }
+            | ProviderReplacement::AutoImport {
+                name: _,
+                module: _,
                 provider,
                 version: _,
             }
@@ -52,8 +61,9 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
                 provider,
                 version: _,
             } => {
-                format!("`{deprecated}` is deprecated and moved into `{provider}` provider in Airflow 3.0; \
-                         It still works in Airflow 3.0 but is expected to be removed in a future version."
+                format!(
+                    "`{deprecated}` is deprecated and moved into `{provider}` provider in Airflow 3.0; \
+                     It still works in Airflow 3.0 but is expected to be removed in a future version."
                 )
             }
         }
@@ -62,22 +72,31 @@ impl Violation for Airflow3SuggestedToMoveToProvider {
     fn fix_title(&self) -> Option<String> {
         let Airflow3SuggestedToMoveToProvider { replacement, .. } = self;
         match replacement {
-         ProviderReplacement::ProviderName {
-            name,
-            provider,
-            version,
-        } => {
-            Some(format!(
-                "Install `apache-airflow-provider-{provider}>={version}` and use `{name}` instead."
-            ))
-        },
-        ProviderReplacement::SourceModuleMovedToProvider {
+            ProviderReplacement::None => None,
+            ProviderReplacement::ProviderName {
                 name,
-                module,
                 provider,
                 version,
             } => {
-                Some(format!("Install `apache-airflow-provider-{provider}>={version}` and use `{module}.{name}` instead."))
+                Some(format!(
+                    "Install `apache-airflow-providers-{provider}>={version}` and use `{name}` instead."
+                ))
+            },
+            ProviderReplacement::AutoImport {
+                module,
+                name,
+                provider,
+                version,
+            } => {
+                Some(format!("Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."))
+            },
+            ProviderReplacement::SourceModuleMovedToProvider {
+                module,
+                name,
+                provider,
+                version,
+            } => {
+                Some(format!("Install `apache-airflow-providers-{provider}>={version}` and use `{module}.{name}` instead."))
             }
         }
     }
@@ -133,7 +152,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "operators", "datetime", rest @ ("BranchDateTimeOperator" | "target_times_as_dates")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
-                module: "airflow.providers.standard.time.operators.datetime",
+                module: "airflow.providers.standard.operators.datetime",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -169,7 +188,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
         ["airflow", "operators", "weekday", "BranchDayOfWeekOperator"] => {
             ProviderReplacement::ProviderName {
-                name: "airflow.providers.standard.time.operators.weekday.BranchDayOfWeekOperator",
+                name: "airflow.providers.standard.operators.weekday.BranchDayOfWeekOperator",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -177,7 +196,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "sensors", "date_time", rest @ ("DateTimeSensor" | "DateTimeSensorAsync")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
-                module: "airflow.providers.standard.time.sensors.date_time",
+                module: "airflow.providers.standard.sensors.date_time",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -198,7 +217,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "sensors", "time_sensor", rest @ ("TimeSensor" | "TimeSensorAsync")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
-                module: "airflow.providers.standard.time.sensors.time",
+                module: "airflow.providers.standard.sensors.time",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -206,13 +225,13 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ["airflow", "sensors", "time_delta", rest @ ("TimeDeltaSensor" | "TimeDeltaSensorAsync" | "WaitSensor")] => {
             ProviderReplacement::SourceModuleMovedToProvider {
                 name: (*rest).to_string(),
-                module: "airflow.providers.standard.time.sensors.time_delta",
+                module: "airflow.providers.standard.sensors.time_delta",
                 provider: "standard",
                 version: "0.0.1",
             }
         }
         ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.standard.time.sensors.weekday.DayOfWeekSensor",
+            name: "airflow.providers.standard.sensors.weekday.DayOfWeekSensor",
             provider: "standard",
             version: "0.0.1",
         },

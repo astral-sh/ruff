@@ -1,4 +1,5 @@
 use super::context::InferContext;
+use super::ClassLiteral;
 use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
@@ -7,8 +8,8 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{KnownInstanceType, Type};
-use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
+use crate::types::{class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
+use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashSet;
@@ -36,6 +37,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
+    registry.register_lint(&INVALID_PROTOCOL);
     registry.register_lint(&INVALID_RAISE);
     registry.register_lint(&INVALID_SUPER_ARGUMENT);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
@@ -225,6 +227,34 @@ declare_lint! {
     /// ```
     pub(crate) static INCOMPATIBLE_SLOTS = {
         summary: "detects class definitions whose MRO has conflicting `__slots__`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalidly defined protocol classes.
+    ///
+    /// ## Why is this bad?
+    /// An invalidly defined protocol class may lead to the type checker inferring
+    /// unexpected things. It may also lead to `TypeError`s at runtime.
+    ///
+    /// ## Examples
+    /// A `Protocol` class cannot inherit from a non-`Protocol` class;
+    /// this raises a `TypeError` at runtime:
+    ///
+    /// ```pycon
+    /// >>> from typing import Protocol
+    /// >>> class Foo(int, Protocol): ...
+    /// ...
+    /// Traceback (most recent call last):
+    ///   File "<python-input-1>", line 1, in <module>
+    ///     class Foo(int, Protocol): ...
+    /// TypeError: Protocols can only inherit from other protocols, got <class 'int'>
+    /// ```
+    pub(crate) static INVALID_PROTOCOL = {
+        summary: "detects invalid protocol class definitions",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -991,6 +1021,10 @@ impl TypeCheckDiagnostics {
         self.used_suppressions.extend(&other.used_suppressions);
     }
 
+    pub(super) fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
+        self.diagnostics.extend(diagnostics);
+    }
+
     pub(crate) fn mark_used(&mut self, suppression_id: FileSuppressionId) {
         self.used_suppressions.insert(suppression_id);
     }
@@ -1046,14 +1080,13 @@ pub(super) fn report_index_out_of_bounds(
     length: usize,
     index: i64,
 ) {
-    context.report_lint_old(
-        &INDEX_OUT_OF_BOUNDS,
-        node,
-        format_args!(
-            "Index {index} is out of bounds for {kind} `{}` with length {length}",
-            tuple_ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&INDEX_OUT_OF_BOUNDS, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Index {index} is out of bounds for {kind} `{}` with length {length}",
+        tuple_ty.display(context.db())
+    ));
 }
 
 /// Emit a diagnostic declaring that a type does not support subscripting.
@@ -1063,22 +1096,20 @@ pub(super) fn report_non_subscriptable(
     non_subscriptable_ty: Type,
     method: &str,
 ) {
-    context.report_lint_old(
-        &NON_SUBSCRIPTABLE,
-        node,
-        format_args!(
-            "Cannot subscript object of type `{}` with no `{method}` method",
-            non_subscriptable_ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&NON_SUBSCRIPTABLE, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Cannot subscript object of type `{}` with no `{method}` method",
+        non_subscriptable_ty.display(context.db())
+    ));
 }
 
 pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {
-    context.report_lint_old(
-        &ZERO_STEPSIZE_IN_SLICE,
-        node,
-        format_args!("Slice step size can not be zero"),
-    );
+    let Some(builder) = context.report_lint(&ZERO_STEPSIZE_IN_SLICE, node) else {
+        return;
+    };
+    builder.into_diagnostic("Slice step size can not be zero");
 }
 
 fn report_invalid_assignment_with_message(
@@ -1087,19 +1118,26 @@ fn report_invalid_assignment_with_message(
     target_ty: Type,
     message: std::fmt::Arguments,
 ) {
+    let Some(builder) = context.report_lint(&INVALID_ASSIGNMENT, node) else {
+        return;
+    };
     match target_ty {
         Type::ClassLiteral(class) => {
-            context.report_lint_old(&INVALID_ASSIGNMENT, node, format_args!(
-                    "Implicit shadowing of class `{}`; annotate to make it explicit if this is intentional",
-                    class.name(context.db())));
+            let mut diag = builder.into_diagnostic(format_args!(
+                "Implicit shadowing of class `{}`",
+                class.name(context.db()),
+            ));
+            diag.info("Annotate to make it explicit if this is intentional");
         }
         Type::FunctionLiteral(function) => {
-            context.report_lint_old(&INVALID_ASSIGNMENT, node, format_args!(
-                    "Implicit shadowing of function `{}`; annotate to make it explicit if this is intentional",
-                    function.name(context.db())));
+            let mut diag = builder.into_diagnostic(format_args!(
+                "Implicit shadowing of function `{}`",
+                function.name(context.db()),
+            ));
+            diag.info("Annotate to make it explicit if this is intentional");
         }
         _ => {
-            context.report_lint_old(&INVALID_ASSIGNMENT, node, message);
+            builder.into_diagnostic(message);
         }
     }
 }
@@ -1173,21 +1211,21 @@ pub(super) fn report_implicit_return_type(
     range: impl Ranged,
     expected_ty: Type,
 ) {
-    context.report_lint_old(
-        &INVALID_RETURN_TYPE,
-        range,
-        format_args!(
-            "Function can implicitly return `None`, which is not assignable to return type `{}`",
-            expected_ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, range) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Function can implicitly return `None`, which is not assignable to return type `{}`",
+        expected_ty.display(context.db())
+    ));
 }
 
 pub(super) fn report_invalid_type_checking_constant(context: &InferContext, node: AnyNodeRef) {
-    context.report_lint_old(
-        &INVALID_TYPE_CHECKING_CONSTANT,
-        node,
-        format_args!("The name TYPE_CHECKING is reserved for use as a flag; only False can be assigned to it.",),
+    let Some(builder) = context.report_lint(&INVALID_TYPE_CHECKING_CONSTANT, node) else {
+        return;
+    };
+    builder.into_diagnostic(
+        "The name TYPE_CHECKING is reserved for use as a flag; only False can be assigned to it",
     );
 }
 
@@ -1195,13 +1233,12 @@ pub(super) fn report_possibly_unresolved_reference(
     context: &InferContext,
     expr_name_node: &ast::ExprName,
 ) {
-    let ast::ExprName { id, .. } = expr_name_node;
+    let Some(builder) = context.report_lint(&POSSIBLY_UNRESOLVED_REFERENCE, expr_name_node) else {
+        return;
+    };
 
-    context.report_lint_old(
-        &POSSIBLY_UNRESOLVED_REFERENCE,
-        expr_name_node,
-        format_args!("Name `{id}` used when possibly not defined"),
-    );
+    let ast::ExprName { id, .. } = expr_name_node;
+    builder.into_diagnostic(format_args!("Name `{id}` used when possibly not defined"));
 }
 
 pub(super) fn report_possibly_unbound_attribute(
@@ -1210,93 +1247,183 @@ pub(super) fn report_possibly_unbound_attribute(
     attribute: &str,
     object_ty: Type,
 ) {
-    context.report_lint_old(
-        &POSSIBLY_UNBOUND_ATTRIBUTE,
-        target,
-        format_args!(
-            "Attribute `{attribute}` on type `{}` is possibly unbound",
-            object_ty.display(context.db()),
-        ),
-    );
+    let Some(builder) = context.report_lint(&POSSIBLY_UNBOUND_ATTRIBUTE, target) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Attribute `{attribute}` on type `{}` is possibly unbound",
+        object_ty.display(context.db()),
+    ));
 }
 
 pub(super) fn report_unresolved_reference(context: &InferContext, expr_name_node: &ast::ExprName) {
-    let ast::ExprName { id, .. } = expr_name_node;
+    let Some(builder) = context.report_lint(&UNRESOLVED_REFERENCE, expr_name_node) else {
+        return;
+    };
 
-    context.report_lint_old(
-        &UNRESOLVED_REFERENCE,
-        expr_name_node,
-        format_args!("Name `{id}` used when not defined"),
-    );
+    let ast::ExprName { id, .. } = expr_name_node;
+    builder.into_diagnostic(format_args!("Name `{id}` used when not defined"));
 }
 
 pub(super) fn report_invalid_exception_caught(context: &InferContext, node: &ast::Expr, ty: Type) {
-    context.report_lint_old(
-        &INVALID_EXCEPTION_CAUGHT,
-        node,
-        format_args!(
-            "Cannot catch object of type `{}` in an exception handler \
+    let Some(builder) = context.report_lint(&INVALID_EXCEPTION_CAUGHT, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Cannot catch object of type `{}` in an exception handler \
             (must be a `BaseException` subclass or a tuple of `BaseException` subclasses)",
-            ty.display(context.db())
-        ),
-    );
+        ty.display(context.db())
+    ));
 }
 
 pub(crate) fn report_invalid_exception_raised(context: &InferContext, node: &ast::Expr, ty: Type) {
-    context.report_lint_old(
-        &INVALID_RAISE,
-        node,
-        format_args!(
-            "Cannot raise object of type `{}` (must be a `BaseException` subclass or instance)",
-            ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Cannot raise object of type `{}` (must be a `BaseException` subclass or instance)",
+        ty.display(context.db())
+    ));
 }
 
 pub(crate) fn report_invalid_exception_cause(context: &InferContext, node: &ast::Expr, ty: Type) {
-    context.report_lint_old(
-        &INVALID_RAISE,
-        node,
-        format_args!(
-            "Cannot use object of type `{}` as exception cause \
-            (must be a `BaseException` subclass or instance or `None`)",
-            ty.display(context.db())
-        ),
-    );
+    let Some(builder) = context.report_lint(&INVALID_RAISE, node) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Cannot use object of type `{}` as exception cause \
+         (must be a `BaseException` subclass or instance or `None`)",
+        ty.display(context.db())
+    ));
 }
 
 pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: &ast::Expr) {
-    context.report_lint_old(
-        &INCOMPATIBLE_SLOTS,
-        node,
-        format_args!("Class base has incompatible `__slots__`"),
-    );
+    let Some(builder) = context.report_lint(&INCOMPATIBLE_SLOTS, node) else {
+        return;
+    };
+    builder.into_diagnostic("Class base has incompatible `__slots__`");
 }
 
 pub(crate) fn report_invalid_arguments_to_annotated(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
-    context.report_lint_old(
-        &INVALID_TYPE_FORM,
-        subscript,
+    let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Special form `{}` expected at least 2 arguments \
+         (one type and at least one metadata element)",
+        KnownInstanceType::Annotated.repr(context.db())
+    ));
+}
+
+pub(crate) fn report_bad_argument_to_get_protocol_members(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    class: ClassLiteral,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+        return;
+    };
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic("Invalid argument to `get_protocol_members`");
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+    diagnostic.info("Only protocol classes can be passed to `get_protocol_members`");
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        Severity::Info,
         format_args!(
-            "Special form `{}` expected at least 2 arguments (one type and at least one metadata element)",
-            KnownInstanceType::Annotated.repr(context.db())
+            "`{}` is declared here, but it is not a protocol class:",
+            class.name(db)
         ),
     );
+    class_def_diagnostic.annotate(Annotation::primary(class.header_span(db)));
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(
+        "A class is only a protocol class if it directly inherits \
+            from `typing.Protocol` or `typing_extensions.Protocol`",
+    );
+    // TODO the typing spec isn't really designed as user-facing documentation,
+    // but there isn't really any user-facing documentation that covers this specific issue well
+    // (it's not described well in the CPython docs; and PEP-544 is a snapshot of a decision taken
+    // years ago rather than up-to-date documentation). We should either write our own docs
+    // describing this well or contribute to type-checker-agnostic docs somewhere and link to those.
+    diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
 }
 
 pub(crate) fn report_invalid_arguments_to_callable(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
-    context.report_lint_old(
-        &INVALID_TYPE_FORM,
-        subscript,
+    let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
+        return;
+    };
+    builder.into_diagnostic(format_args!(
+        "Special form `{}` expected exactly two arguments (parameter types and return type)",
+        KnownInstanceType::Callable.repr(context.db())
+    ));
+}
+
+pub(crate) fn report_runtime_check_against_non_runtime_checkable_protocol(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    protocol: ProtocolClassLiteral,
+    function: KnownFunction,
+) {
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = protocol.name(db);
+    let function_name: &'static str = function.into();
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Class `{class_name}` cannot be used as the second argument to `{function_name}`",
+    ));
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        Severity::Info,
         format_args!(
-            "Special form `{}` expected exactly two arguments (parameter types and return type)",
-            KnownInstanceType::Callable.repr(context.db())
+            "`{class_name}` is declared as a protocol class, \
+                but it is not declared as runtime-checkable"
         ),
     );
+    class_def_diagnostic.annotate(
+        Annotation::primary(protocol.header_span(db))
+            .message(format_args!("`{class_name}` declared here")),
+    );
+    diagnostic.sub(class_def_diagnostic);
+
+    diagnostic.info(format_args!(
+        "A protocol class can only be used in `{function_name}` checks if it is decorated \
+            with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`"
+    ));
+    diagnostic.info("See https://docs.python.org/3/library/typing.html#typing.runtime_checkable");
+}
+
+pub(crate) fn report_attempted_protocol_instantiation(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    protocol: ProtocolClassLiteral,
+) {
+    let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = protocol.name(db);
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Cannot instantiate class `{class_name}`",));
+    diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+
+    let mut class_def_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        format_args!("Protocol classes cannot be instantiated"),
+    );
+    class_def_diagnostic.annotate(
+        Annotation::primary(protocol.header_span(db))
+            .message(format_args!("`{class_name}` declared as a protocol here")),
+    );
+    diagnostic.sub(class_def_diagnostic);
 }

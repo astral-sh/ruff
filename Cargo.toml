@@ -124,7 +124,7 @@ rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "87bf6b6c2d5f6479741271da73bd9d30c2580c26" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "c75b0161aba55965ab6ad8cc9aaee7dc177967f1" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -272,7 +272,9 @@ inherits = "release"
 # Config for 'dist'
 [workspace.metadata.dist]
 # The preferred dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.28.4-prerelease.1"
+cargo-dist-version = "0.28.4"
+# Make distability of apps opt-in instead of opt-out
+dist = false
 # CI backends to support
 ci = "github"
 # The installers to generate for each app
@@ -306,7 +308,7 @@ auto-includes = false
 # Whether dist should create a Github Release or use an existing draft
 create-release = true
 # Which actions to run on pull requests
-pr-run-mode = "skip"
+pr-run-mode = "plan"
 # Whether CI should trigger releases with dispatches instead of tag pushes
 dispatch-releases = true
 # Which phase dist should use to create the GitHub release
@@ -334,7 +336,7 @@ install-path = ["$XDG_BIN_HOME/", "$XDG_DATA_HOME/../bin", "~/.local/bin"]
 global = "depot-ubuntu-latest-4"
 
 [workspace.metadata.dist.github-action-commits]
-"actions/checkout" = "11bd71901bbe5b1630ceea73d27597364c9af683" # v4
-"actions/upload-artifact" = "ea165f8d65b6e75b540449e92b4886f43607fa02" # v4.6.2
-"actions/download-artifact" = "95815c38cf2ff2164869cbab79da8d1f422bc89e" # v4.2.1
+"actions/checkout" = "85e6279cec87321a52edac9c87bce653a07cf6c2" # v4
+"actions/upload-artifact" = "6027e3dd177782cd8ab9af838c04fd81a07f1d47" # v4.6.2
+"actions/download-artifact" = "d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
 "actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3

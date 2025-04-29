@@ -169,8 +169,12 @@ pub enum ExitStatus {
     /// Checking was successful but there were errors.
     Failure = 1,
 
-    /// Checking failed.
+    /// Checking failed due to an invocation error (e.g. the current directory no longer exists, incorrect CLI arguments, ...)
     Error = 2,
+
+    /// Internal Red Knot error (panic, or any other error that isn't due to the user using the
+    /// program incorrectly or transient environment errors).
+    InternalError = 101,
 }
 
 impl Termination for ExitStatus {
@@ -246,11 +250,16 @@ impl MainLoop {
                     // Spawn a new task that checks the project. This needs to be done in a separate thread
                     // to prevent blocking the main loop here.
                     rayon::spawn(move || {
-                        if let Ok(result) = db.check() {
-                            // Send the result back to the main loop for printing.
-                            sender
-                                .send(MainLoopMessage::CheckCompleted { result, revision })
-                                .unwrap();
+                        match db.check() {
+                            Ok(result) => {
+                                // Send the result back to the main loop for printing.
+                                sender
+                                    .send(MainLoopMessage::CheckCompleted { result, revision })
+                                    .unwrap();
+                            }
+                            Err(cancelled) => {
+                                tracing::debug!("Check has been cancelled: {cancelled:?}");
+                            }
                         }
                     });
                 }
@@ -263,12 +272,6 @@ impl MainLoop {
                     let display_config = DisplayDiagnosticConfig::default()
                         .format(terminal_settings.output_format)
                         .color(colored::control::SHOULD_COLORIZE.should_colorize());
-
-                    let min_error_severity = if terminal_settings.error_on_warning {
-                        Severity::Warning
-                    } else {
-                        Severity::Error
-                    };
 
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {
@@ -284,13 +287,13 @@ impl MainLoop {
                                 return Ok(ExitStatus::Success);
                             }
                         } else {
-                            let mut failed = false;
+                            let mut max_severity = Severity::Info;
                             let diagnostics_count = result.len();
 
                             for diagnostic in result {
                                 write!(stdout, "{}", diagnostic.display(db, &display_config))?;
 
-                                failed |= diagnostic.severity() >= min_error_severity;
+                                max_severity = max_severity.max(diagnostic.severity());
                             }
 
                             writeln!(
@@ -301,10 +304,17 @@ impl MainLoop {
                             )?;
 
                             if self.watcher.is_none() {
-                                return Ok(if failed {
-                                    ExitStatus::Failure
-                                } else {
-                                    ExitStatus::Success
+                                return Ok(match max_severity {
+                                    Severity::Info => ExitStatus::Success,
+                                    Severity::Warning => {
+                                        if terminal_settings.error_on_warning {
+                                            ExitStatus::Failure
+                                        } else {
+                                            ExitStatus::Success
+                                        }
+                                    }
+                                    Severity::Error => ExitStatus::Failure,
+                                    Severity::Fatal => ExitStatus::InternalError,
                                 });
                             }
                         }

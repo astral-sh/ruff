@@ -106,13 +106,13 @@ reveal_type(ChainMapSubclass.__mro__)
 class CounterSubclass(typing.Counter): ...
 
 # TODO: Should be (CounterSubclass, Counter, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[CounterSubclass], Literal[Counter], Unknown, Literal[object]]
+# revealed: tuple[Literal[CounterSubclass], Literal[Counter], @Todo(GenericAlias instance), @Todo(`Generic[]` subscript), Literal[object]]
 reveal_type(CounterSubclass.__mro__)
 
 class DefaultDictSubclass(typing.DefaultDict): ...
 
 # TODO: Should be (DefaultDictSubclass, defaultdict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[DefaultDictSubclass], Literal[defaultdict], Unknown, Literal[object]]
+# revealed: tuple[Literal[DefaultDictSubclass], Literal[defaultdict], @Todo(GenericAlias instance), Literal[object]]
 reveal_type(DefaultDictSubclass.__mro__)
 
 class DequeSubclass(typing.Deque): ...
@@ -124,6 +124,6 @@ reveal_type(DequeSubclass.__mro__)
 class OrderedDictSubclass(typing.OrderedDict): ...
 
 # TODO: Should be (OrderedDictSubclass, OrderedDict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[OrderedDictSubclass], Literal[OrderedDict], Unknown, Literal[object]]
+# revealed: tuple[Literal[OrderedDictSubclass], Literal[OrderedDict], @Todo(GenericAlias instance), Literal[object]]
 reveal_type(OrderedDictSubclass.__mro__)
 ```

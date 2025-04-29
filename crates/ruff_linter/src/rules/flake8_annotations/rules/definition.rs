@@ -224,6 +224,16 @@ impl Violation for MissingTypeCls {
 /// def add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for some Python versions,
+/// its diagnostic will not be emitted, and no fix will be offered, if `typing_extensions` imports
+/// have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
@@ -267,6 +277,16 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 /// def _add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for some Python versions,
+/// its diagnostic will not be emitted, and no fix will be offered, if `typing_extensions` imports
+/// have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,

@@ -191,7 +191,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 warn_user!(
                     "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
                     relativize_path(checker.path),
-                    location.row,
+                    location.line,
                     location.column
                 );
                 continue;

@@ -9,7 +9,7 @@ use log::Level;
 use ruff_python_parser::{ParseError, ParseErrorType};
 use rustc_hash::FxHashSet;
 
-use ruff_source_file::{LineIndex, OneIndexed, SourceCode, SourceLocation};
+use ruff_source_file::{LineColumn, LineIndex, OneIndexed, SourceCode};
 
 use crate::fs;
 use crate::source_kind::SourceKind;
@@ -195,21 +195,21 @@ impl DisplayParseError {
         // Translate the byte offset to a location in the originating source.
         let location =
             if let Some(jupyter_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-                let source_location = source_code.source_location(error.location.start());
+                let source_location = source_code.line_column(error.location.start());
 
                 ErrorLocation::Cell(
                     jupyter_index
-                        .cell(source_location.row)
+                        .cell(source_location.line)
                         .unwrap_or(OneIndexed::MIN),
-                    SourceLocation {
-                        row: jupyter_index
-                            .cell_row(source_location.row)
+                    LineColumn {
+                        line: jupyter_index
+                            .cell_row(source_location.line)
                             .unwrap_or(OneIndexed::MIN),
                         column: source_location.column,
                     },
                 )
             } else {
-                ErrorLocation::File(source_code.source_location(error.location.start()))
+                ErrorLocation::File(source_code.line_column(error.location.start()))
             };
 
         Self {
@@ -245,7 +245,7 @@ impl Display for DisplayParseError {
                 write!(
                     f,
                     "{row}{colon}{column}{colon} {inner}",
-                    row = location.row,
+                    row = location.line,
                     column = location.column,
                     colon = ":".cyan(),
                     inner = &DisplayParseErrorType(&self.error.error)
@@ -256,7 +256,7 @@ impl Display for DisplayParseError {
                     f,
                     "{cell}{colon}{row}{colon}{column}{colon} {inner}",
                     cell = cell,
-                    row = location.row,
+                    row = location.line,
                     column = location.column,
                     colon = ":".cyan(),
                     inner = &DisplayParseErrorType(&self.error.error)
@@ -283,9 +283,9 @@ impl Display for DisplayParseErrorType<'_> {
 #[derive(Debug)]
 enum ErrorLocation {
     /// The error occurred in a Python file.
-    File(SourceLocation),
+    File(LineColumn),
     /// The error occurred in a Jupyter cell.
-    Cell(OneIndexed, SourceLocation),
+    Cell(OneIndexed, LineColumn),
 }
 
 /// Truncates the display text before the first newline character to avoid line breaks.

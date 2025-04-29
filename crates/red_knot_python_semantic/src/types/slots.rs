@@ -4,7 +4,7 @@ use crate::db::Db;
 use crate::symbol::{Boundness, Symbol};
 use crate::types::class_base::ClassBase;
 use crate::types::diagnostic::report_base_with_incompatible_slots;
-use crate::types::{ClassLiteralType, Type};
+use crate::types::{ClassLiteral, Type};
 
 use super::InferContext;
 
@@ -23,7 +23,7 @@ enum SlotsKind {
 }
 
 impl SlotsKind {
-    fn from(db: &dyn Db, base: ClassLiteralType) -> Self {
+    fn from(db: &dyn Db, base: ClassLiteral) -> Self {
         let Symbol::Type(slots_ty, bound) = base.own_class_member(db, None, "__slots__").symbol
         else {
             return Self::NotSpecified;
@@ -53,7 +53,7 @@ impl SlotsKind {
 
 pub(super) fn check_class_slots(
     context: &InferContext,
-    class: ClassLiteralType,
+    class: ClassLiteral,
     node: &ast::StmtClassDef,
 ) {
     let db = context.db();

@@ -4,7 +4,7 @@ use ruff_python_ast::{Expr, ExprName, StmtTry};
 use ruff_python_semantic::Exceptions;
 use ruff_python_semantic::SemanticModel;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Replacement {
     None,
     Name(&'static str),
@@ -19,16 +19,23 @@ pub(crate) enum Replacement {
     },
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProviderReplacement {
+    None,
     ProviderName {
         name: &'static str,
         provider: &'static str,
         version: &'static str,
     },
-    SourceModuleMovedToProvider {
-        name: String,
+    AutoImport {
         module: &'static str,
+        name: &'static str,
+        provider: &'static str,
+        version: &'static str,
+    },
+    SourceModuleMovedToProvider {
+        module: &'static str,
+        name: String,
         provider: &'static str,
         version: &'static str,
     },

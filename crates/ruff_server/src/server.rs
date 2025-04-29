@@ -59,6 +59,7 @@ impl Server {
 
         let client_capabilities = init_params.capabilities;
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
+
         let server_capabilities = Self::server_capabilities(position_encoding);
 
         let connection = connection.initialize_finish(
@@ -97,6 +98,8 @@ impl Server {
             workspace_folders,
             workspace_settings.unwrap_or_default(),
         )?;
+
+        tracing::debug!("Negotiated position encoding: {position_encoding:?}");
 
         Ok(Self {
             connection,

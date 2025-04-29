@@ -18,7 +18,7 @@ pub use rdjson::RdjsonEmitter;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::{ParseError, UnsupportedSyntaxError};
-use ruff_source_file::{SourceFile, SourceLocation};
+use ruff_source_file::{LineColumn, SourceFile};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 pub use sarif::SarifEmitter;
 pub use text::TextEmitter;
@@ -239,17 +239,15 @@ impl Message {
     }
 
     /// Computes the start source location for the message.
-    pub fn compute_start_location(&self) -> SourceLocation {
+    pub fn compute_start_location(&self) -> LineColumn {
         self.source_file()
             .to_source_code()
-            .source_location(self.start())
+            .line_column(self.start())
     }
 
     /// Computes the end source location for the message.
-    pub fn compute_end_location(&self) -> SourceLocation {
-        self.source_file()
-            .to_source_code()
-            .source_location(self.end())
+    pub fn compute_end_location(&self) -> LineColumn {
+        self.source_file().to_source_code().line_column(self.end())
     }
 
     /// Returns the [`SourceFile`] which the message belongs to.
@@ -284,7 +282,7 @@ impl Ranged for Message {
 
 struct MessageWithLocation<'a> {
     message: &'a Message,
-    start_location: SourceLocation,
+    start_location: LineColumn,
 }
 
 impl Deref for MessageWithLocation<'_> {

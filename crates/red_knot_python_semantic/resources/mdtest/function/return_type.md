@@ -74,8 +74,6 @@ class Baz(Bar):
 T = TypeVar("T")
 
 class Qux(Protocol[T]):
-    # TODO: no error
-    # error: [invalid-return-type]
     def f(self) -> int: ...
 
 class Foo(Protocol):

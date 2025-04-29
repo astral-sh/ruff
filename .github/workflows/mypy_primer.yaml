@@ -21,11 +21,12 @@ env:
   CARGO_NET_RETRY: 10
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
 
 jobs:
   mypy_primer:
     name: Run mypy_primer
-    runs-on: depot-ubuntu-22.04-16
+    runs-on: depot-ubuntu-22.04-32
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -35,17 +36,14 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@0c5e2b8115b80b4c7c5ddf6ffdd634974642d182 # v5.4.1
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
 
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
           workspaces: "ruff"
+
       - name: Install Rust toolchain
         run: rustup show
-
-      - name: Install mypy_primer
-        run: |
-          uv tool install "git+https://github.com/astral-sh/mypy_primer.git@add-red-knot-support-v5"
 
       - name: Run mypy_primer
         shell: bash
@@ -66,7 +64,9 @@ jobs:
 
           echo "Project selector: $PRIMER_SELECTOR"
           # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
-          uvx mypy_primer \
+          uvx \
+            --from="git+https://github.com/hauntsaninja/mypy_primer@b83b9eade0b7ed2f4b9b129b163acac1ecb48f71" \
+            mypy_primer \
             --repo ruff \
             --type-checker knot \
             --old base_commit \

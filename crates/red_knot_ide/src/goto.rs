@@ -272,9 +272,9 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r###"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
-         --> /main.py:2:19
+         --> main.py:2:19
           |
         2 |             class Test: ...
           |                   ^^^^
@@ -282,14 +282,14 @@ mod tests {
         4 |             ab = Test()
           |
         info: Source
-         --> /main.py:4:13
+         --> main.py:4:13
           |
         2 |             class Test: ...
         3 |
         4 |             ab = Test()
           |             ^^
           |
-        "###);
+        ");
     }
 
     #[test]
@@ -304,9 +304,9 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r###"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
-         --> /main.py:2:17
+         --> main.py:2:17
           |
         2 |             def foo(a, b): ...
           |                 ^^^
@@ -314,14 +314,14 @@ mod tests {
         4 |             ab = foo
           |
         info: Source
-         --> /main.py:6:13
+         --> main.py:6:13
           |
         4 |             ab = foo
         5 |
         6 |             ab
           |             ^^
           |
-        "###);
+        ");
     }
 
     #[test]
@@ -344,7 +344,7 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
-         --> /main.py:3:17
+         --> main.py:3:17
           |
         3 |             def foo(a, b): ...
           |                 ^^^
@@ -352,7 +352,7 @@ mod tests {
         5 |             def bar(a, b): ...
           |
         info: Source
-          --> /main.py:12:13
+          --> main.py:12:13
            |
         10 |                 a = bar
         11 |
@@ -361,7 +361,7 @@ mod tests {
            |
 
         info: lint:goto-type-definition: Type definition
-         --> /main.py:5:17
+         --> main.py:5:17
           |
         3 |             def foo(a, b): ...
         4 |
@@ -371,7 +371,7 @@ mod tests {
         7 |             if random.choice():
           |
         info: Source
-          --> /main.py:12:13
+          --> main.py:12:13
            |
         10 |                 a = bar
         11 |
@@ -395,13 +395,13 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
-         --> /lib.py:1:1
+         --> lib.py:1:1
           |
         1 | a = 10
           | ^^^^^^
           |
         info: Source
-         --> /main.py:4:13
+         --> main.py:4:13
           |
         2 |             import lib
         3 |
@@ -433,7 +433,7 @@ mod tests {
         440 |     def __new__(cls, object: object = ...) -> Self: ...
             |
         info: Source
-         --> /main.py:4:13
+         --> main.py:4:13
           |
         2 |             a: str = "test"
         3 |
@@ -462,7 +462,7 @@ mod tests {
         440 |     def __new__(cls, object: object = ...) -> Self: ...
             |
         info: Source
-         --> /main.py:2:22
+         --> main.py:2:22
           |
         2 |             a: str = "test"
           |                      ^^^^^^
@@ -478,20 +478,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r###"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
-         --> /main.py:2:24
+         --> main.py:2:24
           |
         2 |             type Alias[T: int = bool] = list[T]
           |                        ^
           |
         info: Source
-         --> /main.py:2:46
+         --> main.py:2:46
           |
         2 |             type Alias[T: int = bool] = list[T]
           |                                              ^
           |
-        "###);
+        ");
     }
 
     #[test]
@@ -544,7 +544,7 @@ mod tests {
         440 |     def __new__(cls, object: object = ...) -> Self: ...
             |
         info: Source
-         --> /main.py:4:18
+         --> main.py:4:18
           |
         2 |             def test(a: str): ...
         3 |
@@ -579,7 +579,7 @@ mod tests {
         233 |     def __new__(cls, x: ConvertibleToInt = ..., /) -> Self: ...
             |
         info: Source
-         --> /main.py:4:18
+         --> main.py:4:18
           |
         2 |             def test(a: str): ...
         3 |
@@ -613,7 +613,7 @@ f(**kwargs<CURSOR>)
         1088 |     # Also multiprocessing.managers.SyncManager.dict()
              |
         info: Source
-         --> /main.py:6:5
+         --> main.py:6:5
           |
         4 | kwargs = { "name": "test"}
         5 |
@@ -644,7 +644,7 @@ f(**kwargs<CURSOR>)
         440 |     def __new__(cls, object: object = ...) -> Self: ...
             |
         info: Source
-         --> /main.py:3:17
+         --> main.py:3:17
           |
         2 |             def foo(a: str):
         3 |                 a
@@ -666,23 +666,23 @@ f(**kwargs<CURSOR>)
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r###"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
-         --> /main.py:2:19
+         --> main.py:2:19
           |
         2 |             class X:
           |                   ^
         3 |                 def foo(a, b): ...
           |
         info: Source
-         --> /main.py:7:13
+         --> main.py:7:13
           |
         5 |             x = X()
         6 |
         7 |             x.foo()
           |             ^
           |
-        "###);
+        ");
     }
 
     #[test]
@@ -695,9 +695,9 @@ f(**kwargs<CURSOR>)
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r###"
+        assert_snapshot!(test.goto_type_definition(), @r"
         info: lint:goto-type-definition: Type definition
-         --> /main.py:2:17
+         --> main.py:2:17
           |
         2 |             def foo(a, b): ...
           |                 ^^^
@@ -705,14 +705,14 @@ f(**kwargs<CURSOR>)
         4 |             foo()
           |
         info: Source
-         --> /main.py:4:13
+         --> main.py:4:13
           |
         2 |             def foo(a, b): ...
         3 |
         4 |             foo()
           |             ^^^
           |
-        "###);
+        ");
     }
 
     #[test]
@@ -737,7 +737,7 @@ f(**kwargs<CURSOR>)
         440 |     def __new__(cls, object: object = ...) -> Self: ...
             |
         info: Source
-         --> /main.py:4:27
+         --> main.py:4:27
           |
         2 |             def foo(a: str | None, b):
         3 |                 if a is not None:
@@ -767,7 +767,7 @@ f(**kwargs<CURSOR>)
         672 |         def __bool__(self) -> Literal[False]: ...
             |
         info: Source
-         --> /main.py:3:17
+         --> main.py:3:17
           |
         2 |             def foo(a: str | None, b):
         3 |                 a
@@ -785,7 +785,7 @@ f(**kwargs<CURSOR>)
         440 |     def __new__(cls, object: object = ...) -> Self: ...
             |
         info: Source
-         --> /main.py:3:17
+         --> main.py:3:17
           |
         2 |             def foo(a: str | None, b):
         3 |                 a

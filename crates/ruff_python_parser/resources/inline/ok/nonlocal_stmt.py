@@ -1,2 +1,3 @@
-nonlocal x
-nonlocal x, y, z
+def _():
+    nonlocal x
+    nonlocal x, y, z

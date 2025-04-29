@@ -232,21 +232,11 @@ TODO: These do not currently work yet, because we don't correctly model the nest
 class C[T]:
     def __init__[S](self, x: T, y: S) -> None: ...
 
-# TODO: no error
-# TODO: revealed: C[Literal[1]]
-# error: [invalid-argument-type]
-reveal_type(C(1, 1))  # revealed: C[Unknown]
-# TODO: no error
-# TODO: revealed: C[Literal[1]]
-# error: [invalid-argument-type]
-reveal_type(C(1, "string"))  # revealed: C[Unknown]
-# TODO: no error
-# TODO: revealed: C[Literal[1]]
-# error: [invalid-argument-type]
-reveal_type(C(1, True))  # revealed: C[Unknown]
+reveal_type(C(1, 1))  # revealed: C[Literal[1]]
+reveal_type(C(1, "string"))  # revealed: C[Literal[1]]
+reveal_type(C(1, True))  # revealed: C[Literal[1]]
 
-# TODO: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `S`, found `Literal[1]`"
+# error: [invalid-assignment] "Object of type `C[Literal["five"]]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 
@@ -285,14 +275,16 @@ c: C[int] = C[int]()
 reveal_type(c.method("string"))  # revealed: Literal["string"]
 ```
 
-## Cyclic class definition
+## Cyclic class definitions
+
+### F-bounded quantification
 
 A class can use itself as the type parameter of one of its superclasses. (This is also known as the
 [curiously recurring template pattern][crtp] or [F-bounded quantification][f-bound].)
 
-Here, `Sub` is not a generic class, since it fills its superclass's type parameter (with itself).
+#### In a stub file
 
-`stub.pyi`:
+Here, `Sub` is not a generic class, since it fills its superclass's type parameter (with itself).
 
 ```pyi
 class Base[T]: ...
@@ -301,9 +293,9 @@ class Sub(Base[Sub]): ...
 reveal_type(Sub)  # revealed: Literal[Sub]
 ```
 
-A similar case can work in a non-stub file, if forward references are stringified:
+#### With string forward references
 
-`string_annotation.py`:
+A similar case can work in a non-stub file, if forward references are stringified:
 
 ```py
 class Base[T]: ...
@@ -312,9 +304,9 @@ class Sub(Base["Sub"]): ...
 reveal_type(Sub)  # revealed: Literal[Sub]
 ```
 
-In a non-stub file, without stringified forward references, this raises a `NameError`:
+#### Without string forward references
 
-`bare_annotation.py`:
+In a non-stub file, without stringified forward references, this raises a `NameError`:
 
 ```py
 class Base[T]: ...
@@ -323,12 +315,22 @@ class Base[T]: ...
 class Sub(Base[Sub]): ...
 ```
 
-## Another cyclic case
+### Cyclic inheritance as a generic parameter
 
 ```pyi
-# TODO no error (generics)
-# error: [invalid-base]
 class Derived[T](list[Derived[T]]): ...
+```
+
+### Direct cyclic inheritance
+
+Inheritance that would result in a cyclic MRO is detected as an error.
+
+```py
+# error: [cyclic-class-definition]
+class C[T](C): ...
+
+# error: [cyclic-class-definition]
+class D[T](D[int]): ...
 ```
 
 [crtp]: https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern

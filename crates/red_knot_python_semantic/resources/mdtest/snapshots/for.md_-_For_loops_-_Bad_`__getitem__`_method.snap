@@ -28,20 +28,22 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable
-  --> /src/mdtest_snippet.py:10:10
+error: lint:not-iterable: Object of type `Iterable` is not iterable
+  --> src/mdtest_snippet.py:10:10
    |
  9 | # error: [not-iterable]
 10 | for x in Iterable():
-   |          ^^^^^^^^^^ Object of type `Iterable` is not iterable because it has no `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol (expected a signature at least as permissive as `def __getitem__(self, key: int): ...`)
+   |          ^^^^^^^^^^
 11 |     reveal_type(x)  # revealed: int
    |
+info: It has no `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
+info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 
 ```
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:11:5
+  --> src/mdtest_snippet.py:11:5
    |
  9 | # error: [not-iterable]
 10 | for x in Iterable():

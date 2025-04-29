@@ -36,7 +36,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
-        uses: rui314/setup-mold@v1
+        uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
       - name: Build Red Knot
         # A release build takes longer (2 min vs 1 min), but the property tests run much faster in release

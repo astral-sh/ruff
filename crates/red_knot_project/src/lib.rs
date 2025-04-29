@@ -11,7 +11,7 @@ use red_knot_python_semantic::register_lints;
 use red_knot_python_semantic::types::check_types;
 use ruff_db::diagnostic::{
     create_parse_diagnostic, create_unsupported_syntax_diagnostic, Annotation, Diagnostic,
-    DiagnosticId, Severity, Span,
+    DiagnosticId, Severity, Span, SubDiagnostic,
 };
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
@@ -20,8 +20,10 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
+use std::panic::{catch_unwind, AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
+use tracing::error;
 
 pub mod combine;
 
@@ -187,30 +189,66 @@ impl Project {
                 .map(IOErrorDiagnostic::to_diagnostic),
         );
 
-        let result = Arc::new(std::sync::Mutex::new(diagnostics));
-        let inner_result = Arc::clone(&result);
+        let file_diagnostics = Arc::new(std::sync::Mutex::new(vec![]));
 
-        let db = db.clone();
-        let project_span = project_span.clone();
+        {
+            let file_diagnostics = Arc::clone(&file_diagnostics);
+            let db = db.clone();
+            let project_span = project_span.clone();
 
-        rayon::scope(move |scope| {
-            for file in &files {
-                let result = inner_result.clone();
-                let db = db.clone();
-                let project_span = project_span.clone();
+            rayon::scope(move |scope| {
+                for file in &files {
+                    let result = Arc::clone(&file_diagnostics);
+                    let db = db.clone();
+                    let project_span = project_span.clone();
 
-                scope.spawn(move |_| {
-                    let check_file_span =
-                        tracing::debug_span!(parent: &project_span, "check_file", ?file);
-                    let _entered = check_file_span.entered();
+                    scope.spawn(move |_| {
+                        let check_file_span =
+                            tracing::debug_span!(parent: &project_span, "check_file", ?file);
+                        let _entered = check_file_span.entered();
 
-                    let file_diagnostics = check_file_impl(&db, file);
-                    result.lock().unwrap().extend(file_diagnostics);
-                });
+                        let file_diagnostics = check_file_impl(&db, file);
+                        result.lock().unwrap().extend(file_diagnostics);
+                    });
+                }
+            });
+        }
+
+        let mut file_diagnostics = Arc::into_inner(file_diagnostics)
+            .unwrap()
+            .into_inner()
+            .unwrap();
+        // We sort diagnostics in a way that keeps them in source order
+        // and grouped by file. After that, we fall back to severity
+        // (with fatal messages sorting before info messages) and then
+        // finally the diagnostic ID.
+        file_diagnostics.sort_by(|d1, d2| {
+            if let (Some(span1), Some(span2)) = (d1.primary_span(), d2.primary_span()) {
+                let order = span1
+                    .file()
+                    .path(db)
+                    .as_str()
+                    .cmp(span2.file().path(db).as_str());
+                if order.is_ne() {
+                    return order;
+                }
+
+                if let (Some(range1), Some(range2)) = (span1.range(), span2.range()) {
+                    let order = range1.start().cmp(&range2.start());
+                    if order.is_ne() {
+                        return order;
+                    }
+                }
             }
+            // Reverse so that, e.g., Fatal sorts before Info.
+            let order = d1.severity().cmp(&d2.severity()).reverse();
+            if order.is_ne() {
+                return order;
+            }
+            d1.id().cmp(&d2.id())
         });
-
-        Arc::into_inner(result).unwrap().into_inner().unwrap()
+        diagnostics.extend(file_diagnostics);
+        diagnostics
     }
 
     pub(crate) fn check_file(self, db: &dyn Db, file: File) -> Vec<Diagnostic> {
@@ -314,18 +352,21 @@ impl Project {
     /// * It has a [`SystemPath`] and belongs to a package's `src` files
     /// * It has a [`SystemVirtualPath`](ruff_db::system::SystemVirtualPath)
     pub fn is_file_open(self, db: &dyn Db, file: File) -> bool {
+        let path = file.path(db);
+
+        // Try to return early to avoid adding a dependency on `open_files` or `file_set` which
+        // both have a durability of `LOW`.
+        if path.is_vendored_path() {
+            return false;
+        }
+
         if let Some(open_files) = self.open_files(db) {
             open_files.contains(&file)
         } else if file.path(db).is_system_path() {
-            self.contains_file(db, file)
+            self.files(db).contains(&file)
         } else {
             file.path(db).is_system_virtual_path()
         }
-    }
-
-    /// Returns `true` if `file` is a first-party file part of this package.
-    pub fn contains_file(self, db: &dyn Db, file: File) -> bool {
-        self.files(db).contains(&file)
     }
 
     #[tracing::instrument(level = "debug", skip(self, db))]
@@ -432,7 +473,16 @@ fn check_file_impl(db: &dyn Db, file: File) -> Vec<Diagnostic> {
             .map(|error| create_unsupported_syntax_diagnostic(file, error)),
     );
 
-    diagnostics.extend(check_types(db.upcast(), file).into_iter().cloned());
+    {
+        let db = AssertUnwindSafe(db);
+        match catch(&**db, file, || check_types(db.upcast(), file)) {
+            Ok(Some(type_check_diagnostics)) => {
+                diagnostics.extend(type_check_diagnostics.into_iter().cloned());
+            }
+            Ok(None) => {}
+            Err(diagnostic) => diagnostics.push(diagnostic),
+        }
+    }
 
     diagnostics.sort_unstable_by_key(|diagnostic| {
         diagnostic
@@ -521,6 +571,45 @@ enum IOErrorKind {
 
     #[error(transparent)]
     SourceText(#[from] SourceTextError),
+}
+
+fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<Option<R>, Diagnostic>
+where
+    F: FnOnce() -> R + UnwindSafe,
+{
+    match catch_unwind(|| {
+        // Ignore salsa errors
+        salsa::Cancelled::catch(f).ok()
+    }) {
+        Ok(result) => Ok(result),
+        Err(error) => {
+            let payload = if let Some(s) = error.downcast_ref::<&str>() {
+                Some((*s).to_string())
+            } else {
+                error.downcast_ref::<String>().cloned()
+            };
+
+            let message = if let Some(payload) = payload {
+                format!(
+                    "Panicked while checking `{file}`: `{payload}`",
+                    file = file.path(db)
+                )
+            } else {
+                format!("Panicked while checking `{file}`", file = { file.path(db) })
+            };
+
+            let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
+            diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                "This indicates a bug in Red Knot.",
+            ));
+
+            let report_message = "If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bred-knot%5D:%20panic we'd be very appreciative!";
+            diagnostic.sub(SubDiagnostic::new(Severity::Info, report_message));
+
+            Err(diagnostic)
+        }
+    }
 }
 
 #[cfg(test)]

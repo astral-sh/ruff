@@ -16,6 +16,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
+use crate::preview::is_dunder_init_fix_unused_import_enabled;
 use crate::registry::Rule;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
 
@@ -352,7 +353,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
 
     let in_init = checker.path().ends_with("__init__.py");
     let fix_init = !checker.settings.ignore_init_module_imports;
-    let preview_mode = checker.settings.preview.is_enabled();
+    let preview_mode = is_dunder_init_fix_unused_import_enabled(checker.settings);
     let dunder_all_exprs = find_dunder_all_exprs(checker.semantic());
 
     // Generate a diagnostic for every import, but share fixes across all imports within the same

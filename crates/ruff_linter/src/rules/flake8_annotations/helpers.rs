@@ -131,7 +131,8 @@ impl AutoPythonType {
                     "NoReturn"
                 };
                 let (no_return_edit, binding) = checker
-                    .import_from_typing(member, at, PythonVersion::lowest())
+                    .typing_importer(member, PythonVersion::lowest())?
+                    .import(at)
                     .ok()?;
                 let expr = Expr::Name(ast::ExprName {
                     id: Name::from(binding),
@@ -169,7 +170,8 @@ impl AutoPythonType {
 
                             // Ex) `Optional[int]`
                             let (optional_edit, binding) = checker
-                                .import_from_typing("Optional", at, PythonVersion::lowest())
+                                .typing_importer("Optional", PythonVersion::lowest())?
+                                .import(at)
                                 .ok()?;
                             let expr = typing_optional(element, Name::from(binding));
                             Some((expr, vec![optional_edit]))
@@ -182,7 +184,8 @@ impl AutoPythonType {
 
                             // Ex) `Union[int, str]`
                             let (union_edit, binding) = checker
-                                .import_from_typing("Union", at, PythonVersion::lowest())
+                                .typing_importer("Union", PythonVersion::lowest())?
+                                .import(at)
                                 .ok()?;
                             let expr = typing_union(&elements, Name::from(binding));
                             Some((expr, vec![union_edit]))

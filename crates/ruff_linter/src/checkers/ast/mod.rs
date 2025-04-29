@@ -65,6 +65,7 @@ use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
+use crate::preview::{is_semantic_errors_enabled, is_undefined_export_in_dunder_init_enabled};
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
@@ -533,34 +534,54 @@ impl<'a> Checker<'a> {
         self.semantic_checker = checker;
     }
 
-    /// Attempt to create an [`Edit`] that imports `member`.
+    /// Create a [`TypingImporter`] that will import `member` from either `typing` or
+    /// `typing_extensions`.
     ///
     /// On Python <`version_added_to_typing`, `member` is imported from `typing_extensions`, while
     /// on Python >=`version_added_to_typing`, it is imported from `typing`.
     ///
-    /// See [`Importer::get_or_import_symbol`] for more details on the returned values.
-    pub(crate) fn import_from_typing(
-        &self,
-        member: &str,
-        position: TextSize,
+    /// If the Python version is less than `version_added_to_typing` but
+    /// `LinterSettings::typing_extensions` is `false`, this method returns `None`.
+    pub(crate) fn typing_importer<'b>(
+        &'b self,
+        member: &'b str,
         version_added_to_typing: PythonVersion,
-    ) -> Result<(Edit, String), ResolutionError> {
+    ) -> Option<TypingImporter<'b, 'a>> {
         let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
+        } else if !self.settings.typing_extensions {
+            return None;
         } else {
             "typing_extensions"
         };
-        let request = ImportRequest::import_from(source_module, member);
-        self.importer()
-            .get_or_import_symbol(&request, position, self.semantic())
+        Some(TypingImporter {
+            checker: self,
+            source_module,
+            member,
+        })
+    }
+}
+
+pub(crate) struct TypingImporter<'a, 'b> {
+    checker: &'a Checker<'b>,
+    source_module: &'static str,
+    member: &'a str,
+}
+
+impl TypingImporter<'_, '_> {
+    /// Create an [`Edit`] that makes the requested symbol available at `position`.
+    ///
+    /// See [`Importer::get_or_import_symbol`] for more details on the returned values and
+    /// [`Checker::typing_importer`] for a way to construct a [`TypingImporter`].
+    pub(crate) fn import(&self, position: TextSize) -> Result<(Edit, String), ResolutionError> {
+        let request = ImportRequest::import_from(self.source_module, self.member);
+        self.checker
+            .importer
+            .get_or_import_symbol(&request, position, self.checker.semantic())
     }
 }
 
 impl SemanticSyntaxContext for Checker<'_> {
-    fn seen_docstring_boundary(&self) -> bool {
-        self.semantic.seen_module_docstring_boundary()
-    }
-
     fn python_version(&self) -> PythonVersion {
         self.target_version
     }
@@ -619,8 +640,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
-            | SemanticSyntaxErrorKind::AsyncComprehensionOutsideAsyncFunction(_) => {
-                if self.settings.preview.is_enabled() {
+            | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
+            | SemanticSyntaxErrorKind::DuplicateParameter(_)
+            | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
+                if is_semantic_errors_enabled(self.settings) {
                     self.semantic_errors.borrow_mut().push(error);
                 }
             }
@@ -1539,25 +1562,37 @@ impl<'a> Visitor<'a> for Checker<'a> {
                         }
                     }
                     Some(typing::Callable::Cast) => {
-                        let mut args = arguments.args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_type_definition(arg);
-
-                            if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
-                                flake8_type_checking::rules::runtime_cast_value(self, arg);
+                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                            match (i, arg) {
+                                (0, ArgOrKeyword::Arg(arg)) => self.visit_cast_type_argument(arg),
+                                (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
+                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                    if let Some(id) = arg {
+                                        if id == "typ" {
+                                            self.visit_cast_type_argument(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
+                                }
                             }
-                        }
-                        for arg in args {
-                            self.visit_expr(arg);
                         }
                     }
                     Some(typing::Callable::NewType) => {
-                        let mut args = arguments.args.iter();
-                        if let Some(arg) = args.next() {
-                            self.visit_non_type_definition(arg);
-                        }
-                        for arg in args {
-                            self.visit_type_definition(arg);
+                        for (i, arg) in arguments.arguments_source_order().enumerate() {
+                            match (i, arg) {
+                                (1, ArgOrKeyword::Arg(arg)) => self.visit_type_definition(arg),
+                                (_, ArgOrKeyword::Arg(arg)) => self.visit_non_type_definition(arg),
+                                (_, ArgOrKeyword::Keyword(Keyword { arg, value, .. })) => {
+                                    if let Some(id) = arg {
+                                        if id == "tp" {
+                                            self.visit_type_definition(value);
+                                        } else {
+                                            self.visit_non_type_definition(value);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                     Some(typing::Callable::TypeVar) => {
@@ -2057,8 +2092,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
 }
 
 impl<'a> Checker<'a> {
-    /// Visit a [`Module`]. Returns `true` if the module contains a module-level docstring.
+    /// Visit a [`Module`].
     fn visit_module(&mut self, python_ast: &'a Suite) {
+        // Extract any global bindings from the module body.
+        if let Some(globals) = Globals::from_body(python_ast) {
+            self.semantic.set_globals(globals);
+        }
         analyze::module(python_ast, self);
     }
 
@@ -2207,6 +2246,15 @@ impl<'a> Checker<'a> {
         self.semantic.flags -= SemanticModelFlags::TYPE_DEFINITION;
         self.visit_expr(expr);
         self.semantic.flags = snapshot;
+    }
+
+    /// Visit an [`Expr`], and treat it as the `typ` argument to `typing.cast`.
+    fn visit_cast_type_argument(&mut self, arg: &'a Expr) {
+        self.visit_type_definition(arg);
+
+        if !self.source_type.is_stub() && self.enabled(Rule::RuntimeCastValue) {
+            flake8_type_checking::rules::runtime_cast_value(self, arg);
+        }
     }
 
     /// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
@@ -2804,7 +2852,7 @@ impl<'a> Checker<'a> {
                         }
                     } else {
                         if self.enabled(Rule::UndefinedExport) {
-                            if self.settings.preview.is_enabled()
+                            if is_undefined_export_in_dunder_init_enabled(self.settings)
                                 || !self.path.ends_with("__init__.py")
                             {
                                 self.diagnostics.get_mut().push(

@@ -1,12 +1,16 @@
 #![cfg(target_arch = "wasm32")]
 
-use red_knot_wasm::{Position, Workspace};
+use red_knot_wasm::{Position, PositionEncoding, Workspace};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[wasm_bindgen_test]
 fn check() {
-    let mut workspace =
-        Workspace::new("/", js_sys::JSON::parse("{}").unwrap()).expect("Workspace to be created");
+    let mut workspace = Workspace::new(
+        "/",
+        PositionEncoding::Utf32,
+        js_sys::JSON::parse("{}").unwrap(),
+    )
+    .expect("Workspace to be created");
 
     workspace
         .open_file("test.py", "import random22\n")

@@ -608,7 +608,7 @@ Options:
           RUFF_OUTPUT_FILE=]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314]
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
@@ -723,7 +723,7 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313]
+          py37, py38, py39, py310, py311, py312, py313, py314]
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
