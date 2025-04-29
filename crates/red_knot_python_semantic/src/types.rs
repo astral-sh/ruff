@@ -1167,12 +1167,6 @@ impl<'db> Type<'db> {
                 false
             }
 
-            (Type::Callable(_), _) => {
-                // TODO: Implement subtyping between callable types and other types like
-                // function literals, bound methods, class literals, `type[]`, etc.)
-                false
-            }
-
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
                 let call_symbol = self.member(db, "__call__").symbol;
                 match call_symbol {
@@ -1189,6 +1183,12 @@ impl<'db> Type<'db> {
             // TODO: `Callable` types are also structural types.
             (Type::ProtocolInstance(_), _) => false,
             (_, Type::ProtocolInstance(protocol)) => self.satisfies_protocol(db, protocol),
+
+            (Type::Callable(_), _) => {
+                // TODO: Implement subtyping between callable types and other types like
+                // function literals, bound methods, class literals, `type[]`, etc.)
+                false
+            }
 
             // A fully static heterogeneous tuple type `A` is a subtype of a fully static heterogeneous tuple type `B`
             // iff the two tuple types have the same number of elements and each element-type in `A` is a subtype

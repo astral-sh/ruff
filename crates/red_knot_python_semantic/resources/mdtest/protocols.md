@@ -1437,6 +1437,33 @@ def g(obj: Callable[[int], str], obj2: CallMeMaybe, obj3: Callable[[str], str]):
     obj3 = obj2  # error: [invalid-assignment]
 ```
 
+By the same token, a `Callable` type can also be assignable to a protocol-instance type if the
+signature implied by the `Callable` type is assignable to the signature of the `__call__` method
+specified by the protocol:
+
+```py
+class Foo(Protocol):
+    def __call__(self, x: int, /) -> str: ...
+
+# TODO: these fail because we don't yet understand that all `Callable` types have a `__call__` method,
+# and we therefore don't think that the `Callable` type is assignable to `Foo`. They should pass.
+static_assert(is_subtype_of(Callable[[int], str], Foo))  # error: [static-assert-error]
+static_assert(is_assignable_to(Callable[[int], str], Foo))  # error: [static-assert-error]
+
+static_assert(not is_subtype_of(Callable[[str], str], Foo))
+static_assert(not is_assignable_to(Callable[[str], str], Foo))
+static_assert(not is_subtype_of(Callable[[CallMeMaybe, int], str], Foo))
+static_assert(not is_assignable_to(Callable[[CallMeMaybe, int], str], Foo))
+
+def h(obj: Callable[[int], str], obj2: Foo, obj3: Callable[[str], str]):
+    # TODO: this fails because we don't yet understand that all `Callable` types have a `__call__` method,
+    # and we therefore don't think that the `Callable` type is assignable to `Foo`. It should pass.
+    obj2 = obj  # error: [invalid-assignment]
+
+    # This diagnostic is correct, however.
+    obj2 = obj3  # error: [invalid-assignment]
+```
+
 ## Protocols are never singleton types, and are never single-valued types
 
 It *might* be possible to have a singleton protocol-instance type...?
