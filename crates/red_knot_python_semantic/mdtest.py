@@ -20,6 +20,11 @@ from watchfiles import Change, watch
 
 CRATE_NAME: Final = "red_knot_python_semantic"
 CRATE_ROOT: Final = Path(__file__).resolve().parent
+DIRS_TO_WATCH: Final = (
+    CRATE_ROOT,
+    CRATE_ROOT.parent / "red_knot_vendored",
+    CRATE_ROOT.parent / "red_knot_test/src",
+)
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
 
 
@@ -158,7 +163,7 @@ class MDTestRunner:
         self._run_mdtest()
         self.console.print("[dim]Ready to watch for changes...[/dim]")
 
-        for changes in watch(CRATE_ROOT):
+        for changes in watch(*DIRS_TO_WATCH):
             new_md_files = set()
             changed_md_files = set()
             rust_code_has_changed = False
@@ -166,7 +171,10 @@ class MDTestRunner:
             for change, path_str in changes:
                 path = Path(path_str)
 
-                if path.suffix == ".rs":
+                # Obviously a change to a vendored stub file isn't really "Rust code",
+                # but we need to rebuild the binary to pick up the changes,
+                # # so it comes to the same thing
+                if path.suffix in {".rs", ".pyi"}:
                     rust_code_has_changed = True
                     continue
 
