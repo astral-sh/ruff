@@ -324,8 +324,8 @@ fn run_test(
                         Some(location) => messages.push(format!("panicked at {location}")),
                         None => messages.push("panicked at unknown location".to_string()),
                     }
-                    match info.payload {
-                        Some(payload) => messages.push(payload),
+                    match info.payload.as_str() {
+                        Some(message) => messages.push(message.to_string()),
                         // Mimic the default panic hook's rendering of the panic payload if it's
                         // not a string.
                         None => messages.push("Box<dyn Any>".to_string()),
