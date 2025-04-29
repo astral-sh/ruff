@@ -5009,7 +5009,10 @@ impl<'db> Type<'db> {
         match self {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
-            Type::KnownInstance(known_instance) => Type::string_literal(db, known_instance.repr()),
+            Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
+                db,
+                known_instance.repr(db).to_string().into_boxed_str(),
+            )),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -5027,7 +5030,10 @@ impl<'db> Type<'db> {
                 Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
             }
             Type::LiteralString => Type::LiteralString,
-            Type::KnownInstance(known_instance) => Type::string_literal(db, known_instance.repr()),
+            Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
+                db,
+                known_instance.repr(db).to_string().into_boxed_str(),
+            )),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -5388,12 +5394,12 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
                         "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions)",
-                        q = qualifier.repr()
+                        q = qualifier.repr(self.db)
                     ),
                     InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
                         f,
                         "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)",
-                        q = qualifier.repr()
+                        q = qualifier.repr(self.db)
                     ),
                     InvalidTypeExpression::InvalidType(ty) => write!(
                         f,

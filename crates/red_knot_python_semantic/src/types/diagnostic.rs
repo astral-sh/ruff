@@ -9,6 +9,7 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
+use crate::Db;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
@@ -1333,7 +1334,8 @@ pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: 
     builder.into_diagnostic("Class base has incompatible `__slots__`");
 }
 
-pub(crate) fn report_invalid_arguments_to_annotated(
+pub(crate) fn report_invalid_arguments_to_annotated<'db>(
+    db: &'db dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1343,7 +1345,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        KnownInstanceType::Annotated.repr()
+        KnownInstanceType::Annotated.repr(db)
     ));
 }
 
@@ -1382,7 +1384,8 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
 }
 
-pub(crate) fn report_invalid_arguments_to_callable(
+pub(crate) fn report_invalid_arguments_to_callable<'db>(
+    db: &'db dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1391,7 +1394,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
     };
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        KnownInstanceType::Callable.repr()
+        KnownInstanceType::Callable.repr(db)
     ));
 }
 

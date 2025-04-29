@@ -6877,7 +6877,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }) = slice
                         {
                             if arguments.len() < 2 {
-                                report_invalid_arguments_to_annotated(&self.context, subscript);
+                                report_invalid_arguments_to_annotated(
+                                    self.db(),
+                                    &self.context,
+                                    subscript,
+                                );
                             }
 
                             if let [inner_annotation, metadata @ ..] = &arguments[..] {
@@ -6895,7 +6899,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 TypeAndQualifiers::unknown()
                             }
                         } else {
-                            report_invalid_arguments_to_annotated(&self.context, subscript);
+                            report_invalid_arguments_to_annotated(
+                                self.db(),
+                                &self.context,
+                                subscript,
+                            );
                             self.infer_annotation_expression_impl(slice)
                         }
                     }
@@ -6909,7 +6917,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 builder.into_diagnostic(format_args!(
                                     "Type qualifier `{type_qualifier}` \
                                      expects exactly one type parameter",
-                                    type_qualifier = known_instance.repr(),
+                                    type_qualifier = known_instance.repr(self.db()),
                                 ));
                             }
                             Type::unknown().into()
@@ -7564,7 +7572,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     elts: arguments, ..
                 }) = arguments_slice
                 else {
-                    report_invalid_arguments_to_annotated(&self.context, subscript);
+                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
 
                     // `Annotated[]` with less than two arguments is an error at runtime.
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
@@ -7574,7 +7582,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if arguments.len() < 2 {
-                    report_invalid_arguments_to_annotated(&self.context, subscript);
+                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
                 }
 
                 let [type_expr, metadata @ ..] = &arguments[..] else {
@@ -7658,7 +7666,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if !correct_argument_number {
-                    report_invalid_arguments_to_callable(&self.context, subscript);
+                    report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
                 }
 
                 let callable_type = if let (Some(parameters), Some(return_type), true) =
@@ -7687,7 +7695,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr()
+                            known_instance.repr(self.db())
                         ));
                     }
                     Type::unknown()
@@ -7714,7 +7722,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr()
+                            known_instance.repr(self.db())
                         ));
                     }
                     Type::unknown()
@@ -7730,7 +7738,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr()
+                            known_instance.repr(self.db())
                         ));
                     }
                     Type::unknown()
@@ -7763,7 +7771,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 "Expected the first argument to `{}` \
                                  to be a callable object, \
                                  but got an object of type `{}`",
-                                known_instance.repr(),
+                                known_instance.repr(self.db()),
                                 argument_type.display(db)
                             ));
                         }
@@ -7828,7 +7836,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     builder.into_diagnostic(format_args!(
                         "Type qualifier `{}` is not allowed in type expressions \
                          (only in annotation expressions)",
-                        known_instance.repr()
+                        known_instance.repr(self.db())
                     ));
                 }
                 self.infer_type_expression(arguments_slice)
@@ -7875,7 +7883,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "Type `{}` expected no type parameter",
-                        known_instance.repr()
+                        known_instance.repr(self.db())
                     ));
                 }
                 Type::unknown()
@@ -7889,7 +7897,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "Special form `{}` expected no type parameter",
-                        known_instance.repr()
+                        known_instance.repr(self.db())
                     ));
                 }
                 Type::unknown()
@@ -7900,7 +7908,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Type `{}` expected no type parameter",
-                        known_instance.repr()
+                        known_instance.repr(self.db())
                     ));
                     diag.info("Did you mean to use `Literal[...]` instead?");
                 }
