@@ -67,7 +67,7 @@ fn is_notebook(path: &FilePath) -> bool {
 /// Cheap cloneable in `O(1)`.
 #[derive(Clone, Eq, PartialEq)]
 pub struct SourceText {
-    inner: Arc<SourceTextInner>,
+    pub(crate) inner: Arc<SourceTextInner>,
 }
 
 impl SourceText {
@@ -124,14 +124,14 @@ impl std::fmt::Debug for SourceText {
 }
 
 #[derive(Eq, PartialEq)]
-struct SourceTextInner {
-    count: Count<SourceText>,
-    kind: SourceTextKind,
-    read_error: Option<SourceTextError>,
+pub(crate) struct SourceTextInner {
+    pub(crate) count: Count<SourceText>,
+    pub(crate) kind: SourceTextKind,
+    pub(crate) read_error: Option<SourceTextError>,
 }
 
 #[derive(Eq, PartialEq)]
-enum SourceTextKind {
+pub(crate) enum SourceTextKind {
     Text(String),
     Notebook(Notebook),
 }

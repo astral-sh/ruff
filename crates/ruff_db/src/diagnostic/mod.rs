@@ -1,5 +1,6 @@
 use std::{fmt::Formatter, sync::Arc};
 
+use render::Input;
 use thiserror::Error;
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
@@ -7,6 +8,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 pub use self::render::DisplayDiagnostic;
 use crate::files::File;
+use crate::source::SourceText;
 use crate::Db;
 
 use self::render::FileResolver;
@@ -601,6 +603,81 @@ impl std::fmt::Display for DiagnosticId {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RuffFile {
+    source: String,
+    path: String,
+    line_index: ruff_source_file::LineIndex,
+}
+
+impl RuffFile {
+    fn source_text(&self) -> SourceText {
+        SourceText {
+            inner: std::sync::Arc::new(crate::source::SourceTextInner {
+                count: countme::Count::new(),
+                kind: crate::source::SourceTextKind::Text(self.source.clone()),
+                read_error: None, // TODO
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileWrapper {
+    File(File),
+    RuffFile(RuffFile),
+}
+
+impl FileWrapper {
+    pub fn file_path(&self, db: &dyn Db) -> String {
+        match self {
+            FileWrapper::File(file) => file.path(db).to_string(),
+            FileWrapper::RuffFile(ruff_file) => ruff_file.path.clone(),
+        }
+    }
+
+    fn path<'a>(&'a self, resolver: &'a FileResolver<'a>) -> &'a str {
+        match self {
+            FileWrapper::File(file) => resolver.path(*file),
+            FileWrapper::RuffFile(ruff_file) => ruff_file.path.as_str(),
+        }
+    }
+
+    fn input(&self, resolver: &FileResolver) -> Input {
+        match self {
+            FileWrapper::File(file) => resolver.input(*file),
+            FileWrapper::RuffFile(ruff_file) => Input {
+                text: ruff_file.source_text(),
+                line_index: ruff_file.line_index.clone(),
+            },
+        }
+    }
+
+    pub fn expect_file(&self) -> File {
+        match self {
+            FileWrapper::File(file) => *file,
+            FileWrapper::RuffFile(_) => panic!("Expected a `File`, found `RuffFile`"),
+        }
+    }
+}
+
+#[cfg(test)]
+impl FileWrapper {
+    fn source_text(&self, db: &dyn Db) -> SourceText {
+        match self {
+            FileWrapper::File(file) => crate::source::source_text(db, *file),
+            FileWrapper::RuffFile(ruff_file) => ruff_file.source_text(),
+        }
+    }
+
+    fn line_index(&self, db: &dyn Db) -> ruff_source_file::LineIndex {
+        match self {
+            FileWrapper::File(file) => crate::source::line_index(db, *file),
+            FileWrapper::RuffFile(ruff_file) => ruff_file.line_index.clone(),
+        }
+    }
+}
+
 /// A span represents the source of a diagnostic.
 ///
 /// It consists of a `File` and an optional range into that file. When the
@@ -608,14 +685,14 @@ impl std::fmt::Display for DiagnosticId {
 /// the entire file. For example, when the file should be executable but isn't.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
-    file: File,
+    file: FileWrapper,
     range: Option<TextRange>,
 }
 
 impl Span {
     /// Returns the `File` attached to this `Span`.
-    pub fn file(&self) -> File {
-        self.file
+    pub fn file(&self) -> &FileWrapper {
+        &self.file
     }
 
     /// Returns the range, if available, attached to this `Span`.
@@ -640,6 +717,7 @@ impl Span {
 
 impl From<File> for Span {
     fn from(file: File) -> Span {
+        let file = FileWrapper::File(file);
         Span { file, range: None }
     }
 }

@@ -373,7 +373,7 @@ impl Diagnostic {
         self.inner.primary_span().and_then(|span| {
             Some(Range::from_file_range(
                 &workspace.db,
-                FileRange::new(span.file(), span.range()?),
+                FileRange::new(span.file().expect_file(), span.range()?),
                 workspace.position_encoding,
             ))
         })

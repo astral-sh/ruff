@@ -86,10 +86,10 @@ impl std::fmt::Display for DisplayDiagnostic<'_> {
                 write!(
                     f,
                     " {path}",
-                    path = fmt_styled(self.resolver.path(span.file()), stylesheet.emphasis)
+                    path = fmt_styled(span.file().path(&self.resolver), stylesheet.emphasis)
                 )?;
                 if let Some(range) = span.range() {
-                    let input = self.resolver.input(span.file());
+                    let input = span.file().input(&self.resolver);
                     let start = input.as_source_code().line_column(range.start());
 
                     write!(
@@ -144,7 +144,7 @@ struct Resolved<'a> {
 
 impl<'a> Resolved<'a> {
     /// Creates a new resolved set of diagnostics.
-    fn new(resolver: &FileResolver<'a>, diag: &'a Diagnostic) -> Resolved<'a> {
+    fn new(resolver: &'a FileResolver<'a>, diag: &'a Diagnostic) -> Resolved<'a> {
         let mut diagnostics = vec![];
         diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, diag));
         for sub in &diag.inner.subs {
@@ -182,7 +182,7 @@ struct ResolvedDiagnostic<'a> {
 impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
-        resolver: &FileResolver<'a>,
+        resolver: &'a FileResolver<'a>,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -190,8 +190,8 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = resolver.path(ann.span.file);
-                let input = resolver.input(ann.span.file);
+                let path = ann.span.file.path(resolver);
+                let input = ann.span.file.input(resolver);
                 ResolvedAnnotation::new(path, &input, ann)
             })
             .collect();
@@ -216,7 +216,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 
     /// Resolve a single sub-diagnostic.
     fn from_sub_diagnostic(
-        resolver: &FileResolver<'a>,
+        resolver: &'a FileResolver<'a>,
         diag: &'a SubDiagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -224,8 +224,8 @@ impl<'a> ResolvedDiagnostic<'a> {
             .annotations
             .iter()
             .filter_map(|ann| {
-                let path = resolver.path(ann.span.file);
-                let input = resolver.input(ann.span.file);
+                let path = ann.span.file.path(resolver);
+                let input = ann.span.file.input(resolver);
                 ResolvedAnnotation::new(path, &input, ann)
             })
             .collect();
@@ -639,7 +639,7 @@ impl<'a> FileResolver<'a> {
     }
 
     /// Returns the path associated with the file given.
-    fn path(&self, file: File) -> &'a str {
+    pub(crate) fn path(&self, file: File) -> &'a str {
         relativize_path(
             self.db.system().current_directory(),
             file.path(self.db).as_str(),
@@ -647,7 +647,7 @@ impl<'a> FileResolver<'a> {
     }
 
     /// Returns the input contents associated with the file given.
-    fn input(&self, file: File) -> Input {
+    pub(crate) fn input(&self, file: File) -> Input {
         Input {
             text: source_text(self.db, file),
             line_index: line_index(self.db, file),
@@ -667,9 +667,9 @@ impl std::fmt::Debug for FileResolver<'_> {
 /// This contains the actual content of that input as well as a
 /// line index for efficiently querying its contents.
 #[derive(Clone, Debug)]
-struct Input {
-    text: SourceText,
-    line_index: LineIndex,
+pub(crate) struct Input {
+    pub(crate) text: SourceText,
+    pub(crate) line_index: LineIndex,
 }
 
 impl Input {
@@ -2174,8 +2174,8 @@ watermelon
         fn span(&self, path: &str, line_offset_start: &str, line_offset_end: &str) -> Span {
             let span = self.path(path);
 
-            let text = source_text(&self.db, span.file());
-            let line_index = line_index(&self.db, span.file());
+            let text = span.file().source_text(&self.db);
+            let line_index = span.file().line_index(&self.db);
             let source = SourceCode::new(text.as_str(), &line_index);
 
             let (line_start, offset_start) = parse_line_offset(line_offset_start);
