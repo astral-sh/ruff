@@ -5140,7 +5140,8 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::BoundSuper(_)
-            | Type::Instance(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
             | Type::KnownInstance(_) => {}
         }
     }
