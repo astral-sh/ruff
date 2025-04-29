@@ -49,6 +49,12 @@ use super::suppression_comment_visitor::{
 ///     # fmt: on
 ///     # yapf: enable
 /// ```
+///
+/// ## Fix safety
+///
+/// The fix is always marked as unsafe because it's not possible to clearly determine
+/// the user's true intent behind the suppression statement.
+///
 #[derive(ViolationMetadata)]
 pub(crate) struct InvalidFormatterSuppressionComment {
     reason: IgnoredReason,
