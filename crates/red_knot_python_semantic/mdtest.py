@@ -20,6 +20,12 @@ from watchfiles import Change, watch
 
 CRATE_NAME: Final = "red_knot_python_semantic"
 CRATE_ROOT: Final = Path(__file__).resolve().parent
+RED_KNOT_VENDORED: Final = CRATE_ROOT.parent / "red_knot_vendored"
+DIRS_TO_WATCH: Final = (
+    CRATE_ROOT,
+    RED_KNOT_VENDORED,
+    CRATE_ROOT.parent / "red_knot_test/src",
+)
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
 
 
@@ -158,20 +164,24 @@ class MDTestRunner:
         self._run_mdtest()
         self.console.print("[dim]Ready to watch for changes...[/dim]")
 
-        for changes in watch(CRATE_ROOT):
+        for changes in watch(*DIRS_TO_WATCH):
             new_md_files = set()
             changed_md_files = set()
             rust_code_has_changed = False
+            vendored_typeshed_has_changed = False
 
             for change, path_str in changes:
                 path = Path(path_str)
 
-                if path.suffix == ".rs":
-                    rust_code_has_changed = True
-                    continue
-
-                if path.suffix != ".md":
-                    continue
+                match path.suffix:
+                    case ".rs":
+                        rust_code_has_changed = True
+                    case ".pyi" if path.is_relative_to(RED_KNOT_VENDORED):
+                        vendored_typeshed_has_changed = True
+                    case ".md":
+                        pass
+                    case _:
+                        continue
 
                 try:
                     relative_path = Path(path).relative_to(MDTEST_DIR)
@@ -198,6 +208,11 @@ class MDTestRunner:
 
             if rust_code_has_changed:
                 if self._recompile_tests("Rust code has changed, recompiling tests..."):
+                    self._run_mdtest()
+            elif vendored_typeshed_has_changed:
+                if self._recompile_tests(
+                    "Vendored typeshed has changed, recompiling tests..."
+                ):
                     self._run_mdtest()
             elif new_md_files:
                 files = " ".join(file.as_posix() for file in new_md_files)
