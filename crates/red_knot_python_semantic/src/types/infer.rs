@@ -1020,6 +1020,12 @@ impl<'db> TypeInferenceBuilder<'db> {
             if let Symbol::Type(Type::FunctionLiteral(function), Boundness::Bound) =
                 symbol_from_bindings(self.db(), use_def.public_bindings(symbol))
             {
+                if function.file(self.db()) != self.file() {
+                    // If the function is not in this file, we don't need to check it.
+                    // https://github.com/astral-sh/ruff/pull/17609#issuecomment-2839445740
+                    continue;
+                }
+
                 // Extend the functions that we need to check with the publicly visible overloaded
                 // function. This is always going to be either the implementation or the last
                 // overload if the implementation doesn't exists.
