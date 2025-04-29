@@ -20,9 +20,10 @@ from watchfiles import Change, watch
 
 CRATE_NAME: Final = "red_knot_python_semantic"
 CRATE_ROOT: Final = Path(__file__).resolve().parent
+RED_KNOT_VENDORED: Final = CRATE_ROOT.parent / "red_knot_vendored"
 DIRS_TO_WATCH: Final = (
     CRATE_ROOT,
-    CRATE_ROOT.parent / "red_knot_vendored",
+    RED_KNOT_VENDORED,
     CRATE_ROOT.parent / "red_knot_test/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
@@ -167,19 +168,20 @@ class MDTestRunner:
             new_md_files = set()
             changed_md_files = set()
             rust_code_has_changed = False
+            vendored_typeshed_has_changed = False
 
             for change, path_str in changes:
                 path = Path(path_str)
 
-                # Obviously a change to a vendored stub file isn't really "Rust code",
-                # but we need to rebuild the binary to pick up the changes,
-                # # so it comes to the same thing
-                if path.suffix in {".rs", ".pyi"}:
-                    rust_code_has_changed = True
-                    continue
-
-                if path.suffix != ".md":
-                    continue
+                match path.suffix:
+                    case ".rs":
+                        rust_code_has_changed = True
+                    case ".pyi" if path.is_relative_to(RED_KNOT_VENDORED):
+                        vendored_typeshed_has_changed = True
+                    case ".md":
+                        pass
+                    case _:
+                        continue
 
                 try:
                     relative_path = Path(path).relative_to(MDTEST_DIR)
@@ -206,6 +208,11 @@ class MDTestRunner:
 
             if rust_code_has_changed:
                 if self._recompile_tests("Rust code has changed, recompiling tests..."):
+                    self._run_mdtest()
+            elif vendored_typeshed_has_changed:
+                if self._recompile_tests(
+                    "Vendored typeshed has changed, recompiling tests..."
+                ):
                     self._run_mdtest()
             elif new_md_files:
                 files = " ".join(file.as_posix() for file in new_md_files)
