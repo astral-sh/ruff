@@ -1040,6 +1040,30 @@ mod tests {
         PythonVersion::PY310,
         "AsyncComprehensionOutsideAsyncFunction"
     )]
+    #[test_case(
+        "rebound_comprehension",
+        "[x:= 2 for x in range(2)]",
+        PythonVersion::PY310,
+        "ReboundComprehensionVariable"
+    )]
+    #[test_case(
+        "duplicate_type_param",
+        "class C[T, T]: pass",
+        PythonVersion::PY312,
+        "DuplicateTypeParameter"
+    )]
+    #[test_case(
+        "multiple_case_assignment",
+        "
+        match x:
+            case [a, a]:
+                pass
+            case _:
+                pass
+        ",
+        PythonVersion::PY310,
+        "MultipleCaseAssignment"
+    )]
     fn test_semantic_errors(
         name: &str,
         contents: &str,
