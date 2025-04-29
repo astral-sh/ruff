@@ -20,7 +20,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
-use std::panic::{catch_unwind, AssertUnwindSafe, UnwindSafe};
+use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
@@ -577,26 +577,29 @@ fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<Option<R>, Diagnostic>
 where
     F: FnOnce() -> R + UnwindSafe,
 {
-    match catch_unwind(|| {
+    match ruff_db::panic::catch_unwind(|| {
         // Ignore salsa errors
         salsa::Cancelled::catch(f).ok()
     }) {
         Ok(result) => Ok(result),
         Err(error) => {
-            let payload = if let Some(s) = error.downcast_ref::<&str>() {
-                Some((*s).to_string())
-            } else {
-                error.downcast_ref::<String>().cloned()
-            };
+            use std::fmt::Write;
+            let mut message = String::new();
+            message.push_str("Panicked");
 
-            let message = if let Some(payload) = payload {
-                format!(
-                    "Panicked while checking `{file}`: `{payload}`",
-                    file = file.path(db)
-                )
-            } else {
-                format!("Panicked while checking `{file}`", file = { file.path(db) })
-            };
+            if let Some(location) = error.location {
+                let _ = write!(&mut message, " at {location}");
+            }
+
+            let _ = write!(
+                &mut message,
+                " when checking `{file}`",
+                file = file.path(db)
+            );
+
+            if let Some(payload) = error.payload.as_str() {
+                let _ = write!(&mut message, ": `{payload}`");
+            }
 
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
             diagnostic.sub(SubDiagnostic::new(
@@ -606,6 +609,28 @@ where
 
             let report_message = "If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bred-knot%5D:%20panic we'd be very appreciative!";
             diagnostic.sub(SubDiagnostic::new(Severity::Info, report_message));
+            diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                format!(
+                    "Platform: {os} {arch}",
+                    os = std::env::consts::OS,
+                    arch = std::env::consts::ARCH
+                ),
+            ));
+            diagnostic.sub(SubDiagnostic::new(
+                Severity::Info,
+                format!(
+                    "Args: {args:?}",
+                    args = std::env::args().collect::<Vec<_>>()
+                ),
+            ));
+
+            if let Some(backtrace) = error.backtrace {
+                diagnostic.sub(SubDiagnostic::new(
+                    Severity::Info,
+                    format!("Backtrace:\n{backtrace}"),
+                ));
+            }
 
             Err(diagnostic)
         }
