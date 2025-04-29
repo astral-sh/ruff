@@ -1,6 +1,7 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{self as ast, Expr, ExprCall, PythonVersion};
+use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -158,7 +159,7 @@ fn try_create_replacement(checker: &Checker, arg: &Expr, base: Base) -> Option<S
 
     // On Python 3.11 and earlier, trying to replace an `arg` that spans multiple lines
     // would create a `SyntaxError` in the f-string.
-    if checker.target_version() <= PythonVersion::PY311 && inner_source.contains('\n') {
+    if checker.target_version() <= PythonVersion::PY311 && find_newline(inner_source).is_some() {
         return None;
     }
 
