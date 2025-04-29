@@ -416,12 +416,25 @@ impl<'db> ClassLiteral<'db> {
 
     #[salsa::tracked]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        // TODO: Raise a diagnostic if a class literal contains both a PEP-695 generic scope and a
+        // `typing.Generic` base class.
         let scope = self.body_scope(db);
         let class_def_node = scope.node(db).expect_class();
-        class_def_node.type_params.as_ref().map(|type_params| {
+        let pep_695_context = class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
-        })
+        });
+        let legacy_context = self
+            .explicit_bases(db)
+            .iter()
+            .filter_map(|base| match base {
+                Type::KnownInstance(KnownInstanceType::Generic(generic_context)) => {
+                    *generic_context
+                }
+                _ => None,
+            })
+            .next();
+        pep_695_context.or(legacy_context)
     }
 
     /// Return `true` if this class represents the builtin class `object`
