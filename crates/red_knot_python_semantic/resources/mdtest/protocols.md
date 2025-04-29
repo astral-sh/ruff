@@ -1437,6 +1437,26 @@ def g(obj: Callable[[int], str], obj2: CallMeMaybe, obj3: Callable[[str], str]):
     obj3 = obj2  # error: [invalid-assignment]
 ```
 
+## Protocols are never singleton types, and are never single-valued types
+
+It *might* be possible to have a singleton protocol-instance type...?
+
+For example, `WeirdAndWacky` in the following snippet only has a single possible inhabitant: `None`!
+It is thus a singleton type. However, going out of our way to recognise it as such is probably not
+worth it. Such cases should anyway be exceedingly rare and/or contrived.
+
+```py
+from typing import Protocol, Callable
+from knot_extensions import is_singleton, is_single_valued
+
+class WeirdAndWacky(Protocol):
+    @property
+    def __class__(self) -> Callable[[], None]: ...
+
+reveal_type(is_singleton(WeirdAndWacky))  # revealed: Literal[False]
+reveal_type(is_single_valued(WeirdAndWacky))  # revealed: Literal[False]
+```
+
 ## Integration test: `typing.SupportsIndex` and `typing.Sized`
 
 `typing.SupportsIndex` and `typing.Sized` are two protocols that are very commonly used in the wild.

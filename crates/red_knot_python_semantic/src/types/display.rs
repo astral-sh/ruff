@@ -783,6 +783,7 @@ mod tests {
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::setup_db;
+    use crate::symbol::typing_extensions_symbol;
     use crate::types::{
         KnownClass, Parameter, Parameters, Signature, SliceLiteralType, StringLiteralType, Type,
     };
@@ -851,6 +852,31 @@ mod tests {
                 .display(&db)
                 .to_string(),
             r#"Literal["\""]"#
+        );
+    }
+
+    #[test]
+    fn synthesized_protocol_display() {
+        let db = setup_db();
+
+        // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
+        let supports_index_synthesized = KnownClass::SupportsIndex.to_instance(&db).normalized(&db);
+        assert_eq!(
+            supports_index_synthesized.display(&db).to_string(),
+            "<Protocol with members '__index__'>"
+        );
+
+        let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
+            .symbol
+            .ignore_possibly_unbound()
+            .unwrap()
+            .to_instance(&db)
+            .unwrap()
+            .normalized(&db); // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
+
+        assert_eq!(
+            iterator_synthesized.display(&db).to_string(),
+            "<Protocol with members '__iter__', '__next__'>"
         );
     }
 
