@@ -637,7 +637,7 @@ jobs:
           path: ecosystem-result
 
   fuzz-redknot:
-    name: "Check for new red-knot panics"
+    name: "Fuzz for new red-knot panics"
     runs-on: depot-ubuntu-22.04-16
     needs:
       - cargo-test-linux
