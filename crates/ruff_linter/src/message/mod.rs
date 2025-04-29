@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::ops::Deref;
 
+use ruff_db::diagnostic as db;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::FxHashMap;
 
@@ -43,111 +44,126 @@ mod text;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum NewDiagnostic {
     Message(Message),
+    Diagnostic(db::Diagnostic),
 }
 
 impl NewDiagnostic {
     pub fn is_syntax_error(&self) -> bool {
         match self {
             NewDiagnostic::Message(message) => message.is_syntax_error(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     pub fn rule(&self) -> Option<Rule> {
         match self {
             NewDiagnostic::Message(message) => message.rule(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     pub const fn is_diagnostic_message(&self) -> bool {
         match self {
             NewDiagnostic::Message(message) => message.is_diagnostic_message(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
         match self {
             NewDiagnostic::Message(message) => message.as_diagnostic_message(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     fn filename(&self) -> &str {
         match self {
             NewDiagnostic::Message(message) => message.filename(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     fn body(&self) -> &str {
         match self {
             NewDiagnostic::Message(message) => message.body(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     pub fn name(&self) -> &str {
         match self {
             NewDiagnostic::Message(message) => message.name(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     fn compute_start_location(&self) -> LineColumn {
         match self {
             NewDiagnostic::Message(message) => message.compute_start_location(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     fn compute_end_location(&self) -> LineColumn {
         match self {
             NewDiagnostic::Message(message) => message.compute_end_location(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     pub fn source_file(&self) -> &SourceFile {
         match self {
             NewDiagnostic::Message(message) => message.source_file(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     pub fn fix(&self) -> Option<&Fix> {
         match self {
             NewDiagnostic::Message(message) => message.fix(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     fn suggestion(&self) -> Option<&str> {
         match self {
             NewDiagnostic::Message(message) => message.suggestion(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     fn noqa_offset(&self) -> Option<TextSize> {
         match self {
             NewDiagnostic::Message(message) => message.noqa_offset(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     pub fn into_diagnostic_message(self) -> Option<DiagnosticMessage> {
         match self {
             NewDiagnostic::Message(message) => message.into_diagnostic_message(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     pub fn fixable(&self) -> bool {
         match self {
             NewDiagnostic::Message(message) => message.fixable(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 
     pub fn kind(&self) -> MessageKind {
         match self {
             NewDiagnostic::Message(message) => message.kind(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 }
 
 impl Ord for NewDiagnostic {
     fn cmp(&self, other: &Self) -> Ordering {
-        match (self, other) {
-            (NewDiagnostic::Message(left), NewDiagnostic::Message(right)) => left.cmp(right),
-        }
+        (self.source_file(), self.start()).cmp(&(other.source_file(), other.start()))
     }
 }
 
@@ -161,6 +177,7 @@ impl Ranged for NewDiagnostic {
     fn range(&self) -> TextRange {
         match self {
             NewDiagnostic::Message(message) => message.range(),
+            NewDiagnostic::Diagnostic(_) => todo!(),
         }
     }
 }

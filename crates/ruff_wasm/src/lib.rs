@@ -244,6 +244,7 @@ impl Workspace {
                     end_location: source_code.line_column(range.end()).into(),
                     fix: None,
                 },
+                _ => todo!("handle red-knot-style diagnostics"),
             })
             .collect();
 

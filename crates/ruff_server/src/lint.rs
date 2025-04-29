@@ -187,6 +187,7 @@ pub(crate) fn check(
                         None
                     }
                 }
+                _ => todo!("handle red-knot-style diagnostics"),
             });
 
     if let Some(notebook) = query.as_notebook() {
