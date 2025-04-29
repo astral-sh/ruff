@@ -4049,7 +4049,25 @@ impl<'db> Type<'db> {
                 Signatures::single(CallableSignature::todo("Type::Intersection.call()"))
             }
 
-            _ => Signatures::not_callable(self),
+            // TODO: these are actually callable
+            Type::MethodWrapper(_) | Type::DataclassDecorator(_) => Signatures::not_callable(self),
+
+            // TODO: some `KnownInstance`s are callable (e.g. TypedDicts)
+            Type::KnownInstance(_) => Signatures::not_callable(self),
+
+            Type::PropertyInstance(_)
+            | Type::AlwaysFalsy
+            | Type::AlwaysTruthy
+            | Type::IntLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::BooleanLiteral(_)
+            | Type::LiteralString
+            | Type::SliceLiteral(_)
+            | Type::Tuple(_)
+            | Type::BoundSuper(_)
+            | Type::TypeVar(_)
+            | Type::ModuleLiteral(_) => Signatures::not_callable(self),
         }
     }
 

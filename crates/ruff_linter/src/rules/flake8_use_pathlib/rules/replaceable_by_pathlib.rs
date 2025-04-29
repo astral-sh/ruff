@@ -127,7 +127,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             // PTH123
             ["" | "builtins", "open"] => {
                 // `closefd` and `opener` are not supported by pathlib, so check if they are
-                // are set to non-default values.
+                // set to non-default values.
                 // https://github.com/astral-sh/ruff/issues/7620
                 // Signature as of Python 3.11 (https://docs.python.org/3/library/functions.html#open):
                 // ```text
@@ -154,10 +154,9 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                         .arguments
                         .find_argument_value("opener", 7)
                         .is_some_and(|expr| !expr.is_none_literal_expr())
-                    || call
-                        .arguments
-                        .find_positional(0)
-                        .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+                    || call.arguments.find_positional(0).is_some_and(|expr| {
+                        is_file_descriptor_or_bytes_str(expr, checker.semantic())
+                    })
                 {
                     return None;
                 }
@@ -196,6 +195,10 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
     }
 }
 
+fn is_file_descriptor_or_bytes_str(expr: &Expr, semantic: &SemanticModel) -> bool {
+    is_file_descriptor(expr, semantic) || is_bytes_string(expr, semantic)
+}
+
 /// Returns `true` if the given expression looks like a file descriptor, i.e., if it is an integer.
 fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
     if matches!(
@@ -208,7 +211,7 @@ fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
         return true;
     }
 
-    let Some(name) = expr.as_name_expr() else {
+    let Some(name) = get_name_expr(expr) else {
         return false;
     };
 

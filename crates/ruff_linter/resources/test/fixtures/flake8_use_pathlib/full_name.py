@@ -56,6 +56,20 @@ open(x)
 def foo(y: int):
     open(y)
 
+
+# https://github.com/astral-sh/ruff/issues/17691
+def f() -> int:
+    return 1
+open(f())
+
+open(b"foo")
+byte_str = b"bar"
+open(byte_str)
+
+def bytes_str_func() -> bytes:
+    return b"foo"
+open(bytes_str_func())
+
 # https://github.com/astral-sh/ruff/issues/17694
 os.rename("src", "dst", src_dir_fd=3, dst_dir_fd=4)
 os.rename(b"src", b"dst", src_dir_fd=3, dst_dir_fd=4)

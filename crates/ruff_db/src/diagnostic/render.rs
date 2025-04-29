@@ -7,6 +7,7 @@ use ruff_annotate_snippets::{
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{TextRange, TextSize};
 
+use crate::diagnostic::stylesheet::{fmt_styled, DiagnosticStylesheet};
 use crate::{
     files::File,
     source::{line_index, source_text, SourceText},
@@ -48,6 +49,7 @@ impl<'a> DisplayDiagnostic<'a> {
         } else {
             AnnotateRenderer::plain()
         };
+
         DisplayDiagnostic {
             config,
             resolver,
@@ -59,31 +61,64 @@ impl<'a> DisplayDiagnostic<'a> {
 
 impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if matches!(self.config.format, DiagnosticFormat::Concise) {
-            match self.diag.severity() {
-                Severity::Info => f.write_str("info")?,
-                Severity::Warning => f.write_str("warning")?,
-                Severity::Error => f.write_str("error")?,
-                Severity::Fatal => f.write_str("fatal")?,
-            }
+        let stylesheet = if self.config.color {
+            DiagnosticStylesheet::styled()
+        } else {
+            DiagnosticStylesheet::plain()
+        };
 
-            write!(f, "[{rule}]", rule = self.diag.id())?;
+        if matches!(self.config.format, DiagnosticFormat::Concise) {
+            let (severity, severity_style) = match self.diag.severity() {
+                Severity::Info => ("info", stylesheet.info),
+                Severity::Warning => ("warning", stylesheet.warning),
+                Severity::Error => ("error", stylesheet.error),
+                Severity::Fatal => ("fatal", stylesheet.error),
+            };
+
+            write!(
+                f,
+                "{severity}[{id}]",
+                severity = fmt_styled(severity, severity_style),
+                id = fmt_styled(self.diag.id(), stylesheet.emphasis)
+            )?;
+
             if let Some(span) = self.diag.primary_span() {
-                write!(f, " {path}", path = self.resolver.path(span.file()))?;
+                write!(
+                    f,
+                    " {path}",
+                    path = fmt_styled(self.resolver.path(span.file()), stylesheet.emphasis)
+                )?;
                 if let Some(range) = span.range() {
                     let input = self.resolver.input(span.file());
                     let start = input.as_source_code().line_column(range.start());
-                    write!(f, ":{line}:{col}", line = start.line, col = start.column)?;
+
+                    write!(
+                        f,
+                        ":{line}:{col}",
+                        line = fmt_styled(start.line, stylesheet.emphasis),
+                        col = fmt_styled(start.column, stylesheet.emphasis),
+                    )?;
                 }
                 write!(f, ":")?;
             }
-            return writeln!(f, " {}", self.diag.concise_message());
+            return writeln!(f, " {message}", message = self.diag.concise_message());
         }
+
+        let mut renderer = self.annotate_renderer.clone();
+        renderer = renderer
+            .error(stylesheet.error)
+            .warning(stylesheet.warning)
+            .info(stylesheet.info)
+            .note(stylesheet.note)
+            .help(stylesheet.help)
+            .line_no(stylesheet.line_no)
+            .emphasis(stylesheet.emphasis)
+            .none(stylesheet.none);
 
         let resolved = Resolved::new(&self.resolver, self.diag);
         let renderable = resolved.to_renderable(self.config.context);
         for diag in renderable.diagnostics.iter() {
-            writeln!(f, "{}", self.annotate_renderer.render(diag.to_annotate()))?;
+            writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
         }
         writeln!(f)
     }
