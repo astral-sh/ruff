@@ -1726,7 +1726,7 @@ impl<'db> ProtocolClassLiteral<'db> {
     /// It is illegal for a protocol class to have any instance attributes that are not declared
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
-    pub(super) fn protocol_members(self, db: &'db dyn Db) -> FxOrderSet<Name> {
+    pub(super) fn protocol_members(self, db: &'db dyn Db) -> &'db FxOrderSet<Name> {
         /// The list of excluded members is subject to change between Python versions,
         /// especially for dunders, but it probably doesn't matter *too* much if this
         /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
@@ -1763,52 +1763,60 @@ impl<'db> ProtocolClassLiteral<'db> {
             )
         }
 
-        let mut members = FxOrderSet::default();
+        #[salsa::tracked(return_ref)]
+        fn cached_protocol_members<'db>(
+            db: &'db dyn Db,
+            class: ClassLiteral<'db>,
+        ) -> FxOrderSet<Name> {
+            let mut members = FxOrderSet::default();
 
-        for parent_protocol in self
-            .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
-            .filter_map(|class| class.class_literal(db).0.into_protocol_class(db))
-        {
-            let parent_scope = parent_protocol.body_scope(db);
-            let use_def_map = use_def_map(db, parent_scope);
-            let symbol_table = symbol_table(db, parent_scope);
+            for parent_protocol in class
+                .iter_mro(db, None)
+                .filter_map(ClassBase::into_class)
+                .filter_map(|class| class.class_literal(db).0.into_protocol_class(db))
+            {
+                let parent_scope = parent_protocol.body_scope(db);
+                let use_def_map = use_def_map(db, parent_scope);
+                let symbol_table = symbol_table(db, parent_scope);
 
-            members.extend(
-                use_def_map
-                    .all_public_declarations()
-                    .flat_map(|(symbol_id, declarations)| {
-                        symbol_from_declarations(db, declarations).map(|symbol| (symbol_id, symbol))
-                    })
-                    .filter_map(|(symbol_id, symbol)| {
-                        symbol.symbol.ignore_possibly_unbound().map(|_| symbol_id)
-                    })
-                    // Bindings in the class body that are not declared in the class body
-                    // are not valid protocol members, and we plan to emit diagnostics for them
-                    // elsewhere. Invalid or not, however, it's important that we still consider
-                    // them to be protocol members. The implementation of `issubclass()` and
-                    // `isinstance()` for runtime-checkable protocols considers them to be protocol
-                    // members at runtime, and it's important that we accurately understand
-                    // type narrowing that uses `isinstance()` or `issubclass()` with
-                    // runtime-checkable protocols.
-                    .chain(
-                        use_def_map
-                            .all_public_bindings()
-                            .filter_map(|(symbol_id, bindings)| {
+                members.extend(
+                    use_def_map
+                        .all_public_declarations()
+                        .flat_map(|(symbol_id, declarations)| {
+                            symbol_from_declarations(db, declarations)
+                                .map(|symbol| (symbol_id, symbol))
+                        })
+                        .filter_map(|(symbol_id, symbol)| {
+                            symbol.symbol.ignore_possibly_unbound().map(|_| symbol_id)
+                        })
+                        // Bindings in the class body that are not declared in the class body
+                        // are not valid protocol members, and we plan to emit diagnostics for them
+                        // elsewhere. Invalid or not, however, it's important that we still consider
+                        // them to be protocol members. The implementation of `issubclass()` and
+                        // `isinstance()` for runtime-checkable protocols considers them to be protocol
+                        // members at runtime, and it's important that we accurately understand
+                        // type narrowing that uses `isinstance()` or `issubclass()` with
+                        // runtime-checkable protocols.
+                        .chain(use_def_map.all_public_bindings().filter_map(
+                            |(symbol_id, bindings)| {
                                 symbol_from_bindings(db, bindings)
                                     .ignore_possibly_unbound()
                                     .map(|_| symbol_id)
-                            }),
-                    )
-                    .map(|symbol_id| symbol_table.symbol(symbol_id).name())
-                    .filter(|name| !excluded_from_proto_members(name))
-                    .cloned(),
-            );
+                            },
+                        ))
+                        .map(|symbol_id| symbol_table.symbol(symbol_id).name())
+                        .filter(|name| !excluded_from_proto_members(name))
+                        .cloned(),
+                );
+            }
+
+            members.sort();
+            members.shrink_to_fit();
+            members
         }
 
-        members.sort();
-        members.shrink_to_fit();
-        members
+        let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
+        cached_protocol_members(db, *self)
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
