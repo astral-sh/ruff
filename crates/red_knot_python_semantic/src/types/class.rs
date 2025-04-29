@@ -62,6 +62,8 @@ fn explicit_bases_cycle_initial<'db>(
     Box::default()
 }
 
+#[allow(clippy::ref_option)]
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn generic_context_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<GenericContext<'db>>,
@@ -446,16 +448,10 @@ impl<'db> ClassLiteral<'db> {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
         });
-        let legacy_context = self
-            .explicit_bases(db)
-            .iter()
-            .filter_map(|base| match base {
-                Type::KnownInstance(KnownInstanceType::Generic(generic_context)) => {
-                    *generic_context
-                }
-                _ => None,
-            })
-            .next();
+        let legacy_context = self.explicit_bases(db).iter().find_map(|base| match base {
+            Type::KnownInstance(KnownInstanceType::Generic(generic_context)) => *generic_context,
+            _ => None,
+        });
         pep_695_context.or(legacy_context)
     }
 

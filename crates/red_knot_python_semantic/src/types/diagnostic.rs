@@ -1334,8 +1334,8 @@ pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: 
     builder.into_diagnostic("Class base has incompatible `__slots__`");
 }
 
-pub(crate) fn report_invalid_arguments_to_annotated<'db>(
-    db: &'db dyn Db,
+pub(crate) fn report_invalid_arguments_to_annotated(
+    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1384,8 +1384,8 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
     diagnostic.info("See https://typing.python.org/en/latest/spec/protocol.html#");
 }
 
-pub(crate) fn report_invalid_arguments_to_callable<'db>(
-    db: &'db dyn Db,
+pub(crate) fn report_invalid_arguments_to_callable(
+    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
