@@ -31,7 +31,35 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             // PTH103
             ["os", "mkdir"] => Some(OsMkdir.into()),
             // PTH104
-            ["os", "rename"] => Some(OsRename.into()),
+            ["os", "rename"] => {
+                // `src_dir_fd` and `dst_dir_fd` are not supported by pathlib, so check if they are
+                // are set to non-default values.
+                // Signature as of Python 3.13 (https://docs.python.org/3/library/os.html#os.rename)
+                // ```text
+                //           0    1       2                3
+                // os.rename(src, dst, *, src_dir_fd=None, dst_dir_fd=None)
+                // ```
+                if call
+                    .arguments
+                    .find_argument_value("src_dir_fd", 2)
+                    .is_some_and(|expr| !expr.is_none_literal_expr())
+                    || call
+                        .arguments
+                        .find_argument_value("dst_dir_fd", 3)
+                        .is_some_and(|expr| !expr.is_none_literal_expr())
+                    || call
+                        .arguments
+                        .find_positional(0)
+                        .is_some_and(|expr| is_bytes_string(expr, checker.semantic()))
+                    || call
+                        .arguments
+                        .find_positional(1)
+                        .is_some_and(|expr| is_bytes_string(expr, checker.semantic()))
+                {
+                    return None;
+                }
+                Some(OsRename.into())
+            }
             // PTH105
             ["os", "replace"] => Some(OsReplace.into()),
             // PTH106
@@ -189,4 +217,29 @@ fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     typing::is_int(binding, semantic)
+}
+
+/// Returns `true` if the given expression is a bytes string.
+fn is_bytes_string(expr: &Expr, semantic: &SemanticModel) -> bool {
+    if matches!(expr, Expr::BytesLiteral(_)) {
+        return true;
+    }
+
+    let Some(name) = get_name_expr(expr) else {
+        return false;
+    };
+
+    let Some(binding) = semantic.only_binding(name).map(|id| semantic.binding(id)) else {
+        return false;
+    };
+
+    typing::is_bytes(binding, semantic)
+}
+
+fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {
+    match expr {
+        Expr::Name(name) => Some(name),
+        Expr::Call(ast::ExprCall { func, .. }) => get_name_expr(func),
+        _ => None,
+    }
 }
