@@ -68,9 +68,7 @@ impl Options {
             .and_then(|env| env.python_platform.as_deref().cloned())
             .unwrap_or_else(|| {
                 let default = PythonPlatform::default();
-                tracing::info!(
-                    "Defaulting to default python version for this platform: '{default}'",
-                );
+                tracing::info!("Defaulting to python-platform `{default}`");
                 default
             });
         ProgramSettings {
