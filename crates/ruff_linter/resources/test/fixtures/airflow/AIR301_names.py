@@ -51,6 +51,7 @@ from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.trigger_rule import TriggerRule
 from airflow.www.auth import has_access
 from airflow.www.utils import get_sensitive_variables_fields, should_hide_value_for_key
+from airflow.secrets.cache import SecretCache
 
 # airflow root
 PY36, PY37, PY38, PY39, PY310, PY311, PY312
@@ -88,6 +89,8 @@ postgres.sanitize_uri
 trino.sanitize_uri
 
 # airflow.secrets
+#SecretCache
+SecretCache()
 # get_connection
 LocalFilesystemBackend()
 
