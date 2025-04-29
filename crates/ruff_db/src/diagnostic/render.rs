@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use colored::Colorize;
 
 use ruff_annotate_snippets::{
     Annotation as AnnotateAnnotation, Level as AnnotateLevel, Message as AnnotateMessage,
@@ -19,6 +18,16 @@ use crate::{
 use super::{
     Annotation, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, Severity, SubDiagnostic,
 };
+
+fn write_styled(
+    f: &mut std::fmt::Formatter,
+    text: &str,
+    style: &anstyle::Style,
+) -> std::fmt::Result {
+    write!(f, "{}", style.render())?;
+    write!(f, "{}", text)?;
+    write!(f, "{}", style.render_reset())
+}
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
 ///
@@ -69,32 +78,35 @@ impl<'a> DisplayDiagnostic<'a> {
 impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if matches!(self.config.format, DiagnosticFormat::Concise) {
-            match self.diag.severity() {
-                Severity::Info => write!(f, "{}", "info".bright_cyan().bold())?,
-                Severity::Warning => write!(f, "{}", "warning".bright_yellow().bold())?,
-                Severity::Error => write!(f, "{}", "error".bright_red().bold())?,
-                Severity::Fatal => write!(f, "{}", "fatal".bright_red().bold())?,
-            }
+            let (severity, severity_style) = match self.diag.severity() {
+                Severity::Info => ("info", &self.stylesheet.info),
+                Severity::Warning => ("warning", &self.stylesheet.warning),
+                Severity::Error => ("error", &self.stylesheet.error),
+                Severity::Fatal => ("fatal", &self.stylesheet.error),
+            };
+            write_styled(f, severity, severity_style)?;
 
-            write!(
-                f,
-                "[{rule}]",
-                rule = self.diag.id().to_string().bright_white().bold()
-            )?;
+            let rule = format!("[{}]", self.diag.id());
+            write_styled(f, &rule, &self.stylesheet.emphasis)?;
+
             if let Some(span) = self.diag.primary_span() {
-                write!(f, " {path}", path = self.resolver.path(span.file()))?;
+                let path = format!(" {}", self.resolver.path(span.file()));
+                write_styled(f, &path, &self.stylesheet.emphasis)?;
                 if let Some(range) = span.range() {
                     let input = self.resolver.input(span.file());
                     let start = input.as_source_code().source_location(range.start());
-                    write!(f, ":{line}:{col}", line = start.row, col = start.column)?;
+                    let pos = format!(":{line}:{col}", line = start.row, col = start.column);
+                    write_styled(f, &pos, &self.stylesheet.emphasis)?;
                 }
-                write!(f, ":")?;
             }
-            return writeln!(
+            write!(f, " ")?;
+            write_styled(
                 f,
-                " {}",
-                self.diag.concise_message().to_string().bright_red().bold()
-            );
+                &self.diag.concise_message().to_string(),
+                &self.stylesheet.error,
+            )?;
+            writeln!(f)?;
+            return Ok(());
         }
 
         let mut renderer = self.annotate_renderer.clone();
