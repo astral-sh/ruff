@@ -225,7 +225,7 @@ impl Project {
         // finally the diagnostic ID.
         file_diagnostics.sort_by(|d1, d2| {
             if let (Some(span1), Some(span2)) = (d1.primary_span(), d2.primary_span()) {
-                let order = span1.file().file_path(db).cmp(&span2.file().file_path(db));
+                let order = span1.file().file_path(db).cmp(span2.file().file_path(db));
                 if order.is_ne() {
                     return order;
                 }

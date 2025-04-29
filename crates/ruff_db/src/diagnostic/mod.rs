@@ -1,6 +1,7 @@
 use std::{fmt::Formatter, sync::Arc};
 
 use render::Input;
+use ruff_source_file::SourceFile;
 use thiserror::Error;
 
 use ruff_annotate_snippets::Level as AnnotateLevel;
@@ -604,76 +605,77 @@ impl std::fmt::Display for DiagnosticId {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RuffFile {
-    source: String,
-    path: String,
-    line_index: ruff_source_file::LineIndex,
+pub enum UnifiedFile {
+    RedKnot(File),
+    Ruff(SourceFile),
 }
 
-impl RuffFile {
-    fn source_text(&self) -> SourceText {
-        SourceText {
-            inner: std::sync::Arc::new(crate::source::SourceTextInner {
-                count: countme::Count::new(),
-                kind: crate::source::SourceTextKind::Text(self.source.clone()),
-                read_error: None, // TODO
-            }),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum FileWrapper {
-    File(File),
-    RuffFile(RuffFile),
-}
-
-impl FileWrapper {
-    pub fn file_path(&self, db: &dyn Db) -> String {
+impl UnifiedFile {
+    pub fn file_path<'a>(&'a self, db: &'a dyn Db) -> &'a str {
         match self {
-            FileWrapper::File(file) => file.path(db).to_string(),
-            FileWrapper::RuffFile(ruff_file) => ruff_file.path.clone(),
+            UnifiedFile::RedKnot(file) => file.path(db).as_str(),
+            UnifiedFile::Ruff(file) => file.name(),
         }
     }
 
     fn path<'a>(&'a self, resolver: &'a FileResolver<'a>) -> &'a str {
         match self {
-            FileWrapper::File(file) => resolver.path(*file),
-            FileWrapper::RuffFile(ruff_file) => ruff_file.path.as_str(),
+            UnifiedFile::RedKnot(file) => resolver.path(*file),
+            UnifiedFile::Ruff(file) => file.name(),
         }
     }
 
     fn input(&self, resolver: &FileResolver) -> Input {
         match self {
-            FileWrapper::File(file) => resolver.input(*file),
-            FileWrapper::RuffFile(ruff_file) => Input {
-                text: ruff_file.source_text(),
-                line_index: ruff_file.line_index.clone(),
-            },
+            UnifiedFile::RedKnot(file) => resolver.input(*file),
+            UnifiedFile::Ruff(file) => Input::from(file),
         }
     }
 
     pub fn expect_file(&self) -> File {
         match self {
-            FileWrapper::File(file) => *file,
-            FileWrapper::RuffFile(_) => panic!("Expected a `File`, found `RuffFile`"),
+            UnifiedFile::RedKnot(file) => *file,
+            UnifiedFile::Ruff(_) => panic!("Expected a `File`, found `RuffFile`"),
+        }
+    }
+}
+
+impl From<&SourceFile> for Input {
+    fn from(value: &SourceFile) -> Self {
+        Input {
+            text: SourceText::from(value),
+            line_index: value.index().clone(),
+        }
+    }
+}
+
+impl From<&SourceFile> for SourceText {
+    fn from(value: &SourceFile) -> Self {
+        SourceText {
+            inner: std::sync::Arc::new(crate::source::SourceTextInner {
+                count: countme::Count::new(),
+                // TODO(brent) handle notebooks. it's not really clear (to me) how to determine
+                // if something is a notebook from a SourceFile
+                kind: crate::source::SourceTextKind::Text(value.source_text().to_string()),
+                read_error: None,
+            }),
         }
     }
 }
 
 #[cfg(test)]
-impl FileWrapper {
+impl UnifiedFile {
     fn source_text(&self, db: &dyn Db) -> SourceText {
         match self {
-            FileWrapper::File(file) => crate::source::source_text(db, *file),
-            FileWrapper::RuffFile(ruff_file) => ruff_file.source_text(),
+            UnifiedFile::RedKnot(file) => crate::source::source_text(db, *file),
+            UnifiedFile::Ruff(file) => SourceText::from(file),
         }
     }
 
     fn line_index(&self, db: &dyn Db) -> ruff_source_file::LineIndex {
         match self {
-            FileWrapper::File(file) => crate::source::line_index(db, *file),
-            FileWrapper::RuffFile(ruff_file) => ruff_file.line_index.clone(),
+            UnifiedFile::RedKnot(file) => crate::source::line_index(db, *file),
+            UnifiedFile::Ruff(file) => file.index().clone(),
         }
     }
 }
@@ -685,13 +687,13 @@ impl FileWrapper {
 /// the entire file. For example, when the file should be executable but isn't.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Span {
-    file: FileWrapper,
+    file: UnifiedFile,
     range: Option<TextRange>,
 }
 
 impl Span {
     /// Returns the `File` attached to this `Span`.
-    pub fn file(&self) -> &FileWrapper {
+    pub fn file(&self) -> &UnifiedFile {
         &self.file
     }
 
@@ -717,7 +719,7 @@ impl Span {
 
 impl From<File> for Span {
     fn from(file: File) -> Span {
-        let file = FileWrapper::File(file);
+        let file = UnifiedFile::RedKnot(file);
         Span { file, range: None }
     }
 }

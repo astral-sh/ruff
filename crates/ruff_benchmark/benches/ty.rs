@@ -204,7 +204,7 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
             (
                 diagnostic.id(),
                 diagnostic.primary_span().map(|span| {
-                    paths.push(span.file().file_path(db));
+                    paths.push(span.file().file_path(db).to_string());
                     paths.len() - 1
                 }),
                 diagnostic
