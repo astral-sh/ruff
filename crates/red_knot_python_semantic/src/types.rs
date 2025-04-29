@@ -1503,6 +1503,13 @@ impl<'db> Type<'db> {
                 }
             }
 
+            (Type::ClassLiteral(class_literal), Type::Callable(_)) => {
+                if let Some(callable) = class_literal.into_callable(db) {
+                    return callable.is_assignable_to(db, target);
+                }
+                false
+            }
+
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
                     .into_callable_type(db)
