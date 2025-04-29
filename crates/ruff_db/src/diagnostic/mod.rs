@@ -579,6 +579,10 @@ impl DiagnosticId {
             DiagnosticId::UnknownRule => "unknown-rule",
         })
     }
+
+    pub fn is_invalid_syntax(&self) -> bool {
+        matches!(self, Self::InvalidSyntax)
+    }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Error)]
@@ -636,6 +640,13 @@ impl UnifiedFile {
         match self {
             UnifiedFile::RedKnot(file) => *file,
             UnifiedFile::Ruff(_) => panic!("Expected a `File`, found `RuffFile`"),
+        }
+    }
+
+    pub fn expect_ruff(&self) -> &SourceFile {
+        match self {
+            UnifiedFile::Ruff(source_file) => source_file,
+            UnifiedFile::RedKnot(_) => panic!("Expected a ruff file, found a red-knot file"),
         }
     }
 }
@@ -720,6 +731,13 @@ impl Span {
 impl From<File> for Span {
     fn from(file: File) -> Span {
         let file = UnifiedFile::RedKnot(file);
+        Span { file, range: None }
+    }
+}
+
+impl From<SourceFile> for Span {
+    fn from(file: SourceFile) -> Self {
+        let file = UnifiedFile::Ruff(file);
         Span { file, range: None }
     }
 }
