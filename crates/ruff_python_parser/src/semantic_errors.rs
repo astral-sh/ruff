@@ -106,13 +106,13 @@ impl SemanticSyntaxChecker {
                     );
                 }
 
-                // test_ok single_starred_assignment_value
+                // test_ok assign_stmt_starred_expr_value
                 // _ = 4
                 // _ = [4]
                 // _ = (*[1],)
                 // _ = *[1],
 
-                // test_err single_starred_assignment_value
+                // test_err assign_stmt_starred_expr_value
                 // _ = *[42]
                 // _ = *{42}
                 // _ = *list()

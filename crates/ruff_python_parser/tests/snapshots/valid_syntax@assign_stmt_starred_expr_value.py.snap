@@ -1,0 +1,157 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/assign_stmt_starred_expr_value.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..36,
+        body: [
+            Assign(
+                StmtAssign {
+                    range: 0..5,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 0..1,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            range: 4..5,
+                            value: Int(
+                                4,
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 6..13,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 6..7,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: List(
+                        ExprList {
+                            range: 10..13,
+                            elts: [
+                                NumberLiteral(
+                                    ExprNumberLiteral {
+                                        range: 11..12,
+                                        value: Int(
+                                            4,
+                                        ),
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 14..25,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 14..15,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            range: 18..25,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 19..23,
+                                        value: List(
+                                            ExprList {
+                                                range: 20..23,
+                                                elts: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 21..22,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    range: 26..35,
+                    targets: [
+                        Name(
+                            ExprName {
+                                range: 26..27,
+                                id: Name("_"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: Tuple(
+                        ExprTuple {
+                            range: 30..35,
+                            elts: [
+                                Starred(
+                                    ExprStarred {
+                                        range: 30..34,
+                                        value: List(
+                                            ExprList {
+                                                range: 31..34,
+                                                elts: [
+                                                    NumberLiteral(
+                                                        ExprNumberLiteral {
+                                                            range: 32..33,
+                                                            value: Int(
+                                                                1,
+                                                            ),
+                                                        },
+                                                    ),
+                                                ],
+                                                ctx: Load,
+                                            },
+                                        ),
+                                        ctx: Load,
+                                    },
+                                ),
+                            ],
+                            ctx: Load,
+                            parenthesized: false,
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
