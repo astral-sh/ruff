@@ -1383,13 +1383,27 @@ where
                 }
             }
 
-            ast::Stmt::Assert(node) => {
-                self.visit_expr(&node.test);
-                let predicate = self.record_expression_narrowing_constraint(&node.test);
-                self.record_visibility_constraint(predicate);
+            ast::Stmt::Assert(ast::StmtAssert {
+                test,
+                msg,
+                range: _,
+            }) => {
+                self.visit_expr(test);
 
-                if let Some(msg) = &node.msg {
+                if let Some(msg) = msg {
+                    let pre_assertion = self.flow_snapshot();
+                    let predicate = self.record_expression_narrowing_constraint(test);
+                    let visibility_id = self.record_visibility_constraint(predicate);
+                    let post_assertion = self.flow_snapshot();
+                    self.flow_restore(pre_assertion.clone());
+                    self.record_negated_narrowing_constraint(predicate);
                     self.visit_expr(msg);
+                    self.record_negated_visibility_constraint(visibility_id);
+                    self.flow_restore(post_assertion);
+                    self.simplify_visibility_constraints(pre_assertion);
+                } else {
+                    let predicate = self.record_expression_narrowing_constraint(test);
+                    self.record_visibility_constraint(predicate);
                 }
             }
 
