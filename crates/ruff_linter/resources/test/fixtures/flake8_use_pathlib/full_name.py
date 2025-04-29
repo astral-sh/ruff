@@ -60,3 +60,11 @@ def foo(y: int):
 def f() -> int:
     return 1
 open(f())
+
+open(b"foo")
+byte_str = b"bar"
+open(byte_str)
+
+def bytes_str_func() -> bytes:
+    return b"foo"
+open(bytes_str_func())
