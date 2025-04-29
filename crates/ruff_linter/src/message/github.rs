@@ -3,7 +3,9 @@ use std::io::Write;
 use ruff_source_file::LineColumn;
 
 use crate::fs::relativize_path;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext};
+
+use super::NewDiagnostic;
 
 /// Generate error workflow command in GitHub Actions format.
 /// See: [GitHub documentation](https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-error-message)
@@ -14,7 +16,7 @@ impl Emitter for GithubEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[NewDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {

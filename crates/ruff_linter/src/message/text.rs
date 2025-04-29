@@ -17,6 +17,8 @@ use crate::message::{Emitter, EmitterContext, Message};
 use crate::settings::types::UnsafeFixes;
 use crate::Locator;
 
+use super::NewDiagnostic;
+
 bitflags! {
     #[derive(Default)]
     struct EmitterFlags: u8 {
@@ -66,7 +68,7 @@ impl Emitter for TextEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[NewDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
@@ -140,7 +142,7 @@ impl Emitter for TextEmitter {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub(crate) message: &'a Message,
+    pub(crate) message: &'a NewDiagnostic,
     pub(crate) show_fix_status: bool,
     pub(crate) unsafe_fixes: UnsafeFixes,
 }
@@ -178,7 +180,7 @@ impl Display for RuleCodeAndBody<'_> {
 }
 
 pub(super) struct MessageCodeFrame<'a> {
-    pub(crate) message: &'a Message,
+    pub(crate) message: &'a NewDiagnostic,
     pub(crate) notebook_index: Option<&'a NotebookIndex>,
 }
 

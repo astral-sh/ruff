@@ -9,7 +9,9 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed, SourceCode};
 use ruff_text_size::Ranged;
 
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext};
+
+use super::NewDiagnostic;
 
 #[derive(Default)]
 pub struct JsonEmitter;
@@ -18,7 +20,7 @@ impl Emitter for JsonEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[NewDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(writer, &ExpandedMessages { messages, context })?;
@@ -28,7 +30,7 @@ impl Emitter for JsonEmitter {
 }
 
 struct ExpandedMessages<'a> {
-    messages: &'a [Message],
+    messages: &'a [NewDiagnostic],
     context: &'a EmitterContext<'a>,
 }
 
@@ -48,7 +50,7 @@ impl Serialize for ExpandedMessages<'_> {
     }
 }
 
-pub(crate) fn message_to_json_value(message: &Message, context: &EmitterContext) -> Value {
+pub(crate) fn message_to_json_value(message: &NewDiagnostic, context: &EmitterContext) -> Value {
     let source_code = message.source_file().to_source_code();
     let notebook_index = context.notebook_index(message.filename());
 

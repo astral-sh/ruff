@@ -40,6 +40,137 @@ mod rdjson;
 mod sarif;
 mod text;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum NewDiagnostic {
+    Message(Message),
+}
+
+impl NewDiagnostic {
+    pub fn is_syntax_error(&self) -> bool {
+        match self {
+            NewDiagnostic::Message(message) => message.is_syntax_error(),
+        }
+    }
+
+    pub fn rule(&self) -> Option<Rule> {
+        match self {
+            NewDiagnostic::Message(message) => message.rule(),
+        }
+    }
+
+    pub const fn is_diagnostic_message(&self) -> bool {
+        match self {
+            NewDiagnostic::Message(message) => message.is_diagnostic_message(),
+        }
+    }
+
+    pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
+        match self {
+            NewDiagnostic::Message(message) => message.as_diagnostic_message(),
+        }
+    }
+
+    fn filename(&self) -> &str {
+        match self {
+            NewDiagnostic::Message(message) => message.filename(),
+        }
+    }
+
+    fn body(&self) -> &str {
+        match self {
+            NewDiagnostic::Message(message) => message.body(),
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        match self {
+            NewDiagnostic::Message(message) => message.name(),
+        }
+    }
+
+    fn compute_start_location(&self) -> LineColumn {
+        match self {
+            NewDiagnostic::Message(message) => message.compute_start_location(),
+        }
+    }
+
+    fn compute_end_location(&self) -> LineColumn {
+        match self {
+            NewDiagnostic::Message(message) => message.compute_end_location(),
+        }
+    }
+
+    pub fn source_file(&self) -> &SourceFile {
+        match self {
+            NewDiagnostic::Message(message) => message.source_file(),
+        }
+    }
+
+    pub fn fix(&self) -> Option<&Fix> {
+        match self {
+            NewDiagnostic::Message(message) => message.fix(),
+        }
+    }
+
+    fn suggestion(&self) -> Option<&str> {
+        match self {
+            NewDiagnostic::Message(message) => message.suggestion(),
+        }
+    }
+
+    fn noqa_offset(&self) -> Option<TextSize> {
+        match self {
+            NewDiagnostic::Message(message) => message.noqa_offset(),
+        }
+    }
+
+    pub fn into_diagnostic_message(self) -> Option<DiagnosticMessage> {
+        match self {
+            NewDiagnostic::Message(message) => message.into_diagnostic_message(),
+        }
+    }
+
+    pub fn fixable(&self) -> bool {
+        match self {
+            NewDiagnostic::Message(message) => message.fixable(),
+        }
+    }
+
+    pub fn kind(&self) -> MessageKind {
+        match self {
+            NewDiagnostic::Message(message) => message.kind(),
+        }
+    }
+}
+
+impl Ord for NewDiagnostic {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (NewDiagnostic::Message(left), NewDiagnostic::Message(right)) => left.cmp(right),
+        }
+    }
+}
+
+impl PartialOrd for NewDiagnostic {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ranged for NewDiagnostic {
+    fn range(&self) -> TextRange {
+        match self {
+            NewDiagnostic::Message(message) => message.range(),
+        }
+    }
+}
+
+impl From<Message> for NewDiagnostic {
+    fn from(value: Message) -> Self {
+        Self::Message(value)
+    }
+}
+
 /// Message represents either a diagnostic message corresponding to a rule violation or a syntax
 /// error message raised by the parser.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -281,19 +412,21 @@ impl Ranged for Message {
 }
 
 struct MessageWithLocation<'a> {
-    message: &'a Message,
+    message: &'a NewDiagnostic,
     start_location: LineColumn,
 }
 
 impl Deref for MessageWithLocation<'_> {
-    type Target = Message;
+    type Target = NewDiagnostic;
 
     fn deref(&self) -> &Self::Target {
         self.message
     }
 }
 
-fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<&str, Vec<MessageWithLocation>> {
+fn group_messages_by_filename(
+    messages: &[NewDiagnostic],
+) -> BTreeMap<&str, Vec<MessageWithLocation>> {
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages
@@ -315,7 +448,7 @@ pub trait Emitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[NewDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()>;
 }
@@ -353,7 +486,9 @@ mod tests {
     use crate::message::{Emitter, EmitterContext, Message};
     use crate::Locator;
 
-    pub(super) fn create_syntax_error_messages() -> Vec<Message> {
+    use super::NewDiagnostic;
+
+    pub(super) fn create_syntax_error_messages() -> Vec<NewDiagnostic> {
         let source = r"from os import
 
 if call(foo
@@ -366,12 +501,12 @@ if call(foo
             .errors()
             .iter()
             .map(|parse_error| {
-                Message::from_parse_error(parse_error, &locator, source_file.clone())
+                Message::from_parse_error(parse_error, &locator, source_file.clone()).into()
             })
             .collect()
     }
 
-    pub(super) fn create_messages() -> Vec<Message> {
+    pub(super) fn create_messages() -> Vec<NewDiagnostic> {
         let fib = r#"import os
 
 
@@ -431,13 +566,14 @@ def fibonacci(n):
         let unused_variable_start = unused_variable.start();
         let undefined_name_start = undefined_name.start();
         vec![
-            Message::from_diagnostic(unused_import, fib_source.clone(), unused_import_start),
-            Message::from_diagnostic(unused_variable, fib_source, unused_variable_start),
-            Message::from_diagnostic(undefined_name, file_2_source, undefined_name_start),
+            Message::from_diagnostic(unused_import, fib_source.clone(), unused_import_start).into(),
+            Message::from_diagnostic(unused_variable, fib_source, unused_variable_start).into(),
+            Message::from_diagnostic(undefined_name, file_2_source, undefined_name_start).into(),
         ]
     }
 
-    pub(super) fn create_notebook_messages() -> (Vec<Message>, FxHashMap<String, NotebookIndex>) {
+    pub(super) fn create_notebook_messages(
+    ) -> (Vec<NewDiagnostic>, FxHashMap<String, NotebookIndex>) {
         let notebook = r"# cell 1
 import os
 # cell 2
@@ -532,13 +668,16 @@ def foo():
                     unused_import_os,
                     notebook_source.clone(),
                     unused_import_os_start,
-                ),
+                )
+                .into(),
                 Message::from_diagnostic(
                     unused_import_math,
                     notebook_source.clone(),
                     unused_import_math_start,
-                ),
-                Message::from_diagnostic(unused_variable, notebook_source, unused_variable_start),
+                )
+                .into(),
+                Message::from_diagnostic(unused_variable, notebook_source, unused_variable_start)
+                    .into(),
             ],
             notebook_indexes,
         )
@@ -546,7 +685,7 @@ def foo():
 
     pub(super) fn capture_emitter_output(
         emitter: &mut dyn Emitter,
-        messages: &[Message],
+        messages: &[NewDiagnostic],
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
@@ -558,7 +697,7 @@ def foo():
 
     pub(super) fn capture_emitter_notebook_output(
         emitter: &mut dyn Emitter,
-        messages: &[Message],
+        messages: &[NewDiagnostic],
         notebook_indexes: &FxHashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);

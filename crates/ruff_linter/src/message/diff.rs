@@ -12,6 +12,8 @@ use ruff_source_file::{OneIndexed, SourceFile};
 use crate::message::Message;
 use crate::text_helpers::ShowNonprinting;
 
+use super::NewDiagnostic;
+
 /// Renders a diff that shows the code fixes.
 ///
 /// The implementation isn't fully fledged out and only used by tests. Before using in production, try
@@ -26,7 +28,7 @@ pub(super) struct Diff<'a> {
 }
 
 impl<'a> Diff<'a> {
-    pub(crate) fn from_message(message: &'a Message) -> Option<Diff<'a>> {
+    pub(crate) fn from_message(message: &'a NewDiagnostic) -> Option<Diff<'a>> {
         message.fix().map(|fix| Diff {
             source_code: message.source_file(),
             fix,

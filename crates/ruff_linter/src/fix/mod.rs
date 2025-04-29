@@ -7,7 +7,7 @@ use ruff_diagnostics::{Edit, Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::linter::FixTable;
-use crate::message::{DiagnosticMessage, Message};
+use crate::message::{DiagnosticMessage, NewDiagnostic};
 use crate::registry::{AsRule, Rule};
 use crate::settings::types::UnsafeFixes;
 use crate::Locator;
@@ -27,7 +27,7 @@ pub(crate) struct FixResult {
 
 /// Fix errors in a file, and write the fixed source code to disk.
 pub(crate) fn fix_file(
-    messages: &[Message],
+    messages: &[NewDiagnostic],
     locator: &Locator,
     unsafe_fixes: UnsafeFixes,
 ) -> Option<FixResult> {
@@ -35,7 +35,7 @@ pub(crate) fn fix_file(
 
     let mut with_fixes = messages
         .iter()
-        .filter_map(Message::as_diagnostic_message)
+        .filter_map(NewDiagnostic::as_diagnostic_message)
         .filter(|message| {
             message
                 .fix

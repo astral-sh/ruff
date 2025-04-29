@@ -15,6 +15,8 @@ use crate::message::{
 };
 use crate::settings::types::UnsafeFixes;
 
+use super::NewDiagnostic;
+
 #[derive(Default)]
 pub struct GroupedEmitter {
     show_fix_status: bool,
@@ -46,7 +48,7 @@ impl Emitter for GroupedEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[NewDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for (filename, messages) in group_messages_by_filename(messages) {

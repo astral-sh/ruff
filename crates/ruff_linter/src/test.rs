@@ -22,7 +22,7 @@ use ruff_source_file::SourceFileBuilder;
 
 use crate::fix::{fix_file, FixResult};
 use crate::linter::check_path;
-use crate::message::{Emitter, EmitterContext, Message, TextEmitter};
+use crate::message::{Emitter, EmitterContext, Message, NewDiagnostic, TextEmitter};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
@@ -38,7 +38,10 @@ pub(crate) fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 
 /// Run [`check_path`] on a Python file in the `resources/test/fixtures` directory.
 #[cfg(not(fuzzing))]
-pub(crate) fn test_path(path: impl AsRef<Path>, settings: &LinterSettings) -> Result<Vec<Message>> {
+pub(crate) fn test_path(
+    path: impl AsRef<Path>,
+    settings: &LinterSettings,
+) -> Result<Vec<NewDiagnostic>> {
     let path = test_resource_path("fixtures").join(path);
     let source_type = PySourceType::from(&path);
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
@@ -47,7 +50,7 @@ pub(crate) fn test_path(path: impl AsRef<Path>, settings: &LinterSettings) -> Re
 
 #[cfg(not(fuzzing))]
 pub(crate) struct TestedNotebook {
-    pub(crate) messages: Vec<Message>,
+    pub(crate) messages: Vec<NewDiagnostic>,
     pub(crate) source_notebook: Notebook,
     pub(crate) linted_notebook: Notebook,
 }
@@ -83,7 +86,7 @@ pub(crate) fn assert_notebook_path(
 }
 
 /// Run [`check_path`] on a snippet of Python code.
-pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Message> {
+pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<NewDiagnostic> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
     test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0
@@ -107,7 +110,7 @@ pub(crate) fn test_contents<'a>(
     source_kind: &'a SourceKind,
     path: &Path,
     settings: &LinterSettings,
-) -> (Vec<Message>, Cow<'a, SourceKind>) {
+) -> (Vec<NewDiagnostic>, Cow<'a, SourceKind>) {
     let source_type = PySourceType::from(path);
     let target_version = settings.resolve_target_version(path);
     let options =
@@ -233,7 +236,7 @@ Source with applied fixes:
 
     let messages = messages
         .into_iter()
-        .filter_map(Message::into_diagnostic_message)
+        .filter_map(NewDiagnostic::into_diagnostic_message)
         .map(|mut diagnostic| {
             let rule = diagnostic.kind.rule();
             let fixable = diagnostic.fix.as_ref().is_some_and(|fix| {
@@ -284,6 +287,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             Message::from_parse_error(parse_error, &locator, source_code.clone())
         }))
         .sorted()
+        .map(NewDiagnostic::from)
         .collect();
     (messages, transformed)
 }
@@ -299,7 +303,9 @@ fn print_syntax_errors(
 
     let messages: Vec<_> = errors
         .iter()
-        .map(|parse_error| Message::from_parse_error(parse_error, locator, source_file.clone()))
+        .map(|parse_error| {
+            Message::from_parse_error(parse_error, locator, source_file.clone()).into()
+        })
         .collect();
 
     if let Some(notebook) = source.as_ipy_notebook() {
@@ -310,8 +316,8 @@ fn print_syntax_errors(
 }
 
 /// Print the [`Message::Diagnostic`]s in `messages`.
-fn print_diagnostics(mut messages: Vec<Message>, path: &Path, source: &SourceKind) -> String {
-    messages.retain(Message::is_diagnostic_message);
+fn print_diagnostics(mut messages: Vec<NewDiagnostic>, path: &Path, source: &SourceKind) -> String {
+    messages.retain(NewDiagnostic::is_diagnostic_message);
 
     if let Some(notebook) = source.as_ipy_notebook() {
         print_jupyter_messages(&messages, path, notebook)
@@ -321,7 +327,7 @@ fn print_diagnostics(mut messages: Vec<Message>, path: &Path, source: &SourceKin
 }
 
 pub(crate) fn print_jupyter_messages(
-    messages: &[Message],
+    messages: &[NewDiagnostic],
     path: &Path,
     notebook: &Notebook,
 ) -> String {
@@ -345,7 +351,7 @@ pub(crate) fn print_jupyter_messages(
     String::from_utf8(output).unwrap()
 }
 
-pub(crate) fn print_messages(messages: &[Message]) -> String {
+pub(crate) fn print_messages(messages: &[NewDiagnostic]) -> String {
     let mut output = Vec::new();
 
     TextEmitter::default()

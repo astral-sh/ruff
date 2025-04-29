@@ -13,7 +13,7 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{
     AzureEmitter, Emitter, EmitterContext, GithubEmitter, GitlabEmitter, GroupedEmitter,
-    JsonEmitter, JsonLinesEmitter, JunitEmitter, Message, MessageKind, PylintEmitter,
+    JsonEmitter, JsonLinesEmitter, JunitEmitter, MessageKind, NewDiagnostic, PylintEmitter,
     RdjsonEmitter, SarifEmitter, TextEmitter,
 };
 use ruff_linter::notify_user;
@@ -337,7 +337,7 @@ impl Printer {
             .messages
             .iter()
             .sorted_by_key(|message| (message.rule(), message.fixable()))
-            .fold(vec![], |mut acc: Vec<(&Message, usize)>, message| {
+            .fold(vec![], |mut acc: Vec<(&NewDiagnostic, usize)>, message| {
                 if let Some((prev_message, count)) = acc.last_mut() {
                     if prev_message.rule() == message.rule() {
                         *count += 1;

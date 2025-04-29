@@ -19,7 +19,7 @@ use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
-use ruff_linter::message::{DiagnosticMessage, Message};
+use ruff_linter::message::{DiagnosticMessage, Message, NewDiagnostic};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{warn_user, VERSION};
 use ruff_macros::CacheKey;
@@ -356,6 +356,7 @@ impl FileCache {
                             parent: msg.parent,
                         })
                     })
+                    .map(NewDiagnostic::from)
                     .collect()
             };
             let notebook_indexes = if let Some(notebook_index) = lint.notebook_index.as_ref() {
@@ -424,7 +425,7 @@ pub(crate) struct LintCacheData {
 
 impl LintCacheData {
     pub(crate) fn from_messages(
-        messages: &[Message],
+        messages: &[NewDiagnostic],
         notebook_index: Option<NotebookIndex>,
     ) -> Self {
         let source = if let Some(msg) = messages.first() {
@@ -589,11 +590,11 @@ mod tests {
     use anyhow::Result;
     use filetime::{set_file_mtime, FileTime};
     use itertools::Itertools;
+    use ruff_linter::message::NewDiagnostic;
     use ruff_linter::settings::LinterSettings;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
-    use ruff_linter::message::Message;
     use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;
@@ -661,7 +662,11 @@ mod tests {
                     UnsafeFixes::Enabled,
                 )
                 .unwrap();
-                if diagnostics.messages.iter().any(Message::is_syntax_error) {
+                if diagnostics
+                    .messages
+                    .iter()
+                    .any(NewDiagnostic::is_syntax_error)
+                {
                     parse_errors.push(path.clone());
                 }
                 paths.push(path);

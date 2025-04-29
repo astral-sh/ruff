@@ -8,7 +8,9 @@ use serde::{Serialize, Serializer};
 use serde_json::json;
 
 use crate::fs::{relativize_path, relativize_path_to};
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext};
+
+use super::NewDiagnostic;
 
 /// Generate JSON with violations in GitLab CI format
 //  https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
@@ -28,7 +30,7 @@ impl Emitter for GitlabEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[NewDiagnostic],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         serde_json::to_writer_pretty(
@@ -45,7 +47,7 @@ impl Emitter for GitlabEmitter {
 }
 
 struct SerializedMessages<'a> {
-    messages: &'a [Message],
+    messages: &'a [NewDiagnostic],
     context: &'a EmitterContext<'a>,
     project_dir: Option<&'a str>,
 }
@@ -123,7 +125,7 @@ impl Serialize for SerializedMessages<'_> {
 }
 
 /// Generate a unique fingerprint to identify a violation.
-fn fingerprint(message: &Message, project_path: &str, salt: u64) -> u64 {
+fn fingerprint(message: &NewDiagnostic, project_path: &str, salt: u64) -> u64 {
     let mut hasher = DefaultHasher::new();
 
     salt.hash(&mut hasher);

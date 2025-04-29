@@ -15,7 +15,7 @@ use rustc_hash::FxHashMap;
 use ruff_diagnostics::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult, ParseSource};
-use ruff_linter::message::{Message, SyntaxErrorMessage};
+use ruff_linter::message::{Message, NewDiagnostic, SyntaxErrorMessage};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -32,14 +32,14 @@ use crate::cache::{Cache, FileCacheKey, LintCacheData};
 
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Diagnostics {
-    pub(crate) messages: Vec<Message>,
+    pub(crate) messages: Vec<NewDiagnostic>,
     pub(crate) fixed: FixMap,
     pub(crate) notebook_indexes: FxHashMap<String, NotebookIndex>,
 }
 
 impl Diagnostics {
     pub(crate) fn new(
-        messages: Vec<Message>,
+        messages: Vec<NewDiagnostic>,
         notebook_indexes: FxHashMap<String, NotebookIndex>,
     ) -> Self {
         Self {
@@ -72,7 +72,8 @@ impl Diagnostics {
                             ),
                             source_file,
                             TextSize::default(),
-                        )],
+                        )
+                        .into()],
                         FxHashMap::default(),
                     )
                 } else {
@@ -106,7 +107,8 @@ impl Diagnostics {
                         message: err.to_string(),
                         range: TextRange::default(),
                         file: dummy,
-                    })],
+                    })
+                    .into()],
                     FxHashMap::default(),
                 )
             }

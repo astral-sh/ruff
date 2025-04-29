@@ -13,13 +13,15 @@ use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::{Linter, RuleNamespace};
 use crate::VERSION;
 
+use super::NewDiagnostic;
+
 pub struct SarifEmitter;
 
 impl Emitter for SarifEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[Message],
+        messages: &[NewDiagnostic],
         _context: &EmitterContext,
     ) -> Result<()> {
         let results = messages
@@ -118,7 +120,7 @@ struct SarifResult {
 
 impl SarifResult {
     #[cfg(not(target_arch = "wasm32"))]
-    fn from_message(message: &Message) -> Result<Self> {
+    fn from_message(message: &NewDiagnostic) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
         let path = normalize_path(message.filename());
