@@ -79,6 +79,28 @@ def two(x: int | None, y: int | None):
     reveal_type(y)  # revealed: int | None
 ```
 
+## Assertions with `test` predicates that are statically known to always be `True`
+
+```py
+assert True, (x := 1)
+
+# error: [unresolved-reference]
+reveal_type(x)  # revealed: Unknown
+
+assert False, (y := 1)
+
+# The `assert` statement is terminal if `test` resolves to `False`,
+# so even though we know the `msg` branch will have been taken here
+# (we know what the truthiness of `False is!), we also know that the
+# `y` definition is not visible from this point in control flow
+# (because this point in control flow is unreachable).
+# We make sure that this does not emit an `[unresolved-reference]`
+# diagnostic by adding a reachability constraint,
+# but the inferred type is `Unknown`.
+#
+reveal_type(y)  # revealed: Unknown
+```
+
 ## Assertions with messages that reference definitions from the `test`
 
 ```py

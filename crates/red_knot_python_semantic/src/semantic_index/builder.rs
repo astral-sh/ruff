@@ -1391,16 +1391,23 @@ where
                 self.visit_expr(test);
 
                 if let Some(msg) = msg {
-                    let pre_assertion = self.flow_snapshot();
+                    // A snapshot of the state after `test` has been evaluated, but before `msg` has been evaluated.
+                    // This is the state we need to return to after we've visited `msg`,
+                    // since all code following the assert statement can only be reached if test evaluated to `True`
+                    // (which means that the `msg` expression would not have been evaluated)
+                    let post_test = self.flow_snapshot();
+
                     let predicate = self.record_expression_narrowing_constraint(test);
+                    let reachability_constraint = self.record_reachability_constraint(predicate);
                     let visibility_id = self.record_visibility_constraint(predicate);
                     let post_assertion = self.flow_snapshot();
-                    self.flow_restore(pre_assertion.clone());
+                    self.flow_restore(post_test.clone());
                     self.record_negated_narrowing_constraint(predicate);
+                    self.record_negated_reachability_constraint(reachability_constraint);
                     self.visit_expr(msg);
                     self.record_negated_visibility_constraint(visibility_id);
                     self.flow_restore(post_assertion);
-                    self.simplify_visibility_constraints(pre_assertion);
+                    self.simplify_visibility_constraints(post_test);
                 } else {
                     let predicate = self.record_expression_narrowing_constraint(test);
                     self.record_visibility_constraint(predicate);
