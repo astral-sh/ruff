@@ -1761,7 +1761,7 @@ impl<'db> ProtocolClassLiteral<'db> {
             )
         }
 
-        #[salsa::tracked(return_ref)]
+        #[salsa::tracked(return_ref, cycle_fn=proto_members_cycle_recover, cycle_initial=proto_members_cycle_initial)]
         fn cached_protocol_members<'db>(
             db: &'db dyn Db,
             class: ClassLiteral<'db>,
@@ -1811,6 +1811,19 @@ impl<'db> ProtocolClassLiteral<'db> {
             members.sort();
             members.shrink_to_fit();
             members
+        }
+
+        fn proto_members_cycle_recover(
+            _db: &dyn Db,
+            _value: &FxOrderSet<Name>,
+            _count: u32,
+            _class: ClassLiteral,
+        ) -> salsa::CycleRecoveryAction<FxOrderSet<Name>> {
+            salsa::CycleRecoveryAction::Iterate
+        }
+
+        fn proto_members_cycle_initial(_db: &dyn Db, _class: ClassLiteral) -> FxOrderSet<Name> {
+            FxOrderSet::default()
         }
 
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();

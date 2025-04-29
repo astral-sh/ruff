@@ -1436,6 +1436,25 @@ def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
     c: Sized = some_sized
 ```
 
+## Regression test: narrowing with self-referential protocols
+
+This snippet caused us to panic on an early version of the implementation for protocols.
+
+```py
+from typing import Protocol
+
+class A(Protocol):
+    def x(self) -> "B | A": ...
+
+class B(Protocol):
+    def y(self): ...
+
+obj = something_unresolvable  # error: [unresolved-reference]
+reveal_type(obj)  # revealed: Unknown
+if isinstance(obj, (B, A)):
+    reveal_type(obj)  # revealed: (Unknown & B) | (Unknown & A)
+```
+
 ## TODO
 
 Add tests for:
