@@ -1963,6 +1963,7 @@ pub enum KnownClass {
     TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
+    NamedTuple,
     NewType,
     SupportsIndex,
     // Collections
@@ -2049,6 +2050,8 @@ impl<'db> KnownClass {
             | Self::Float
             | Self::Enum
             | Self::ABCMeta
+            // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
+            | Self::NamedTuple
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -2156,6 +2159,7 @@ impl<'db> KnownClass {
             Self::UnionType => "UnionType",
             Self::MethodWrapperType => "MethodWrapperType",
             Self::WrapperDescriptorType => "WrapperDescriptorType",
+            Self::NamedTuple => "NamedTuple",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
@@ -2343,6 +2347,7 @@ impl<'db> KnownClass {
             Self::Any
             | Self::SpecialForm
             | Self::TypeVar
+            | Self::NamedTuple
             | Self::StdlibAlias
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
@@ -2435,6 +2440,7 @@ impl<'db> KnownClass {
             | Self::Enum
             | Self::ABCMeta
             | Self::Super
+            | Self::NamedTuple
             | Self::NewType => false,
         }
     }
@@ -2495,6 +2501,7 @@ impl<'db> KnownClass {
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
+            | Self::NamedTuple
             | Self::NewType => false,
         }
     }
@@ -2536,6 +2543,7 @@ impl<'db> KnownClass {
             "UnionType" => Self::UnionType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
+            "NamedTuple" => Self::NamedTuple,
             "NewType" => Self::NewType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
@@ -2624,6 +2632,7 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::NamedTuple
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }
