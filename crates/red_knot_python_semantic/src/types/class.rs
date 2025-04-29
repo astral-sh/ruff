@@ -144,10 +144,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
-        self.class_literal(db).0.is_protocol(db)
-    }
-
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         let (class_literal, _) = self.class_literal(db);
         class_literal.name(db)

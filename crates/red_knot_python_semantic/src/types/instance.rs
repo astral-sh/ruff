@@ -7,7 +7,7 @@ use crate::{Db, FxOrderSet};
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        if class.is_protocol(db) {
+        if class.class_literal(db).0.is_protocol(db) {
             Self::ProtocolInstance(ProtocolInstanceType(Protocol::FromClass(class)))
         } else {
             Self::NominalInstance(NominalInstanceType { class })
@@ -19,6 +19,21 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance_type) => Some(instance_type),
             _ => None,
         }
+    }
+
+    /// Return `true` if `self` conforms to the interface described by `protocol`.
+    pub(super) fn satisfies_protocol(
+        self,
+        db: &'db dyn Db,
+        protocol: ProtocolInstanceType<'db>,
+    ) -> bool {
+        // TODO: this should consider the types of the protocol members
+        // as well as whether each member *exists* on `self`.
+        protocol
+            .0
+            .protocol_members(db)
+            .iter()
+            .all(|member| !self.member(db, member).symbol.is_unbound())
     }
 }
 
@@ -99,6 +114,8 @@ impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
     }
 }
 
+/// A `ProtocolInstanceType` represents the set of all possible runtime objects
+/// that conform to the interface described by a certain protocol.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord, salsa::Update)]
 pub struct ProtocolInstanceType<'db>(
     // Keep the inner field here private,
@@ -108,14 +125,11 @@ pub struct ProtocolInstanceType<'db>(
 );
 
 impl<'db> ProtocolInstanceType<'db> {
-    pub(super) fn protocol_members(self, db: &'db dyn Db) -> &'db FxOrderSet<Name> {
-        self.0.protocol_members(db)
-    }
-
     pub(super) fn inner(self) -> Protocol<'db> {
         self.0
     }
 
+    /// Return the meta-type of this protocol-instance type.
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.0 {
             Protocol::FromClass(class) => SubclassOfType::from(db, class),
@@ -137,6 +151,9 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    /// Return a "normalized" version of this `Protocol` type.
+    ///
+    /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
         let object = KnownClass::Object.to_instance(db);
         if object.satisfies_protocol(db, self) {
@@ -144,46 +161,58 @@ impl<'db> ProtocolInstanceType<'db> {
         }
         match self.0 {
             Protocol::FromClass(_) => Type::ProtocolInstance(Self(Protocol::Synthesized(
-                SynthesizedProtocolType::new(db, self.protocol_members(db)),
+                SynthesizedProtocolType::new(db, self.0.protocol_members(db)),
             ))),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
     }
 
-    /// TODO: should iterate over the types of the members
-    /// and check if any of them contain `Todo` types
+    /// TODO: this should return `true` if any of the members of this protocol type contain any `Todo` types.
     #[expect(clippy::unused_self)]
     pub(super) fn contains_todo(self) -> bool {
         false
     }
 
+    /// Return `true` if this protocol type is fully static.
+    ///
     /// TODO: should not be considered fully static if any members do not have fully static types
     #[expect(clippy::unused_self)]
     pub(super) fn is_fully_static(self) -> bool {
         true
     }
 
+    /// Return `true` if this protocol type is a subtype of the protocol `other`.
+    ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.protocol_members(db)
-            .is_superset(other.protocol_members(db))
+        self.0
+            .protocol_members(db)
+            .is_superset(other.0.protocol_members(db))
     }
 
+    /// Return `true` if this protocol type is assignable to the protocol `other`.
+    ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.is_subtype_of(db, other)
     }
 
+    /// Return `true` if this protocol type is equivalent to the protocol `other`.
+    ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.normalized(db) == other.normalized(db)
     }
 
+    /// Return `true` if this protocol type is gradually equivalent to the protocol `other`.
+    ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         self.is_equivalent_to(db, other)
     }
 
+    /// Return `true` if this protocol type is disjoint from the protocol `other`.
+    ///
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
@@ -192,9 +221,8 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 }
 
-/// Private inner enum to represent the two kinds of protocol types.
-/// This is not exposed publicly, so that the only way of constructing `Protocol` instances
-/// is through the [`Type::instance`] constructor function.
+/// An enumeration of the two kinds of protocol types: those that originate from a class
+/// definition in source code, and those that are synthesized from a set of members.
 #[derive(
     Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, salsa::Supertype, PartialOrd, Ord,
 )]
@@ -203,8 +231,8 @@ pub(super) enum Protocol<'db> {
     Synthesized(SynthesizedProtocolType<'db>),
 }
 
-#[salsa::tracked]
 impl<'db> Protocol<'db> {
+    /// Return the members of this protocol type
     fn protocol_members(self, db: &'db dyn Db) -> &'db FxOrderSet<Name> {
         match self {
             Self::FromClass(class) => class
@@ -218,6 +246,12 @@ impl<'db> Protocol<'db> {
     }
 }
 
+/// A "synthesized" protocol type that is dissociated from a class definition in source code.
+///
+/// Two synthesized protocol types with the same members will share the same Salsa ID,
+/// making them easy to compare for equivalence. A synthesized protocol type is therefore
+/// returned by [`ProtocolInstanceType::normalized`] so that two protocols with the same members
+/// will be understood as equivalent even in the context of differently ordered unions or intersections.
 #[salsa::interned(debug)]
 pub(super) struct SynthesizedProtocolType<'db> {
     #[return_ref]

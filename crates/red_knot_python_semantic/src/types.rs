@@ -899,6 +899,7 @@ impl<'db> Type<'db> {
     ///   as these are irrelevant to whether a callable type `X` is equivalent to a callable type `Y`.
     /// - Strips the types of default values from parameters in `Callable` types: only whether a parameter
     ///   *has* or *does not have* a default value is relevant to whether two `Callable` types  are equivalent.
+    /// - Converts class-based protocols into synthesized protocols
     #[must_use]
     pub fn normalized(self, db: &'db dyn Db) -> Self {
         match self {
@@ -1602,13 +1603,6 @@ impl<'db> Type<'db> {
             }
             _ => false,
         }
-    }
-
-    fn satisfies_protocol(self, db: &'db dyn Db, protocol: ProtocolInstanceType<'db>) -> bool {
-        protocol
-            .protocol_members(db)
-            .iter()
-            .all(|member| !self.member(db, member).symbol.is_unbound())
     }
 
     /// Return true if this type and `other` have no common elements.
