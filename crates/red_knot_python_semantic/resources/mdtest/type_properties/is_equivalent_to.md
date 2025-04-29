@@ -256,6 +256,65 @@ static_assert(is_equivalent_to(int | Callable[[int | str], None], Callable[[str 
 
 ### Overloads
 
-TODO
+#### One overload
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class Grandparent: ...
+class Parent(Grandparent): ...
+class Child(Parent): ...
+
+@overload
+def overloaded(a: Child) -> None: ...
+@overload
+def overloaded(a: Parent) -> None: ...
+@overload
+def overloaded(a: Grandparent) -> None: ...
+```
+
+```py
+from knot_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from overloaded import Grandparent, Parent, Child, overloaded
+
+def grandparent(a: Grandparent) -> None: ...
+
+static_assert(is_equivalent_to(CallableTypeOf[grandparent], CallableTypeOf[overloaded]))
+static_assert(is_equivalent_to(CallableTypeOf[overloaded], CallableTypeOf[grandparent]))
+```
+
+#### Both overloads
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+class Grandparent: ...
+class Parent(Grandparent): ...
+class Child(Parent): ...
+
+@overload
+def pg(a: Parent) -> None: ...
+@overload
+def pg(a: Grandparent) -> None: ...
+
+@overload
+def cpg(a: Child) -> None: ...
+@overload
+def cpg(a: Parent) -> None: ...
+@overload
+def cpg(a: Grandparent) -> None: ...
+```
+
+```py
+from knot_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from overloaded import pg, cpg
+
+static_assert(is_equivalent_to(CallableTypeOf[pg], CallableTypeOf[cpg]))
+static_assert(is_equivalent_to(CallableTypeOf[cpg], CallableTypeOf[pg]))
+```
 
 [the equivalence relation]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
