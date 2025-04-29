@@ -35,6 +35,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
@@ -386,6 +387,34 @@ declare_lint! {
     ///  This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid legacy `TypeVar`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a legacy `TypeVar`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeVar
+    ///
+    /// T = TypeVar("T")  # okay
+    /// Q = TypeVar("S")  # error: TypeVar name must match the variable it's assigned to
+    /// T = TypeVar("T")  # error: TypeVars should not be redefined
+    ///
+    /// # error: TypeVar must be immediately assigned to a variable
+    /// def f(t: TypeVar("U")): ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    pub(crate) static INVALID_LEGACY_TYPE_VARIABLE = {
+        summary: "detects invalid legacy type variables",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1314,7 +1343,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        KnownInstanceType::Annotated.repr(context.db())
+        KnownInstanceType::Annotated.repr()
     ));
 }
 
@@ -1362,7 +1391,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
     };
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        KnownInstanceType::Callable.repr(context.db())
+        KnownInstanceType::Callable.repr()
     ));
 }
 

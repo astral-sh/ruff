@@ -16,7 +16,7 @@ use crate::types::diagnostic::{
     NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, TOO_MANY_POSITIONAL_ARGUMENTS,
     UNKNOWN_ARGUMENT,
 };
-use crate::types::generics::{Specialization, SpecializationBuilder};
+use crate::types::generics::{Specialization, SpecializationBuilder, SpecializationError};
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators,
@@ -295,54 +295,76 @@ impl<'db> Bindings<'db> {
                     }
                 }
 
-                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => {
-                    match overload.parameter_types() {
-                        [Some(property @ Type::PropertyInstance(_)), Some(instance), ..]
-                            if instance.is_none(db) =>
+                Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => match overload
+                    .parameter_types()
+                {
+                    [Some(property @ Type::PropertyInstance(_)), Some(instance), ..]
+                        if instance.is_none(db) =>
+                    {
+                        overload.set_return_type(*property);
+                    }
+                    [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))), ..]
+                        if property.getter(db).is_some_and(|getter| {
+                            getter
+                                .into_function_literal()
+                                .is_some_and(|f| f.name(db) == "__name__")
+                        }) =>
+                    {
+                        overload.set_return_type(Type::string_literal(db, type_alias.name(db)));
+                    }
+                    [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))), ..] => {
+                        match property
+                            .getter(db)
+                            .and_then(Type::into_function_literal)
+                            .map(|f| f.name(db).as_str())
                         {
-                            overload.set_return_type(*property);
+                            Some("__name__") => {
+                                overload
+                                    .set_return_type(Type::string_literal(db, typevar.name(db)));
+                            }
+                            Some("__bound__") => {
+                                overload.set_return_type(
+                                    typevar.upper_bound(db).unwrap_or_else(|| Type::none(db)),
+                                );
+                            }
+                            Some("__constraints__") => {
+                                overload.set_return_type(TupleType::from_elements(
+                                    db,
+                                    typevar.constraints(db).into_iter().flatten(),
+                                ));
+                            }
+                            Some("__default__") => {
+                                overload.set_return_type(
+                                    typevar.default_ty(db).unwrap_or_else(|| {
+                                        KnownClass::NoDefaultType.to_instance(db)
+                                    }),
+                                );
+                            }
+                            _ => {}
                         }
-                        [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias))), ..]
-                            if property.getter(db).is_some_and(|getter| {
-                                getter
-                                    .into_function_literal()
-                                    .is_some_and(|f| f.name(db) == "__name__")
-                            }) =>
-                        {
-                            overload.set_return_type(Type::string_literal(db, type_alias.name(db)));
-                        }
-                        [Some(Type::PropertyInstance(property)), Some(Type::KnownInstance(KnownInstanceType::TypeVar(type_var))), ..]
-                            if property.getter(db).is_some_and(|getter| {
-                                getter
-                                    .into_function_literal()
-                                    .is_some_and(|f| f.name(db) == "__name__")
-                            }) =>
-                        {
-                            overload.set_return_type(Type::string_literal(db, type_var.name(db)));
-                        }
-                        [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
-                            if let Some(getter) = property.getter(db) {
-                                if let Ok(return_ty) = getter
-                                    .try_call(db, CallArgumentTypes::positional([*instance]))
-                                    .map(|binding| binding.return_type(db))
-                                {
-                                    overload.set_return_type(return_ty);
-                                } else {
-                                    overload.errors.push(BindingError::InternalCallError(
-                                        "calling the getter failed",
-                                    ));
-                                    overload.set_return_type(Type::unknown());
-                                }
+                    }
+                    [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
+                        if let Some(getter) = property.getter(db) {
+                            if let Ok(return_ty) = getter
+                                .try_call(db, CallArgumentTypes::positional([*instance]))
+                                .map(|binding| binding.return_type(db))
+                            {
+                                overload.set_return_type(return_ty);
                             } else {
                                 overload.errors.push(BindingError::InternalCallError(
-                                    "property has no getter",
+                                    "calling the getter failed",
                                 ));
-                                overload.set_return_type(Type::Never);
+                                overload.set_return_type(Type::unknown());
                             }
+                        } else {
+                            overload
+                                .errors
+                                .push(BindingError::InternalCallError("property has no getter"));
+                            overload.set_return_type(Type::Never);
                         }
-                        _ => {}
                     }
-                }
+                    _ => {}
+                },
 
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderGet(property)) => {
                     match overload.parameter_types() {
@@ -1150,29 +1172,6 @@ impl<'db> Binding<'db> {
         signature: &Signature<'db>,
         argument_types: &CallArgumentTypes<'_, 'db>,
     ) {
-        // If this overload is generic, first see if we can infer a specialization of the function
-        // from the arguments that were passed in.
-        let parameters = signature.parameters();
-        if signature.generic_context.is_some() || signature.inherited_generic_context.is_some() {
-            let mut builder = SpecializationBuilder::new(db);
-            for (argument_index, (_, argument_type)) in argument_types.iter().enumerate() {
-                let Some(parameter_index) = self.argument_parameters[argument_index] else {
-                    // There was an error with argument when matching parameters, so don't bother
-                    // type-checking it.
-                    continue;
-                };
-                let parameter = &parameters[parameter_index];
-                let Some(expected_type) = parameter.annotated_type() else {
-                    continue;
-                };
-                builder.infer(expected_type, argument_type);
-            }
-            self.specialization = signature.generic_context.map(|gc| builder.build(gc));
-            self.inherited_specialization = signature
-                .inherited_generic_context
-                .map(|gc| builder.build(gc));
-        }
-
         let mut num_synthetic_args = 0;
         let get_argument_index = |argument_index: usize, num_synthetic_args: usize| {
             if argument_index >= num_synthetic_args {
@@ -1185,6 +1184,39 @@ impl<'db> Binding<'db> {
                 None
             }
         };
+
+        // If this overload is generic, first see if we can infer a specialization of the function
+        // from the arguments that were passed in.
+        let parameters = signature.parameters();
+        if signature.generic_context.is_some() || signature.inherited_generic_context.is_some() {
+            let mut builder = SpecializationBuilder::new(db);
+            for (argument_index, (argument, argument_type)) in argument_types.iter().enumerate() {
+                if matches!(argument, Argument::Synthetic) {
+                    num_synthetic_args += 1;
+                }
+                let Some(parameter_index) = self.argument_parameters[argument_index] else {
+                    // There was an error with argument when matching parameters, so don't bother
+                    // type-checking it.
+                    continue;
+                };
+                let parameter = &parameters[parameter_index];
+                let Some(expected_type) = parameter.annotated_type() else {
+                    continue;
+                };
+                if let Err(error) = builder.infer(expected_type, argument_type) {
+                    self.errors.push(BindingError::SpecializationError {
+                        error,
+                        argument_index: get_argument_index(argument_index, num_synthetic_args),
+                    });
+                }
+            }
+            self.specialization = signature.generic_context.map(|gc| builder.build(gc));
+            self.inherited_specialization = signature
+                .inherited_generic_context
+                .map(|gc| builder.build(gc));
+        }
+
+        num_synthetic_args = 0;
         for (argument_index, (argument, argument_type)) in argument_types.iter().enumerate() {
             if matches!(argument, Argument::Synthetic) {
                 num_synthetic_args += 1;
@@ -1248,6 +1280,20 @@ impl<'db> Binding<'db> {
 
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
+    }
+
+    pub(crate) fn arguments_for_parameter<'a>(
+        &'a self,
+        argument_types: &'a CallArgumentTypes<'a, 'db>,
+        parameter_index: usize,
+    ) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + 'a {
+        argument_types
+            .iter()
+            .zip(&self.argument_parameters)
+            .filter(move |(_, argument_parameter)| {
+                argument_parameter.is_some_and(|ap| ap == parameter_index)
+            })
+            .map(|(arg_and_type, _)| arg_and_type)
     }
 
     fn report_diagnostics(
@@ -1398,6 +1444,11 @@ pub(crate) enum BindingError<'db> {
         argument_index: Option<usize>,
         parameter: ParameterContext,
     },
+    /// An inferred specialization was invalid.
+    SpecializationError {
+        error: SpecializationError<'db>,
+        argument_index: Option<usize>,
+    },
     /// The call itself might be well constructed, but an error occurred while evaluating the call.
     /// We use this variant to report errors in `property.__get__` and `property.__set__`, which
     /// can occur when the call to the underlying getter/setter fails.
@@ -1508,6 +1559,35 @@ impl<'db> BindingError<'db> {
                         }
                     ));
                 }
+            }
+
+            Self::SpecializationError {
+                error,
+                argument_index,
+            } => {
+                let range = Self::get_node(node, *argument_index);
+                let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, range) else {
+                    return;
+                };
+
+                let typevar = error.typevar();
+                let argument_type = error.argument_type();
+                let argument_ty_display = argument_type.display(context.db());
+
+                let mut diag = builder.into_diagnostic("Argument to this function is incorrect");
+                diag.set_primary_message(format_args!(
+                    "Argument type `{argument_ty_display}` does not satisfy {} of type variable `{}`",
+                    match error {
+                        SpecializationError::MismatchedBound {..} => "upper bound",
+                        SpecializationError::MismatchedConstraint {..} => "constraints",
+                    },
+                    typevar.name(context.db()),
+                ));
+
+                let typevar_range = typevar.definition(context.db()).full_range(context.db());
+                let mut sub = SubDiagnostic::new(Severity::Info, "Type variable defined here");
+                sub.annotate(Annotation::primary(typevar_range.into()));
+                diag.sub(sub);
             }
 
             Self::InternalCallError(reason) => {

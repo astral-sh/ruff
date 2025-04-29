@@ -73,9 +73,9 @@ use crate::types::diagnostic::{
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO,
     INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
-    UNSUPPORTED_OPERATOR,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
@@ -87,7 +87,8 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature,
     Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionType,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, UnionBuilder,
+    UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -2204,6 +2205,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             definition,
             bound_or_constraint,
             default_ty,
+            TypeVarKind::Pep695,
         )));
         self.add_declaration_with_binding(
             node.into(),
@@ -3733,7 +3735,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Named(named) => self.infer_named_expression(named),
             ast::Expr::If(if_expression) => self.infer_if_expression(if_expression),
             ast::Expr::Lambda(lambda_expression) => self.infer_lambda_expression(lambda_expression),
-            ast::Expr::Call(call_expression) => self.infer_call_expression(call_expression),
+            ast::Expr::Call(call_expression) => {
+                self.infer_call_expression(expression, call_expression)
+            }
             ast::Expr::Starred(starred) => self.infer_starred_expression(starred),
             ast::Expr::Yield(yield_expression) => self.infer_yield_expression(yield_expression),
             ast::Expr::YieldFrom(yield_from) => self.infer_yield_from_expression(yield_from),
@@ -4277,7 +4281,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             })
     }
 
-    fn infer_call_expression(&mut self, call_expression: &ast::ExprCall) -> Type<'db> {
+    fn infer_call_expression(
+        &mut self,
+        call_expression_node: &ast::Expr,
+        call_expression: &ast::ExprCall,
+    ) -> Type<'db> {
         let ast::ExprCall {
             range: _,
             func,
@@ -4332,6 +4340,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         | KnownClass::Object
                         | KnownClass::Property
                         | KnownClass::Super
+                        | KnownClass::TypeVar
                 )
             )
         {
@@ -4543,70 +4552,179 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 _ => {}
                             }
                         }
-                        Type::ClassLiteral(class)
-                            if class.is_known(self.db(), KnownClass::Super) =>
-                        {
-                            // Handle the case where `super()` is called with no arguments.
-                            // In this case, we need to infer the two arguments:
-                            //   1. The nearest enclosing class
-                            //   2. The first parameter of the current function (typically `self` or `cls`)
-                            match overload.parameter_types() {
-                                [] => {
-                                    let scope = self.scope();
 
-                                    let Some(enclosing_class) = self.enclosing_class_symbol(scope)
+                        Type::ClassLiteral(class) => {
+                            let Some(known_class) = class.known(self.db()) else {
+                                continue;
+                            };
+
+                            match known_class {
+                                KnownClass::Super => {
+                                    // Handle the case where `super()` is called with no arguments.
+                                    // In this case, we need to infer the two arguments:
+                                    //   1. The nearest enclosing class
+                                    //   2. The first parameter of the current function (typically `self` or `cls`)
+                                    match overload.parameter_types() {
+                                        [] => {
+                                            let scope = self.scope();
+
+                                            let Some(enclosing_class) =
+                                                self.enclosing_class_symbol(scope)
+                                            else {
+                                                overload.set_return_type(Type::unknown());
+                                                BoundSuperError::UnavailableImplicitArguments
+                                                    .report_diagnostic(
+                                                        &self.context,
+                                                        call_expression.into(),
+                                                    );
+                                                continue;
+                                            };
+
+                                            let Some(first_param) =
+                                                self.first_param_type_in_scope(scope)
+                                            else {
+                                                overload.set_return_type(Type::unknown());
+                                                BoundSuperError::UnavailableImplicitArguments
+                                                    .report_diagnostic(
+                                                        &self.context,
+                                                        call_expression.into(),
+                                                    );
+                                                continue;
+                                            };
+
+                                            let bound_super = BoundSuperType::build(
+                                                self.db(),
+                                                enclosing_class,
+                                                first_param,
+                                            )
+                                            .unwrap_or_else(|err| {
+                                                err.report_diagnostic(
+                                                    &self.context,
+                                                    call_expression.into(),
+                                                );
+                                                Type::unknown()
+                                            });
+
+                                            overload.set_return_type(bound_super);
+                                        }
+                                        [Some(pivot_class_type), Some(owner_type)] => {
+                                            let bound_super = BoundSuperType::build(
+                                                self.db(),
+                                                *pivot_class_type,
+                                                *owner_type,
+                                            )
+                                            .unwrap_or_else(|err| {
+                                                err.report_diagnostic(
+                                                    &self.context,
+                                                    call_expression.into(),
+                                                );
+                                                Type::unknown()
+                                            });
+
+                                            overload.set_return_type(bound_super);
+                                        }
+                                        _ => (),
+                                    }
+                                }
+
+                                KnownClass::TypeVar => {
+                                    let assigned_to = (self.index)
+                                        .try_expression(call_expression_node)
+                                        .and_then(|expr| expr.assigned_to(self.db()));
+
+                                    let Some(target) =
+                                        assigned_to.as_ref().and_then(|assigned_to| {
+                                            match assigned_to.node().targets.as_slice() {
+                                                [ast::Expr::Name(target)] => Some(target),
+                                                _ => None,
+                                            }
+                                        })
                                     else {
-                                        overload.set_return_type(Type::unknown());
-                                        BoundSuperError::UnavailableImplicitArguments
-                                            .report_diagnostic(
-                                                &self.context,
-                                                call_expression.into(),
-                                            );
+                                        if let Some(builder) = self.context.report_lint(
+                                            &INVALID_LEGACY_TYPE_VARIABLE,
+                                            call_expression,
+                                        ) {
+                                            builder.into_diagnostic(format_args!(
+                                                "A legacy `typing.TypeVar` must be immediately assigned to a variable",
+                                            ));
+                                        }
                                         continue;
                                     };
 
-                                    let Some(first_param) = self.first_param_type_in_scope(scope)
+                                    let [Some(name_param), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
+                                        overload.parameter_types()
                                     else {
-                                        overload.set_return_type(Type::unknown());
-                                        BoundSuperError::UnavailableImplicitArguments
-                                            .report_diagnostic(
-                                                &self.context,
-                                                call_expression.into(),
-                                            );
                                         continue;
                                     };
 
-                                    let bound_super = BoundSuperType::build(
-                                        self.db(),
-                                        enclosing_class,
-                                        first_param,
-                                    )
-                                    .unwrap_or_else(|err| {
-                                        err.report_diagnostic(
-                                            &self.context,
-                                            call_expression.into(),
-                                        );
-                                        Type::unknown()
-                                    });
+                                    let name_param = name_param
+                                        .into_string_literal()
+                                        .map(|name| name.value(self.db()).as_ref());
+                                    if name_param.is_none_or(|name_param| name_param != target.id) {
+                                        if let Some(builder) = self.context.report_lint(
+                                            &INVALID_LEGACY_TYPE_VARIABLE,
+                                            call_expression,
+                                        ) {
+                                            builder.into_diagnostic(format_args!(
+                                                "The name of a legacy `typing.TypeVar`{} must match \
+                                                the name of the variable it is assigned to (`{}`)",
+                                                if let Some(name_param) = name_param {
+                                                    format!(" (`{name_param}`)")
+                                                } else {
+                                                    String::new()
+                                                },
+                                                target.id,
+                                            ));
+                                        }
+                                        continue;
+                                    }
 
-                                    overload.set_return_type(bound_super);
-                                }
-                                [Some(pivot_class_type), Some(owner_type)] => {
-                                    let bound_super = BoundSuperType::build(
-                                        self.db(),
-                                        *pivot_class_type,
-                                        *owner_type,
-                                    )
-                                    .unwrap_or_else(|err| {
-                                        err.report_diagnostic(
-                                            &self.context,
-                                            call_expression.into(),
-                                        );
-                                        Type::unknown()
-                                    });
+                                    let bound_or_constraint = match (bound, constraints) {
+                                        (Some(bound), None) => {
+                                            Some(TypeVarBoundOrConstraints::UpperBound(*bound))
+                                        }
 
-                                    overload.set_return_type(bound_super);
+                                        (None, Some(_constraints)) => {
+                                            // We don't use UnionType::from_elements or UnionBuilder here,
+                                            // because we don't want to simplify the list of constraints like
+                                            // we do with the elements of an actual union type.
+                                            // TODO: Consider using a new `OneOfType` connective here instead,
+                                            // since that more accurately represents the actual semantics of
+                                            // typevar constraints.
+                                            let elements = UnionType::new(
+                                                self.db(),
+                                                overload
+                                                    .arguments_for_parameter(
+                                                        &call_argument_types,
+                                                        1,
+                                                    )
+                                                    .map(|(_, ty)| ty)
+                                                    .collect::<Box<_>>(),
+                                            );
+                                            Some(TypeVarBoundOrConstraints::Constraints(elements))
+                                        }
+
+                                        // TODO: Emit a diagnostic that TypeVar cannot be both bounded and
+                                        // constrained
+                                        (Some(_), Some(_)) => continue,
+
+                                        (None, None) => None,
+                                    };
+
+                                    let containing_assignment =
+                                        self.index.expect_single_definition(target);
+                                    overload.set_return_type(Type::KnownInstance(
+                                        KnownInstanceType::TypeVar(TypeVarInstance::new(
+                                            self.db(),
+                                            target.id.clone(),
+                                            containing_assignment,
+                                            bound_or_constraint,
+                                            *default,
+                                            TypeVarKind::Legacy,
+                                        )),
+                                    ));
                                 }
+
                                 _ => (),
                             }
                         }
@@ -6509,7 +6627,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                         if class.generic_context(self.db()).is_some() {
                             // TODO: specialize the generic class using these explicit type
-                            // variable assignments
+                            // variable assignments. This branch is only encountered when an
+                            // explicit class specialization appears inside of some other subscript
+                            // expression, e.g. `tuple[list[int], ...]`. We have already inferred
+                            // the type of the outer subscript slice as a value expression, which
+                            // means we can't re-infer the inner specialization here as a type
+                            // expression.
                             return value_ty;
                         }
                     }
@@ -6753,7 +6876,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 builder.into_diagnostic(format_args!(
                                     "Type qualifier `{type_qualifier}` \
                                      expects exactly one type parameter",
-                                    type_qualifier = known_instance.repr(self.db()),
+                                    type_qualifier = known_instance.repr(),
                                 ));
                             }
                             Type::unknown().into()
@@ -7111,7 +7234,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             ast::Expr::Call(call_expr) => {
-                self.infer_call_expression(call_expr);
+                self.infer_call_expression(expression, call_expr);
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("Function calls are not allowed in type expressions"),
@@ -7531,7 +7654,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(db)
+                            known_instance.repr()
                         ));
                     }
                     Type::unknown()
@@ -7558,7 +7681,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(db)
+                            known_instance.repr()
                         ));
                     }
                     Type::unknown()
@@ -7574,7 +7697,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr(db)
+                            known_instance.repr()
                         ));
                     }
                     Type::unknown()
@@ -7607,7 +7730,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 "Expected the first argument to `{}` \
                                  to be a callable object, \
                                  but got an object of type `{}`",
-                                known_instance.repr(db),
+                                known_instance.repr(),
                                 argument_type.display(db)
                             ));
                         }
@@ -7672,7 +7795,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     builder.into_diagnostic(format_args!(
                         "Type qualifier `{}` is not allowed in type expressions \
                          (only in annotation expressions)",
-                        known_instance.repr(db)
+                        known_instance.repr()
                     ));
                 }
                 self.infer_type_expression(arguments_slice)
@@ -7715,7 +7838,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "Type `{}` expected no type parameter",
-                        known_instance.repr(db)
+                        known_instance.repr()
                     ));
                 }
                 Type::unknown()
@@ -7729,7 +7852,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "Special form `{}` expected no type parameter",
-                        known_instance.repr(db)
+                        known_instance.repr()
                     ));
                 }
                 Type::unknown()
@@ -7740,7 +7863,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Type `{}` expected no type parameter",
-                        known_instance.repr(db)
+                        known_instance.repr()
                     ));
                     diag.info("Did you mean to use `Literal[...]` instead?");
                 }
@@ -8288,7 +8411,7 @@ mod tests {
                              constraints: Option<&[&'static str]>,
                              default: Option<&'static str>| {
             let var_ty = get_symbol(&db, "src/a.py", &["f"], var).expect_type();
-            assert_eq!(var_ty.display(&db).to_string(), var);
+            assert_eq!(var_ty.display(&db).to_string(), "typing.TypeVar");
 
             let expected_name_ty = format!(r#"Literal["{var}"]"#);
             let name_ty = var_ty.member(&db, "__name__").symbol.expect_type();

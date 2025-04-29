@@ -5,9 +5,9 @@ use crate::semantic_index::SemanticIndex;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     declaration_type, KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance,
-    UnionBuilder, UnionType,
+    UnionType,
 };
-use crate::Db;
+use crate::{Db, FxOrderSet};
 
 /// A list of formal type variables for a generic function, class, or type alias.
 ///
@@ -20,6 +20,7 @@ pub struct GenericContext<'db> {
 }
 
 impl<'db> GenericContext<'db> {
+    /// Creates a generic context from a list of PEP-695 type parameters.
     pub(crate) fn from_type_params(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
@@ -51,6 +52,32 @@ impl<'db> GenericContext<'db> {
             ast::TypeParam::ParamSpec(_) => None,
             ast::TypeParam::TypeVarTuple(_) => None,
         }
+    }
+
+    /// Creates a generic context from the legecy `TypeVar`s that appear in a function parameter
+    /// list.
+    pub(crate) fn from_function_params(
+        db: &'db dyn Db,
+        parameters: &Parameters<'db>,
+        return_type: Option<Type<'db>>,
+    ) -> Option<Self> {
+        let mut variables = FxOrderSet::default();
+        for param in parameters {
+            if let Some(ty) = param.annotated_type() {
+                ty.find_legacy_typevars(db, &mut variables);
+            }
+            if let Some(ty) = param.default_type() {
+                ty.find_legacy_typevars(db, &mut variables);
+            }
+        }
+        if let Some(ty) = return_type {
+            ty.find_legacy_typevars(db, &mut variables);
+        }
+        if variables.is_empty() {
+            return None;
+        }
+        let variables: Box<[_]> = variables.into_iter().collect();
+        Some(Self::new(db, variables))
     }
 
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -303,7 +330,7 @@ impl<'db> Specialization<'db> {
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
-    types: FxHashMap<TypeVarInstance<'db>, UnionBuilder<'db>>,
+    types: FxHashMap<TypeVarInstance<'db>, Type<'db>>,
 }
 
 impl<'db> SpecializationBuilder<'db> {
@@ -320,8 +347,8 @@ impl<'db> SpecializationBuilder<'db> {
             .iter()
             .map(|variable| {
                 self.types
-                    .remove(variable)
-                    .map(UnionBuilder::build)
+                    .get(variable)
+                    .copied()
                     .unwrap_or(variable.default_ty(self.db).unwrap_or(Type::unknown()))
             })
             .collect();
@@ -329,17 +356,25 @@ impl<'db> SpecializationBuilder<'db> {
     }
 
     fn add_type_mapping(&mut self, typevar: TypeVarInstance<'db>, ty: Type<'db>) {
-        let builder = self
-            .types
+        self.types
             .entry(typevar)
-            .or_insert_with(|| UnionBuilder::new(self.db));
-        builder.add_in_place(ty);
+            .and_modify(|existing| {
+                *existing = UnionType::from_elements(self.db, [*existing, ty]);
+            })
+            .or_insert(ty);
     }
 
-    pub(crate) fn infer(&mut self, formal: Type<'db>, actual: Type<'db>) {
-        // If the actual type is already assignable to the formal type, then return without adding
-        // any new type mappings. (Note that if the formal type contains any typevars, this check
-        // will fail, since no non-typevar types are assignable to a typevar.)
+    pub(crate) fn infer(
+        &mut self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+    ) -> Result<(), SpecializationError<'db>> {
+        // If the actual type is a subtype of the formal type, then return without adding any new
+        // type mappings. (Note that if the formal type contains any typevars, this check will
+        // fail, since no non-typevar types are assignable to a typevar. Also note that we are
+        // checking _subtyping_, not _assignability_, so that we do specialize typevars to dynamic
+        // argument types; and we have a special case for `Never`, which is a subtype of all types,
+        // but which we also do want as a specialization candidate.)
         //
         // In particular, this handles a case like
         //
@@ -350,12 +385,37 @@ impl<'db> SpecializationBuilder<'db> {
         // ```
         //
         // without specializing `T` to `None`.
-        if actual.is_assignable_to(self.db, formal) {
-            return;
+        if !actual.is_never() && actual.is_subtype_of(self.db, formal) {
+            return Ok(());
         }
 
         match (formal, actual) {
-            (Type::TypeVar(typevar), _) => self.add_type_mapping(typevar, actual),
+            (Type::TypeVar(typevar), _) => match typevar.bound_or_constraints(self.db) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    if !actual.is_assignable_to(self.db, bound) {
+                        return Err(SpecializationError::MismatchedBound {
+                            typevar,
+                            argument: actual,
+                        });
+                    }
+                    self.add_type_mapping(typevar, actual);
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    for constraint in constraints.iter(self.db) {
+                        if actual.is_assignable_to(self.db, *constraint) {
+                            self.add_type_mapping(typevar, *constraint);
+                            return Ok(());
+                        }
+                    }
+                    return Err(SpecializationError::MismatchedConstraint {
+                        typevar,
+                        argument: actual,
+                    });
+                }
+                _ => {
+                    self.add_type_mapping(typevar, actual);
+                }
+            },
 
             (Type::Tuple(formal_tuple), Type::Tuple(actual_tuple)) => {
                 let formal_elements = formal_tuple.elements(self.db);
@@ -364,7 +424,7 @@ impl<'db> SpecializationBuilder<'db> {
                     for (formal_element, actual_element) in
                         formal_elements.iter().zip(actual_elements)
                     {
-                        self.infer(*formal_element, *actual_element);
+                        self.infer(*formal_element, *actual_element)?;
                     }
                 }
             }
@@ -397,12 +457,42 @@ impl<'db> SpecializationBuilder<'db> {
                 // actual type must also be disjoint from every negative element of the
                 // intersection, but that doesn't help us infer any type mappings.)
                 for positive in formal.iter_positive(self.db) {
-                    self.infer(positive, actual);
+                    self.infer(positive, actual)?;
                 }
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables
             _ => {}
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum SpecializationError<'db> {
+    MismatchedBound {
+        typevar: TypeVarInstance<'db>,
+        argument: Type<'db>,
+    },
+    MismatchedConstraint {
+        typevar: TypeVarInstance<'db>,
+        argument: Type<'db>,
+    },
+}
+
+impl<'db> SpecializationError<'db> {
+    pub(crate) fn typevar(&self) -> TypeVarInstance<'db> {
+        match self {
+            Self::MismatchedBound { typevar, .. } => *typevar,
+            Self::MismatchedConstraint { typevar, .. } => *typevar,
+        }
+    }
+
+    pub(crate) fn argument_type(&self) -> Type<'db> {
+        match self {
+            Self::MismatchedBound { argument, .. } => *argument,
+            Self::MismatchedConstraint { argument, .. } => *argument,
         }
     }
 }
