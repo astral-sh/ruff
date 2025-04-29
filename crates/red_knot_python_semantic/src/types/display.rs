@@ -10,15 +10,12 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    FunctionSignature, IntersectionType, KnownClass, MethodWrapperKind, StringLiteralType,
-    SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
-    WrapperDescriptorKind,
+    CallableType, FunctionSignature, IntersectionType, KnownClass, MethodWrapperKind, Protocol,
+    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
+    UnionType, WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
-
-use super::instance::Protocol;
-use super::CallableType;
 
 impl<'db> Type<'db> {
     pub fn display(&self, db: &'db dyn Db) -> DisplayType {

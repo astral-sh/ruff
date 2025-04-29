@@ -1,4 +1,3 @@
-use instance::{Protocol, ProtocolInstanceType};
 use itertools::Either;
 
 use std::slice::Iter;
@@ -52,7 +51,8 @@ pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::signatures::{Parameter, ParameterForm, Parameters};
 use crate::{Db, FxOrderSet, Module, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, KnownClass};
-pub(crate) use instance::NominalInstanceType;
+use instance::Protocol;
+pub(crate) use instance::{NominalInstanceType, ProtocolInstanceType};
 pub(crate) use known_instance::KnownInstanceType;
 
 mod builder;
