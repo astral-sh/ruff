@@ -20,39 +20,16 @@ impl Default for DiagnosticStylesheet {
 
 impl DiagnosticStylesheet {
     /// Default terminal styling
-    ///
-    /// # Note
-    /// When testing styled terminal output, see the [`testing-colors` feature](crate#features)
     pub fn styled() -> Self {
-        #[cfg(windows)]
-        const USE_WINDOWS_COLORS: bool = !cfg!(feature = "testing-colors");
-        #[cfg(not(windows))]
-        const USE_WINDOWS_COLORS: bool = false;
-
-        let bright_blue = if USE_WINDOWS_COLORS {
-            AnsiColor::BrightCyan.on_default()
-        } else {
-            AnsiColor::BrightBlue.on_default()
-        };
-
+        let bright_blue = AnsiColor::BrightBlue.on_default();
         Self {
             error: AnsiColor::BrightRed.on_default().effects(Effects::BOLD),
-            warning: if USE_WINDOWS_COLORS {
-                AnsiColor::BrightYellow.on_default()
-            } else {
-                AnsiColor::Yellow.on_default()
-            }
-            .effects(Effects::BOLD),
+            warning: AnsiColor::Yellow.on_default().effects(Effects::BOLD),
             info: bright_blue.effects(Effects::BOLD),
             note: AnsiColor::BrightGreen.on_default().effects(Effects::BOLD),
             help: AnsiColor::BrightCyan.on_default().effects(Effects::BOLD),
             line_no: bright_blue.effects(Effects::BOLD),
-            emphasis: if USE_WINDOWS_COLORS {
-                AnsiColor::BrightWhite.on_default()
-            } else {
-                Style::new()
-            }
-            .effects(Effects::BOLD),
+            emphasis: Style::new().effects(Effects::BOLD),
             none: Style::new(),
         }
     }
