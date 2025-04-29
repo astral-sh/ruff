@@ -13,8 +13,7 @@ python-version = "3.11"
 try:
     help()
 except* BaseException as e:
-    # TODO: should be `BaseExceptionGroup[BaseException]` --Alex
-    reveal_type(e)  # revealed: BaseExceptionGroup
+    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
 ```
 
 ## `except*` with specific exception
@@ -25,7 +24,7 @@ try:
 except* OSError as e:
     # TODO: more precise would be `ExceptionGroup[OSError]` --Alex
     # (needs homogeneous tuples + generics)
-    reveal_type(e)  # revealed: BaseExceptionGroup
+    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
 ```
 
 ## `except*` with multiple exceptions
@@ -36,7 +35,7 @@ try:
 except* (TypeError, AttributeError) as e:
     # TODO: more precise would be `ExceptionGroup[TypeError | AttributeError]` --Alex
     # (needs homogeneous tuples + generics)
-    reveal_type(e)  # revealed: BaseExceptionGroup
+    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
 ```
 
 ## `except*` with mix of `Exception`s and `BaseException`s
@@ -46,7 +45,7 @@ try:
     help()
 except* (KeyboardInterrupt, AttributeError) as e:
     # TODO: more precise would be `BaseExceptionGroup[KeyboardInterrupt | AttributeError]` --Alex
-    reveal_type(e)  # revealed: BaseExceptionGroup
+    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
 ```
 
 ## Invalid `except*` handlers
@@ -56,11 +55,11 @@ try:
     help()
 except* 3 as e:  # error: [invalid-exception-caught]
     # TODO: Should be `BaseExceptionGroup[Unknown]` --Alex
-    reveal_type(e)  # revealed: BaseExceptionGroup
+    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
 
 try:
     help()
 except* (AttributeError, 42) as e:  # error: [invalid-exception-caught]
     # TODO: Should be `BaseExceptionGroup[AttributeError | Unknown]` --Alex
-    reveal_type(e)  # revealed: BaseExceptionGroup
+    reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
 ```

@@ -45,8 +45,9 @@ def f(
     reveal_type(chain_map_bare)  # revealed: ChainMap
     reveal_type(chain_map_parametrized)  # revealed: ChainMap
 
-    reveal_type(counter_bare)  # revealed: Counter
-    reveal_type(counter_parametrized)  # revealed: Counter
+    reveal_type(counter_bare)  # revealed: Counter[Unknown]
+    # TODO: revealed: Counter[int]
+    reveal_type(counter_parametrized)  # revealed: Counter[Unknown]
 
     reveal_type(default_dict_bare)  # revealed: defaultdict
     reveal_type(default_dict_parametrized)  # revealed: defaultdict
@@ -78,7 +79,7 @@ reveal_type(ListSubclass.__mro__)
 class DictSubclass(typing.Dict): ...
 
 # TODO: generic protocols
-# revealed: tuple[Literal[DictSubclass], Literal[dict], Literal[MutableMapping], Literal[Mapping], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], Literal[object]]
+# revealed: tuple[Literal[DictSubclass], Literal[dict], Literal[MutableMapping], Literal[Mapping[_KT, _VT]], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], Literal[object]]
 reveal_type(DictSubclass.__mro__)
 
 class SetSubclass(typing.Set): ...
@@ -100,13 +101,13 @@ reveal_type(FrozenSetSubclass.__mro__)
 class ChainMapSubclass(typing.ChainMap): ...
 
 # TODO: generic protocols
-# revealed: tuple[Literal[ChainMapSubclass], Literal[ChainMap], Literal[MutableMapping], Literal[Mapping], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], Literal[object]]
+# revealed: tuple[Literal[ChainMapSubclass], Literal[ChainMap], Literal[MutableMapping], Literal[Mapping[_KT, _VT]], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], Literal[object]]
 reveal_type(ChainMapSubclass.__mro__)
 
 class CounterSubclass(typing.Counter): ...
 
 # TODO: Should be (CounterSubclass, Counter, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[CounterSubclass], Literal[Counter], @Todo(GenericAlias instance), typing.Generic[_T], Literal[object]]
+# revealed: tuple[Literal[CounterSubclass], Literal[Counter[Unknown]], @Todo(GenericAlias instance), typing.Generic[_T], Literal[object]]
 reveal_type(CounterSubclass.__mro__)
 
 class DefaultDictSubclass(typing.DefaultDict): ...
