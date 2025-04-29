@@ -416,6 +416,12 @@ impl<'db> ClassLiteral<'db> {
 
     #[salsa::tracked]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        // Several typeshed definitions examine `sys.version_info`. To break cycles, we hard-code
+        // the knowledge that this class is not generic.
+        if self.is_known(db, KnownClass::VersionInfo) {
+            return None;
+        }
+
         // TODO: Raise a diagnostic if a class literal contains both a PEP-695 generic scope and a
         // `typing.Generic` base class.
         let scope = self.body_scope(db);
