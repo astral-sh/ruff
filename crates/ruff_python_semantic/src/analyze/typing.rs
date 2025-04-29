@@ -639,6 +639,18 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             _ => false,
         },
 
+        BindingKind::FunctionDefinition(_) => match binding.statement(semantic) {
+            // ```python
+            // def foo() -> int:
+            //   ...
+            // ```
+            Some(Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. })) => returns
+                .as_ref()
+                .is_some_and(|return_ann| T::match_annotation(return_ann, semantic)),
+
+            _ => false,
+        },
+
         _ => false,
     }
 }

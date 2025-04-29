@@ -180,7 +180,7 @@ fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
         return true;
     }
 
-    let Some(name) = expr.as_name_expr() else {
+    let Some(name) = get_name_expr(expr) else {
         return false;
     };
 
@@ -189,4 +189,12 @@ fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool {
     };
 
     typing::is_int(binding, semantic)
+}
+
+fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {
+    match expr {
+        Expr::Name(name) => Some(name),
+        Expr::Call(ast::ExprCall { func, .. }) => get_name_expr(func),
+        _ => None,
+    }
 }

@@ -55,3 +55,8 @@ x = 2
 open(x)
 def foo(y: int):
     open(y)
+
+# https://github.com/astral-sh/ruff/issues/17691
+def f() -> int:
+    return 1
+open(f())
