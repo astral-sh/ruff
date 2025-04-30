@@ -10,14 +10,12 @@ use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    FunctionSignature, IntersectionType, KnownClass, MethodWrapperKind, StringLiteralType,
-    SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionType,
-    WrapperDescriptorKind,
+    CallableType, FunctionSignature, IntersectionType, KnownClass, MethodWrapperKind, Protocol,
+    StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
+    UnionType, WrapperDescriptorKind,
 };
 use crate::Db;
 use rustc_hash::FxHashMap;
-
-use super::CallableType;
 
 impl<'db> Type<'db> {
     pub fn display(&self, db: &'db dyn Db) -> DisplayType {
@@ -73,11 +71,32 @@ impl Display for DisplayRepresentation<'_> {
         match self.ty {
             Type::Dynamic(dynamic) => dynamic.fmt(f),
             Type::Never => f.write_str("Never"),
-            Type::Instance(instance) => match (instance.class(), instance.class().known(self.db)) {
-                (_, Some(KnownClass::NoneType)) => f.write_str("None"),
-                (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
-                (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
-                (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
+            Type::NominalInstance(instance) => {
+                match (instance.class(), instance.class().known(self.db)) {
+                    (_, Some(KnownClass::NoneType)) => f.write_str("None"),
+                    (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
+                    (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
+                    (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
+                }
+            }
+            Type::ProtocolInstance(protocol) => match protocol.inner() {
+                Protocol::FromClass(ClassType::NonGeneric(class)) => {
+                    f.write_str(class.name(self.db))
+                }
+                Protocol::FromClass(ClassType::Generic(alias)) => alias.display(self.db).fmt(f),
+                Protocol::Synthesized(synthetic) => {
+                    f.write_str("<Protocol with members ")?;
+                    let member_list = synthetic.members(self.db);
+                    let num_members = member_list.len();
+                    for (i, member) in member_list.iter().enumerate() {
+                        let is_last = i == num_members - 1;
+                        write!(f, "'{member}'")?;
+                        if !is_last {
+                            f.write_str(", ")?;
+                        }
+                    }
+                    f.write_char('>')
+                }
             },
             Type::PropertyInstance(_) => f.write_str("property"),
             Type::ModuleLiteral(module) => {
@@ -761,6 +780,7 @@ mod tests {
     use ruff_python_ast::name::Name;
 
     use crate::db::tests::setup_db;
+    use crate::symbol::typing_extensions_symbol;
     use crate::types::{
         KnownClass, Parameter, Parameters, Signature, SliceLiteralType, StringLiteralType, Type,
     };
@@ -829,6 +849,31 @@ mod tests {
                 .display(&db)
                 .to_string(),
             r#"Literal["\""]"#
+        );
+    }
+
+    #[test]
+    fn synthesized_protocol_display() {
+        let db = setup_db();
+
+        // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
+        let supports_index_synthesized = KnownClass::SupportsIndex.to_instance(&db).normalized(&db);
+        assert_eq!(
+            supports_index_synthesized.display(&db).to_string(),
+            "<Protocol with members '__index__'>"
+        );
+
+        let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
+            .symbol
+            .ignore_possibly_unbound()
+            .unwrap()
+            .to_instance(&db)
+            .unwrap()
+            .normalized(&db); // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
+
+        assert_eq!(
+            iterator_synthesized.display(&db).to_string(),
+            "<Protocol with members '__iter__', '__next__'>"
         );
     }
 
