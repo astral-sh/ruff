@@ -20,6 +20,7 @@ use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashSet;
 use salsa::Durability;
 use salsa::Setter;
+use std::backtrace::BacktraceStatus;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
@@ -626,10 +627,27 @@ where
             ));
 
             if let Some(backtrace) = error.backtrace {
-                diagnostic.sub(SubDiagnostic::new(
-                    Severity::Info,
-                    format!("Backtrace:\n{backtrace}"),
-                ));
+                match backtrace.status() {
+                    BacktraceStatus::Disabled => {
+                        diagnostic.sub(SubDiagnostic::new(
+                            Severity::Info,
+                            "run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information",
+                        ));
+                    }
+                    BacktraceStatus::Captured => {
+                        diagnostic.sub(SubDiagnostic::new(
+                            Severity::Info,
+                            format!("Backtrace:\n{backtrace}"),
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+
+            if let Some(backtrace) = error.salsa_backtrace {
+                salsa::attach(db, || {
+                    diagnostic.sub(SubDiagnostic::new(Severity::Info, backtrace.to_string()));
+                });
             }
 
             Err(diagnostic)

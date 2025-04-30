@@ -160,7 +160,7 @@ pub(crate) fn format(
                             }),
                             Err(error) => Err(FormatCommandError::Panic(
                                 Some(resolved_file.path().to_path_buf()),
-                                error,
+                                Box::new(error),
                             )),
                         },
                     )
@@ -635,7 +635,7 @@ impl<'a> FormatResults<'a> {
 pub(crate) enum FormatCommandError {
     Ignore(#[from] ignore::Error),
     Parse(#[from] DisplayParseError),
-    Panic(Option<PathBuf>, PanicError),
+    Panic(Option<PathBuf>, Box<PanicError>),
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),

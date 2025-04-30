@@ -1,5 +1,7 @@
+use crate::importer::ImportRequest;
+
 use crate::rules::airflow::helpers::ProviderReplacement;
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute};
 use ruff_python_semantic::Modules;
@@ -34,6 +36,7 @@ pub(crate) struct Airflow3SuggestedToMoveToProvider {
 }
 
 impl Violation for Airflow3SuggestedToMoveToProvider {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
     #[derive_message_formats]
     fn message(&self) -> String {
         let Airflow3SuggestedToMoveToProvider {
@@ -124,14 +127,16 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
 
     let replacement = match qualified_name.segments() {
         // apache-airflow-providers-standard
-        ["airflow", "hooks", "filesystem", "FSHook"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.standard.hooks.filesystem.FSHook",
+        ["airflow", "hooks", "filesystem", "FSHook"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.hooks.filesystem",
+            name: "FSHook",
             provider: "standard",
             version: "0.0.1",
         },
         ["airflow", "hooks", "package_index", "PackageIndexHook"] => {
-            ProviderReplacement::ProviderName {
-                name: "airflow.providers.standard.hooks.package_index.PackageIndexHook",
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.standard.hooks.package_index",
+                name: "PackageIndexHook",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -144,8 +149,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 version: "0.0.3",
             }
         }
-        ["airflow", "operators", "bash", "BashOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.standard.operators.bash.BashOperator",
+        ["airflow", "operators", "bash", "BashOperator"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.operators.bash",
+            name: "BashOperator",
             provider: "standard",
             version: "0.0.1",
         },
@@ -165,14 +171,16 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 version: "0.0.2",
             }
         }
-        ["airflow", "operators", "empty", "EmptyOperator"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.standard.operators.empty.EmptyOperator",
+        ["airflow", "operators", "empty", "EmptyOperator"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.operators.empty",
+            name: "EmptyOperator",
             provider: "standard",
             version: "0.0.2",
         },
         ["airflow", "operators", "latest_only", "LatestOnlyOperator"] => {
-            ProviderReplacement::ProviderName {
-                name: "airflow.providers.standard.operators.latest_only.LatestOnlyOperator",
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.standard.operators.latest_only",
+                name: "LatestOnlyOperator",
                 provider: "standard",
                 version: "0.0.3",
             }
@@ -187,8 +195,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
             version: "0.0.1",
         },
         ["airflow", "operators", "weekday", "BranchDayOfWeekOperator"] => {
-            ProviderReplacement::ProviderName {
-                name: "airflow.providers.standard.operators.weekday.BranchDayOfWeekOperator",
+            ProviderReplacement::AutoImport {
+                module: "airflow.providers.standard.operators.weekday",
+                name: "BranchDayOfWeekOperator",
                 provider: "standard",
                 version: "0.0.1",
             }
@@ -209,8 +218,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 version: "0.0.3",
             }
         }
-        ["airflow", "sensors", "filesystem", "FileSensor"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.standard.sensors.filesystem.FileSensor",
+        ["airflow", "sensors", "filesystem", "FileSensor"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.sensors.filesystem",
+            name: "FileSensor",
             provider: "standard",
             version: "0.0.2",
         },
@@ -230,8 +240,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 version: "0.0.1",
             }
         }
-        ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.standard.sensors.weekday.DayOfWeekSensor",
+        ["airflow", "sensors", "weekday", "DayOfWeekSensor"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.sensors.weekday",
+            name: "DayOfWeekSensor",
             provider: "standard",
             version: "0.0.1",
         },
@@ -243,8 +254,9 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
                 version: "0.0.3",
             }
         }
-        ["airflow", "triggers", "file", "FileTrigger"] => ProviderReplacement::ProviderName {
-            name: "airflow.providers.standard.triggers.file.FileTrigger",
+        ["airflow", "triggers", "file", "FileTrigger"] => ProviderReplacement::AutoImport {
+            module: "airflow.providers.standard.triggers.file",
+            name: "FileTrigger",
             provider: "standard",
             version: "0.0.3",
         },
@@ -258,11 +270,32 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         }
         _ => return,
     };
-    checker.report_diagnostic(Diagnostic::new(
+
+    let mut diagnostic = Diagnostic::new(
         Airflow3SuggestedToMoveToProvider {
             deprecated: qualified_name.to_string(),
-            replacement,
+            replacement: replacement.clone(),
         },
         ranged.range(),
-    ));
+    );
+
+    if let ProviderReplacement::AutoImport {
+        module,
+        name,
+        provider: _,
+        version: _,
+    } = replacement
+    {
+        diagnostic.try_set_fix(|| {
+            let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                &ImportRequest::import_from(module, name),
+                expr.start(),
+                checker.semantic(),
+            )?;
+            let replacement_edit = Edit::range_replacement(binding, ranged.range());
+            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+        });
+    }
+
+    checker.report_diagnostic(diagnostic);
 }
