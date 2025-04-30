@@ -562,6 +562,13 @@ impl<'db> ClassLiteral<'db> {
             })
     }
 
+    /// Determine if this is an abstract class.
+    pub(super) fn is_abstract(self, db: &'db dyn Db) -> bool {
+        self.metaclass(db)
+            .into_class_literal()
+            .is_some_and(|metaclass| metaclass.is_known(db, KnownClass::ABCMeta))
+    }
+
     /// Return the types of the decorators on this class
     #[salsa::tracked(return_ref)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {

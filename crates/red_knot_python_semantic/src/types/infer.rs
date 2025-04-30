@@ -744,7 +744,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // TODO: Only call this function when diagnostics are enabled.
         self.check_class_definitions();
-        self.check_overloaded_functions();
+        self.check_overloaded_functions(node);
     }
 
     /// Iterate over all class definitions to check that the definition will not cause an exception
@@ -987,7 +987,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ///
     /// For (1), this has the consequence of not checking an overloaded function that is being
     /// shadowed by another function with the same name in this scope.
-    fn check_overloaded_functions(&mut self) {
+    fn check_overloaded_functions(&mut self, scope: &NodeWithScopeKind) {
         // Collect all the unique overloaded function symbols in this scope. This requires a set
         // because an overloaded function uses the same symbol for each of the overloads and the
         // implementation.
@@ -1054,6 +1054,46 @@ impl<'db> TypeInferenceBuilder<'db> {
                             .secondary(single_overload.focus_range(self.db()))
                             .message(format_args!("Only one overload defined here")),
                     );
+                }
+            }
+
+            // Check that the overloaded function has an implementation. Overload definitions
+            // within stub files, protocols, and on abstract methods within abstract base classes
+            // are exempt from this check.
+            if overloaded.implementation.is_none() && !self.in_stub() {
+                let mut implementation_required = true;
+
+                if let NodeWithScopeKind::Class(class_node_ref) = scope {
+                    let class = binding_type(
+                        self.db(),
+                        self.index.expect_single_definition(class_node_ref.node()),
+                    )
+                    .expect_class_literal();
+
+                    if class.is_protocol(self.db())
+                        || (class.is_abstract(self.db())
+                            && overloaded.overloads.iter().all(|overload| {
+                                overload.has_known_decorator(
+                                    self.db(),
+                                    FunctionDecorators::ABSTRACT_METHOD,
+                                )
+                            }))
+                    {
+                        implementation_required = false;
+                    }
+                }
+
+                if implementation_required {
+                    let function_node = function.node(self.db(), self.file());
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_OVERLOAD, &function_node.name)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Overloaded non-stub function `{}` must have an implementation",
+                            &function_node.name
+                        ));
+                    }
                 }
             }
         }

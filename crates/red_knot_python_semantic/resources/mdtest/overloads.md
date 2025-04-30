@@ -336,23 +336,25 @@ def func(x: int) -> int: ...
 
 #### Regular modules
 
+<!-- snapshot-diagnostics -->
+
 In regular modules, a series of `@overload`-decorated definitions must be followed by exactly one
 non-`@overload`-decorated definition (for the same function/method).
 
 ```py
 from typing import overload
 
-# TODO: error because implementation does not exists
 @overload
 def func(x: int) -> int: ...
 @overload
+# error: [invalid-overload] "Overloaded non-stub function `func` must have an implementation"
 def func(x: str) -> str: ...
 
 class Foo:
-    # TODO: error because implementation does not exists
     @overload
     def method(self, x: int) -> int: ...
     @overload
+    # error: [invalid-overload] "Overloaded non-stub function `method` must have an implementation"
     def method(self, x: str) -> str: ...
 ```
 
@@ -405,12 +407,12 @@ from it.
 
 ```py
 class Foo:
-    # TODO: Error because implementation does not exists
     @overload
     @abstractmethod
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
+    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
 ```
 
@@ -422,6 +424,7 @@ class PartialFoo1(ABC):
     @abstractmethod
     def f(self, x: int) -> int: ...
     @overload
+    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
 
 class PartialFoo(ABC):
@@ -429,6 +432,7 @@ class PartialFoo(ABC):
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
+    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
 ```
 
