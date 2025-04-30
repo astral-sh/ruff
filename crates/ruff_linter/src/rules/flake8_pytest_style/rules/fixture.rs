@@ -1,11 +1,12 @@
 use ruff_diagnostics::{AlwaysFixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::Decorator;
 use ruff_python_ast::{self as ast, Expr, Parameters, Stmt};
-use ruff_python_ast::{visitor, ArgOrKeyword};
 use ruff_python_semantic::analyze::visibility::is_abstract;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::LineRanges;
@@ -18,8 +19,8 @@ use crate::fix::edits;
 use crate::registry::Rule;
 
 use super::helpers::{
-    get_mark_decorators, get_parametrize_decorators, is_pytest_fixture, is_pytest_yield_fixture,
-    keyword_is_literal, Parentheses,
+    get_mark_decorators, is_pytest_fixture, is_pytest_yield_fixture, keyword_is_literal,
+    Parentheses,
 };
 
 /// ## What it does
@@ -810,7 +811,10 @@ fn check_fixture_returns(checker: &Checker, name: &str, body: &[Stmt], returns: 
 /// PT019
 fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorators: &[Decorator]) {
     let mut named_parametrize = FxHashSet::default();
-    for decorator in get_parametrize_decorators(decorators) {
+    for decorator in decorators.iter().filter(|decorator| {
+        UnqualifiedName::from_expr(map_callable(&decorator.expression))
+            .is_some_and(|name| matches!(name.segments(), ["pytest", "mark", "parametrize"]))
+    }) {
         let Some(call_expr) = decorator.expression.as_call_expr() else {
             continue;
         };
