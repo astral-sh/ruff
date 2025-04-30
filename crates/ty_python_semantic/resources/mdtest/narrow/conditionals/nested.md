@@ -45,9 +45,17 @@ def _(flag1: bool, flag2: bool):
 
 ## Cross-scope narrowing
 
-```py
-from typing import Literal
+Narrowing constraints are also valid in eager nested scopes (however, because class variables are
+not visible from nested scopes, constraints on those variables are invalid).
 
+Currently they are assumed to be invalid in lazy nested scopes since there is a possibility that the
+constraints may no longer be valid due to a "time lag". However, it may be possible to determine
+that some of them are valid by performing a more detailed analysis (e.g. checking that the narrowing
+target has not changed in all places where the function is called).
+
+### Narrowing constraints introduced in eager nested scopes
+
+```py
 def f(x: str | None):
     def _():
         if x is not None:
@@ -58,8 +66,14 @@ def f(x: str | None):
             reveal_type(x)  # revealed: str
 
     # TODO: should be str
+    # This could be fixed if we supported narrowing with if clauses in comprehensions.
     [reveal_type(x) for _ in range(1) if x is not None]  # revealed: str | None
+```
 
+### Narrowing constraints introduced in the outer scope
+
+```py
+def f(x: str | None):
     if x is not None:
         def _():
             # If there is a possibility that `x` may be rewritten after this function definition,
@@ -70,8 +84,14 @@ def f(x: str | None):
             reveal_type(x)  # revealed: str
 
         [reveal_type(x) for _ in range(1)]  # revealed: str
+```
 
-def g(x: str | Literal[1] | None):
+### Narrowing constraints introduced in multiple scopes
+
+```py
+from typing import Literal
+
+def f(x: str | Literal[1] | None):
     class C:
         if x is not None:
             def _():

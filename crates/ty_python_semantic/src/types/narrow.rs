@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use super::UnionType;
 
-/// Return the type constraint that `test` (if true) would place on `definition`, if any.
+/// Return the type constraint that `test` (if true) would place on (definition) `symbol`, if any.
 ///
 /// For example, if we have this code:
 ///
@@ -34,7 +34,7 @@ use super::UnionType;
 /// The `test` expression `x is not None` places the constraint "not None" on the definition of
 /// `x`, so in that case we'd return `Some(Type::Intersection(negative=[Type::None]))`.
 ///
-/// But if we called this with the same `test` expression, but the `definition` of `y`, no
+/// But if we called this with the same `test` expression, but the `symbol` of `y`, no
 /// constraint is applied to that definition, so we'd just return `None`.
 pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
