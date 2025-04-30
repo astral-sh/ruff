@@ -4527,27 +4527,43 @@ impl<'db> Type<'db> {
                 new_call_outcome @ (None | Some(Ok(_))),
                 init_call_outcome @ (None | Some(Ok(_))),
             ) => {
+                fn combine_specializations<'db>(
+                    db: &'db dyn Db,
+                    s1: Option<Specialization<'db>>,
+                    s2: Option<Specialization<'db>>,
+                ) -> Option<Specialization<'db>> {
+                    match (s1, s2) {
+                        (None, None) => None,
+                        (Some(s), None) | (None, Some(s)) => Some(s),
+                        (Some(s1), Some(s2)) => Some(s1.combine(db, s2)),
+                    }
+                }
+
+                fn combine_binding_specialization<'db>(
+                    db: &'db dyn Db,
+                    binding: &CallableBinding<'db>,
+                ) -> Option<Specialization<'db>> {
+                    binding
+                        .matching_overloads()
+                        .map(|(_, binding)| binding.inherited_specialization())
+                        .reduce(|acc, specialization| {
+                            combine_specializations(db, acc, specialization)
+                        })
+                        .flatten()
+                }
+
                 let new_specialization = new_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(CallableBinding::matching_overload)
-                    .and_then(|(_, binding)| binding.inherited_specialization());
+                    .and_then(|binding| combine_binding_specialization(db, binding));
                 let init_specialization = init_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(CallableBinding::matching_overload)
-                    .and_then(|(_, binding)| binding.inherited_specialization());
-                let specialization = match (new_specialization, init_specialization) {
-                    (None, None) => None,
-                    (Some(specialization), None) | (None, Some(specialization)) => {
-                        Some(specialization)
-                    }
-                    (Some(new_specialization), Some(init_specialization)) => {
-                        Some(new_specialization.combine(db, init_specialization))
-                    }
-                };
+                    .and_then(|binding| combine_binding_specialization(db, binding));
+                let specialization =
+                    combine_specializations(db, new_specialization, init_specialization);
                 let specialized = specialization
                     .map(|specialization| {
                         Type::instance(
