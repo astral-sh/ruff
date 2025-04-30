@@ -6848,6 +6848,8 @@ pub enum KnownFunction {
     IsSingleton,
     /// `knot_extensions.is_single_valued`
     IsSingleValued,
+    /// `knot_extensions.is_generic_class`
+    IsGenericClass,
 }
 
 impl KnownFunction {
@@ -6903,6 +6905,7 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
+            | Self::IsGenericClass
             | Self::StaticAssert => module.is_knot_extensions(),
         }
     }
@@ -8299,6 +8302,7 @@ pub(crate) mod tests {
 
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
+                | KnownFunction::IsGenericClass
                 | KnownFunction::StaticAssert
                 | KnownFunction::IsFullyStatic
                 | KnownFunction::IsDisjointFrom

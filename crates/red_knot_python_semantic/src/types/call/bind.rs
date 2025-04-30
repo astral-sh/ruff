@@ -553,6 +553,15 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
+                    Some(KnownFunction::IsGenericClass) => {
+                        if let [Some(ty)] = overload.parameter_types() {
+                            overload.set_return_type(Type::BooleanLiteral(match ty {
+                                Type::ClassLiteral(class) => class.generic_context(db).is_some(),
+                                _ => false,
+                            }));
+                        }
+                    }
+
                     Some(KnownFunction::Len) => {
                         if let [Some(first_arg)] = overload.parameter_types() {
                             if let Some(len_ty) = first_arg.len(db) {

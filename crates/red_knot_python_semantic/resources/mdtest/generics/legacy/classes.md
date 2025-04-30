@@ -2,25 +2,81 @@
 
 ## Defining a generic class
 
-TODO: Add a `red_knot_extension` function that asserts whether a function or class is generic.
-
-This is a generic class defined using the legacy syntax:
+At its simplest, to define a generic class using the legacy syntax, you use inherit from the
+`typing.Generic` special form, which is "specialized" with the generic class's type variables.
 
 ```py
+from knot_extensions import is_generic_class, static_assert
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
+S = TypeVar("S")
 
-class C(Generic[T]): ...
+class SingleTypevar(Generic[T]): ...
+class MultipleTypevars(Generic[T, S]): ...
+
+static_assert(is_generic_class(SingleTypevar))
+static_assert(is_generic_class(MultipleTypevars))
 ```
 
-A class that inherits from a generic class, and fills its type parameters with typevars, is generic.
+You cannot use the same typevar more than once.
 
 ```py
-class D(C[T]): ...
+# TODO: error
+class RepeatedTypevar(Generic[T, T]): ...
 ```
 
-(Examples `E` and `F` from above do not have analogues in the legacy syntax.)
+You can only specialize `typing.Generic` with typevars (TODO: or param specs or typevar tuples).
+
+```py
+# error: [invalid-argument-type] "`Literal[int]` is not a valid argument to `typing.Generic`"
+class GenericOfType(Generic[int]): ...
+```
+
+You can also define a generic class by inheriting from some _other_ generic class, and specializing
+it with typevars.
+
+```py
+class InheritedGeneric(MultipleTypevars[T, S]): ...
+class InheritedGenericPartiallySpecialized(MultipleTypevars[T, int]): ...
+class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
+
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_generic_class(InheritedGeneric))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_generic_class(InheritedGenericPartiallySpecialized))
+static_assert(not is_generic_class(InheritedGenericFullySpecialized))
+```
+
+If you don't specialize a generic base class, we use the default specialization, which maps each
+typevar to its default value or `Any`. Since that base class is fully specialized, it does not make
+the inheriting class generic.
+
+```py
+class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
+
+static_assert(not is_generic_class(InheritedGenericDefaultSpecialization))
+```
+
+When inheriting from a generic class, you can optionally inherit from `typing.Generic` as well. But
+if you do, you have to mention all of the typevars that you use in your other base classes.
+
+```py
+class ExplicitInheritedGeneric(MultipleTypevars[T, S], Generic[T, S]): ...
+# TODO: error
+class ExplicitInheritedGenericMissingTypevar(MultipleTypevars[T, S], Generic[T]): ...
+
+class ExplicitInheritedGenericPartiallySpecialized(MultipleTypevars[T, int], Generic[T]): ...
+class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[T, int], Generic[T, S]): ...
+# TODO: error
+class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
+
+static_assert(is_generic_class(ExplicitInheritedGeneric))
+static_assert(is_generic_class(ExplicitInheritedGenericPartiallySpecialized))
+static_assert(is_generic_class(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
+```
 
 ## Specializing generic classes explicitly
 
