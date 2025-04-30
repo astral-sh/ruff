@@ -5,6 +5,8 @@ name, and not just by its numeric position within the tuple:
 
 ## `typing.NamedTuple`
 
+### Basics
+
 ```py
 from typing import NamedTuple
 
@@ -48,6 +50,62 @@ Person2(1)
 
 reveal_type(alice2.id)  # revealed: @Todo(GenericAlias instance)
 reveal_type(alice2.name)  # revealed: @Todo(GenericAlias instance)
+```
+
+### Multiple Inheritance
+
+Multiple inheritance is not supported for `NamedTuple` classes:
+
+```py
+from typing import NamedTuple
+
+# This should ideally emit a diagnostic
+class C(NamedTuple, object):
+    id: int
+    name: str
+```
+
+### Inheriting from a `NamedTuple`
+
+Inheriting from a `NamedTuple` is supported, but new fields on the subclass will not be part of the
+synthesized `__new__` signature:
+
+```py
+from typing import NamedTuple
+
+class User(NamedTuple):
+    id: int
+    name: str
+
+class SuperUser(User):
+    level: int
+
+# This is fine:
+alice = SuperUser(1, "Alice")
+reveal_type(alice.level)  # revealed: int
+
+# This is an error because `level` is not part of the signature:
+# error: [too-many-positional-arguments]
+alice = SuperUser(1, "Alice", 3)
+```
+
+### Generic named tuples
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NamedTuple
+
+class Property[T](NamedTuple):
+    name: str
+    value: T
+
+# TODO: this should be supported (no error, revealed type of `Property[float]`)
+# error: [invalid-argument-type]
+reveal_type(Property("height", 3.4))  # revealed: Property[Unknown]
 ```
 
 ## `collections.namedtuple`
