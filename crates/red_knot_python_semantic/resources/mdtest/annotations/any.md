@@ -89,8 +89,6 @@ from unittest.mock import MagicMock
 x: int = MagicMock()
 ```
 
-## Any subclass assigned to Callable
-
 A subclass of `Any` can be assigned to a `Callable` and called.
 
 ```py
@@ -116,3 +114,4 @@ from typing import Any
 def f(x: Any[int]):
     reveal_type(x)  # revealed: Unknown
 ```
+
