@@ -570,7 +570,7 @@ class ConvertToLength:
 class C:
     converter: ConvertToLength = ConvertToLength()
 
-reveal_type(C.__init__)  # revealed: (converter: str = Never) -> None
+reveal_type(C.__init__)  # revealed: (converter: str = Literal[""]) -> None
 
 c = C("abc")
 reveal_type(c.converter)  # revealed: int

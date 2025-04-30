@@ -20,8 +20,8 @@ use crate::types::generics::{Specialization, SpecializationBuilder, Specializati
 use crate::types::signatures::{Parameter, ParameterForm};
 use crate::types::{
     todo_type, BoundMethodType, DataclassParams, DataclassTransformerParams, FunctionDecorators,
-    IntersectionBuilder, KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind,
-    PropertyInstanceType, TupleType, UnionType, WrapperDescriptorKind,
+    KnownClass, KnownFunction, KnownInstanceType, MethodWrapperKind, PropertyInstanceType,
+    TupleType, UnionType, WrapperDescriptorKind,
 };
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_python_ast as ast;
@@ -164,9 +164,9 @@ impl<'db> Bindings<'db> {
     /// types that are not callable, returns `Type::Unknown`.
     pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         if let [binding] = self.elements.as_slice() {
-            return binding.return_type(db);
+            return binding.return_type();
         }
-        UnionType::from_elements(db, self.into_iter().map(|binding| binding.return_type(db)))
+        UnionType::from_elements(db, self.into_iter().map(CallableBinding::return_type))
     }
 
     /// Report diagnostics for all of the errors that occurred when trying to match actual
@@ -968,20 +968,13 @@ impl<'db> CallableBinding<'db> {
     }
 
     /// Returns the return type of this call. For a valid call, this is the return type of the
-    /// overload that the arguments matched against. For an invalid call to a non-overloaded
+    /// first overload that the arguments matched against. For an invalid call to a non-overloaded
     /// function, this is the return type of the function. For an invalid call to an overloaded
     /// function, we return `Type::unknown`, since we cannot make any useful conclusions about
     /// which overload was intended to be called.
-    pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        let mut overloads = self.matching_overloads();
-        if let Some(first) = overloads.next() {
-            return std::iter::once(first)
-                .chain(overloads)
-                .map(|(_, overload)| overload.return_type())
-                .fold(IntersectionBuilder::new(db), |builder, ty| {
-                    builder.add_positive(ty)
-                })
-                .build();
+    pub(crate) fn return_type(&self) -> Type<'db> {
+        if let Some((_, first_overload)) = self.matching_overloads().next() {
+            return first_overload.return_type();
         }
         if let [overload] = self.overloads.as_slice() {
             return overload.return_type();
