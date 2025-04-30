@@ -442,7 +442,7 @@ impl<'db> ClassLiteral<'db> {
         // We've already verified that the class literal does not contain both a PEP-695 generic
         // scope and a `typing.Generic` base class.
         self.pep695_generic_context(db)
-            .or(self.legacy_generic_context(db))
+            .or_else(|| self.legacy_generic_context(db))
     }
 
     #[salsa::tracked]
