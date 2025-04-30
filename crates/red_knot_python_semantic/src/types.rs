@@ -1302,12 +1302,17 @@ impl<'db> Type<'db> {
     ///
     /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        // PEP 484: Any and its subclasses are assignable to all types.
-        if let Type::Instance(instance) = self {
-            if instance.class().is_subclass_of_any_or_unknown(db) {
-                return true;
+        // Handle 'any' type early, as it can be assigned to most other types.
+        if let Type::Instance(self_instance) = self {
+            if self_instance.class().is_subclass_of_any_or_unknown(db) {
+                match target {
+                    Type::ClassLiteral(_) => return false,
+                    Type::Instance(target_instance) => return target_instance.class().is_final(db),
+                    _ => return true,
+                }
             }
         }
+
         if self.is_gradual_equivalent_to(db, target) {
             return true;
         }
