@@ -492,6 +492,7 @@ pub enum Type<'db> {
     /// Construct this variant using the `Type::instance` constructor function.
     NominalInstance(NominalInstanceType<'db>),
     /// The set of Python objects that conform to the interface described by a given protocol.
+    /// Construct this variant using the `Type::instance` constructor function.
     ProtocolInstance(ProtocolInstanceType<'db>),
     /// A single Python object that requires special treatment in the type system
     KnownInstance(KnownInstanceType<'db>),
@@ -1180,7 +1181,6 @@ impl<'db> Type<'db> {
                 left.is_subtype_of(db, right)
             }
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
-            // TODO: `Callable` types are also structural types.
             (Type::ProtocolInstance(_), _) => false,
             (_, Type::ProtocolInstance(protocol)) => self.satisfies_protocol(db, protocol),
 
@@ -1510,7 +1510,6 @@ impl<'db> Type<'db> {
             // Other than the dynamic types such as `Any`/`Unknown`/`Todo` handled above,
             // a protocol instance can never be assignable to a nominal type,
             // with the *sole* exception of `object`.
-            // TODO: `Callable` types are also structural types.
             (Type::ProtocolInstance(_), _) => false,
             (_, Type::ProtocolInstance(protocol)) => self.satisfies_protocol(db, protocol),
 
@@ -1537,8 +1536,8 @@ impl<'db> Type<'db> {
             (Type::NominalInstance(left), Type::NominalInstance(right)) => {
                 left.is_equivalent_to(db, right)
             }
-            (Type::ProtocolInstance(first), Type::ProtocolInstance(right)) => {
-                first.is_equivalent_to(db, right)
+            (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
+                left.is_equivalent_to(db, right)
             }
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
@@ -1594,8 +1593,8 @@ impl<'db> Type<'db> {
                 first.is_gradual_equivalent_to(db, second)
             }
 
-            (Type::ProtocolInstance(first), Type::ProtocolInstance(right)) => {
-                first.is_gradual_equivalent_to(db, right)
+            (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => {
+                first.is_gradual_equivalent_to(db, second)
             }
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {

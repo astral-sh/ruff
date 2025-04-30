@@ -137,8 +137,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (_, Type::NominalInstance(_)) => Ordering::Greater,
 
         (Type::ProtocolInstance(left_proto), Type::ProtocolInstance(right_proto)) => {
-            debug_assert_eq!(*left, left_proto.normalized(db));
-            debug_assert_eq!(*right, right_proto.normalized(db));
             left_proto.cmp(right_proto)
         }
         (Type::ProtocolInstance(_), _) => Ordering::Less,

@@ -534,13 +534,24 @@ impl<'db> ClassLiteral<'db> {
 
     /// Determine if this class is a protocol.
     ///
-    /// See the docs on [`KnownClass::is_protocol`] for why we hardcode knowledge
-    /// about certain special-cased classes, rather than treating all classes
-    /// the same way here.
+    /// This method relies on the accuracy of the [`KnownClass::is_protocol`] method,
+    /// which hardcodes knowledge about certain special-cased classes. See the docs on
+    /// that method for why we do this rather than relying on generalised logic for all
+    /// classes, including the special-cased ones that are included in the [`KnownClass`]
+    /// enum.
     pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
         self.known(db)
             .map(KnownClass::is_protocol)
             .unwrap_or_else(|| {
+                // Iterate through the last three bases of the class
+                // searching for `Protocol` or `Protocol[]` in the bases list.
+                //
+                // If `Protocol` is present in the bases list of a valid protocol class, it must either:
+                //
+                // - be the last base
+                // - OR be the last-but-one base (with the final base being `Generic[]` or `object`)
+                // - OR be the last-but-two base (with the penultimate base being `Generic[]`
+                //                                and the final base being `object`)
                 self.explicit_bases(db).iter().rev().take(3).any(|base| {
                     matches!(
                         base,
