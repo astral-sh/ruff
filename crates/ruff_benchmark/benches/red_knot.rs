@@ -59,22 +59,13 @@ type KeyDiagnosticFields = (
     Severity,
 );
 
-static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[
-    (
-        DiagnosticId::lint("no-matching-overload"),
-        Some("/src/tomllib/_parser.py"),
-        Some(2329..2358),
-        "No overload of bound method `__init__` matches arguments",
-        Severity::Error,
-    ),
-    (
-        DiagnosticId::lint("unused-ignore-comment"),
-        Some("/src/tomllib/_parser.py"),
-        Some(22299..22333),
-        "Unused blanket `type: ignore` directive",
-        Severity::Warning,
-    ),
-];
+static EXPECTED_TOMLLIB_DIAGNOSTICS: &[KeyDiagnosticFields] = &[(
+    DiagnosticId::lint("unused-ignore-comment"),
+    Some("/src/tomllib/_parser.py"),
+    Some(22299..22333),
+    "Unused blanket `type: ignore` directive",
+    Severity::Warning,
+)];
 
 fn tomllib_path(file: &TestFile) -> SystemPathBuf {
     SystemPathBuf::from("src").join(file.name())
