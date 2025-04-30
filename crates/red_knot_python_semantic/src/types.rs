@@ -1308,7 +1308,9 @@ impl<'db> Type<'db> {
             if self_instance.class().is_subclass_of_any_or_unknown(db) {
                 match target {
                     Type::ClassLiteral(_) => return false,
-                    Type::Instance(target_instance) => return target_instance.class().is_final(db),
+                    Type::Instance(target_instance) => {
+                        return !target_instance.class().is_final(db)
+                    }
                     _ => return true,
                 }
             }
