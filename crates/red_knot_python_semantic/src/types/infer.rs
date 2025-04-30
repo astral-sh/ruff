@@ -8483,7 +8483,7 @@ mod tests {
         db.clear_salsa_events();
         assert_file_diagnostics(&db, "src/a.py", &[]);
         let events = db.take_salsa_events();
-        let cycles = salsa::plumbing::attach(&db, || {
+        let cycles = salsa::attach(&db, || {
             events
                 .iter()
                 .filter_map(|event| {

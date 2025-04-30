@@ -1,3 +1,4 @@
+use std::backtrace::BacktraceStatus;
 use std::cell::Cell;
 use std::panic::Location;
 use std::sync::OnceLock;
@@ -7,6 +8,7 @@ pub struct PanicError {
     pub location: Option<String>,
     pub payload: Payload,
     pub backtrace: Option<std::backtrace::Backtrace>,
+    pub salsa_backtrace: Option<salsa::Backtrace>,
 }
 
 #[derive(Debug)]
@@ -34,15 +36,35 @@ impl std::fmt::Display for PanicError {
             write!(f, ":\n{payload}")?;
         }
         if let Some(backtrace) = &self.backtrace {
-            writeln!(f, "\nBacktrace: {backtrace}")?;
+            match backtrace.status() {
+                BacktraceStatus::Disabled => {
+                    writeln!(
+                        f,
+                        "\nrun with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+                    )?;
+                }
+                BacktraceStatus::Captured => {
+                    writeln!(f, "\nBacktrace: {backtrace}")?;
+                }
+                _ => {}
+            }
         }
         Ok(())
     }
 }
 
+#[derive(Default)]
+struct CapturedPanicInfo {
+    backtrace: Option<std::backtrace::Backtrace>,
+    location: Option<String>,
+    salsa_backtrace: Option<salsa::Backtrace>,
+}
+
 thread_local! {
     static CAPTURE_PANIC_INFO: Cell<bool> = const { Cell::new(false) };
-    static LAST_BACKTRACE: Cell<(Option<std::backtrace::Backtrace>, Option<String>)> = const { Cell::new((None, None)) };
+    static LAST_BACKTRACE: Cell<CapturedPanicInfo> = const {
+        Cell::new(CapturedPanicInfo { backtrace: None, location: None, salsa_backtrace: None })
+    };
 }
 
 fn install_hook() {
@@ -56,9 +78,13 @@ fn install_hook() {
             }
 
             let location = info.location().map(Location::to_string);
-            let backtrace = Some(std::backtrace::Backtrace::force_capture());
+            let backtrace = Some(std::backtrace::Backtrace::capture());
 
-            LAST_BACKTRACE.set((backtrace, location));
+            LAST_BACKTRACE.set(CapturedPanicInfo {
+                backtrace,
+                location,
+                salsa_backtrace: salsa::Backtrace::capture(),
+            });
         }));
     });
 }
@@ -92,12 +118,17 @@ where
         // Because of that, always take the payload from `catch_unwind` because it may have been transformed
         // by an inner `std::panic::catch_unwind` handlers and only use the information
         // from the custom handler to enrich the error with the backtrace and location.
-        let (backtrace, location) = LAST_BACKTRACE.with(Cell::take);
+        let CapturedPanicInfo {
+            location,
+            backtrace,
+            salsa_backtrace,
+        } = LAST_BACKTRACE.with(Cell::take);
 
         PanicError {
             location,
             payload: Payload(payload),
             backtrace,
+            salsa_backtrace,
         }
     });
     CAPTURE_PANIC_INFO.set(prev_should_capture);
