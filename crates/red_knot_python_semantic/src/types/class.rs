@@ -791,14 +791,14 @@ impl<'db> ClassLiteral<'db> {
             return Some(metaclass_call_function.into_callable_type(db));
         }
 
-        let new_function_symbol = self_ty
+        let dunder_new_method = self_ty
             .find_name_in_mro(db, "__new__")
             .expect("find_name_in_mro always succeeds for class literals")
             .symbol
             .try_call_dunder_get(db, self_ty);
 
-        if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-            return Some(new_function.into_bound_method_type(db, self.into()));
+        if let Symbol::Type(Type::FunctionLiteral(dunder_new_method), _) = dunder_new_method {
+            return Some(dunder_new_method.into_bound_method_type(db, self.into()));
         }
         // TODO handle `__init__` also
         None

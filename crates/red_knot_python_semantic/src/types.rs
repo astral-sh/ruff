@@ -6146,9 +6146,14 @@ impl<'db> BoolError<'db> {
     }
 }
 
+/// Represents possibly failure modes of implicit `__new__` calls.
 #[derive(Debug)]
 enum DunderNewCallError<'db> {
+    /// The call to `__new__` failed.
     CallError(CallError<'db>),
+    /// The `__new__` method could be unbound. If the call to the
+    /// method has also failed, this variant also includes the
+    /// corresponding `CallError`.
     PossiblyUnbound(Option<CallError<'db>>),
 }
 

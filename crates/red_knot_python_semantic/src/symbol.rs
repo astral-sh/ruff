@@ -110,6 +110,7 @@ impl<'db> Symbol<'db> {
 
     /// Try to call `__get__(None, owner)` on the type of this symbol (not on the meta type).
     /// If it succeeds, return the `__get__` return type. Otherwise, returns the original symbol.
+    /// This is used to resolve (potential) descriptor attributes.
     pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Symbol<'db> {
         match self {
             Symbol::Type(Type::Union(union), boundness) => union.map_with_boundness(db, |elem| {
