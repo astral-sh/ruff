@@ -58,6 +58,17 @@ class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
 reveal_type(generic_context(InheritedGenericDefaultSpecialization))  # revealed: None
 ```
 
+You cannot use PEP-695 syntax and the legacy syntax in the same class definition.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-generic-class] "Cannot both inherit from `Generic` and use PEP 695 type variables"
+class BothGenericSyntaxes[U](Generic[T]): ...
+```
+
 ## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:

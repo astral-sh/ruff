@@ -36,6 +36,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
@@ -388,6 +389,32 @@ declare_lint! {
     ///  This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid generic classes
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when defining a generic class.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")  # okay
+    ///
+    /// # error: class uses both PEP-695 syntax and legacy syntax
+    /// class C[U](Generic[T]): ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    pub(crate) static INVALID_GENERIC_CLASS = {
+        summary: "detects invalid generic classes",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }

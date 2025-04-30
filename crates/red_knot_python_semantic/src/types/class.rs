@@ -64,7 +64,7 @@ fn explicit_bases_cycle_initial<'db>(
 
 #[allow(clippy::ref_option)]
 #[allow(clippy::trivially_copy_pass_by_ref)]
-fn generic_context_cycle_recover<'db>(
+fn legacy_generic_context_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<GenericContext<'db>>,
     _count: u32,
@@ -73,7 +73,7 @@ fn generic_context_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn generic_context_cycle_initial<'db>(
+fn legacy_generic_context_cycle_initial<'db>(
     _db: &'db dyn Db,
     _self: ClassLiteral<'db>,
 ) -> Option<GenericContext<'db>> {
@@ -432,7 +432,6 @@ impl<'db> ClassLiteral<'db> {
         self.known(db) == Some(known_class)
     }
 
-    #[salsa::tracked(cycle_fn=generic_context_cycle_recover, cycle_initial=generic_context_cycle_initial)]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         // Several typeshed definitions examine `sys.version_info`. To break cycles, we hard-code
         // the knowledge that this class is not generic.
@@ -440,19 +439,28 @@ impl<'db> ClassLiteral<'db> {
             return None;
         }
 
-        // TODO: Raise a diagnostic if a class literal contains both a PEP-695 generic scope and a
-        // `typing.Generic` base class.
+        // We've already verified that the class literal does not contain both a PEP-695 generic
+        // scope and a `typing.Generic` base class.
+        self.pep695_generic_context(db)
+            .or(self.legacy_generic_context(db))
+    }
+
+    #[salsa::tracked]
+    pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let class_def_node = scope.node(db).expect_class();
-        let pep_695_context = class_def_node.type_params.as_ref().map(|type_params| {
+        class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
-        });
-        let legacy_context = self.explicit_bases(db).iter().find_map(|base| match base {
+        })
+    }
+
+    #[salsa::tracked(cycle_fn=legacy_generic_context_cycle_recover, cycle_initial=legacy_generic_context_cycle_initial)]
+    pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        self.explicit_bases(db).iter().find_map(|base| match base {
             Type::KnownInstance(KnownInstanceType::Generic(generic_context)) => *generic_context,
             _ => None,
-        });
-        pep_695_context.or(legacy_context)
+        })
     }
 
     /// Return `true` if this class represents the builtin class `object`
