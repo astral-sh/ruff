@@ -202,7 +202,7 @@ pub(crate) fn format(
                 results.write_diff(&mut stdout().lock())?;
             }
         }
-        
+
         if mode.is_diff() {
             // Allow piping the diff to e.g. a file by writing the summary to stderr
             results.write_summary(&mut stderr().lock())?;
