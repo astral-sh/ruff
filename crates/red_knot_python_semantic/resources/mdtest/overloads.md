@@ -347,14 +347,14 @@ from typing import overload
 @overload
 def func(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Overloaded function `func` must have an implementation outside a stub file"
+# error: [invalid-overload] "Overloaded non-stub function `func` must have an implementation"
 def func(x: str) -> str: ...
 
 class Foo:
     @overload
     def method(self, x: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloaded function `method` must have an implementation outside a stub file"
+    # error: [invalid-overload] "Overloaded non-stub function `method` must have an implementation"
     def method(self, x: str) -> str: ...
 ```
 

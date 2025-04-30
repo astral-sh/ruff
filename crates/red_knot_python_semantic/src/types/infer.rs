@@ -1090,8 +1090,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         .report_lint(&INVALID_OVERLOAD, &function_node.name)
                     {
                         builder.into_diagnostic(format_args!(
-                            "Overloaded function `{}` must have an implementation \
-                             outside a stub file",
+                            "Overloaded non-stub function `{}` must have an implementation",
                             &function_node.name
                         ));
                     }
