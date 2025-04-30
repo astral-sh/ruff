@@ -682,22 +682,6 @@ fn check_silent_mode_no_output() -> Result<()> {
     Ok(())
 }
 
-// #[test]
-// fn check_silent_mode_with_changes() -> Result<()> {
-//     let tempdir = TempDir::new()?;
-//     let file_path = tempdir.path().join("main.py");
-//     fs::write(&file_path, "def foo():\n pass\n")?;
-
-//     let assert = assert_cmd_snapshot!(
-//         Command::new(get_cargo_bin(BIN_NAME))
-//             .current_dir(tempdir.path())
-//             .args(["format", "--check", "--silent"])
-//             .arg(&file_path)
-//     );
-//     assert.failure().stdout("").stderr("");
-//     Ok(())
-// }
-
 #[test]
 fn force_exclude() -> Result<()> {
     let tempdir = TempDir::new()?;
