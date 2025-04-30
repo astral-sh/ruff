@@ -101,12 +101,12 @@ fn inheritance_cycle_initial<'db>(
     None
 }
 
-/// A category of classes with code generation capabilities (with sythesized methods).
+/// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum CodeGeneratorKind {
     /// Classes decorated with `@dataclass` or similar dataclass-like decorators
     DataclassLike,
-    /// Classes inheriting from `typging.NamedTuple`
+    /// Classes inheriting from `typing.NamedTuple`
     NamedTuple,
 }
 
