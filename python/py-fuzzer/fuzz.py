@@ -50,14 +50,12 @@ ExitCode = NewType("ExitCode", int)
 def redknot_contains_bug(code: str, *, red_knot_executable: Path) -> bool:
     """Return `True` if the code triggers a panic in type-checking code."""
     with tempfile.TemporaryDirectory() as tempdir:
-        Path(tempdir, "pyproject.toml").write_text('[project]\n\tname = "fuzz-input"')
-        Path(tempdir, "input.py").write_text(code)
+        input_file = Path(tempdir, "input.py")
+        input_file.write_text(code)
         completed_process = subprocess.run(
-            [red_knot_executable, "check", "--project", tempdir],
-            capture_output=True,
-            text=True,
+            [red_knot_executable, "check", input_file], capture_output=True, text=True
         )
-    return completed_process.returncode != 0 and completed_process.returncode != 1
+    return completed_process.returncode not in {0, 1, 2}
 
 
 def ruff_contains_bug(code: str, *, ruff_executable: Path) -> bool:
