@@ -323,3 +323,57 @@ reveal_type(Foo(1))  # revealed: Foo
 # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
+
+### Incompatible signatures
+
+```py
+import abc
+
+class Foo:
+    def __new__(cls) -> "Foo":
+        return object.__new__(cls)
+    def __init__(self, x):
+        self.x = 42
+
+# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+reveal_type(Foo())  # revealed: Foo
+
+# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 0, got 1"
+reveal_type(Foo(42))  # revealed: Foo
+
+class Foo2:
+    def __new__(cls, x) -> "Foo2":
+        return object.__new__(cls)
+    def __init__(self):
+        pass
+
+# error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
+reveal_type(Foo2())  # revealed: Foo2
+
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 0, got 1"
+reveal_type(Foo2(42))  # revealed: Foo2
+
+class Foo3(metaclass=abc.ABCMeta):
+    def __new__(cls) -> "Foo3":
+        return object.__new__(cls)
+    def __init__(self, x):
+        self.x = 42
+
+# error: [missing-argument] "No argument provided for required parameter `x` of bound method `__init__`"
+reveal_type(Foo3())  # revealed: Foo3
+
+# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 0, got 1"
+reveal_type(Foo3(42))  # revealed: Foo3
+
+class Foo4(metaclass=abc.ABCMeta):
+    def __new__(cls, x) -> "Foo4":
+        return object.__new__(cls)
+    def __init__(self):
+        pass
+
+# error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
+reveal_type(Foo4())  # revealed: Foo4
+
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 0, got 1"
+reveal_type(Foo4(42))  # revealed: Foo4
+```
