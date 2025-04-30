@@ -73,3 +73,6 @@ open(bytes_str_func())
 # https://github.com/astral-sh/ruff/issues/17694
 os.rename("src", "dst", src_dir_fd=3, dst_dir_fd=4)
 os.rename(b"src", b"dst", src_dir_fd=3, dst_dir_fd=4)
+os.rename(b"src", b"dst", src_dir_fd=3)
+os.rename(b"src", b"dst", dst_dir_fd=4)
+os.rename(b"src", b"dst")
