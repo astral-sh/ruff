@@ -26,6 +26,17 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
     left: &Type<'db>,
     right: &Type<'db>,
 ) -> Ordering {
+    debug_assert_eq!(
+        *left,
+        left.normalized(db),
+        "`left` must be normalized before a meaningful ordering can be established"
+    );
+    debug_assert_eq!(
+        *right,
+        right.normalized(db),
+        "`right` must be normalized before a meaningful ordering can be established"
+    );
+
     if left == right {
         return Ordering::Equal;
     }
@@ -85,19 +96,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::DataclassTransformer(_), _) => Ordering::Less,
         (_, Type::DataclassTransformer(_)) => Ordering::Greater,
 
-        (Type::Callable(left), Type::Callable(right)) => {
-            debug_assert_eq!(*left, left.normalized(db));
-            debug_assert_eq!(*right, right.normalized(db));
-            left.cmp(right)
-        }
+        (Type::Callable(left), Type::Callable(right)) => left.cmp(right),
         (Type::Callable(_), _) => Ordering::Less,
         (_, Type::Callable(_)) => Ordering::Greater,
 
-        (Type::Tuple(left), Type::Tuple(right)) => {
-            debug_assert_eq!(*left, left.normalized(db));
-            debug_assert_eq!(*right, right.normalized(db));
-            left.cmp(right)
-        }
+        (Type::Tuple(left), Type::Tuple(right)) => left.cmp(right),
         (Type::Tuple(_), _) => Ordering::Less,
         (_, Type::Tuple(_)) => Ordering::Greater,
 
@@ -325,13 +328,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         }
 
         (Type::Intersection(left), Type::Intersection(right)) => {
-            debug_assert_eq!(*left, left.normalized(db));
-            debug_assert_eq!(*right, right.normalized(db));
-
-            if left == right {
-                return Ordering::Equal;
-            }
-
             // Lexicographically compare the elements of the two unequal intersections.
             let left_positive = left.positive(db);
             let right_positive = right.positive(db);
@@ -356,7 +352,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 }
             }
 
-            unreachable!("Two equal intersections that both have sorted elements should share the same Salsa ID")
+            unreachable!("Two equal, normalized intersections should share the same Salsa ID")
         }
     }
 }
