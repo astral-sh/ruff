@@ -304,6 +304,22 @@ else:
     pass
 ```
 
+And for nested `if` statements:
+
+```py
+def _(flag: bool):
+    if flag:
+        if sys.version_info >= (3, 11):
+            ExceptionGroup  # no error here
+        else:
+            pass
+
+        if sys.version_info < (3, 11):
+            pass
+        else:
+            ExceptionGroup  # no error here
+```
+
 The same works for ternary expressions:
 
 ```py
@@ -342,6 +358,15 @@ Terminal statements can also lead to unreachable code:
 def f():
     if sys.version_info < (3, 11):
         raise RuntimeError("this code only works for Python 3.11+")
+
+    ExceptionGroup
+```
+
+Similarly, assertions with statically-known falsy conditions can lead to unreachable code:
+
+```py
+def f():
+    assert sys.version_info > (3, 11)
 
     ExceptionGroup
 ```

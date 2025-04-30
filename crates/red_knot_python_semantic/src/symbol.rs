@@ -1114,7 +1114,7 @@ mod tests {
     fn assert_bound_string_symbol<'db>(db: &'db dyn Db, symbol: Symbol<'db>) {
         assert!(matches!(
             symbol,
-            Symbol::Type(Type::Instance(_), Boundness::Bound)
+            Symbol::Type(Type::NominalInstance(_), Boundness::Bound)
         ));
         assert_eq!(symbol.expect_type(), KnownClass::Str.to_instance(db));
     }

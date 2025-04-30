@@ -21,3 +21,6 @@ if os.listdir("dir"):
 
 if "file" in os.listdir("dir"):
     ...
+
+os.listdir(1)
+os.listdir(path=1)

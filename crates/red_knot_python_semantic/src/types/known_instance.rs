@@ -1,6 +1,6 @@
 //! The `KnownInstance` type.
 //!
-//! Despite its name, this is quite a different type from [`super::InstanceType`].
+//! Despite its name, this is quite a different type from [`super::NominalInstanceType`].
 //! For the vast majority of instance-types in Python, we cannot say how many possible
 //! inhabitants there are or could be of that type at runtime. Each variant of the
 //! [`KnownInstanceType`] enum, however, represents a specific runtime symbol
@@ -260,7 +260,7 @@ impl<'db> KnownInstanceType<'db> {
     ///
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
     /// so `KnownInstanceType::Literal.instance_fallback(db)`
-    /// returns `Type::Instance(InstanceType { class: <typing._SpecialForm> })`.
+    /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
     pub(super) fn instance_fallback(self, db: &dyn Db) -> Type {
         self.class().to_instance(db)
     }

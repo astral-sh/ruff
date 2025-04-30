@@ -591,7 +591,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
             _ => {
                 let known_instance = new_positive
-                    .into_instance()
+                    .into_nominal_instance()
                     .and_then(|instance| instance.class().known(db));
 
                 if known_instance == Some(KnownClass::Object) {
@@ -611,7 +611,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         Type::AlwaysFalsy if addition_is_bool_instance => {
                             new_positive = Type::BooleanLiteral(false);
                         }
-                        Type::Instance(instance)
+                        Type::NominalInstance(instance)
                             if instance.class().is_known(db, KnownClass::Bool) =>
                         {
                             match new_positive {
@@ -705,7 +705,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let contains_bool = || {
             self.positive
                 .iter()
-                .filter_map(|ty| ty.into_instance())
+                .filter_map(|ty| ty.into_nominal_instance())
                 .filter_map(|instance| instance.class().known(db))
                 .any(KnownClass::is_bool)
         };
@@ -722,7 +722,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
             }
-            Type::Instance(instance) if instance.class().is_object(db) => {
+            Type::NominalInstance(instance) if instance.class().is_object(db) => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
