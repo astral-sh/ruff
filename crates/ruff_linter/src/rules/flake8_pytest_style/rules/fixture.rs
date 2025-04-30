@@ -818,20 +818,29 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
         let Some(call_expr) = decorator.expression.as_call_expr() else {
             continue;
         };
-        let first_arg = call_expr
-            .arguments
-            .find_argument_value("argnames", 0)
-            .and_then(Expr::as_string_literal_expr);
+        let first_arg = call_expr.arguments.find_argument_value("argnames", 0);
 
-        if let Some(arg) = first_arg {
-            for param_name in arg
-                .value
-                .to_str()
-                .split(',')
-                .filter(|param| !param.is_empty() && param.starts_with('_'))
-            {
-                named_parametrize.insert(param_name);
+        match first_arg {
+            Some(Expr::StringLiteral(ast::ExprStringLiteral { value, .. })) => {
+                named_parametrize.extend(
+                    value
+                        .to_str()
+                        .split(',')
+                        .map(str::trim)
+                        .filter(|param| !param.is_empty() && param.starts_with('_')),
+                );
             }
+            Some(
+                Expr::List(ast::ExprList { elts, .. }) | Expr::Tuple(ast::ExprTuple { elts, .. }),
+            ) => {
+                named_parametrize.extend(
+                    elts.iter()
+                        .filter_map(Expr::as_string_literal_expr)
+                        .map(|param| param.value.to_str().trim())
+                        .filter(|param| !param.is_empty() && param.starts_with('_')),
+                );
+            }
+            _ => {}
         }
     }
 

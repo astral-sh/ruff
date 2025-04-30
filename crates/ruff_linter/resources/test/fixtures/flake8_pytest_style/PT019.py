@@ -30,3 +30,11 @@ def test_eval(_test_input, _expected):  # OK defined in parametrize
 @pytest.mark.parametrize("_foo", [1, 2, 3])
 def test_thingy2(_foo, _bar):  # Error _bar is not defined in parametrize
     pass
+
+@pytest.mark.parametrize(["_foo", "_bar"], [1, 2, 3])
+def test_thingy3(_foo, _bar):  # OK defined in parametrize
+    pass
+
+@pytest.mark.parametrize(("_foo"), [1, 2, 3])
+def test_thingy4(_foo, _bar):  # Error _bar is not defined in parametrize
+    pass
