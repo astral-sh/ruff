@@ -1096,6 +1096,103 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
                 }
             }
+
+            // TODO: Add `@staticmethod`
+            for (decorator, name) in [(FunctionDecorators::CLASSMETHOD, "classmethod")] {
+                let mut decorator_present = false;
+                let mut decorator_missing = vec![];
+
+                for function in overloaded.all() {
+                    if function.has_known_decorator(self.db(), decorator) {
+                        decorator_present = true;
+                    } else {
+                        decorator_missing.push(function);
+                    }
+                }
+
+                if !decorator_present {
+                    // Both overloads and implementation does not have the decorator
+                    continue;
+                }
+                if decorator_missing.is_empty() {
+                    // All overloads and implementation have the decorator
+                    continue;
+                }
+
+                let function_node = function.node(self.db(), self.file());
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_OVERLOAD, &function_node.name)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Overloaded function `{}` does not use the `@{name}` decorator \
+                         consistently",
+                        &function_node.name
+                    ));
+                    for function in decorator_missing {
+                        diagnostic.annotate(
+                            self.context
+                                .secondary(function.focus_range(self.db()))
+                                .message(format_args!("Missing here")),
+                        );
+                    }
+                }
+            }
+
+            for (decorator, name) in [
+                (FunctionDecorators::FINAL, "final"),
+                (FunctionDecorators::OVERRIDE, "override"),
+            ] {
+                if let Some(implementation) = overloaded.implementation.as_ref() {
+                    for overload in &overloaded.overloads {
+                        if !overload.has_known_decorator(self.db(), decorator) {
+                            continue;
+                        }
+                        let function_node = function.node(self.db(), self.file());
+                        let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_OVERLOAD, &function_node.name)
+                        else {
+                            continue;
+                        };
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "`@{name}` decorator should be applied only to the \
+                                overload implementation"
+                        ));
+                        diagnostic.annotate(
+                            self.context
+                                .secondary(implementation.focus_range(self.db()))
+                                .message(format_args!("Implementation defined here")),
+                        );
+                    }
+                } else {
+                    let mut overloads = overloaded.overloads.iter();
+                    let Some(first_overload) = overloads.next() else {
+                        continue;
+                    };
+                    for overload in overloads {
+                        if !overload.has_known_decorator(self.db(), decorator) {
+                            continue;
+                        }
+                        let function_node = function.node(self.db(), self.file());
+                        let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_OVERLOAD, &function_node.name)
+                        else {
+                            continue;
+                        };
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "`@{name}` decorator should be applied only to the \
+                                first overload"
+                        ));
+                        diagnostic.annotate(
+                            self.context
+                                .secondary(first_overload.focus_range(self.db()))
+                                .message(format_args!("First overload defined here")),
+                        );
+                    }
+                }
+            }
         }
     }
 
