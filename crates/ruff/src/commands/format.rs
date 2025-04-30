@@ -191,18 +191,18 @@ pub(crate) fn format(
     }
 
     let results = FormatResults::new(results.as_slice(), mode);
-    match mode {
-        FormatMode::Write => {}
-        FormatMode::Check => {
-            results.write_changed(&mut stdout().lock())?;
-        }
-        FormatMode::Diff => {
-            results.write_diff(&mut stdout().lock())?;
-        }
-    }
-
     // Report on the formatting changes.
     if config_arguments.log_level >= LogLevel::Default {
+        match mode {
+            FormatMode::Write => {}
+            FormatMode::Check => {
+                results.write_changed(&mut stdout().lock())?;
+            }
+            FormatMode::Diff => {
+                results.write_diff(&mut stdout().lock())?;
+            }
+        }
+        
         if mode.is_diff() {
             // Allow piping the diff to e.g. a file by writing the summary to stderr
             results.write_summary(&mut stderr().lock())?;
