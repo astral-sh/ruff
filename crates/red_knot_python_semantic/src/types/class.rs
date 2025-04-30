@@ -876,8 +876,7 @@ impl<'db> ClassLiteral<'db> {
                         continue;
                     }
 
-                    if matches!(class.known(db), Some(KnownClass::Type))
-                        && policy.meta_class_no_type_fallback()
+                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
                     {
                         continue;
                     }

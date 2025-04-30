@@ -1,16 +1,16 @@
 # Constructor
 
-When classes are instantiated, Python calls the metaclass `__call__` method, which can either be
-customized by the user or `type.__call__` is used.
+When classes are instantiated, Python calls the metaclass's `__call__` method. The metaclass of most
+Python classes is the class `builtins.type`.
 
-The latter calls the `__new__` method of the class, which is responsible for creating the instance
-and then calls the `__init__` method on the resulting instance to initialize it with the same
-arguments.
+`type.__call__` calls the `__new__` method of the class, which is responsible for creating the
+instance. `__init__` is then called on the constructed instance with the same arguments that were
+passed to `__new__`.
 
-Both `__new__` and `__init__` are looked up using the descriptor protocol, i.e. `__get__` is called
-if these attributes are descriptors. `__new__` is always treated as a static method, i.e. `cls` is
-passed as the first argument. `__init__` has no special handling, it is fetched as bound method and
-is called just like any other dunder method.
+Both `__new__` and `__init__` are looked up using the descriptor protocol, i.e., `__get__` is called
+if these attributes are descriptors. `__new__` is always treated as a static method, i.e., `cls` is
+passed as the first argument. `__init__` has no special handling; it is fetched as a bound method
+and called just like any other dunder method.
 
 `type.__call__` does other things too, but this is not yet handled by us.
 
@@ -19,7 +19,7 @@ Since every class has `object` in it's MRO, the default implementations are `obj
 
 - If neither `__new__` nor `__init__` are defined anywhere in the MRO of class (except for
     `object`), no arguments are accepted and `TypeError` is raised if any are passed.
-- If `__new__` is defined, but `__init__` is not, `object.__init__` will allow arbitrary arguments!
+- If `__new__` is defined but `__init__` is not, `object.__init__` will allow arbitrary arguments!
 
 As of today there are a number of behaviors that we do not support:
 
@@ -146,7 +146,7 @@ reveal_type(Foo())  # revealed: Foo
 
 ### Possibly Unbound
 
-### Possibly unbound `__new__` method
+#### Possibly unbound `__new__` method
 
 ```py
 def _(flag: bool) -> None:
@@ -163,7 +163,7 @@ def _(flag: bool) -> None:
     reveal_type(Foo(1))  # revealed: Foo
 ```
 
-### Possibly unbound `__call__` on `__new__` callable
+#### Possibly unbound `__call__` on `__new__` callable
 
 ```py
 def _(flag: bool) -> None:
