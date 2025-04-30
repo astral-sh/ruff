@@ -49,6 +49,15 @@ pub(crate) struct Predicate<'db> {
     pub(crate) is_positive: bool,
 }
 
+impl Predicate<'_> {
+    pub(crate) fn negated(self) -> Self {
+        Self {
+            node: self.node,
+            is_positive: !self.is_positive,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
