@@ -334,6 +334,10 @@ But a non-protocol class can be instantiated, even if it has `Protocol` in its M
 class SubclassOfMyProtocol(MyProtocol): ...
 
 reveal_type(SubclassOfMyProtocol())  # revealed: SubclassOfMyProtocol
+
+class SubclassOfGenericProtocol[T](GenericProtocol[T]): ...
+
+reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
 ```
 
 And as a corollary, `type[MyProtocol]` can also be called:

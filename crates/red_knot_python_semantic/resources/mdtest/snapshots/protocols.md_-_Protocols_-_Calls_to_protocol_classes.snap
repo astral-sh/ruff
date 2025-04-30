@@ -31,8 +31,12 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/protocols.md
 17 | class SubclassOfMyProtocol(MyProtocol): ...
 18 | 
 19 | reveal_type(SubclassOfMyProtocol())  # revealed: SubclassOfMyProtocol
-20 | def f(x: type[MyProtocol]):
-21 |     reveal_type(x())  # revealed: MyProtocol
+20 | 
+21 | class SubclassOfGenericProtocol[T](GenericProtocol[T]): ...
+22 | 
+23 | reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
+24 | def f(x: type[MyProtocol]):
+25 |     reveal_type(x())  # revealed: MyProtocol
 ```
 
 # Diagnostics
@@ -99,6 +103,27 @@ info: revealed-type: Revealed type
 ```
 
 ```
+error: lint:call-non-callable: Cannot instantiate class `GenericProtocol`
+  --> src/mdtest_snippet.py:16:13
+   |
+15 | # error: [call-non-callable] "Cannot instantiate class `GenericProtocol`"
+16 | reveal_type(GenericProtocol[int]())  # revealed: GenericProtocol[int]
+   |             ^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+17 | class SubclassOfMyProtocol(MyProtocol): ...
+   |
+info: Protocol classes cannot be instantiated
+  --> src/mdtest_snippet.py:12:7
+   |
+10 | reveal_type(MyProtocol())  # revealed: MyProtocol
+11 |
+12 | class GenericProtocol[T](Protocol):
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `GenericProtocol` declared as a protocol here
+13 |     x: T
+   |
+
+```
+
+```
 info: revealed-type: Revealed type
   --> src/mdtest_snippet.py:16:1
    |
@@ -118,19 +143,33 @@ info: revealed-type: Revealed type
 18 |
 19 | reveal_type(SubclassOfMyProtocol())  # revealed: SubclassOfMyProtocol
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `SubclassOfMyProtocol`
-20 | def f(x: type[MyProtocol]):
-21 |     reveal_type(x())  # revealed: MyProtocol
+20 |
+21 | class SubclassOfGenericProtocol[T](GenericProtocol[T]): ...
    |
 
 ```
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:21:5
+  --> src/mdtest_snippet.py:23:1
    |
-19 | reveal_type(SubclassOfMyProtocol())  # revealed: SubclassOfMyProtocol
-20 | def f(x: type[MyProtocol]):
-21 |     reveal_type(x())  # revealed: MyProtocol
+21 | class SubclassOfGenericProtocol[T](GenericProtocol[T]): ...
+22 |
+23 | reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `SubclassOfGenericProtocol[int]`
+24 | def f(x: type[MyProtocol]):
+25 |     reveal_type(x())  # revealed: MyProtocol
+   |
+
+```
+
+```
+info: revealed-type: Revealed type
+  --> src/mdtest_snippet.py:25:5
+   |
+23 | reveal_type(SubclassOfGenericProtocol[int]())  # revealed: SubclassOfGenericProtocol[int]
+24 | def f(x: type[MyProtocol]):
+25 |     reveal_type(x())  # revealed: MyProtocol
    |     ^^^^^^^^^^^^^^^^ `MyProtocol`
    |
 

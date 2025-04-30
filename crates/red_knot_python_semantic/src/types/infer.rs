@@ -4555,18 +4555,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        // It might look odd here that we emit an error for class-literals but not `type[]` types.
-        // But it's deliberate! The typing spec explicitly mandates that `type[]` types can be called
-        // even though class-literals cannot. This is because even though a protocol class `SomeProtocol`
-        // is always an abstract class, `type[SomeProtocol]` can be a concrete subclass of that protocol
-        // -- and indeed, according to the spec, type checkers must disallow abstract subclasses of the
-        // protocol to be passed to parameters that accept `type[SomeProtocol]`.
+        // It might look odd here that we emit an error for class-literals and generic aliases but not
+        // `type[]` types. But it's deliberate! The typing spec explicitly mandates that `type[]` types
+        // can be called even though class-literals cannot. This is because even though a protocol class
+        // `SomeProtocol` is always an abstract class, `type[SomeProtocol]` can be a concrete subclass of
+        // that protocol -- and indeed, according to the spec, type checkers must disallow abstract
+        // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
         // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
-        if let Some(protocol_class) = callable_type
-            .into_class_literal()
-            .and_then(|class| class.into_protocol_class(self.db()))
+        let possible_protocol_class = match callable_type {
+            Type::ClassLiteral(class) => Some(class),
+            Type::GenericAlias(generic) => Some(generic.origin(self.db())),
+            _ => None,
+        };
+
+        if let Some(protocol) =
+            possible_protocol_class.and_then(|class| class.into_protocol_class(self.db()))
         {
-            report_attempted_protocol_instantiation(&self.context, call_expression, protocol_class);
+            report_attempted_protocol_instantiation(&self.context, call_expression, protocol);
         }
 
         // For class literals we model the entire class instantiation logic, so it is handled
