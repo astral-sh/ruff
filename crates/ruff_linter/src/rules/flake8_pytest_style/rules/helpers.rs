@@ -22,13 +22,9 @@ pub(super) fn get_mark_decorators(
 pub(super) fn get_parametrize_decorators(
     decorators: &[Decorator],
 ) -> impl Iterator<Item = &Decorator> {
-    decorators.iter().filter_map(|decorator| {
-        let name = UnqualifiedName::from_expr(map_callable(&decorator.expression))?;
-        let ["pytest", "mark", "parametrize"] = name.segments() else {
-            return None;
-        };
-
-        Some(decorator)
+    decorators.iter().filter(|decorator| {
+        UnqualifiedName::from_expr(map_callable(&decorator.expression))
+            .is_some_and(|name| matches!(name.segments(), ["pytest", "mark", "parametrize"]))
     })
 }
 
