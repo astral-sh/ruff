@@ -18,8 +18,8 @@ use smallvec::{smallvec, SmallVec};
 use super::{definition_expression_type, DynamicType, Type};
 use crate::semantic_index::definition::Definition;
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::todo_type;
-use crate::Db;
+use crate::types::{todo_type, TypeVarInstance};
+use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
 
 /// The signature of a possible union of callables.
@@ -267,6 +267,8 @@ impl<'db> Signature<'db> {
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
     ) -> Self {
+        let parameters =
+            Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
         let return_ty = function_node.returns.as_ref().map(|returns| {
             if function_node.is_async {
                 todo_type!("generic types.CoroutineType")
@@ -274,15 +276,17 @@ impl<'db> Signature<'db> {
                 definition_expression_type(db, definition, returns.as_ref())
             }
         });
+        let legacy_generic_context =
+            GenericContext::from_function_params(db, &parameters, return_ty);
+
+        if generic_context.is_some() && legacy_generic_context.is_some() {
+            // TODO: Raise a diagnostic!
+        }
 
         Self {
-            generic_context,
+            generic_context: generic_context.or(legacy_generic_context),
             inherited_generic_context,
-            parameters: Parameters::from_parameters(
-                db,
-                definition,
-                function_node.parameters.as_ref(),
-            ),
+            parameters,
             return_ty,
         }
     }
@@ -312,6 +316,24 @@ impl<'db> Signature<'db> {
             return_ty: self
                 .return_ty
                 .map(|ty| ty.apply_specialization(db, specialization)),
+        }
+    }
+
+    pub(crate) fn find_legacy_typevars(
+        &self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        for param in &self.parameters {
+            if let Some(ty) = param.annotated_type() {
+                ty.find_legacy_typevars(db, typevars);
+            }
+            if let Some(ty) = param.default_type() {
+                ty.find_legacy_typevars(db, typevars);
+            }
+        }
+        if let Some(ty) = self.return_ty {
+            ty.find_legacy_typevars(db, typevars);
         }
     }
 

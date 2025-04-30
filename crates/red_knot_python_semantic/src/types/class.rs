@@ -533,14 +533,40 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Determine if this class is a protocol.
+    ///
+    /// This method relies on the accuracy of the [`KnownClass::is_protocol`] method,
+    /// which hardcodes knowledge about certain special-cased classes. See the docs on
+    /// that method for why we do this rather than relying on generalised logic for all
+    /// classes, including the special-cased ones that are included in the [`KnownClass`]
+    /// enum.
     pub(super) fn is_protocol(self, db: &'db dyn Db) -> bool {
-        self.explicit_bases(db).iter().any(|base| {
-            matches!(
-                base,
-                Type::KnownInstance(KnownInstanceType::Protocol)
-                    | Type::Dynamic(DynamicType::SubscriptedProtocol)
-            )
-        })
+        self.known(db)
+            .map(KnownClass::is_protocol)
+            .unwrap_or_else(|| {
+                // Iterate through the last three bases of the class
+                // searching for `Protocol` or `Protocol[]` in the bases list.
+                //
+                // If `Protocol` is present in the bases list of a valid protocol class, it must either:
+                //
+                // - be the last base
+                // - OR be the last-but-one base (with the final base being `Generic[]` or `object`)
+                // - OR be the last-but-two base (with the penultimate base being `Generic[]`
+                //                                and the final base being `object`)
+                self.explicit_bases(db).iter().rev().take(3).any(|base| {
+                    matches!(
+                        base,
+                        Type::KnownInstance(KnownInstanceType::Protocol)
+                            | Type::Dynamic(DynamicType::SubscriptedProtocol)
+                    )
+                })
+            })
+    }
+
+    /// Determine if this is an abstract class.
+    pub(super) fn is_abstract(self, db: &'db dyn Db) -> bool {
+        self.metaclass(db)
+            .into_class_literal()
+            .is_some_and(|metaclass| metaclass.is_known(db, KnownClass::ABCMeta))
     }
 
     /// Return the types of the decorators on this class
@@ -1076,6 +1102,7 @@ impl<'db> ClassLiteral<'db> {
                     Parameters::new([Parameter::positional_or_keyword(Name::new_static("other"))
                         // TODO: could be `Self`.
                         .with_annotated_type(Type::instance(
+                            db,
                             self.apply_optional_specialization(db, specialization),
                         ))]),
                     Some(KnownClass::Bool.to_instance(db)),
@@ -1711,7 +1738,7 @@ impl<'db> ProtocolClassLiteral<'db> {
     /// It is illegal for a protocol class to have any instance attributes that are not declared
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
-    pub(super) fn protocol_members(self, db: &'db dyn Db) -> &'db ordermap::set::Slice<Name> {
+    pub(super) fn protocol_members(self, db: &'db dyn Db) -> &'db FxOrderSet<Name> {
         /// The list of excluded members is subject to change between Python versions,
         /// especially for dunders, but it probably doesn't matter *too* much if this
         /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
@@ -1748,11 +1775,11 @@ impl<'db> ProtocolClassLiteral<'db> {
             )
         }
 
-        #[salsa::tracked(return_ref)]
+        #[salsa::tracked(return_ref, cycle_fn=proto_members_cycle_recover, cycle_initial=proto_members_cycle_initial)]
         fn cached_protocol_members<'db>(
             db: &'db dyn Db,
             class: ClassLiteral<'db>,
-        ) -> Box<ordermap::set::Slice<Name>> {
+        ) -> FxOrderSet<Name> {
             let mut members = FxOrderSet::default();
 
             for parent_protocol in class
@@ -1796,9 +1823,24 @@ impl<'db> ProtocolClassLiteral<'db> {
             }
 
             members.sort();
-            members.into_boxed_slice()
+            members.shrink_to_fit();
+            members
         }
 
+        fn proto_members_cycle_recover(
+            _db: &dyn Db,
+            _value: &FxOrderSet<Name>,
+            _count: u32,
+            _class: ClassLiteral,
+        ) -> salsa::CycleRecoveryAction<FxOrderSet<Name>> {
+            salsa::CycleRecoveryAction::Iterate
+        }
+
+        fn proto_members_cycle_initial(_db: &dyn Db, _class: ClassLiteral) -> FxOrderSet<Name> {
+            FxOrderSet::default()
+        }
+
+        let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
         cached_protocol_members(db, *self)
     }
 
@@ -1892,8 +1934,6 @@ pub enum KnownClass {
     TypeAliasType,
     NoDefaultType,
     NewType,
-    Sized,
-    // TODO: This can probably be removed when we have support for protocols
     SupportsIndex,
     // Collections
     ChainMap,
@@ -1977,7 +2017,6 @@ impl<'db> KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::Float
-            | Self::Sized
             | Self::Enum
             | Self::ABCMeta
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
@@ -1985,6 +2024,75 @@ impl<'db> KnownClass {
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
             | Self::NotImplementedType
             | Self::Classmethod => Truthiness::Ambiguous,
+        }
+    }
+
+    /// Return `true` if this class is a protocol class.
+    ///
+    /// In an ideal world, perhaps we wouldn't hardcode this knowledge here;
+    /// instead, we'd just look at the bases for these classes, as we do for
+    /// all other classes. However, the special casing here helps us out in
+    /// two important ways:
+    ///
+    /// 1. It helps us avoid Salsa cycles when creating types such as "instance of `str`"
+    ///    and "instance of `sys._version_info`". These types are constructed very early
+    ///    on, but it causes problems if we attempt to infer the types of their bases
+    ///    too soon.
+    /// 2. It's probably more performant.
+    const fn is_protocol(self) -> bool {
+        match self {
+            Self::SupportsIndex => true,
+
+            Self::Any
+            | Self::Bool
+            | Self::Object
+            | Self::Bytes
+            | Self::Bytearray
+            | Self::Tuple
+            | Self::Int
+            | Self::Float
+            | Self::Complex
+            | Self::FrozenSet
+            | Self::Str
+            | Self::Set
+            | Self::Dict
+            | Self::List
+            | Self::Type
+            | Self::Slice
+            | Self::Range
+            | Self::Property
+            | Self::BaseException
+            | Self::BaseExceptionGroup
+            | Self::Classmethod
+            | Self::GenericAlias
+            | Self::ModuleType
+            | Self::FunctionType
+            | Self::MethodType
+            | Self::MethodWrapperType
+            | Self::WrapperDescriptorType
+            | Self::NoneType
+            | Self::SpecialForm
+            | Self::TypeVar
+            | Self::ParamSpec
+            | Self::ParamSpecArgs
+            | Self::ParamSpecKwargs
+            | Self::TypeVarTuple
+            | Self::TypeAliasType
+            | Self::NoDefaultType
+            | Self::NewType
+            | Self::ChainMap
+            | Self::Counter
+            | Self::DefaultDict
+            | Self::Deque
+            | Self::OrderedDict
+            | Self::Enum
+            | Self::ABCMeta
+            | Self::Super
+            | Self::StdlibAlias
+            | Self::VersionInfo
+            | Self::EllipsisType
+            | Self::NotImplementedType
+            | Self::UnionType => false,
         }
     }
 
@@ -2033,7 +2141,6 @@ impl<'db> KnownClass {
             Self::Counter => "Counter",
             Self::DefaultDict => "defaultdict",
             Self::Deque => "deque",
-            Self::Sized => "Sized",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
             Self::ABCMeta => "ABCMeta",
@@ -2090,7 +2197,7 @@ impl<'db> KnownClass {
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.to_class_literal(db)
             .to_class_type(db)
-            .map(Type::instance)
+            .map(|class| Type::instance(db, class))
             .unwrap_or_else(Type::unknown)
     }
 
@@ -2207,8 +2314,7 @@ impl<'db> KnownClass {
             | Self::SpecialForm
             | Self::TypeVar
             | Self::StdlibAlias
-            | Self::SupportsIndex
-            | Self::Sized => KnownModule::Typing,
+            | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
             | Self::TypeVarTuple
             | Self::ParamSpec
@@ -2296,7 +2402,6 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::Sized
             | Self::Enum
             | Self::ABCMeta
             | Self::Super
@@ -2356,7 +2461,6 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::Sized
             | Self::Enum
             | Self::ABCMeta
             | Self::Super
@@ -2418,7 +2522,6 @@ impl<'db> KnownClass {
             "_SpecialForm" => Self::SpecialForm,
             "_NoDefaultType" => Self::NoDefaultType,
             "SupportsIndex" => Self::SupportsIndex,
-            "Sized" => Self::Sized,
             "Enum" => Self::Enum,
             "ABCMeta" => Self::ABCMeta,
             "super" => Self::Super,
@@ -2491,7 +2594,6 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
-            | Self::Sized
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }

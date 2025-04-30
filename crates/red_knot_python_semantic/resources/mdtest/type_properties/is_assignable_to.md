@@ -529,6 +529,18 @@ c: Callable[[Any], str] = A().f
 c: Callable[[Any], str] = A().g
 ```
 
+### Class literal types
+
+```py
+from typing import Any, Callable
+
+c: Callable[[str], Any] = str
+c: Callable[[str], Any] = int
+
+# error: [invalid-assignment]
+c: Callable[[str], Any] = object
+```
+
 ### Overloads
 
 `overloaded.pyi`:
@@ -583,6 +595,8 @@ from functools import partial
 
 def f(x: int, y: str) -> None: ...
 
+# TODO: no error
+# error: [invalid-assignment] "Object of type `partial` is not assignable to `(int, /) -> None`"
 c1: Callable[[int], None] = partial(f, y="a")
 ```
 

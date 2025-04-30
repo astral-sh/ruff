@@ -450,9 +450,29 @@
             }
           ]
         },
+        "invalid-legacy-type-variable": {
+          "title": "detects invalid legacy type variables",
+          "description": "## What it does\nChecks for the creation of invalid legacy `TypeVar`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a legacy `TypeVar`.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"T\")  # okay\nQ = TypeVar(\"S\")  # error: TypeVar name must match the variable it's assigned to\nT = TypeVar(\"T\")  # error: TypeVars should not be redefined\n\n# error: TypeVar must be immediately assigned to a variable\ndef f(t: TypeVar(\"U\")): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-metaclass": {
           "title": "detects invalid `metaclass=` arguments",
           "description": "## What it does\nChecks for arguments to `metaclass=` that are invalid.\n\n## Why is this bad?\nPython allows arbitrary expressions to be used as the argument to `metaclass=`.\nThese expressions, however, need to be callable and accept the same arguments\nas `type.__new__`.\n\n## Example\n\n```python\ndef f(): ...\n\n# TypeError: f() takes 0 positional arguments but 3 were given\nclass B(metaclass=f): ...\n```\n\n## References\n- [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-overload": {
+          "title": "detects invalid `@overload` usages",
+          "description": "## What it does\nChecks for various invalid `@overload` usages.\n\n## Why is this bad?\nThe `@overload` decorator is used to define functions and methods that accepts different\ncombinations of arguments and return different types based on the arguments passed. This is\nmainly beneficial for type checkers. But, if the `@overload` usage is invalid, the type\nchecker may not be able to provide correct type information.\n\n## Example\n\nDefining only one overload:\n\n```py\nfrom typing import overload\n\n@overload\ndef foo(x: int) -> int: ...\ndef foo(x: int | None) -> int | None:\n    return x\n```\n\nOr, not providing an implementation for the overloaded definition:\n\n```py\nfrom typing import overload\n\n@overload\ndef foo() -> None: ...\n@overload\ndef foo(x: int) -> int: ...\n```\n\n## References\n- [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)",
           "default": "error",
           "oneOf": [
             {

@@ -29,7 +29,7 @@ ruff_python_formatter = { path = "../crates/ruff_python_formatter" }
 ruff_text_size = { path = "../crates/ruff_text_size" }
 
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "c75b0161aba55965ab6ad8cc9aaee7dc177967f1" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "79afd59ed5a5edb4dac63cf5b6cf4a6aa9514bdf" }
 similar = { version = "2.5.0" }
 tracing = { version = "0.1.40" }
 

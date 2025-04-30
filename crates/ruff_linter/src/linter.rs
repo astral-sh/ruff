@@ -1006,19 +1006,22 @@ mod tests {
     }
 
     #[test_case(
-        "error_on_310",
+        "async_in_sync_error_on_310",
         "async def f(): return [[x async for x in foo(n)] for n in range(3)]",
-        PythonVersion::PY310
+        PythonVersion::PY310,
+        "AsyncComprehensionOutsideAsyncFunction"
     )]
     #[test_case(
-        "okay_on_311",
+        "async_in_sync_okay_on_311",
         "async def f(): return [[x async for x in foo(n)] for n in range(3)]",
-        PythonVersion::PY311
+        PythonVersion::PY311,
+        "AsyncComprehensionOutsideAsyncFunction"
     )]
     #[test_case(
-        "okay_on_310",
+        "async_in_sync_okay_on_310",
         "async def test(): return [[x async for x in elements(n)] async for n in range(3)]",
-        PythonVersion::PY310
+        PythonVersion::PY310,
+        "AsyncComprehensionOutsideAsyncFunction"
     )]
     #[test_case(
         "deferred_function_body",
@@ -1028,15 +1031,46 @@ mod tests {
 			def g(): ...
 			[x async for x in foo()]
 		",
-        PythonVersion::PY310
+        PythonVersion::PY310,
+        "AsyncComprehensionOutsideAsyncFunction"
     )]
-    #[test_case("false_positive", "[x async for x in y]", PythonVersion::PY310)]
-    fn test_async_comprehension_in_sync_comprehension(
+    #[test_case(
+        "async_in_sync_false_positive",
+        "[x async for x in y]",
+        PythonVersion::PY310,
+        "AsyncComprehensionOutsideAsyncFunction"
+    )]
+    #[test_case(
+        "rebound_comprehension",
+        "[x:= 2 for x in range(2)]",
+        PythonVersion::PY310,
+        "ReboundComprehensionVariable"
+    )]
+    #[test_case(
+        "duplicate_type_param",
+        "class C[T, T]: pass",
+        PythonVersion::PY312,
+        "DuplicateTypeParameter"
+    )]
+    #[test_case(
+        "multiple_case_assignment",
+        "
+        match x:
+            case [a, a]:
+                pass
+            case _:
+                pass
+        ",
+        PythonVersion::PY310,
+        "MultipleCaseAssignment"
+    )]
+    fn test_semantic_errors(
         name: &str,
         contents: &str,
         python_version: PythonVersion,
+        error_type: &str,
     ) {
-        let snapshot = format!("async_comprehension_in_sync_comprehension_{name}_{python_version}");
+        let snapshot = format!("semantic_syntax_error_{error_type}_{name}_{python_version}");
         let messages = test_snippet_syntax_errors(
             contents,
             &LinterSettings {

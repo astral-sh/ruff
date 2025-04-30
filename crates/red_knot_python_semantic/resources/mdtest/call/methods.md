@@ -205,7 +205,7 @@ reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or
 
 The `__get__` method on `types.FunctionType` has the following overloaded signature in typeshed:
 
-```py
+```pyi
 from types import FunctionType, MethodType
 from typing import overload
 
