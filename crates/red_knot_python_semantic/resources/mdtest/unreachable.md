@@ -304,6 +304,22 @@ else:
     pass
 ```
 
+And for nested `if` statements:
+
+```py
+def _(flag: bool):
+    if flag:
+        if sys.version_info >= (3, 11):
+            ExceptionGroup  # no error here
+        else:
+            pass
+
+        if sys.version_info < (3, 11):
+            pass
+        else:
+            ExceptionGroup  # no error here
+```
+
 The same works for ternary expressions:
 
 ```py
