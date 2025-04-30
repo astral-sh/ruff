@@ -107,6 +107,33 @@ impl<'db> Symbol<'db> {
             qualifiers,
         }
     }
+
+    /// Try to call `__get__(None, owner)` on the type of this symbol (not on the meta type).
+    /// If it succeeds, return the `__get__` return type. Otherwise, returns the original symbol.
+    pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Symbol<'db> {
+        match self {
+            Symbol::Type(Type::Union(union), boundness) => union.map_with_boundness(db, |elem| {
+                Symbol::Type(*elem, boundness).try_call_dunder_get(db, owner)
+            }),
+
+            Symbol::Type(Type::Intersection(intersection), boundness) => intersection
+                .map_with_boundness(db, |elem| {
+                    Symbol::Type(*elem, boundness).try_call_dunder_get(db, owner)
+                }),
+
+            Symbol::Type(self_ty, boundness) => {
+                if let Some((dunder_get_return_ty, _)) =
+                    self_ty.try_call_dunder_get(db, Type::none(db), owner)
+                {
+                    Symbol::Type(dunder_get_return_ty, boundness)
+                } else {
+                    self
+                }
+            }
+
+            Symbol::Unbound => Symbol::Unbound,
+        }
+    }
 }
 
 impl<'db> From<LookupResult<'db>> for SymbolAndQualifiers<'db> {

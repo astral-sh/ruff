@@ -154,7 +154,7 @@ fn definition_expression_type<'db>(
 /// method or a `__delete__` method. This enum is used to categorize attributes into two
 /// groups: (1) data descriptors and (2) normal attributes or non-data descriptors.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, salsa::Update)]
-enum AttributeKind {
+pub(crate) enum AttributeKind {
     DataDescriptor,
     NormalOrNonDataDescriptor,
 }
@@ -2512,7 +2512,7 @@ impl<'db> Type<'db> {
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
     #[salsa::tracked]
-    fn try_call_dunder_get(
+    pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
         instance: Type<'db>,
@@ -4348,16 +4348,27 @@ impl<'db> Type<'db> {
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
         let new_call_outcome = argument_types.with_self(Some(self_type), |argument_types| {
-            let result = self_type.try_call_dunder_with_policy(
-                db,
-                "__new__",
-                argument_types,
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            );
-            match result {
-                Err(CallDunderError::MethodNotAvailable) => None,
-                _ => Some(result),
+            let new_method = self_type
+                .find_name_in_mro_with_policy(
+                    db,
+                    "__new__",
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                        | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                )?
+                .symbol
+                .try_call_dunder_get(db, self_type);
+
+            match new_method {
+                Symbol::Type(new_method, boundness) => {
+                    let result = new_method.try_call(db, CallArgumentTypes::clone(argument_types));
+
+                    if boundness == Boundness::PossiblyUnbound {
+                        return Some(Err(DunderNewCallError::PossiblyUnbound(result.err())));
+                    }
+
+                    Some(result.map_err(DunderNewCallError::CallError))
+                }
+                Symbol::Unbound => None,
             }
         });
 
@@ -6133,12 +6144,18 @@ impl<'db> BoolError<'db> {
     }
 }
 
+#[derive(Debug)]
+enum DunderNewCallError<'db> {
+    CallError(CallError<'db>),
+    PossiblyUnbound(Option<CallError<'db>>),
+}
+
 /// Error returned if a class instantiation call failed
 #[derive(Debug)]
 enum ConstructorCallError<'db> {
     Init(Type<'db>, CallDunderError<'db>),
-    New(Type<'db>, CallDunderError<'db>),
-    NewAndInit(Type<'db>, CallDunderError<'db>, CallDunderError<'db>),
+    New(Type<'db>, DunderNewCallError<'db>),
+    NewAndInit(Type<'db>, DunderNewCallError<'db>, CallDunderError<'db>),
 }
 
 impl<'db> ConstructorCallError<'db> {
@@ -6188,13 +6205,8 @@ impl<'db> ConstructorCallError<'db> {
             }
         };
 
-        let report_new_error = |call_dunder_error: &CallDunderError<'db>| match call_dunder_error {
-            CallDunderError::MethodNotAvailable => {
-                // We are explicitly checking for `__new__` before attempting to call it,
-                // so this should never happen.
-                unreachable!("`__new__` method may not be called if missing");
-            }
-            CallDunderError::PossiblyUnbound(bindings) => {
+        let report_new_error = |error: &DunderNewCallError<'db>| match error {
+            DunderNewCallError::PossiblyUnbound(call_error) => {
                 if let Some(builder) =
                     context.report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, context_expression_node)
                 {
@@ -6204,22 +6216,24 @@ impl<'db> ConstructorCallError<'db> {
                     ));
                 }
 
-                bindings.report_diagnostics(context, context_expression_node);
+                if let Some(CallError(_kind, bindings)) = call_error {
+                    bindings.report_diagnostics(context, context_expression_node);
+                }
             }
-            CallDunderError::CallError(_, bindings) => {
+            DunderNewCallError::CallError(CallError(_kind, bindings)) => {
                 bindings.report_diagnostics(context, context_expression_node);
             }
         };
 
         match self {
-            Self::Init(_, call_dunder_error) => {
-                report_init_error(call_dunder_error);
+            Self::Init(_, init_call_dunder_error) => {
+                report_init_error(init_call_dunder_error);
             }
-            Self::New(_, call_dunder_error) => {
-                report_new_error(call_dunder_error);
+            Self::New(_, new_call_error) => {
+                report_new_error(new_call_error);
             }
-            Self::NewAndInit(_, new_call_dunder_error, init_call_dunder_error) => {
-                report_new_error(new_call_dunder_error);
+            Self::NewAndInit(_, new_call_error, init_call_dunder_error) => {
+                report_new_error(new_call_error);
                 report_init_error(init_call_dunder_error);
             }
         }

@@ -792,13 +792,10 @@ impl<'db> ClassLiteral<'db> {
         }
 
         let new_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .symbol;
+            .find_name_in_mro(db, "__new__")
+            .expect("find_name_in_mro always succeeds for class literals")
+            .symbol
+            .try_call_dunder_get(db, self_ty);
 
         if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
             return Some(new_function.into_bound_method_type(db, self.into()));
@@ -879,12 +876,8 @@ impl<'db> ClassLiteral<'db> {
                         continue;
                     }
 
-                    // HACK: we should implement some more general logic here that supports arbitrary custom
-                    // metaclasses, not just `type` and `ABCMeta`.
-                    if matches!(
-                        class.known(db),
-                        Some(KnownClass::Type | KnownClass::ABCMeta)
-                    ) && policy.meta_class_no_type_fallback()
+                    if matches!(class.known(db), Some(KnownClass::Type))
+                        && policy.meta_class_no_type_fallback()
                     {
                         continue;
                     }
