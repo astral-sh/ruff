@@ -631,7 +631,7 @@ where
                     BacktraceStatus::Disabled => {
                         diagnostic.sub(SubDiagnostic::new(
                             Severity::Info,
-                            "run with `RUST_BACKTRACE=1` environment variable to display a backtrace",
+                            "run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information",
                         ));
                     }
                     BacktraceStatus::Captured => {
