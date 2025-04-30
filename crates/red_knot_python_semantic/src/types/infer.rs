@@ -1571,7 +1571,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = match decorator_ty
-                .try_call(self.db(), CallArgumentTypes::positional([inferred_ty]))
+                .try_call(self.db(), &mut CallArgumentTypes::positional([inferred_ty]))
                 .map(|bindings| bindings.return_type(self.db()))
             {
                 Ok(return_ty) => return_ty,
@@ -2587,7 +2587,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let successful_call = meta_dunder_set
                                 .try_call(
                                     db,
-                                    CallArgumentTypes::positional([
+                                    &mut CallArgumentTypes::positional([
                                         meta_attr_ty,
                                         object_ty,
                                         value_ty,
@@ -2728,7 +2728,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let successful_call = meta_dunder_set
                                 .try_call(
                                     db,
-                                    CallArgumentTypes::positional([
+                                    &mut CallArgumentTypes::positional([
                                         meta_attr_ty,
                                         object_ty,
                                         value_ty,
@@ -6194,7 +6194,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
-                    .try_call(db, CallArgumentTypes::positional([right, left]))
+                    .try_call(db, &mut CallArgumentTypes::positional([right, left]))
                     .map(|bindings| bindings.return_type(db))
                     .ok()
             }
@@ -6600,7 +6600,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             match ty.try_call(
                                 self.db(),
-                                CallArgumentTypes::positional([value_ty, slice_ty]),
+                                &mut CallArgumentTypes::positional([value_ty, slice_ty]),
                             ) {
                                 Ok(bindings) => return bindings.return_type(self.db()),
                                 Err(CallError(_, bindings)) => {

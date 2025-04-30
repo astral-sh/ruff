@@ -2528,7 +2528,10 @@ impl<'db> Type<'db> {
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
-                .try_call(db, CallArgumentTypes::positional([self, instance, owner]))
+                .try_call(
+                    db,
+                    &mut CallArgumentTypes::positional([self, instance, owner]),
+                )
                 .map(|bindings| {
                     if descr_get_boundness == Boundness::Bound {
                         bindings.return_type(db)
@@ -4080,11 +4083,10 @@ impl<'db> Type<'db> {
     fn try_call(
         self,
         db: &'db dyn Db,
-        mut argument_types: CallArgumentTypes<'_, 'db>,
+        argument_types: &mut CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, &mut argument_types)
-            .check_types(db, &mut argument_types)
+        Bindings::match_parameters(signatures, argument_types).check_types(db, argument_types)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -4360,7 +4362,7 @@ impl<'db> Type<'db> {
 
             match new_method {
                 Symbol::Type(new_method, boundness) => {
-                    let result = new_method.try_call(db, CallArgumentTypes::clone(argument_types));
+                    let result = new_method.try_call(db, argument_types);
 
                     if boundness == Boundness::PossiblyUnbound {
                         return Some(Err(DunderNewCallError::PossiblyUnbound(result.err())));

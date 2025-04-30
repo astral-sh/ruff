@@ -55,7 +55,6 @@ pub(crate) enum Argument<'a> {
 }
 
 /// Arguments for a single call, in source order, along with inferred types for each argument.
-#[derive(Clone, Debug)]
 pub(crate) struct CallArgumentTypes<'a, 'db> {
     arguments: CallArguments<'a>,
     types: VecDeque<Type<'db>>,

@@ -346,7 +346,7 @@ impl<'db> Bindings<'db> {
                     [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                         if let Some(getter) = property.getter(db) {
                             if let Ok(return_ty) = getter
-                                .try_call(db, CallArgumentTypes::positional([*instance]))
+                                .try_call(db, &mut CallArgumentTypes::positional([*instance]))
                                 .map(|binding| binding.return_type(db))
                             {
                                 overload.set_return_type(return_ty);
@@ -374,7 +374,7 @@ impl<'db> Bindings<'db> {
                         [Some(instance), ..] => {
                             if let Some(getter) = property.getter(db) {
                                 if let Ok(return_ty) = getter
-                                    .try_call(db, CallArgumentTypes::positional([*instance]))
+                                    .try_call(db, &mut CallArgumentTypes::positional([*instance]))
                                     .map(|binding| binding.return_type(db))
                                 {
                                     overload.set_return_type(return_ty);
@@ -400,9 +400,10 @@ impl<'db> Bindings<'db> {
                         overload.parameter_types()
                     {
                         if let Some(setter) = property.setter(db) {
-                            if let Err(_call_error) = setter
-                                .try_call(db, CallArgumentTypes::positional([*instance, *value]))
-                            {
+                            if let Err(_call_error) = setter.try_call(
+                                db,
+                                &mut CallArgumentTypes::positional([*instance, *value]),
+                            ) {
                                 overload.errors.push(BindingError::InternalCallError(
                                     "calling the setter failed",
                                 ));
@@ -418,9 +419,10 @@ impl<'db> Bindings<'db> {
                 Type::MethodWrapper(MethodWrapperKind::PropertyDunderSet(property)) => {
                     if let [Some(instance), Some(value), ..] = overload.parameter_types() {
                         if let Some(setter) = property.setter(db) {
-                            if let Err(_call_error) = setter
-                                .try_call(db, CallArgumentTypes::positional([*instance, *value]))
-                            {
+                            if let Err(_call_error) = setter.try_call(
+                                db,
+                                &mut CallArgumentTypes::positional([*instance, *value]),
+                            ) {
                                 overload.errors.push(BindingError::InternalCallError(
                                     "calling the setter failed",
                                 ));
