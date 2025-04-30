@@ -159,7 +159,7 @@ impl KnownConstraintFunction {
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
         let constraint_fn = |class| match self {
-            KnownConstraintFunction::IsInstance => Type::instance(class),
+            KnownConstraintFunction::IsInstance => Type::instance(db, class),
             KnownConstraintFunction::IsSubclass => SubclassOfType::from(db, class),
         };
 
@@ -472,7 +472,9 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty))
                     }
                     // Treat `bool` as `Literal[True, False]`.
-                    Type::Instance(instance) if instance.class().is_known(db, KnownClass::Bool) => {
+                    Type::NominalInstance(instance)
+                        if instance.class().is_known(db, KnownClass::Bool) =>
+                    {
                         UnionType::from_elements(
                             db,
                             [Type::BooleanLiteral(true), Type::BooleanLiteral(false)]
@@ -501,7 +503,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
 
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         match (lhs_ty, rhs_ty) {
-            (Type::Instance(instance), Type::IntLiteral(i))
+            (Type::NominalInstance(instance), Type::IntLiteral(i))
                 if instance.class().is_known(self.db, KnownClass::Bool) =>
             {
                 if i == 0 {
@@ -682,7 +684,7 @@ impl<'db> NarrowingConstraintsBuilder<'db> {
                         let symbol = self.expect_expr_name_symbol(id);
                         constraints.insert(
                             symbol,
-                            Type::instance(rhs_class.unknown_specialization(self.db)),
+                            Type::instance(self.db, rhs_class.unknown_specialization(self.db)),
                         );
                     }
                 }
