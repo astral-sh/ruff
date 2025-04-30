@@ -7,7 +7,10 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
 use super::TypeVarVariance;
-use crate::semantic_index::place_table;
+use crate::semantic_index::place::ScopedPlaceId;
+use crate::semantic_index::{SemanticIndex, place_table};
+use crate::types::context::InferContext;
+use crate::types::diagnostic::report_undeclared_protocol_member;
 use crate::{
     Db, FxOrderSet,
     place::{Boundness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -54,6 +57,59 @@ impl<'db> ProtocolClassLiteral<'db> {
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
         self.known_function_decorators(db)
             .contains(&KnownFunction::RuntimeCheckable)
+    }
+
+    /// Iterate through the body of the protocol class. Check that all definitions
+    /// in the protocol class body are either explicitly declared directly in the
+    /// class body, or are declared in a superclass of the protocol class.
+    pub(super) fn validate_members(self, context: &InferContext, index: &SemanticIndex<'db>) {
+        let db = context.db();
+        let interface = self.interface(db);
+        let class_place_table = index.place_table(self.body_scope(db).file_scope_id(db));
+
+        for (symbol_id, mut bindings_iterator) in
+            use_def_map(db, self.body_scope(db)).all_end_of_scope_symbol_bindings()
+        {
+            let symbol_name = class_place_table.symbol(symbol_id).name();
+
+            if !interface.includes_member(db, symbol_name) {
+                continue;
+            }
+
+            let has_declaration = self
+                .iter_mro(db, None)
+                .filter_map(ClassBase::into_class)
+                .any(|superclass| {
+                    let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+                    let Some(scoped_symbol_id) =
+                        place_table(db, superclass_scope).symbol_id(symbol_name)
+                    else {
+                        return false;
+                    };
+                    !place_from_declarations(
+                        db,
+                        index
+                            .use_def_map(superclass_scope.file_scope_id(db))
+                            .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
+                    )
+                    .into_place_and_conflicting_declarations()
+                    .0
+                    .place
+                    .is_unbound()
+                });
+
+            if has_declaration {
+                continue;
+            }
+
+            let Some(first_definition) =
+                bindings_iterator.find_map(|binding| binding.binding.definition())
+            else {
+                continue;
+            };
+
+            report_undeclared_protocol_member(context, first_definition, self, class_place_table);
+        }
     }
 }
 
@@ -145,6 +201,10 @@ impl<'db> ProtocolInterface<'db> {
             kind: data.kind,
             qualifiers: data.qualifiers,
         })
+    }
+
+    pub(super) fn includes_member(self, db: &'db dyn Db, name: &str) -> bool {
+        self.inner(db).contains_key(name)
     }
 
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
