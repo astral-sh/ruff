@@ -816,15 +816,8 @@ fn check_test_function_args(checker: &Checker, parameters: &Parameters, decorato
         };
         let first_arg = call_expr
             .arguments
-            .arguments_source_order()
-            .next()
-            .and_then(|arg| {
-                if let ArgOrKeyword::Arg(expr) = arg {
-                    expr.as_string_literal_expr()
-                } else {
-                    None
-                }
-            });
+            .find_argument_value("argnames", 0)
+            .and_then(Expr::as_string_literal_expr);
 
         if let Some(arg) = first_arg {
             for param_name in arg
