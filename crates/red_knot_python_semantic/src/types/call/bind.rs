@@ -553,12 +553,24 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Some(KnownFunction::IsGenericClass) => {
+                    Some(KnownFunction::GenericContext) => {
                         if let [Some(ty)] = overload.parameter_types() {
-                            overload.set_return_type(Type::BooleanLiteral(match ty {
-                                Type::ClassLiteral(class) => class.generic_context(db).is_some(),
-                                _ => false,
-                            }));
+                            // TODO: Handle generic functions, and unions/intersections of generic
+                            // types
+                            overload.set_return_type(match ty {
+                                Type::ClassLiteral(class) => match class.generic_context(db) {
+                                    Some(generic_context) => TupleType::from_elements(
+                                        db,
+                                        generic_context
+                                            .variables(db)
+                                            .iter()
+                                            .map(|typevar| Type::TypeVar(*typevar)),
+                                    ),
+                                    None => Type::none(db),
+                                },
+
+                                _ => Type::none(db),
+                            });
                         }
                     }
 

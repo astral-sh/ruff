@@ -6,7 +6,7 @@ At its simplest, to define a generic class using the legacy syntax, you use inhe
 `typing.Generic` special form, which is "specialized" with the generic class's type variables.
 
 ```py
-from knot_extensions import is_generic_class, static_assert
+from knot_extensions import generic_context
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
@@ -15,8 +15,8 @@ S = TypeVar("S")
 class SingleTypevar(Generic[T]): ...
 class MultipleTypevars(Generic[T, S]): ...
 
-static_assert(is_generic_class(SingleTypevar))
-static_assert(is_generic_class(MultipleTypevars))
+reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
+reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
 ```
 
 You cannot use the same typevar more than once.
@@ -41,13 +41,11 @@ class InheritedGeneric(MultipleTypevars[T, S]): ...
 class InheritedGenericPartiallySpecialized(MultipleTypevars[T, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-# TODO: no error
-# error: [static-assert-error]
-static_assert(is_generic_class(InheritedGeneric))
-# TODO: no error
-# error: [static-assert-error]
-static_assert(is_generic_class(InheritedGenericPartiallySpecialized))
-static_assert(not is_generic_class(InheritedGenericFullySpecialized))
+# TODO: revealed: tuple[T, S]
+reveal_type(generic_context(InheritedGeneric))  # revealed: None
+# TODO: revealed: tuple[T]
+reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: None
+reveal_type(generic_context(InheritedGenericFullySpecialized))  # revealed: None
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each
@@ -57,7 +55,7 @@ the inheriting class generic.
 ```py
 class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
 
-static_assert(not is_generic_class(InheritedGenericDefaultSpecialization))
+reveal_type(generic_context(InheritedGenericDefaultSpecialization))  # revealed: None
 ```
 
 When inheriting from a generic class, you can optionally inherit from `typing.Generic` as well. But
@@ -73,9 +71,9 @@ class ExplicitInheritedGenericPartiallySpecializedExtraTypevar(MultipleTypevars[
 # TODO: error
 class ExplicitInheritedGenericPartiallySpecializedMissingTypevar(MultipleTypevars[T, int], Generic[S]): ...
 
-static_assert(is_generic_class(ExplicitInheritedGeneric))
-static_assert(is_generic_class(ExplicitInheritedGenericPartiallySpecialized))
-static_assert(is_generic_class(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
+reveal_type(generic_context(ExplicitInheritedGeneric))  # revealed: tuple[T, S]
+reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))  # revealed: tuple[T]
+reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))  # revealed: tuple[T, S]
 ```
 
 ## Specializing generic classes explicitly

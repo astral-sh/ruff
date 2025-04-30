@@ -11,13 +11,13 @@ At its simplest, to define a generic class using PEP 695 syntax, you add a list 
 the class name.
 
 ```py
-from knot_extensions import is_generic_class, static_assert
+from knot_extensions import generic_context
 
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...
 
-static_assert(is_generic_class(SingleTypevar))
-static_assert(is_generic_class(MultipleTypevars))
+reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
+reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
 ```
 
 You cannot use the same typevar more than once.
@@ -43,9 +43,9 @@ class InheritedGeneric[U, V](MultipleTypevars[U, V]): ...
 class InheritedGenericPartiallySpecialized[U](MultipleTypevars[U, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-static_assert(is_generic_class(InheritedGeneric))
-static_assert(is_generic_class(InheritedGenericPartiallySpecialized))
-static_assert(not is_generic_class(InheritedGenericFullySpecialized))
+reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[U, V]
+reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[U]
+reveal_type(generic_context(InheritedGenericFullySpecialized))  # revealed: None
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each
@@ -55,7 +55,7 @@ the inheriting class generic.
 ```py
 class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
 
-static_assert(not is_generic_class(InheritedGenericDefaultSpecialization))
+reveal_type(generic_context(InheritedGenericDefaultSpecialization))  # revealed: None
 ```
 
 ## Specializing generic classes explicitly
