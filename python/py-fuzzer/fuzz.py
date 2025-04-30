@@ -32,6 +32,7 @@ import concurrent.futures
 import enum
 import subprocess
 import tempfile
+from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
 from pathlib import Path
@@ -148,39 +149,51 @@ class FuzzResult:
 def fuzz_code(seed: Seed, args: ResolvedCliArgs) -> FuzzResult:
     """Return a `FuzzResult` instance describing the fuzzing result from this seed."""
     code = generate_random_code(seed)
-    has_bug = (
-        contains_new_bug(
-            code,
+    bug_found = False
+    minimizer_callback: Callable[[str], bool] | None = None
+
+    if args.baseline_executable_path is None:
+        if contains_bug(
+            code, executable=args.executable, executable_path=args.test_executable_path
+        ):
+            bug_found = True
+            minimizer_callback = partial(
+                contains_bug,
+                executable=args.executable,
+                executable_path=args.test_executable_path,
+            )
+    elif contains_new_bug(
+        code,
+        executable=args.executable,
+        test_executable_path=args.test_executable_path,
+        baseline_executable_path=args.baseline_executable_path,
+    ):
+        bug_found = True
+        minimizer_callback = partial(
+            contains_new_bug,
             executable=args.executable,
             test_executable_path=args.test_executable_path,
             baseline_executable_path=args.baseline_executable_path,
         )
-        if args.baseline_executable_path is not None
-        else contains_bug(
-            code, executable=args.executable, executable_path=args.test_executable_path
-        )
-    )
-    if has_bug:
-        callback = partial(
-            contains_bug,
-            executable=args.executable,
-            executable_path=args.test_executable_path,
-        )
-        try:
-            maybe_bug = MinimizedSourceCode(minimize_repro(code, callback))
-        except CouldNotMinimize as e:
-            # This is to double-check that there isn't a bug in
-            # `pysource-minimize`/`pysource-codegen`.
-            # `pysource-minimize` *should* never produce code that's invalid syntax.
-            try:
-                ast.parse(code)
-            except SyntaxError:
-                raise e from None
-            else:
-                maybe_bug = MinimizedSourceCode(code)
 
-    else:
-        maybe_bug = None
+    if not bug_found:
+        return FuzzResult(seed, None, args.executable)
+
+    assert minimizer_callback is not None
+
+    try:
+        maybe_bug = MinimizedSourceCode(minimize_repro(code, minimizer_callback))
+    except CouldNotMinimize as e:
+        # This is to double-check that there isn't a bug in
+        # `pysource-minimize`/`pysource-codegen`.
+        # `pysource-minimize` *should* never produce code that's invalid syntax.
+        try:
+            ast.parse(code)
+        except SyntaxError:
+            raise e from None
+        else:
+            maybe_bug = MinimizedSourceCode(code)
+
     return FuzzResult(seed, maybe_bug, args.executable)
 
 
