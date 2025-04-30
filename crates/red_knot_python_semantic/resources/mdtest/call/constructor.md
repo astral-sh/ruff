@@ -351,6 +351,7 @@ import abc
 class Foo:
     def __new__(cls) -> "Foo":
         return object.__new__(cls)
+
     def __init__(self, x):
         self.x = 42
 
@@ -363,6 +364,7 @@ reveal_type(Foo(42))  # revealed: Foo
 class Foo2:
     def __new__(cls, x) -> "Foo2":
         return object.__new__(cls)
+
     def __init__(self):
         pass
 
@@ -375,6 +377,7 @@ reveal_type(Foo2(42))  # revealed: Foo2
 class Foo3(metaclass=abc.ABCMeta):
     def __new__(cls) -> "Foo3":
         return object.__new__(cls)
+
     def __init__(self, x):
         self.x = 42
 
@@ -387,6 +390,7 @@ reveal_type(Foo3(42))  # revealed: Foo3
 class Foo4(metaclass=abc.ABCMeta):
     def __new__(cls, x) -> "Foo4":
         return object.__new__(cls)
+
     def __init__(self):
         pass
 
