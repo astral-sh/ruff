@@ -5288,6 +5288,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Symbol::Unbound.into();
                     }
 
+                    let global = FileScopeId::global().to_scope_id(db, self.file());
+
                     if !self.is_deferred() {
                         match self.index.eager_bindings(
                             FileScopeId::global(),
@@ -5295,7 +5297,9 @@ impl<'db> TypeInferenceBuilder<'db> {
                             file_scope_id,
                         ) {
                             EagerBindingsResult::Found(bindings) => {
-                                return symbol_from_bindings(db, bindings).into();
+                                return symbol_from_bindings(db, bindings)
+                                    .map_type(|ty| narrow_with_applicable_constraints(ty, global))
+                                    .into();
                             }
                             // There are no visible bindings here.
                             EagerBindingsResult::NotFound => {
@@ -5306,11 +5310,19 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
 
                     explicit_global_symbol(db, self.file(), symbol_name)
+                        .map_type(|ty| narrow_with_applicable_constraints(ty, global))
                 })
                 // Not found in the module's explicitly declared global symbols?
                 // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
                 // These are looked up as attributes on `types.ModuleType`.
-                .or_fall_back_to(db, || module_type_implicit_global_symbol(db, symbol_name))
+                .or_fall_back_to(db, || {
+                    module_type_implicit_global_symbol(db, symbol_name).map_type(|ty| {
+                        narrow_with_applicable_constraints(
+                            ty,
+                            FileScopeId::global().to_scope_id(db, self.file()),
+                        )
+                    })
+                })
                 // Not found in globals? Fallback to builtins
                 // (without infinite recursion if we're already in builtins.)
                 .or_fall_back_to(db, || {

@@ -56,14 +56,22 @@ target has not changed in all places where the function is called).
 ### Narrowing constraints introduced in eager nested scopes
 
 ```py
+g: str | None = "a"
+
 def f(x: str | None):
     def _():
         if x is not None:
             reveal_type(x)  # revealed: str
 
+        if g is not None:
+            reveal_type(g)  # revealed: str
+
     class C:
         if x is not None:
             reveal_type(x)  # revealed: str
+
+        if g is not None:
+            reveal_type(g)  # revealed: str
 
     # TODO: should be str
     # This could be fixed if we supported narrowing with if clauses in comprehensions.
@@ -73,6 +81,8 @@ def f(x: str | None):
 ### Narrowing constraints introduced in the outer scope
 
 ```py
+g: str | None = "a"
+
 def f(x: str | None):
     if x is not None:
         def _():
@@ -84,12 +94,23 @@ def f(x: str | None):
             reveal_type(x)  # revealed: str
 
         [reveal_type(x) for _ in range(1)]  # revealed: str
+
+    if g is not None:
+        def _():
+            reveal_type(g)  # revealed: str | None
+
+        class D:
+            reveal_type(g)  # revealed: str
+
+        [reveal_type(g) for _ in range(1)]  # revealed: str
 ```
 
 ### Narrowing constraints introduced in multiple scopes
 
 ```py
 from typing import Literal
+
+g: str | Literal[1] | None = "a"
 
 def f(x: str | Literal[1] | None):
     class C:
@@ -104,4 +125,13 @@ def f(x: str | Literal[1] | None):
 
             # TODO: should be str
             [reveal_type(x) for _ in range(1) if x != 1]  # revealed: str | Literal[1]
+
+        if g is not None:
+            def _():
+                if g != 1:
+                    reveal_type(g)  # revealed: str | None
+
+            class D:
+                if g != 1:
+                    reveal_type(g)  # revealed: str
 ```

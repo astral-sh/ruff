@@ -1937,20 +1937,14 @@ where
                         .record_use(symbol, use_id, node_key);
                     // We also mark symbols in the outer scopes as used
                     // to perform cross-scope type narrowing.
-                    for scope in self.scope_stack.iter().rev().skip(1) {
-                        if !self.scopes[scope.file_scope_id]
-                            .node()
-                            .scope_kind()
-                            .is_eager()
-                        {
-                            break;
-                        }
-                        let symbol_table = &mut self.symbol_tables[scope.file_scope_id];
+                    for enclosing_scope in self.scope_stack.iter().rev().skip(1) {
+                        let symbol_table = &mut self.symbol_tables[enclosing_scope.file_scope_id];
                         if let Some(symbol) = symbol_table.symbol_id_by_name(id) {
-                            symbol_table.mark_symbol_used(symbol);
-                            let use_id = self.ast_ids[scope.file_scope_id].record_use(expr);
-                            self.use_def_maps[scope.file_scope_id]
+                            let use_id =
+                                self.ast_ids[enclosing_scope.file_scope_id].record_use(expr);
+                            self.use_def_maps[enclosing_scope.file_scope_id]
                                 .record_use(symbol, use_id, node_key);
+                            break;
                         }
                     }
                 }
