@@ -6525,6 +6525,13 @@ pub struct FunctionType<'db> {
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
+    /// Returns the [`File`] in which this function is defined.
+    pub(crate) fn file(self, db: &'db dyn Db) -> File {
+        // NOTE: Do not use `self.definition(db).file(db)` here, as that could create a
+        // cross-module dependency on the full AST.
+        self.body_scope(db).file(db)
+    }
+
     pub(crate) fn has_known_decorator(self, db: &dyn Db, decorator: FunctionDecorators) -> bool {
         self.decorators(db).contains(decorator)
     }
@@ -6546,21 +6553,41 @@ impl<'db> FunctionType<'db> {
         Type::BoundMethod(BoundMethodType::new(db, self, self_instance))
     }
 
+    /// Returns the AST node for this function.
+    pub(crate) fn node(self, db: &'db dyn Db, file: File) -> &'db ast::StmtFunctionDef {
+        debug_assert_eq!(
+            file,
+            self.file(db),
+            "FunctionType::node() must be called with the same file as the one where \
+            the function is defined."
+        );
+
+        self.body_scope(db).node(db).expect_function()
+    }
+
     /// Returns the [`FileRange`] of the function's name.
     pub fn focus_range(self, db: &dyn Db) -> FileRange {
         FileRange::new(
-            self.body_scope(db).file(db),
+            self.file(db),
             self.body_scope(db).node(db).expect_function().name.range,
         )
     }
 
     pub fn full_range(self, db: &dyn Db) -> FileRange {
         FileRange::new(
-            self.body_scope(db).file(db),
+            self.file(db),
             self.body_scope(db).node(db).expect_function().range,
         )
     }
 
+    /// Returns the [`Definition`] of this function.
+    ///
+    /// ## Warning
+    ///
+    /// This uses the semantic index to find the definition of the function. This means that if the
+    /// calling query is not in the same file as this function is defined in, then this will create
+    /// a cross-module dependency directly on the full AST which will lead to cache
+    /// over-invalidation.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.file(db));
