@@ -304,6 +304,11 @@ reveal_type(typing.Protocol is not typing_extensions.Protocol)  # revealed: bool
 
 Neither `Protocol`, nor any protocol class, can be directly instantiated:
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing_extensions import Protocol, reveal_type
 
@@ -315,6 +320,12 @@ class MyProtocol(Protocol):
 
 # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
 reveal_type(MyProtocol())  # revealed: MyProtocol
+
+class GenericProtocol[T](Protocol):
+    x: T
+
+# error: [call-non-callable] "Cannot instantiate class `GenericProtocol`"
+reveal_type(GenericProtocol[int]())  # revealed: GenericProtocol[int]
 ```
 
 But a non-protocol class can be instantiated, even if it has `Protocol` in its MRO:
