@@ -108,12 +108,7 @@ enum DataclassFieldsPolicy {
 }
 
 impl DataclassFieldsPolicy {
-    fn matches<'db>(
-        self,
-        db: &'db dyn Db,
-        class: ClassLiteral<'db>,
-        specialization: Option<Specialization<'db>>,
-    ) -> bool {
+    fn matches<'db>(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
         match self {
             Self::Dataclass => {
                 class.dataclass_params(db).is_some()
@@ -121,10 +116,10 @@ impl DataclassFieldsPolicy {
                         .try_metaclass(db)
                         .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
             }
-            Self::NamedTuple => KnownClass::NamedTuple
-                .to_class_literal(db)
-                .to_class_type(db)
-                .is_some_and(|named_tuple| class.is_subclass_of(db, specialization, named_tuple)),
+            Self::NamedTuple => class.explicit_bases(db).iter().any(|base| {
+                base.into_class_literal()
+                    .is_some_and(|c| c.is_known(db, KnownClass::NamedTuple))
+            }),
         }
     }
 }
@@ -1015,12 +1010,6 @@ impl<'db> ClassLiteral<'db> {
 
         if symbol.symbol.is_unbound() {
             if let Some(dataclass_member) = self.own_dataclass_member(db, specialization, name) {
-                eprintln!(
-                    "==> dataclass {} {} {}",
-                    Type::from(self).display(db),
-                    name,
-                    dataclass_member.display(db)
-                );
                 return Symbol::bound(dataclass_member).into();
             }
         }
@@ -1037,21 +1026,21 @@ impl<'db> ClassLiteral<'db> {
     ) -> Option<Type<'db>> {
         let params = self.dataclass_params(db);
         let has_dataclass_param = |param| params.is_some_and(|params| params.contains(param));
+        let field_policy = if has_dataclass_param(DataclassParams::INIT)
+            || self
+                .try_metaclass(db)
+                .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
+        {
+            DataclassFieldsPolicy::Dataclass
+        } else if DataclassFieldsPolicy::NamedTuple.matches(db, self) {
+            DataclassFieldsPolicy::NamedTuple
+        } else {
+            return None;
+        };
 
-        match name {
-            "__init__" => {
-                let field_policy = if has_dataclass_param(DataclassParams::INIT)
-                    || self
-                        .try_metaclass(db)
-                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
-                {
-                    DataclassFieldsPolicy::Dataclass
-                } else if DataclassFieldsPolicy::NamedTuple.matches(db, self, specialization) {
-                    DataclassFieldsPolicy::NamedTuple
-                } else {
-                    return None;
-                };
-
+        match (name, field_policy) {
+            ("__init__", DataclassFieldsPolicy::Dataclass)
+            | ("__new__", DataclassFieldsPolicy::NamedTuple) => {
                 let mut parameters = vec![];
 
                 for (name, (mut attr_ty, mut default_ty)) in
@@ -1117,12 +1106,20 @@ impl<'db> ClassLiteral<'db> {
                     parameters.push(parameter);
                 }
 
-                let init_signature =
-                    Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+                if name == "__init__" {
+                    let init_signature =
+                        Signature::new(Parameters::new(parameters), Some(Type::none(db)));
 
-                Some(Type::Callable(CallableType::single(db, init_signature)))
+                    Some(Type::Callable(CallableType::single(db, init_signature)))
+                } else {
+                    parameters.insert(0, Parameter::positional_or_keyword(Name::new_static("cls")));
+                    let new_signature =
+                        Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+
+                    Some(Type::Callable(CallableType::single(db, new_signature)))
+                }
             }
-            "__lt__" | "__le__" | "__gt__" | "__ge__" => {
+            ("__lt__" | "__le__" | "__gt__" | "__ge__", DataclassFieldsPolicy::Dataclass) => {
                 if !has_dataclass_param(DataclassParams::ORDER) {
                     return None;
                 }
@@ -1143,13 +1140,6 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    fn is_dataclass(self, db: &'db dyn Db) -> bool {
-        self.dataclass_params(db).is_some()
-            || self
-                .try_metaclass(db)
-                .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
-    }
-
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
     /// See [`ClassLiteral::own_dataclass_fields`] for more details.
@@ -1164,7 +1154,7 @@ impl<'db> ClassLiteral<'db> {
             .filter_map(|superclass| {
                 if let Some(class) = superclass.into_class() {
                     let class_literal = class.class_literal(db).0;
-                    if field_policy.matches(db, class_literal, specialization) {
+                    if field_policy.matches(db, class_literal) {
                         Some(class_literal)
                     } else {
                         None
@@ -2112,6 +2102,7 @@ impl<'db> KnownClass {
             | Self::TypeVarTuple
             | Self::TypeAliasType
             | Self::NoDefaultType
+            | Self::NamedTuple
             | Self::NewType
             | Self::ChainMap
             | Self::Counter
