@@ -155,7 +155,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             ["os", "readlink"] if checker.target_version() >= PythonVersion::PY39 => {
                 Some(OsReadlink.into())
             }
-            // PTH208,
+            // PTH208
             ["os", "listdir"] => {
                 if call
                     .arguments
