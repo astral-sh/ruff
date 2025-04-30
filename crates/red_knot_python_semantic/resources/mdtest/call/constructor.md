@@ -1,25 +1,25 @@
 # Constructor
 
-When classes are instantiated, Python calls the meta-class `__call__` method, which can either be
-customized by the user or `type.__call__` is used.
+When classes are instantiated, Python calls the metaclass's `__call__` method. The metaclass of most
+Python classes is the class `builtins.type`.
 
-The latter calls the `__new__` method of the class, which is responsible for creating the instance
-and then calls the `__init__` method on the resulting instance to initialize it with the same
-arguments.
+`type.__call__` calls the `__new__` method of the class, which is responsible for creating the
+instance. `__init__` is then called on the constructed instance with the same arguments that were
+passed to `__new__`.
 
-Both `__new__` and `__init__` are looked up using full descriptor protocol, but `__new__` is then
-called as an implicit static, rather than bound method with `cls` passed as the first argument.
-`__init__` has no special handling, it is fetched as bound method and is called just like any other
-dunder method.
+Both `__new__` and `__init__` are looked up using the descriptor protocol, i.e., `__get__` is called
+if these attributes are descriptors. `__new__` is always treated as a static method, i.e., `cls` is
+passed as the first argument. `__init__` has no special handling; it is fetched as a bound method
+and called just like any other dunder method.
 
 `type.__call__` does other things too, but this is not yet handled by us.
 
 Since every class has `object` in it's MRO, the default implementations are `object.__new__` and
 `object.__init__`. They have some special behavior, namely:
 
-- If neither `__new__` nor `__init__` are defined anywhere in the MRO of class (except for `object`)
-    \- no arguments are accepted and `TypeError` is raised if any are passed.
-- If `__new__` is defined, but `__init__` is not - `object.__init__` will allow arbitrary arguments!
+- If neither `__new__` nor `__init__` are defined anywhere in the MRO of class (except for
+    `object`), no arguments are accepted and `TypeError` is raised if any are passed.
+- If `__new__` is defined but `__init__` is not, `object.__init__` will allow arbitrary arguments!
 
 As of today there are a number of behaviors that we do not support:
 
@@ -145,6 +145,25 @@ reveal_type(Foo())  # revealed: Foo
 ```
 
 ### Possibly Unbound
+
+#### Possibly unbound `__new__` method
+
+```py
+def _(flag: bool) -> None:
+    class Foo:
+        if flag:
+            def __new__(cls):
+                return object.__new__(cls)
+
+    # error: [call-possibly-unbound-method]
+    reveal_type(Foo())  # revealed: Foo
+
+    # error: [call-possibly-unbound-method]
+    # error: [too-many-positional-arguments]
+    reveal_type(Foo(1))  # revealed: Foo
+```
+
+#### Possibly unbound `__call__` on `__new__` callable
 
 ```py
 def _(flag: bool) -> None:
@@ -322,4 +341,29 @@ reveal_type(Foo(1))  # revealed: Foo
 
 # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 1, got 2"
 reveal_type(Foo(1, 2))  # revealed: Foo
+```
+
+### Lookup of `__new__`
+
+The `__new__` method is always invoked on the class itself, never on the metaclass. This is
+different from how other dunder methods like `__lt__` are implicitly called (always on the
+meta-type, never on the type itself).
+
+```py
+from typing_extensions import Literal
+
+class Meta(type):
+    def __new__(mcls, name, bases, namespace, /, **kwargs):
+        return super().__new__(mcls, name, bases, namespace)
+
+    def __lt__(cls, other) -> Literal[True]:
+        return True
+
+class C(metaclass=Meta): ...
+
+# No error is raised here, since we don't implicitly call `Meta.__new__`
+reveal_type(C())  # revealed: C
+
+# Meta.__lt__ is implicitly called here:
+reveal_type(C < C)  # revealed: Literal[True]
 ```

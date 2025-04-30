@@ -732,9 +732,9 @@ impl<'db> ClassLiteral<'db> {
             let namespace = KnownClass::Dict.to_instance(db);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArgumentTypes::positional([name, bases, namespace]);
+            let mut arguments = CallArgumentTypes::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, arguments) {
+            let return_ty_result = match metaclass.try_call(db, &mut arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
 
                 Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {
@@ -817,17 +817,14 @@ impl<'db> ClassLiteral<'db> {
             return Some(metaclass_call_function.into_callable_type(db));
         }
 
-        let new_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .symbol;
+        let dunder_new_method = self_ty
+            .find_name_in_mro(db, "__new__")
+            .expect("find_name_in_mro always succeeds for class literals")
+            .symbol
+            .try_call_dunder_get(db, self_ty);
 
-        if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-            return Some(new_function.into_bound_method_type(db, self.into()));
+        if let Symbol::Type(Type::FunctionLiteral(dunder_new_method), _) = dunder_new_method {
+            return Some(dunder_new_method.into_bound_method_type(db, self.into()));
         }
         // TODO handle `__init__` also
         None
@@ -905,12 +902,7 @@ impl<'db> ClassLiteral<'db> {
                         continue;
                     }
 
-                    // HACK: we should implement some more general logic here that supports arbitrary custom
-                    // metaclasses, not just `type` and `ABCMeta`.
-                    if matches!(
-                        class.known(db),
-                        Some(KnownClass::Type | KnownClass::ABCMeta)
-                    ) && policy.meta_class_no_type_fallback()
+                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
                     {
                         continue;
                     }
