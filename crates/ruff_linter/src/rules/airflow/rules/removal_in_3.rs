@@ -682,7 +682,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.secrets.local_filesystem",
             name: "load_connections_dict",
         },
-        ["airflow", "secrets", "cache"] => Replacement::AutoImport {
+        ["airflow", "secrets", "cache", "SecretCache"] => Replacement::AutoImport {
             module: "airflow.sdk.execution_time.cache",
             name: "SecretCache",
         },

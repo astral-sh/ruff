@@ -204,6 +204,16 @@ AIR301_names.py:89:7: AIR301 `airflow.providers.trino.datasets.trino.sanitize_ur
    |
    = help: Use `airflow.providers.trino.assets.trino.sanitize_uri` instead
 
+AIR301_names.py:96:1: AIR301 `airflow.secrets.cache.SecretCache` is removed in Airflow 3.0
+   |
+95 | # airflow.secrets.cache
+96 | SecretCache()
+   | ^^^^^^^^^^^ AIR301
+97 |
+98 | # airflow.sensors.base_sensor_operator
+   |
+   = help: Use `airflow.sdk.execution_time.cache.SecretCache` instead
+
 AIR301_names.py:99:1: AIR301 `airflow.sensors.base_sensor_operator.BaseSensorOperator` is removed in Airflow 3.0
    |
 98 | # airflow.sensors.base_sensor_operator
