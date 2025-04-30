@@ -886,7 +886,7 @@ impl<'db> CallableBinding<'db> {
             // the matching overloads. Make sure to implement that as part of separating call binding into
             // two phases.
             //
-            // [1] https://github.com/python/typing/pull/1839
+            // [1] https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
             let overloads = signature
                 .into_iter()
                 .map(|signature| {
@@ -973,6 +973,10 @@ impl<'db> CallableBinding<'db> {
     /// function, we return `Type::unknown`, since we cannot make any useful conclusions about
     /// which overload was intended to be called.
     pub(crate) fn return_type(&self) -> Type<'db> {
+        // TODO: Implement the overload call evaluation algorithm as mentioned in the spec [1] to
+        // get the matching overload and use that to get the return type.
+        //
+        // [1]: https://typing.python.org/en/latest/spec/overload.html#overload-call-evaluation
         if let Some((_, first_overload)) = self.matching_overloads().next() {
             return first_overload.return_type();
         }
