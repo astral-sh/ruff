@@ -6364,9 +6364,16 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
         let mut call_argument_types = match slice_node {
-            ast::Expr::Tuple(tuple) => CallArgumentTypes::positional(
-                tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
-            ),
+            ast::Expr::Tuple(tuple) => {
+                let arguments = CallArgumentTypes::positional(
+                    tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
+                );
+                self.store_expression_type(
+                    slice_node,
+                    TupleType::from_elements(self.db(), arguments.iter().map(|(_, ty)| ty)),
+                );
+                arguments
+            }
             _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
         };
         let signatures = Signatures::single(CallableSignature::single(
@@ -7883,6 +7890,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Type::Dynamic(DynamicType::SubscriptedProtocol)
             }
             KnownInstanceType::Generic(_) => {
+                self.infer_type_expression(arguments_slice);
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "`typing.Generic` is not allowed in type expressions",
