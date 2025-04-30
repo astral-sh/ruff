@@ -635,7 +635,8 @@ impl<'db> SemanticIndexBuilder<'db> {
             .current_visibility_constraints_mut()
             .add_atom(predicate_id);
         self.current_use_def_map_mut()
-            .record_reachability_constraint(visibility_constraint)
+            .record_reachability_constraint(visibility_constraint);
+        visibility_constraint
     }
 
     /// Record the negation of a given reachability/visibility constraint.
