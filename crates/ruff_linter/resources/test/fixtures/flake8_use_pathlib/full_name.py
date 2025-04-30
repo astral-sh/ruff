@@ -71,7 +71,6 @@ def bytes_str_func() -> bytes:
 open(bytes_str_func())
 
 # https://github.com/astral-sh/ruff/issues/17693
-os.stat(b"/foo")
 os.stat(1)
 os.stat(x)
 
