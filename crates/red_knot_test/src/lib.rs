@@ -346,7 +346,7 @@ fn run_test(
 
                     if let Some(backtrace) = info.salsa_backtrace {
                         salsa::attach(db, || {
-                            messages.extend(backtrace.to_string().split('\n').map(String::from));
+                            messages.extend(format!("{backtrace:#}").split('\n').map(String::from));
                         });
                     }
 
