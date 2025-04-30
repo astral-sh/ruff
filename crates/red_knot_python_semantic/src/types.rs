@@ -6495,8 +6495,8 @@ struct OverloadedFunction<'db> {
 
 impl<'db> OverloadedFunction<'db> {
     /// Returns an iterator over all overloads and the implementation, in that order.
-    fn all(&self) -> impl Iterator<Item = &FunctionType<'db>> {
-        self.overloads.iter().chain(self.implementation.as_ref())
+    fn all(&self) -> impl Iterator<Item = FunctionType<'db>> + '_ {
+        self.overloads.iter().copied().chain(self.implementation)
     }
 }
 
