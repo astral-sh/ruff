@@ -159,7 +159,7 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             ["os", "listdir"] => {
                 if call
                     .arguments
-                    .find_positional(0)
+                    .find_argument_value("path", 0)
                     .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
                 {
                     return None;
