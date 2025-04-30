@@ -101,8 +101,8 @@ use super::diagnostic::{
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, INVALID_PROTOCOL, REDUNDANT_CAST,
-    STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    report_unresolved_reference, INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL,
+    REDUNDANT_CAST, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -418,7 +418,7 @@ impl<'db> TypeInference<'db> {
             .copied()
             .or(self.cycle_fallback_type)
             .expect(
-                "definition should belong to this TypeInference region and
+                "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
     }
@@ -430,7 +430,7 @@ impl<'db> TypeInference<'db> {
             .copied()
             .or(self.cycle_fallback_type.map(Into::into))
             .expect(
-                "definition should belong to this TypeInference region and
+                "definition should belong to this TypeInference region and \
                 TypeInferenceBuilder should have inferred a type for it",
             )
     }
@@ -524,6 +524,31 @@ pub(super) struct TypeInferenceBuilder<'db> {
     /// The returned types and their corresponding ranges of the region, if it is a function body.
     return_types_and_ranges: Vec<TypeAndRange<'db>>,
 
+    /// A set of functions that have been defined **and** called in this region.
+    ///
+    /// This is a set because the same function could be called multiple times in the same region.
+    /// This is mainly used in [`check_overloaded_functions`] to check an overloaded function that
+    /// is shadowed by a function with the same name in this scope but has been called before. For
+    /// example:
+    ///
+    /// ```py
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def foo() -> None: ...
+    /// @overload
+    /// def foo(x: int) -> int: ...
+    /// def foo(x: int | None) -> int | None: return x
+    ///
+    /// foo()  # An overloaded function that was defined in this scope have been called
+    ///
+    /// def foo(x: int) -> int:
+    ///     return x
+    /// ```
+    ///
+    /// [`check_overloaded_functions`]: TypeInferenceBuilder::check_overloaded_functions
+    called_functions: FxHashSet<FunctionType<'db>>,
+
     /// The deferred state of inferring types of certain expressions within the region.
     ///
     /// This is different from [`InferenceRegion::Deferred`] which works on the entire definition
@@ -556,6 +581,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             index,
             region,
             return_types_and_ranges: vec![],
+            called_functions: FxHashSet::default(),
             deferred_state: DeferredExpressionState::None,
             types: TypeInference::empty(scope),
         }
@@ -718,6 +744,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         // TODO: Only call this function when diagnostics are enabled.
         self.check_class_definitions();
+        self.check_overloaded_functions(node);
     }
 
     /// Iterate over all class definitions to check that the definition will not cause an exception
@@ -952,6 +979,126 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
+    /// Check the overloaded functions in this scope.
+    ///
+    /// This only checks the overloaded functions that are:
+    /// 1. Visible publicly at the end of this scope
+    /// 2. Or, defined and called in this scope
+    ///
+    /// For (1), this has the consequence of not checking an overloaded function that is being
+    /// shadowed by another function with the same name in this scope.
+    fn check_overloaded_functions(&mut self, scope: &NodeWithScopeKind) {
+        // Collect all the unique overloaded function symbols in this scope. This requires a set
+        // because an overloaded function uses the same symbol for each of the overloads and the
+        // implementation.
+        let overloaded_function_symbols: FxHashSet<_> = self
+            .types
+            .declarations
+            .iter()
+            .filter_map(|(definition, ty)| {
+                // Filter out function literals that result from anything other than a function
+                // definition e.g., imports which would create a cross-module AST dependency.
+                if !matches!(definition.kind(self.db()), DefinitionKind::Function(_)) {
+                    return None;
+                }
+                let function = ty.inner_type().into_function_literal()?;
+                if function.has_known_decorator(self.db(), FunctionDecorators::OVERLOAD) {
+                    Some(definition.symbol(self.db()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        let use_def = self
+            .index
+            .use_def_map(self.scope().file_scope_id(self.db()));
+
+        let mut public_functions = FxHashSet::default();
+
+        for symbol in overloaded_function_symbols {
+            if let Symbol::Type(Type::FunctionLiteral(function), Boundness::Bound) =
+                symbol_from_bindings(self.db(), use_def.public_bindings(symbol))
+            {
+                if function.file(self.db()) != self.file() {
+                    // If the function is not in this file, we don't need to check it.
+                    // https://github.com/astral-sh/ruff/pull/17609#issuecomment-2839445740
+                    continue;
+                }
+
+                // Extend the functions that we need to check with the publicly visible overloaded
+                // function. This is always going to be either the implementation or the last
+                // overload if the implementation doesn't exists.
+                public_functions.insert(function);
+            }
+        }
+
+        for function in self.called_functions.union(&public_functions) {
+            let Some(overloaded) = function.to_overloaded(self.db()) else {
+                continue;
+            };
+
+            // Check that the overloaded function has at least two overloads
+            if let [single_overload] = overloaded.overloads.as_slice() {
+                let function_node = function.node(self.db(), self.file());
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&INVALID_OVERLOAD, &function_node.name)
+                {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Overloaded function `{}` requires at least two overloads",
+                        &function_node.name
+                    ));
+                    diagnostic.annotate(
+                        self.context
+                            .secondary(single_overload.focus_range(self.db()))
+                            .message(format_args!("Only one overload defined here")),
+                    );
+                }
+            }
+
+            // Check that the overloaded function has an implementation. Overload definitions
+            // within stub files, protocols, and on abstract methods within abstract base classes
+            // are exempt from this check.
+            if overloaded.implementation.is_none() && !self.in_stub() {
+                let mut implementation_required = true;
+
+                if let NodeWithScopeKind::Class(class_node_ref) = scope {
+                    let class = binding_type(
+                        self.db(),
+                        self.index.expect_single_definition(class_node_ref.node()),
+                    )
+                    .expect_class_literal();
+
+                    if class.is_protocol(self.db())
+                        || (class.is_abstract(self.db())
+                            && overloaded.overloads.iter().all(|overload| {
+                                overload.has_known_decorator(
+                                    self.db(),
+                                    FunctionDecorators::ABSTRACT_METHOD,
+                                )
+                            }))
+                    {
+                        implementation_required = false;
+                    }
+                }
+
+                if implementation_required {
+                    let function_node = function.node(self.db(), self.file());
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_OVERLOAD, &function_node.name)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Overloaded non-stub function `{}` must have an implementation",
+                            &function_node.name
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
         match definition.kind(self.db()) {
             DefinitionKind::Function(function) => {
@@ -1065,7 +1212,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> bool {
         match left {
             Type::BooleanLiteral(_) | Type::IntLiteral(_) => {}
-            Type::Instance(instance)
+            Type::NominalInstance(instance)
                 if matches!(
                     instance.class().known(self.db()),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
@@ -2517,7 +2664,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             // Super instances do not allow attribute assignment
-            Type::Instance(instance) if instance.class().is_known(db, KnownClass::Super) => {
+            Type::NominalInstance(instance) if instance.class().is_known(db, KnownClass::Super) => {
                 if emit_diagnostics {
                     if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target) {
                         builder.into_diagnostic(format_args!(
@@ -2542,7 +2689,8 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             Type::Dynamic(..) | Type::Never => true,
 
-            Type::Instance(..)
+            Type::NominalInstance(..)
+            | Type::ProtocolInstance(_)
             | Type::BooleanLiteral(..)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
@@ -3033,7 +3181,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         // Handle various singletons.
-        if let Type::Instance(instance) = declared_ty.inner_type() {
+        if let Type::NominalInstance(instance) = declared_ty.inner_type() {
             if instance
                 .class()
                 .is_known(self.db(), KnownClass::SpecialForm)
@@ -4298,6 +4446,18 @@ impl<'db> TypeInferenceBuilder<'db> {
         let mut call_arguments = Self::parse_arguments(arguments);
         let callable_type = self.infer_expression(func);
 
+        if let Type::FunctionLiteral(function) = callable_type {
+            // Make sure that the `function.definition` is only called when the function is defined
+            // in the same file as the one we're currently inferring the types for. This is because
+            // the `definition` method accesses the semantic index, which could create a
+            // cross-module AST dependency.
+            if function.file(self.db()) == self.file()
+                && function.definition(self.db()).scope(self.db()) == self.scope()
+            {
+                self.called_functions.insert(function);
+            }
+        }
+
         // It might look odd here that we emit an error for class-literals but not `type[]` types.
         // But it's deliberate! The typing spec explicitly mandates that `type[]` types can be called
         // even though class-literals cannot. This is because even though a protocol class `SomeProtocol`
@@ -5125,7 +5285,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
-                | Type::Instance(_)
+                | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Union(_)
@@ -5405,7 +5566,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
-                | Type::Instance(_)
+                | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
@@ -5430,7 +5592,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 | Type::ClassLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::SubclassOf(_)
-                | Type::Instance(_)
+                | Type::NominalInstance(_)
+                | Type::ProtocolInstance(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
@@ -5863,13 +6026,13 @@ impl<'db> TypeInferenceBuilder<'db> {
                     right_ty: right,
                 }),
             },
-            (Type::IntLiteral(_), Type::Instance(_)) => self.infer_binary_type_comparison(
+            (Type::IntLiteral(_), Type::NominalInstance(_)) => self.infer_binary_type_comparison(
                 KnownClass::Int.to_instance(self.db()),
                 op,
                 right,
                 range,
             ),
-            (Type::Instance(_), Type::IntLiteral(_)) => self.infer_binary_type_comparison(
+            (Type::NominalInstance(_), Type::IntLiteral(_)) => self.infer_binary_type_comparison(
                 left,
                 op,
                 KnownClass::Int.to_instance(self.db()),
@@ -5995,7 +6158,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 KnownClass::Bytes.to_instance(self.db()),
                 range,
             ),
-            (Type::Tuple(_), Type::Instance(instance))
+            (Type::Tuple(_), Type::NominalInstance(instance))
                 if instance
                     .class()
                     .is_known(self.db(), KnownClass::VersionInfo) =>
@@ -6007,7 +6170,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     range,
                 )
             }
-            (Type::Instance(instance), Type::Tuple(_))
+            (Type::NominalInstance(instance), Type::Tuple(_))
                 if instance
                     .class()
                     .is_known(self.db(), KnownClass::VersionInfo) =>
@@ -6393,7 +6556,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         match (value_ty, slice_ty) {
             (
-                Type::Instance(instance),
+                Type::NominalInstance(instance),
                 Type::IntLiteral(_) | Type::BooleanLiteral(_) | Type::SliceLiteral(_),
             ) if instance
                 .class()
@@ -6699,7 +6862,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 Err(_) => SliceArg::Unsupported,
             },
             Some(Type::BooleanLiteral(b)) => SliceArg::Arg(Some(i32::from(b))),
-            Some(Type::Instance(instance))
+            Some(Type::NominalInstance(instance))
                 if instance.class().is_known(self.db(), KnownClass::NoneType) =>
             {
                 SliceArg::Arg(None)
@@ -8483,7 +8646,7 @@ mod tests {
         db.clear_salsa_events();
         assert_file_diagnostics(&db, "src/a.py", &[]);
         let events = db.take_salsa_events();
-        let cycles = salsa::plumbing::attach(&db, || {
+        let cycles = salsa::attach(&db, || {
             events
                 .iter()
                 .filter_map(|event| {

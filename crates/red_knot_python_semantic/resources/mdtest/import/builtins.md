@@ -7,7 +7,7 @@ Builtin symbols can be explicitly imported:
 ```py
 import builtins
 
-reveal_type(builtins.chr)  # revealed: def chr(i: int | SupportsIndex, /) -> str
+reveal_type(builtins.chr)  # revealed: def chr(i: SupportsIndex, /) -> str
 ```
 
 ## Implicit use of builtin
@@ -15,7 +15,7 @@ reveal_type(builtins.chr)  # revealed: def chr(i: int | SupportsIndex, /) -> str
 Or used implicitly:
 
 ```py
-reveal_type(chr)  # revealed: def chr(i: int | SupportsIndex, /) -> str
+reveal_type(chr)  # revealed: def chr(i: SupportsIndex, /) -> str
 reveal_type(str)  # revealed: Literal[str]
 ```
 
