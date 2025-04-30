@@ -551,5 +551,24 @@ fn venv() -> Result<()> {
         "#);
     });
 
+    // test the error message for a non-existent venv. it's important that the `ruff analyze graph`
+    // flag matches the red-knot flag used to generate the error message (`--python`)
+    insta::with_settings!({
+        filters => INSTA_FILTERS.to_vec(),
+    }, {
+        assert_cmd_snapshot!(
+            command().args(["--python", "none"]).arg("packages/albatross").current_dir(&root),
+            @r"
+        success: false
+        exit_code: 2
+        ----- stdout -----
+
+        ----- stderr -----
+        ruff failed
+          Cause: Invalid search path settings
+          Cause: Failed to discover the site-packages directory: Invalid `--python` argument: `none` could not be canonicalized
+        ");
+    });
+
     Ok(())
 }
