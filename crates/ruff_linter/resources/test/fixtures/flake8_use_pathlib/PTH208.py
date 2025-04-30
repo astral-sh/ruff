@@ -9,6 +9,8 @@ os.listdir(string_path)
 bytes_path = b'.'
 os.listdir(bytes_path)
 
+os.listdir(1)
+os.listdir(path=1)
 
 from pathlib import Path
 
