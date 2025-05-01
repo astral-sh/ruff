@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
-use ruff_linter::message::{DiagnosticMessage, Message, NewDiagnostic, SyntaxErrorMessage};
+use ruff_linter::message::{DiagnosticMessage, Message, NewDiagnostic};
 use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -233,18 +233,13 @@ impl Workspace {
                             .collect(),
                     }),
                 },
-                NewDiagnostic::Message(Message::SyntaxError(SyntaxErrorMessage {
-                    message,
-                    range,
-                    ..
-                })) => ExpandedMessage {
+                NewDiagnostic::SyntaxError(_) => ExpandedMessage {
                     code: None,
-                    message,
-                    start_location: source_code.line_column(range.start()).into(),
-                    end_location: source_code.line_column(range.end()).into(),
+                    message: message.body().to_string(),
+                    start_location: source_code.line_column(message.range().start()).into(),
+                    end_location: source_code.line_column(message.range().end()).into(),
                     fix: None,
                 },
-                _ => todo!("handle red-knot-style diagnostics"),
             })
             .collect();
 

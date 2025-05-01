@@ -1252,7 +1252,7 @@ mod tests {
     ) -> NewDiagnostic {
         let noqa_offset = diagnostic.start();
         let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
-        Message::from_diagnostic(diagnostic, file, noqa_offset).into()
+        Message::from_diagnostic(diagnostic, file, noqa_offset)
     }
 
     #[test]

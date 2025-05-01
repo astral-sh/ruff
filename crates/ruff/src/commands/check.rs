@@ -134,8 +134,7 @@ pub(crate) fn check(
                             Diagnostic::new(IOError { message }, TextRange::default()),
                             dummy,
                             TextSize::default(),
-                        )
-                        .into()],
+                        )],
                         FxHashMap::default(),
                     )
                 } else {

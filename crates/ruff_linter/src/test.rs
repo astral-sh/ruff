@@ -281,13 +281,12 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             diagnostic.noqa_offset = directives.noqa_line_for.resolve(diagnostic.range.start());
             diagnostic.file = source_code.clone();
 
-            Message::Diagnostic(diagnostic)
+            NewDiagnostic::Message(Message::Diagnostic(diagnostic))
         })
         .chain(parsed.errors().iter().map(|parse_error| {
             Message::from_parse_error(parse_error, &locator, source_code.clone())
         }))
         .sorted()
-        .map(NewDiagnostic::from)
         .collect();
     (messages, transformed)
 }
@@ -303,9 +302,7 @@ fn print_syntax_errors(
 
     let messages: Vec<_> = errors
         .iter()
-        .map(|parse_error| {
-            Message::from_parse_error(parse_error, locator, source_file.clone()).into()
-        })
+        .map(|parse_error| Message::from_parse_error(parse_error, locator, source_file.clone()))
         .collect();
 
     if let Some(notebook) = source.as_ipy_notebook() {

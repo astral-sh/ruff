@@ -14,7 +14,7 @@ use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
     linter::check_path,
-    message::{DiagnosticMessage, Message, NewDiagnostic, SyntaxErrorMessage},
+    message::{DiagnosticMessage, Message, NewDiagnostic},
     package::PackageRoot,
     packaging::detect_package_root,
     registry::AsRule,
@@ -175,10 +175,10 @@ pub(crate) fn check(
                         encoding,
                     ))
                 }
-                NewDiagnostic::Message(Message::SyntaxError(syntax_error_message)) => {
+                NewDiagnostic::SyntaxError(_) => {
                     if show_syntax_errors {
                         Some(syntax_error_to_lsp_diagnostic(
-                            syntax_error_message,
+                            &message,
                             &source_kind,
                             locator.to_index(),
                             encoding,
@@ -187,7 +187,6 @@ pub(crate) fn check(
                         None
                     }
                 }
-                _ => todo!("handle red-knot-style diagnostics"),
             });
 
     if let Some(notebook) = query.as_notebook() {
@@ -325,7 +324,7 @@ fn to_lsp_diagnostic(
 }
 
 fn syntax_error_to_lsp_diagnostic(
-    syntax_error: SyntaxErrorMessage,
+    syntax_error: &NewDiagnostic,
     source_kind: &SourceKind,
     index: &LineIndex,
     encoding: PositionEncoding,
@@ -334,7 +333,7 @@ fn syntax_error_to_lsp_diagnostic(
     let cell: usize;
 
     if let Some(notebook_index) = source_kind.as_ipy_notebook().map(Notebook::index) {
-        NotebookRange { cell, range } = syntax_error.range.to_notebook_range(
+        NotebookRange { cell, range } = syntax_error.range().to_notebook_range(
             source_kind.source_code(),
             index,
             notebook_index,
@@ -343,7 +342,7 @@ fn syntax_error_to_lsp_diagnostic(
     } else {
         cell = usize::default();
         range = syntax_error
-            .range
+            .range()
             .to_range(source_kind.source_code(), index, encoding);
     }
 
@@ -356,7 +355,7 @@ fn syntax_error_to_lsp_diagnostic(
             code: None,
             code_description: None,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: syntax_error.message,
+            message: syntax_error.body().to_string(),
             related_information: None,
             data: None,
         },
