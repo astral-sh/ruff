@@ -169,8 +169,6 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
             continue;
         };
 
-        let target_version = checker.target_version_or_default();
-        let conversion_type = ConversionType::from(target_version);
         if let Expr::StringLiteral(string_expr) = annotation {
             // Quoted annotation.
             if let Ok(parsed_annotation) = checker.parse_type_annotation(string_expr) {

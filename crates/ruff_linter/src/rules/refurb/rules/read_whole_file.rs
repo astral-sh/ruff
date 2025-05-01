@@ -56,10 +56,9 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
     if with.is_async {
         return;
     }
-    let target_version = checker.target_version_or_default();
 
     // First we go through all the items in the statement and find all `open` operations.
-    let candidates = find_file_opens(with, checker.semantic(), true, target_version);
+    let candidates = find_file_opens(with, checker.semantic(), true, checker.target_version());
     if candidates.is_empty() {
         return;
     }

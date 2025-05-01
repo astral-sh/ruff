@@ -155,8 +155,6 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
 
 /// UP041
 pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandler]) {
-    let target_version = checker.target_version_or_default();
-
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
         let Some(expr) = type_.as_ref() else {
@@ -164,7 +162,7 @@ pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[Except
         };
         match expr.as_ref() {
             Expr::Name(_) | Expr::Attribute(_) => {
-                if is_alias(expr, checker.semantic(), target_version) {
+                if is_alias(expr, checker.semantic(), checker.target_version()) {
                     atom_diagnostic(checker, expr);
                 }
             }
@@ -172,7 +170,7 @@ pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[Except
                 // List of aliases to replace with `TimeoutError`.
                 let mut aliases: Vec<&Expr> = vec![];
                 for element in tuple {
-                    if is_alias(element, checker.semantic(), target_version) {
+                    if is_alias(element, checker.semantic(), checker.target_version()) {
                         aliases.push(element);
                     }
                 }
@@ -187,11 +185,7 @@ pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[Except
 
 /// UP041
 pub(crate) fn timeout_error_alias_call(checker: &Checker, func: &Expr) {
-    if is_alias(
-        func,
-        checker.semantic(),
-        checker.target_version_or_default(),
-    ) {
+    if is_alias(func, checker.semantic(), checker.target_version()) {
         atom_diagnostic(checker, func);
     }
 }
@@ -199,11 +193,7 @@ pub(crate) fn timeout_error_alias_call(checker: &Checker, func: &Expr) {
 /// UP041
 pub(crate) fn timeout_error_alias_raise(checker: &Checker, expr: &Expr) {
     if matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
-        if is_alias(
-            expr,
-            checker.semantic(),
-            checker.target_version_or_default(),
-        ) {
+        if is_alias(expr, checker.semantic(), checker.target_version()) {
             atom_diagnostic(checker, expr);
         }
     }

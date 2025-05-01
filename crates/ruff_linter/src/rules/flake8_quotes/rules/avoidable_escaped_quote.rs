@@ -64,7 +64,7 @@ pub(crate) fn avoidable_escaped_quote(checker: &Checker, string_like: StringLike
     let mut rule_checker = AvoidableEscapedQuoteChecker::new(
         checker.locator(),
         checker.settings,
-        checker.target_version_or_default(),
+        checker.target_version(),
     );
 
     for part in string_like.parts() {

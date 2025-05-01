@@ -122,7 +122,7 @@ impl AutoPythonType {
         checker: &Checker,
         at: TextSize,
     ) -> Option<(Expr, Vec<Edit>)> {
-        let target_version = checker.target_version_or_default();
+        let target_version = checker.target_version();
         match self {
             AutoPythonType::Never => {
                 let member = if target_version >= PythonVersion::PY311 {

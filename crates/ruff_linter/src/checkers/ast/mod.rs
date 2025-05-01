@@ -523,9 +523,8 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Return the [`PythonVersion`] to use for version-related checks or [`PythonVersion::default`]
-    /// if unset.
-    pub(crate) fn target_version_or_default(&self) -> PythonVersion {
+    /// Return the [`PythonVersion`] to use for version-related checks.
+    pub(crate) fn target_version(&self) -> PythonVersion {
         self.target_version.unwrap_or_default()
     }
 
@@ -548,7 +547,7 @@ impl<'a> Checker<'a> {
         member: &'b str,
         version_added_to_typing: PythonVersion,
     ) -> Option<TypingImporter<'b, 'a>> {
-        let source_module = if self.target_version_or_default() >= version_added_to_typing {
+        let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
         } else if !self.settings.typing_extensions {
             return None;
@@ -2367,7 +2366,7 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        let target_version = self.target_version_or_default();
+        let target_version = self.target_version();
         let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();
