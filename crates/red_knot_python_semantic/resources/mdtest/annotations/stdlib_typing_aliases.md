@@ -20,7 +20,7 @@ def f(
     frozen_set_bare: typing.FrozenSet,
     frozen_set_parametrized: typing.FrozenSet[str],
     chain_map_bare: typing.ChainMap,
-    chain_map_parametrized: typing.ChainMap[int],
+    chain_map_parametrized: typing.ChainMap[str, int],
     counter_bare: typing.Counter,
     counter_parametrized: typing.Counter[int],
     default_dict_bare: typing.DefaultDict,
@@ -30,19 +30,27 @@ def f(
     ordered_dict_bare: typing.OrderedDict,
     ordered_dict_parametrized: typing.OrderedDict[int, str],
 ):
+    # TODO: revealed: list[Unknown]
     reveal_type(list_bare)  # revealed: list
+    # TODO: revealed: list[int]
     reveal_type(list_parametrized)  # revealed: list
 
     reveal_type(dict_bare)  # revealed: dict[Unknown, Unknown]
+    # TODO: revealed: dict[int, str]
     reveal_type(dict_parametrized)  # revealed: dict[Unknown, Unknown]
 
+    # TODO: revealed: set[Unknown]
     reveal_type(set_bare)  # revealed: set
+    # TODO: revealed: set[int]
     reveal_type(set_parametrized)  # revealed: set
 
+    # TODO: revealed: frozenset[Unknown]
     reveal_type(frozen_set_bare)  # revealed: frozenset
+    # TODO: revealed: frozenset[str]
     reveal_type(frozen_set_parametrized)  # revealed: frozenset
 
     reveal_type(chain_map_bare)  # revealed: ChainMap[Unknown, Unknown]
+    # TODO: revealed: ChainMap[str, int]
     reveal_type(chain_map_parametrized)  # revealed: ChainMap[Unknown, Unknown]
 
     reveal_type(counter_bare)  # revealed: Counter[Unknown]
@@ -50,12 +58,16 @@ def f(
     reveal_type(counter_parametrized)  # revealed: Counter[Unknown]
 
     reveal_type(default_dict_bare)  # revealed: defaultdict[Unknown, Unknown]
+    # TODO: revealed: defaultdict[str, int]
     reveal_type(default_dict_parametrized)  # revealed: defaultdict[Unknown, Unknown]
 
+    # TODO: revealed: deque[Unknown]
     reveal_type(deque_bare)  # revealed: deque
+    # TODO: revealed: deque[str]
     reveal_type(deque_parametrized)  # revealed: deque
 
     reveal_type(ordered_dict_bare)  # revealed: OrderedDict[Unknown, Unknown]
+    # TODO: revealed: OrderedDict[int, str]
     reveal_type(ordered_dict_parametrized)  # revealed: OrderedDict[Unknown, Unknown]
 ```
 
