@@ -1935,7 +1935,7 @@ where
                     let use_id = self.current_ast_ids().record_use(expr);
                     self.current_use_def_map_mut()
                         .record_use(symbol, use_id, node_key);
-                    // We also mark symbols in the outer scopes as used
+                    // We also mark symbols in the outer scope as used
                     // to perform cross-scope type narrowing.
                     for enclosing_scope in self.scope_stack.iter().rev().skip(1) {
                         let symbol_table = &mut self.symbol_tables[enclosing_scope.file_scope_id];

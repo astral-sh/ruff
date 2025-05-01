@@ -5146,27 +5146,26 @@ impl<'db> TypeInferenceBuilder<'db> {
         let symbol_table = self.index.symbol_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
 
+        let mut use_ids = vec![];
         // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
-        let narrow_with_applicable_constraints = |mut ty, enclosing_scope_id| {
-            let mut scope = scope;
-            loop {
-                if let Some(use_id) = name_node.try_scoped_use_id(db, scope) {
-                    let use_def = self.index.use_def_map(scope.file_scope_id(db));
-                    let mut bindings = use_def.bindings_at_use(use_id);
-                    // "Unbound binding" exists even if there are no actual bindings in the scope.
-                    let first_binding = bindings.next().unwrap();
-                    let symbol_table = self.index.symbol_table(scope.file_scope_id(db));
-                    let symbol = symbol_table.symbol_id_by_name(symbol_name).unwrap();
-                    ty = first_binding.narrowing_constraint.narrow(db, ty, symbol);
-                }
+        let narrow_with_applicable_constraints = |mut ty, use_ids: &[_]| {
+            for (enclosing_scope_file_id, use_id) in use_ids {
+                let use_def = self.index.use_def_map(*enclosing_scope_file_id);
+                let mut bindings = use_def.bindings_at_use(*use_id);
+                // "Unbound binding" exists even if there are no actual bindings in the scope.
+                let first_binding = bindings.next().unwrap();
+                let symbol_table = self.index.symbol_table(*enclosing_scope_file_id);
+                let symbol = symbol_table.symbol_id_by_name(symbol_name).unwrap();
+
+                ty = first_binding.narrowing_constraint.narrow(db, ty, symbol);
+
                 // Constraints outside a lazy scope are not applicable.
                 // TODO: If the symbol has never been rewritten, it is applicable.
-                if !scope.node(db).scope_kind().is_eager() || scope == enclosing_scope_id {
-                    break;
-                }
-                if let Some(parent) = scope.scope(db).parent() {
-                    scope = parent.to_scope_id(db, self.file());
-                } else {
+                if !enclosing_scope_file_id
+                    .to_scope_id(db, self.file())
+                    .scope(db)
+                    .is_eager()
+                {
                     break;
                 }
             }
@@ -5188,6 +5187,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             let use_id = name_node.scoped_use_id(db, scope);
             symbol_from_bindings(db, use_def.bindings_at_use(use_id))
         };
+
+        if let Some(use_id) = name_node.try_scoped_use_id(db, scope) {
+            use_ids.push((file_scope_id, use_id));
+        }
 
         let symbol = SymbolAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
             let has_bindings_in_this_scope = match symbol_table.symbol_by_name(symbol_name) {
@@ -5227,6 +5230,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // There is one exception to this rule: type parameter scopes can see
                 // names defined in an immediately-enclosing class scope.
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
+
+                if let Some(use_id) = name_node.try_scoped_use_id(db, enclosing_scope_id) {
+                    use_ids.push((enclosing_scope_file_id, use_id));
+                }
+
                 let is_immediately_enclosing_scope = scope.is_type_parameter(db)
                     && scope
                         .scope(db)
@@ -5250,9 +5258,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ) {
                         EagerBindingsResult::Found(bindings) => {
                             return symbol_from_bindings(db, bindings)
-                                .map_type(|ty| {
-                                    narrow_with_applicable_constraints(ty, enclosing_scope_id)
-                                })
+                                .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids))
                                 .into();
                         }
                         // There are no visible bindings here.
@@ -5276,7 +5282,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
                     return symbol(db, enclosing_scope_id, symbol_name)
-                        .map_type(|ty| narrow_with_applicable_constraints(ty, enclosing_scope_id));
+                        .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids));
                 }
             }
 
@@ -5288,8 +5294,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                         return Symbol::Unbound.into();
                     }
 
-                    let global = FileScopeId::global().to_scope_id(db, self.file());
-
                     if !self.is_deferred() {
                         match self.index.eager_bindings(
                             FileScopeId::global(),
@@ -5298,7 +5302,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                         ) {
                             EagerBindingsResult::Found(bindings) => {
                                 return symbol_from_bindings(db, bindings)
-                                    .map_type(|ty| narrow_with_applicable_constraints(ty, global))
+                                    .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids))
                                     .into();
                             }
                             // There are no visible bindings here.
@@ -5310,18 +5314,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
 
                     explicit_global_symbol(db, self.file(), symbol_name)
-                        .map_type(|ty| narrow_with_applicable_constraints(ty, global))
+                        .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids))
                 })
                 // Not found in the module's explicitly declared global symbols?
                 // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
                 // These are looked up as attributes on `types.ModuleType`.
                 .or_fall_back_to(db, || {
-                    module_type_implicit_global_symbol(db, symbol_name).map_type(|ty| {
-                        narrow_with_applicable_constraints(
-                            ty,
-                            FileScopeId::global().to_scope_id(db, self.file()),
-                        )
-                    })
+                    module_type_implicit_global_symbol(db, symbol_name)
+                        .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids))
                 })
                 // Not found in globals? Fallback to builtins
                 // (without infinite recursion if we're already in builtins.)
