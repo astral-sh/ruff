@@ -82,3 +82,8 @@ os.stat(func())
 
 def bar(x: int):
     os.stat(x)
+
+# https://github.com/astral-sh/ruff/issues/17694
+os.rename("src", "dst", src_dir_fd=3, dst_dir_fd=4)
+os.rename("src", "dst", src_dir_fd=3)
+os.rename("src", "dst", dst_dir_fd=4)
