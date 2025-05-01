@@ -1465,6 +1465,12 @@ impl<'db> Type<'db> {
                 self_callable.is_assignable_to(db, target_callable)
             }
 
+            (Type::NominalInstance(instance), Type::Callable(_))
+                if instance.class().is_subclass_of_any_or_unknown(db) =>
+            {
+                true
+            }
+
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
                 let call_symbol = self.member(db, "__call__").symbol;
                 match call_symbol {

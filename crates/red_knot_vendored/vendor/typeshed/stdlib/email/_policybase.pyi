@@ -23,7 +23,7 @@ class _PolicyBase(Generic[_MessageT]):
     raise_on_defect: bool
     mangle_from_: bool
     message_factory: _MessageFactory[_MessageT] | None
-    # Added in Python 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5
+    # Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
     verify_generated_headers: bool
 
     def __init__(
@@ -35,7 +35,7 @@ class _PolicyBase(Generic[_MessageT]):
         raise_on_defect: bool = False,
         mangle_from_: bool = ...,  # default depends on sub-class
         message_factory: _MessageFactory[_MessageT] | None = None,
-        # Added in Python 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5
+        # Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
         verify_generated_headers: bool = True,
     ) -> None: ...
     def clone(
@@ -47,7 +47,7 @@ class _PolicyBase(Generic[_MessageT]):
         raise_on_defect: bool = ...,
         mangle_from_: bool = ...,
         message_factory: _MessageFactory[_MessageT] | None = ...,
-        # Added in Python 3.8.20, 3.9.20, 3.10.15, 3.11.10, 3.12.5
+        # Added in Python 3.9.20, 3.10.15, 3.11.10, 3.12.5
         verify_generated_headers: bool = ...,
     ) -> Self: ...
     def __add__(self, other: Policy) -> Self: ...
