@@ -96,7 +96,7 @@ flags: _flags
 # This can be re-visited when typeshed drops support for 3.10,
 # at which point all supported versions will include int_max_str_digits
 # in all patch versions.
-# 3.8 and 3.9 are 15 or 16-tuple
+# 3.9 is 15 or 16-tuple
 # 3.10 is 16 or 17-tuple
 # 3.11+ is an 18-tuple.
 @final
@@ -184,7 +184,7 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
     # Whether or not this exists on lower versions of Python
     # may depend on which patch release you're using
     # (it was backported to all Python versions on 3.8+ as a security fix)
-    # Added in: 3.8.14, 3.9.14, 3.10.7
+    # Added in: 3.9.14, 3.10.7
     # and present in all versions of 3.11 and later.
     @property
     def int_max_str_digits(self) -> int: ...
@@ -448,7 +448,7 @@ if sys.platform == "win32":
 def get_coroutine_origin_tracking_depth() -> int: ...
 def set_coroutine_origin_tracking_depth(depth: int) -> None: ...
 
-# The following two functions were added in 3.11.0, 3.10.7, 3.9.14, and 3.8.14,
+# The following two functions were added in 3.11.0, 3.10.7, and 3.9.14,
 # as part of the response to CVE-2020-10735
 def set_int_max_str_digits(maxdigits: int) -> None: ...
 def get_int_max_str_digits() -> int: ...

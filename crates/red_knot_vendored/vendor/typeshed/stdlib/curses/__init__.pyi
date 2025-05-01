@@ -23,11 +23,6 @@ COLOR_PAIRS: int
 
 def wrapper(func: Callable[Concatenate[window, _P], _T], /, *arg: _P.args, **kwds: _P.kwargs) -> _T: ...
 
-# typeshed used the name _CursesWindow for the underlying C class before
-# it was mapped to the name 'window' in 3.8.
-# Kept here as a legacy alias in case any third-party code is relying on it.
-_CursesWindow = window
-
 # At runtime this class is unexposed and calls itself curses.ncurses_version.
 # That name would conflict with the actual curses.ncurses_version, which is
 # an instance of this class.
