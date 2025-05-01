@@ -749,7 +749,6 @@ x = 1 \
                 kind: diag.kind,
                 range: diag.range,
                 fix: diag.fix,
-                parent: diag.parent,
                 file: SourceFileBuilder::new("<filename>", "<code>").finish(),
                 noqa_offset: TextSize::default(),
             }

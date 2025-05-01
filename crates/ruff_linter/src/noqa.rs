@@ -862,26 +862,6 @@ fn find_noqa_comments<'a>(
             }
         }
 
-        // Is the violation ignored by a `noqa` directive on the parent line?
-        if let Some(parent) = diagnostic.parent {
-            if let Some(directive_line) =
-                directives.find_line_with_directive(noqa_line_for.resolve(parent))
-            {
-                match &directive_line.directive {
-                    Directive::All(_) => {
-                        comments_by_line.push(None);
-                        continue;
-                    }
-                    Directive::Codes(codes) => {
-                        if codes.includes(diagnostic.kind.rule()) {
-                            comments_by_line.push(None);
-                            continue;
-                        }
-                    }
-                }
-            }
-        }
-
         let noqa_offset = noqa_line_for.resolve(diagnostic.range.start());
 
         let rule = diagnostic.kind.rule();
