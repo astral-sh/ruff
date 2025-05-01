@@ -10,7 +10,7 @@ use ruff_db::source::{source_text, SourceText};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
-use ruff_python_ast::{self as ast, PythonVersion};
+use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
@@ -75,6 +75,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     // Builder state
     db: &'db dyn Db,
     file: File,
+    source_type: PySourceType,
     module: &'db ParsedModule,
     scope_stack: Vec<ScopeInfo>,
     /// The assignments we're currently visiting, with
@@ -118,6 +119,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let mut builder = Self {
             db,
             file,
+            source_type: file.source_type(db),
             module: parsed,
             scope_stack: Vec::new(),
             current_assignments: vec![],
@@ -445,7 +447,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         #[allow(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
-        let category = kind.category(self.file.is_stub(self.db.upcast()));
+        let category = kind.category(self.source_type.is_stub());
         let is_reexported = kind.is_reexported();
 
         let definition = Definition::new(
