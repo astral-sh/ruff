@@ -231,6 +231,16 @@ impl<'db> ClassType<'db> {
         class_literal.is_final(db)
     }
 
+    /// Is this class a subclass of `Any` or `Unknown`?
+    pub(crate) fn is_subclass_of_any_or_unknown(self, db: &'db dyn Db) -> bool {
+        self.iter_mro(db).any(|base| {
+            matches!(
+                base,
+                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
+            )
+        })
+    }
+
     /// If `self` and `other` are generic aliases of the same generic class, returns their
     /// corresponding specializations.
     fn compatible_specializations(
@@ -310,13 +320,7 @@ impl<'db> ClassType<'db> {
             }
         }
 
-        if self.iter_mro(db).any(|base| {
-            matches!(
-                base,
-                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
-            )
-        }) && !other.is_final(db)
-        {
+        if self.is_subclass_of_any_or_unknown(db) && !other.is_final(db) {
             return true;
         }
 
