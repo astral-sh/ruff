@@ -22,7 +22,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/generics/legacy/fu
  8 | 
  9 | reveal_type(f(1))  # revealed: Literal[1]
 10 | reveal_type(f(True))  # revealed: Literal[True]
-11 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy upper bound of type variable `T`"
+11 | # error: [invalid-argument-type]
 12 | reveal_type(f("string"))  # revealed: Unknown
 ```
 
@@ -37,7 +37,7 @@ info: revealed-type: Revealed type
  9 | reveal_type(f(1))  # revealed: Literal[1]
    | ^^^^^^^^^^^^^^^^^ `Literal[1]`
 10 | reveal_type(f(True))  # revealed: Literal[True]
-11 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy upper b...
+11 | # error: [invalid-argument-type]
    |
 
 ```
@@ -49,7 +49,7 @@ info: revealed-type: Revealed type
  9 | reveal_type(f(1))  # revealed: Literal[1]
 10 | reveal_type(f(True))  # revealed: Literal[True]
    | ^^^^^^^^^^^^^^^^^^^^ `Literal[True]`
-11 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy upper b...
+11 | # error: [invalid-argument-type]
 12 | reveal_type(f("string"))  # revealed: Unknown
    |
 
@@ -60,7 +60,7 @@ error: lint:invalid-argument-type: Argument to this function is incorrect
   --> src/mdtest_snippet.py:12:15
    |
 10 | reveal_type(f(True))  # revealed: Literal[True]
-11 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy upper b...
+11 | # error: [invalid-argument-type]
 12 | reveal_type(f("string"))  # revealed: Unknown
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy upper bound of type variable `T`
    |
@@ -82,7 +82,7 @@ info: revealed-type: Revealed type
   --> src/mdtest_snippet.py:12:1
    |
 10 | reveal_type(f(True))  # revealed: Literal[True]
-11 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy upper b...
+11 | # error: [invalid-argument-type]
 12 | reveal_type(f("string"))  # revealed: Unknown
    | ^^^^^^^^^^^^^^^^^^^^^^^^ `Unknown`
    |

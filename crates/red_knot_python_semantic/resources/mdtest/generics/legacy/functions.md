@@ -95,7 +95,7 @@ def f(x: T) -> T:
 
 reveal_type(f(1))  # revealed: Literal[1]
 reveal_type(f(True))  # revealed: Literal[True]
-# error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy upper bound of type variable `T`"
+# error: [invalid-argument-type]
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
@@ -115,7 +115,7 @@ def f(x: T) -> T:
 reveal_type(f(1))  # revealed: int
 reveal_type(f(True))  # revealed: int
 reveal_type(f(None))  # revealed: None
-# error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy constraints of type variable `T`"
+# error: [invalid-argument-type]
 reveal_type(f("string"))  # revealed: Unknown
 ```
 
