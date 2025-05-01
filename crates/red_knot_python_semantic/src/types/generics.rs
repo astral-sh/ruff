@@ -88,7 +88,7 @@ impl<'db> GenericContext<'db> {
     ) -> Option<Self> {
         let mut variables = FxOrderSet::default();
         for base in bases {
-            Type::from(base).find_legacy_typevars(db, &mut variables);
+            base.find_legacy_typevars(db, &mut variables);
         }
         if variables.is_empty() {
             return None;
