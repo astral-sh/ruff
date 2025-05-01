@@ -23,7 +23,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/generics/legacy/fu
  9 | reveal_type(f(1))  # revealed: int
 10 | reveal_type(f(True))  # revealed: int
 11 | reveal_type(f(None))  # revealed: None
-12 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy constraints of type variable `T`"
+12 | # error: [invalid-argument-type]
 13 | reveal_type(f("string"))  # revealed: Unknown
 ```
 
@@ -51,7 +51,7 @@ info: revealed-type: Revealed type
 10 | reveal_type(f(True))  # revealed: int
    | ^^^^^^^^^^^^^^^^^^^^ `int`
 11 | reveal_type(f(None))  # revealed: None
-12 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy constra...
+12 | # error: [invalid-argument-type]
    |
 
 ```
@@ -64,7 +64,7 @@ info: revealed-type: Revealed type
 10 | reveal_type(f(True))  # revealed: int
 11 | reveal_type(f(None))  # revealed: None
    | ^^^^^^^^^^^^^^^^^^^^ `None`
-12 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy constra...
+12 | # error: [invalid-argument-type]
 13 | reveal_type(f("string"))  # revealed: Unknown
    |
 
@@ -75,7 +75,7 @@ error: lint:invalid-argument-type: Argument to this function is incorrect
   --> src/mdtest_snippet.py:13:15
    |
 11 | reveal_type(f(None))  # revealed: None
-12 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy constra...
+12 | # error: [invalid-argument-type]
 13 | reveal_type(f("string"))  # revealed: Unknown
    |               ^^^^^^^^ Argument type `Literal["string"]` does not satisfy constraints of type variable `T`
    |
@@ -97,7 +97,7 @@ info: revealed-type: Revealed type
   --> src/mdtest_snippet.py:13:1
    |
 11 | reveal_type(f(None))  # revealed: None
-12 | # error: [invalid-argument-type] "Argument to this function is incorrect: Argument type `Literal["string"]` does not satisfy constra...
+12 | # error: [invalid-argument-type]
 13 | reveal_type(f("string"))  # revealed: Unknown
    | ^^^^^^^^^^^^^^^^^^^^^^^^ `Unknown`
    |
