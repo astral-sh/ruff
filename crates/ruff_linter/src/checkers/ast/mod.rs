@@ -523,7 +523,14 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Return the [`PythonVersion`] to use for version-related checks.
+    /// Return the [`PythonVersion`] to use for version-related lint rules.
+    ///
+    /// If the user did not provide a target version, this defaults to the lowest supported Python
+    /// version ([`PythonVersion::default`]).
+    ///
+    /// Note that this method should not be used for version-related syntax errors emitted by the
+    /// parser or the [`SemanticSyntaxChecker`], which should instead default to the _latest_
+    /// supported Python version.
     pub(crate) fn target_version(&self) -> PythonVersion {
         self.target_version.unwrap_or_default()
     }
