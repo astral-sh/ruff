@@ -2,9 +2,7 @@ use std::io::Write;
 
 use ruff_source_file::LineColumn;
 
-use crate::message::{Emitter, EmitterContext};
-
-use super::Message;
+use crate::message::{Emitter, EmitterContext, Message};
 
 /// Generate error logging commands for Azure Pipelines format.
 /// See [documentation](https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning)

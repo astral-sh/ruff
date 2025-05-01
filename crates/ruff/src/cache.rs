@@ -589,11 +589,11 @@ mod tests {
     use anyhow::Result;
     use filetime::{set_file_mtime, FileTime};
     use itertools::Itertools;
-    use ruff_linter::message::Message;
     use ruff_linter::settings::LinterSettings;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
+    use ruff_linter::message::Message;
     use ruff_linter::package::PackageRoot;
     use ruff_linter::settings::flags;
     use ruff_linter::settings::types::UnsafeFixes;

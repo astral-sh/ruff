@@ -1,5 +1,4 @@
-use std::fmt::Formatter;
-use std::sync::Arc;
+use std::{fmt::Formatter, sync::Arc};
 
 use countme::Count;
 use render::Input;

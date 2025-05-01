@@ -64,13 +64,133 @@ macro_rules! ruff_file {
     };
 }
 
+/// Message represents either a diagnostic message corresponding to a rule violation or a syntax
+/// error message raised by the parser.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
     Diagnostic(DiagnosticMessage),
     SyntaxError(db::Diagnostic),
 }
 
+/// A diagnostic message corresponding to a rule violation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiagnosticMessage {
+    pub kind: DiagnosticKind,
+    pub range: TextRange,
+    pub fix: Option<Fix>,
+    pub parent: Option<TextSize>,
+    pub file: SourceFile,
+    pub noqa_offset: TextSize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum MessageKind {
+    Diagnostic(Rule),
+    SyntaxError,
+}
+
+impl MessageKind {
+    pub fn as_str(&self) -> &str {
+        match self {
+            MessageKind::Diagnostic(rule) => rule.as_ref(),
+            MessageKind::SyntaxError => "syntax-error",
+        }
+    }
+}
+
 impl Message {
+    pub fn syntax_error(message: String, range: TextRange, file: SourceFile) -> Message {
+        let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+        let span = Span::from(file).with_range(range);
+        diag.annotate(Annotation::primary(span).message(message));
+        Self::SyntaxError(diag)
+    }
+
+    /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
+    pub fn from_diagnostic(
+        diagnostic: Diagnostic,
+        file: SourceFile,
+        noqa_offset: TextSize,
+    ) -> Message {
+        Message::Diagnostic(DiagnosticMessage {
+            range: diagnostic.range(),
+            kind: diagnostic.kind,
+            fix: diagnostic.fix,
+            parent: diagnostic.parent,
+            file,
+            noqa_offset,
+        })
+    }
+
+    /// Create a [`Message`] from the given [`ParseError`].
+    pub fn from_parse_error(
+        parse_error: &ParseError,
+        locator: &Locator,
+        file: SourceFile,
+    ) -> Message {
+        // Try to create a non-empty range so that the diagnostic can print a caret at the right
+        // position. This requires that we retrieve the next character, if any, and take its length
+        // to maintain char-boundaries.
+        let len = locator
+            .after(parse_error.location.start())
+            .chars()
+            .next()
+            .map_or(TextSize::new(0), TextLen::text_len);
+
+        Message::syntax_error(
+            format!(
+                "SyntaxError: {}",
+                DisplayParseErrorType::new(&parse_error.error)
+            ),
+            TextRange::at(parse_error.location.start(), len),
+            file,
+        )
+    }
+
+    /// Create a [`Message`] from the given [`UnsupportedSyntaxError`].
+    pub fn from_unsupported_syntax_error(
+        unsupported_syntax_error: &UnsupportedSyntaxError,
+        file: SourceFile,
+    ) -> Message {
+        Message::syntax_error(
+            format!("SyntaxError: {unsupported_syntax_error}"),
+            unsupported_syntax_error.range,
+            file,
+        )
+    }
+
+    /// Create a [`Message`] from the given [`SemanticSyntaxError`].
+    pub fn from_semantic_syntax_error(
+        semantic_syntax_error: &SemanticSyntaxError,
+        file: SourceFile,
+    ) -> Message {
+        Message::syntax_error(
+            format!("SyntaxError: {semantic_syntax_error}"),
+            semantic_syntax_error.range,
+            file,
+        )
+    }
+
+    pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
+        match self {
+            Message::Diagnostic(m) => Some(m),
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    pub fn into_diagnostic_message(self) -> Option<DiagnosticMessage> {
+        match self {
+            Message::Diagnostic(m) => Some(m),
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    /// Returns `true` if `self` is a diagnostic message.
+    pub const fn is_diagnostic_message(&self) -> bool {
+        matches!(self, Message::Diagnostic(_))
+    }
+
+    /// Returns `true` if `self` is a syntax error message.
     pub fn is_syntax_error(&self) -> bool {
         match self {
             Message::Diagnostic(_) => false,
@@ -78,9 +198,69 @@ impl Message {
         }
     }
 
+    /// Returns a message kind.
+    pub fn kind(&self) -> MessageKind {
+        match self {
+            Message::Diagnostic(m) => MessageKind::Diagnostic(m.kind.rule()),
+            Message::SyntaxError(_) => MessageKind::SyntaxError,
+        }
+    }
+
+    /// Returns the name used to represent the diagnostic.
+    pub fn name(&self) -> &str {
+        match self {
+            Message::Diagnostic(m) => &m.kind.name,
+            // TODO(brent) something more like diag.id().as_str() and match on the result once we
+            // move past syntax errors
+            Message::SyntaxError(_) => "SyntaxError",
+        }
+    }
+
+    /// Returns the message body to display to the user.
+    pub fn body(&self) -> &str {
+        match self {
+            Message::Diagnostic(m) => &m.kind.body,
+            Message::SyntaxError(m) => ruff_annotation!(m)
+                .get_message()
+                .expect("Expected a message for a ruff diagnostic"),
+        }
+    }
+
+    /// Returns the fix suggestion for the violation.
+    pub fn suggestion(&self) -> Option<&str> {
+        match self {
+            Message::Diagnostic(m) => m.kind.suggestion.as_deref(),
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    /// Returns the offset at which the `noqa` comment will be placed if it's a diagnostic message.
+    pub fn noqa_offset(&self) -> Option<TextSize> {
+        match self {
+            Message::Diagnostic(m) => Some(m.noqa_offset),
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    /// Returns the [`Fix`] for the message, if there is any.
+    pub fn fix(&self) -> Option<&Fix> {
+        match self {
+            Message::Diagnostic(m) => m.fix.as_ref(),
+            // TODO(brent) db::Diagnostics don't currently have a concept of fixes, but we'll need
+            // to add them eventually
+            Message::SyntaxError(_) => None,
+        }
+    }
+
+    /// Returns `true` if the message contains a [`Fix`].
+    pub fn fixable(&self) -> bool {
+        self.fix().is_some()
+    }
+
+    /// Returns the [`Rule`] corresponding to the diagnostic message.
     pub fn rule(&self) -> Option<Rule> {
         match self {
-            Message::Diagnostic(message) => Some(message.kind.rule()),
+            Message::Diagnostic(m) => Some(m.kind.rule()),
             // TODO(brent) syntax errors don't have Rules, but we'll need these for lint rules,
             // obviously. I think we can just map the rule code back from the name like the Message
             // version does under the hood
@@ -88,106 +268,37 @@ impl Message {
         }
     }
 
-    pub const fn is_diagnostic_message(&self) -> bool {
+    /// Returns the filename for the message.
+    pub fn filename(&self) -> Cow<'_, str> {
         match self {
-            Message::Diagnostic(_) => true,
-            Message::SyntaxError(_) => false,
-        }
-    }
-
-    pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
-        match self {
-            Message::Diagnostic(message) => Some(message),
-            Message::SyntaxError(_) => None,
-        }
-    }
-
-    fn filename(&self) -> Cow<'_, str> {
-        match self {
-            Message::Diagnostic(message) => Cow::Borrowed(message.file.name()),
+            Message::Diagnostic(m) => Cow::Borrowed(m.file.name()),
             Message::SyntaxError(diag) => Cow::Owned(ruff_file!(diag).name().to_string()),
         }
     }
 
-    pub fn body(&self) -> &str {
+    /// Computes the start source location for the message.
+    pub fn compute_start_location(&self) -> LineColumn {
         match self {
-            Message::Diagnostic(message) => &message.kind.body,
-            Message::SyntaxError(diag) => ruff_annotation!(diag)
-                .get_message()
-                .expect("Expected a message for a ruff diagnostic"),
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        match self {
-            Message::Diagnostic(message) => &message.kind.name,
-            // TODO(brent) something more like diag.id().as_str() and match on the result once we
-            // move past syntax errors
-            Message::SyntaxError(_) => "SyntaxError",
-        }
-    }
-
-    fn compute_start_location(&self) -> LineColumn {
-        match self {
-            Message::Diagnostic(message) => message.compute_start_location(),
+            Message::Diagnostic(m) => m.file.to_source_code().line_column(m.range.start()),
             Message::SyntaxError(diag) => {
                 ruff_file!(diag).to_source_code().line_column(self.start())
             }
         }
     }
 
-    fn compute_end_location(&self) -> LineColumn {
+    /// Computes the end source location for the message.
+    pub fn compute_end_location(&self) -> LineColumn {
         match self {
-            Message::Diagnostic(message) => message.compute_end_location(),
+            Message::Diagnostic(m) => m.file.to_source_code().line_column(m.range.end()),
             Message::SyntaxError(diag) => ruff_file!(diag).to_source_code().line_column(self.end()),
         }
     }
 
+    /// Returns the [`SourceFile`] which the message belongs to.
     pub fn source_file(&self) -> SourceFile {
         match self {
-            Message::Diagnostic(message) => message.source_file().clone(),
-            Message::SyntaxError(diag) => ruff_file!(diag).clone(),
-        }
-    }
-
-    pub fn fix(&self) -> Option<&Fix> {
-        match self {
-            Message::Diagnostic(message) => message.fix.as_ref(),
-            // TODO(brent) db::Diagnostics don't currently have a concept of fixes, but we'll need
-            // to add them eventually
-            Message::SyntaxError(_) => None,
-        }
-    }
-
-    fn suggestion(&self) -> Option<&str> {
-        match self {
-            Message::Diagnostic(message) => message.kind.suggestion.as_deref(),
-            Message::SyntaxError(_) => None,
-        }
-    }
-
-    fn noqa_offset(&self) -> Option<TextSize> {
-        match self {
-            Message::Diagnostic(message) => Some(message.noqa_offset),
-            Message::SyntaxError(_) => None,
-        }
-    }
-
-    pub fn into_diagnostic_message(self) -> Option<DiagnosticMessage> {
-        match self {
-            Message::Diagnostic(message) => Some(message),
-            Message::SyntaxError(_) => None,
-        }
-    }
-
-    pub fn fixable(&self) -> bool {
-        self.fix().is_some()
-    }
-
-    pub fn kind(&self) -> MessageKind {
-        match self {
-            Message::Diagnostic(message) => MessageKind::Diagnostic(message.kind.rule()),
-            Message::SyntaxError(_) => MessageKind::SyntaxError,
+            Message::Diagnostic(m) => m.file.clone(),
+            Message::SyntaxError(m) => ruff_file!(m).clone(),
         }
     }
 }
@@ -207,127 +318,8 @@ impl PartialOrd for Message {
 impl Ranged for Message {
     fn range(&self) -> TextRange {
         match self {
-            Message::Diagnostic(message) => message.range,
-            Message::SyntaxError(diag) => ruff_span!(diag)
-                .range()
-                .expect("Expected range for ruff span"),
-        }
-    }
-}
-
-impl Message {
-    pub fn syntax_error(message: String, range: TextRange, file: SourceFile) -> Message {
-        let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
-        let span = Span::from(file).with_range(range);
-        diag.annotate(Annotation::primary(span).message(message));
-        Self::SyntaxError(diag)
-    }
-
-    /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(
-        diagnostic: Diagnostic,
-        file: SourceFile,
-        noqa_offset: TextSize,
-    ) -> Self {
-        Self::Diagnostic(DiagnosticMessage {
-            range: diagnostic.range(),
-            kind: diagnostic.kind,
-            fix: diagnostic.fix,
-            parent: diagnostic.parent,
-            file,
-            noqa_offset,
-        })
-    }
-
-    /// Create a [`Message`] from the given [`ParseError`].
-    pub fn from_parse_error(parse_error: &ParseError, locator: &Locator, file: SourceFile) -> Self {
-        // Try to create a non-empty range so that the diagnostic can print a caret at the right
-        // position. This requires that we retrieve the next character, if any, and take its length
-        // to maintain char-boundaries.
-        let len = locator
-            .after(parse_error.location.start())
-            .chars()
-            .next()
-            .map_or(TextSize::new(0), TextLen::text_len);
-
-        Self::syntax_error(
-            format!(
-                "SyntaxError: {}",
-                DisplayParseErrorType::new(&parse_error.error)
-            ),
-            TextRange::at(parse_error.location.start(), len),
-            file,
-        )
-    }
-
-    /// Create a [`Message`] from the given [`UnsupportedSyntaxError`].
-    pub fn from_unsupported_syntax_error(
-        unsupported_syntax_error: &UnsupportedSyntaxError,
-        file: SourceFile,
-    ) -> Self {
-        Self::syntax_error(
-            format!("SyntaxError: {unsupported_syntax_error}"),
-            unsupported_syntax_error.range,
-            file,
-        )
-    }
-
-    /// Create a [`Message`] from the given [`SemanticSyntaxError`].
-    pub fn from_semantic_syntax_error(
-        semantic_syntax_error: &SemanticSyntaxError,
-        file: SourceFile,
-    ) -> Self {
-        Self::syntax_error(
-            format!("SyntaxError: {semantic_syntax_error}"),
-            semantic_syntax_error.range,
-            file,
-        )
-    }
-}
-
-/// A diagnostic message corresponding to a rule violation.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DiagnosticMessage {
-    pub kind: DiagnosticKind,
-    pub range: TextRange,
-    pub fix: Option<Fix>,
-    pub parent: Option<TextSize>,
-    pub file: SourceFile,
-    pub noqa_offset: TextSize,
-}
-
-impl DiagnosticMessage {
-    /// Returns the [`SourceFile`] which the message belongs to.
-    pub fn source_file(&self) -> &SourceFile {
-        &self.file
-    }
-
-    /// Computes the start source location for the message.
-    pub fn compute_start_location(&self) -> LineColumn {
-        self.source_file()
-            .to_source_code()
-            .line_column(self.range.start())
-    }
-
-    /// Computes the end source location for the message.
-    pub fn compute_end_location(&self) -> LineColumn {
-        self.source_file()
-            .to_source_code()
-            .line_column(self.range.end())
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MessageKind {
-    Diagnostic(Rule),
-    SyntaxError,
-}
-
-impl MessageKind {
-    pub fn as_str(&self) -> &str {
-        match self {
-            MessageKind::Diagnostic(rule) => rule.as_ref(),
-            MessageKind::SyntaxError => "syntax-error",
+            Message::Diagnostic(m) => m.range,
+            Message::SyntaxError(m) => ruff_span!(m).range().expect("Expected range for ruff span"),
         }
     }
 }
