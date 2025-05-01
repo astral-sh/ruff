@@ -56,10 +56,7 @@ impl Violation for Pep484StylePositionalOnlyParameter {
 /// PYI063
 pub(crate) fn pep_484_positional_parameter(checker: &Checker, function_def: &ast::StmtFunctionDef) {
     // PEP 570 was introduced in Python 3.8.
-    if checker
-        .target_version()
-        .is_none_or(|v| v < PythonVersion::PY38)
-    {
+    if checker.target_version_or_default() < PythonVersion::PY38 {
         return;
     }
 

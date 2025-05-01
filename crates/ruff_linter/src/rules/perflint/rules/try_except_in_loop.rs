@@ -89,10 +89,7 @@ impl Violation for TryExceptInLoop {
 
 /// PERF203
 pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
-    if checker
-        .target_version()
-        .is_none_or(|v| v >= PythonVersion::PY311)
-    {
+    if checker.target_version_or_default() >= PythonVersion::PY311 {
         return;
     }
 

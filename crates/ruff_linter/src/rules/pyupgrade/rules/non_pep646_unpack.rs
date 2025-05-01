@@ -53,10 +53,7 @@ impl Violation for NonPEP646Unpack {
 
 /// UP044
 pub(crate) fn use_pep646_unpack(checker: &Checker, expr: &ExprSubscript) {
-    if checker
-        .target_version()
-        .is_none_or(|v| v < PythonVersion::PY311)
-    {
+    if checker.target_version_or_default() < PythonVersion::PY311 {
         return;
     }
 

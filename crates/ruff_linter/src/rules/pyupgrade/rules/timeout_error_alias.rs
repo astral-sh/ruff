@@ -155,9 +155,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
 
 /// UP041
 pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[ExceptHandler]) {
-    let Some(target_version) = checker.target_version() else {
-        return;
-    };
+    let target_version = checker.target_version_or_default();
 
     for handler in handlers {
         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler { type_, .. }) = handler;
@@ -189,21 +187,13 @@ pub(crate) fn timeout_error_alias_handlers(checker: &Checker, handlers: &[Except
 
 /// UP041
 pub(crate) fn timeout_error_alias_call(checker: &Checker, func: &Expr) {
-    let Some(target_version) = checker.target_version() else {
-        return;
-    };
-
-    if is_alias(func, checker.semantic(), target_version) {
+    if is_alias(func, checker.semantic(), checker.target_version_or_default()) {
         atom_diagnostic(checker, func);
     }
 }
 
 /// UP041
 pub(crate) fn timeout_error_alias_raise(checker: &Checker, expr: &Expr) {
-    let Some(target_version) = checker.target_version() else {
-        return;
-    };
-
     if matches!(expr, Expr::Name(_) | Expr::Attribute(_)) {
         if is_alias(expr, checker.semantic(), checker.target_version_or_default()) {
             atom_diagnostic(checker, expr);

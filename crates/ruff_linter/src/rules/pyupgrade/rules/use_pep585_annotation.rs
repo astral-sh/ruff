@@ -98,14 +98,12 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                         checker.semantic(),
                     )?;
                     let binding_edit = Edit::range_replacement(binding, expr.range());
-                    let applicability = if checker
-                        .target_version()
-                        .is_some_and(|v| v >= PythonVersion::PY310)
-                    {
-                        Applicability::Safe
-                    } else {
-                        Applicability::Unsafe
-                    };
+                    let applicability =
+                        if checker.target_version_or_default() >= PythonVersion::PY310 {
+                            Applicability::Safe
+                        } else {
+                            Applicability::Unsafe
+                        };
                     Ok(Fix::applicable_edits(
                         binding_edit,
                         import_edit,
@@ -125,10 +123,7 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                     Ok(Fix::applicable_edits(
                         import_edit,
                         [reference_edit],
-                        if checker
-                            .target_version()
-                            .is_some_and(|v| v >= PythonVersion::PY310)
-                        {
+                        if checker.target_version_or_default() >= PythonVersion::PY310 {
                             Applicability::Safe
                         } else {
                             Applicability::Unsafe

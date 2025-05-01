@@ -205,11 +205,7 @@ pub(crate) fn bad_str_strip_call(checker: &Checker, call: &ast::ExprCall) {
         return;
     }
 
-    let Some(target_version) = checker.target_version() else {
-        return;
-    };
-
-    let removal = if target_version >= PythonVersion::PY39 {
+    let removal = if checker.target_version_or_default() >= PythonVersion::PY39 {
         RemovalKind::for_strip(strip)
     } else {
         None

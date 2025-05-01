@@ -68,7 +68,7 @@ pub(crate) fn builtin_argument_shadowing(checker: &Checker, parameter: &Paramete
         parameter.name(),
         checker.source_type,
         &checker.settings.flake8_builtins.ignorelist,
-        checker.target_version(),
+        checker.target_version_or_latest(),
     ) {
         // Ignore parameters in lambda expressions.
         // (That is the domain of A006.)

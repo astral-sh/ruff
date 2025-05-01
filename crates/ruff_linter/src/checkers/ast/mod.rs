@@ -523,25 +523,16 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Return the [`PythonVersion`] to use for version-related checks.
-    pub(crate) fn target_version(&self) -> Option<PythonVersion> {
-        self.target_version
-    }
-
-    /// Return the [`PythonVersion`] to use for version-related checks.
-    ///
-    /// This returns the same value as `target_version` if the result is `Some`, otherwise it falls
-    /// back on [`PythonVersion::latest`].
+    /// Return the [`PythonVersion`] to use for version-related checks or [`PythonVersion::latest`]
+    /// if unset.
     pub(crate) fn target_version_or_latest(&self) -> PythonVersion {
         self.target_version.unwrap_or_else(PythonVersion::latest)
     }
 
-    /// Return the [`PythonVersion`] to use for version-related checks.
-    ///
-    /// This returns the same value as `target_version` if the result is `Some`, otherwise it falls
-    /// back on [`PythonVersion::default`].
+    /// Return the [`PythonVersion`] to use for version-related checks or [`PythonVersion::default`]
+    /// if unset.
     pub(crate) fn target_version_or_default(&self) -> PythonVersion {
-        self.target_version.unwrap_or_else(PythonVersion::default)
+        self.target_version.unwrap_or_default()
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
@@ -599,7 +590,7 @@ impl TypingImporter<'_, '_> {
 
 impl SemanticSyntaxContext for Checker<'_> {
     fn python_version(&self) -> PythonVersion {
-        self.target_version().unwrap_or_default()
+        self.target_version_or_default()
     }
 
     fn global(&self, name: &str) -> Option<TextRange> {

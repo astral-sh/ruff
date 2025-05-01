@@ -84,10 +84,6 @@ pub(crate) fn subscript_with_parenthesized_tuple(checker: &Checker, subscript: &
         return;
     }
 
-    let Some(target_version) = checker.target_version() else {
-        return;
-    };
-
     // Removing parentheses in the presence of unpacking leads
     // to a syntax error in Python 3.10.
     // This is no longer a syntax error starting in Python 3.11
