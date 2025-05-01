@@ -165,7 +165,7 @@ Module(
 
   |
 1 | _ = *[42]
-  |     ^^^^^ Syntax Error: can't use starred expression here
+  |     ^^^^^ Syntax Error: Starred expression cannot be used here
 2 | _ = *{42}
 3 | _ = *list()
   |
@@ -174,7 +174,7 @@ Module(
   |
 1 | _ = *[42]
 2 | _ = *{42}
-  |     ^^^^^ Syntax Error: can't use starred expression here
+  |     ^^^^^ Syntax Error: Starred expression cannot be used here
 3 | _ = *list()
 4 | _ = *(p + q)
   |
@@ -184,7 +184,7 @@ Module(
 1 | _ = *[42]
 2 | _ = *{42}
 3 | _ = *list()
-  |     ^^^^^^^ Syntax Error: can't use starred expression here
+  |     ^^^^^^^ Syntax Error: Starred expression cannot be used here
 4 | _ = *(p + q)
   |
 
@@ -193,5 +193,5 @@ Module(
 2 | _ = *{42}
 3 | _ = *list()
 4 | _ = *(p + q)
-  |     ^^^^^^^^ Syntax Error: can't use starred expression here
+  |     ^^^^^^^^ Syntax Error: Starred expression cannot be used here
   |
