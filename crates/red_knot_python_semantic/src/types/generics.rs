@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
@@ -145,6 +146,15 @@ impl<'db> GenericContext<'db> {
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         let types = vec![Type::unknown(); self.variables(db).len()];
         self.specialize(db, types.into())
+    }
+
+    pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
+        for variable in self.variables(db) {
+            if !other.variables(db).iter().contains(variable) {
+                return false;
+            }
+        }
+        true
     }
 
     pub(crate) fn specialize(

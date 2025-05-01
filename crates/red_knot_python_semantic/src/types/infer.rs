@@ -978,7 +978,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
-            // (5) Check that a generic class does not use both PEP-695 and legacy syntax.
+            // (5) Check that a generic class does not have invalid or conflicting generic
+            // contexts.
             if class.pep695_generic_context(self.db()).is_some()
                 && class.legacy_generic_context(self.db()).is_some()
             {
@@ -987,6 +988,22 @@ impl<'db> TypeInferenceBuilder<'db> {
                     builder.into_diagnostic(
                         "Cannot both inherit from `Generic` and use PEP 695 type variables",
                     );
+                }
+            }
+
+            if let (Some(legacy), Some(inherited)) = (
+                class.legacy_generic_context(self.db()),
+                class.inherited_legacy_generic_context(self.db()),
+            ) {
+                if !inherited.is_subset_of(self.db(), legacy) {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+                    {
+                        builder.into_diagnostic(
+                            "`Generic` base class must include all type \
+                            variables used in other base classes",
+                        );
+                    }
                 }
             }
         }
