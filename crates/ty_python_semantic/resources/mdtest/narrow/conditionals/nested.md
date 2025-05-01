@@ -134,4 +134,10 @@ def f(x: str | Literal[1] | None):
             class D:
                 if g != 1:
                     reveal_type(g)  # revealed: str
+
+            # This class variable is not visible from the nested class scope.
+            g = None
+
+            class E:
+                reveal_type(g)  # revealed: str | Literal[1]
 ```

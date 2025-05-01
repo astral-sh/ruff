@@ -5151,13 +5151,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         let narrow_with_applicable_constraints = |mut ty, use_ids: &[_]| {
             for (enclosing_scope_file_id, use_id) in use_ids {
                 let use_def = self.index.use_def_map(*enclosing_scope_file_id);
-                let mut bindings = use_def.bindings_at_use(*use_id);
-                // "Unbound binding" exists even if there are no actual bindings in the scope.
-                let first_binding = bindings.next().unwrap();
+                let constraints = use_def.narrowing_constraints_at_use(*use_id);
                 let symbol_table = self.index.symbol_table(*enclosing_scope_file_id);
                 let symbol = symbol_table.symbol_id_by_name(symbol_name).unwrap();
 
-                ty = first_binding.narrowing_constraint.narrow(db, ty, symbol);
+                ty = constraints.narrow(db, ty, symbol);
 
                 // Constraints outside a lazy scope are not applicable.
                 // TODO: If the symbol has never been rewritten, it is applicable.

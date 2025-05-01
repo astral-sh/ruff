@@ -354,6 +354,18 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(&self.bindings_by_use[use_id])
     }
 
+    pub(crate) fn narrowing_constraints_at_use(
+        &self,
+        use_id: ScopedUseId,
+    ) -> ConstraintsIterator<'_, 'db> {
+        ConstraintsIterator {
+            predicates: &self.predicates,
+            constraint_ids: self
+                .narrowing_constraints
+                .iter_predicates(self.bindings_by_use[use_id].narrowing_constraint_at_use),
+        }
+    }
+
     pub(super) fn is_reachable(
         &self,
         db: &dyn crate::Db,

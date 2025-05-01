@@ -181,6 +181,11 @@ impl SymbolDeclarations {
 /// with a set of narrowing constraints and a visibility constraint.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolBindings {
+    /// A narrowing constraint that applies when the symbol is used at the current location.
+    /// This is almost equivalent to a narrowing constraint of an unbound binding,
+    /// but is valid even after the unbound binding becomes invisible.
+    /// This is used for cross-scope narrowing.
+    pub(super) narrowing_constraint_at_use: ScopedNarrowingConstraint,
     /// A list of live bindings for this symbol, sorted by their `ScopedDefinitionId`
     live_bindings: SmallVec<[LiveBinding; INLINE_DEFINITIONS_PER_SYMBOL]>,
 }
@@ -203,6 +208,7 @@ impl SymbolBindings {
             visibility_constraint: scope_start_visibility,
         };
         Self {
+            narrowing_constraint_at_use: ScopedNarrowingConstraint::empty(),
             live_bindings: smallvec![initial_binding],
         }
     }
@@ -229,6 +235,8 @@ impl SymbolBindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         predicate: ScopedNarrowingConstraintPredicate,
     ) {
+        self.narrowing_constraint_at_use = narrowing_constraints
+            .add_predicate_to_constraint(self.narrowing_constraint_at_use, predicate);
         for binding in &mut self.live_bindings {
             binding.narrowing_constraint = narrowing_constraints
                 .add_predicate_to_constraint(binding.narrowing_constraint, predicate);
@@ -277,6 +285,9 @@ impl SymbolBindings {
         visibility_constraints: &mut VisibilityConstraintsBuilder,
     ) {
         let a = std::mem::take(self);
+
+        self.narrowing_constraint_at_use = narrowing_constraints
+            .intersect_constraints(a.narrowing_constraint_at_use, b.narrowing_constraint_at_use);
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
         // the merged `live_bindings` vec remains sorted. If a definition is found in both `a` and
