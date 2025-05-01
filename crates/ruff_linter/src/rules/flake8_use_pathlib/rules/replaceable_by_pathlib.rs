@@ -83,7 +83,16 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
         // PTH114
         ["os", "path", "islink"] => OsPathIslink.into(),
         // PTH116
-        ["os", "stat"] => OsStat.into(),
+        ["os", "stat"] => {
+            if call
+                .arguments
+                .find_positional(0)
+                .is_some_and(|expr| is_file_descriptor(expr, checker.semantic()))
+            {
+                return;
+            }
+            OsStat.into()
+        }
         // PTH117
         ["os", "path", "isabs"] => OsPathIsabs.into(),
         // PTH118

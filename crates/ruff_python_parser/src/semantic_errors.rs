@@ -90,7 +90,7 @@ impl SemanticSyntaxChecker {
                     Self::duplicate_type_parameter_name(type_params, ctx);
                 }
             }
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
                 if let [Expr::Starred(ast::ExprStarred { range, .. })] = targets.as_slice() {
                     // test_ok single_starred_assignment_target
                     // (*a,) = (1,)
@@ -105,6 +105,19 @@ impl SemanticSyntaxChecker {
                         *range,
                     );
                 }
+
+                // test_ok assign_stmt_starred_expr_value
+                // _ = 4
+                // _ = [4]
+                // _ = (*[1],)
+                // _ = *[1],
+
+                // test_err assign_stmt_starred_expr_value
+                // _ = *[42]
+                // _ = *{42}
+                // _ = *list()
+                // _ = *(p + q)
+                Self::invalid_star_expression(value, ctx);
             }
             Stmt::Return(ast::StmtReturn { value, range }) => {
                 if let Some(value) = value {

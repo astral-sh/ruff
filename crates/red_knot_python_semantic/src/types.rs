@@ -155,7 +155,7 @@ fn definition_expression_type<'db>(
 /// method or a `__delete__` method. This enum is used to categorize attributes into two
 /// groups: (1) data descriptors and (2) normal attributes or non-data descriptors.
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, salsa::Update)]
-enum AttributeKind {
+pub(crate) enum AttributeKind {
     DataDescriptor,
     NormalOrNonDataDescriptor,
 }
@@ -1477,6 +1477,12 @@ impl<'db> Type<'db> {
                 self_callable.is_assignable_to(db, target_callable)
             }
 
+            (Type::NominalInstance(instance), Type::Callable(_))
+                if instance.class().is_subclass_of_any_or_unknown(db) =>
+            {
+                true
+            }
+
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {
                 let call_symbol = self.member(db, "__call__").symbol;
                 match call_symbol {
@@ -2627,7 +2633,7 @@ impl<'db> Type<'db> {
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
     #[salsa::tracked]
-    fn try_call_dunder_get(
+    pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
         instance: Type<'db>,
@@ -2643,7 +2649,10 @@ impl<'db> Type<'db> {
 
         if let Symbol::Type(descr_get, descr_get_boundness) = descr_get {
             let return_ty = descr_get
-                .try_call(db, CallArgumentTypes::positional([self, instance, owner]))
+                .try_call(
+                    db,
+                    &mut CallArgumentTypes::positional([self, instance, owner]),
+                )
                 .map(|bindings| {
                     if descr_get_boundness == Boundness::Bound {
                         bindings.return_type(db)
@@ -4198,11 +4207,10 @@ impl<'db> Type<'db> {
     fn try_call(
         self,
         db: &'db dyn Db,
-        mut argument_types: CallArgumentTypes<'_, 'db>,
+        argument_types: &mut CallArgumentTypes<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
         let signatures = self.signatures(db);
-        Bindings::match_parameters(signatures, &mut argument_types)
-            .check_types(db, &mut argument_types)
+        Bindings::match_parameters(signatures, argument_types).check_types(db, argument_types)
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -4466,16 +4474,27 @@ impl<'db> Type<'db> {
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
         let new_call_outcome = argument_types.with_self(Some(self_type), |argument_types| {
-            let result = self_type.try_call_dunder_with_policy(
-                db,
-                "__new__",
-                argument_types,
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            );
-            match result {
-                Err(CallDunderError::MethodNotAvailable) => None,
-                _ => Some(result),
+            let new_method = self_type
+                .find_name_in_mro_with_policy(
+                    db,
+                    "__new__",
+                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                        | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                )?
+                .symbol
+                .try_call_dunder_get(db, self_type);
+
+            match new_method {
+                Symbol::Type(new_method, boundness) => {
+                    let result = new_method.try_call(db, argument_types);
+
+                    if boundness == Boundness::PossiblyUnbound {
+                        return Some(Err(DunderNewCallError::PossiblyUnbound(result.err())));
+                    }
+
+                    Some(result.map_err(DunderNewCallError::CallError))
+                }
+                Symbol::Unbound => None,
             }
         });
 
@@ -4514,27 +4533,43 @@ impl<'db> Type<'db> {
                 new_call_outcome @ (None | Some(Ok(_))),
                 init_call_outcome @ (None | Some(Ok(_))),
             ) => {
+                fn combine_specializations<'db>(
+                    db: &'db dyn Db,
+                    s1: Option<Specialization<'db>>,
+                    s2: Option<Specialization<'db>>,
+                ) -> Option<Specialization<'db>> {
+                    match (s1, s2) {
+                        (None, None) => None,
+                        (Some(s), None) | (None, Some(s)) => Some(s),
+                        (Some(s1), Some(s2)) => Some(s1.combine(db, s2)),
+                    }
+                }
+
+                fn combine_binding_specialization<'db>(
+                    db: &'db dyn Db,
+                    binding: &CallableBinding<'db>,
+                ) -> Option<Specialization<'db>> {
+                    binding
+                        .matching_overloads()
+                        .map(|(_, binding)| binding.inherited_specialization())
+                        .reduce(|acc, specialization| {
+                            combine_specializations(db, acc, specialization)
+                        })
+                        .flatten()
+                }
+
                 let new_specialization = new_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(CallableBinding::matching_overload)
-                    .and_then(|(_, binding)| binding.inherited_specialization());
+                    .and_then(|binding| combine_binding_specialization(db, binding));
                 let init_specialization = init_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(CallableBinding::matching_overload)
-                    .and_then(|(_, binding)| binding.inherited_specialization());
-                let specialization = match (new_specialization, init_specialization) {
-                    (None, None) => None,
-                    (Some(specialization), None) | (None, Some(specialization)) => {
-                        Some(specialization)
-                    }
-                    (Some(new_specialization), Some(init_specialization)) => {
-                        Some(new_specialization.combine(db, init_specialization))
-                    }
-                };
+                    .and_then(|binding| combine_binding_specialization(db, binding));
+                let specialization =
+                    combine_specializations(db, new_specialization, init_specialization);
                 let specialized = specialization
                     .map(|specialization| {
                         Type::instance(
@@ -6265,12 +6300,23 @@ impl<'db> BoolError<'db> {
     }
 }
 
+/// Represents possibly failure modes of implicit `__new__` calls.
+#[derive(Debug)]
+enum DunderNewCallError<'db> {
+    /// The call to `__new__` failed.
+    CallError(CallError<'db>),
+    /// The `__new__` method could be unbound. If the call to the
+    /// method has also failed, this variant also includes the
+    /// corresponding `CallError`.
+    PossiblyUnbound(Option<CallError<'db>>),
+}
+
 /// Error returned if a class instantiation call failed
 #[derive(Debug)]
 enum ConstructorCallError<'db> {
     Init(Type<'db>, CallDunderError<'db>),
-    New(Type<'db>, CallDunderError<'db>),
-    NewAndInit(Type<'db>, CallDunderError<'db>, CallDunderError<'db>),
+    New(Type<'db>, DunderNewCallError<'db>),
+    NewAndInit(Type<'db>, DunderNewCallError<'db>, CallDunderError<'db>),
 }
 
 impl<'db> ConstructorCallError<'db> {
@@ -6320,13 +6366,8 @@ impl<'db> ConstructorCallError<'db> {
             }
         };
 
-        let report_new_error = |call_dunder_error: &CallDunderError<'db>| match call_dunder_error {
-            CallDunderError::MethodNotAvailable => {
-                // We are explicitly checking for `__new__` before attempting to call it,
-                // so this should never happen.
-                unreachable!("`__new__` method may not be called if missing");
-            }
-            CallDunderError::PossiblyUnbound(bindings) => {
+        let report_new_error = |error: &DunderNewCallError<'db>| match error {
+            DunderNewCallError::PossiblyUnbound(call_error) => {
                 if let Some(builder) =
                     context.report_lint(&CALL_POSSIBLY_UNBOUND_METHOD, context_expression_node)
                 {
@@ -6336,22 +6377,24 @@ impl<'db> ConstructorCallError<'db> {
                     ));
                 }
 
-                bindings.report_diagnostics(context, context_expression_node);
+                if let Some(CallError(_kind, bindings)) = call_error {
+                    bindings.report_diagnostics(context, context_expression_node);
+                }
             }
-            CallDunderError::CallError(_, bindings) => {
+            DunderNewCallError::CallError(CallError(_kind, bindings)) => {
                 bindings.report_diagnostics(context, context_expression_node);
             }
         };
 
         match self {
-            Self::Init(_, call_dunder_error) => {
-                report_init_error(call_dunder_error);
+            Self::Init(_, init_call_dunder_error) => {
+                report_init_error(init_call_dunder_error);
             }
-            Self::New(_, call_dunder_error) => {
-                report_new_error(call_dunder_error);
+            Self::New(_, new_call_error) => {
+                report_new_error(new_call_error);
             }
-            Self::NewAndInit(_, new_call_dunder_error, init_call_dunder_error) => {
-                report_new_error(new_call_dunder_error);
+            Self::NewAndInit(_, new_call_error, init_call_dunder_error) => {
+                report_new_error(new_call_error);
                 report_init_error(init_call_dunder_error);
             }
         }
@@ -6491,6 +6534,13 @@ struct OverloadedFunction<'db> {
     overloads: Vec<FunctionType<'db>>,
     /// The implementation of this overloaded function, if any.
     implementation: Option<FunctionType<'db>>,
+}
+
+impl<'db> OverloadedFunction<'db> {
+    /// Returns an iterator over all overloads and the implementation, in that order.
+    fn all(&self) -> impl Iterator<Item = FunctionType<'db>> + '_ {
+        self.overloads.iter().copied().chain(self.implementation)
+    }
 }
 
 #[salsa::interned(debug)]

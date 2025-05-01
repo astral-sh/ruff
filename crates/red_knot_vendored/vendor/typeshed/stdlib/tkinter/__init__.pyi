@@ -977,6 +977,7 @@ class Tk(Misc, Wm):
         sync: bool = False,
         use: str | None = None,
     ) -> None: ...
+    # Keep this in sync with ttktheme.ThemedTk. See issue #13858
     @overload
     def configure(
         self,

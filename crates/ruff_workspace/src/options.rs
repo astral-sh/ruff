@@ -3118,7 +3118,7 @@ pub struct PydocstyleOptions {
         default = r#"false"#,
         value_type = "bool",
         example = r#"
-            ignore_var_parameters = true
+            ignore-var-parameters = true
         "#
     )]
     pub ignore_var_parameters: Option<bool>,

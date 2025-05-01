@@ -101,6 +101,42 @@ fn inheritance_cycle_initial<'db>(
     None
 }
 
+/// A category of classes with code generation capabilities (with synthesized methods).
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum CodeGeneratorKind {
+    /// Classes decorated with `@dataclass` or similar dataclass-like decorators
+    DataclassLike,
+    /// Classes inheriting from `typing.NamedTuple`
+    NamedTuple,
+}
+
+impl CodeGeneratorKind {
+    fn from_class(db: &dyn Db, class: ClassLiteral<'_>) -> Option<Self> {
+        if CodeGeneratorKind::DataclassLike.matches(db, class) {
+            Some(CodeGeneratorKind::DataclassLike)
+        } else if CodeGeneratorKind::NamedTuple.matches(db, class) {
+            Some(CodeGeneratorKind::NamedTuple)
+        } else {
+            None
+        }
+    }
+
+    fn matches<'db>(self, db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+        match self {
+            Self::DataclassLike => {
+                class.dataclass_params(db).is_some()
+                    || class
+                        .try_metaclass(db)
+                        .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
+            }
+            Self::NamedTuple => class.explicit_bases(db).iter().any(|base| {
+                base.into_class_literal()
+                    .is_some_and(|c| c.is_known(db, KnownClass::NamedTuple))
+            }),
+        }
+    }
+}
+
 /// A specialization of a generic class with a particular assignment of types to typevars.
 #[salsa::interned(debug)]
 pub struct GenericAlias<'db> {
@@ -195,6 +231,16 @@ impl<'db> ClassType<'db> {
         class_literal.is_final(db)
     }
 
+    /// Is this class a subclass of `Any` or `Unknown`?
+    pub(crate) fn is_subclass_of_any_or_unknown(self, db: &'db dyn Db) -> bool {
+        self.iter_mro(db).any(|base| {
+            matches!(
+                base,
+                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
+            )
+        })
+    }
+
     /// If `self` and `other` are generic aliases of the same generic class, returns their
     /// corresponding specializations.
     fn compatible_specializations(
@@ -274,13 +320,7 @@ impl<'db> ClassType<'db> {
             }
         }
 
-        if self.iter_mro(db).any(|base| {
-            matches!(
-                base,
-                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
-            )
-        }) && !other.is_final(db)
-        {
+        if self.is_subclass_of_any_or_unknown(db) && !other.is_final(db) {
             return true;
         }
 
@@ -732,9 +772,9 @@ impl<'db> ClassLiteral<'db> {
             let namespace = KnownClass::Dict.to_instance(db);
 
             // TODO: Other keyword arguments?
-            let arguments = CallArgumentTypes::positional([name, bases, namespace]);
+            let mut arguments = CallArgumentTypes::positional([name, bases, namespace]);
 
-            let return_ty_result = match metaclass.try_call(db, arguments) {
+            let return_ty_result = match metaclass.try_call(db, &mut arguments) {
                 Ok(bindings) => Ok(bindings.return_type(db)),
 
                 Err(CallError(CallErrorKind::NotCallable, bindings)) => Err(MetaclassError {
@@ -817,17 +857,14 @@ impl<'db> ClassLiteral<'db> {
             return Some(metaclass_call_function.into_callable_type(db));
         }
 
-        let new_function_symbol = self_ty
-            .member_lookup_with_policy(
-                db,
-                "__new__".into(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-            )
-            .symbol;
+        let dunder_new_method = self_ty
+            .find_name_in_mro(db, "__new__")
+            .expect("find_name_in_mro always succeeds for class literals")
+            .symbol
+            .try_call_dunder_get(db, self_ty);
 
-        if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-            return Some(new_function.into_bound_method_type(db, self.into()));
+        if let Symbol::Type(Type::FunctionLiteral(dunder_new_method), _) = dunder_new_method {
+            return Some(dunder_new_method.into_bound_method_type(db, self.into()));
         }
         // TODO handle `__init__` also
         None
@@ -905,12 +942,7 @@ impl<'db> ClassLiteral<'db> {
                         continue;
                     }
 
-                    // HACK: we should implement some more general logic here that supports arbitrary custom
-                    // metaclasses, not just `type` and `ABCMeta`.
-                    if matches!(
-                        class.known(db),
-                        Some(KnownClass::Type | KnownClass::ABCMeta)
-                    ) && policy.meta_class_no_type_fallback()
+                    if class.is_known(db, KnownClass::Type) && policy.meta_class_no_type_fallback()
                     {
                         continue;
                     }
@@ -994,26 +1026,91 @@ impl<'db> ClassLiteral<'db> {
         });
 
         if symbol.symbol.is_unbound() {
-            if let Some(dataclass_member) = self.own_dataclass_member(db, specialization, name) {
-                return Symbol::bound(dataclass_member).into();
+            if let Some(synthesized_member) = self.own_synthesized_member(db, specialization, name)
+            {
+                return Symbol::bound(synthesized_member).into();
             }
         }
 
         symbol
     }
 
-    /// Returns the type of a synthesized dataclass member like `__init__` or `__lt__`.
-    fn own_dataclass_member(
+    /// Returns the type of a synthesized dataclass member like `__init__` or `__lt__`, or
+    /// a synthesized `__new__` method for a `NamedTuple`.
+    fn own_synthesized_member(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Option<Type<'db>> {
-        let params = self.dataclass_params(db);
-        let has_dataclass_param = |param| params.is_some_and(|params| params.contains(param));
+        let dataclass_params = self.dataclass_params(db);
+        let has_dataclass_param =
+            |param| dataclass_params.is_some_and(|params| params.contains(param));
 
-        match name {
-            "__init__" => {
+        let field_policy = CodeGeneratorKind::from_class(db, self)?;
+
+        let signature_from_fields = |mut parameters: Vec<_>| {
+            for (name, (mut attr_ty, mut default_ty)) in
+                self.fields(db, specialization, field_policy)
+            {
+                // The descriptor handling below is guarded by this fully-static check, because dynamic
+                // types like `Any` are valid (data) descriptors: since they have all possible attributes,
+                // they also have a (callable) `__set__` method. The problem is that we can't determine
+                // the type of the value parameter this way. Instead, we want to use the dynamic type
+                // itself in this case, so we skip the special descriptor handling.
+                if attr_ty.is_fully_static(db) {
+                    let dunder_set = attr_ty.class_member(db, "__set__".into());
+                    if let Some(dunder_set) = dunder_set.symbol.ignore_possibly_unbound() {
+                        // This type of this attribute is a data descriptor. Instead of overwriting the
+                        // descriptor attribute, data-classes will (implicitly) call the `__set__` method
+                        // of the descriptor. This means that the synthesized `__init__` parameter for
+                        // this attribute is determined by possible `value` parameter types with which
+                        // the `__set__` method can be called. We build a union of all possible options
+                        // to account for possible overloads.
+                        let mut value_types = UnionBuilder::new(db);
+                        for signature in &dunder_set.signatures(db) {
+                            for overload in signature {
+                                if let Some(value_param) = overload.parameters().get_positional(2) {
+                                    value_types = value_types.add(
+                                        value_param.annotated_type().unwrap_or_else(Type::unknown),
+                                    );
+                                } else if overload.parameters().is_gradual() {
+                                    value_types = value_types.add(Type::unknown());
+                                }
+                            }
+                        }
+                        attr_ty = value_types.build();
+
+                        // The default value of the attribute is *not* determined by the right hand side
+                        // of the class-body assignment. Instead, the runtime invokes `__get__` on the
+                        // descriptor, as if it had been called on the class itself, i.e. it passes `None`
+                        // for the `instance` argument.
+
+                        if let Some(ref mut default_ty) = default_ty {
+                            *default_ty = default_ty
+                                .try_call_dunder_get(db, Type::none(db), Type::ClassLiteral(self))
+                                .map(|(return_ty, _)| return_ty)
+                                .unwrap_or_else(Type::unknown);
+                        }
+                    }
+                }
+
+                let mut parameter =
+                    Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
+
+                if let Some(default_ty) = default_ty {
+                    parameter = parameter.with_default_type(default_ty);
+                }
+
+                parameters.push(parameter);
+            }
+
+            let signature = Signature::new(Parameters::new(parameters), Some(Type::none(db)));
+            Some(Type::Callable(CallableType::single(db, signature)))
+        };
+
+        match (field_policy, name) {
+            (CodeGeneratorKind::DataclassLike, "__init__") => {
                 let has_synthesized_dunder_init = has_dataclass_param(DataclassParams::INIT)
                     || self
                         .try_metaclass(db)
@@ -1023,77 +1120,14 @@ impl<'db> ClassLiteral<'db> {
                     return None;
                 }
 
-                let mut parameters = vec![];
-
-                for (name, (mut attr_ty, mut default_ty)) in
-                    self.dataclass_fields(db, specialization)
-                {
-                    // The descriptor handling below is guarded by this fully-static check, because dynamic
-                    // types like `Any` are valid (data) descriptors: since they have all possible attributes,
-                    // they also have a (callable) `__set__` method. The problem is that we can't determine
-                    // the type of the value parameter this way. Instead, we want to use the dynamic type
-                    // itself in this case, so we skip the special descriptor handling.
-                    if attr_ty.is_fully_static(db) {
-                        let dunder_set = attr_ty.class_member(db, "__set__".into());
-                        if let Some(dunder_set) = dunder_set.symbol.ignore_possibly_unbound() {
-                            // This type of this attribute is a data descriptor. Instead of overwriting the
-                            // descriptor attribute, data-classes will (implicitly) call the `__set__` method
-                            // of the descriptor. This means that the synthesized `__init__` parameter for
-                            // this attribute is determined by possible `value` parameter types with which
-                            // the `__set__` method can be called. We build a union of all possible options
-                            // to account for possible overloads.
-                            let mut value_types = UnionBuilder::new(db);
-                            for signature in &dunder_set.signatures(db) {
-                                for overload in signature {
-                                    if let Some(value_param) =
-                                        overload.parameters().get_positional(2)
-                                    {
-                                        value_types = value_types.add(
-                                            value_param
-                                                .annotated_type()
-                                                .unwrap_or_else(Type::unknown),
-                                        );
-                                    } else if overload.parameters().is_gradual() {
-                                        value_types = value_types.add(Type::unknown());
-                                    }
-                                }
-                            }
-                            attr_ty = value_types.build();
-
-                            // The default value of the attribute is *not* determined by the right hand side
-                            // of the class-body assignment. Instead, the runtime invokes `__get__` on the
-                            // descriptor, as if it had been called on the class itself, i.e. it passes `None`
-                            // for the `instance` argument.
-
-                            if let Some(ref mut default_ty) = default_ty {
-                                *default_ty = default_ty
-                                    .try_call_dunder_get(
-                                        db,
-                                        Type::none(db),
-                                        Type::ClassLiteral(self),
-                                    )
-                                    .map(|(return_ty, _)| return_ty)
-                                    .unwrap_or_else(Type::unknown);
-                            }
-                        }
-                    }
-
-                    let mut parameter =
-                        Parameter::positional_or_keyword(name).with_annotated_type(attr_ty);
-
-                    if let Some(default_ty) = default_ty {
-                        parameter = parameter.with_default_type(default_ty);
-                    }
-
-                    parameters.push(parameter);
-                }
-
-                let init_signature =
-                    Signature::new(Parameters::new(parameters), Some(Type::none(db)));
-
-                Some(Type::Callable(CallableType::single(db, init_signature)))
+                signature_from_fields(vec![])
             }
-            "__lt__" | "__le__" | "__gt__" | "__ge__" => {
+            (CodeGeneratorKind::NamedTuple, "__new__") => {
+                let cls_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
+                    .with_annotated_type(KnownClass::Type.to_instance(db));
+                signature_from_fields(vec![cls_parameter])
+            }
+            (CodeGeneratorKind::DataclassLike, "__lt__" | "__le__" | "__gt__" | "__ge__") => {
                 if !has_dataclass_param(DataclassParams::ORDER) {
                     return None;
                 }
@@ -1114,27 +1148,27 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    fn is_dataclass(self, db: &'db dyn Db) -> bool {
-        self.dataclass_params(db).is_some()
-            || self
-                .try_metaclass(db)
-                .is_ok_and(|(_, transformer_params)| transformer_params.is_some())
-    }
-
     /// Returns a list of all annotated attributes defined in this class, or any of its superclasses.
     ///
-    /// See [`ClassLiteral::own_dataclass_fields`] for more details.
-    fn dataclass_fields(
+    /// See [`ClassLiteral::own_fields`] for more details.
+    fn fields(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
+        field_policy: CodeGeneratorKind,
     ) -> FxOrderMap<Name, (Type<'db>, Option<Type<'db>>)> {
-        let dataclasses_in_mro: Vec<_> = self
+        if field_policy == CodeGeneratorKind::NamedTuple {
+            // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
+            // fields of this class only.
+            return self.own_fields(db);
+        }
+
+        let matching_classes_in_mro: Vec<_> = self
             .iter_mro(db, specialization)
             .filter_map(|superclass| {
                 if let Some(class) = superclass.into_class() {
                     let class_literal = class.class_literal(db).0;
-                    if class_literal.is_dataclass(db) {
+                    if field_policy.matches(db, class_literal) {
                         Some(class_literal)
                     } else {
                         None
@@ -1146,10 +1180,10 @@ impl<'db> ClassLiteral<'db> {
             // We need to collect into a `Vec` here because we iterate the MRO in reverse order
             .collect();
 
-        dataclasses_in_mro
+        matching_classes_in_mro
             .into_iter()
             .rev()
-            .flat_map(|class| class.own_dataclass_fields(db))
+            .flat_map(|class| class.own_fields(db))
             // We collect into a FxOrderMap here to deduplicate attributes
             .collect()
     }
@@ -1165,10 +1199,7 @@ impl<'db> ClassLiteral<'db> {
     ///     y: str = "a"
     /// ```
     /// we return a map `{"x": (int, None), "y": (str, Some(Literal["a"]))}`.
-    fn own_dataclass_fields(
-        self,
-        db: &'db dyn Db,
-    ) -> FxOrderMap<Name, (Type<'db>, Option<Type<'db>>)> {
+    fn own_fields(self, db: &'db dyn Db) -> FxOrderMap<Name, (Type<'db>, Option<Type<'db>>)> {
         let mut attributes = FxOrderMap::default();
 
         let class_body_scope = self.body_scope(db);
@@ -1933,6 +1964,7 @@ pub enum KnownClass {
     TypeVarTuple,
     TypeAliasType,
     NoDefaultType,
+    NamedTuple,
     NewType,
     SupportsIndex,
     // Collections
@@ -2019,6 +2051,8 @@ impl<'db> KnownClass {
             | Self::Float
             | Self::Enum
             | Self::ABCMeta
+            // Empty tuples are AlwaysFalse; non-empty tuples are AlwaysTrue
+            | Self::NamedTuple
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -2079,6 +2113,7 @@ impl<'db> KnownClass {
             | Self::TypeVarTuple
             | Self::TypeAliasType
             | Self::NoDefaultType
+            | Self::NamedTuple
             | Self::NewType
             | Self::ChainMap
             | Self::Counter
@@ -2126,6 +2161,7 @@ impl<'db> KnownClass {
             Self::UnionType => "UnionType",
             Self::MethodWrapperType => "MethodWrapperType",
             Self::WrapperDescriptorType => "WrapperDescriptorType",
+            Self::NamedTuple => "NamedTuple",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
             Self::TypeVar => "TypeVar",
@@ -2313,6 +2349,7 @@ impl<'db> KnownClass {
             Self::Any
             | Self::SpecialForm
             | Self::TypeVar
+            | Self::NamedTuple
             | Self::StdlibAlias
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
@@ -2405,6 +2442,7 @@ impl<'db> KnownClass {
             | Self::Enum
             | Self::ABCMeta
             | Self::Super
+            | Self::NamedTuple
             | Self::NewType => false,
         }
     }
@@ -2465,6 +2503,7 @@ impl<'db> KnownClass {
             | Self::ABCMeta
             | Self::Super
             | Self::UnionType
+            | Self::NamedTuple
             | Self::NewType => false,
         }
     }
@@ -2506,6 +2545,7 @@ impl<'db> KnownClass {
             "UnionType" => Self::UnionType,
             "MethodWrapperType" => Self::MethodWrapperType,
             "WrapperDescriptorType" => Self::WrapperDescriptorType,
+            "NamedTuple" => Self::NamedTuple,
             "NewType" => Self::NewType,
             "TypeAliasType" => Self::TypeAliasType,
             "TypeVar" => Self::TypeVar,
@@ -2594,6 +2634,7 @@ impl<'db> KnownClass {
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
+            | Self::NamedTuple
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
         }
     }
