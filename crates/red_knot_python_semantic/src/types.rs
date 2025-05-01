@@ -1353,7 +1353,7 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
-            
+
             // Subclasses of Any are assignable to non-final, non-literal types,
             // as Any can materialize to any such type, but not to final or literal types.
             (Type::Instance(instance), target)
