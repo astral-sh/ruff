@@ -1354,25 +1354,6 @@ impl<'db> Type<'db> {
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
 
-            // Subclasses of Any are assignable to non-final, non-literal types,
-            // as Any can materialize to any such type, but not to final or literal types.
-            (Type::Instance(instance), target)
-                if instance.class().is_subclass_of_any_or_unknown(db) =>
-            {
-                match target {
-                    Type::IntLiteral(_)
-                    | Type::BooleanLiteral(_)
-                    | Type::StringLiteral(_)
-                    | Type::BytesLiteral(_)
-                    | Type::LiteralString
-                    | Type::SliceLiteral(_) => false,
-                    Type::Instance(target_instance) if target_instance.class().is_final(db) => {
-                        false
-                    }
-                    _ => true,
-                }
-            }
-
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be assignable to all of the constraints.
@@ -1494,6 +1475,12 @@ impl<'db> Type<'db> {
 
             (Type::Callable(self_callable), Type::Callable(target_callable)) => {
                 self_callable.is_assignable_to(db, target_callable)
+            }
+
+            (Type::NominalInstance(instance), Type::Callable(_))
+                if instance.class().is_subclass_of_any_or_unknown(db) =>
+            {
+                true
             }
 
             (Type::NominalInstance(_) | Type::ProtocolInstance(_), Type::Callable(_)) => {

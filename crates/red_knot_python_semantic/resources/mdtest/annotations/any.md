@@ -46,30 +46,27 @@ def f():
 y: Any = "not an Any"  # error: [invalid-assignment]
 ```
 
-## Subclass
+## Subclasses of `Any`
 
 The spec allows you to define subclasses of `Any`.
 
-`Subclass` has an unknown superclass, which might be `int`. The assignment to `x` should not be
+`SubclassOfAny` has an unknown superclass, which might be `int`. The assignment to `x` should not be
 allowed, even when the unknown superclass is `int`. The assignment to `y` should be allowed, since
 `Subclass` might have `int` as a superclass, and is therefore assignable to `int`.
 
 ```py
 from typing import Any
 
-class Subclass(Any): ...
+class SubclassOfAny(Any): ...
 
-reveal_type(Subclass.__mro__)  # revealed: tuple[Literal[Subclass], Any, Literal[object]]
+reveal_type(SubclassOfAny.__mro__)  # revealed: tuple[Literal[SubclassOfAny], Any, Literal[object]]
 
-x: Subclass = 1  # error: [invalid-assignment]
-y: int = Subclass()
-
-def _(s: Subclass):
-    reveal_type(s)  # revealed: Subclass
+x: SubclassOfAny = 1  # error: [invalid-assignment]
+y: int = SubclassOfAny()
 ```
 
-`Subclass` should not be assignable to a final class though, because `Subclass` could not possibly
-be a subclass of `FinalClass`:
+`SubclassOfAny` should not be assignable to a final class though, because `SubclassOfAny` could not
+possibly be a subclass of `FinalClass`:
 
 ```py
 from typing import final
@@ -77,33 +74,31 @@ from typing import final
 @final
 class FinalClass: ...
 
-f: FinalClass = Subclass()  # error: [invalid-assignment]
+f: FinalClass = SubclassOfAny()  # error: [invalid-assignment]
+
+@final
+class OtherFinalClass: ...
+
+f: FinalClass | OtherFinalClass = SubclassOfAny()  # error: [invalid-assignment]
 ```
 
-A use case where this comes up is with mocking libraries, where the mock object should be assignable
-to any type:
-
-```py
-from unittest.mock import MagicMock
-
-x: int = MagicMock()
-```
-
-A subclass of `Any` can be assigned to a `Callable` and called.
+A subclass of `Any` can also be assigned to arbitrary `Callable` types:
 
 ```py
 from typing import Callable, Any
 
-class MockCallable(Any):
-    pass
-
-def takes_callable(f: Callable):
+def takes_callable1(f: Callable):
     f()
 
-takes_callable(MockCallable())
+takes_callable1(SubclassOfAny())
+
+def takes_callable2(f: Callable[[int], None]):
+    f(1)
+
+takes_callable2(SubclassOfAny())
 ```
 
-But `Any` cannot be assigned to `Final` or `Literal`
+A subclass of `Any` cannot be assigned to literal types, since those can not be subclassed:
 
 ```py
 from typing import Any, Literal
@@ -114,21 +109,14 @@ class MockAny(Any):
 x: Literal[1] = MockAny()  # error: [invalid-assignment]
 ```
 
+A use case where subclasses of `Any` come up is in mocking libraries, where the mock object should
+be assignable to (almost) any type:
 
 ```py
-from typing import final, Any
+from unittest.mock import MagicMock
 
-@final
-class FinalA: ...
-
-@final
-class FinalB: ...
-
-class MockAny(Any): ...
-
-value: FinalA  | FinalB  = MockAny()  # error: [invalid-assignment]
+x: int = MagicMock()
 ```
-
 
 ## Invalid
 

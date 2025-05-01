@@ -284,13 +284,7 @@ impl<'db> ClassType<'db> {
             }
         }
 
-        if self.iter_mro(db).any(|base| {
-            matches!(
-                base,
-                ClassBase::Dynamic(DynamicType::Any | DynamicType::Unknown)
-            )
-        }) && !other.is_final(db)
-        {
+        if self.is_subclass_of_any_or_unknown(db) && !other.is_final(db) {
             return true;
         }
 
