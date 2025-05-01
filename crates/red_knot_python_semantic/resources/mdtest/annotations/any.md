@@ -141,4 +141,3 @@ from typing import Any
 def f(x: Any[int]):
     reveal_type(x)  # revealed: Unknown
 ```
-
