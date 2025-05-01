@@ -119,7 +119,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let mut builder = Self {
             db,
             file,
-            source_type: file.source_type(db),
+            source_type: file.source_type(db.upcast()),
             module: parsed,
             scope_stack: Vec::new(),
             current_assignments: vec![],
