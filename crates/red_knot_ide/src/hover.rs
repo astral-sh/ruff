@@ -444,7 +444,129 @@ mod tests {
     }
 
     #[test]
-    fn hover_class_member_declaration() {
+    fn hover_variable_assignment() {
+        let test = cursor_test(
+            r#"
+            value<CURSOR> = 1
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        Literal[1]
+        ---------------------------------------------
+        ```text
+        Literal[1]
+        ```
+        ---------------------------------------------
+        info: lint:hover: Hovered content is
+         --> main.py:2:13
+          |
+        2 |             value = 1
+          |             ^^^^^- Cursor offset
+          |             |
+          |             source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_augmented_assignment() {
+        let test = cursor_test(
+            r#"
+            value = 1
+            value<CURSOR> += 2
+            "#,
+        );
+
+        // We currently show the *previous* value of the variable (1), not the new one (3).
+        // Showing the new value might be more intuitive for some users, but the actual 'use'
+        // of the `value` symbol here in read-context is `1`. This comment mainly exists to
+        // signal that it might be okay to revisit this in the future and reveal 3 instead.
+        assert_snapshot!(test.hover(), @r"
+        Literal[1]
+        ---------------------------------------------
+        ```text
+        Literal[1]
+        ```
+        ---------------------------------------------
+        info: lint:hover: Hovered content is
+         --> main.py:3:13
+          |
+        2 |             value = 1
+        3 |             value += 2
+          |             ^^^^^- Cursor offset
+          |             |
+          |             source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_attribute_assignment() {
+        let test = cursor_test(
+            r#"
+            class C:
+                attr: int = 1
+
+            C.attr<CURSOR> = 2
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        Literal[2]
+        ---------------------------------------------
+        ```text
+        Literal[2]
+        ```
+        ---------------------------------------------
+        info: lint:hover: Hovered content is
+         --> main.py:5:13
+          |
+        3 |                 attr: int = 1
+        4 |
+        5 |             C.attr = 2
+          |             ^^^^^^- Cursor offset
+          |             |
+          |             source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_augmented_attribute_assignment() {
+        let test = cursor_test(
+            r#"
+            class C:
+                attr = 1
+
+            C.attr<CURSOR> += 2
+            "#,
+        );
+
+        // See the comment in the `hover_augmented_assignment` test above. The same
+        // reasoning applies here.
+        assert_snapshot!(test.hover(), @r"
+        Unknown | Literal[1]
+        ---------------------------------------------
+        ```text
+        Unknown | Literal[1]
+        ```
+        ---------------------------------------------
+        info: lint:hover: Hovered content is
+         --> main.py:5:13
+          |
+        3 |                 attr = 1
+        4 |
+        5 |             C.attr += 2
+          |             ^^^^^^- Cursor offset
+          |             |
+          |             source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_annotated_assignment() {
         let test = cursor_test(
             r#"
         class Foo:
@@ -452,12 +574,11 @@ mod tests {
         "#,
         );
 
-        // TODO: This should be int and not `Never`, https://github.com/astral-sh/ruff/issues/17122
         assert_snapshot!(test.hover(), @r"
-        Never
+        int
         ---------------------------------------------
         ```text
-        Never
+        int
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
@@ -468,6 +589,64 @@ mod tests {
           |             ^- Cursor offset
           |             |
           |             source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_annotated_assignment_with_rhs() {
+        let test = cursor_test(
+            r#"
+        class Foo:
+            a<CURSOR>: int = 1
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        Literal[1]
+        ---------------------------------------------
+        ```text
+        Literal[1]
+        ```
+        ---------------------------------------------
+        info: lint:hover: Hovered content is
+         --> main.py:3:13
+          |
+        2 |         class Foo:
+        3 |             a: int = 1
+          |             ^- Cursor offset
+          |             |
+          |             source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_annotated_attribute_assignment() {
+        let test = cursor_test(
+            r#"
+        class Foo:
+            def __init__(self, a: int):
+                self.a<CURSOR>: int = a
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int
+        ---------------------------------------------
+        ```text
+        int
+        ```
+        ---------------------------------------------
+        info: lint:hover: Hovered content is
+         --> main.py:4:17
+          |
+        2 |         class Foo:
+        3 |             def __init__(self, a: int):
+        4 |                 self.a: int = a
+          |                 ^^^^^^- Cursor offset
+          |                 |
+          |                 source
           |
         ");
     }

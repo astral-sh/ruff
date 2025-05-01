@@ -3143,7 +3143,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ..
                 },
             ) => {
-                self.store_expression_type(target, Type::Never);
+                self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
 
                 let object_ty = self.infer_expression(object);
 
@@ -3228,9 +3228,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 target,
                 simple: _,
             } = assignment;
-            self.infer_annotation_expression(annotation, DeferredExpressionState::None);
+            let annotated =
+                self.infer_annotation_expression(annotation, DeferredExpressionState::None);
             self.infer_optional_expression(value.as_deref());
+
+            // If we have an annotated assignment like `self.attr: int = 1`, we still need to
+            // do type inference on the `self.attr` target to get types for all sub-expressions.
             self.infer_expression(target);
+
+            // But here we explicitly overwrite the type for the overall `self.attr` node with
+            // the annotated type. We do no use `store_expression_type` here, because it checks
+            // that no type has been stored for the expression before.
+            let expr_id = target.scoped_expression_id(self.db(), self.scope());
+            self.types
+                .expressions
+                .insert(expr_id, annotated.inner_type());
         }
     }
 
@@ -3295,6 +3307,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
+        // Annotated assignments to non-names are not definitions, so we can only be here
+        // if the target is a name. In this case, we can simply store types in `target`
+        // below, instead of calling `infer_expression` (which would return `Never`).
+        debug_assert!(target.is_name_expr());
+
         if let Some(value) = value {
             let inferred_ty = self.infer_expression(value);
             let inferred_ty = if target
@@ -3315,6 +3332,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     inferred_ty,
                 },
             );
+
+            self.store_expression_type(target, inferred_ty);
         } else {
             if self.in_stub() {
                 self.add_declaration_with_binding(
@@ -3325,9 +3344,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             } else {
                 self.add_declaration(target.into(), definition, declared_ty);
             }
-        }
 
-        self.infer_expression(target);
+            self.store_expression_type(target, declared_ty.inner_type());
+        }
     }
 
     fn infer_augmented_assignment_statement(&mut self, assignment: &ast::StmtAugAssign) {
@@ -3416,12 +3435,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         // Resolve the target type, assuming a load context.
         let target_type = match &**target {
             ast::Expr::Name(name) => {
-                self.store_expression_type(target, Type::Never);
-                self.infer_name_load(name)
+                let previous_value = self.infer_name_load(name);
+                self.store_expression_type(target, previous_value);
+                previous_value
             }
             ast::Expr::Attribute(attr) => {
-                self.store_expression_type(target, Type::Never);
-                self.infer_attribute_load(attr)
+                let previous_value = self.infer_attribute_load(attr);
+                self.store_expression_type(target, previous_value);
+                previous_value
             }
             _ => self.infer_expression(target),
         };
