@@ -523,12 +523,6 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Return the [`PythonVersion`] to use for version-related checks or [`PythonVersion::latest`]
-    /// if unset.
-    pub(crate) fn target_version_or_latest(&self) -> PythonVersion {
-        self.target_version.unwrap_or_else(PythonVersion::latest)
-    }
-
     /// Return the [`PythonVersion`] to use for version-related checks or [`PythonVersion::default`]
     /// if unset.
     pub(crate) fn target_version_or_default(&self) -> PythonVersion {
@@ -590,7 +584,7 @@ impl TypingImporter<'_, '_> {
 
 impl SemanticSyntaxContext for Checker<'_> {
     fn python_version(&self) -> PythonVersion {
-        self.target_version_or_default()
+        self.target_version.unwrap_or_else(PythonVersion::latest)
     }
 
     fn global(&self, name: &str) -> Option<TextRange> {
