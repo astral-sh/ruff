@@ -177,6 +177,9 @@ pub struct AnalyzeGraphCommand {
     /// The minimum Python version that should be supported.
     #[arg(long, value_enum)]
     target_version: Option<PythonVersion>,
+    /// Path to a virtual environment to use for resolving additional dependencies
+    #[arg(long)]
+    python: Option<PathBuf>,
 }
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
@@ -796,6 +799,7 @@ impl AnalyzeGraphCommand {
         let format_arguments = AnalyzeGraphArgs {
             files: self.files,
             direction: self.direction,
+            python: self.python,
         };
 
         let cli_overrides = ExplicitConfigOverrides {
@@ -1261,6 +1265,7 @@ impl LineColumnParseError {
 pub struct AnalyzeGraphArgs {
     pub files: Vec<PathBuf>,
     pub direction: Direction,
+    pub python: Option<PathBuf>,
 }
 
 /// Configuration overrides provided via dedicated CLI flags:
