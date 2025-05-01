@@ -17,9 +17,9 @@ use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use crate::error::{FStringErrorType, LexicalError, LexicalErrorType};
+use crate::error::{FStringErrorType, LexicalError, LexicalErrorType, TStringErrorType};
 use crate::lexer::cursor::{Cursor, EOF_CHAR};
-use crate::lexer::fstring::{FStringContext, FStrings, FStringsCheckpoint};
+use crate::lexer::fstring::{FTStringContext, FTStringKind, FTStrings, FTStringsCheckpoint};
 use crate::lexer::indentation::{Indentation, Indentations, IndentationsCheckpoint};
 use crate::token::{TokenFlags, TokenKind, TokenValue};
 use crate::Mode;
@@ -65,8 +65,8 @@ pub struct Lexer<'src> {
     /// Lexer mode.
     mode: Mode,
 
-    /// F-string contexts.
-    fstrings: FStrings,
+    /// F-string and t-string contexts.
+    ftstrings: FTStrings,
 
     /// Errors encountered while lexing.
     errors: Vec<LexicalError>,
@@ -102,7 +102,7 @@ impl<'src> Lexer<'src> {
             indentations: Indentations::default(),
             pending_indentation: None,
             mode,
-            fstrings: FStrings::default(),
+            ftstrings: FTStrings::default(),
             errors: Vec::new(),
         };
 
@@ -162,13 +162,25 @@ impl<'src> Lexer<'src> {
     }
 
     fn lex_token(&mut self) -> TokenKind {
-        if let Some(fstring) = self.fstrings.current() {
-            if !fstring.is_in_expression(self.nesting) {
-                if let Some(token) = self.lex_fstring_middle_or_end() {
-                    if matches!(token, TokenKind::FStringEnd) {
-                        self.fstrings.pop();
+        if let Some(ftstring) = self.ftstrings.current() {
+            if !ftstring.is_in_expression(self.nesting) {
+                match ftstring.kind() {
+                    FTStringKind::FString => {
+                        if let Some(token) = self.lex_fstring_middle_or_end() {
+                            if matches!(token, TokenKind::FStringEnd) {
+                                self.ftstrings.pop();
+                            }
+                            return token;
+                        }
                     }
-                    return token;
+                    FTStringKind::TString => {
+                        if let Some(token) = self.lex_tstring_middle_or_end() {
+                            if matches!(token, TokenKind::TStringEnd) {
+                                self.ftstrings.pop();
+                            }
+                            return token;
+                        }
+                    }
                 }
             }
         }
@@ -510,23 +522,23 @@ impl<'src> Lexer<'src> {
                 TokenKind::Lbrace
             }
             '}' => {
-                if let Some(fstring) = self.fstrings.current_mut() {
-                    if fstring.nesting() == self.nesting {
+                if let Some(ftstring) = self.ftstrings.current_mut() {
+                    if ftstring.nesting() == self.nesting {
                         return self.push_error(LexicalError::new(
                             LexicalErrorType::FStringError(FStringErrorType::SingleRbrace),
                             self.token_range(),
                         ));
                     }
-                    fstring.try_end_format_spec(self.nesting);
+                    ftstring.try_end_format_spec(self.nesting);
                 }
                 self.nesting = self.nesting.saturating_sub(1);
                 TokenKind::Rbrace
             }
             ':' => {
                 if self
-                    .fstrings
+                    .ftstrings
                     .current_mut()
-                    .is_some_and(|fstring| fstring.try_start_format_spec(self.nesting))
+                    .is_some_and(|ftstring| ftstring.try_start_format_spec(self.nesting))
                 {
                     TokenKind::Colon
                 } else if self.cursor.eat_char('=') {
@@ -577,7 +589,7 @@ impl<'src> Lexer<'src> {
                     self.state = State::AfterNewline;
                     TokenKind::Newline
                 } else {
-                    if let Some(fstring) = self.fstrings.current_mut() {
+                    if let Some(fstring) = self.ftstrings.current_mut() {
                         fstring.try_end_format_spec(self.nesting);
                     }
                     TokenKind::NonLogicalNewline
@@ -590,7 +602,7 @@ impl<'src> Lexer<'src> {
                     self.state = State::AfterNewline;
                     TokenKind::Newline
                 } else {
-                    if let Some(fstring) = self.fstrings.current_mut() {
+                    if let Some(fstring) = self.ftstrings.current_mut() {
                         fstring.try_end_format_spec(self.nesting);
                     }
                     TokenKind::NonLogicalNewline
@@ -633,6 +645,10 @@ impl<'src> Lexer<'src> {
         if let Some(quote) = quote {
             if self.current_flags.is_f_string() {
                 return self.lex_fstring_start(quote);
+            }
+
+            if self.current_flags.is_t_string() {
+                return self.lex_tstring_start(quote);
             }
 
             return self.lex_string(quote);
@@ -715,6 +731,7 @@ impl<'src> Lexer<'src> {
     fn try_single_char_prefix(&mut self, first: char) -> bool {
         match first {
             'f' | 'F' => self.current_flags |= TokenFlags::F_STRING,
+            't' | 'T' => self.current_flags |= TokenFlags::T_STRING,
             'u' | 'U' => self.current_flags |= TokenFlags::UNICODE_STRING,
             'b' | 'B' => self.current_flags |= TokenFlags::BYTE_STRING,
             'r' => self.current_flags |= TokenFlags::RAW_STRING_LOWERCASE,
@@ -733,6 +750,12 @@ impl<'src> Lexer<'src> {
             }
             ['R', 'f' | 'F'] | ['f' | 'F', 'R'] => {
                 self.current_flags |= TokenFlags::F_STRING | TokenFlags::RAW_STRING_UPPERCASE;
+            }
+            ['r', 't' | 'T'] | ['t' | 'T', 'r'] => {
+                self.current_flags |= TokenFlags::T_STRING | TokenFlags::RAW_STRING_LOWERCASE;
+            }
+            ['R', 't' | 'T'] | ['t' | 'T', 'R'] => {
+                self.current_flags |= TokenFlags::T_STRING | TokenFlags::RAW_STRING_UPPERCASE;
             }
             ['r', 'b' | 'B'] | ['b' | 'B', 'r'] => {
                 self.current_flags |= TokenFlags::BYTE_STRING | TokenFlags::RAW_STRING_LOWERCASE;
@@ -758,8 +781,11 @@ impl<'src> Lexer<'src> {
             self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
         }
 
-        self.fstrings
-            .push(FStringContext::new(self.current_flags, self.nesting));
+        self.ftstrings.push(FTStringContext::new(
+            FTStringKind::FString,
+            self.current_flags,
+            self.nesting,
+        ));
 
         TokenKind::FStringStart
     }
@@ -767,7 +793,7 @@ impl<'src> Lexer<'src> {
     /// Lex a f-string middle or end token.
     fn lex_fstring_middle_or_end(&mut self) -> Option<TokenKind> {
         // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
-        let fstring = self.fstrings.current().unwrap();
+        let fstring = self.ftstrings.current().unwrap();
 
         // Check if we're at the end of the f-string.
         if fstring.is_triple_quoted() {
@@ -805,7 +831,7 @@ impl<'src> Lexer<'src> {
                     } else {
                         FStringErrorType::UnterminatedString
                     };
-                    self.fstrings.pop();
+                    self.ftstrings.pop();
                     return Some(self.push_error(LexicalError::new(
                         LexicalErrorType::FStringError(error),
                         self.token_range(),
@@ -819,7 +845,7 @@ impl<'src> Lexer<'src> {
                     if in_format_spec {
                         break;
                     }
-                    self.fstrings.pop();
+                    self.ftstrings.pop();
                     return Some(self.push_error(LexicalError::new(
                         LexicalErrorType::FStringError(FStringErrorType::UnterminatedString),
                         self.token_range(),
@@ -900,6 +926,168 @@ impl<'src> Lexer<'src> {
 
         self.current_flags = fstring.flags();
         Some(TokenKind::FStringMiddle)
+    }
+
+    /// Lex a t-string start token.
+    fn lex_tstring_start(&mut self, quote: char) -> TokenKind {
+        #[cfg(debug_assertions)]
+        debug_assert_eq!(self.cursor.previous(), quote);
+
+        if quote == '"' {
+            self.current_flags |= TokenFlags::DOUBLE_QUOTES;
+        }
+
+        if self.cursor.eat_char2(quote, quote) {
+            self.current_flags |= TokenFlags::TRIPLE_QUOTED_STRING;
+        }
+
+        self.ftstrings.push(FTStringContext::new(
+            FTStringKind::TString,
+            self.current_flags,
+            self.nesting,
+        ));
+
+        TokenKind::TStringStart
+    }
+
+    /// Lex a t-string middle or end token.
+    fn lex_tstring_middle_or_end(&mut self) -> Option<TokenKind> {
+        // SAFETY: Safe because the function is only called when `self.fstrings` is not empty.
+        let tstring = self.ftstrings.current().unwrap();
+
+        assert!(matches!(tstring.kind(), FTStringKind::TString));
+
+        // Check if we're at the end of the f-string.
+        if tstring.is_triple_quoted() {
+            let quote_char = tstring.quote_char();
+            if self.cursor.eat_char3(quote_char, quote_char, quote_char) {
+                self.current_flags = tstring.flags();
+                return Some(TokenKind::TStringEnd);
+            }
+        } else if self.cursor.eat_char(tstring.quote_char()) {
+            self.current_flags = tstring.flags();
+            return Some(TokenKind::TStringEnd);
+        }
+
+        // We have to decode `{{` and `}}` into `{` and `}` respectively. As an
+        // optimization, we only allocate a new string we find any escaped curly braces,
+        // otherwise this string will remain empty and we'll use a source slice instead.
+        let mut normalized = String::new();
+
+        // Tracks the last offset of token value that has been written to `normalized`.
+        let mut last_offset = self.offset();
+
+        // This isn't going to change for the duration of the loop.
+        let in_format_spec = tstring.is_in_format_spec(self.nesting);
+
+        let mut in_named_unicode = false;
+
+        loop {
+            match self.cursor.first() {
+                // The condition is to differentiate between the `NUL` (`\0`) character
+                // in the source code and the one returned by `self.cursor.first()` when
+                // we reach the end of the source code.
+                EOF_CHAR if self.cursor.is_eof() => {
+                    let error = if tstring.is_triple_quoted() {
+                        TStringErrorType::UnterminatedTripleQuotedString
+                    } else {
+                        TStringErrorType::UnterminatedString
+                    };
+                    self.ftstrings.pop();
+                    return Some(self.push_error(LexicalError::new(
+                        LexicalErrorType::TStringError(error),
+                        self.token_range(),
+                    )));
+                }
+                '\n' | '\r' if !tstring.is_triple_quoted() => {
+                    // If we encounter a newline while we're in a format spec, then
+                    // we stop here and let the lexer emit the newline token.
+                    //
+                    // Relevant discussion: https://github.com/python/cpython/issues/110259
+                    if in_format_spec {
+                        break;
+                    }
+                    self.ftstrings.pop();
+                    return Some(self.push_error(LexicalError::new(
+                        LexicalErrorType::TStringError(TStringErrorType::UnterminatedString),
+                        self.token_range(),
+                    )));
+                }
+                '\\' => {
+                    self.cursor.bump(); // '\'
+                    if matches!(self.cursor.first(), '{' | '}') {
+                        // Don't consume `{` or `}` as we want them to be emitted as tokens.
+                        // They will be handled in the next iteration.
+                        continue;
+                    } else if !tstring.is_raw_string() {
+                        if self.cursor.eat_char2('N', '{') {
+                            in_named_unicode = true;
+                            continue;
+                        }
+                    }
+                    // Consume the escaped character.
+                    if self.cursor.eat_char('\r') {
+                        self.cursor.eat_char('\n');
+                    } else {
+                        self.cursor.bump();
+                    }
+                }
+                quote @ ('\'' | '"') if quote == tstring.quote_char() => {
+                    if let Some(triple_quotes) = tstring.triple_quotes() {
+                        if self.cursor.rest().starts_with(triple_quotes) {
+                            break;
+                        }
+                        self.cursor.bump();
+                    } else {
+                        break;
+                    }
+                }
+                '{' => {
+                    if self.cursor.second() == '{' && !in_format_spec {
+                        self.cursor.bump();
+                        normalized
+                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
+                        self.cursor.bump(); // Skip the second `{`
+                        last_offset = self.offset();
+                    } else {
+                        break;
+                    }
+                }
+                '}' => {
+                    if in_named_unicode {
+                        in_named_unicode = false;
+                        self.cursor.bump();
+                    } else if self.cursor.second() == '}' && !in_format_spec {
+                        self.cursor.bump();
+                        normalized
+                            .push_str(&self.source[TextRange::new(last_offset, self.offset())]);
+                        self.cursor.bump(); // Skip the second `}`
+                        last_offset = self.offset();
+                    } else {
+                        break;
+                    }
+                }
+                _ => {
+                    self.cursor.bump();
+                }
+            }
+        }
+        let range = self.token_range();
+        if range.is_empty() {
+            return None;
+        }
+
+        let value = if normalized.is_empty() {
+            self.source[range].to_string()
+        } else {
+            normalized.push_str(&self.source[TextRange::new(last_offset, self.offset())]);
+            normalized
+        };
+
+        self.current_value = TokenValue::TStringMiddle(value.into_boxed_str());
+
+        self.current_flags = tstring.flags();
+        Some(TokenKind::TStringMiddle)
     }
 
     /// Lex a string literal.
@@ -1482,7 +1670,7 @@ impl<'src> Lexer<'src> {
             nesting: self.nesting,
             indentations_checkpoint: self.indentations.checkpoint(),
             pending_indentation: self.pending_indentation,
-            fstrings_checkpoint: self.fstrings.checkpoint(),
+            fstrings_checkpoint: self.ftstrings.checkpoint(),
             errors_position: self.errors.len(),
         }
     }
@@ -1516,7 +1704,7 @@ impl<'src> Lexer<'src> {
         self.nesting = nesting;
         self.indentations.rewind(indentations_checkpoint);
         self.pending_indentation = pending_indentation;
-        self.fstrings.rewind(fstrings_checkpoint);
+        self.ftstrings.rewind(fstrings_checkpoint);
         self.errors.truncate(errors_position);
     }
 
@@ -1535,7 +1723,7 @@ pub(crate) struct LexerCheckpoint {
     nesting: u32,
     indentations_checkpoint: IndentationsCheckpoint,
     pending_indentation: Option<Indentation>,
-    fstrings_checkpoint: FStringsCheckpoint,
+    fstrings_checkpoint: FTStringsCheckpoint,
     errors_position: usize,
 }
 
