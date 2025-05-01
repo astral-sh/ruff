@@ -65,54 +65,54 @@ macro_rules! ruff_file {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum NewDiagnostic {
-    Message(DiagnosticMessage),
+pub enum Message {
+    Diagnostic(DiagnosticMessage),
     SyntaxError(db::Diagnostic),
 }
 
-impl NewDiagnostic {
+impl Message {
     pub fn is_syntax_error(&self) -> bool {
         match self {
-            NewDiagnostic::Message(_) => false,
-            NewDiagnostic::SyntaxError(diag) => diag.id().is_invalid_syntax(),
+            Message::Diagnostic(_) => false,
+            Message::SyntaxError(diag) => diag.id().is_invalid_syntax(),
         }
     }
 
     pub fn rule(&self) -> Option<Rule> {
         match self {
-            NewDiagnostic::Message(message) => Some(message.kind.rule()),
+            Message::Diagnostic(message) => Some(message.kind.rule()),
             // TODO(brent) syntax errors don't have Rules, but we'll need these for lint rules,
             // obviously. I think we can just map the rule code back from the name like the Message
             // version does under the hood
-            NewDiagnostic::SyntaxError(_) => None,
+            Message::SyntaxError(_) => None,
         }
     }
 
     pub const fn is_diagnostic_message(&self) -> bool {
         match self {
-            NewDiagnostic::Message(_) => true,
-            NewDiagnostic::SyntaxError(_) => false,
+            Message::Diagnostic(_) => true,
+            Message::SyntaxError(_) => false,
         }
     }
 
     pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
         match self {
-            NewDiagnostic::Message(message) => Some(message),
-            NewDiagnostic::SyntaxError(_) => None,
+            Message::Diagnostic(message) => Some(message),
+            Message::SyntaxError(_) => None,
         }
     }
 
     fn filename(&self) -> Cow<'_, str> {
         match self {
-            NewDiagnostic::Message(message) => Cow::Borrowed(message.file.name()),
-            NewDiagnostic::SyntaxError(diag) => Cow::Owned(ruff_file!(diag).name().to_string()),
+            Message::Diagnostic(message) => Cow::Borrowed(message.file.name()),
+            Message::SyntaxError(diag) => Cow::Owned(ruff_file!(diag).name().to_string()),
         }
     }
 
     pub fn body(&self) -> &str {
         match self {
-            NewDiagnostic::Message(message) => &message.kind.body,
-            NewDiagnostic::SyntaxError(diag) => ruff_annotation!(diag)
+            Message::Diagnostic(message) => &message.kind.body,
+            Message::SyntaxError(diag) => ruff_annotation!(diag)
                 .get_message()
                 .expect("Expected a message for a ruff diagnostic"),
         }
@@ -120,17 +120,17 @@ impl NewDiagnostic {
 
     pub fn name(&self) -> &str {
         match self {
-            NewDiagnostic::Message(message) => &message.kind.name,
+            Message::Diagnostic(message) => &message.kind.name,
             // TODO(brent) something more like diag.id().as_str() and match on the result once we
             // move past syntax errors
-            NewDiagnostic::SyntaxError(_) => "SyntaxError",
+            Message::SyntaxError(_) => "SyntaxError",
         }
     }
 
     fn compute_start_location(&self) -> LineColumn {
         match self {
-            NewDiagnostic::Message(message) => message.compute_start_location(),
-            NewDiagnostic::SyntaxError(diag) => {
+            Message::Diagnostic(message) => message.compute_start_location(),
+            Message::SyntaxError(diag) => {
                 ruff_file!(diag).to_source_code().line_column(self.start())
             }
         }
@@ -138,47 +138,45 @@ impl NewDiagnostic {
 
     fn compute_end_location(&self) -> LineColumn {
         match self {
-            NewDiagnostic::Message(message) => message.compute_end_location(),
-            NewDiagnostic::SyntaxError(diag) => {
-                ruff_file!(diag).to_source_code().line_column(self.end())
-            }
+            Message::Diagnostic(message) => message.compute_end_location(),
+            Message::SyntaxError(diag) => ruff_file!(diag).to_source_code().line_column(self.end()),
         }
     }
 
     pub fn source_file(&self) -> SourceFile {
         match self {
-            NewDiagnostic::Message(message) => message.source_file().clone(),
-            NewDiagnostic::SyntaxError(diag) => ruff_file!(diag).clone(),
+            Message::Diagnostic(message) => message.source_file().clone(),
+            Message::SyntaxError(diag) => ruff_file!(diag).clone(),
         }
     }
 
     pub fn fix(&self) -> Option<&Fix> {
         match self {
-            NewDiagnostic::Message(message) => message.fix.as_ref(),
+            Message::Diagnostic(message) => message.fix.as_ref(),
             // TODO(brent) db::Diagnostics don't currently have a concept of fixes, but we'll need
             // to add them eventually
-            NewDiagnostic::SyntaxError(_) => None,
+            Message::SyntaxError(_) => None,
         }
     }
 
     fn suggestion(&self) -> Option<&str> {
         match self {
-            NewDiagnostic::Message(message) => message.kind.suggestion.as_deref(),
-            NewDiagnostic::SyntaxError(_) => None,
+            Message::Diagnostic(message) => message.kind.suggestion.as_deref(),
+            Message::SyntaxError(_) => None,
         }
     }
 
     fn noqa_offset(&self) -> Option<TextSize> {
         match self {
-            NewDiagnostic::Message(message) => Some(message.noqa_offset),
-            NewDiagnostic::SyntaxError(_) => None,
+            Message::Diagnostic(message) => Some(message.noqa_offset),
+            Message::SyntaxError(_) => None,
         }
     }
 
     pub fn into_diagnostic_message(self) -> Option<DiagnosticMessage> {
         match self {
-            NewDiagnostic::Message(message) => Some(message),
-            NewDiagnostic::SyntaxError(_) => None,
+            Message::Diagnostic(message) => Some(message),
+            Message::SyntaxError(_) => None,
         }
     }
 
@@ -188,50 +186,50 @@ impl NewDiagnostic {
 
     pub fn kind(&self) -> MessageKind {
         match self {
-            NewDiagnostic::Message(message) => MessageKind::Diagnostic(message.kind.rule()),
-            NewDiagnostic::SyntaxError(_) => MessageKind::SyntaxError,
+            Message::Diagnostic(message) => MessageKind::Diagnostic(message.kind.rule()),
+            Message::SyntaxError(_) => MessageKind::SyntaxError,
         }
     }
 }
 
-impl Ord for NewDiagnostic {
+impl Ord for Message {
     fn cmp(&self, other: &Self) -> Ordering {
         (self.source_file(), self.start()).cmp(&(other.source_file(), other.start()))
     }
 }
 
-impl PartialOrd for NewDiagnostic {
+impl PartialOrd for Message {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ranged for NewDiagnostic {
+impl Ranged for Message {
     fn range(&self) -> TextRange {
         match self {
-            NewDiagnostic::Message(message) => message.range,
-            NewDiagnostic::SyntaxError(diag) => ruff_span!(diag)
+            Message::Diagnostic(message) => message.range,
+            Message::SyntaxError(diag) => ruff_span!(diag)
                 .range()
                 .expect("Expected range for ruff span"),
         }
     }
 }
 
-impl NewDiagnostic {
-    pub fn syntax_error(message: String, range: TextRange, file: SourceFile) -> NewDiagnostic {
+impl Message {
+    pub fn syntax_error(message: String, range: TextRange, file: SourceFile) -> Message {
         let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
         let span = Span::from(file).with_range(range);
         diag.annotate(Annotation::primary(span).message(message));
         Self::SyntaxError(diag)
     }
 
-    /// Create a [`NewDiagnostic`] from the given [`Diagnostic`] corresponding to a rule violation.
+    /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
     pub fn from_diagnostic(
         diagnostic: Diagnostic,
         file: SourceFile,
         noqa_offset: TextSize,
     ) -> Self {
-        Self::Message(DiagnosticMessage {
+        Self::Diagnostic(DiagnosticMessage {
             range: diagnostic.range(),
             kind: diagnostic.kind,
             fix: diagnostic.fix,
@@ -241,7 +239,7 @@ impl NewDiagnostic {
         })
     }
 
-    /// Create a [`NewDiagnostic`] from the given [`ParseError`].
+    /// Create a [`Message`] from the given [`ParseError`].
     pub fn from_parse_error(parse_error: &ParseError, locator: &Locator, file: SourceFile) -> Self {
         // Try to create a non-empty range so that the diagnostic can print a caret at the right
         // position. This requires that we retrieve the next character, if any, and take its length
@@ -262,7 +260,7 @@ impl NewDiagnostic {
         )
     }
 
-    /// Create a [`NewDiagnostic`] from the given [`UnsupportedSyntaxError`].
+    /// Create a [`Message`] from the given [`UnsupportedSyntaxError`].
     pub fn from_unsupported_syntax_error(
         unsupported_syntax_error: &UnsupportedSyntaxError,
         file: SourceFile,
@@ -274,7 +272,7 @@ impl NewDiagnostic {
         )
     }
 
-    /// Create a [`NewDiagnostic`] from the given [`SemanticSyntaxError`].
+    /// Create a [`Message`] from the given [`SemanticSyntaxError`].
     pub fn from_semantic_syntax_error(
         semantic_syntax_error: &SemanticSyntaxError,
         file: SourceFile,
@@ -335,21 +333,19 @@ impl MessageKind {
 }
 
 struct MessageWithLocation<'a> {
-    message: &'a NewDiagnostic,
+    message: &'a Message,
     start_location: LineColumn,
 }
 
 impl Deref for MessageWithLocation<'_> {
-    type Target = NewDiagnostic;
+    type Target = Message;
 
     fn deref(&self) -> &Self::Target {
         self.message
     }
 }
 
-fn group_messages_by_filename(
-    messages: &[NewDiagnostic],
-) -> BTreeMap<String, Vec<MessageWithLocation>> {
+fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<String, Vec<MessageWithLocation>> {
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages
@@ -371,7 +367,7 @@ pub trait Emitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[NewDiagnostic],
+        messages: &[Message],
         context: &EmitterContext,
     ) -> anyhow::Result<()>;
 }
@@ -409,9 +405,7 @@ mod tests {
     use crate::message::{Emitter, EmitterContext, Message};
     use crate::Locator;
 
-    use super::NewDiagnostic;
-
-    pub(super) fn create_syntax_error_messages() -> Vec<NewDiagnostic> {
+    pub(super) fn create_syntax_error_messages() -> Vec<Message> {
         let source = r"from os import
 
 if call(foo
@@ -424,12 +418,12 @@ if call(foo
             .errors()
             .iter()
             .map(|parse_error| {
-                NewDiagnostic::from_parse_error(parse_error, &locator, source_file.clone())
+                Message::from_parse_error(parse_error, &locator, source_file.clone())
             })
             .collect()
     }
 
-    pub(super) fn create_messages() -> Vec<NewDiagnostic> {
+    pub(super) fn create_messages() -> Vec<Message> {
         let fib = r#"import os
 
 
@@ -489,14 +483,13 @@ def fibonacci(n):
         let unused_variable_start = unused_variable.start();
         let undefined_name_start = undefined_name.start();
         vec![
-            NewDiagnostic::from_diagnostic(unused_import, fib_source.clone(), unused_import_start),
-            NewDiagnostic::from_diagnostic(unused_variable, fib_source, unused_variable_start),
-            NewDiagnostic::from_diagnostic(undefined_name, file_2_source, undefined_name_start),
+            Message::from_diagnostic(unused_import, fib_source.clone(), unused_import_start),
+            Message::from_diagnostic(unused_variable, fib_source, unused_variable_start),
+            Message::from_diagnostic(undefined_name, file_2_source, undefined_name_start),
         ]
     }
 
-    pub(super) fn create_notebook_messages(
-    ) -> (Vec<NewDiagnostic>, FxHashMap<String, NotebookIndex>) {
+    pub(super) fn create_notebook_messages() -> (Vec<Message>, FxHashMap<String, NotebookIndex>) {
         let notebook = r"# cell 1
 import os
 # cell 2
@@ -587,21 +580,17 @@ def foo():
 
         (
             vec![
-                NewDiagnostic::from_diagnostic(
+                Message::from_diagnostic(
                     unused_import_os,
                     notebook_source.clone(),
                     unused_import_os_start,
                 ),
-                NewDiagnostic::from_diagnostic(
+                Message::from_diagnostic(
                     unused_import_math,
                     notebook_source.clone(),
                     unused_import_math_start,
                 ),
-                NewDiagnostic::from_diagnostic(
-                    unused_variable,
-                    notebook_source,
-                    unused_variable_start,
-                ),
+                Message::from_diagnostic(unused_variable, notebook_source, unused_variable_start),
             ],
             notebook_indexes,
         )
@@ -609,7 +598,7 @@ def foo():
 
     pub(super) fn capture_emitter_output(
         emitter: &mut dyn Emitter,
-        messages: &[NewDiagnostic],
+        messages: &[Message],
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
@@ -621,7 +610,7 @@ def foo():
 
     pub(super) fn capture_emitter_notebook_output(
         emitter: &mut dyn Emitter,
-        messages: &[NewDiagnostic],
+        messages: &[Message],
         notebook_indexes: &FxHashMap<String, NotebookIndex>,
     ) -> String {
         let context = EmitterContext::new(notebook_indexes);

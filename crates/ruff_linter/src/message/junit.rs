@@ -5,9 +5,9 @@ use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, X
 
 use ruff_source_file::LineColumn;
 
-use crate::message::{group_messages_by_filename, Emitter, EmitterContext, MessageWithLocation};
-
-use super::NewDiagnostic;
+use crate::message::{
+    group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
+};
 
 #[derive(Default)]
 pub struct JunitEmitter;
@@ -16,7 +16,7 @@ impl Emitter for JunitEmitter {
     fn emit(
         &mut self,
         writer: &mut dyn Write,
-        messages: &[NewDiagnostic],
+        messages: &[Message],
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         let mut report = Report::new("ruff");

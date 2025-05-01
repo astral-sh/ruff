@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
-use ruff_linter::message::{DiagnosticMessage, NewDiagnostic};
+use ruff_linter::message::{DiagnosticMessage, Message};
 use ruff_linter::settings::types::PythonVersion;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -210,7 +210,7 @@ impl Workspace {
         let messages: Vec<ExpandedMessage> = messages
             .into_iter()
             .map(|message| match message {
-                NewDiagnostic::Message(DiagnosticMessage {
+                Message::Diagnostic(DiagnosticMessage {
                     kind, range, fix, ..
                 }) => ExpandedMessage {
                     code: Some(kind.rule().noqa_code().to_string()),
@@ -230,7 +230,7 @@ impl Workspace {
                             .collect(),
                     }),
                 },
-                NewDiagnostic::SyntaxError(_) => ExpandedMessage {
+                Message::SyntaxError(_) => ExpandedMessage {
                     code: None,
                     message: message.body().to_string(),
                     start_location: source_code.line_column(message.range().start()).into(),

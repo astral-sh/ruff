@@ -6,16 +6,13 @@ use ruff_text_size::{TextRange, TextSize};
 use ruff_diagnostics::Diagnostic;
 use ruff_source_file::SourceFile;
 
-use crate::message::NewDiagnostic;
+use crate::message::Message;
 use crate::registry::Rule;
 use crate::rules::ruff::rules::InvalidPyprojectToml;
 use crate::settings::LinterSettings;
 use crate::IOError;
 
-pub fn lint_pyproject_toml(
-    source_file: SourceFile,
-    settings: &LinterSettings,
-) -> Vec<NewDiagnostic> {
+pub fn lint_pyproject_toml(source_file: SourceFile, settings: &LinterSettings) -> Vec<Message> {
     let Some(err) = toml::from_str::<PyProjectToml>(source_file.source_text()).err() else {
         return Vec::default();
     };
@@ -33,7 +30,7 @@ pub fn lint_pyproject_toml(
                 );
                 if settings.rules.enabled(Rule::IOError) {
                     let diagnostic = Diagnostic::new(IOError { message }, TextRange::default());
-                    messages.push(NewDiagnostic::from_diagnostic(
+                    messages.push(Message::from_diagnostic(
                         diagnostic,
                         source_file,
                         TextSize::default(),
@@ -59,7 +56,7 @@ pub fn lint_pyproject_toml(
     if settings.rules.enabled(Rule::InvalidPyprojectToml) {
         let toml_err = err.message().to_string();
         let diagnostic = Diagnostic::new(InvalidPyprojectToml { message: toml_err }, range);
-        messages.push(NewDiagnostic::from_diagnostic(
+        messages.push(Message::from_diagnostic(
             diagnostic,
             source_file,
             TextSize::default(),

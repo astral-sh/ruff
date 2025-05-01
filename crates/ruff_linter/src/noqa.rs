@@ -16,7 +16,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
-use crate::message::NewDiagnostic;
+use crate::message::Message;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::Locator;
@@ -28,7 +28,7 @@ use crate::Locator;
 /// simultaneously.
 pub fn generate_noqa_edits(
     path: &Path,
-    messages: &[NewDiagnostic],
+    messages: &[Message],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -703,7 +703,7 @@ impl Error for LexicalError {}
 /// Adds noqa comments to suppress all messages of a file.
 pub(crate) fn add_noqa(
     path: &Path,
-    messages: &[NewDiagnostic],
+    messages: &[Message],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -726,7 +726,7 @@ pub(crate) fn add_noqa(
 
 fn add_noqa_inner(
     path: &Path,
-    messages: &[NewDiagnostic],
+    messages: &[Message],
     locator: &Locator,
     comment_ranges: &CommentRanges,
     external: &[String],
@@ -831,7 +831,7 @@ struct NoqaComment<'a> {
 }
 
 fn find_noqa_comments<'a>(
-    messages: &'a [NewDiagnostic],
+    messages: &'a [Message],
     locator: &'a Locator,
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
@@ -842,7 +842,7 @@ fn find_noqa_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in messages {
-        let NewDiagnostic::Message(diagnostic) = message else {
+        let Message::Diagnostic(diagnostic) = message else {
             comments_by_line.push(None);
             continue;
         };
@@ -1219,7 +1219,7 @@ mod tests {
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-    use crate::message::NewDiagnostic;
+    use crate::message::Message;
     use crate::noqa::{
         add_noqa_inner, lex_codes, lex_file_exemption, lex_inline_noqa, Directive, LexicalError,
         NoqaLexerOutput, NoqaMapping,
@@ -1249,10 +1249,10 @@ mod tests {
         diagnostic: Diagnostic,
         path: impl AsRef<Path>,
         source: &str,
-    ) -> NewDiagnostic {
+    ) -> Message {
         let noqa_offset = diagnostic.start();
         let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
-        NewDiagnostic::from_diagnostic(diagnostic, file, noqa_offset)
+        Message::from_diagnostic(diagnostic, file, noqa_offset)
     }
 
     #[test]
