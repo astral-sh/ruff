@@ -194,7 +194,7 @@ If the type of a constructor parameter is a class typevar, we can use that to in
 parameter. The types inferred from a type context and from a constructor parameter must be
 consistent with each other.
 
-## `__new__` only
+### `__new__` only
 
 ```py
 from typing import Generic, TypeVar
@@ -211,7 +211,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
-## `__init__` only
+### `__init__` only
 
 ```py
 from typing import Generic, TypeVar
@@ -227,7 +227,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
-## Identical `__new__` and `__init__` signatures
+### Identical `__new__` and `__init__` signatures
 
 ```py
 from typing import Generic, TypeVar
@@ -246,7 +246,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
-## Compatible `__new__` and `__init__` signatures
+### Compatible `__new__` and `__init__` signatures
 
 ```py
 from typing import Generic, TypeVar
@@ -276,9 +276,29 @@ reveal_type(D(1))  # revealed: D[Literal[1]]
 wrong_innards: D[int] = D("five")
 ```
 
-## `__init__` is itself generic
+### Both present, `__new__` inherited from a generic base class fwomp
 
-TODO: These do not currently work yet, because we don't correctly model the nested generic contexts.
+If either method comes from a generic base class, we don't currently use its inferred specialization
+to specialize the class.
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+class C(Generic[T, U]):
+    def __new__(cls, *args, **kwargs) -> "C[T, U]":
+        return object.__new__(cls)
+
+class D(C[V, int]):
+    def __init__(self, x: V) -> None: ...
+
+reveal_type(D(1))  # revealed: D[Literal[1]]
+```
+
+### `__init__` is itself generic
 
 ```py
 from typing import Generic, TypeVar

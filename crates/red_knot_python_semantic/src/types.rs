@@ -4423,18 +4423,19 @@ impl<'db> Type<'db> {
         // have the class's typevars still in the method signature when we attempt to call it. To
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
-        let (generic_origin, self_type) = match self {
+        let (generic_origin, generic_context, self_type) = match self {
             Type::ClassLiteral(class) => match class.generic_context(db) {
                 Some(generic_context) => {
                     let specialization = generic_context.identity_specialization(db);
                     (
                         Some(class),
+                        Some(generic_context),
                         Type::GenericAlias(GenericAlias::new(db, class, specialization)),
                     )
                 }
-                _ => (None, self),
+                _ => (None, None, self),
             },
-            _ => (None, self),
+            _ => (None, None, self),
         };
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
@@ -4550,12 +4551,18 @@ impl<'db> Type<'db> {
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(|binding| combine_binding_specialization(db, binding));
+                    .and_then(|binding| combine_binding_specialization(db, binding))
+                    .filter(|specialization| {
+                        Some(specialization.generic_context(db)) == generic_context
+                    });
                 let init_specialization = init_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(|binding| combine_binding_specialization(db, binding));
+                    .and_then(|binding| combine_binding_specialization(db, binding))
+                    .filter(|specialization| {
+                        Some(specialization.generic_context(db)) == generic_context
+                    });
                 let specialization =
                     combine_specializations(db, new_specialization, init_specialization);
                 let specialized = specialization
