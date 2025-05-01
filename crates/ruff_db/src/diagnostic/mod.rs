@@ -1,6 +1,9 @@
-use std::{fmt::Formatter, sync::Arc};
+use std::fmt::Formatter;
+use std::sync::Arc;
 
+use countme::Count;
 use render::Input;
+use ruff_notebook::Notebook;
 use ruff_source_file::SourceFile;
 use thiserror::Error;
 
@@ -8,8 +11,8 @@ use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange};
 
 pub use self::render::DisplayDiagnostic;
-use crate::files::File;
-use crate::source::SourceText;
+use crate::files::{File, FilePath};
+use crate::source::{is_notebook, SourceText, SourceTextError, SourceTextInner, SourceTextKind};
 use crate::Db;
 
 use self::render::FileResolver;
@@ -662,13 +665,24 @@ impl From<&SourceFile> for Input {
 
 impl From<&SourceFile> for SourceText {
     fn from(value: &SourceFile) -> Self {
+        let mut read_error = None;
+        let path = FilePath::system(value.name());
+        let kind = if is_notebook(&path) {
+            SourceTextKind::Notebook(
+                Notebook::from_source_code(value.source_text()).unwrap_or_else(|error| {
+                    tracing::debug!("Failed to read notebook '{path}': {error}");
+                    read_error = Some(SourceTextError::FailedToReadNotebook(error.to_string()));
+                    Notebook::empty()
+                }),
+            )
+        } else {
+            SourceTextKind::Text(value.source_text().to_string())
+        };
         SourceText {
-            inner: std::sync::Arc::new(crate::source::SourceTextInner {
-                count: countme::Count::new(),
-                // TODO(brent) handle notebooks. it's not really clear (to me) how to determine
-                // if something is a notebook from a SourceFile
-                kind: crate::source::SourceTextKind::Text(value.source_text().to_string()),
-                read_error: None,
+            inner: Arc::new(SourceTextInner {
+                kind,
+                read_error,
+                count: Count::new(),
             }),
         }
     }
