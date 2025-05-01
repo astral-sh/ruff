@@ -29,6 +29,12 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 /// pairwise(letters)  # ("A", "B"), ("B", "C"), ("C", "D")
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because the `zip` operator takes as argument a sequence
+/// object and this last one could have a custom implementation of the `__getitem__` method, and
+/// `pairwise(iterable)` assumes standard slicing behavior.
+///
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
 #[derive(ViolationMetadata)]
