@@ -94,7 +94,9 @@ impl Files {
                     .root(db, path)
                     .map_or(Durability::default(), |root| root.durability(db));
 
-                let builder = File::builder(FilePath::System(absolute)).durability(durability);
+                let builder = File::builder(FilePath::System(absolute))
+                    .durability(durability)
+                    .path_durability(Durability::HIGH);
 
                 let builder = match metadata {
                     Ok(metadata) if metadata.file_type().is_file() => builder
@@ -159,9 +161,11 @@ impl Files {
         tracing::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
             File::builder(FilePath::SystemVirtual(path.to_path_buf()))
+                .path_durability(Durability::HIGH)
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
                 .permissions(None)
+                .permissions_durability(Durability::HIGH)
                 .new(db),
         );
         self.inner
@@ -272,7 +276,7 @@ impl std::panic::RefUnwindSafe for Files {}
 /// A file that's either stored on the host system's file system or in the vendored file system.
 #[salsa::input]
 pub struct File {
-    /// The path of the file.
+    /// The path of the file (immutable).
     #[return_ref]
     pub path: FilePath,
 
