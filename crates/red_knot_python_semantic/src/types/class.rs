@@ -2287,6 +2287,29 @@ impl<'db> KnownClass {
             .unwrap_or_else(Type::unknown)
     }
 
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing all possible instances of the generic class with a specialization.
+    ///
+    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_specialized_instance(
+        self,
+        db: &'db dyn Db,
+        specialization: impl IntoIterator<Item = Type<'db>>,
+    ) -> Type<'db> {
+        let class_literal = self.to_class_literal(db).expect_class_literal();
+        match class_literal.generic_context(db) {
+            Some(generic_context) => {
+                let types = specialization.into_iter().collect::<Box<[_]>>();
+                let specialization = generic_context.specialize(db, types);
+                Type::instance(
+                    db,
+                    ClassType::Generic(GenericAlias::new(db, class_literal, specialization)),
+                )
+            }
+            None => Type::unknown(),
+        }
+    }
+
     /// Attempt to lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
     ///
     /// Return an error if the symbol cannot be found in the expected typeshed module,

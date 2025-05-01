@@ -25,10 +25,7 @@ def h() -> TypeIs[int]: ...
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
     # TODO: should understand the annotation
     reveal_type(args)  # revealed: tuple
-
-    # TODO: should understand the annotation
-    reveal_type(kwargs)  # revealed: dict[Unknown, Unknown]
-
+    reveal_type(kwargs)  # revealed: dict[str, @Todo(Support for `typing.ParamSpec`)]
     return callback(42, *args, **kwargs)
 
 class Foo:

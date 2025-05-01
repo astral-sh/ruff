@@ -86,8 +86,7 @@ lambda *args: reveal_type(args)  # revealed: tuple
 Using a keyword-varidic parameter:
 
 ```py
-# TODO: should be `dict[str, Unknown]` (needs generics)
-lambda **kwargs: reveal_type(kwargs)  # revealed: dict[Unknown, Unknown]
+lambda **kwargs: reveal_type(kwargs)  # revealed: dict[str, Unknown]
 ```
 
 ## Nested `lambda` expressions
