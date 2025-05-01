@@ -31,8 +31,11 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// ## Fix safety
 ///
-/// This fix is always marked as unsafe because the import `from itertools import pairwise` could
-/// be shadowed by a custom pairwise function in the same scope.
+/// The fix is always marked unsafe because it assumes that slicing an object
+/// (e.g., `obj[1:]`) produces a value with the same type and iteration behavior
+/// as the original object, which is not guaranteed for user-defined types that
+/// override `__getitem__` without handling slices properly. Moreover, the fix could deletes
+/// comments.
 ///
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
