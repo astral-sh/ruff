@@ -27,7 +27,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{fix_file, FixResult};
-use crate::message::{Message, NewDiagnostic};
+use crate::message::NewDiagnostic;
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
 use crate::preview::{is_py314_support_enabled, is_unsupported_syntax_enabled};
@@ -522,18 +522,20 @@ fn diagnostics_to_messages(
 
     parse_errors
         .iter()
-        .map(|parse_error| Message::from_parse_error(parse_error, locator, file.deref().clone()))
+        .map(|parse_error| {
+            NewDiagnostic::from_parse_error(parse_error, locator, file.deref().clone())
+        })
         .chain(unsupported_syntax_errors.iter().map(|syntax_error| {
-            Message::from_unsupported_syntax_error(syntax_error, file.deref().clone())
+            NewDiagnostic::from_unsupported_syntax_error(syntax_error, file.deref().clone())
         }))
         .chain(
-            semantic_syntax_errors
-                .iter()
-                .map(|error| Message::from_semantic_syntax_error(error, file.deref().clone())),
+            semantic_syntax_errors.iter().map(|error| {
+                NewDiagnostic::from_semantic_syntax_error(error, file.deref().clone())
+            }),
         )
         .chain(diagnostics.into_iter().map(|diagnostic| {
             let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
-            Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
+            NewDiagnostic::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
         }))
         .collect()
 }

@@ -1219,7 +1219,7 @@ mod tests {
     use ruff_source_file::{LineEnding, SourceFileBuilder};
     use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-    use crate::message::{Message, NewDiagnostic};
+    use crate::message::NewDiagnostic;
     use crate::noqa::{
         add_noqa_inner, lex_codes, lex_file_exemption, lex_inline_noqa, Directive, LexicalError,
         NoqaLexerOutput, NoqaMapping,
@@ -1252,7 +1252,7 @@ mod tests {
     ) -> NewDiagnostic {
         let noqa_offset = diagnostic.start();
         let file = SourceFileBuilder::new(path.as_ref().to_string_lossy(), source).finish();
-        Message::from_diagnostic(diagnostic, file, noqa_offset)
+        NewDiagnostic::from_diagnostic(diagnostic, file, noqa_offset)
     }
 
     #[test]

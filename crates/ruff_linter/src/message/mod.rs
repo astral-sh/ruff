@@ -232,6 +232,67 @@ impl NewDiagnostic {
         diag.annotate(Annotation::primary(span).message(message));
         Self::SyntaxError(diag)
     }
+
+    /// Create a [`NewDiagnostic`] from the given [`Diagnostic`] corresponding to a rule violation.
+    pub fn from_diagnostic(
+        diagnostic: Diagnostic,
+        file: SourceFile,
+        noqa_offset: TextSize,
+    ) -> Self {
+        Self::Message(Message::Diagnostic(DiagnosticMessage {
+            range: diagnostic.range(),
+            kind: diagnostic.kind,
+            fix: diagnostic.fix,
+            parent: diagnostic.parent,
+            file,
+            noqa_offset,
+        }))
+    }
+
+    /// Create a [`NewDiagnostic`] from the given [`ParseError`].
+    pub fn from_parse_error(parse_error: &ParseError, locator: &Locator, file: SourceFile) -> Self {
+        // Try to create a non-empty range so that the diagnostic can print a caret at the right
+        // position. This requires that we retrieve the next character, if any, and take its length
+        // to maintain char-boundaries.
+        let len = locator
+            .after(parse_error.location.start())
+            .chars()
+            .next()
+            .map_or(TextSize::new(0), TextLen::text_len);
+
+        Self::syntax_error(
+            format!(
+                "SyntaxError: {}",
+                DisplayParseErrorType::new(&parse_error.error)
+            ),
+            TextRange::at(parse_error.location.start(), len),
+            file,
+        )
+    }
+
+    /// Create a [`NewDiagnostic`] from the given [`UnsupportedSyntaxError`].
+    pub fn from_unsupported_syntax_error(
+        unsupported_syntax_error: &UnsupportedSyntaxError,
+        file: SourceFile,
+    ) -> Self {
+        Self::syntax_error(
+            format!("SyntaxError: {unsupported_syntax_error}"),
+            unsupported_syntax_error.range,
+            file,
+        )
+    }
+
+    /// Create a [`NewDiagnostic`] from the given [`SemanticSyntaxError`].
+    pub fn from_semantic_syntax_error(
+        semantic_syntax_error: &SemanticSyntaxError,
+        file: SourceFile,
+    ) -> Self {
+        Self::syntax_error(
+            format!("SyntaxError: {semantic_syntax_error}"),
+            semantic_syntax_error.range,
+            file,
+        )
+    }
 }
 
 /// Message represents either a diagnostic message corresponding to a rule violation or a syntax
@@ -276,71 +337,6 @@ impl MessageKind {
 }
 
 impl Message {
-    /// Create a [`Message`] from the given [`Diagnostic`] corresponding to a rule violation.
-    pub fn from_diagnostic(
-        diagnostic: Diagnostic,
-        file: SourceFile,
-        noqa_offset: TextSize,
-    ) -> NewDiagnostic {
-        NewDiagnostic::Message(Message::Diagnostic(DiagnosticMessage {
-            range: diagnostic.range(),
-            kind: diagnostic.kind,
-            fix: diagnostic.fix,
-            parent: diagnostic.parent,
-            file,
-            noqa_offset,
-        }))
-    }
-
-    /// Create a [`Message`] from the given [`ParseError`].
-    pub fn from_parse_error(
-        parse_error: &ParseError,
-        locator: &Locator,
-        file: SourceFile,
-    ) -> NewDiagnostic {
-        // Try to create a non-empty range so that the diagnostic can print a caret at the right
-        // position. This requires that we retrieve the next character, if any, and take its length
-        // to maintain char-boundaries.
-        let len = locator
-            .after(parse_error.location.start())
-            .chars()
-            .next()
-            .map_or(TextSize::new(0), TextLen::text_len);
-
-        NewDiagnostic::syntax_error(
-            format!(
-                "SyntaxError: {}",
-                DisplayParseErrorType::new(&parse_error.error)
-            ),
-            TextRange::at(parse_error.location.start(), len),
-            file,
-        )
-    }
-
-    /// Create a [`Message`] from the given [`UnsupportedSyntaxError`].
-    pub fn from_unsupported_syntax_error(
-        unsupported_syntax_error: &UnsupportedSyntaxError,
-        file: SourceFile,
-    ) -> NewDiagnostic {
-        NewDiagnostic::syntax_error(
-            format!("SyntaxError: {unsupported_syntax_error}"),
-            unsupported_syntax_error.range,
-            file,
-        )
-    }
-
-    /// Create a [`Message`] from the given [`SemanticSyntaxError`].
-    pub fn from_semantic_syntax_error(
-        semantic_syntax_error: &SemanticSyntaxError,
-        file: SourceFile,
-    ) -> NewDiagnostic {
-        NewDiagnostic::syntax_error(
-            format!("SyntaxError: {semantic_syntax_error}"),
-            semantic_syntax_error.range,
-            file,
-        )
-    }
-
     pub const fn as_diagnostic_message(&self) -> Option<&DiagnosticMessage> {
         match self {
             Message::Diagnostic(m) => Some(m),
@@ -547,7 +543,7 @@ if call(foo
             .errors()
             .iter()
             .map(|parse_error| {
-                Message::from_parse_error(parse_error, &locator, source_file.clone())
+                NewDiagnostic::from_parse_error(parse_error, &locator, source_file.clone())
             })
             .collect()
     }
@@ -612,9 +608,9 @@ def fibonacci(n):
         let unused_variable_start = unused_variable.start();
         let undefined_name_start = undefined_name.start();
         vec![
-            Message::from_diagnostic(unused_import, fib_source.clone(), unused_import_start),
-            Message::from_diagnostic(unused_variable, fib_source, unused_variable_start),
-            Message::from_diagnostic(undefined_name, file_2_source, undefined_name_start),
+            NewDiagnostic::from_diagnostic(unused_import, fib_source.clone(), unused_import_start),
+            NewDiagnostic::from_diagnostic(unused_variable, fib_source, unused_variable_start),
+            NewDiagnostic::from_diagnostic(undefined_name, file_2_source, undefined_name_start),
         ]
     }
 
@@ -710,17 +706,21 @@ def foo():
 
         (
             vec![
-                Message::from_diagnostic(
+                NewDiagnostic::from_diagnostic(
                     unused_import_os,
                     notebook_source.clone(),
                     unused_import_os_start,
                 ),
-                Message::from_diagnostic(
+                NewDiagnostic::from_diagnostic(
                     unused_import_math,
                     notebook_source.clone(),
                     unused_import_math_start,
                 ),
-                Message::from_diagnostic(unused_variable, notebook_source, unused_variable_start),
+                NewDiagnostic::from_diagnostic(
+                    unused_variable,
+                    notebook_source,
+                    unused_variable_start,
+                ),
             ],
             notebook_indexes,
         )
