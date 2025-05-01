@@ -1949,6 +1949,27 @@ reveal_type(C.a_type)  # revealed: type
 reveal_type(C.a_none)  # revealed: None
 ```
 
+### Generic methods
+
+We also detect implicit instance attributes on methods that are themselves generic. We have an extra
+test for this because generic functions have an extra type-params scope in between the function body
+scope and the outer scope, so we need to make sure that our implementation can still recognize `f`
+as a method of `C` here:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C:
+    def f[T](self, t: T) -> T:
+        self.x: int = 1
+        return t
+
+reveal_type(C().x)  # revealed: int
+```
+
 ## Enum classes
 
 Enums are not supported yet; attribute access on an enum class is inferred as `Todo`.
