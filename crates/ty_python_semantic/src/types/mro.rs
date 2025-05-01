@@ -68,21 +68,9 @@ impl<'db> Mro<'db> {
         class: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroErrorKind<'db>> {
-        let class_bases = class.explicit_bases(db);
-
-        if !class_bases.is_empty() && class.inheritance_cycle(db).is_some() {
-            // We emit errors for cyclically defined classes elsewhere.
-            // It's important that we don't even try to infer the MRO for a cyclically defined class,
-            // or we'll end up in an infinite loop.
-            return Ok(Mro::from_error(
-                db,
-                class.apply_optional_specialization(db, specialization),
-            ));
-        }
-
         let class_type = class.apply_optional_specialization(db, specialization);
 
-        match class_bases {
+        match class.explicit_bases(db) {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
             [] if class.is_object(db) => Ok(Self::from([
@@ -116,9 +104,15 @@ impl<'db> Mro<'db> {
             [single_base] => ClassBase::try_from_type(db, *single_base).map_or_else(
                 || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                 |single_base| {
-                    Ok(std::iter::once(ClassBase::Class(class_type))
+                    if single_base.has_cyclic_mro(db) {
+                        Err(MroErrorKind::InheritanceCycle)
+                    } else {
+                        Ok(std::iter::once(ClassBase::Class(
+                            class.apply_optional_specialization(db, specialization),
+                        ))
                         .chain(single_base.mro(db, specialization))
                         .collect())
+                    }
                 },
             ),
 
@@ -144,6 +138,9 @@ impl<'db> Mro<'db> {
 
                 let mut seqs = vec![VecDeque::from([ClassBase::Class(class_type)])];
                 for base in &valid_bases {
+                    if base.has_cyclic_mro(db) {
+                        return Err(MroErrorKind::InheritanceCycle);
+                    }
                     seqs.push(base.mro(db, specialization).collect());
                 }
                 seqs.push(
@@ -331,6 +328,15 @@ pub(super) struct MroError<'db> {
 }
 
 impl<'db> MroError<'db> {
+    /// Construct an MRO error of kind `InheritanceCycle`.
+    pub(super) fn cycle(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        MroErrorKind::InheritanceCycle.into_mro_error(db, class)
+    }
+
+    pub(super) fn is_cycle(&self) -> bool {
+        matches!(self.kind, MroErrorKind::InheritanceCycle)
+    }
+
     /// Return an [`MroErrorKind`] variant describing why we could not resolve the MRO for this class.
     pub(super) fn reason(&self) -> &MroErrorKind<'db> {
         &self.kind
@@ -362,6 +368,9 @@ pub(super) enum MroErrorKind<'db> {
     /// The class has one or more duplicate bases.
     /// See [`DuplicateBaseError`] for more details.
     DuplicateBases(Box<[DuplicateBaseError<'db>]>),
+
+    /// A cycle was encountered resolving the class' bases.
+    InheritanceCycle,
 
     /// The MRO is otherwise unresolvable through the C3-merge algorithm.
     ///

@@ -1,6 +1,6 @@
 use crate::types::generics::{GenericContext, Specialization, TypeMapping};
 use crate::types::{
-    todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroIterator, Type,
+    todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroError, MroIterator, Type,
 };
 use crate::Db;
 
@@ -230,6 +230,19 @@ impl<'db> ClassBase<'db> {
             self.apply_type_mapping(db, specialization.type_mapping())
         } else {
             self
+        }
+    }
+
+    pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
+        match self {
+            ClassBase::Class(class) => {
+                let (class_literal, specialization) = class.class_literal(db);
+                class_literal
+                    .try_mro(db, specialization)
+                    .as_ref()
+                    .is_err_and(MroError::is_cycle)
+            }
+            ClassBase::Dynamic(_) | ClassBase::Generic(_) | ClassBase::Protocol => false,
         }
     }
 

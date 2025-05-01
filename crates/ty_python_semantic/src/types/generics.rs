@@ -44,7 +44,7 @@ impl<'db> GenericContext<'db> {
                 let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
                     declaration_type(db, definition).inner_type()
                 else {
-                    panic!("typevar should be inferred as a TypeVarInstance");
+                    return None;
                 };
                 Some(typevar)
             }
