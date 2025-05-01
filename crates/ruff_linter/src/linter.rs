@@ -160,7 +160,7 @@ pub fn check_path(
             locator,
             comment_ranges,
             settings,
-            target_version,
+            target_version.unwrap_or_default(),
         ));
     }
 

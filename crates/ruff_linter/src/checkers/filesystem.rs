@@ -19,7 +19,7 @@ pub(crate) fn check_file_path(
     locator: &Locator,
     comment_ranges: &CommentRanges,
     settings: &LinterSettings,
-    target_version: Option<PythonVersion>,
+    target_version: PythonVersion,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -50,9 +50,7 @@ pub(crate) fn check_file_path(
 
     // flake8-builtins
     if settings.rules.enabled(Rule::StdlibModuleShadowing) {
-        if let Some(diagnostic) =
-            stdlib_module_shadowing(path, settings, target_version.unwrap_or_default())
-        {
+        if let Some(diagnostic) = stdlib_module_shadowing(path, settings, target_version) {
             diagnostics.push(diagnostic);
         }
     }
