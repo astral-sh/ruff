@@ -7839,7 +7839,7 @@ impl SliceLiteralType<'_> {
 #[salsa::interned(debug)]
 pub struct TupleType<'db> {
     #[return_ref]
-    pub(crate) elements: Box<[Type<'db>]>,
+    elements: Box<[Type<'db>]>,
 }
 
 impl<'db> TupleType<'db> {
