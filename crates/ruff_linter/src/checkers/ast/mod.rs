@@ -536,6 +536,14 @@ impl<'a> Checker<'a> {
         self.target_version.unwrap_or_else(PythonVersion::latest)
     }
 
+    /// Return the [`PythonVersion`] to use for version-related checks.
+    ///
+    /// This returns the same value as `target_version` if the result is `Some`, otherwise it falls
+    /// back on [`PythonVersion::default`].
+    pub(crate) fn target_version_or_default(&self) -> PythonVersion {
+        self.target_version.unwrap_or_else(PythonVersion::default)
+    }
+
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
         let mut checker = std::mem::take(&mut self.semantic_checker);
         f(&mut checker, self);
