@@ -185,7 +185,7 @@ impl Configuration {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
-            unresolved_target_version: target_version.unwrap_or_default(), // TODO(brent)
+            unresolved_target_version: target_version.unwrap_or_default(),
             per_file_target_version: per_file_target_version.clone(),
             line_width: self
                 .line_length
@@ -218,7 +218,7 @@ impl Configuration {
         let analyze = AnalyzeSettings {
             exclude: FilePatternSet::try_from_iter(analyze.exclude.unwrap_or_default())?,
             preview: analyze_preview,
-            target_version: target_version.unwrap_or_default(), // TODO(brent)
+            target_version: target_version.unwrap_or_default(),
             extension: self.extension.clone().unwrap_or_default(),
             detect_string_imports: analyze
                 .detect_string_imports
