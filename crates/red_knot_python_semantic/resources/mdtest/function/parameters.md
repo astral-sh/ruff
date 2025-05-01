@@ -30,7 +30,7 @@ def f(a, b: int, c=1, d: int = 2, /, e=3, f: Literal[4] = 4, *args: object, g=5,
     reveal_type(args)  # revealed: tuple
 
     # TODO: should be `dict[str, str]` (needs generics)
-    reveal_type(kwargs)  # revealed: dict
+    reveal_type(kwargs)  # revealed: dict[Unknown, Unknown]
 ```
 
 ## Unannotated variadic parameters
@@ -43,7 +43,7 @@ def g(*args, **kwargs):
     reveal_type(args)  # revealed: tuple
 
     # TODO: should be `dict[str, Unknown]` (needs generics)
-    reveal_type(kwargs)  # revealed: dict
+    reveal_type(kwargs)  # revealed: dict[Unknown, Unknown]
 ```
 
 ## Annotation is present but not a fully static type

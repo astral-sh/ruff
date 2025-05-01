@@ -54,7 +54,7 @@ impl<'db> GenericContext<'db> {
         }
     }
 
-    /// Creates a generic context from the legecy `TypeVar`s that appear in a function parameter
+    /// Creates a generic context from the legacy `TypeVar`s that appear in a function parameter
     /// list.
     pub(crate) fn from_function_params(
         db: &'db dyn Db,
@@ -72,6 +72,23 @@ impl<'db> GenericContext<'db> {
         }
         if let Some(ty) = return_type {
             ty.find_legacy_typevars(db, &mut variables);
+        }
+        if variables.is_empty() {
+            return None;
+        }
+        let variables: Box<[_]> = variables.into_iter().collect();
+        Some(Self::new(db, variables))
+    }
+
+    /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
+    /// list.
+    pub(crate) fn from_base_classes(
+        db: &'db dyn Db,
+        bases: impl Iterator<Item = Type<'db>>,
+    ) -> Option<Self> {
+        let mut variables = FxOrderSet::default();
+        for base in bases {
+            Type::from(base).find_legacy_typevars(db, &mut variables);
         }
         if variables.is_empty() {
             return None;
@@ -323,6 +340,16 @@ impl<'db> Specialization<'db> {
         }
 
         true
+    }
+
+    pub(crate) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        for ty in self.types(db) {
+            ty.find_legacy_typevars(db, typevars);
+        }
     }
 }
 

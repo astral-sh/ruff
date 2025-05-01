@@ -27,7 +27,7 @@ def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.
     reveal_type(args)  # revealed: tuple
 
     # TODO: should understand the annotation
-    reveal_type(kwargs)  # revealed: dict
+    reveal_type(kwargs)  # revealed: dict[Unknown, Unknown]
 
     return callback(42, *args, **kwargs)
 

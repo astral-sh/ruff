@@ -441,8 +441,13 @@ impl<'db> ClassLiteral<'db> {
 
         // We've already verified that the class literal does not contain both a PEP-695 generic
         // scope and a `typing.Generic` base class.
+        //
+        // Note that if a class has an explicit legacy generic context (by inheriting from
+        // `typing.Generic`), and also an implicit one (by inheriting from other generic classes,
+        // specialized by typevars), the explicit one takes precedence.
         self.pep695_generic_context(db)
             .or_else(|| self.legacy_generic_context(db))
+            .or_else(|| self.inherited_legacy_generic_context(db))
     }
 
     #[salsa::tracked]
@@ -461,6 +466,20 @@ impl<'db> ClassLiteral<'db> {
             Type::KnownInstance(KnownInstanceType::Generic(generic_context)) => *generic_context,
             _ => None,
         })
+    }
+
+    #[salsa::tracked(cycle_fn=legacy_generic_context_cycle_recover, cycle_initial=legacy_generic_context_cycle_initial)]
+    pub(crate) fn inherited_legacy_generic_context(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<GenericContext<'db>> {
+        GenericContext::from_base_classes(
+            db,
+            self.explicit_bases(db)
+                .iter()
+                .copied()
+                .filter(|ty| matches!(ty, Type::GenericAlias(_))),
+        )
     }
 
     /// Return `true` if this class represents the builtin class `object`

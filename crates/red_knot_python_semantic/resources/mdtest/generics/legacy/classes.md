@@ -41,10 +41,8 @@ class InheritedGeneric(MultipleTypevars[T, S]): ...
 class InheritedGenericPartiallySpecialized(MultipleTypevars[T, int]): ...
 class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
 
-# TODO: revealed: tuple[T, S]
-reveal_type(generic_context(InheritedGeneric))  # revealed: None
-# TODO: revealed: tuple[T]
-reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: None
+reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[T, S]
+reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[T]
 reveal_type(generic_context(InheritedGenericFullySpecialized))  # revealed: None
 ```
 
@@ -317,8 +315,7 @@ class ImplicitlyGenericSub(Base[T]): ...
 
 reveal_type(Base[int].x)  # revealed: int | None
 reveal_type(ExplicitlyGenericSub[int].x)  # revealed: int | None
-# TODO: revealed: int | None
-reveal_type(ImplicitlyGenericSub[int].x)  # revealed: T | None
+reveal_type(ImplicitlyGenericSub[int].x)  # revealed: int | None
 ```
 
 ## Generic methods

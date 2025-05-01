@@ -1677,7 +1677,7 @@ functions are instances of that class:
 def f(): ...
 
 reveal_type(f.__defaults__)  # revealed: @Todo(full tuple[...] support) | None
-reveal_type(f.__kwdefaults__)  # revealed: @Todo(specialized non-generic class) | None
+reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
 Some attributes are special-cased, however:

@@ -87,7 +87,7 @@ Using a keyword-varidic parameter:
 
 ```py
 # TODO: should be `dict[str, Unknown]` (needs generics)
-lambda **kwargs: reveal_type(kwargs)  # revealed: dict
+lambda **kwargs: reveal_type(kwargs)  # revealed: dict[Unknown, Unknown]
 ```
 
 ## Nested `lambda` expressions

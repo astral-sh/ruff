@@ -5101,6 +5101,10 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::GenericAlias(alias) => {
+                alias.specialization(db).find_legacy_typevars(db, typevars);
+            }
+
             Type::Dynamic(_)
             | Type::Never
             | Type::AlwaysTruthy
@@ -5111,7 +5115,6 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
-            | Type::GenericAlias(_)
             | Type::SubclassOf(_)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
