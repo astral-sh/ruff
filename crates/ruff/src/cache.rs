@@ -19,7 +19,7 @@ use tempfile::NamedTempFile;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
-use ruff_linter::message::{DiagnosticMessage, Message, NewDiagnostic};
+use ruff_linter::message::{DiagnosticMessage, NewDiagnostic};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::{warn_user, VERSION};
 use ruff_macros::CacheKey;
@@ -347,7 +347,7 @@ impl FileCache {
                 lint.messages
                     .iter()
                     .map(|msg| {
-                        Message::Diagnostic(DiagnosticMessage {
+                        NewDiagnostic::Message(DiagnosticMessage {
                             kind: msg.kind.clone(),
                             range: msg.range,
                             fix: msg.fix.clone(),
@@ -356,7 +356,6 @@ impl FileCache {
                             parent: msg.parent,
                         })
                     })
-                    .map(NewDiagnostic::from)
                     .collect()
             };
             let notebook_indexes = if let Some(notebook_index) = lint.notebook_index.as_ref() {

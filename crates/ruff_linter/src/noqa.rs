@@ -16,7 +16,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::codes::NoqaCode;
 use crate::fs::relativize_path;
-use crate::message::{Message, NewDiagnostic};
+use crate::message::NewDiagnostic;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::Locator;
@@ -842,7 +842,7 @@ fn find_noqa_comments<'a>(
 
     // Mark any non-ignored diagnostics.
     for message in messages {
-        let NewDiagnostic::Message(Message::Diagnostic(diagnostic)) = message else {
+        let NewDiagnostic::Message(diagnostic) = message else {
             comments_by_line.push(None);
             continue;
         };

@@ -14,7 +14,7 @@ use ruff_linter::{
     directives::{extract_directives, Flags},
     generate_noqa_edits,
     linter::check_path,
-    message::{DiagnosticMessage, Message, NewDiagnostic},
+    message::{DiagnosticMessage, NewDiagnostic},
     package::PackageRoot,
     packaging::detect_package_root,
     registry::AsRule,
@@ -166,15 +166,13 @@ pub(crate) fn check(
             .into_iter()
             .zip(noqa_edits)
             .filter_map(|(message, noqa_edit)| match message {
-                NewDiagnostic::Message(Message::Diagnostic(diagnostic_message)) => {
-                    Some(to_lsp_diagnostic(
-                        diagnostic_message,
-                        noqa_edit,
-                        &source_kind,
-                        locator.to_index(),
-                        encoding,
-                    ))
-                }
+                NewDiagnostic::Message(diagnostic_message) => Some(to_lsp_diagnostic(
+                    diagnostic_message,
+                    noqa_edit,
+                    &source_kind,
+                    locator.to_index(),
+                    encoding,
+                )),
                 NewDiagnostic::SyntaxError(_) => {
                     if show_syntax_errors {
                         Some(syntax_error_to_lsp_diagnostic(

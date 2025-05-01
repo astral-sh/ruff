@@ -22,7 +22,7 @@ use ruff_source_file::SourceFileBuilder;
 
 use crate::fix::{fix_file, FixResult};
 use crate::linter::check_path;
-use crate::message::{Emitter, EmitterContext, Message, NewDiagnostic, TextEmitter};
+use crate::message::{Emitter, EmitterContext, NewDiagnostic, TextEmitter};
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::registry::AsRule;
@@ -281,7 +281,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             diagnostic.noqa_offset = directives.noqa_line_for.resolve(diagnostic.range.start());
             diagnostic.file = source_code.clone();
 
-            NewDiagnostic::Message(Message::Diagnostic(diagnostic))
+            NewDiagnostic::Message(diagnostic)
         })
         .chain(parsed.errors().iter().map(|parse_error| {
             NewDiagnostic::from_parse_error(parse_error, &locator, source_code.clone())
