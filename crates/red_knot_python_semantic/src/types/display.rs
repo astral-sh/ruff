@@ -14,7 +14,7 @@ use crate::types::{
     StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
     UnionType, WrapperDescriptorKind,
 };
-use crate::Db;
+use crate::{Db, FxOrderSet};
 use rustc_hash::FxHashMap;
 
 impl<'db> Type<'db> {
@@ -317,7 +317,7 @@ impl<'db> GenericContext<'db> {
 }
 
 pub struct DisplayGenericContext<'db> {
-    typevars: &'db [TypeVarInstance<'db>],
+    typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     db: &'db dyn Db,
 }
 
@@ -376,7 +376,7 @@ impl<'db> Specialization<'db> {
 }
 
 pub struct DisplaySpecialization<'db> {
-    typevars: &'db [TypeVarInstance<'db>],
+    typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     types: &'db [Type<'db>],
     db: &'db dyn Db,
     full: bool,

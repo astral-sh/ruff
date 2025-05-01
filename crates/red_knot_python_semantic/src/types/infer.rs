@@ -93,7 +93,7 @@ use crate::types::{
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::Db;
+use crate::{Db, FxOrderSet};
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
@@ -6998,7 +6998,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         value_node: &ast::Expr,
         typevars: &[Type<'db>],
     ) -> Type<'db> {
-        let typevars: Option<Box<[_]>> = typevars
+        let typevars: Option<FxOrderSet<_>> = typevars
             .iter()
             .map(|typevar| match typevar {
                 Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(*typevar),
