@@ -124,7 +124,7 @@ rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "79afd59ed5a5edb4dac63cf5b6cf4a6aa9514bdf" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "42f15835c0005c4b37aaf5bc1a15e3e1b3df14b7" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }

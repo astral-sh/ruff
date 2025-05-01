@@ -79,11 +79,15 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => Some(if literal.is_known(db, KnownClass::Any) {
-                Self::Dynamic(DynamicType::Any)
-            } else {
-                Self::Class(literal.default_specialization(db))
-            }),
+            Type::ClassLiteral(literal) => {
+                if literal.is_known(db, KnownClass::Any) {
+                    Some(Self::Dynamic(DynamicType::Any))
+                } else if literal.is_known(db, KnownClass::NamedTuple) {
+                    Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db))
+                } else {
+                    Some(Self::Class(literal.default_specialization(db)))
+                }
+            }
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
                 if instance.class().is_known(db, KnownClass::GenericAlias) =>

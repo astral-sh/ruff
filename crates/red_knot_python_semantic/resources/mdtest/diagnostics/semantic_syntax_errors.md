@@ -130,6 +130,62 @@ async def g():
 (x async for x in g())
 ```
 
+## Rebound comprehension variable
+
+Walrus operators cannot rebind variables already in use as iterators:
+
+```py
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+[x := 2 for x in range(10)]
+
+# error: [invalid-syntax] "assignment expression cannot rebind comprehension variable"
+{y := 5 for y in range(10)}
+```
+
+## Multiple case assignments
+
+Variable names in pattern matching must be unique within a single pattern:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+x = [1, 2]
+match x:
+    # error: [invalid-syntax] "multiple assignments to name `a` in pattern"
+    case [a, a]:
+        pass
+    case _:
+        pass
+
+d = {"key": "value"}
+match d:
+    # error: [invalid-syntax] "multiple assignments to name `b` in pattern"
+    case {"key": b, "other": b}:
+        pass
+```
+
+## Duplicate type parameter
+
+Type parameter names must be unique in a generic class or function definition:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+# error: [invalid-syntax] "duplicate type parameter"
+class C[T, T]:
+    pass
+
+# error: [invalid-syntax] "duplicate type parameter"
+def f[X, Y, X]():
+    pass
+```
+
 ## `await` outside async function
 
 This error includes `await`, `async for`, `async with`, and `async` comprehensions.
