@@ -554,7 +554,7 @@ impl<'a> Checker<'a> {
         member: &'b str,
         version_added_to_typing: PythonVersion,
     ) -> Option<TypingImporter<'b, 'a>> {
-        let source_module = if self.target_version_or_latest() >= version_added_to_typing {
+        let source_module = if self.target_version_or_default() >= version_added_to_typing {
             "typing"
         } else if !self.settings.typing_extensions {
             return None;
@@ -2373,7 +2373,7 @@ impl<'a> Checker<'a> {
     }
 
     fn bind_builtins(&mut self) {
-        let target_version = self.target_version_or_latest();
+        let target_version = self.target_version_or_default();
         let mut bind_builtin = |builtin| {
             // Add the builtin to the scope.
             let binding_id = self.semantic.push_builtin();

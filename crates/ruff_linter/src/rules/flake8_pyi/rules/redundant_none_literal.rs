@@ -112,7 +112,7 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
 
     let union_kind = if literal_elements.is_empty() {
         UnionKind::NoUnion
-    } else if (checker.target_version_or_latest() >= PythonVersion::PY310)
+    } else if (checker.target_version_or_default() >= PythonVersion::PY310)
         || checker.source_type.is_stub()
     {
         UnionKind::BitOr

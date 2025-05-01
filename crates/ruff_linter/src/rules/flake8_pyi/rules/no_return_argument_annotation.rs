@@ -67,7 +67,7 @@ pub(crate) fn no_return_argument_annotation(checker: &Checker, parameters: &ast:
         if is_no_return(annotation, checker) {
             checker.report_diagnostic(Diagnostic::new(
                 NoReturnArgumentAnnotationInStub {
-                    module: if checker.target_version_or_latest() >= PythonVersion::PY311 {
+                    module: if checker.target_version_or_default() >= PythonVersion::PY311 {
                         TypingModule::Typing
                     } else {
                         TypingModule::TypingExtensions
