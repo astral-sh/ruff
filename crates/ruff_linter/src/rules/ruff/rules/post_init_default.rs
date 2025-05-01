@@ -61,6 +61,11 @@ use super::helpers::{dataclass_kind, DataclassKind};
 /// foo = Foo()  # Prints '1 2'.
 /// ```
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because it assumes that the user always
+/// wants `__post_init__`args to be `InitVar`s.
+///
 /// ## References
 /// - [Python documentation: Post-init processing](https://docs.python.org/3/library/dataclasses.html#post-init-processing)
 /// - [Python documentation: Init-only variables](https://docs.python.org/3/library/dataclasses.html#init-only-variables)
