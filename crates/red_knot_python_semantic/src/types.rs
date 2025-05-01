@@ -1302,20 +1302,6 @@ impl<'db> Type<'db> {
     ///
     /// [assignable to]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation
     pub(crate) fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        // Subclasses of Any are assignable to non-final, non-literal types,
-        // as Any can materialize to any such type, but not to final or literal types.
-        if let Type::Instance(self_instance) = self {
-            if self_instance.class().is_subclass_of_any_or_unknown(db) {
-                match target {
-                    Type::ClassLiteral(_) => return false,
-                    Type::Instance(target_instance) => {
-                        return !target_instance.class().is_final(db)
-                    }
-                    _ => return true,
-                }
-            }
-        }
-
         if self.is_gradual_equivalent_to(db, target) {
             return true;
         }
@@ -1367,6 +1353,23 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .any(|&elem_ty| ty.is_assignable_to(db, elem_ty)),
+
+            (Type::Instance(instance), target)
+                if instance.class().is_subclass_of_any_or_unknown(db) =>
+            {
+                match target {
+                    Type::IntLiteral(_)
+                    | Type::BooleanLiteral(_)
+                    | Type::StringLiteral(_)
+                    | Type::BytesLiteral(_)
+                    | Type::LiteralString
+                    | Type::SliceLiteral(_) => false,
+                    Type::Instance(target_instance) if target_instance.class().is_final(db) => {
+                        false
+                    }
+                    _ => true,
+                }
+            }
 
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be

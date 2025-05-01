@@ -94,14 +94,41 @@ A subclass of `Any` can be assigned to a `Callable` and called.
 ```py
 from typing import Callable, Any
 
-class MyMock(Any):
+class MockCallable(Any):
     pass
 
-def f(c: Callable):
-    c()
+def takes_callable(f: Callable):
+    f()
 
-f(MyMock())
+takes_callable(MockCallable())
 ```
+
+But `Any` cannot be assigned to `Final` or `Literal`
+
+```py
+from typing import Any, Literal
+
+class MockAny(Any):
+    pass
+
+x: Literal[1] = MockAny()  # error: [invalid-assignment]
+```
+
+
+```py
+from typing import final, Any
+
+@final
+class FinalA: ...
+
+@final
+class FinalB: ...
+
+class MockAny(Any): ...
+
+value: FinalA  | FinalB  = MockAny()  # error: [invalid-assignment]
+```
+
 
 ## Invalid
 
