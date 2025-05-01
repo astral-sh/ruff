@@ -72,6 +72,11 @@ use super::super::typing::type_hint_explicitly_allows_none;
 /// ## Options
 /// - `target-version`
 ///
+/// ## Fix safety
+///
+/// This fix is always marked as unsafe because it is not possible to establish if the equality
+/// with `None` has specific semantics different from `Optional`.
+///
 /// [PEP 484]: https://peps.python.org/pep-0484/#union-types
 #[derive(ViolationMetadata)]
 pub(crate) struct ImplicitOptional {
