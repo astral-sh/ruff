@@ -48,14 +48,6 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
                     .arguments
                     .find_argument_value("dst_dir_fd", 3)
                     .is_some_and(|expr| !expr.is_none_literal_expr())
-                || call
-                    .arguments
-                    .find_positional(0)
-                    .is_some_and(|expr| is_bytes_string(expr, checker.semantic()))
-                || call
-                    .arguments
-                    .find_positional(1)
-                    .is_some_and(|expr| is_bytes_string(expr, checker.semantic()))
             {
                 return;
             }
