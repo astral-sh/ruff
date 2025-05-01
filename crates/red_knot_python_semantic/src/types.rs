@@ -1369,7 +1369,7 @@ impl<'db> Type<'db> {
                     Type::Instance(target_instance) if target_instance.class().is_final(db) => {
                         false
                     }
-                    _ => true,
+                    _ => true
                 }
             }
 
