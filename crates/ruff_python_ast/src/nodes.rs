@@ -17,7 +17,9 @@ use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::str_prefix::{AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix};
+use crate::str_prefix::{
+    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
+};
 use crate::{
     int,
     name::Name,
@@ -1661,18 +1663,23 @@ bitflags! {
         /// but can have no other prefixes.
         const F_PREFIX = 1 << 4;
 
+        /// The string has a `t` or `T` prefix, meaning it is an t-string.
+        /// T-strings can also be raw strings,
+        /// but can have no other prefixes.
+        const T_PREFIX = 1 << 5;
+
         /// The string has an `r` prefix, meaning it is a raw string.
         /// F-strings and byte-strings can be raw,
         /// as can strings with no other prefixes.
         /// U-strings cannot be raw.
-        const R_PREFIX_LOWER = 1 << 5;
+        const R_PREFIX_LOWER = 1 << 6;
 
         /// The string has an `R` prefix, meaning it is a raw string.
         /// The casing of the `r`/`R` has no semantic significance at runtime;
         /// see https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#r-strings-and-r-strings
         /// for why we track the casing of the `r` prefix,
         /// but not for any other prefix
-        const R_PREFIX_UPPER = 1 << 6;
+        const R_PREFIX_UPPER = 1 << 7;
     }
 }
 
@@ -1709,6 +1716,15 @@ impl AnyStringFlags {
             }
             AnyStringPrefix::Format(FStringPrefix::Raw { uppercase_r: true }) => {
                 AnyStringFlagsInner::F_PREFIX.union(AnyStringFlagsInner::R_PREFIX_UPPER)
+            }
+
+            // t-strings
+            AnyStringPrefix::Template(TStringPrefix::Regular) => AnyStringFlagsInner::T_PREFIX,
+            AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: false }) => {
+                AnyStringFlagsInner::T_PREFIX.union(AnyStringFlagsInner::R_PREFIX_LOWER)
+            }
+            AnyStringPrefix::Template(TStringPrefix::Raw { uppercase_r: true }) => {
+                AnyStringFlagsInner::T_PREFIX.union(AnyStringFlagsInner::R_PREFIX_UPPER)
             }
         };
         self
