@@ -62,24 +62,6 @@ fn explicit_bases_cycle_initial<'db>(
     Box::default()
 }
 
-#[allow(clippy::ref_option)]
-#[allow(clippy::trivially_copy_pass_by_ref)]
-fn legacy_generic_context_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _value: &Option<GenericContext<'db>>,
-    _count: u32,
-    _self: ClassLiteral<'db>,
-) -> salsa::CycleRecoveryAction<Option<GenericContext<'db>>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-fn legacy_generic_context_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    _self: ClassLiteral<'db>,
-) -> Option<GenericContext<'db>> {
-    None
-}
-
 fn try_mro_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Result<Mro<'db>, MroError<'db>>,
@@ -500,7 +482,6 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
-    #[salsa::tracked(cycle_fn=legacy_generic_context_cycle_recover, cycle_initial=legacy_generic_context_cycle_initial)]
     pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.explicit_bases(db).iter().find_map(|base| match base {
             Type::KnownInstance(KnownInstanceType::Generic(generic_context)) => *generic_context,
@@ -508,7 +489,6 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
-    #[salsa::tracked(cycle_fn=legacy_generic_context_cycle_recover, cycle_initial=legacy_generic_context_cycle_initial)]
     pub(crate) fn inherited_legacy_generic_context(
         self,
         db: &'db dyn Db,
