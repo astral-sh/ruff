@@ -8,10 +8,9 @@ use ruff_source_file::UniversalNewlines;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::registry::Rule;
 
 /// ## What it does
-/// Checks for non-contextmanager use of `pytest.raises`.
+/// Checks for non-contextmanager use of `pytest.raises`, `pytest.warns`, and `pytest.deprecated_call`.
 ///
 /// ## Why is this bad?
 /// The context-manager form is more readable, easier to extend, and supports additional kwargs.
@@ -22,6 +21,8 @@ use crate::registry::Rule;
 ///
 ///
 /// excinfo = pytest.raises(ValueError, int, "hello")
+/// pytest.warns(UserWarning, my_function, arg)
+/// pytest.deprecated_call(my_deprecated_function, arg1, arg2)
 /// ```
 ///
 /// Use instead:
@@ -31,83 +32,158 @@ use crate::registry::Rule;
 ///
 /// with pytest.raises(ValueError) as excinfo:
 ///     int("hello")
+/// with pytest.warns(UserWarning):
+///     my_function(arg)
+/// with pytest.deprecated_call():
+///     my_deprecated_function(arg1, arg2)
 /// ```
 ///
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
+/// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
+/// - [`pytest` documentation: `pytest.deprecated_call`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-deprecated-call)
 #[derive(ViolationMetadata)]
-pub(crate) struct LegacyFormPytestRaises;
+pub(crate) struct LegacyFormPytestRaisesWarnsDeprecatedCall {
+    name: &'static str,
+}
 
-impl Violation for LegacyFormPytestRaises {
+impl Violation for LegacyFormPytestRaisesWarnsDeprecatedCall {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use context-manager form of `pytest.raises()`".to_string()
+        let Self { name } = self;
+        format!("Use context-manager form of `pytest.{name}()`")
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Use `pytest.raises()` as a context-manager".to_string())
+        let Self { name } = self;
+        Some(format!("Use `pytest.{name}()` as a context-manager"))
     }
 }
 
-pub(crate) fn is_pytest_raises(func: &Expr, semantic: &SemanticModel) -> bool {
-    semantic
-        .resolve_qualified_name(func)
-        .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["pytest", "raises"]))
+/// Enum representing the type of pytest context manager
+#[derive(PartialEq, Clone, Copy)]
+enum PytestContextType {
+    Raises,
+    Warns,
+    DeprecatedCall,
 }
 
-pub(crate) fn legacy_raises_call(checker: &Checker, call: &ast::ExprCall) {
-    if is_pytest_raises(&call.func, checker.semantic()) {
-        if checker.enabled(Rule::LegacyFormPytestRaises)
-            && call.arguments.find_argument("func", 1).is_some()
-        {
-            let mut diagnostic = Diagnostic::new(LegacyFormPytestRaises, call.range());
-            let stmt = checker.semantic().current_statement();
-            if !has_leading_content(stmt.start(), checker.source())
-                && !has_trailing_content(stmt.end(), checker.source())
-            {
-                if let Some(with_stmt) = try_fix_legacy_raises(stmt, checker.semantic()) {
-                    let generated = checker.generator().stmt(&Stmt::With(with_stmt));
-                    let first_line = checker.locator().line_str(stmt.start());
-                    let indentation = leading_indentation(first_line);
-                    let mut indented = String::new();
-                    for (idx, line) in generated.universal_newlines().enumerate() {
-                        if idx == 0 {
-                            indented.push_str(&line);
-                        } else {
-                            indented.push_str(checker.stylist().line_ending().as_str());
-                            indented.push_str(indentation);
-                            indented.push_str(&line);
-                        }
-                    }
+impl PytestContextType {
+    fn from_expr_name(func: &Expr, semantic: &SemanticModel) -> Option<Self> {
+        semantic
+            .resolve_qualified_name(func)
+            .and_then(|qualified_name| match qualified_name.segments() {
+                ["pytest", "raises"] => Some(Self::Raises),
+                ["pytest", "warns"] => Some(Self::Warns),
+                ["pytest", "deprecated_call"] => Some(Self::DeprecatedCall),
+                _ => None,
+            })
+    }
 
-                    diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                        indented,
-                        stmt.range(),
-                    )));
-                }
-            }
-            checker.report_diagnostic(diagnostic);
+    fn expected_arg(self) -> Option<(&'static str, usize)> {
+        match self {
+            Self::Raises => Some(("expected_exception", 0)),
+            Self::Warns => Some(("expected_warning", 0)),
+            Self::DeprecatedCall => None,
+        }
+    }
+
+    fn func_arg(self) -> (&'static str, usize) {
+        match self {
+            Self::Raises | Self::Warns => ("func", 1),
+            Self::DeprecatedCall => ("func", 0),
+        }
+    }
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::Raises => "raises",
+            Self::Warns => "warns",
+            Self::DeprecatedCall => "deprecated_call",
         }
     }
 }
 
-fn try_fix_legacy_raises(stmt: &Stmt, semantic: &SemanticModel) -> Option<StmtWith> {
+pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast::ExprCall) {
+    let semantic = checker.semantic();
+    let Some(context_type) = PytestContextType::from_expr_name(&call.func, semantic) else {
+        return;
+    };
+
+    let (func_arg_name, func_arg_position) = context_type.func_arg();
+    if call
+        .arguments
+        .find_argument(func_arg_name, func_arg_position)
+        .is_none()
+    {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(
+        LegacyFormPytestRaisesWarnsDeprecatedCall {
+            name: context_type.name(),
+        },
+        call.range(),
+    );
+
+    let stmt = checker.semantic().current_statement();
+    if !has_leading_content(stmt.start(), checker.source())
+        && !has_trailing_content(stmt.end(), checker.source())
+    {
+        if let Some(with_stmt) = try_fix_legacy_call(context_type, stmt, checker.semantic()) {
+            let generated = checker.generator().stmt(&Stmt::With(with_stmt));
+            let first_line = checker.locator().line_str(stmt.start());
+            let indentation = leading_indentation(first_line);
+            let mut indented = String::new();
+            for (idx, line) in generated.universal_newlines().enumerate() {
+                if idx == 0 {
+                    indented.push_str(&line);
+                } else {
+                    indented.push_str(checker.stylist().line_ending().as_str());
+                    indented.push_str(indentation);
+                    indented.push_str(&line);
+                }
+            }
+
+            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                indented,
+                stmt.range(),
+            )));
+        }
+    }
+    checker.report_diagnostic(diagnostic);
+}
+
+fn try_fix_legacy_call(
+    context_type: PytestContextType,
+    stmt: &Stmt,
+    semantic: &SemanticModel,
+) -> Option<StmtWith> {
     match stmt {
         Stmt::Expr(StmtExpr { value, .. }) => {
             let call = value.as_call_expr()?;
 
-            if is_pytest_raises(&call.func, semantic) {
-                generate_with_raises(call, None, None)
-            } else {
+            if PytestContextType::from_expr_name(&call.func, semantic) == Some(context_type) {
+                generate_with_statement(context_type, call, None, None, None)
+            } else if let PytestContextType::Raises = context_type {
+                // Handle call to match right after the legacy call
+                // This applies only for `raises` because it returns `ExceptionInfo`
+                // while `warns` and `deprecated_call` return what `func` returns
                 let inner_raises_call = call
                     .func
                     .as_attribute_expr()
                     .filter(|expr_attribute| &expr_attribute.attr == "match")
                     .and_then(|expr_attribute| expr_attribute.value.as_call_expr())
-                    .filter(|inner_call| is_pytest_raises(&inner_call.func, semantic))?;
-                generate_with_raises(inner_raises_call, call.arguments.args.first(), None)
+                    .filter(|inner_call| {
+                        PytestContextType::from_expr_name(&inner_call.func, semantic)
+                            == Some(PytestContextType::Raises)
+                    })?;
+                let match_arg = call.arguments.args.first();
+                generate_with_statement(context_type, inner_raises_call, match_arg, None, None)
+            } else {
+                None
             }
         }
         Stmt::Assign(ast::StmtAssign {
@@ -115,41 +191,60 @@ fn try_fix_legacy_raises(stmt: &Stmt, semantic: &SemanticModel) -> Option<StmtWi
             targets,
             value,
         }) => {
-            let [target] = targets.as_slice() else {
-                return None;
+            let call = value.as_call_expr().filter(|call| {
+                PytestContextType::from_expr_name(&call.func, semantic) == Some(context_type)
+            })?;
+            let (optional_vars, assign_targets) = match context_type {
+                PytestContextType::Raises => {
+                    let [target] = targets.as_slice() else {
+                        return None;
+                    };
+                    (Some(target), None)
+                }
+                PytestContextType::Warns | PytestContextType::DeprecatedCall => {
+                    (None, Some(targets.as_slice()))
+                }
             };
 
-            let raises_call = value
-                .as_call_expr()
-                .filter(|call| is_pytest_raises(&call.func, semantic))?;
-
-            let optional_vars = Some(target);
-            let match_call = None;
-            generate_with_raises(raises_call, match_call, optional_vars)
+            generate_with_statement(context_type, call, None, optional_vars, assign_targets)
         }
         _ => None,
     }
 }
 
-fn generate_with_raises(
-    legacy_raises_call: &ast::ExprCall,
+fn generate_with_statement(
+    context_type: PytestContextType,
+    legacy_call: &ast::ExprCall,
     match_arg: Option<&Expr>,
     optional_vars: Option<&Expr>,
+    assign_targets: Option<&[Expr]>,
 ) -> Option<StmtWith> {
-    let expected_exception = legacy_raises_call
-        .arguments
-        .find_argument_value("expected_exception", 0)?;
+    let expected = if let Some((name, position)) = context_type.expected_arg() {
+        Some(legacy_call.arguments.find_argument_value(name, position)?)
+    } else {
+        None
+    };
 
-    let func = legacy_raises_call
+    let (func_arg_name, func_arg_position) = context_type.func_arg();
+    let func = legacy_call
         .arguments
-        .find_argument_value("func", 1)?;
+        .find_argument_value(func_arg_name, func_arg_position)?;
 
-    let raises_call = ast::ExprCall {
+    let (func_args, func_keywords): (Vec<_>, Vec<_>) = legacy_call
+        .arguments
+        .arguments_source_order()
+        .skip(if expected.is_some() { 2 } else { 1 })
+        .partition_map(|arg_or_keyword| match arg_or_keyword {
+            ast::ArgOrKeyword::Arg(expr) => Either::Left(expr.clone()),
+            ast::ArgOrKeyword::Keyword(keyword) => Either::Right(keyword.clone()),
+        });
+
+    let context_call = ast::ExprCall {
         range: TextRange::default(),
-        func: legacy_raises_call.func.clone(),
+        func: legacy_call.func.clone(),
         arguments: ast::Arguments {
             range: TextRange::default(),
-            args: Box::new([expected_exception.clone()]),
+            args: expected.cloned().as_slice().into(),
             keywords: match_arg
                 .map(|expr| ast::Keyword {
                     // Take range from the original expression so that the keyword
@@ -163,25 +258,27 @@ fn generate_with_raises(
         },
     };
 
-    let (func_args, func_keywords): (Vec<_>, Vec<_>) = legacy_raises_call
-        .arguments
-        .arguments_source_order()
-        .skip(2)
-        .partition_map(|arg_or_keyword| match arg_or_keyword {
-            ast::ArgOrKeyword::Arg(expr) => Either::Left(expr.clone()),
-            ast::ArgOrKeyword::Keyword(keyword) => Either::Right(keyword.clone()),
-        });
-    let func_args = func_args.into_boxed_slice();
-    let func_keywords = func_keywords.into_boxed_slice();
-
     let func_call = ast::ExprCall {
         range: TextRange::default(),
         func: Box::new(func.clone()),
         arguments: ast::Arguments {
             range: TextRange::default(),
-            args: func_args,
-            keywords: func_keywords,
+            args: func_args.into(),
+            keywords: func_keywords.into(),
         },
+    };
+
+    let body = if let Some(assign_targets) = assign_targets {
+        Stmt::Assign(ast::StmtAssign {
+            range: TextRange::default(),
+            targets: assign_targets.to_vec(),
+            value: Box::new(func_call.into()),
+        })
+    } else {
+        Stmt::Expr(StmtExpr {
+            range: TextRange::default(),
+            value: Box::new(func_call.into()),
+        })
     };
 
     Some(StmtWith {
@@ -189,12 +286,9 @@ fn generate_with_raises(
         is_async: false,
         items: vec![WithItem {
             range: TextRange::default(),
-            context_expr: raises_call.into(),
+            context_expr: context_call.into(),
             optional_vars: optional_vars.map(|var| Box::new(var.clone())),
         }],
-        body: vec![Stmt::Expr(StmtExpr {
-            range: TextRange::default(),
-            value: Box::new(func_call.into()),
-        })],
+        body: vec![body],
     })
 }
