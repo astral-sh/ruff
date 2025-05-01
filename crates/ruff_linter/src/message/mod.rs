@@ -313,14 +313,6 @@ pub struct DiagnosticMessage {
     pub noqa_offset: TextSize,
 }
 
-/// A syntax error message raised by the parser.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SyntaxErrorMessage {
-    pub message: String,
-    pub range: TextRange,
-    pub file: SourceFile,
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MessageKind {
     Diagnostic(Rule),
