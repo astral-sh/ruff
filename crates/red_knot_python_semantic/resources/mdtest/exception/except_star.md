@@ -54,12 +54,10 @@ except* (KeyboardInterrupt, AttributeError) as e:
 try:
     help()
 except* 3 as e:  # error: [invalid-exception-caught]
-    # TODO: Should be `BaseExceptionGroup[Unknown]` --Alex
     reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
 
 try:
     help()
 except* (AttributeError, 42) as e:  # error: [invalid-exception-caught]
-    # TODO: Should be `BaseExceptionGroup[AttributeError | Unknown]` --Alex
     reveal_type(e)  # revealed: BaseExceptionGroup[BaseException]
 ```
