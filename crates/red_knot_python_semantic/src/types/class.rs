@@ -14,7 +14,6 @@ use crate::types::signatures::{Parameter, Parameters};
 use crate::types::{
     CallableType, DataclassParams, DataclassTransformerParams, KnownInstanceType, Signature,
 };
-use crate::FxOrderSet;
 use crate::{
     module_resolver::file_to_module,
     semantic_index::{
@@ -1803,7 +1802,9 @@ impl<'db> ProtocolClassLiteral<'db> {
     /// It is illegal for a protocol class to have any instance attributes that are not declared
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
-    pub(super) fn protocol_members(self, db: &'db dyn Db) -> &'db FxOrderSet<Name> {
+    pub(super) fn interface(self, db: &'db dyn Db) -> &'db ProtocolInterface<'db> {
+        /// Returns `true` if the given member should be excluded from the protocol interface.
+        ///
         /// The list of excluded members is subject to change between Python versions,
         /// especially for dunders, but it probably doesn't matter *too* much if this
         /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
@@ -1841,11 +1842,11 @@ impl<'db> ProtocolClassLiteral<'db> {
         }
 
         #[salsa::tracked(return_ref, cycle_fn=proto_members_cycle_recover, cycle_initial=proto_members_cycle_initial)]
-        fn cached_protocol_members<'db>(
+        fn cached_protocol_interface<'db>(
             db: &'db dyn Db,
             class: ClassLiteral<'db>,
-        ) -> FxOrderSet<Name> {
-            let mut members = FxOrderSet::default();
+        ) -> ProtocolInterface<'db> {
+            let mut members = vec![];
 
             for parent_protocol in class
                 .iter_mro(db, None)
@@ -1864,7 +1865,10 @@ impl<'db> ProtocolClassLiteral<'db> {
                                 .map(|symbol| (symbol_id, symbol))
                         })
                         .filter_map(|(symbol_id, symbol)| {
-                            symbol.symbol.ignore_possibly_unbound().map(|_| symbol_id)
+                            symbol
+                                .symbol
+                                .ignore_possibly_unbound()
+                                .map(|ty| (symbol_id, ty, symbol.qualifiers))
                         })
                         // Bindings in the class body that are not declared in the class body
                         // are not valid protocol members, and we plan to emit diagnostics for them
@@ -1878,35 +1882,44 @@ impl<'db> ProtocolClassLiteral<'db> {
                             |(symbol_id, bindings)| {
                                 symbol_from_bindings(db, bindings)
                                     .ignore_possibly_unbound()
-                                    .map(|_| symbol_id)
+                                    .map(|ty| (symbol_id, ty, TypeQualifiers::default()))
                             },
                         ))
-                        .map(|symbol_id| symbol_table.symbol(symbol_id).name())
-                        .filter(|name| !excluded_from_proto_members(name))
-                        .cloned(),
+                        .map(|(symbol_id, member, qualifiers)| {
+                            (symbol_table.symbol(symbol_id).name(), member, qualifiers)
+                        })
+                        .filter(|(name, _, _)| !excluded_from_proto_members(name))
+                        .map(|(name, ty, qualifiers)| ProtocolMember {
+                            name: name.clone(),
+                            ty,
+                            qualifiers,
+                        }),
                 );
             }
 
-            members.sort();
-            members.shrink_to_fit();
-            members
+            members.sort_unstable_by(|m1, m2| m1.name().cmp(m2.name()));
+            members.dedup_by(|m1, m2| m1.name() == m2.name());
+            ProtocolInterface(members.into_boxed_slice())
         }
 
-        fn proto_members_cycle_recover(
+        fn proto_members_cycle_recover<'db>(
             _db: &dyn Db,
-            _value: &FxOrderSet<Name>,
+            _value: &ProtocolInterface<'db>,
             _count: u32,
-            _class: ClassLiteral,
-        ) -> salsa::CycleRecoveryAction<FxOrderSet<Name>> {
+            _class: ClassLiteral<'db>,
+        ) -> salsa::CycleRecoveryAction<ProtocolInterface<'db>> {
             salsa::CycleRecoveryAction::Iterate
         }
 
-        fn proto_members_cycle_initial(_db: &dyn Db, _class: ClassLiteral) -> FxOrderSet<Name> {
-            FxOrderSet::default()
+        fn proto_members_cycle_initial<'db>(
+            _db: &dyn Db,
+            _class: ClassLiteral<'db>,
+        ) -> ProtocolInterface<'db> {
+            ProtocolInterface::default()
         }
 
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
-        cached_protocol_members(db, *self)
+        cached_protocol_interface(db, *self)
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
@@ -1922,6 +1935,55 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
         &self.0
     }
 }
+
+#[derive(Debug, PartialEq, Eq, salsa::Update, Default, Clone, Hash)]
+pub(super) struct ProtocolInterface<'db>(Box<[ProtocolMember<'db>]>);
+
+impl<'db> ProtocolInterface<'db> {
+    pub(super) fn members(&self) -> impl ExactSizeIterator<Item = &ProtocolMember<'db>> {
+        self.0.iter()
+    }
+
+    pub(super) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
+        self.members().all(|member| member.ty.is_fully_static(db))
+    }
+
+    /// TODO: consider the types of the members as well as their names.
+    /// TODO: using a map as the underlying data structure would be more efficient here than a boxed slice.
+    pub(super) fn is_sub_interface_of(&self, other: &Self) -> bool {
+        self.members().all(|member| {
+            other
+                .members()
+                .any(|other_member| member.name() == other_member.name())
+        })
+    }
+
+    pub(super) fn contains_todo(&self, db: &'db dyn Db) -> bool {
+        self.members().any(|member| member.ty.contains_todo(db))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, salsa::Update, Clone, Hash)]
+pub(super) struct ProtocolMember<'db> {
+    name: Name,
+    ty: Type<'db>,
+    qualifiers: TypeQualifiers,
+}
+
+impl<'db> ProtocolMember<'db> {
+    pub(super) fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub(super) fn ty(&self) -> Type<'db> {
+        self.ty
+    }
+
+    pub(super) fn qualifiers(&self) -> TypeQualifiers {
+        self.qualifiers
+    }
+}
+
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(super) enum InheritanceCycle {

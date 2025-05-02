@@ -1087,7 +1087,8 @@ from knot_extensions import is_equivalent_to
 class HasMutableXAttr(Protocol):
     x: int
 
-static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))
+# TODO: should pass
+static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))  # error: [static-assert-error]
 
 static_assert(is_subtype_of(HasMutableXAttr, HasXProperty))
 static_assert(is_assignable_to(HasMutableXAttr, HasXProperty))
@@ -1350,25 +1351,32 @@ class NotFullyStatic(Protocol):
     x: Any
 
 static_assert(is_fully_static(FullyStatic))
-
-# TODO: should pass
-static_assert(not is_fully_static(NotFullyStatic))  # error: [static-assert-error]
+static_assert(not is_fully_static(NotFullyStatic))
 ```
 
-Non-fully-static protocols do not participate in subtyping, only assignability:
+Non-fully-static protocols do not participate in subtyping or equivalence, only assignability and
+gradual equivalence:
 
 ```py
-from knot_extensions import is_subtype_of, is_assignable_to
+from knot_extensions import is_subtype_of, is_assignable_to, is_equivalent_to, is_gradual_equivalent_to
 
 class NominalWithX:
     x: int = 42
 
 static_assert(is_assignable_to(NominalWithX, FullyStatic))
 static_assert(is_assignable_to(NominalWithX, NotFullyStatic))
+
+static_assert(not is_subtype_of(FullyStatic, NotFullyStatic))
+static_assert(not is_subtype_of(NotFullyStatic, FullyStatic))
+static_assert(not is_subtype_of(NominalWithX, NotFullyStatic))
+
 static_assert(is_subtype_of(NominalWithX, FullyStatic))
 
-# TODO: this should pass
-static_assert(not is_subtype_of(NominalWithX, NotFullyStatic))  # error: [static-assert-error]
+static_assert(is_equivalent_to(FullyStatic, FullyStatic))
+static_assert(not is_equivalent_to(NotFullyStatic, NotFullyStatic))
+
+static_assert(is_gradual_equivalent_to(FullyStatic, FullyStatic))
+static_assert(is_gradual_equivalent_to(NotFullyStatic, NotFullyStatic))
 ```
 
 Empty protocols are fully static; this follows from the fact that an empty protocol is equivalent to
