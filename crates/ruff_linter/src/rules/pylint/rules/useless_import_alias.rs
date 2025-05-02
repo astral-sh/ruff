@@ -27,6 +27,20 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// import numpy
 /// ```
+///
+/// ## Fix safety
+/// This fix is sometimes unsafe. When the import with a useless alias is also 
+/// configured as a required import in isort settings, removing the alias can 
+/// cause an infinite loop in the auto-fixing process. This happens because isort 
+/// would re-add the alias that Ruff just removed, creating a cycle.
+///
+/// For example, if you have:
+/// ```
+/// import numpy as numpy
+/// ```
+///
+/// And you've configured isort to require `import numpy as numpy`, removing the 
+/// alias would conflict with that requirement, causing an infinite fix loop.
 #[derive(ViolationMetadata)]
 pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
