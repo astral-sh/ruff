@@ -1339,9 +1339,34 @@ impl<'db> TypeInferenceBuilder<'db> {
             .kind(self.db())
             .category(self.context.in_stub())
             .is_binding());
-        let use_def = self.index.use_def_map(binding.file_scope(self.db()));
-        let declarations = use_def.declarations_at_binding(binding);
+
+        let file_scope_id = binding.file_scope(self.db());
+        let symbol_table = self.index.symbol_table(file_scope_id);
+        let symbol_name = symbol_table.symbol(binding.symbol(self.db())).name();
+        let use_def = self.index.use_def_map(file_scope_id);
         let mut bound_ty = ty;
+
+        let is_global = self
+            .index
+            .scope(file_scope_id)
+            .globals
+            .contains(symbol_name);
+
+        let global_use_def_map = self.index.use_def_map(FileScopeId::global());
+        let declarations = if is_global {
+            match self
+                .index
+                .symbol_table(FileScopeId::global())
+                .symbol_id_by_name(symbol_name)
+            {
+                Some(id) => global_use_def_map.public_declarations(id),
+                // This case is a syntax error (load before global declaration) but ignore that here
+                None => use_def.declarations_at_binding(binding),
+            }
+        } else {
+            use_def.declarations_at_binding(binding)
+        };
+
         let declared_ty = symbol_from_declarations(self.db(), declarations)
             .map(|SymbolAndQualifiers { symbol, .. }| {
                 symbol.ignore_possibly_unbound().unwrap_or(Type::unknown())
@@ -1358,6 +1383,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 ty.inner_type()
             });
+
         if !bound_ty.is_assignable_to(self.db(), declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment

@@ -32,8 +32,14 @@ def f():
     y = ""
 
     global x
-    # TODO: error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
+    # error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
     x = ""
+
+    global z
+    # error: [invalid-assignment] "Object of type `Literal[""]` is not assignable to `int`"
+    z = ""
+
+z: int
 ```
 
 ## Nested intervening scope
