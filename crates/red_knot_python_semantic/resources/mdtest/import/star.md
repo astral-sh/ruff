@@ -923,6 +923,9 @@ reveal_type(X)  # revealed: bool
 
 # TODO: should emit [unresolved-reference] diagnostic & reveal `Unknown`
 reveal_type(Y)  # revealed: bool
+
+# error: [unresolved-reference]
+reveal_type(__all__)  # revealed: Unknown
 ```
 
 ### `__all__` with additions later on in the global scope

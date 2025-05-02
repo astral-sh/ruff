@@ -71,10 +71,10 @@ impl<'db> ExportFinder<'db> {
     }
 
     fn possibly_add_export(&mut self, export: &'db Name, kind: PossibleExportKind) {
-        self.exports.insert(export, kind);
-
         if export == "__all__" {
             self.dunder_all = DunderAll::Present;
+        } else {
+            self.exports.insert(export, kind);
         }
     }
 
