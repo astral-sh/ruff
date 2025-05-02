@@ -183,13 +183,26 @@ impl<'db> SemanticIndexBuilder<'db> {
     fn is_method_of_class(&self) -> Option<FileScopeId> {
         let mut scopes_rev = self.scope_stack.iter().rev();
         let current = scopes_rev.next()?;
+
+        if self.scopes[current.file_scope_id].kind() != ScopeKind::Function {
+            return None;
+        }
+
         let parent = scopes_rev.next()?;
 
-        match (
-            self.scopes[current.file_scope_id].kind(),
-            self.scopes[parent.file_scope_id].kind(),
-        ) {
-            (ScopeKind::Function, ScopeKind::Class) => Some(parent.file_scope_id),
+        match self.scopes[parent.file_scope_id].kind() {
+            ScopeKind::Class => Some(parent.file_scope_id),
+            ScopeKind::Annotation => {
+                // If the function is generic, the parent scope is an annotation scope.
+                // In this case, we need to go up one level higher to find the class scope.
+                let grandparent = scopes_rev.next()?;
+
+                if self.scopes[grandparent.file_scope_id].kind() == ScopeKind::Class {
+                    Some(grandparent.file_scope_id)
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
