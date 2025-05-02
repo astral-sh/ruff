@@ -122,6 +122,7 @@ pub(crate) static EXCLUDE: &[FilePattern] = &[
     FilePattern::Builtin(".mypy_cache"),
     FilePattern::Builtin(".nox"),
     FilePattern::Builtin(".pants.d"),
+    FilePattern::Builtin(".pixi"),
     FilePattern::Builtin(".pyenv"),
     FilePattern::Builtin(".pytest_cache"),
     FilePattern::Builtin(".pytype"),
