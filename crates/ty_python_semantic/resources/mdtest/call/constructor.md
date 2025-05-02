@@ -53,6 +53,8 @@ reveal_type(Foo(1))  # revealed: Foo
 
 ## `__new__` present on the class itself
 
+FAILING
+
 ```py
 class Foo:
     def __new__(cls, x: int) -> "Foo":
@@ -75,6 +77,7 @@ constructor from it.
 from typing_extensions import Self
 
 class Base:
+# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `Base`"
     def __new__(cls, x: int) -> Self: ...
 
 class Foo(Base): ...
