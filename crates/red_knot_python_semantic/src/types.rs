@@ -68,6 +68,7 @@ mod instance;
 mod known_instance;
 mod mro;
 mod narrow;
+mod protocol_class;
 mod signatures;
 mod slots;
 mod string_annotation;

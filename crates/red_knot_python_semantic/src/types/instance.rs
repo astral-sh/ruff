@@ -1,6 +1,6 @@
 //! Instance types: both nominal and structural.
 
-use super::class::ProtocolInterface;
+use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
 use crate::Db;
