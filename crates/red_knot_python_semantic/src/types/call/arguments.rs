@@ -1,11 +1,10 @@
-use std::collections::VecDeque;
 use std::ops::{Deref, DerefMut};
 
 use super::Type;
 
 /// Arguments for a single call, in source order.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CallArguments<'a>(VecDeque<Argument<'a>>);
+pub(crate) struct CallArguments<'a>(Vec<Argument<'a>>);
 
 impl<'a> CallArguments<'a> {
     /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
@@ -15,16 +14,14 @@ impl<'a> CallArguments<'a> {
     where
         F: FnOnce(&Self) -> R,
     {
-        let mut call_arguments = self.clone();
-
         if bound_self.is_some() {
-            call_arguments.0.push_front(Argument::Synthetic);
+            let arguments = std::iter::once(Argument::Synthetic)
+                .chain(self.0.iter().copied())
+                .collect();
+            f(&CallArguments(arguments))
+        } else {
+            f(self)
         }
-        let result = f(&call_arguments);
-        if bound_self.is_some() {
-            call_arguments.0.pop_front();
-        }
-        result
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -60,22 +57,22 @@ pub(crate) enum Argument<'a> {
 #[derive(Clone, Debug)]
 pub(crate) struct CallArgumentTypes<'a, 'db> {
     arguments: CallArguments<'a>,
-    types: VecDeque<Type<'db>>,
+    types: Vec<Type<'db>>,
 }
 
 impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     /// Create a [`CallArgumentTypes`] with no arguments.
     pub(crate) fn none() -> Self {
         let arguments = CallArguments::default();
-        let types = VecDeque::default();
+        let types = Vec::default();
         Self { arguments, types }
     }
 
     /// Create a [`CallArgumentTypes`] from an iterator over non-variadic positional argument
     /// types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
-        let types: VecDeque<_> = positional_tys.into_iter().collect();
-        let arguments = CallArguments(vec![Argument::Positional; types.len()].into());
+        let types: Vec<_> = positional_tys.into_iter().collect();
+        let arguments = CallArguments(vec![Argument::Positional; types.len()]);
         Self { arguments, types }
     }
 
@@ -98,18 +95,21 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     /// function is invoked with the unmodified argument list.)
     pub(crate) fn with_self<F, R>(&self, bound_self: Option<Type<'db>>, f: F) -> R
     where
-        F: FnOnce(Self) -> R,
+        F: FnOnce(&Self) -> R,
     {
-        let mut call_argument_types = self.clone();
-
         if let Some(bound_self) = bound_self {
-            call_argument_types
-                .arguments
-                .0
-                .push_front(Argument::Synthetic);
-            call_argument_types.types.push_front(bound_self);
+            let arguments = CallArguments(
+                std::iter::once(Argument::Synthetic)
+                    .chain(self.arguments.0.iter().copied())
+                    .collect(),
+            );
+            let types = std::iter::once(bound_self)
+                .chain(self.types.iter().copied())
+                .collect();
+            f(&CallArgumentTypes { arguments, types })
+        } else {
+            f(self)
         }
-        f(call_argument_types)
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + '_ {

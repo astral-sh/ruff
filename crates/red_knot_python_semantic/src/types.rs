@@ -4483,7 +4483,7 @@ impl<'db> Type<'db> {
 
             match new_method {
                 Symbol::Type(new_method, boundness) => {
-                    let result = new_method.try_call(db, &argument_types);
+                    let result = new_method.try_call(db, argument_types);
 
                     if boundness == Boundness::PossiblyUnbound {
                         return Some(Err(DunderNewCallError::PossiblyUnbound(result.err())));

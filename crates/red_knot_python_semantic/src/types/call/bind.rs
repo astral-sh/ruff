@@ -912,7 +912,7 @@ impl<'db> CallableBinding<'db> {
         // before checking.
         argument_types.with_self(signature.bound_type, |argument_types| {
             for (signature, overload) in signature.iter().zip(&mut self.overloads) {
-                overload.check_types(db, signature, &argument_types);
+                overload.check_types(db, signature, argument_types);
             }
         });
     }
