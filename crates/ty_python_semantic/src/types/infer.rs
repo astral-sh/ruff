@@ -90,7 +90,6 @@ use crate::types::{
     Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
     TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    UnionBuilder, UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -112,7 +111,9 @@ use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
 use super::subclass_of::SubclassOfInner;
-use super::{BoundSuperError, BoundSuperType, ClassBase};
+use super::{
+    BoundSuperError, BoundSuperType, ClassBase, FunctionSignature, UnionBuilder, UnionType,
+};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -1120,6 +1121,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
 
+            self.check_overloaded_function_implementation_concistency(*function, scope);
+
             // TODO: Add `@staticmethod`
             for (decorator, name) in [(FunctionDecorators::CLASSMETHOD, "classmethod")] {
                 let mut decorator_present = false;
@@ -1215,6 +1218,46 @@ impl<'db> TypeInferenceBuilder<'db> {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    /// Check that the overloaded function implementation has a consistent function signature with
+    /// the overloaded functions.
+    fn check_overloaded_function_implementation_concistency(
+        &self,
+        function: FunctionType,
+        scope: &NodeWithScopeKind,
+    ) {
+        let FunctionSignature::Overloaded(overloaded_signatures, impl_signature) =
+            function.signature(self.db())
+        else {
+            return;
+        };
+        let Some(impl_signature) = impl_signature else {
+            return;
+        };
+        if matches!(scope, NodeWithScopeKind::Class(_)) {
+            return;
+        }
+        let function_node = function.node(self.db(), self.file());
+
+        for (idx, overloaded_signature) in overloaded_signatures
+            .iter()
+            .filter(|overloaded_signature| {
+                !(impl_signature.is_parameters_assignable_to(self.db(), overloaded_signature)
+                    && overloaded_signature.is_return_type_assignable_to(self.db(), impl_signature))
+            })
+            .enumerate()
+        {
+            if let Some(builder) = self
+                .context
+                .report_lint(&INVALID_OVERLOAD, &function_node.name)
+            {
+                builder.into_diagnostic(format_args!(
+            "Overloaded implementation is not consistent with signature of overload {} `{}`",
+            idx + 1, overloaded_signature.display(self.db())
+        ));
             }
         }
     }

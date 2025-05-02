@@ -478,12 +478,34 @@ impl<'db> Signature<'db> {
     /// Return `true` if a callable with signature `self` is assignable to a callable with
     /// signature `other`.
     pub(crate) fn is_assignable_to(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
+        self.is_parameters_assignable_to(db, other) && self.is_return_type_assignable_to(db, other)
+    }
+
+    /// Return `true` if a callable with parameters signature `self` is assignable to a callable with
+    /// parameters signature `other`.
+    pub(crate) fn is_parameters_assignable_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+    ) -> bool {
         self.is_assignable_to_impl(other, |type1, type2| {
             // In the context of a callable type, the `None` variant represents an `Unknown` type.
             type1
                 .unwrap_or(Type::unknown())
                 .is_assignable_to(db, type2.unwrap_or(Type::unknown()))
         })
+    }
+
+    /// Return `true` if a callable with return type `self` is assignable to a callable with
+    /// return type `other`.
+    pub(crate) fn is_return_type_assignable_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Signature<'db>,
+    ) -> bool {
+        self.return_ty
+            .unwrap_or(Type::unknown())
+            .is_assignable_to(db, other.return_ty.unwrap_or(Type::unknown()))
     }
 
     /// Return `true` if a callable with signature `self` is a subtype of a callable with signature
@@ -493,10 +515,12 @@ impl<'db> Signature<'db> {
     ///
     /// Panics if `self` or `other` is not a fully static signature.
     pub(crate) fn is_subtype_of(&self, db: &'db dyn Db, other: &Signature<'db>) -> bool {
-        self.is_assignable_to_impl(other, |type1, type2| {
+        let check_types = |type1: Option<Type>, type2: Option<Type>| {
             // SAFETY: Subtype relation is only checked for fully static types.
             type1.unwrap().is_subtype_of(db, type2.unwrap())
-        })
+        };
+        self.is_assignable_to_impl(other, check_types)
+            && check_types(self.return_ty, other.return_ty)
     }
 
     /// Implementation for the [`is_assignable_to`] and [`is_subtype_of`] for signature.
@@ -566,11 +590,6 @@ impl<'db> Signature<'db> {
                     self.current_other.into_iter().chain(self.iter_other),
                 )
             }
-        }
-
-        // Return types are covariant.
-        if !check_types(self.return_ty, other.return_ty) {
-            return false;
         }
 
         if self.parameters.is_gradual() || other.parameters.is_gradual() {

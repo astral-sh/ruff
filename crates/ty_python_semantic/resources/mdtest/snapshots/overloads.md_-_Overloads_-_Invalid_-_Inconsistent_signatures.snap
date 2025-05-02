@@ -1,0 +1,48 @@
+---
+source: crates/red_knot_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: overloads.md - Overloads - Invalid - Inconsistent signatures
+mdtest path: crates/red_knot_python_semantic/resources/mdtest/overloads.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import overload
+2 | 
+3 | @overload
+4 | def func(x: int) -> int: ...
+5 | @overload
+6 | def func(x: str) -> str: ...
+7 | 
+8 | # error: [invalid-overload]
+9 | def func(): ...
+```
+
+# Diagnostics
+
+```
+error: lint:invalid-overload: Overloaded implementation is not consistent with signature of overload 1 `(x: int) -> int`
+ --> src/mdtest_snippet.py:9:5
+  |
+8 | # error: [invalid-overload]
+9 | def func(): ...
+  |     ^^^^
+  |
+
+```
+
+```
+error: lint:invalid-overload: Overloaded implementation is not consistent with signature of overload 2 `(x: str) -> str`
+ --> src/mdtest_snippet.py:9:5
+  |
+8 | # error: [invalid-overload]
+9 | def func(): ...
+  |     ^^^^
+  |
+
+```

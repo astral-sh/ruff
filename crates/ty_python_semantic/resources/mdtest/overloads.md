@@ -332,6 +332,25 @@ from typing import overload
 def func(x: int) -> int: ...
 ```
 
+### Inconsistent signatures
+
+<!-- snapshot-diagnostics -->
+
+The overloaded function implementation must have a consistent function signature with the overloaded
+functions.
+
+```py
+from typing import overload
+
+@overload
+def func(x: int) -> int: ...
+@overload
+def func(x: str) -> str: ...
+
+# error: [invalid-overload]
+def func(): ...
+```
+
 ### Overload without an implementation
 
 #### Regular modules
