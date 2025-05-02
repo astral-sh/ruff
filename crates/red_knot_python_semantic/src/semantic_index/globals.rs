@@ -3,20 +3,19 @@
 //! names in a given scope.
 
 use ruff_python_ast::name::Name;
-use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 
 /// The set of global names for a given scope, represented as a map from the name of the global to
 /// the range of the declaration in the source code.
 #[derive(Debug, salsa::Update, Default)]
-pub struct Globals(FxHashMap<Name, TextRange>);
+pub struct Globals(FxHashSet<Name>);
 
 impl Globals {
     pub(crate) fn contains(&self, name: &str) -> bool {
-        self.0.contains_key(name)
+        self.0.contains(name)
     }
 
-    pub(crate) fn insert(&mut self, name: Name, range: TextRange) {
-        self.0.insert(name, range);
+    pub(crate) fn insert(&mut self, name: Name) {
+        self.0.insert(name);
     }
 }

@@ -1921,7 +1921,7 @@ where
                     self.globals_by_scope
                         .entry(scope_id)
                         .or_default()
-                        .insert(name.id.clone(), name.range);
+                        .insert(name.id.clone());
                 }
                 walk_stmt(self, stmt);
             }
