@@ -182,43 +182,33 @@ impl<'db> ProtocolInstanceType<'db> {
 
     /// Return `true` if this protocol type is a subtype of the protocol `other`.
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        if !self.is_fully_static(db) {
-            return false;
-        }
-        if !other.is_fully_static(db) {
-            return false;
-        }
-        other
-            .0
-            .interface(db)
-            .is_sub_interface_of(self.0.interface(db))
+        self.is_fully_static(db) && other.is_fully_static(db) && self.is_assignable_to(db, other)
     }
 
     /// Return `true` if this protocol type is assignable to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_subtype_of(db, other)
+        other
+            .0
+            .interface(db)
+            .is_sub_interface_of(self.0.interface(db))
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        if !self.is_fully_static(db) {
-            return false;
-        }
-        if !other.is_fully_static(db) {
-            return false;
-        }
-        self.normalized(db) == other.normalized(db)
+        self.is_fully_static(db)
+            && other.is_fully_static(db)
+            && self.normalized(db) == other.normalized(db)
     }
 
     /// Return `true` if this protocol type is gradually equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_equivalent_to(db, other)
+        self.normalized(db) == other.normalized(db)
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.

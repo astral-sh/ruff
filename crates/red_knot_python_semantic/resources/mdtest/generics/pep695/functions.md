@@ -232,3 +232,58 @@ def g[T](x: T) -> T | None:
 reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]
 reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 ```
+
+## Protocols as TypeVar bounds
+
+Protocol types can be used as TypeVar bounds, just like nominal types.
+
+```py
+from typing import Any, Protocol
+from knot_extensions import static_assert, is_assignable_to
+
+class SupportsClose(Protocol):
+    def close(self) -> None: ...
+
+class ClosableFullyStaticProtocol(Protocol):
+    x: int
+    def close(self) -> None: ...
+
+class ClosableNonFullyStaticProtocol(Protocol):
+    x: Any
+    def close(self) -> None: ...
+
+class ClosableFullyStaticNominal:
+    x: int
+    def close(self) -> None: ...
+
+class ClosableNonFullyStaticNominal:
+    x: int
+    def close(self) -> None: ...
+
+class NotClosableProtocol(Protocol): ...
+class NotClosableNominal: ...
+
+def close_and_return[T: SupportsClose](x: T) -> T:
+    x.close()
+    return x
+
+def f(
+    a: SupportsClose,
+    b: ClosableFullyStaticProtocol,
+    c: ClosableNonFullyStaticProtocol,
+    d: ClosableFullyStaticNominal,
+    e: ClosableNonFullyStaticNominal,
+    f: NotClosableProtocol,
+    g: NotClosableNominal,
+):
+    reveal_type(close_and_return(a))  # revealed: SupportsClose
+    reveal_type(close_and_return(b))  # revealed: ClosableFullyStaticProtocol
+    reveal_type(close_and_return(c))  # revealed: ClosableNonFullyStaticProtocol
+    reveal_type(close_and_return(d))  # revealed: ClosableFullyStaticNominal
+    reveal_type(close_and_return(e))  # revealed: ClosableNonFullyStaticNominal
+
+    # error: [invalid-argument-type] "does not satisfy upper bound"
+    reveal_type(close_and_return(f))  # revealed: Unknown
+    # error: [invalid-argument-type] "does not satisfy upper bound"
+    reveal_type(close_and_return(g))  # revealed: Unknown
+```

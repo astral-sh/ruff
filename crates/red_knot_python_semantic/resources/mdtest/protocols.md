@@ -1367,8 +1367,13 @@ static_assert(is_assignable_to(NominalWithX, FullyStatic))
 static_assert(is_assignable_to(NominalWithX, NotFullyStatic))
 
 static_assert(not is_subtype_of(FullyStatic, NotFullyStatic))
+static_assert(is_assignable_to(FullyStatic, NotFullyStatic))
+
 static_assert(not is_subtype_of(NotFullyStatic, FullyStatic))
+static_assert(is_assignable_to(NotFullyStatic, FullyStatic))
+
 static_assert(not is_subtype_of(NominalWithX, NotFullyStatic))
+static_assert(is_assignable_to(NominalWithX, NotFullyStatic))
 
 static_assert(is_subtype_of(NominalWithX, FullyStatic))
 
@@ -1377,6 +1382,12 @@ static_assert(not is_equivalent_to(NotFullyStatic, NotFullyStatic))
 
 static_assert(is_gradual_equivalent_to(FullyStatic, FullyStatic))
 static_assert(is_gradual_equivalent_to(NotFullyStatic, NotFullyStatic))
+
+class AlsoNotFullyStatic(Protocol):
+    x: Any
+
+static_assert(not is_equivalent_to(NotFullyStatic, AlsoNotFullyStatic))
+static_assert(is_gradual_equivalent_to(NotFullyStatic, AlsoNotFullyStatic))
 ```
 
 Empty protocols are fully static; this follows from the fact that an empty protocol is equivalent to
