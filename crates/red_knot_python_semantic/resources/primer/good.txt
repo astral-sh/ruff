@@ -100,7 +100,6 @@ static-frame
 stone
 strawberry
 tornado
-trio
 twine
 typeshed-stats
 urllib3

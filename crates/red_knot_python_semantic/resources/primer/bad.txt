@@ -28,4 +28,5 @@ spark  # cycle panics (try_metaclass_)
 steam.py  # cycle panics (try_metaclass_), often hangs when multi-threaded
 streamlit  # cycle panic (signature_)
 sympy  # stack overflow
+trio  # cycle panics (deferred annotatation resolving in wrong scope)
 xarray  # cycle panics (try_metaclass_)
