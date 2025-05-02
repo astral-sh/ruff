@@ -1900,6 +1900,41 @@ def first_square():
     Ok(())
 }
 
+/// Regression test for https://github.com/astral-sh/ruff/issues/2253
+#[test]
+fn add_noqa_parent() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let test_path = tempdir.path().join("noqa.py");
+    fs::write(
+        &test_path,
+        r#"
+from foo import (  # noqa: F401
+		bar
+)
+		"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--add-noqa")
+                .arg("--select=F401")
+                .arg("noqa.py")
+                .current_dir(&tempdir), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        Added 1 noqa directive.
+        ");
+    });
+
+    Ok(())
+}
+
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python() -> Result<()> {
