@@ -1928,7 +1928,6 @@ from foo import (  # noqa: F401
         ----- stdout -----
 
         ----- stderr -----
-        Added 1 noqa directive.
         ");
     });
 
