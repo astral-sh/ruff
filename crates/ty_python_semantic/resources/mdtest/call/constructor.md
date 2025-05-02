@@ -77,7 +77,7 @@ constructor from it.
 from typing_extensions import Self
 
 class Base:
-# error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `Base`"
+    # error: [invalid-return-type] "Function can implicitly return `None`, which is not assignable to return type `Base`"
     def __new__(cls, x: int) -> Self: ...
 
 class Foo(Base): ...

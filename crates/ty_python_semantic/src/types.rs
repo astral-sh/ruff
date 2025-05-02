@@ -4762,6 +4762,7 @@ impl<'db> Type<'db> {
                 // TODO: Use an opt-in rule for a bare `Callable`
                 KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
+                // For self we need access to scopes to get the
                 KnownInstanceType::TypingSelf => Ok(todo_type!("Support for `typing.Self`")),
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
                 KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),

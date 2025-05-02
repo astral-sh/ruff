@@ -7312,16 +7312,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                         Type::KnownInstance(KnownInstanceType::TypingSelf) => {
                             let scope = self.scope();
-                            if let Some(class_node) = self.enclosing_class_symbol(scope) {
-                                let class = class_node.expect_class_literal();
+                            if let Some(class_ty) = self.enclosing_class_symbol(scope) {
+                                let class = class_ty.expect_class_literal();
                                 if let TypeDefinition::Class(d) =
-                                    class_node.definition(self.db()).unwrap()
+                                    class_ty.definition(self.db()).unwrap()
                                 {
                                     let ty = Type::TypeVar(TypeVarInstance::new(
                                         self.db(),
                                         class.name(self.db()),
                                         d,
-                                        Some(TypeVarBoundOrConstraints::UpperBound(name_expr_ty)),
+                                        Some(TypeVarBoundOrConstraints::UpperBound(
+                                            Type::instance(
+                                                self.db(),
+                                                class_ty.expect_class_type(self.db()),
+                                            ),
+                                        )),
                                         TypeVarVariance::Invariant,
                                         None,
                                         TypeVarKind::Legacy,
