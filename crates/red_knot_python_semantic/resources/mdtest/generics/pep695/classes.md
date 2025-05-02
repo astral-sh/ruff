@@ -97,10 +97,12 @@ class IntSubclass(int): ...
 reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
+# TODO: update this diagnostic to talk about type parameters and specializations
 # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `str`"
 reveal_type(Bounded[str]())  # revealed: Unknown
 
-# error:  [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `int | str`"
+# TODO: update this diagnostic to talk about type parameters and specializations
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `int | str`"
 reveal_type(Bounded[int | str]())  # revealed: Unknown
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
@@ -126,6 +128,7 @@ reveal_type(Constrained[str]())  # revealed: Constrained[str]
 # TODO: revealed: Unknown
 reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 
+# TODO: update this diagnostic to talk about type parameters and specializations
 # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int | str`, found `object`"
 reveal_type(Constrained[object]())  # revealed: Unknown
 ```
