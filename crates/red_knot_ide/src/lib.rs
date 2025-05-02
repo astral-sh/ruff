@@ -1,3 +1,4 @@
+mod completion;
 mod db;
 mod find_node;
 mod goto;
@@ -5,6 +6,7 @@ mod hover;
 mod inlay_hints;
 mod markup;
 
+pub use completion::completion;
 pub use db::Db;
 pub use goto::goto_type_definition;
 pub use hover::hover;

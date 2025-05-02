@@ -1845,7 +1845,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = match decorator_ty
-                .try_call(self.db(), &mut CallArgumentTypes::positional([inferred_ty]))
+                .try_call(self.db(), &CallArgumentTypes::positional([inferred_ty]))
                 .map(|bindings| bindings.return_type(self.db()))
             {
                 Ok(return_ty) => return_ty,
@@ -2866,7 +2866,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let successful_call = meta_dunder_set
                                 .try_call(
                                     db,
-                                    &mut CallArgumentTypes::positional([
+                                    &CallArgumentTypes::positional([
                                         meta_attr_ty,
                                         object_ty,
                                         value_ty,
@@ -3007,7 +3007,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let successful_call = meta_dunder_set
                                 .try_call(
                                     db,
-                                    &mut CallArgumentTypes::positional([
+                                    &CallArgumentTypes::positional([
                                         meta_attr_ty,
                                         object_ty,
                                         value_ty,
@@ -3177,7 +3177,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     ..
                 },
             ) => {
-                self.store_expression_type(target, Type::Never);
+                self.store_expression_type(target, assigned_ty.unwrap_or(Type::unknown()));
 
                 let object_ty = self.infer_expression(object);
 
@@ -3262,9 +3262,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 target,
                 simple: _,
             } = assignment;
-            self.infer_annotation_expression(annotation, DeferredExpressionState::None);
+            let annotated =
+                self.infer_annotation_expression(annotation, DeferredExpressionState::None);
             self.infer_optional_expression(value.as_deref());
+
+            // If we have an annotated assignment like `self.attr: int = 1`, we still need to
+            // do type inference on the `self.attr` target to get types for all sub-expressions.
             self.infer_expression(target);
+
+            // But here we explicitly overwrite the type for the overall `self.attr` node with
+            // the annotated type. We do no use `store_expression_type` here, because it checks
+            // that no type has been stored for the expression before.
+            let expr_id = target.scoped_expression_id(self.db(), self.scope());
+            self.types
+                .expressions
+                .insert(expr_id, annotated.inner_type());
         }
     }
 
@@ -3329,6 +3341,11 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
+        // Annotated assignments to non-names are not definitions, so we can only be here
+        // if the target is a name. In this case, we can simply store types in `target`
+        // below, instead of calling `infer_expression` (which would return `Never`).
+        debug_assert!(target.is_name_expr());
+
         if let Some(value) = value {
             let inferred_ty = self.infer_expression(value);
             let inferred_ty = if target
@@ -3349,6 +3366,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     inferred_ty,
                 },
             );
+
+            self.store_expression_type(target, inferred_ty);
         } else {
             if self.in_stub() {
                 self.add_declaration_with_binding(
@@ -3359,9 +3378,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             } else {
                 self.add_declaration(target.into(), definition, declared_ty);
             }
-        }
 
-        self.infer_expression(target);
+            self.store_expression_type(target, declared_ty.inner_type());
+        }
     }
 
     fn infer_augmented_assignment_statement(&mut self, assignment: &ast::StmtAugAssign) {
@@ -3450,12 +3469,14 @@ impl<'db> TypeInferenceBuilder<'db> {
         // Resolve the target type, assuming a load context.
         let target_type = match &**target {
             ast::Expr::Name(name) => {
-                self.store_expression_type(target, Type::Never);
-                self.infer_name_load(name)
+                let previous_value = self.infer_name_load(name);
+                self.store_expression_type(target, previous_value);
+                previous_value
             }
             ast::Expr::Attribute(attr) => {
-                self.store_expression_type(target, Type::Never);
-                self.infer_attribute_load(attr)
+                let previous_value = self.infer_attribute_load(attr);
+                self.store_expression_type(target, previous_value);
+                previous_value
             }
             _ => self.infer_expression(target),
         };
@@ -4574,7 +4595,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
-        let mut call_arguments = Self::parse_arguments(arguments);
+        let call_arguments = Self::parse_arguments(arguments);
         let callable_type = self.infer_expression(func);
 
         if let Type::FunctionLiteral(function) = callable_type {
@@ -4653,11 +4674,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         let signatures = callable_type.signatures(self.db());
-        let bindings = Bindings::match_parameters(signatures, &mut call_arguments);
-        let mut call_argument_types =
+        let bindings = Bindings::match_parameters(signatures, &call_arguments);
+        let call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
-        match bindings.check_types(self.db(), &mut call_argument_types) {
+        match bindings.check_types(self.db(), &call_argument_types) {
             Ok(mut bindings) => {
                 for binding in &mut bindings {
                     let binding_type = binding.callable_type;
@@ -6497,7 +6518,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
-                    .try_call(db, &mut CallArgumentTypes::positional([right, left]))
+                    .try_call(db, &CallArgumentTypes::positional([right, left]))
                     .map(|bindings| bindings.return_type(db))
                     .ok()
             }
@@ -6651,7 +6672,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         generic_context: GenericContext<'db>,
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
-        let mut call_argument_types = match slice_node {
+        let call_argument_types = match slice_node {
             ast::Expr::Tuple(tuple) => {
                 let arguments = CallArgumentTypes::positional(
                     tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
@@ -6668,8 +6689,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             value_ty,
             generic_context.signature(self.db()),
         ));
-        let bindings = match Bindings::match_parameters(signatures, &mut call_argument_types)
-            .check_types(self.db(), &mut call_argument_types)
+        let bindings = match Bindings::match_parameters(signatures, &call_argument_types)
+            .check_types(self.db(), &call_argument_types)
         {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
@@ -6917,7 +6938,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             match ty.try_call(
                                 self.db(),
-                                &mut CallArgumentTypes::positional([value_ty, slice_ty]),
+                                &CallArgumentTypes::positional([value_ty, slice_ty]),
                             ) {
                                 Ok(bindings) => return bindings.return_type(self.db()),
                                 Err(CallError(_, bindings)) => {
@@ -7676,7 +7697,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         fn element_could_alter_type_of_whole_tuple(
             element: &ast::Expr,
             element_ty: Type,
-            builder: &TypeInferenceBuilder,
+            builder: &mut TypeInferenceBuilder,
         ) -> bool {
             if !element_ty.is_todo() {
                 return false;
@@ -7685,10 +7706,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             match element {
                 ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) => true,
                 ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-                    matches!(
-                        builder.expression_type(value),
-                        Type::KnownInstance(KnownInstanceType::Unpack)
-                    )
+                    let value_ty = if builder.deferred_state.in_string_annotation() {
+                        // Using `.expression_type` does not work in string annotations, because
+                        // we do not store types for sub-expressions. Re-infer the type here.
+                        builder.infer_expression(value)
+                    } else {
+                        builder.expression_type(value)
+                    };
+
+                    matches!(value_ty, Type::KnownInstance(KnownInstanceType::Unpack))
                 }
                 _ => false,
             }

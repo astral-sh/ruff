@@ -227,6 +227,9 @@ impl Server {
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),
+            completion_provider: Some(lsp_types::CompletionOptions {
+                ..Default::default()
+            }),
             ..Default::default()
         }
     }

@@ -36,6 +36,11 @@ pub(super) fn request<'a>(req: server::Request) -> Task<'a> {
         request::InlayHintRequestHandler::METHOD => background_request_task::<
             request::InlayHintRequestHandler,
         >(req, BackgroundSchedule::Worker),
+        request::CompletionRequestHandler::METHOD => background_request_task::<
+            request::CompletionRequestHandler,
+        >(
+            req, BackgroundSchedule::LatencySensitive
+        ),
 
         method => {
             tracing::warn!("Received request {method} which does not have a handler");
