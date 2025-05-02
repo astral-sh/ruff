@@ -12,7 +12,6 @@ use rustc_hash::FxHasher;
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
-use crate::semantic_index::globals::Globals;
 use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
 use crate::semantic_index::{semantic_index, SymbolMap};
 use crate::Db;
@@ -179,7 +178,6 @@ pub struct Scope {
     node: NodeWithScopeKind,
     descendants: Range<FileScopeId>,
     reachability: ScopedVisibilityConstraintId,
-    pub globals: Globals,
 }
 
 impl Scope {
@@ -194,7 +192,6 @@ impl Scope {
             node,
             descendants,
             reachability,
-            globals: Globals::default(),
         }
     }
 
@@ -577,7 +574,3 @@ pub(crate) enum NodeWithScopeKey {
     DictComprehension(NodeKey),
     GeneratorExpression(NodeKey),
 }
-
-// globals_per_scope: FxHashMap<ScopeId, Globals>
-
-// semantic_index.globals_per_scope[scope_id]

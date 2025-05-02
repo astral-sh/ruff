@@ -51,6 +51,8 @@ use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
+use super::globals::Globals;
+
 mod except_handlers;
 
 #[derive(Clone, Debug, Default)]
@@ -106,6 +108,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
+    globals_by_scope: FxHashMap<FileScopeId, Globals>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -140,6 +143,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             scopes_by_node: FxHashMap::default(),
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
+            globals_by_scope: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
 
@@ -1089,6 +1093,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             definitions_by_node: self.definitions_by_node,
             expressions_by_node: self.expressions_by_node,
             scope_ids_by_scope: self.scope_ids_by_scope,
+            globals_by_scope: self.globals_by_scope,
             ast_ids,
             scopes_by_expression: self.scopes_by_expression,
             scopes_by_node: self.scopes_by_node,
@@ -1913,8 +1918,9 @@ where
                         });
                     }
                     let scope_id = self.current_scope();
-                    self.scopes[scope_id]
-                        .globals
+                    self.globals_by_scope
+                        .entry(scope_id)
+                        .or_default()
                         .insert(name.id.clone(), name.range);
                 }
                 walk_stmt(self, stmt);

@@ -12,10 +12,6 @@ use rustc_hash::FxHashMap;
 pub struct Globals(FxHashMap<Name, TextRange>);
 
 impl Globals {
-    pub(crate) fn get(&self, name: &str) -> Option<TextRange> {
-        self.0.get(name).copied()
-    }
-
     pub(crate) fn contains(&self, name: &str) -> bool {
         self.0.contains_key(name)
     }

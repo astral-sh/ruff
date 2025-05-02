@@ -1,6 +1,7 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
+use globals::Globals;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
@@ -175,6 +176,9 @@ pub(crate) struct SemanticIndex<'db> {
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
 
+    /// Map from the file-local [`FileScopeId`] to the [`Globals`] it contains.
+    globals_by_scope: FxHashMap<FileScopeId, Globals>,
+
     /// Use-def map for each scope in this file.
     use_def_maps: IndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
 
@@ -249,6 +253,10 @@ impl<'db> SemanticIndex<'db> {
 
     pub(crate) fn scope_ids(&self) -> impl Iterator<Item = ScopeId> {
         self.scope_ids_by_scope.iter().copied()
+    }
+
+    pub(crate) fn globals_by_scope(&self, scope_id: FileScopeId) -> Option<&Globals> {
+        self.globals_by_scope.get(&scope_id)
     }
 
     /// Returns the id of the parent scope.
