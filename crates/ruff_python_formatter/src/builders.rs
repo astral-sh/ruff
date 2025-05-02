@@ -212,7 +212,7 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
             if self
                 .fmt
                 .context()
-                .f_string_state()
+                .ft_string_state()
                 .can_contain_line_breaks()
                 == Some(false)
             {

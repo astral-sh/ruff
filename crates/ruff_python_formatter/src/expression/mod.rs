@@ -50,6 +50,7 @@ pub(crate) mod expr_slice;
 pub(crate) mod expr_starred;
 pub(crate) mod expr_string_literal;
 pub(crate) mod expr_subscript;
+pub(crate) mod expr_t_string;
 pub(crate) mod expr_tuple;
 pub(crate) mod expr_unary_op;
 pub(crate) mod expr_yield;
@@ -94,6 +95,7 @@ impl FormatRule<Expr, PyFormatContext<'_>> for FormatExpr {
             Expr::Compare(expr) => expr.format().fmt(f),
             Expr::Call(expr) => expr.format().fmt(f),
             Expr::FString(expr) => expr.format().fmt(f),
+            Expr::TString(expr) => expr.format().fmt(f),
             Expr::StringLiteral(expr) => expr.format().fmt(f),
             Expr::BytesLiteral(expr) => expr.format().fmt(f),
             Expr::NumberLiteral(expr) => expr.format().fmt(f),
@@ -282,6 +284,7 @@ fn format_with_parentheses_comments(
         Expr::Compare(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::Call(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::FString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
+        Expr::TString(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::StringLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::BytesLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
         Expr::NumberLiteral(expr) => FormatNodeRule::fmt_fields(expr.format().rule(), expr, f),
@@ -480,6 +483,7 @@ impl NeedsParentheses for Expr {
             Expr::Compare(expr) => expr.needs_parentheses(parent, context),
             Expr::Call(expr) => expr.needs_parentheses(parent, context),
             Expr::FString(expr) => expr.needs_parentheses(parent, context),
+            Expr::TString(expr) => expr.needs_parentheses(parent, context),
             Expr::StringLiteral(expr) => expr.needs_parentheses(parent, context),
             Expr::BytesLiteral(expr) => expr.needs_parentheses(parent, context),
             Expr::NumberLiteral(expr) => expr.needs_parentheses(parent, context),
@@ -775,6 +779,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
             // Terminal nodes or nodes that wrap a sub-expression (where the sub expression can never be at the end).
             Expr::FString(_)
+            | Expr::TString(_)
             | Expr::StringLiteral(_)
             | Expr::BytesLiteral(_)
             | Expr::NumberLiteral(_)
@@ -1126,6 +1131,7 @@ pub(crate) fn is_expression_huggable(expr: &Expr, context: &PyFormatContext) -> 
         | Expr::StringLiteral(_)
         | Expr::BytesLiteral(_)
         | Expr::FString(_)
+        | Expr::TString(_)
         | Expr::EllipsisLiteral(_) => false,
     }
 }
@@ -1221,6 +1227,7 @@ pub(crate) fn is_splittable_expression(expr: &Expr, context: &PyFormatContext) -
 
         // String like literals can expand if they are implicit concatenated.
         Expr::FString(fstring) => fstring.value.is_implicit_concatenated(),
+        Expr::TString(tstring) => tstring.value.is_implicit_concatenated(),
         Expr::StringLiteral(string) => string.value.is_implicit_concatenated(),
         Expr::BytesLiteral(bytes) => bytes.value.is_implicit_concatenated(),
 
@@ -1278,6 +1285,7 @@ pub(crate) fn left_most<'expr>(
             | Expr::Name(_)
             | Expr::Starred(_)
             | Expr::FString(_)
+            | Expr::TString(_)
             | Expr::StringLiteral(_)
             | Expr::BytesLiteral(_)
             | Expr::NumberLiteral(_)

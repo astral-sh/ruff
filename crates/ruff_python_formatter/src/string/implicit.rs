@@ -2,9 +2,11 @@ use itertools::Itertools;
 use ruff_formatter::{format_args, write, FormatContext};
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::str_prefix::{
-    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix,
+    AnyStringPrefix, ByteStringPrefix, FStringPrefix, StringLiteralPrefix, TStringPrefix,
 };
-use ruff_python_ast::{AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart};
+use ruff_python_ast::{
+    AnyStringFlags, FStringElement, StringFlags, StringLike, StringLikePart, TStringElement,
+};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 use std::borrow::Cow;
@@ -13,6 +15,8 @@ use crate::comments::{leading_comments, trailing_comments};
 use crate::expression::parentheses::in_parentheses_only_soft_line_break_or_space;
 use crate::other::f_string::{FStringContext, FStringLayout};
 use crate::other::f_string_element::FormatFStringExpressionElement;
+use crate::other::t_string::{TStringContext, TStringLayout};
+use crate::other::t_string_element::FormatTStringInterpolationElement;
 use crate::prelude::*;
 use crate::string::docstring::needs_chaperone_space;
 use crate::string::normalize::{
@@ -97,6 +101,7 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringExpanded<'_
                 StringLikePart::String(part) => part.format().fmt(f),
                 StringLikePart::Bytes(bytes_literal) => bytes_literal.format().fmt(f),
                 StringLikePart::FString(part) => part.format().fmt(f),
+                StringLikePart::TString(part) => part.format().fmt(f),
             });
 
             let part_comments = comments.leading_dangling_trailing(part);
@@ -202,6 +207,7 @@ impl<'a> FormatImplicitConcatenatedStringFlat<'a> {
                 StringLike::String(_) => AnyStringPrefix::Regular(StringLiteralPrefix::Empty),
                 StringLike::Bytes(_) => AnyStringPrefix::Bytes(ByteStringPrefix::Regular),
                 StringLike::FString(_) => AnyStringPrefix::Format(FStringPrefix::Regular),
+                StringLike::TString(_) => AnyStringPrefix::Template(TStringPrefix::Regular),
             };
 
             let quote = if let Some(quote) = preserve_quotes_requirement {
@@ -321,6 +327,33 @@ impl Format<PyFormatContext<'_>> for FormatImplicitConcatenatedStringFlat<'_> {
                                 );
 
                                 FormatFStringExpressionElement::new(expression, context).fmt(f)?;
+                            }
+                        }
+                    }
+                }
+                StringLikePart::TString(f_string) => {
+                    for element in &f_string.elements {
+                        match element {
+                            TStringElement::Literal(literal) => {
+                                FormatLiteralContent {
+                                    range: literal.range(),
+                                    flags: self.flags,
+                                    is_fstring: true,
+                                    trim_end: false,
+                                    trim_start: false,
+                                }
+                                .fmt(f)?;
+                            }
+                            // Formatting the expression here and in the expanded version is safe **only**
+                            // because we assert that the f-string never contains any comments.
+                            TStringElement::Interpolation(expression) => {
+                                let context = TStringContext::new(
+                                    self.flags,
+                                    TStringLayout::from_t_string(f_string, f.context().source()),
+                                );
+
+                                FormatTStringInterpolationElement::new(expression, context)
+                                    .fmt(f)?;
                             }
                         }
                     }

@@ -7,11 +7,11 @@ use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
     str::{Quote, TripleQuotes},
     AnyStringFlags, BytesLiteral, FString, FStringElement, FStringElements, FStringFlags,
-    StringFlags, StringLikePart, StringLiteral,
+    StringFlags, StringLikePart, StringLiteral, TStringElement, TStringElements, TStringFlags,
 };
 use ruff_text_size::{Ranged, TextRange, TextSlice};
 
-use crate::context::FStringState;
+use crate::context::FTStringState;
 use crate::prelude::*;
 use crate::string::StringQuotes;
 use crate::QuoteStyle;
@@ -48,7 +48,8 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
         let supports_pep_701 = self.context.options().target_version().supports_pep_701();
 
         // For f-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
-        if let FStringState::InsideExpressionElement(parent_context) = self.context.f_string_state()
+        if let FTStringState::InsideExpressionElement(parent_context) =
+            self.context.ft_string_state()
         {
             let parent_flags = parent_context.f_string().flags();
 
@@ -269,6 +270,16 @@ impl QuoteMetadata {
                     preferred_quote,
                 )
             }
+            StringLikePart::TString(tstring) => {
+                let metadata = QuoteMetadata::from_str("", part.flags(), preferred_quote);
+
+                metadata.merge_tstring_elements(
+                    &tstring.elements,
+                    tstring.flags,
+                    context,
+                    preferred_quote,
+                )
+            }
         }
     }
 
@@ -401,6 +412,51 @@ impl QuoteMetadata {
                     if let Some(spec) = expression.format_spec.as_deref() {
                         if expression.debug_text.is_none() {
                             merged = merged.merge_fstring_elements(
+                                &spec.elements,
+                                flags,
+                                context,
+                                preferred_quote,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        merged
+    }
+    /// For t-strings, only consider the quotes inside string-literals but ignore
+    /// quotes inside interpolations (except inside the format spec). This allows both the outer and the nested literals
+    /// to make the optimal local-choice to reduce the total number of quotes necessary.
+    /// This doesn't require any pre 312 special handling because an interpolation
+    /// can never contain the outer quote character, not even escaped:
+    /// ```python
+    /// t"{'escaping a quote like this \" is a syntax error pre 312'}"
+    /// ```
+    fn merge_tstring_elements(
+        self,
+        elements: &TStringElements,
+        flags: TStringFlags,
+        context: &PyFormatContext,
+        preferred_quote: Quote,
+    ) -> Self {
+        let mut merged = self;
+
+        for element in elements {
+            match element {
+                TStringElement::Literal(literal) => {
+                    merged = merged
+                        .merge(&QuoteMetadata::from_str(
+                            context.source().slice(literal),
+                            flags.into(),
+                            preferred_quote,
+                        ))
+                        .expect("Merge to succeed because all parts have the same flags");
+                }
+                TStringElement::Interpolation(interpolation) => {
+                    if let Some(spec) = interpolation.format_spec.as_deref() {
+                        if interpolation.debug_text.is_none() {
+                            merged = merged.merge_tstring_elements(
                                 &spec.elements,
                                 flags,
                                 context,
@@ -975,6 +1031,17 @@ pub(super) fn is_fstring_with_triple_quoted_literal_expression_containing_quotes
                     let mut contains_quotes = false;
                     for literal in fstring.elements.literals() {
                         if self.contains_quote(literal.range(), fstring.flags.into()) {
+                            contains_quotes = true;
+                            break;
+                        }
+                    }
+
+                    contains_quotes
+                }
+                StringLikePart::TString(tstring) => {
+                    let mut contains_quotes = false;
+                    for literal in tstring.elements.literals() {
+                        if self.contains_quote(literal.range(), tstring.flags.into()) {
                             contains_quotes = true;
                             break;
                         }
