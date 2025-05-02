@@ -39,7 +39,7 @@ impl<'db> ProtocolClassLiteral<'db> {
     /// the protocol's list of members.
     pub(super) fn interface(self, db: &'db dyn Db) -> &'db ProtocolInterface<'db> {
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
-        cached_protocol_members(db, *self)
+        cached_protocol_interface(db, *self)
     }
 
     pub(super) fn is_runtime_checkable(self, db: &'db dyn Db) -> bool {
@@ -56,19 +56,24 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
     }
 }
 
+/// The interface of a protocol: the members of that protocol, and the types of those members.
 #[derive(Debug, PartialEq, Eq, salsa::Update, Default, Clone, Hash)]
 pub(super) struct ProtocolInterface<'db>(Box<[ProtocolMember<'db>]>);
 
 impl<'db> ProtocolInterface<'db> {
+    /// Iterate over the members of this protocol.
     pub(super) fn members(&self) -> impl ExactSizeIterator<Item = &ProtocolMember<'db>> {
         self.0.iter()
     }
 
+    /// Return `true` if all members of this protocol are fully static.
     pub(super) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         self.members().all(|member| member.ty.is_fully_static(db))
     }
 
-    /// TODO: consider the types of the members as well as their names.
+    /// Return `true` if if all members on `self` are also members of `other`.
+    ///
+    /// TODO: this method should consider the types of the members as well as their names.
     /// TODO: using a map as the underlying data structure would be more efficient here than a boxed slice.
     pub(super) fn is_sub_interface_of(&self, other: &Self) -> bool {
         self.members().all(|member| {
@@ -78,11 +83,13 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
+    /// Return `true` if any of the members of this protocol type contain any `Todo` types.
     pub(super) fn contains_todo(&self, db: &'db dyn Db) -> bool {
         self.members().any(|member| member.ty.contains_todo(db))
     }
 }
 
+/// A single member of a protocol interface.
 #[derive(Debug, PartialEq, Eq, salsa::Update, Clone, Hash)]
 pub(super) struct ProtocolMember<'db> {
     name: Name,
@@ -104,6 +111,9 @@ impl<'db> ProtocolMember<'db> {
     }
 }
 
+/// Returns `true` if a declaration or binding to a given name in a protocol class body
+/// should be excluded from the list of protocol members of that class.
+///
 /// The list of excluded members is subject to change between Python versions,
 /// especially for dunders, but it probably doesn't matter *too* much if this
 /// list goes out of date. It's up to date as of Python commit 87b1ea016b1454b1e83b9113fa9435849b7743aa
@@ -140,8 +150,9 @@ fn excluded_from_proto_members(member: &str) -> bool {
     )
 }
 
-#[salsa::tracked(return_ref, cycle_fn=proto_members_cycle_recover, cycle_initial=proto_members_cycle_initial)]
-fn cached_protocol_members<'db>(
+/// Inner Salsa query for [`ProtocolClassLiteral::interface`].
+#[salsa::tracked(return_ref, cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial)]
+fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> ProtocolInterface<'db> {
@@ -202,7 +213,7 @@ fn cached_protocol_members<'db>(
     ProtocolInterface(members.into_boxed_slice())
 }
 
-fn proto_members_cycle_recover<'db>(
+fn proto_interface_cycle_recover<'db>(
     _db: &dyn Db,
     _value: &ProtocolInterface<'db>,
     _count: u32,
@@ -211,7 +222,7 @@ fn proto_members_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-fn proto_members_cycle_initial<'db>(
+fn proto_interface_cycle_initial<'db>(
     _db: &dyn Db,
     _class: ClassLiteral<'db>,
 ) -> ProtocolInterface<'db> {
