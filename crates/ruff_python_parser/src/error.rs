@@ -215,6 +215,8 @@ pub enum ParseErrorType {
 
     /// An f-string error containing the [`FStringErrorType`].
     FStringError(FStringErrorType),
+    /// An f-string error containing the [`FStringErrorType`].
+    TStringError(TStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
 }
@@ -327,6 +329,9 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::FStringError(ref fstring_error) => {
                 write!(f, "f-string: {fstring_error}")
+            }
+            ParseErrorType::TStringError(ref tstring_error) => {
+                write!(f, "t-string: {tstring_error}")
             }
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
@@ -488,7 +493,7 @@ pub enum StarTupleKind {
 
 /// The type of PEP 701 f-string error for [`UnsupportedSyntaxErrorKind::Pep701FString`].
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum FStringKind {
+pub enum FTStringKind {
     Backslash,
     Comment,
     NestedQuote,
@@ -729,7 +734,7 @@ pub enum UnsupportedSyntaxErrorKind {
     /// valid.
     ///
     /// [PEP 701]: https://peps.python.org/pep-0701/
-    Pep701FString(FStringKind),
+    Pep701FString(FTStringKind),
 
     /// Represents the use of a parenthesized `with` item before Python 3.9.
     ///
@@ -943,13 +948,13 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::TypeParamDefault => {
                 "Cannot set default type for a type parameter"
             }
-            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash) => {
+            UnsupportedSyntaxErrorKind::Pep701FString(FTStringKind::Backslash) => {
                 "Cannot use an escape sequence (backslash) in f-strings"
             }
-            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment) => {
+            UnsupportedSyntaxErrorKind::Pep701FString(FTStringKind::Comment) => {
                 "Cannot use comments in f-strings"
             }
-            UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote) => {
+            UnsupportedSyntaxErrorKind::Pep701FString(FTStringKind::NestedQuote) => {
                 "Cannot reuse outer quote character in f-strings"
             }
             UnsupportedSyntaxErrorKind::ParenthesizedContextManager => {

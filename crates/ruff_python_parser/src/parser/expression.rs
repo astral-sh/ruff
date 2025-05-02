@@ -7,21 +7,25 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
     self as ast, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext, FStringElement, FStringElements,
-    IpyEscapeKind, Number, Operator, OperatorPrecedence, StringFlags, UnaryOp,
+    IpyEscapeKind, Number, Operator, OperatorPrecedence, StringFlags, TStringElement,
+    TStringElements, UnaryOp,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-use crate::error::{FStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
+use crate::error::{FTStringKind, StarTupleKind, UnparenthesizedNamedExprKind};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{helpers, FunctionKind, Parser};
-use crate::string::{parse_fstring_literal_element, parse_string_literal, StringType};
+use crate::string::{
+    parse_fstring_literal_element, parse_string_literal, parse_tstring_literal_element, StringType,
+};
 use crate::token::{TokenKind, TokenValue};
 use crate::token_set::TokenSet;
 use crate::{
-    FStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError, UnsupportedSyntaxErrorKind,
+    FStringErrorType, Mode, ParseErrorType, TStringErrorType, UnsupportedSyntaxError,
+    UnsupportedSyntaxErrorKind,
 };
 
-use super::{FStringElementsKind, Parenthesized, RecoveryContextKind};
+use super::{FStringElementsKind, Parenthesized, RecoveryContextKind, TStringElementsKind};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
@@ -54,6 +58,7 @@ pub(super) const EXPR_SET: TokenSet = TokenSet::new([
     TokenKind::Not,
     TokenKind::Yield,
     TokenKind::FStringStart,
+    TokenKind::TStringStart,
     TokenKind::IpyEscapeCommand,
 ])
 .union(LITERAL_SET);
@@ -581,7 +586,9 @@ impl<'src> Parser<'src> {
             TokenKind::IpyEscapeCommand => {
                 Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
-            TokenKind::String | TokenKind::FStringStart => self.parse_strings(),
+            TokenKind::String | TokenKind::FStringStart | TokenKind::TStringStart => {
+                self.parse_strings()
+            }
             TokenKind::Lpar => {
                 return self.parse_parenthesized_expression();
             }
@@ -1177,12 +1184,15 @@ impl<'src> Parser<'src> {
     ///
     /// # Panics
     ///
-    /// If the parser isn't positioned at a `String` or `FStringStart` token.
+    /// If the parser isn't positioned at a `String`, `FStringStart`, or `TStringStart` token.
     ///
     /// See: <https://docs.python.org/3/reference/grammar.html> (Search "strings:")
     pub(super) fn parse_strings(&mut self) -> Expr {
-        const STRING_START_SET: TokenSet =
-            TokenSet::new([TokenKind::String, TokenKind::FStringStart]);
+        const STRING_START_SET: TokenSet = TokenSet::new([
+            TokenKind::String,
+            TokenKind::FStringStart,
+            TokenKind::TStringStart,
+        ]);
 
         let start = self.node_start();
         let mut strings = vec![];
@@ -1194,8 +1204,10 @@ impl<'src> Parser<'src> {
 
             if self.at(TokenKind::String) {
                 strings.push(self.parse_string_or_byte_literal());
-            } else {
+            } else if self.at(TokenKind::FStringStart) {
                 strings.push(StringType::FString(self.parse_fstring()));
+            } else if self.at(TokenKind::TStringStart) {
+                strings.push(StringType::TString(self.parse_tstring()));
             }
         }
 
@@ -1219,6 +1231,10 @@ impl<'src> Parser<'src> {
                     value: ast::FStringValue::single(fstring),
                     range,
                 }),
+                StringType::TString(tstring) => Expr::TString(ast::ExprTString {
+                    value: ast::TStringValue::single(tstring),
+                    range,
+                }),
             },
             _ => self.handle_implicitly_concatenated_strings(strings, range),
         }
@@ -1236,11 +1252,13 @@ impl<'src> Parser<'src> {
     ) -> Expr {
         assert!(strings.len() > 1);
 
+        let mut has_tstring = false;
         let mut has_fstring = false;
         let mut byte_literal_count = 0;
         for string in &strings {
             match string {
                 StringType::FString(_) => has_fstring = true,
+                StringType::TString(_) => has_tstring = true,
                 StringType::Bytes(_) => byte_literal_count += 1,
                 StringType::Str(_) => {}
             }
@@ -1269,7 +1287,7 @@ impl<'src> Parser<'src> {
                     );
                 }
                 // Only construct a byte expression if all the literals are bytes
-                // otherwise, we'll try either string or f-string. This is to retain
+                // otherwise, we'll try either string, t-string, or f-string. This is to retain
                 // as much information as possible.
                 Ordering::Equal => {
                     let mut values = Vec::with_capacity(strings.len());
@@ -1310,7 +1328,7 @@ impl<'src> Parser<'src> {
         // )
         // 2 + 2
 
-        if !has_fstring {
+        if !has_fstring && !has_tstring {
             let mut values = Vec::with_capacity(strings.len());
             for string in strings {
                 values.push(match string {
@@ -1324,10 +1342,34 @@ impl<'src> Parser<'src> {
             });
         }
 
+        if has_tstring {
+            let mut parts = Vec::with_capacity(strings.len());
+            for string in strings {
+                match string {
+                    StringType::TString(tstring) => parts.push(ast::TStringPart::TString(tstring)),
+                    StringType::FString(fstring) => {
+                        parts.push(ruff_python_ast::TStringPart::FString(fstring));
+                    }
+                    StringType::Str(string) => parts.push(ast::TStringPart::Literal(string)),
+                    StringType::Bytes(bytes) => parts.push(ast::TStringPart::Literal(
+                        ast::StringLiteral::invalid(bytes.range()),
+                    )),
+                }
+            }
+
+            return Expr::from(ast::ExprTString {
+                value: ast::TStringValue::concatenated(parts),
+                range,
+            });
+        }
+
         let mut parts = Vec::with_capacity(strings.len());
         for string in strings {
             match string {
                 StringType::FString(fstring) => parts.push(ast::FStringPart::FString(fstring)),
+                StringType::TString(_) => {
+                    unreachable!("expected no tstring parts by this point")
+                }
                 StringType::Str(string) => parts.push(ast::FStringPart::Literal(string)),
                 StringType::Bytes(bytes) => parts.push(ast::FStringPart::Literal(
                     ast::StringLiteral::invalid(bytes.range()),
@@ -1388,7 +1430,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Parses a f-string.
+    /// Parses an f-string.
     ///
     /// This does not handle implicitly concatenated strings.
     ///
@@ -1452,7 +1494,7 @@ impl<'src> Parser<'src> {
                 {
                     let slash_position = TextSize::try_from(slash_position).unwrap();
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash),
+                        UnsupportedSyntaxErrorKind::Pep701FString(FTStringKind::Backslash),
                         TextRange::at(expr.range.start() + slash_position, '\\'.text_len()),
                     );
                 }
@@ -1462,7 +1504,7 @@ impl<'src> Parser<'src> {
                 {
                     let quote_position = TextSize::try_from(quote_position).unwrap();
                     self.add_unsupported_syntax_error(
-                        UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::NestedQuote),
+                        UnsupportedSyntaxErrorKind::Pep701FString(FTStringKind::NestedQuote),
                         TextRange::at(expr.range.start() + quote_position, quote_len),
                     );
                 }
@@ -1483,7 +1525,7 @@ impl<'src> Parser<'src> {
         self.unsupported_syntax_errors
             .extend(self.tokens.in_range(range).iter().filter_map(|token| {
                 token.kind().is_comment().then_some(UnsupportedSyntaxError {
-                    kind: UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Comment),
+                    kind: UnsupportedSyntaxErrorKind::Pep701FString(FTStringKind::Comment),
                     range: token.range(),
                     target_version: self.options.target_version,
                 })
@@ -1555,7 +1597,7 @@ impl<'src> Parser<'src> {
         FStringElements::from(elements)
     }
 
-    /// Parses a f-string expression element.
+    /// Parses an f-string expression element.
     ///
     /// # Panics
     ///

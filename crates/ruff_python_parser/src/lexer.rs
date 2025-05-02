@@ -1597,7 +1597,9 @@ impl<'src> Lexer<'src> {
 
         // The lexer can't be moved back for a triple-quoted f-string because the newlines are
         // part of the f-string itself, so there is no newline token to be emitted.
-        if self.current_flags.is_triple_quoted_fstring() {
+        if self.current_flags.is_triple_quoted_fstring()
+            || self.current_flags.is_triple_quoted_tstring()
+        {
             return false;
         }
 
