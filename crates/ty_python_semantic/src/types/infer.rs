@@ -5176,10 +5176,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             symbol_from_bindings(db, use_def.bindings_at_use(use_id))
         };
 
-        if let Some(use_id) = name_node.try_scoped_use_id(db, scope) {
-            use_ids.push((file_scope_id, use_id));
-        }
-
         let symbol = SymbolAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
             let has_bindings_in_this_scope = match symbol_table.symbol_by_name(symbol_name) {
                 Some(symbol) => symbol.is_bound(),
@@ -5203,6 +5199,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             // scope. (At runtime, it would use the `LOAD_FAST` opcode.)
             if has_bindings_in_this_scope && scope.is_function_like(db) {
                 return Symbol::Unbound.into();
+            }
+
+            if let Some(use_id) = name_node.try_scoped_use_id(db, scope) {
+                use_ids.push((file_scope_id, use_id));
             }
 
             let current_file = self.file();
