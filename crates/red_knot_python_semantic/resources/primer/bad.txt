@@ -17,6 +17,7 @@ pandas  # slow
 pandas-stubs  # cycle panics (try_metaclass_)
 pandera  # cycle panics (try_metaclass_)
 prefect # slow
+pylint  # cycle panics (self-recursive type alias)
 pytest  # cycle panics (signature_)
 pywin32  # bad use-def map (binding with definitely-visible unbound)
 schemathesis  # cycle panics (signature_)
