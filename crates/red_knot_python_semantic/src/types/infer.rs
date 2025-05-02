@@ -7615,7 +7615,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         fn element_could_alter_type_of_whole_tuple(
             element: &ast::Expr,
             element_ty: Type,
-            builder: &TypeInferenceBuilder,
+            builder: &mut TypeInferenceBuilder,
         ) -> bool {
             if !element_ty.is_todo() {
                 return false;
@@ -7624,10 +7624,15 @@ impl<'db> TypeInferenceBuilder<'db> {
             match element {
                 ast::Expr::EllipsisLiteral(_) | ast::Expr::Starred(_) => true,
                 ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-                    matches!(
-                        builder.expression_type(value),
-                        Type::KnownInstance(KnownInstanceType::Unpack)
-                    )
+                    let value_ty = if builder.deferred_state.in_string_annotation() {
+                        // Using `.expression_type` does not work in string annotations, because
+                        // we do not store types for sub-expressions. Re-infer the type here.
+                        builder.infer_expression(value)
+                    } else {
+                        builder.expression_type(value)
+                    };
+
+                    matches!(value_ty, Type::KnownInstance(KnownInstanceType::Unpack))
                 }
                 _ => false,
             }
