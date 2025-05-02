@@ -5156,16 +5156,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let symbol = symbol_table.symbol_id_by_name(symbol_name).unwrap();
 
                 ty = constraints.narrow(db, ty, symbol);
-
-                // Constraints outside a lazy scope are not applicable.
-                // TODO: If the symbol has never been rewritten, it is applicable.
-                if !enclosing_scope_file_id
-                    .to_scope_id(db, self.file())
-                    .scope(db)
-                    .is_eager()
-                {
-                    break;
-                }
             }
             ty
         };

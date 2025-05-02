@@ -395,6 +395,10 @@ impl<'db> SemanticIndexBuilder<'db> {
         let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_symbol(symbol_id);
+            if self.scopes[self.current_scope()].kind().is_class() {
+                self.current_use_def_map_mut()
+                    .set_narrowing_constraint_at_use(symbol_id);
+            }
         }
         symbol_id
     }
@@ -1935,16 +1939,27 @@ where
                     let use_id = self.current_ast_ids().record_use(expr);
                     self.current_use_def_map_mut()
                         .record_use(symbol, use_id, node_key);
-                    // We also mark symbols in the outer scope as used
-                    // to perform cross-scope type narrowing.
-                    for enclosing_scope in self.scope_stack.iter().rev().skip(1) {
-                        let symbol_table = &mut self.symbol_tables[enclosing_scope.file_scope_id];
-                        if let Some(symbol) = symbol_table.symbol_id_by_name(id) {
-                            let use_id =
-                                self.ast_ids[enclosing_scope.file_scope_id].record_use(expr);
-                            self.use_def_maps[enclosing_scope.file_scope_id]
-                                .record_use(symbol, use_id, node_key);
-                            break;
+                    if self.scopes[self.current_scope()].is_eager() {
+                        // We also mark symbols in the outer scope as used
+                        // to perform cross-scope type narrowing.
+                        // Symbols in class scope are not visible to eager nested scopes,
+                        // but `SymbolBindings::narrowing_constraint_at_use` information is required and recorded.
+                        for enclosing_scope in self.scope_stack.iter().rev().skip(1) {
+                            let symbol_table =
+                                &mut self.symbol_tables[enclosing_scope.file_scope_id];
+                            if let Some(symbol) = symbol_table.symbol_id_by_name(id) {
+                                let use_id =
+                                    self.ast_ids[enclosing_scope.file_scope_id].record_use(expr);
+                                self.use_def_maps[enclosing_scope.file_scope_id]
+                                    .record_use(symbol, use_id, node_key);
+                                break;
+                            }
+
+                            // Constraints outside a lazy scope are not applicable.
+                            // TODO: If the symbol has never been rewritten, it is applicable.
+                            if !self.scopes[enclosing_scope.file_scope_id].is_eager() {
+                                break;
+                            }
                         }
                     }
                 }

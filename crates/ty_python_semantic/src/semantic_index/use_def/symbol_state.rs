@@ -182,10 +182,11 @@ impl SymbolDeclarations {
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolBindings {
     /// A narrowing constraint that applies when the symbol is used at the current location.
-    /// This is almost equivalent to a narrowing constraint of an unbound binding,
-    /// but is valid even after the unbound binding becomes invisible.
     /// This is used for cross-scope narrowing.
-    pub(super) narrowing_constraint_at_use: ScopedNarrowingConstraint,
+    /// This has the same role as an unbound binding narrowing constraint,
+    /// and is usually `None` (to avoid extra cost), but only has a value in a class scope.
+    /// This is because symbol bindings in a class scope are not visible in eager nested scopes.
+    pub(super) narrowing_constraint_at_use: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this symbol, sorted by their `ScopedDefinitionId`
     live_bindings: SmallVec<[LiveBinding; INLINE_DEFINITIONS_PER_SYMBOL]>,
 }
@@ -208,9 +209,13 @@ impl SymbolBindings {
             visibility_constraint: scope_start_visibility,
         };
         Self {
-            narrowing_constraint_at_use: ScopedNarrowingConstraint::empty(),
+            narrowing_constraint_at_use: None,
             live_bindings: smallvec![initial_binding],
         }
+    }
+
+    pub(super) fn set_narrowing_constraint_at_use(&mut self) {
+        self.narrowing_constraint_at_use = Some(self.live_bindings[0].narrowing_constraint);
     }
 
     /// Record a newly-encountered binding for this symbol.
@@ -235,8 +240,9 @@ impl SymbolBindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         predicate: ScopedNarrowingConstraintPredicate,
     ) {
-        self.narrowing_constraint_at_use = narrowing_constraints
-            .add_predicate_to_constraint(self.narrowing_constraint_at_use, predicate);
+        if let Some(constraint) = &mut self.narrowing_constraint_at_use {
+            *constraint = narrowing_constraints.add_predicate_to_constraint(*constraint, predicate);
+        }
         for binding in &mut self.live_bindings {
             binding.narrowing_constraint = narrowing_constraints
                 .add_predicate_to_constraint(binding.narrowing_constraint, predicate);
@@ -286,8 +292,13 @@ impl SymbolBindings {
     ) {
         let a = std::mem::take(self);
 
-        self.narrowing_constraint_at_use = narrowing_constraints
-            .intersect_constraints(a.narrowing_constraint_at_use, b.narrowing_constraint_at_use);
+        if let Some((a, b)) = a
+            .narrowing_constraint_at_use
+            .zip(b.narrowing_constraint_at_use)
+        {
+            self.narrowing_constraint_at_use =
+                Some(narrowing_constraints.intersect_constraints(a, b));
+        }
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
         // the merged `live_bindings` vec remains sorted. If a definition is found in both `a` and
@@ -337,6 +348,10 @@ impl SymbolState {
             declarations: SymbolDeclarations::undeclared(scope_start_visibility),
             bindings: SymbolBindings::unbound(scope_start_visibility),
         }
+    }
+
+    pub(super) fn set_narrowing_constraint_at_use(&mut self) {
+        self.bindings.set_narrowing_constraint_at_use();
     }
 
     /// Record a newly-encountered binding for this symbol.

@@ -358,11 +358,16 @@ impl<'db> UseDefMap<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> ConstraintsIterator<'_, 'db> {
+        let Some(narrowing_constraint) = self.bindings_by_use[use_id].narrowing_constraint_at_use
+        else {
+            let mut bindings = self.bindings_iterator(&self.bindings_by_use[use_id]);
+            return bindings.next().unwrap().narrowing_constraint;
+        };
         ConstraintsIterator {
             predicates: &self.predicates,
             constraint_ids: self
                 .narrowing_constraints
-                .iter_predicates(self.bindings_by_use[use_id].narrowing_constraint_at_use),
+                .iter_predicates(narrowing_constraint),
         }
     }
 
@@ -763,6 +768,12 @@ impl<'db> UseDefMapBuilder<'db> {
             .symbol_states
             .push(SymbolState::undefined(self.scope_start_visibility));
         debug_assert_eq!(symbol, new_symbol);
+    }
+
+    /// When adding a new class symbol, `SymbolBindings::narrowing_constraint_at_use` needs to have a value
+    /// (see the doc comment for why it is necessary), so set it here.
+    pub(super) fn set_narrowing_constraint_at_use(&mut self, symbol: ScopedSymbolId) {
+        self.symbol_states[symbol].set_narrowing_constraint_at_use();
     }
 
     pub(super) fn add_attribute(&mut self, symbol: ScopedSymbolId) {
