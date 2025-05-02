@@ -54,8 +54,7 @@ def outer():
 
     def inner():
         global x
-        # TODO: revealed: int
-        reveal_type(x)  # revealed: str
+        reveal_type(x)  # revealed: int
 ```
 
 ## Narrowing

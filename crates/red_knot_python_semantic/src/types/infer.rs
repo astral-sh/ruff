@@ -5140,11 +5140,21 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             };
 
+            let current_file = self.file();
+
             let is_global = self
                 .index
                 .scope(file_scope_id)
                 .globals
                 .contains(symbol_name);
+
+            if is_global {
+                return symbol(
+                    db,
+                    FileScopeId::global().to_scope_id(db, current_file),
+                    symbol_name,
+                );
+            }
 
             // If it's a function-like scope and there is one or more binding in this scope (but
             // none of those bindings are visible from where we are in the control flow), we cannot
@@ -5155,11 +5165,9 @@ impl<'db> TypeInferenceBuilder<'db> {
             // a local variable or not in function-like scopes. If a variable has any bindings in a
             // function-like scope, it is considered a local variable; it never references another
             // scope. (At runtime, it would use the `LOAD_FAST` opcode.)
-            if has_bindings_in_this_scope && scope.is_function_like(db) && !is_global {
+            if has_bindings_in_this_scope && scope.is_function_like(db) {
                 return Symbol::Unbound.into();
             }
-
-            let current_file = self.file();
 
             // Walk up parent scopes looking for a possible enclosing scope that may have a
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
