@@ -7312,26 +7312,28 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                         Type::KnownInstance(KnownInstanceType::TypingSelf) => {
                             let scope = self.scope();
-                            let Some(class_node) = self.enclosing_class_symbol(scope) else {
-                                return TypeAndQualifiers::unknown();
-                            };
-                            let Type::ClassLiteral(class) = class_node else {
-                                return TypeAndQualifiers::unknown();
-                            };
-                            let TypeDefinition::Class(d) =
-                                class_node.definition(self.db()).unwrap()
-                            else {
-                                return TypeAndQualifiers::unknown();
-                            };
-                            let ty = Type::TypeVar(TypeVarInstance::new(
-                                self.db(),
-                                class.name(self.db()),
-                                d,
-                                Some(TypeVarBoundOrConstraints::UpperBound(name_expr_ty)),
-                                None,
-                                TypeVarKind::Legacy,
-                            ));
-                            TypeAndQualifiers::new(ty, TypeQualifiers::empty())
+                            if let Some(class_node) = self.enclosing_class_symbol(scope) {
+                                let class = class_node.expect_class_literal();
+                                if let TypeDefinition::Class(d) =
+                                    class_node.definition(self.db()).unwrap()
+                                {
+                                    let ty = Type::TypeVar(TypeVarInstance::new(
+                                        self.db(),
+                                        class.name(self.db()),
+                                        d,
+                                        Some(TypeVarBoundOrConstraints::UpperBound(name_expr_ty)),
+                                        TypeVarVariance::Invariant,
+                                        None,
+                                        TypeVarKind::Legacy,
+                                    ));
+                                    TypeAndQualifiers::new(ty, TypeQualifiers::empty())
+                                } else {
+                                    TypeAndQualifiers::unknown()
+                                }
+                            } else {
+                                report_invalid_self_usage(&self.context, annotation);
+                                TypeAndQualifiers::unknown()
+                            }
                         }
                         _ => name_expr_ty
                             .in_type_expression(self.db())
