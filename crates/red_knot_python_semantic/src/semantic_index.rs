@@ -114,11 +114,9 @@ pub(crate) fn attribute_assignments<'db, 's>(
         let (function_scope_id, function_scope) =
             if scope.node().scope_kind() == ScopeKind::Annotation {
                 // This could be a generic method with a type-params scope.
-                // Go one level deeper to find the function scope. There is
-                // just one descendant scope.
-                let descendants = scope.descendants();
-                debug_assert!(descendants.start.as_u32() + 1 == descendants.end.as_u32());
-                let function_scope_id = descendants.start;
+                // Go one level deeper to find the function scope. The first
+                // descendant is the (potential) function scope.
+                let function_scope_id = scope.descendants().start;
                 (function_scope_id, index.scope(function_scope_id))
             } else {
                 (child_scope_id, scope)
