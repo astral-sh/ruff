@@ -468,6 +468,11 @@ impl Drop for DiagnosticGuard<'_, '_> {
         // once.
         let diag = self.diag.take().unwrap();
 
+        if std::thread::panicking() {
+            // Don't submit diagnostics when panicking because they might be incomplete.
+            return;
+        }
+
         let Some(ann) = diag.primary_annotation() else {
             panic!(
                 "All diagnostics reported by `InferContext` must have a \
