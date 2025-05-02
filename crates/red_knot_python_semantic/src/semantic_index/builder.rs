@@ -1038,8 +1038,7 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     pub(super) fn build(mut self) -> SemanticIndex<'db> {
         let module = self.module;
-        let suite = module.suite();
-        self.visit_body(suite);
+        self.visit_body(module.suite());
 
         // Pop the root scope
         self.pop_scope();
@@ -1227,7 +1226,6 @@ where
                         }
 
                         builder.push_scope(NodeWithScopeRef::Class(class));
-
                         builder.visit_body(&class.body);
 
                         builder.pop_scope()
@@ -2402,8 +2400,10 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_> {
         self.source_text().as_str()
     }
 
-    fn global(&self, name: &str) -> Option<TextRange> {
-        self.scopes[self.current_scope()].globals.get(name)
+    // We handle the one syntax error that relies on this method (`LoadBeforeGlobalDeclaration`)
+    // directly in `visit_stmt`, so this just returns a placeholder value.
+    fn global(&self, _name: &str) -> Option<TextRange> {
+        None
     }
 
     fn in_async_context(&self) -> bool {

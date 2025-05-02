@@ -1383,7 +1383,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
                 ty.inner_type()
             });
-
         if !bound_ty.is_assignable_to(self.db(), declared_ty) {
             report_invalid_assignment(&self.context, node, declared_ty, bound_ty);
             // allow declarations to override inference in case of invalid assignment
