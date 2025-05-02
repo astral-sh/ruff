@@ -95,6 +95,10 @@ impl<'db> GenericContext<'db> {
         Some(Self::new(db, variables))
     }
 
+    pub(crate) fn len(self, db: &'db dyn Db) -> usize {
+        self.variables(db).len()
+    }
+
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
         let parameters = Parameters::new(
             self.variables(db)

@@ -2274,26 +2274,38 @@ impl<'db> KnownClass {
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
     /// representing all possible instances of the generic class with a specialization.
     ///
-    /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
-    ///
-    /// Panics if you provide a specialization with the wrong number of types.
+    /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
+    /// number of types, a debug-level log message will be emitted stating this.
     pub(crate) fn to_specialized_instance(
         self,
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
     ) -> Type<'db> {
         let class_literal = self.to_class_literal(db).expect_class_literal();
-        match class_literal.generic_context(db) {
-            Some(generic_context) => {
-                let types = specialization.into_iter().collect::<Box<[_]>>();
-                let specialization = generic_context.specialize(db, types);
-                Type::instance(
-                    db,
-                    ClassType::Generic(GenericAlias::new(db, class_literal, specialization)),
-                )
+        let Some(generic_context) = class_literal.generic_context(db) else {
+            return Type::unknown();
+        };
+
+        let types = specialization.into_iter().collect::<Box<[_]>>();
+        if types.len() != generic_context.len(db) {
+            // a cache of the `KnownClass`es that we have already seen mismatched-arity
+            // specializations for (and therefore that we've already logged a warning for)
+            static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
+            if MESSAGES.lock().unwrap().insert(self) {
+                tracing::info!(
+                    "Wrong number of types when specializing {}. \
+                     Falling back to `Unknown` for the symbol instead.",
+                    self.display(db)
+                );
             }
-            None => Type::unknown(),
+            return Type::unknown();
         }
+
+        let specialization = generic_context.specialize(db, types);
+        Type::instance(
+            db,
+            ClassType::Generic(GenericAlias::new(db, class_literal, specialization)),
+        )
     }
 
     /// Attempt to lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
