@@ -2266,15 +2266,13 @@ where
                         }) => {
                             // SAFETY: `iter` and `expr` belong to the `self.module` tree
                             #[expect(unsafe_code)]
-                            let assignment = ComprehensionDefinitionKind {
-                                target_kind: TargetKind::from(unpack),
-                                iterable: unsafe {
-                                    AstNodeRef::new(self.module.clone(), &node.iter)
-                                },
-                                target: unsafe { AstNodeRef::new(self.module.clone(), expr) },
+                            let assignment = ComprehensionDefinitionKind::new(
+                                TargetKind::from(unpack),
+                                unsafe { AstNodeRef::new(self.module.clone(), &node.iter) },
+                                unsafe { AstNodeRef::new(self.module.clone(), expr) },
                                 first,
-                                is_async: node.is_async,
-                            };
+                                node.is_async,
+                            );
                             // Temporarily move to the scope of the method to which the instance attribute is defined.
                             // SAFETY: `self.scope_stack` is not empty because the targets in comprehensions should always introduce a new scope.
                             let scope = self.scope_stack.pop().expect("The popped scope must be a comprehension, which must have a parent scope");

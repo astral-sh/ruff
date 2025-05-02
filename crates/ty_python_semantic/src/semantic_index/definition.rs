@@ -307,27 +307,27 @@ impl<'db> DefinitionNodeRef<'db> {
                 node,
                 alias_index,
                 is_reexported,
-            }) => DefinitionKind::Import(ImportDefinitionKind {
-                node: AstNodeRef::new(parsed, node),
+            }) => DefinitionKind::Import(ImportDefinitionKind::new(
+                AstNodeRef::new(parsed, node),
                 alias_index,
                 is_reexported,
-            }),
+            )),
 
             DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef {
                 node,
                 alias_index,
                 is_reexported,
-            }) => DefinitionKind::ImportFrom(ImportFromDefinitionKind {
-                node: AstNodeRef::new(parsed, node),
+            }) => DefinitionKind::ImportFrom(ImportFromDefinitionKind::new(
+                AstNodeRef::new(parsed, node),
                 alias_index,
                 is_reexported,
-            }),
+            )),
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
-                DefinitionKind::StarImport(StarImportDefinitionKind {
-                    node: AstNodeRef::new(parsed, node),
+                DefinitionKind::StarImport(StarImportDefinitionKind::new(
+                    AstNodeRef::new(parsed, node),
                     symbol_id,
-                })
+                ))
             }
             DefinitionNodeRef::Function(function) => {
                 DefinitionKind::Function(AstNodeRef::new(parsed, function))
@@ -345,21 +345,21 @@ impl<'db> DefinitionNodeRef<'db> {
                 unpack,
                 value,
                 target,
-            }) => DefinitionKind::Assignment(AssignmentDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                value: AstNodeRef::new(parsed.clone(), value),
-                target: AstNodeRef::new(parsed, target),
-            }),
+            }) => DefinitionKind::Assignment(AssignmentDefinitionKind::new(
+                TargetKind::from(unpack),
+                AstNodeRef::new(parsed.clone(), value),
+                AstNodeRef::new(parsed, target),
+            )),
             DefinitionNodeRef::AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef {
                 node: _,
                 annotation,
                 value,
                 target,
-            }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind {
-                target: AstNodeRef::new(parsed.clone(), target),
-                annotation: AstNodeRef::new(parsed.clone(), annotation),
-                value: value.map(|v| AstNodeRef::new(parsed, v)),
-            }),
+            }) => DefinitionKind::AnnotatedAssignment(AnnotatedAssignmentDefinitionKind::new(
+                AstNodeRef::new(parsed.clone(), annotation),
+                value.map(|v| AstNodeRef::new(parsed.clone(), v)),
+                AstNodeRef::new(parsed, target),
+            )),
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
@@ -368,25 +368,25 @@ impl<'db> DefinitionNodeRef<'db> {
                 iterable,
                 target,
                 is_async,
-            }) => DefinitionKind::For(ForStmtDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                iterable: AstNodeRef::new(parsed.clone(), iterable),
-                target: AstNodeRef::new(parsed, target),
+            }) => DefinitionKind::For(ForStmtDefinitionKind::new(
+                TargetKind::from(unpack),
+                AstNodeRef::new(parsed.clone(), iterable),
+                AstNodeRef::new(parsed, target),
                 is_async,
-            }),
+            )),
             DefinitionNodeRef::Comprehension(ComprehensionDefinitionNodeRef {
                 unpack,
                 iterable,
                 target,
                 first,
                 is_async,
-            }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                iterable: AstNodeRef::new(parsed.clone(), iterable),
-                target: AstNodeRef::new(parsed, target),
+            }) => DefinitionKind::Comprehension(ComprehensionDefinitionKind::new(
+                TargetKind::from(unpack),
+                AstNodeRef::new(parsed.clone(), iterable),
+                AstNodeRef::new(parsed, target),
                 first,
                 is_async,
-            }),
+            )),
             DefinitionNodeRef::VariadicPositionalParameter(parameter) => {
                 DefinitionKind::VariadicPositionalParameter(AstNodeRef::new(parsed, parameter))
             }
@@ -401,28 +401,28 @@ impl<'db> DefinitionNodeRef<'db> {
                 context_expr,
                 target,
                 is_async,
-            }) => DefinitionKind::WithItem(WithItemDefinitionKind {
-                target_kind: TargetKind::from(unpack),
-                context_expr: AstNodeRef::new(parsed.clone(), context_expr),
-                target: AstNodeRef::new(parsed, target),
+            }) => DefinitionKind::WithItem(WithItemDefinitionKind::new(
+                TargetKind::from(unpack),
+                AstNodeRef::new(parsed.clone(), context_expr),
+                AstNodeRef::new(parsed, target),
                 is_async,
-            }),
+            )),
             DefinitionNodeRef::MatchPattern(MatchPatternDefinitionNodeRef {
                 pattern,
                 identifier,
                 index,
-            }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind {
-                pattern: AstNodeRef::new(parsed.clone(), pattern),
-                identifier: AstNodeRef::new(parsed, identifier),
+            }) => DefinitionKind::MatchPattern(MatchPatternDefinitionKind::new(
+                AstNodeRef::new(parsed.clone(), pattern),
+                AstNodeRef::new(parsed, identifier),
                 index,
-            }),
+            )),
             DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
                 handler,
                 is_star,
-            }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind {
-                handler: AstNodeRef::new(parsed, handler),
+            }) => DefinitionKind::ExceptHandler(ExceptHandlerDefinitionKind::new(
+                AstNodeRef::new(parsed, handler),
                 is_star,
-            }),
+            )),
             DefinitionNodeRef::TypeVar(node) => {
                 DefinitionKind::TypeVar(AstNodeRef::new(parsed, node))
             }
@@ -596,16 +596,16 @@ impl DefinitionKind<'_> {
             DefinitionKind::Class(class) => class.name.range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.name.range(),
             DefinitionKind::NamedExpression(named) => named.target.range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
+            DefinitionKind::Assignment(assignment) => assignment.target().range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target().range(),
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.target.range(),
-            DefinitionKind::For(for_stmt) => for_stmt.target.range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target().range(),
             DefinitionKind::Comprehension(comp) => comp.target().range(),
             DefinitionKind::VariadicPositionalParameter(parameter) => parameter.name.range(),
             DefinitionKind::VariadicKeywordParameter(parameter) => parameter.name.range(),
             DefinitionKind::Parameter(parameter) => parameter.parameter.name.range(),
-            DefinitionKind::WithItem(with_item) => with_item.target.range(),
-            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
+            DefinitionKind::WithItem(with_item) => with_item.target().range(),
+            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier().range(),
             DefinitionKind::ExceptHandler(handler) => handler.node().range(),
             DefinitionKind::TypeVar(type_var) => type_var.name.range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.name.range(),
@@ -623,16 +623,16 @@ impl DefinitionKind<'_> {
             DefinitionKind::Class(class) => class.range(),
             DefinitionKind::TypeAlias(type_alias) => type_alias.range(),
             DefinitionKind::NamedExpression(named) => named.range(),
-            DefinitionKind::Assignment(assignment) => assignment.target.range(),
-            DefinitionKind::AnnotatedAssignment(assign) => assign.target.range(),
+            DefinitionKind::Assignment(assignment) => assignment.target().range(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target().range(),
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.range(),
-            DefinitionKind::For(for_stmt) => for_stmt.target.range(),
+            DefinitionKind::For(for_stmt) => for_stmt.target().range(),
             DefinitionKind::Comprehension(comp) => comp.target().range(),
             DefinitionKind::VariadicPositionalParameter(parameter) => parameter.range(),
             DefinitionKind::VariadicKeywordParameter(parameter) => parameter.range(),
             DefinitionKind::Parameter(parameter) => parameter.parameter.range(),
-            DefinitionKind::WithItem(with_item) => with_item.target.range(),
-            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.range(),
+            DefinitionKind::WithItem(with_item) => with_item.target().range(),
+            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier().range(),
             DefinitionKind::ExceptHandler(handler) => handler.node().range(),
             DefinitionKind::TypeVar(type_var) => type_var.range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.range(),
@@ -672,7 +672,7 @@ impl DefinitionKind<'_> {
             // Annotated assignment is always a declaration. It is also a binding if there is a RHS
             // or if we are in a stub file. Unfortunately, it is common for stubs to omit even an `...` value placeholder.
             DefinitionKind::AnnotatedAssignment(ann_assign) => {
-                if in_stub || ann_assign.value.is_some() {
+                if in_stub || ann_assign.value().is_some() {
                     DefinitionCategory::DeclarationAndBinding
                 } else {
                     DefinitionCategory::Declaration
@@ -708,19 +708,31 @@ impl<'db> From<Option<(UnpackPosition, Unpack<'db>)>> for TargetKind<'db> {
 
 #[derive(Clone, Debug)]
 pub struct StarImportDefinitionKind {
+    inner: Box<StarImportDefinitionKindInner>,
+}
+
+#[derive(Clone, Debug)]
+struct StarImportDefinitionKindInner {
     node: AstNodeRef<ast::StmtImportFrom>,
     symbol_id: ScopedSymbolId,
 }
 
 impl StarImportDefinitionKind {
+    pub(crate) fn new(node: AstNodeRef<ast::StmtImportFrom>, symbol_id: ScopedSymbolId) -> Self {
+        Self {
+            inner: Box::new(StarImportDefinitionKindInner { node, symbol_id }),
+        }
+    }
+
     pub(crate) fn import(&self) -> &ast::StmtImportFrom {
-        self.node.node()
+        self.inner.node.node()
     }
 
     pub(crate) fn alias(&self) -> &ast::Alias {
         // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
         // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
-        self.node
+        self.inner
+            .node
             .node()
             .names
             .iter()
@@ -732,102 +744,191 @@ impl StarImportDefinitionKind {
     }
 
     pub(crate) fn symbol_id(&self) -> ScopedSymbolId {
-        self.symbol_id
+        self.inner.symbol_id
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct MatchPatternDefinitionKind {
+    inner: Box<MatchPatternDefinitionKindInner>,
+}
+
+#[derive(Clone, Debug)]
+struct MatchPatternDefinitionKindInner {
     pattern: AstNodeRef<ast::Pattern>,
     identifier: AstNodeRef<ast::Identifier>,
     index: u32,
 }
 
 impl MatchPatternDefinitionKind {
+    pub(crate) fn new(
+        pattern: AstNodeRef<ast::Pattern>,
+        identifier: AstNodeRef<ast::Identifier>,
+        index: u32,
+    ) -> MatchPatternDefinitionKind {
+        Self {
+            inner: Box::new(MatchPatternDefinitionKindInner {
+                pattern,
+                identifier,
+                index,
+            }),
+        }
+    }
+
     pub(crate) fn pattern(&self) -> &ast::Pattern {
-        self.pattern.node()
+        self.inner.pattern.node()
+    }
+
+    pub(crate) fn identifier(&self) -> &ast::Identifier {
+        self.inner.identifier.node()
     }
 
     pub(crate) fn index(&self) -> u32 {
-        self.index
+        self.inner.index
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ComprehensionDefinitionKind<'db> {
-    pub(super) target_kind: TargetKind<'db>,
-    pub(super) iterable: AstNodeRef<ast::Expr>,
-    pub(super) target: AstNodeRef<ast::Expr>,
-    pub(super) first: bool,
-    pub(super) is_async: bool,
+    inner: Box<ComprehensionDefinitionKindInner<'db>>,
+}
+
+#[derive(Clone, Debug)]
+struct ComprehensionDefinitionKindInner<'db> {
+    target_kind: TargetKind<'db>,
+    iterable: AstNodeRef<ast::Expr>,
+    target: AstNodeRef<ast::Expr>,
+    first: bool,
+    is_async: bool,
 }
 
 impl<'db> ComprehensionDefinitionKind<'db> {
+    pub(crate) fn new(
+        target_kind: TargetKind<'db>,
+        iterable: AstNodeRef<ast::Expr>,
+        target: AstNodeRef<ast::Expr>,
+        first: bool,
+        is_async: bool,
+    ) -> ComprehensionDefinitionKind<'db> {
+        Self {
+            inner: Box::new(ComprehensionDefinitionKindInner {
+                target_kind,
+                iterable,
+                target,
+                first,
+                is_async,
+            }),
+        }
+    }
+
     pub(crate) fn iterable(&self) -> &ast::Expr {
-        self.iterable.node()
+        self.inner.iterable.node()
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        self.inner.target_kind
     }
 
     pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+        self.inner.target.node()
     }
 
     pub(crate) fn is_first(&self) -> bool {
-        self.first
+        self.inner.first
     }
 
     pub(crate) fn is_async(&self) -> bool {
-        self.is_async
+        self.inner.is_async
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ImportDefinitionKind {
+    inner: Box<ImportDefinitionKindInner>,
+}
+
+#[derive(Clone, Debug)]
+struct ImportDefinitionKindInner {
     node: AstNodeRef<ast::StmtImport>,
     alias_index: usize,
     is_reexported: bool,
 }
 
 impl ImportDefinitionKind {
+    pub(crate) fn new(
+        node: AstNodeRef<ast::StmtImport>,
+        alias_index: usize,
+        is_reexported: bool,
+    ) -> ImportDefinitionKind {
+        Self {
+            inner: Box::new(ImportDefinitionKindInner {
+                node,
+                alias_index,
+                is_reexported,
+            }),
+        }
+    }
+
     pub(crate) fn import(&self) -> &ast::StmtImport {
-        self.node.node()
+        self.inner.node.node()
     }
 
     pub(crate) fn alias(&self) -> &ast::Alias {
-        &self.node.node().names[self.alias_index]
+        &self.inner.node.node().names[self.inner.alias_index]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
-        self.is_reexported
+        self.inner.is_reexported
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ImportFromDefinitionKind {
+    inner: Box<ImportFromDefinitionKindInner>,
+}
+
+#[derive(Clone, Debug)]
+struct ImportFromDefinitionKindInner {
     node: AstNodeRef<ast::StmtImportFrom>,
     alias_index: usize,
     is_reexported: bool,
 }
 
 impl ImportFromDefinitionKind {
+    pub(crate) fn new(
+        node: AstNodeRef<ast::StmtImportFrom>,
+        alias_index: usize,
+        is_reexported: bool,
+    ) -> Self {
+        Self {
+            inner: Box::new(ImportFromDefinitionKindInner {
+                node,
+                alias_index,
+                is_reexported,
+            }),
+        }
+    }
+
     pub(crate) fn import(&self) -> &ast::StmtImportFrom {
-        self.node.node()
+        self.inner.node.node()
     }
 
     pub(crate) fn alias(&self) -> &ast::Alias {
-        &self.node.node().names[self.alias_index]
+        &self.inner.node.node().names[self.inner.alias_index]
     }
 
     pub(crate) fn is_reexported(&self) -> bool {
-        self.is_reexported
+        self.inner.is_reexported
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct AssignmentDefinitionKind<'db> {
+    inner: Box<AssignmentDefinitionKindInner<'db>>,
+}
+
+#[derive(Clone, Debug)]
+struct AssignmentDefinitionKindInner<'db> {
     target_kind: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
@@ -840,27 +941,34 @@ impl<'db> AssignmentDefinitionKind<'db> {
         target: AstNodeRef<ast::Expr>,
     ) -> Self {
         Self {
-            target_kind,
-            value,
-            target,
+            inner: Box::new(AssignmentDefinitionKindInner {
+                target_kind,
+                value,
+                target,
+            }),
         }
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        self.inner.target_kind
     }
 
     pub(crate) fn value(&self) -> &ast::Expr {
-        self.value.node()
+        self.inner.value.node()
     }
 
     pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+        self.inner.target.node()
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct AnnotatedAssignmentDefinitionKind {
+    inner: Box<AnnotatedAssignmentDefinitionKindInner>,
+}
+
+#[derive(Clone, Debug)]
+struct AnnotatedAssignmentDefinitionKindInner {
     annotation: AstNodeRef<ast::Expr>,
     value: Option<AstNodeRef<ast::Expr>>,
     target: AstNodeRef<ast::Expr>,
@@ -873,27 +981,34 @@ impl AnnotatedAssignmentDefinitionKind {
         target: AstNodeRef<ast::Expr>,
     ) -> Self {
         Self {
-            annotation,
-            value,
-            target,
+            inner: Box::new(AnnotatedAssignmentDefinitionKindInner {
+                annotation,
+                value,
+                target,
+            }),
         }
     }
 
     pub(crate) fn value(&self) -> Option<&ast::Expr> {
-        self.value.as_deref()
+        self.inner.value.as_deref()
     }
 
     pub(crate) fn annotation(&self) -> &ast::Expr {
-        self.annotation.node()
+        self.inner.annotation.node()
     }
 
     pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+        self.inner.target.node()
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct WithItemDefinitionKind<'db> {
+    inner: Box<WithItemDefinitionKindInner<'db>>,
+}
+
+#[derive(Clone, Debug)]
+struct WithItemDefinitionKindInner<'db> {
     target_kind: TargetKind<'db>,
     context_expr: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
@@ -908,32 +1023,39 @@ impl<'db> WithItemDefinitionKind<'db> {
         is_async: bool,
     ) -> Self {
         Self {
-            target_kind,
-            context_expr,
-            target,
-            is_async,
+            inner: Box::new(WithItemDefinitionKindInner {
+                target_kind,
+                context_expr,
+                target,
+                is_async,
+            }),
         }
     }
 
     pub(crate) fn context_expr(&self) -> &ast::Expr {
-        self.context_expr.node()
+        self.inner.context_expr.node()
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        self.inner.target_kind
     }
 
     pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+        self.inner.target.node()
     }
 
     pub(crate) const fn is_async(&self) -> bool {
-        self.is_async
+        self.inner.is_async
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ForStmtDefinitionKind<'db> {
+    inner: Box<ForStmtDefinitionKindInner<'db>>,
+}
+
+#[derive(Clone, Debug)]
+struct ForStmtDefinitionKindInner<'db> {
     target_kind: TargetKind<'db>,
     iterable: AstNodeRef<ast::Expr>,
     target: AstNodeRef<ast::Expr>,
@@ -948,39 +1070,52 @@ impl<'db> ForStmtDefinitionKind<'db> {
         is_async: bool,
     ) -> Self {
         Self {
-            target_kind,
-            iterable,
-            target,
-            is_async,
+            inner: Box::new(ForStmtDefinitionKindInner {
+                target_kind,
+                iterable,
+                target,
+                is_async,
+            }),
         }
     }
 
     pub(crate) fn iterable(&self) -> &ast::Expr {
-        self.iterable.node()
+        self.inner.iterable.node()
     }
 
     pub(crate) fn target_kind(&self) -> TargetKind<'db> {
-        self.target_kind
+        self.inner.target_kind
     }
 
     pub(crate) fn target(&self) -> &ast::Expr {
-        self.target.node()
+        self.inner.target.node()
     }
 
     pub(crate) const fn is_async(&self) -> bool {
-        self.is_async
+        self.inner.is_async
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct ExceptHandlerDefinitionKind {
+    inner: Box<ExceptHandlerDefinitionKindInner>,
+}
+
+#[derive(Clone, Debug)]
+struct ExceptHandlerDefinitionKindInner {
     handler: AstNodeRef<ast::ExceptHandlerExceptHandler>,
     is_star: bool,
 }
 
 impl ExceptHandlerDefinitionKind {
+    pub(crate) fn new(handler: AstNodeRef<ast::ExceptHandlerExceptHandler>, is_star: bool) -> Self {
+        Self {
+            inner: Box::new(ExceptHandlerDefinitionKindInner { handler, is_star }),
+        }
+    }
+
     pub(crate) fn node(&self) -> &ast::ExceptHandlerExceptHandler {
-        self.handler.node()
+        self.inner.handler.node()
     }
 
     pub(crate) fn handled_exceptions(&self) -> Option<&ast::Expr> {
@@ -988,7 +1123,7 @@ impl ExceptHandlerDefinitionKind {
     }
 
     pub(crate) fn is_star(&self) -> bool {
-        self.is_star
+        self.inner.is_star
     }
 }
 
