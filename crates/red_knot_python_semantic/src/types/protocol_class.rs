@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::BTreeMap, ops::Deref};
 
 use itertools::Itertools;
 
@@ -58,12 +58,24 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
 #[derive(Debug, PartialEq, Eq, salsa::Update, Default, Clone, Hash)]
-pub(super) struct ProtocolInterface<'db>(Box<[ProtocolMember<'db>]>);
+pub(super) struct ProtocolInterface<'db>(BTreeMap<Name, ProtocolMemberData<'db>>);
 
 impl<'db> ProtocolInterface<'db> {
     /// Iterate over the members of this protocol.
-    pub(super) fn members(&self) -> impl ExactSizeIterator<Item = &ProtocolMember<'db>> {
-        self.0.iter()
+    pub(super) fn members<'a>(&'a self) -> impl ExactSizeIterator<Item = ProtocolMember<'a, 'db>> {
+        self.0.iter().map(|(name, data)| ProtocolMember {
+            name,
+            ty: data.ty,
+            qualifiers: data.qualifiers,
+        })
+    }
+
+    pub(super) fn member_by_name<'a>(&self, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
+        self.0.get(name).map(|data| ProtocolMember {
+            name,
+            ty: data.ty,
+            qualifiers: data.qualifiers,
+        })
     }
 
     /// Return `true` if all members of this protocol are fully static.
@@ -74,13 +86,10 @@ impl<'db> ProtocolInterface<'db> {
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
-    /// TODO: using a map as the underlying data structure would be more efficient here than a boxed slice.
     pub(super) fn is_sub_interface_of(&self, other: &Self) -> bool {
-        self.members().all(|member| {
-            other
-                .members()
-                .any(|other_member| member.name() == other_member.name())
-        })
+        self.0
+            .keys()
+            .all(|member_name| other.0.contains_key(member_name))
     }
 
     /// Return `true` if any of the members of this protocol type contain any `Todo` types.
@@ -89,17 +98,23 @@ impl<'db> ProtocolInterface<'db> {
     }
 }
 
-/// A single member of a protocol interface.
-#[derive(Debug, PartialEq, Eq, salsa::Update, Clone, Hash)]
-pub(super) struct ProtocolMember<'db> {
-    name: Name,
+#[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
+struct ProtocolMemberData<'db> {
     ty: Type<'db>,
     qualifiers: TypeQualifiers,
 }
 
-impl<'db> ProtocolMember<'db> {
-    pub(super) fn name(&self) -> &str {
-        &self.name
+/// A single member of a protocol interface.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct ProtocolMember<'a, 'db> {
+    name: &'a str,
+    ty: Type<'db>,
+    qualifiers: TypeQualifiers,
+}
+
+impl<'a, 'db> ProtocolMember<'a, 'db> {
+    pub(super) fn name(&self) -> &'a str {
+        self.name
     }
 
     pub(super) fn ty(&self) -> Type<'db> {
@@ -156,7 +171,7 @@ fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> ProtocolInterface<'db> {
-    let mut members = vec![];
+    let mut members = BTreeMap::default();
 
     for parent_protocol in class
         .iter_mro(db, None)
@@ -200,17 +215,14 @@ fn cached_protocol_interface<'db>(
                     (symbol_table.symbol(symbol_id).name(), member, qualifiers)
                 })
                 .filter(|(name, _, _)| !excluded_from_proto_members(name))
-                .map(|(name, ty, qualifiers)| ProtocolMember {
-                    name: name.clone(),
-                    ty,
-                    qualifiers,
+                .map(|(name, ty, qualifiers)| {
+                    let member = ProtocolMemberData { ty, qualifiers };
+                    (name.clone(), member)
                 }),
         );
     }
 
-    members.sort_unstable_by(|m1, m2| m1.name().cmp(m2.name()));
-    members.dedup_by(|m1, m2| m1.name() == m2.name());
-    ProtocolInterface(members.into_boxed_slice())
+    ProtocolInterface(members)
 }
 
 fn proto_interface_cycle_recover<'db>(

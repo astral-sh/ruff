@@ -225,8 +225,7 @@ impl<'db> ProtocolInstanceType<'db> {
             Protocol::FromClass(class) => class.instance_member(db, name),
             Protocol::Synthesized(synthesized) => synthesized
                 .interface(db)
-                .members()
-                .find(|member| member.name() == name)
+                .member_by_name(name)
                 .map(|member| SymbolAndQualifiers {
                     symbol: Symbol::bound(member.ty()),
                     qualifiers: member.qualifiers(),
