@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
 use super::Type;
@@ -7,20 +8,17 @@ use super::Type;
 pub(crate) struct CallArguments<'a>(Vec<Argument<'a>>);
 
 impl<'a> CallArguments<'a> {
-    /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
-    /// parameter) prepended to the front of this argument list. (If `bound_self` is none, the
-    /// function is invoked with the unmodified argument list.)
-    pub(crate) fn with_self<F, R>(&self, bound_self: Option<Type<'_>>, f: F) -> R
-    where
-        F: FnOnce(&Self) -> R,
-    {
+    /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
+    /// of this argument list. (If `bound_self` is none, we return the the argument list
+    /// unmodified.)
+    pub(crate) fn with_self(&self, bound_self: Option<Type<'_>>) -> Cow<Self> {
         if bound_self.is_some() {
             let arguments = std::iter::once(Argument::Synthetic)
                 .chain(self.0.iter().copied())
                 .collect();
-            f(&CallArguments(arguments))
+            Cow::Owned(CallArguments(arguments))
         } else {
-            f(self)
+            Cow::Borrowed(self)
         }
     }
 
@@ -90,13 +88,10 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
         Self { arguments, types }
     }
 
-    /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
-    /// parameter) prepended to the front of this argument list. (If `bound_self` is none, the
-    /// function is invoked with the unmodified argument list.)
-    pub(crate) fn with_self<F, R>(&self, bound_self: Option<Type<'db>>, f: F) -> R
-    where
-        F: FnOnce(&Self) -> R,
-    {
+    /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
+    /// of this argument list. (If `bound_self` is none, we return the the argument list
+    /// unmodified.)
+    pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<Self> {
         if let Some(bound_self) = bound_self {
             let arguments = CallArguments(
                 std::iter::once(Argument::Synthetic)
@@ -106,9 +101,9 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
             let types = std::iter::once(bound_self)
                 .chain(self.types.iter().copied())
                 .collect();
-            f(&CallArgumentTypes { arguments, types })
+            Cow::Owned(CallArgumentTypes { arguments, types })
         } else {
-            f(self)
+            Cow::Borrowed(self)
         }
     }
 
