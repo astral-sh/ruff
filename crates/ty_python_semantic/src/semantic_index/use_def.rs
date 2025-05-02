@@ -265,6 +265,7 @@ use self::symbol_state::{
     SymbolDeclarations, SymbolState,
 };
 use crate::node_key::NodeKey;
+use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::narrowing_constraints::{
@@ -735,6 +736,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
     eager_bindings: EagerBindings,
+
+    /// Used names in the current scope and their corresponding node keys.
+    used_names: FxHashMap<ScopedSymbolId, (ExpressionNodeKey, NodeKey)>,
 }
 
 impl Default for UseDefMapBuilder<'_> {
@@ -753,6 +757,7 @@ impl Default for UseDefMapBuilder<'_> {
             symbol_states: IndexVec::new(),
             eager_bindings: EagerBindings::default(),
             instance_attribute_states: IndexVec::new(),
+            used_names: FxHashMap::default(),
         }
     }
 }
@@ -994,6 +999,7 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol: ScopedSymbolId,
         use_id: ScopedUseId,
         node_key: NodeKey,
+        expr_node_key: Option<ExpressionNodeKey>,
     ) {
         // We have a use of a symbol; clone the current bindings for that symbol, and record them
         // as the live bindings for this use.
@@ -1002,9 +1008,17 @@ impl<'db> UseDefMapBuilder<'db> {
             .push(self.symbol_states[symbol].bindings().clone());
         debug_assert_eq!(use_id, new_use);
 
+        if let Some(expr_node_key) = expr_node_key {
+            self.used_names.insert(symbol, (expr_node_key, node_key));
+        }
+
         // Track reachability of all uses of symbols to silence `unresolved-reference`
         // diagnostics in unreachable code.
         self.record_node_reachability(node_key);
+    }
+
+    pub(super) fn used_name(&self, symbol: ScopedSymbolId) -> Option<(ExpressionNodeKey, NodeKey)> {
+        self.used_names.get(&symbol).copied()
     }
 
     pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {
