@@ -237,7 +237,7 @@ reveal_type(D(1))  # revealed: D[Literal[1]]
 wrong_innards: D[int] = D("five")
 ```
 
-### Both present, `__new__` inherited from a generic base class fwomp
+### Both present, `__new__` inherited from a generic base class
 
 If either method comes from a generic base class, we don't currently use its inferred specialization
 to specialize the class.
