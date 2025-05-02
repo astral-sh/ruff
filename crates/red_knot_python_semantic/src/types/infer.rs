@@ -5140,6 +5140,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             };
 
+            let is_global = self
+                .index
+                .scope(file_scope_id)
+                .globals
+                .contains(symbol_name);
+
             // If it's a function-like scope and there is one or more binding in this scope (but
             // none of those bindings are visible from where we are in the control flow), we cannot
             // fallback to any bindings in enclosing scopes. As such, we can immediately short-circuit
@@ -5149,7 +5155,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             // a local variable or not in function-like scopes. If a variable has any bindings in a
             // function-like scope, it is considered a local variable; it never references another
             // scope. (At runtime, it would use the `LOAD_FAST` opcode.)
-            if has_bindings_in_this_scope && scope.is_function_like(db) {
+            if has_bindings_in_this_scope && scope.is_function_like(db) && !is_global {
                 return Symbol::Unbound.into();
             }
 

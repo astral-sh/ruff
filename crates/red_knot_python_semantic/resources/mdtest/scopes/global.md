@@ -93,8 +93,7 @@ def f():
 ```py
 def f():
     global x
-    # TODO this should also not be an error
-    y = x  # error: [unresolved-reference] "Name `x` used when not defined"
+    y = x
     x = 1  # No error.
 
 x = 2
