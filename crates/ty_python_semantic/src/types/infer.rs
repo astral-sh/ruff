@@ -4119,6 +4119,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_bytes_literal_expression(bytes_literal)
             }
             ast::Expr::FString(fstring) => self.infer_fstring_expression(fstring),
+            ast::Expr::TString(tstring) => self.infer_tstring_expression(tstring),
             ast::Expr::EllipsisLiteral(literal) => self.infer_ellipsis_literal_expression(literal),
             ast::Expr::Tuple(tuple) => self.infer_tuple_expression(tuple),
             ast::Expr::List(list) => self.infer_list_expression(list),
@@ -4248,6 +4249,100 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 }
                             }
                             ast::FStringElement::Literal(literal) => {
+                                collector.push_str(&literal.value);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        collector.string_type(self.db())
+    }
+
+    fn infer_tstring_expression(&mut self, tstring: &ast::ExprTString) -> Type<'db> {
+        let ast::ExprTString { range: _, value } = tstring;
+
+        let mut collector = StringPartsCollector::new();
+        for part in value {
+            // Make sure we iter through every parts to infer all sub-expressions. The `collector`
+            // struct ensures we don't allocate unnecessary strings.
+            match part {
+                ast::TStringPart::Literal(literal) => {
+                    collector.push_str(&literal.value);
+                }
+                ast::TStringPart::FString(fstring) => {
+                    for element in &fstring.elements {
+                        match element {
+                            ast::FStringElement::Expression(expression) => {
+                                let ast::FStringExpressionElement {
+                                    range: _,
+                                    expression,
+                                    debug_text: _,
+                                    conversion,
+                                    format_spec,
+                                } = expression;
+                                let ty = self.infer_expression(expression);
+
+                                if let Some(ref format_spec) = format_spec {
+                                    for element in format_spec.elements.expressions() {
+                                        self.infer_expression(&element.expression);
+                                    }
+                                }
+
+                                // TODO: handle format specifiers by calling a method
+                                // (`Type::format`?) that handles the `__format__` method.
+                                // Conversion flags should be handled before calling `__format__`.
+                                // https://docs.python.org/3/library/string.html#format-string-syntax
+                                if !conversion.is_none() || format_spec.is_some() {
+                                    collector.add_expression();
+                                } else {
+                                    if let Type::StringLiteral(literal) = ty.str(self.db()) {
+                                        collector.push_str(literal.value(self.db()));
+                                    } else {
+                                        collector.add_expression();
+                                    }
+                                }
+                            }
+                            ast::FStringElement::Literal(literal) => {
+                                collector.push_str(&literal.value);
+                            }
+                        }
+                    }
+                }
+                ast::TStringPart::TString(fstring) => {
+                    for element in &fstring.elements {
+                        match element {
+                            ast::TStringElement::Interpolation(interpolation) => {
+                                let ast::TStringInterpolationElement {
+                                    range: _,
+                                    interpolation,
+                                    debug_text: _,
+                                    conversion,
+                                    format_spec,
+                                } = interpolation;
+                                let ty = self.infer_expression(interpolation);
+
+                                if let Some(ref format_spec) = format_spec {
+                                    for element in format_spec.elements.interpolations() {
+                                        self.infer_expression(&element.interpolation);
+                                    }
+                                }
+
+                                // TODO: handle format specifiers by calling a method
+                                // (`Type::format`?) that handles the `__format__` method.
+                                // Conversion flags should be handled before calling `__format__`.
+                                // https://docs.python.org/3/library/string.html#format-string-syntax
+                                if !conversion.is_none() || format_spec.is_some() {
+                                    collector.add_expression();
+                                } else {
+                                    if let Type::StringLiteral(literal) = ty.str(self.db()) {
+                                        collector.push_str(literal.value(self.db()));
+                                    } else {
+                                        collector.add_expression();
+                                    }
+                                }
+                            }
+                            ast::TStringElement::Literal(literal) => {
                                 collector.push_str(&literal.value);
                             }
                         }
@@ -7876,6 +7971,14 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             ast::Expr::FString(fstring) => {
                 self.infer_fstring_expression(fstring);
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!("F-strings are not allowed in type expressions"),
+                )
+            }
+
+            ast::Expr::TString(tstring) => {
+                self.infer_tstring_expression(tstring);
                 self.report_invalid_type_expression(
                     expression,
                     format_args!("F-strings are not allowed in type expressions"),
