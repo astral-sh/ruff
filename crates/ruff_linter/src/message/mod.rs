@@ -54,6 +54,7 @@ pub struct DiagnosticMessage {
     pub kind: DiagnosticKind,
     pub range: TextRange,
     pub fix: Option<Fix>,
+    pub parent: Option<TextSize>,
     pub file: SourceFile,
     pub noqa_offset: TextSize,
 }
@@ -92,6 +93,7 @@ impl Message {
             range: diagnostic.range(),
             kind: diagnostic.kind,
             fix: diagnostic.fix,
+            parent: diagnostic.parent,
             file,
             noqa_offset,
         })

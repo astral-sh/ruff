@@ -184,6 +184,7 @@ mod tests {
                 kind: MissingNewlineAtEndOfFile.into(),
                 range: edit.range(),
                 fix: Some(Fix::safe_edit(edit)),
+                parent: None,
                 file: SourceFileBuilder::new(filename, source).finish(),
                 noqa_offset: TextSize::default(),
             })
