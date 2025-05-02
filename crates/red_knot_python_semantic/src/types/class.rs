@@ -2275,6 +2275,8 @@ impl<'db> KnownClass {
     /// representing all possible instances of the generic class with a specialization.
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
+    ///
+    /// Panics if you provide a specialization with the wrong number of types.
     pub(crate) fn to_specialized_instance(
         self,
         db: &'db dyn Db,
