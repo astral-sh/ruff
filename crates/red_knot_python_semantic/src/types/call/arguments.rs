@@ -52,7 +52,7 @@ pub(crate) enum Argument<'a> {
 }
 
 /// Arguments for a single call, in source order, along with inferred types for each argument.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct CallArgumentTypes<'a, 'db> {
     arguments: CallArguments<'a>,
     types: Vec<Type<'db>>,
@@ -61,9 +61,7 @@ pub(crate) struct CallArgumentTypes<'a, 'db> {
 impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     /// Create a [`CallArgumentTypes`] with no arguments.
     pub(crate) fn none() -> Self {
-        let arguments = CallArguments::default();
-        let types = Vec::default();
-        Self { arguments, types }
+        Self::default()
     }
 
     /// Create a [`CallArgumentTypes`] from an iterator over non-variadic positional argument
