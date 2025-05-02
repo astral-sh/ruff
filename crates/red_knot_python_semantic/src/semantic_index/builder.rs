@@ -12,7 +12,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{walk_expr, walk_pattern, walk_stmt, Visitor};
 use ruff_python_ast::{self as ast, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
-    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
+    SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use ruff_text_size::TextRange;
 
@@ -1896,7 +1896,24 @@ where
                 self.mark_unreachable();
             }
             ast::Stmt::Global(ast::StmtGlobal { range: _, names }) => {
+                let enclosing_scope_info = self.current_scope_info();
+                let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+                let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
                 for name in names {
+                    // record whether or not the symbol is already bound in the enclosing scope, at
+                    // the point of the `global` statement. This is a syntax error, which we'll emit
+                    // in `build`.
+                    let bound = enclosing_symbol_table.symbol_id_by_name(name).is_some();
+                    if bound {
+                        self.report_semantic_error(SemanticSyntaxError {
+                            kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
+                                name: name.to_string(),
+                                start: name.range.start(),
+                            },
+                            range: name.range,
+                            python_version: self.python_version,
+                        });
+                    }
                     let scope_id = self.current_scope();
                     self.scopes[scope_id]
                         .globals

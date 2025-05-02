@@ -104,76 +104,76 @@ Using a name prior to its `global` declaration in the same scope is a syntax err
 
 ```py
 def f():
-    print(x)  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x
+    print(x)
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
 
 def f():
     global x
-    print(x)  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x
+    print(x)
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
 
 def f():
-    print(x)  # error: [invalid-syntax] "name `x` is used prior to global declaration"
+    print(x)
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
+    print(x)
+
+def f():
     global x, y
     print(x)
-
-def f():
-    global x, y
-    print(x)  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x, y
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     print(x)
 
 def f():
-    x = 1  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x
+    x = 1
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     x = 1
 
 def f():
     global x
-    x = 1  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x
+    x = 1
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     x = 1
 
 def f():
-    del x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x, y
+    del x
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
     global x, y
-    del x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x, y
+    del x
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
-    del x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
+    del x
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
+    del x
+
+def f():
     global x
     del x
-
-def f():
-    global x
-    del x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
-    del x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x, y
+    del x
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
     global x, y
-    del x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x, y
+    del x
+    global x, y  # error: [invalid-syntax] "name `x` is used prior to global declaration"
     del x
 
 def f():
-    print(f"{x=}")  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x
+    print(f"{x=}")
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 
 # still an error in module scope
-x = None  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-global x
+x = None
+global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 ```

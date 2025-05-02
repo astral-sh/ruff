@@ -212,6 +212,6 @@ def _():
 
 ```py
 def f():
-    x = 1  # error: [invalid-syntax] "name `x` is used prior to global declaration"
-    global x
+    x = 1
+    global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 ```
