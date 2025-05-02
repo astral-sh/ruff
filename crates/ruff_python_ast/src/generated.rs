@@ -7375,7 +7375,7 @@ pub struct ExprFString {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprTString {
     pub range: ruff_text_size::TextRange,
-    pub value: TStringValue,
+    pub value: crate::TStringValue,
 }
 
 /// An AST node that represents either a single-part string literal
