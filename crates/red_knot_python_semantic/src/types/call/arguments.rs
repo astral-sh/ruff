@@ -11,16 +11,18 @@ impl<'a> CallArguments<'a> {
     /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
     /// parameter) prepended to the front of this argument list. (If `bound_self` is none, the
     /// function is invoked with the unmodified argument list.)
-    pub(crate) fn with_self<F, R>(&mut self, bound_self: Option<Type<'_>>, f: F) -> R
+    pub(crate) fn with_self<F, R>(&self, bound_self: Option<Type<'_>>, f: F) -> R
     where
-        F: FnOnce(&mut Self) -> R,
+        F: FnOnce(&Self) -> R,
     {
+        let mut call_arguments = self.clone();
+
         if bound_self.is_some() {
-            self.0.push_front(Argument::Synthetic);
+            call_arguments.0.push_front(Argument::Synthetic);
         }
-        let result = f(self);
+        let result = f(&call_arguments);
         if bound_self.is_some() {
-            self.0.pop_front();
+            call_arguments.0.pop_front();
         }
         result
     }
@@ -55,6 +57,7 @@ pub(crate) enum Argument<'a> {
 }
 
 /// Arguments for a single call, in source order, along with inferred types for each argument.
+#[derive(Clone, Debug)]
 pub(crate) struct CallArgumentTypes<'a, 'db> {
     arguments: CallArguments<'a>,
     types: VecDeque<Type<'db>>,
@@ -93,20 +96,20 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
     /// parameter) prepended to the front of this argument list. (If `bound_self` is none, the
     /// function is invoked with the unmodified argument list.)
-    pub(crate) fn with_self<F, R>(&mut self, bound_self: Option<Type<'db>>, f: F) -> R
+    pub(crate) fn with_self<F, R>(&self, bound_self: Option<Type<'db>>, f: F) -> R
     where
-        F: FnOnce(&mut Self) -> R,
+        F: FnOnce(Self) -> R,
     {
+        let mut call_argument_types = self.clone();
+
         if let Some(bound_self) = bound_self {
-            self.arguments.0.push_front(Argument::Synthetic);
-            self.types.push_front(bound_self);
+            call_argument_types
+                .arguments
+                .0
+                .push_front(Argument::Synthetic);
+            call_argument_types.types.push_front(bound_self);
         }
-        let result = f(self);
-        if bound_self.is_some() {
-            self.arguments.0.pop_front();
-            self.types.pop_front();
-        }
-        result
+        f(call_argument_types)
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + '_ {

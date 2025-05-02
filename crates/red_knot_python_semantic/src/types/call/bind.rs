@@ -56,7 +56,7 @@ impl<'db> Bindings<'db> {
     /// verify that each argument type is assignable to the corresponding parameter type.
     pub(crate) fn match_parameters(
         signatures: Signatures<'db>,
-        arguments: &mut CallArguments<'_>,
+        arguments: &CallArguments<'_>,
     ) -> Self {
         let mut argument_forms = vec![None; arguments.len()];
         let mut conflicting_forms = vec![false; arguments.len()];
@@ -92,7 +92,7 @@ impl<'db> Bindings<'db> {
     pub(crate) fn check_types(
         mut self,
         db: &'db dyn Db,
-        argument_types: &mut CallArgumentTypes<'_, 'db>,
+        argument_types: &CallArgumentTypes<'_, 'db>,
     ) -> Result<Self, CallError<'db>> {
         for (signature, element) in self.signatures.iter().zip(&mut self.elements) {
             element.check_types(db, signature, argument_types);
@@ -351,10 +351,7 @@ impl<'db> Bindings<'db> {
                             [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
                                     if let Ok(return_ty) = getter
-                                        .try_call(
-                                            db,
-                                            &mut CallArgumentTypes::positional([*instance]),
-                                        )
+                                        .try_call(db, &CallArgumentTypes::positional([*instance]))
                                         .map(|binding| binding.return_type(db))
                                     {
                                         overload.set_return_type(return_ty);
@@ -383,10 +380,7 @@ impl<'db> Bindings<'db> {
                             [Some(instance), ..] => {
                                 if let Some(getter) = property.getter(db) {
                                     if let Ok(return_ty) = getter
-                                        .try_call(
-                                            db,
-                                            &mut CallArgumentTypes::positional([*instance]),
-                                        )
+                                        .try_call(db, &CallArgumentTypes::positional([*instance]))
                                         .map(|binding| binding.return_type(db))
                                     {
                                         overload.set_return_type(return_ty);
@@ -414,7 +408,7 @@ impl<'db> Bindings<'db> {
                             if let Some(setter) = property.setter(db) {
                                 if let Err(_call_error) = setter.try_call(
                                     db,
-                                    &mut CallArgumentTypes::positional([*instance, *value]),
+                                    &CallArgumentTypes::positional([*instance, *value]),
                                 ) {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the setter failed",
@@ -433,7 +427,7 @@ impl<'db> Bindings<'db> {
                             if let Some(setter) = property.setter(db) {
                                 if let Err(_call_error) = setter.try_call(
                                     db,
-                                    &mut CallArgumentTypes::positional([*instance, *value]),
+                                    &CallArgumentTypes::positional([*instance, *value]),
                                 ) {
                                     overload.errors.push(BindingError::InternalCallError(
                                         "calling the setter failed",
@@ -874,7 +868,7 @@ pub(crate) struct CallableBinding<'db> {
 impl<'db> CallableBinding<'db> {
     fn match_parameters(
         signature: &CallableSignature<'db>,
-        arguments: &mut CallArguments<'_>,
+        arguments: &CallArguments<'_>,
         argument_forms: &mut [Option<ParameterForm>],
         conflicting_forms: &mut [bool],
     ) -> Self {
@@ -912,13 +906,13 @@ impl<'db> CallableBinding<'db> {
         &mut self,
         db: &'db dyn Db,
         signature: &CallableSignature<'db>,
-        argument_types: &mut CallArgumentTypes<'_, 'db>,
+        argument_types: &CallArgumentTypes<'_, 'db>,
     ) {
         // If this callable is a bound method, prepend the self instance onto the arguments list
         // before checking.
         argument_types.with_self(signature.bound_type, |argument_types| {
             for (signature, overload) in signature.iter().zip(&mut self.overloads) {
-                overload.check_types(db, signature, argument_types);
+                overload.check_types(db, signature, &argument_types);
             }
         });
     }

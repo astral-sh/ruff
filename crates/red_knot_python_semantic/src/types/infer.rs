@@ -1815,7 +1815,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
             inferred_ty = match decorator_ty
-                .try_call(self.db(), &mut CallArgumentTypes::positional([inferred_ty]))
+                .try_call(self.db(), &CallArgumentTypes::positional([inferred_ty]))
                 .map(|bindings| bindings.return_type(self.db()))
             {
                 Ok(return_ty) => return_ty,
@@ -2832,7 +2832,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let successful_call = meta_dunder_set
                                 .try_call(
                                     db,
-                                    &mut CallArgumentTypes::positional([
+                                    &CallArgumentTypes::positional([
                                         meta_attr_ty,
                                         object_ty,
                                         value_ty,
@@ -2973,7 +2973,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             let successful_call = meta_dunder_set
                                 .try_call(
                                     db,
-                                    &mut CallArgumentTypes::positional([
+                                    &CallArgumentTypes::positional([
                                         meta_attr_ty,
                                         object_ty,
                                         value_ty,
@@ -4561,7 +4561,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
-        let mut call_arguments = Self::parse_arguments(arguments);
+        let call_arguments = Self::parse_arguments(arguments);
         let callable_type = self.infer_expression(func);
 
         if let Type::FunctionLiteral(function) = callable_type {
@@ -4640,11 +4640,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
 
         let signatures = callable_type.signatures(self.db());
-        let bindings = Bindings::match_parameters(signatures, &mut call_arguments);
-        let mut call_argument_types =
+        let bindings = Bindings::match_parameters(signatures, &call_arguments);
+        let call_argument_types =
             self.infer_argument_types(arguments, call_arguments, &bindings.argument_forms);
 
-        match bindings.check_types(self.db(), &mut call_argument_types) {
+        match bindings.check_types(self.db(), &call_argument_types) {
             Ok(mut bindings) => {
                 for binding in &mut bindings {
                     let binding_type = binding.callable_type;
@@ -6486,7 +6486,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             Symbol::Type(contains_dunder, Boundness::Bound) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
-                    .try_call(db, &mut CallArgumentTypes::positional([right, left]))
+                    .try_call(db, &CallArgumentTypes::positional([right, left]))
                     .map(|bindings| bindings.return_type(db))
                     .ok()
             }
@@ -6640,7 +6640,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         generic_context: GenericContext<'db>,
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
-        let mut call_argument_types = match slice_node {
+        let call_argument_types = match slice_node {
             ast::Expr::Tuple(tuple) => CallArgumentTypes::positional(
                 tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
             ),
@@ -6650,8 +6650,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             value_ty,
             generic_context.signature(self.db()),
         ));
-        let bindings = match Bindings::match_parameters(signatures, &mut call_argument_types)
-            .check_types(self.db(), &mut call_argument_types)
+        let bindings = match Bindings::match_parameters(signatures, &call_argument_types)
+            .check_types(self.db(), &call_argument_types)
         {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => {
@@ -6893,7 +6893,7 @@ impl<'db> TypeInferenceBuilder<'db> {
 
                             match ty.try_call(
                                 self.db(),
-                                &mut CallArgumentTypes::positional([value_ty, slice_ty]),
+                                &CallArgumentTypes::positional([value_ty, slice_ty]),
                             ) {
                                 Ok(bindings) => return bindings.return_type(self.db()),
                                 Err(CallError(_, bindings)) => {
