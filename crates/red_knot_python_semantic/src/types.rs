@@ -4459,26 +4459,22 @@ impl<'db> Type<'db> {
         // An alternative might be to not skip `object.__new__` but instead mark it such that it's
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
-        let new_call_outcome = argument_types.with_self(Some(self_type), |argument_types| {
-            let new_method = self_type
-                .find_name_in_mro_with_policy(
-                    db,
-                    "__new__",
-                    MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                        | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                )?
-                .symbol
-                .try_call_dunder_get(db, self_type);
-
-            match new_method {
+        let new_method = self_type.find_name_in_mro_with_policy(
+            db,
+            "__new__",
+            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+        );
+        let new_call_outcome = new_method.and_then(|new_method| {
+            match new_method.symbol.try_call_dunder_get(db, self_type) {
                 Symbol::Type(new_method, boundness) => {
-                    let result = new_method.try_call(db, &argument_types);
-
+                    let result =
+                        new_method.try_call(db, argument_types.with_self(Some(self_type)).as_ref());
                     if boundness == Boundness::PossiblyUnbound {
-                        return Some(Err(DunderNewCallError::PossiblyUnbound(result.err())));
+                        Some(Err(DunderNewCallError::PossiblyUnbound(result.err())))
+                    } else {
+                        Some(result.map_err(DunderNewCallError::CallError))
                     }
-
-                    Some(result.map_err(DunderNewCallError::CallError))
                 }
                 Symbol::Unbound => None,
             }
