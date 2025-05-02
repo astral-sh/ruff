@@ -2,7 +2,7 @@
 
 ## Defining a generic class
 
-At its simplest, to define a generic class using the legacy syntax, you use inherit from the
+At its simplest, to define a generic class using the legacy syntax, you inherit from the
 `typing.Generic` special form, which is "specialized" with the generic class's type variables.
 
 ```py

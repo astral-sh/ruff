@@ -83,7 +83,7 @@ Using a variadic parameter:
 lambda *args: reveal_type(args)  # revealed: tuple
 ```
 
-Using a keyword-varidic parameter:
+Using a keyword-variadic parameter:
 
 ```py
 lambda **kwargs: reveal_type(kwargs)  # revealed: dict[str, Unknown]

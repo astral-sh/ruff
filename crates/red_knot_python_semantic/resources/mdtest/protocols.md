@@ -70,7 +70,7 @@ simultaneously:
 class DuplicateBases(Protocol, Protocol[T]):
     x: T
 
-# TODO: should not have `Generic` multiple times and `Protocol` multiple times
+# TODO: should not have `Protocol` multiple times
 # revealed: tuple[Literal[DuplicateBases], typing.Protocol, @Todo(`Protocol[]` subscript), typing.Generic, Literal[object]]
 reveal_type(DuplicateBases.__mro__)
 ```
