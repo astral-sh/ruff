@@ -520,6 +520,7 @@ function restoreWorkspace(
 ) {
   let hasSettings = false;
 
+  // eslint-disable-next-line prefer-const
   for (let [name, content] of Object.entries(state.files)) {
     let handle = null;
 
@@ -527,7 +528,6 @@ function restoreWorkspace(
       name === "knot.json" &&
       !Object.keys(state.files).includes(SETTINGS_FILE_NAME)
     ) {
-      console.log("Rename to", SETTINGS_FILE_NAME);
       name = SETTINGS_FILE_NAME;
     }
 
