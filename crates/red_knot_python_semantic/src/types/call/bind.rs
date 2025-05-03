@@ -621,9 +621,9 @@ impl<'db> Bindings<'db> {
                                     overload.set_return_type(Type::Tuple(TupleType::new(
                                         db,
                                         protocol_class
-                                            .protocol_members(db)
-                                            .iter()
-                                            .map(|member| Type::string_literal(db, member))
+                                            .interface(db)
+                                            .members()
+                                            .map(|member| Type::string_literal(db, member.name()))
                                             .collect::<Box<[Type<'db>]>>(),
                                     )));
                                 }

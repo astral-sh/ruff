@@ -1,9 +1,9 @@
 //! Instance types: both nominal and structural.
 
-use ruff_python_ast::name::Name;
-
+use super::protocol_class::ProtocolInterface;
 use super::{ClassType, KnownClass, SubclassOfType, Type};
-use crate::{Db, FxOrderSet};
+use crate::symbol::{Symbol, SymbolAndQualifiers};
+use crate::Db;
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
@@ -34,9 +34,9 @@ impl<'db> Type<'db> {
         // as well as whether each member *exists* on `self`.
         protocol
             .0
-            .protocol_members(db)
-            .iter()
-            .all(|member| !self.member(db, member).symbol.is_unbound())
+            .interface(db)
+            .members()
+            .all(|member| !self.member(db, member.name()).symbol.is_unbound())
     }
 }
 
@@ -164,54 +164,51 @@ impl<'db> ProtocolInstanceType<'db> {
         }
         match self.0 {
             Protocol::FromClass(_) => Type::ProtocolInstance(Self(Protocol::Synthesized(
-                SynthesizedProtocolType::new(db, self.0.protocol_members(db)),
+                SynthesizedProtocolType::new(db, self.0.interface(db)),
             ))),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
     }
 
-    /// TODO: this should return `true` if any of the members of this protocol type contain any `Todo` types.
-    #[expect(clippy::unused_self)]
-    pub(super) fn contains_todo(self) -> bool {
-        false
+    /// Return `true` if any of the members of this protocol type contain any `Todo` types.
+    pub(super) fn contains_todo(self, db: &'db dyn Db) -> bool {
+        self.0.interface(db).contains_todo(db)
     }
 
     /// Return `true` if this protocol type is fully static.
-    ///
-    /// TODO: should not be considered fully static if any members do not have fully static types
-    #[expect(clippy::unused_self)]
-    pub(super) fn is_fully_static(self) -> bool {
-        true
+    pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        self.0.interface(db).is_fully_static(db)
     }
 
     /// Return `true` if this protocol type is a subtype of the protocol `other`.
-    ///
-    /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_subtype_of(self, db: &'db dyn Db, other: Self) -> bool {
-        self.0
-            .protocol_members(db)
-            .is_superset(other.0.protocol_members(db))
+        self.is_fully_static(db) && other.is_fully_static(db) && self.is_assignable_to(db, other)
     }
 
     /// Return `true` if this protocol type is assignable to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_assignable_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_subtype_of(db, other)
+        other
+            .0
+            .interface(db)
+            .is_sub_interface_of(self.0.interface(db))
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.normalized(db) == other.normalized(db)
+        self.is_fully_static(db)
+            && other.is_fully_static(db)
+            && self.normalized(db) == other.normalized(db)
     }
 
     /// Return `true` if this protocol type is gradually equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_gradual_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
-        self.is_equivalent_to(db, other)
+        self.normalized(db) == other.normalized(db)
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
@@ -221,6 +218,20 @@ impl<'db> ProtocolInstanceType<'db> {
     #[expect(clippy::unused_self)]
     pub(super) fn is_disjoint_from(self, _db: &'db dyn Db, _other: Self) -> bool {
         false
+    }
+
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
+        match self.inner() {
+            Protocol::FromClass(class) => class.instance_member(db, name),
+            Protocol::Synthesized(synthesized) => synthesized
+                .interface(db)
+                .member_by_name(name)
+                .map(|member| SymbolAndQualifiers {
+                    symbol: Symbol::bound(member.ty()),
+                    qualifiers: member.qualifiers(),
+                })
+                .unwrap_or_else(|| KnownClass::Object.to_instance(db).instance_member(db, name)),
+        }
     }
 }
 
@@ -236,15 +247,15 @@ pub(super) enum Protocol<'db> {
 
 impl<'db> Protocol<'db> {
     /// Return the members of this protocol type
-    fn protocol_members(self, db: &'db dyn Db) -> &'db FxOrderSet<Name> {
+    fn interface(self, db: &'db dyn Db) -> &'db ProtocolInterface<'db> {
         match self {
             Self::FromClass(class) => class
                 .class_literal(db)
                 .0
                 .into_protocol_class(db)
                 .expect("Protocol class literal should be a protocol class")
-                .protocol_members(db),
-            Self::Synthesized(synthesized) => synthesized.members(db),
+                .interface(db),
+            Self::Synthesized(synthesized) => synthesized.interface(db),
         }
     }
 }
@@ -258,5 +269,5 @@ impl<'db> Protocol<'db> {
 #[salsa::interned(debug)]
 pub(super) struct SynthesizedProtocolType<'db> {
     #[return_ref]
-    pub(super) members: FxOrderSet<Name>,
+    pub(super) interface: ProtocolInterface<'db>,
 }

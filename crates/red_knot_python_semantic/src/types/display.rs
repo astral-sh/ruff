@@ -86,11 +86,11 @@ impl Display for DisplayRepresentation<'_> {
                 Protocol::FromClass(ClassType::Generic(alias)) => alias.display(self.db).fmt(f),
                 Protocol::Synthesized(synthetic) => {
                     f.write_str("<Protocol with members ")?;
-                    let member_list = synthetic.members(self.db);
+                    let member_list = synthetic.interface(self.db).members();
                     let num_members = member_list.len();
-                    for (i, member) in member_list.iter().enumerate() {
+                    for (i, member) in member_list.enumerate() {
                         let is_last = i == num_members - 1;
-                        write!(f, "'{member}'")?;
+                        write!(f, "'{}'", member.name())?;
                         if !is_last {
                             f.write_str(", ")?;
                         }

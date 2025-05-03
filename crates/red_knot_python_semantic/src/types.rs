@@ -68,6 +68,7 @@ mod instance;
 mod known_instance;
 mod mro;
 mod narrow;
+mod protocol_class;
 mod signatures;
 mod slots;
 mod string_annotation;
@@ -674,7 +675,7 @@ impl<'db> Type<'db> {
                         .any(|ty| ty.contains_todo(db))
             }
 
-            Self::ProtocolInstance(protocol) => protocol.contains_todo(),
+            Self::ProtocolInstance(protocol) => protocol.contains_todo(db),
         }
     }
 
@@ -2061,7 +2062,7 @@ impl<'db> Type<'db> {
             | Type::AlwaysTruthy
             | Type::PropertyInstance(_) => true,
 
-            Type::ProtocolInstance(protocol) => protocol.is_fully_static(),
+            Type::ProtocolInstance(protocol) => protocol.is_fully_static(db),
 
             Type::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
                 None => true,
@@ -2515,16 +2516,7 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance) => instance.class().instance_member(db, name),
 
-            Type::ProtocolInstance(protocol) => match protocol.inner() {
-                Protocol::FromClass(class) => class.instance_member(db, name),
-                Protocol::Synthesized(synthesized) => {
-                    if synthesized.members(db).contains(name) {
-                        SymbolAndQualifiers::todo("Capture type of synthesized protocol members")
-                    } else {
-                        Symbol::Unbound.into()
-                    }
-                }
-            },
+            Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
                 .to_instance(db)
@@ -5415,7 +5407,7 @@ impl std::fmt::Display for DynamicType {
 
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
     pub(crate) struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
