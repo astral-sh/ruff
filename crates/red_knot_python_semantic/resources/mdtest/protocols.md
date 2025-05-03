@@ -816,6 +816,22 @@ class B: ...
 static_assert(is_equivalent_to(A | HasX | B | HasY, B | AlsoHasY | AlsoHasX | A))
 ```
 
+Protocols are considered equivalent if their members are equivalent, even if those members are
+differently ordered unions:
+
+```py
+class C: ...
+
+class UnionProto1(Protocol):
+    x: A | B | C
+
+class UnionProto2(Protocol):
+    x: C | A | B
+
+static_assert(is_equivalent_to(UnionProto1, UnionProto2))
+static_assert(is_equivalent_to(UnionProto1 | A | B, B | UnionProto2 | A))
+```
+
 ## Intersections of protocols
 
 An intersection of two protocol types `X` and `Y` is equivalent to a protocol type `Z` that inherits
