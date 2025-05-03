@@ -42,7 +42,7 @@ use crate::semantic_index::symbol::{
     ScopedSymbolId, SymbolTableBuilder,
 };
 use crate::semantic_index::use_def::{
-    EagerBindingsKey, FlowSnapshot, ScopedEagerBindingsId, UseDefMapBuilder,
+    EagerSnapshotKey, FlowSnapshot, ScopedEagerSnapshotId, UseDefMapBuilder,
 };
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraintsBuilder,
@@ -113,7 +113,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
     generator_functions: FxHashSet<FileScopeId>,
-    eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
+    eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
@@ -148,7 +148,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
-            eager_bindings: FxHashMap::default(),
+            eager_snapshots: FxHashMap::default(),
 
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
@@ -287,9 +287,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             .pop()
             .expect("Root scope should be present");
 
-        let popped_symbol_table = &self.symbol_tables[popped_scope_id];
-        let mut recorded_names = FxHashSet::default();
-
         let children_end = self.scopes.next_index();
         let popped_scope = &mut self.scopes[popped_scope_id];
         popped_scope.extend_descendants(children_end);
@@ -306,39 +303,6 @@ impl<'db> SemanticIndexBuilder<'db> {
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
 
-            // We also mark symbols in the outer scope as used
-            // to perform cross-scope type narrowing.
-            // Symbols in class scope are not visible to eager nested scopes,
-            // but `SymbolBindings::narrowing_constraint_at_use` information is required and recorded here.
-            for symbol_id in popped_symbol_table.symbol_ids() {
-                if recorded_names.contains(&symbol_id) {
-                    continue;
-                }
-                let symbol = popped_symbol_table.symbol(symbol_id);
-                let Some(enclosing_symbol_id) =
-                    enclosing_symbol_table.symbol_id_by_name(symbol.name())
-                else {
-                    continue;
-                };
-                let popped_use_def = &self.use_def_maps[popped_scope_id];
-                if let Some((expr, node_key)) = popped_use_def.used_name(symbol_id) {
-                    let use_id = self.ast_ids[enclosing_scope_id].record_use(expr);
-                    self.use_def_maps[enclosing_scope_id].record_use(
-                        enclosing_symbol_id,
-                        use_id,
-                        node_key,
-                        None,
-                    );
-                    recorded_names.insert(symbol_id);
-                }
-            }
-
-            // Names bound in class scopes are never visible to nested scopes, so we never need to
-            // save eager scope bindings in a class scope.
-            if enclosing_scope_kind.is_class() {
-                continue;
-            }
-
             for nested_symbol in self.symbol_tables[popped_scope_id].symbols() {
                 // Skip this symbol if this enclosing scope doesn't contain any bindings for it.
                 // Note that even if this symbol is bound in the popped scope,
@@ -351,20 +315,20 @@ impl<'db> SemanticIndexBuilder<'db> {
                     continue;
                 };
                 let enclosing_symbol = enclosing_symbol_table.symbol(enclosing_symbol_id);
-                if !enclosing_symbol.is_bound() {
-                    continue;
-                }
 
-                // Snapshot the bindings of this symbol that are visible at this point in this
+                // Snapshot the state of this symbol that are visible at this point in this
                 // enclosing scope.
-                let key = EagerBindingsKey {
+                let key = EagerSnapshotKey {
                     enclosing_scope: enclosing_scope_id,
                     enclosing_symbol: enclosing_symbol_id,
                     nested_scope: popped_scope_id,
                 };
-                let eager_bindings = self.use_def_maps[enclosing_scope_id]
-                    .snapshot_eager_bindings(enclosing_symbol_id);
-                self.eager_bindings.insert(key, eager_bindings);
+                let eager_snapshot = self.use_def_maps[enclosing_scope_id].snapshot_eager_state(
+                    enclosing_symbol_id,
+                    enclosing_scope_kind,
+                    enclosing_symbol.is_bound(),
+                );
+                self.eager_snapshots.insert(key, eager_snapshot);
             }
 
             // Lazy scopes are "sticky": once we see a lazy scope we stop doing lookups
@@ -1121,8 +1085,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
-        self.eager_bindings.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
+        self.eager_snapshots.shrink_to_fit();
 
         SemanticIndex {
             symbol_tables,
@@ -1137,7 +1101,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
-            eager_bindings: self.eager_bindings,
+            eager_snapshots: self.eager_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
             generator_functions: self.generator_functions,
         }
@@ -1250,12 +1214,8 @@ where
                 // AST uses.
                 self.mark_symbol_used(symbol);
                 let use_id = self.current_ast_ids().record_use(name);
-                self.current_use_def_map_mut().record_use(
-                    symbol,
-                    use_id,
-                    NodeKey::from_node(name),
-                    None,
-                );
+                self.current_use_def_map_mut()
+                    .record_use(symbol, use_id, NodeKey::from_node(name));
 
                 self.add_definition(symbol, function_def);
             }
@@ -1973,12 +1933,8 @@ where
                 if is_use {
                     self.mark_symbol_used(symbol);
                     let use_id = self.current_ast_ids().record_use(expr);
-                    self.current_use_def_map_mut().record_use(
-                        symbol,
-                        use_id,
-                        node_key,
-                        Some(expr.into()),
-                    );
+                    self.current_use_def_map_mut()
+                        .record_use(symbol, use_id, node_key);
                 }
 
                 if is_definition {

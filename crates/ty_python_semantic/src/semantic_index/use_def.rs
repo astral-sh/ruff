@@ -259,25 +259,24 @@
 use ruff_index::{newtype_index, IndexVec};
 use rustc_hash::FxHashMap;
 
-use self::symbol_state::ScopedDefinitionId;
 use self::symbol_state::{
-    LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator, SymbolBindings,
-    SymbolDeclarations, SymbolState,
+    EagerSnapshot, LiveBindingsIterator, LiveDeclaration, LiveDeclarationsIterator,
+    ScopedDefinitionId, SymbolBindings, SymbolDeclarations, SymbolState,
 };
 use crate::node_key::NodeKey;
-use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::narrowing_constraints::{
-    NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
+    ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
 };
 use crate::semantic_index::predicate::{
     Predicate, Predicates, PredicatesBuilder, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
-use crate::semantic_index::symbol::{FileScopeId, ScopedSymbolId};
+use crate::semantic_index::symbol::{FileScopeId, ScopeKind, ScopedSymbolId};
 use crate::semantic_index::visibility_constraints::{
     ScopedVisibilityConstraintId, VisibilityConstraints, VisibilityConstraintsBuilder,
 };
+use crate::semantic_index::EagerSnapshotResult;
 use crate::types::{infer_narrowing_constraint, IntersectionBuilder, Truthiness, Type};
 
 mod symbol_state;
@@ -329,7 +328,7 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// eager scope.
-    eager_bindings: EagerBindings,
+    eager_snapshots: EagerSnapshots,
 
     /// Whether or not the start of the scope is visible.
     /// This is used to check if the function can implicitly return `None`.
@@ -357,13 +356,15 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn narrowing_constraints_at_use(
         &self,
-        use_id: ScopedUseId,
+        constraint_key: ConstraintKey,
     ) -> ConstraintsIterator<'_, 'db> {
+        let constraint = match constraint_key {
+            ConstraintKey::NarrowingConstraint(constraint) => constraint,
+            ConstraintKey::UseId(use_id) => self.bindings_by_use[use_id].narrowing_constraint(),
+        };
         ConstraintsIterator {
             predicates: &self.predicates,
-            constraint_ids: self
-                .narrowing_constraints
-                .iter_predicates(self.bindings_by_use[use_id].narrowing_constraint()),
+            constraint_ids: self.narrowing_constraints.iter_predicates(constraint),
         }
     }
 
@@ -411,13 +412,19 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(self.instance_attributes[symbol].bindings())
     }
 
-    pub(crate) fn eager_bindings(
+    pub(crate) fn eager_snapshot(
         &self,
-        eager_bindings: ScopedEagerBindingsId,
-    ) -> Option<BindingWithConstraintsIterator<'_, 'db>> {
-        self.eager_bindings
-            .get(eager_bindings)
-            .map(|symbol_bindings| self.bindings_iterator(symbol_bindings))
+        eager_bindings: ScopedEagerSnapshotId,
+    ) -> EagerSnapshotResult<'_, 'db> {
+        match self.eager_snapshots.get(eager_bindings) {
+            Some(EagerSnapshot::Constraint(constraint)) => {
+                EagerSnapshotResult::FoundConstraint(*constraint)
+            }
+            Some(EagerSnapshot::Bindings(symbol_bindings)) => {
+                EagerSnapshotResult::FoundBindings(self.bindings_iterator(symbol_bindings))
+            }
+            None => EagerSnapshotResult::NotFound,
+        }
     }
 
     pub(crate) fn bindings_at_declaration(
@@ -502,19 +509,19 @@ impl<'db> UseDefMap<'db> {
     }
 }
 
-/// Uniquely identifies a snapshot of bindings that can be used to resolve a reference in a nested
+/// Uniquely identifies a snapshot of an eager symbol state that can be used to resolve a reference in a nested
 /// eager scope.
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
 /// For any free references in the nested scope, we use the bindings that are visible at the point
 /// where the nested scope is defined, instead of using the public type of the symbol.
 ///
-/// There is a unique ID for each distinct [`EagerBindingsKey`] in the file.
+/// There is a unique ID for each distinct [`EagerSnapshotKey`] in the file.
 #[newtype_index]
-pub(crate) struct ScopedEagerBindingsId;
+pub(crate) struct ScopedEagerSnapshotId;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub(crate) struct EagerBindingsKey {
+pub(crate) struct EagerSnapshotKey {
     /// The enclosing scope containing the bindings
     pub(crate) enclosing_scope: FileScopeId,
     /// The referenced symbol (in the enclosing scope)
@@ -523,8 +530,8 @@ pub(crate) struct EagerBindingsKey {
     pub(crate) nested_scope: FileScopeId,
 }
 
-/// A snapshot of bindings that can be used to resolve a reference in a nested eager scope.
-type EagerBindings = IndexVec<ScopedEagerBindingsId, SymbolBindings>;
+/// A snapshot of symbol states that can be used to resolve a reference in a nested eager scope.
+type EagerSnapshots = IndexVec<ScopedEagerSnapshotId, EagerSnapshot>;
 
 #[derive(Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
@@ -728,12 +735,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Currently live bindings for each instance attribute.
     instance_attribute_states: IndexVec<ScopedSymbolId, SymbolState>,
 
-    /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
+    /// Snapshot of eager states in this scope that can be used to resolve a reference in a nested
     /// eager scope.
-    eager_bindings: EagerBindings,
-
-    /// Used names in the current scope and their corresponding node keys.
-    used_names: FxHashMap<ScopedSymbolId, (ExpressionNodeKey, NodeKey)>,
+    eager_snapshots: EagerSnapshots,
 }
 
 impl Default for UseDefMapBuilder<'_> {
@@ -750,9 +754,8 @@ impl Default for UseDefMapBuilder<'_> {
             declarations_by_binding: FxHashMap::default(),
             bindings_by_declaration: FxHashMap::default(),
             symbol_states: IndexVec::new(),
-            eager_bindings: EagerBindings::default(),
+            eager_snapshots: EagerSnapshots::default(),
             instance_attribute_states: IndexVec::new(),
-            used_names: FxHashMap::default(),
         }
     }
 }
@@ -994,7 +997,6 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol: ScopedSymbolId,
         use_id: ScopedUseId,
         node_key: NodeKey,
-        expr_node_key: Option<ExpressionNodeKey>,
     ) {
         // We have a use of a symbol; clone the current bindings for that symbol, and record them
         // as the live bindings for this use.
@@ -1003,29 +1005,34 @@ impl<'db> UseDefMapBuilder<'db> {
             .push(self.symbol_states[symbol].bindings().clone());
         debug_assert_eq!(use_id, new_use);
 
-        if let Some(expr_node_key) = expr_node_key {
-            self.used_names.insert(symbol, (expr_node_key, node_key));
-        }
-
         // Track reachability of all uses of symbols to silence `unresolved-reference`
         // diagnostics in unreachable code.
         self.record_node_reachability(node_key);
-    }
-
-    pub(super) fn used_name(&self, symbol: ScopedSymbolId) -> Option<(ExpressionNodeKey, NodeKey)> {
-        self.used_names.get(&symbol).copied()
     }
 
     pub(super) fn record_node_reachability(&mut self, node_key: NodeKey) {
         self.node_reachability.insert(node_key, self.reachability);
     }
 
-    pub(super) fn snapshot_eager_bindings(
+    pub(super) fn snapshot_eager_state(
         &mut self,
         enclosing_symbol: ScopedSymbolId,
-    ) -> ScopedEagerBindingsId {
-        self.eager_bindings
-            .push(self.symbol_states[enclosing_symbol].bindings().clone())
+        scope: ScopeKind,
+        is_bound: bool,
+    ) -> ScopedEagerSnapshotId {
+        // Names bound in class scopes are never visible to nested scopes, so we never need to
+        // save eager scope bindings in a class scope.
+        if scope.is_class() || !is_bound {
+            self.eager_snapshots.push(EagerSnapshot::Constraint(
+                self.symbol_states[enclosing_symbol]
+                    .bindings()
+                    .narrowing_constraint(),
+            ))
+        } else {
+            self.eager_snapshots.push(EagerSnapshot::Bindings(
+                self.symbol_states[enclosing_symbol].bindings().clone(),
+            ))
+        }
     }
 
     /// Take a snapshot of the current visible-symbols state.
@@ -1145,7 +1152,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_declaration.shrink_to_fit();
-        self.eager_bindings.shrink_to_fit();
+        self.eager_snapshots.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
@@ -1158,7 +1165,7 @@ impl<'db> UseDefMapBuilder<'db> {
             instance_attributes: self.instance_attribute_states,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_declaration: self.bindings_by_declaration,
-            eager_bindings: self.eager_bindings,
+            eager_snapshots: self.eager_snapshots,
             scope_start_visibility: self.scope_start_visibility,
         }
     }

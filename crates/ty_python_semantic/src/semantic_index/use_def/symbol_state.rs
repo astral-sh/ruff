@@ -177,6 +177,16 @@ impl SymbolDeclarations {
     }
 }
 
+/// A snapshot of a symbol state that can be used to resolve a reference in a nested eager scope.
+/// If there are bindings in a scope other than class, they are stored in `Bindings`.
+/// Even if it's a class scope (class variables are not visible in eager nested scopes) or there are no bindings,
+/// the current narrowing constraint is necessary for narrowing, so it's stored in `Constraint`.
+#[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
+pub(super) enum EagerSnapshot {
+    Constraint(ScopedNarrowingConstraint),
+    Bindings(SymbolBindings),
+}
+
 /// Live bindings for a single symbol at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a visibility constraint.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]

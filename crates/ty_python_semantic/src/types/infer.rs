@@ -54,10 +54,11 @@ use crate::semantic_index::definition::{
     ForStmtDefinitionKind, TargetKind, WithItemDefinitionKind,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::narrowing_constraints::ConstraintKey;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
-use crate::semantic_index::{semantic_index, EagerBindingsResult, SemanticIndex};
+use crate::semantic_index::{semantic_index, EagerSnapshotResult, SemanticIndex};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -5146,12 +5147,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         let symbol_table = self.index.symbol_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
 
-        let mut use_ids = vec![];
+        let mut constraint_keys = vec![];
         // Perform narrowing with applicable constraints between the current scope and the enclosing scope.
-        let narrow_with_applicable_constraints = |mut ty, use_ids: &[_]| {
-            for (enclosing_scope_file_id, use_id) in use_ids {
+        let narrow_with_applicable_constraints = |mut ty, constraint_keys: &[_]| {
+            for (enclosing_scope_file_id, constraint_key) in constraint_keys {
                 let use_def = self.index.use_def_map(*enclosing_scope_file_id);
-                let constraints = use_def.narrowing_constraints_at_use(*use_id);
+                let constraints = use_def.narrowing_constraints_at_use(*constraint_key);
                 let symbol_table = self.index.symbol_table(*enclosing_scope_file_id);
                 let symbol = symbol_table.symbol_id_by_name(symbol_name).unwrap();
 
@@ -5202,7 +5203,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             if let Some(use_id) = name_node.try_scoped_use_id(db, scope) {
-                use_ids.push((file_scope_id, use_id));
+                constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
             }
 
             let current_file = self.file();
@@ -5220,7 +5221,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
 
                 if let Some(use_id) = name_node.try_scoped_use_id(db, enclosing_scope_id) {
-                    use_ids.push((enclosing_scope_file_id, use_id));
+                    constraint_keys.push((enclosing_scope_file_id, ConstraintKey::UseId(use_id)));
                 }
 
                 let is_immediately_enclosing_scope = scope.is_type_parameter(db)
@@ -5228,9 +5229,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                         .scope(db)
                         .parent()
                         .is_some_and(|parent| parent == enclosing_scope_file_id);
-                if !enclosing_scope_id.is_function_like(db) && !is_immediately_enclosing_scope {
-                    continue;
-                }
 
                 // If the reference is in a nested eager scope, we need to look for the symbol at
                 // the point where the previous enclosing scope was defined, instead of at the end
@@ -5239,23 +5237,40 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // enclosing scopes that actually contain bindings that we should use when
                 // resolving the reference.)
                 if !self.is_deferred() {
-                    match self.index.eager_bindings(
+                    match self.index.eager_snapshot(
                         enclosing_scope_file_id,
                         symbol_name,
                         file_scope_id,
                     ) {
-                        EagerBindingsResult::Found(bindings) => {
+                        EagerSnapshotResult::FoundConstraint(constraint) => {
+                            constraint_keys.push((
+                                enclosing_scope_file_id,
+                                ConstraintKey::NarrowingConstraint(constraint),
+                            ));
+                        }
+                        EagerSnapshotResult::FoundBindings(bindings) => {
+                            if !enclosing_scope_id.is_function_like(db)
+                                && !is_immediately_enclosing_scope
+                            {
+                                continue;
+                            }
                             return symbol_from_bindings(db, bindings)
-                                .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids))
+                                .map_type(|ty| {
+                                    narrow_with_applicable_constraints(ty, &constraint_keys)
+                                })
                                 .into();
                         }
-                        // There are no visible bindings here.
+                        // There are no visible bindings / constraint here.
                         // Don't fall back to non-eager symbol resolution.
-                        EagerBindingsResult::NotFound => {
+                        EagerSnapshotResult::NotFound => {
                             continue;
                         }
-                        EagerBindingsResult::NoLongerInEagerContext => {}
+                        EagerSnapshotResult::NoLongerInEagerContext => {}
                     }
+                }
+
+                if !enclosing_scope_id.is_function_like(db) && !is_immediately_enclosing_scope {
+                    continue;
                 }
 
                 let enclosing_symbol_table = self.index.symbol_table(enclosing_scope_file_id);
@@ -5270,7 +5285,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     // isn't bound in that scope, we should get an unbound name, not continue
                     // falling back to other scopes / globals / builtins.
                     return symbol(db, enclosing_scope_id, symbol_name)
-                        .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids));
+                        .map_type(|ty| narrow_with_applicable_constraints(ty, &constraint_keys));
                 }
             }
 
@@ -5283,33 +5298,41 @@ impl<'db> TypeInferenceBuilder<'db> {
                     }
 
                     if !self.is_deferred() {
-                        match self.index.eager_bindings(
+                        match self.index.eager_snapshot(
                             FileScopeId::global(),
                             symbol_name,
                             file_scope_id,
                         ) {
-                            EagerBindingsResult::Found(bindings) => {
+                            EagerSnapshotResult::FoundConstraint(constraint) => {
+                                constraint_keys.push((
+                                    FileScopeId::global(),
+                                    ConstraintKey::NarrowingConstraint(constraint),
+                                ));
+                            }
+                            EagerSnapshotResult::FoundBindings(bindings) => {
                                 return symbol_from_bindings(db, bindings)
-                                    .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids))
+                                    .map_type(|ty| {
+                                        narrow_with_applicable_constraints(ty, &constraint_keys)
+                                    })
                                     .into();
                             }
-                            // There are no visible bindings here.
-                            EagerBindingsResult::NotFound => {
+                            // There are no visible bindings / constraint here.
+                            EagerSnapshotResult::NotFound => {
                                 return Symbol::Unbound.into();
                             }
-                            EagerBindingsResult::NoLongerInEagerContext => {}
+                            EagerSnapshotResult::NoLongerInEagerContext => {}
                         }
                     }
 
                     explicit_global_symbol(db, self.file(), symbol_name)
-                        .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids))
+                        .map_type(|ty| narrow_with_applicable_constraints(ty, &constraint_keys))
                 })
                 // Not found in the module's explicitly declared global symbols?
                 // Check the "implicit globals" such as `__doc__`, `__file__`, `__name__`, etc.
                 // These are looked up as attributes on `types.ModuleType`.
                 .or_fall_back_to(db, || {
                     module_type_implicit_global_symbol(db, symbol_name)
-                        .map_type(|ty| narrow_with_applicable_constraints(ty, &use_ids))
+                        .map_type(|ty| narrow_with_applicable_constraints(ty, &constraint_keys))
                 })
                 // Not found in globals? Fallback to builtins
                 // (without infinite recursion if we're already in builtins.)

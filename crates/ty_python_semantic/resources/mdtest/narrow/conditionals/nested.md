@@ -63,12 +63,18 @@ def f(x: str | None):
         if x is not None:
             reveal_type(x)  # revealed: str
 
+        if not isinstance(x, str):
+            reveal_type(x)  # revealed: None
+
         if g is not None:
             reveal_type(g)  # revealed: str
 
     class C:
         if x is not None:
             reveal_type(x)  # revealed: str
+
+        if not isinstance(x, str):
+            reveal_type(x)  # revealed: None
 
         if g is not None:
             reveal_type(g)  # revealed: str

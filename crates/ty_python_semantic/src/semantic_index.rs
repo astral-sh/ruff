@@ -17,18 +17,19 @@ use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
     SymbolTable,
 };
-use crate::semantic_index::use_def::{EagerBindingsKey, ScopedEagerBindingsId, UseDefMap};
+use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
 use crate::Db;
 
 pub mod ast_ids;
 mod builder;
 pub mod definition;
 pub mod expression;
-mod narrowing_constraints;
+pub(crate) mod narrowing_constraints;
 pub(crate) mod predicate;
 mod re_exports;
 pub mod symbol;
@@ -141,8 +142,9 @@ pub(crate) fn global_scope(db: &dyn Db, file: File) -> ScopeId<'_> {
     FileScopeId::global().to_scope_id(db, file)
 }
 
-pub(crate) enum EagerBindingsResult<'map, 'db> {
-    Found(BindingWithConstraintsIterator<'map, 'db>),
+pub(crate) enum EagerSnapshotResult<'map, 'db> {
+    FoundConstraint(ScopedNarrowingConstraint),
+    FoundBindings(BindingWithConstraintsIterator<'map, 'db>),
     NotFound,
     NoLongerInEagerContext,
 }
@@ -189,8 +191,8 @@ pub(crate) struct SemanticIndex<'db> {
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
 
-    /// Map of all of the eager bindings that appear in this file.
-    eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
+    /// Map of all of the eager snapshots that appear in this file.
+    eager_snapshots: FxHashMap<EagerSnapshotKey, ScopedEagerSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
@@ -390,36 +392,34 @@ impl<'db> SemanticIndex<'db> {
     /// * `NoLongerInEagerContext` if the nested scope is no longer in an eager context
     ///   (that is, not every scope that will be traversed is eager).
     /// *  an iterator of bindings for a particular nested eager scope reference if the bindings exist.
-    /// * `NotFound` if the bindings do not exist in the nested eager scope.
-    pub(crate) fn eager_bindings(
+    /// *  a narrowing constraint if there are no bindings, but there is a narrowing constraint for an outer scope symbol.
+    /// * `NotFound` if the narrowing constraint / bindings do not exist in the nested eager scope.
+    pub(crate) fn eager_snapshot(
         &self,
         enclosing_scope: FileScopeId,
         symbol: &str,
         nested_scope: FileScopeId,
-    ) -> EagerBindingsResult<'_, 'db> {
+    ) -> EagerSnapshotResult<'_, 'db> {
         for (ancestor_scope_id, ancestor_scope) in self.ancestor_scopes(nested_scope) {
             if ancestor_scope_id == enclosing_scope {
                 break;
             }
             if !ancestor_scope.is_eager() {
-                return EagerBindingsResult::NoLongerInEagerContext;
+                return EagerSnapshotResult::NoLongerInEagerContext;
             }
         }
         let Some(symbol_id) = self.symbol_tables[enclosing_scope].symbol_id_by_name(symbol) else {
-            return EagerBindingsResult::NotFound;
+            return EagerSnapshotResult::NotFound;
         };
-        let key = EagerBindingsKey {
+        let key = EagerSnapshotKey {
             enclosing_scope,
             enclosing_symbol: symbol_id,
             nested_scope,
         };
-        let Some(id) = self.eager_bindings.get(&key) else {
-            return EagerBindingsResult::NotFound;
+        let Some(id) = self.eager_snapshots.get(&key) else {
+            return EagerSnapshotResult::NotFound;
         };
-        match self.use_def_maps[enclosing_scope].eager_bindings(*id) {
-            Some(bindings) => EagerBindingsResult::Found(bindings),
-            None => EagerBindingsResult::NotFound,
-        }
+        self.use_def_maps[enclosing_scope].eager_snapshot(*id)
     }
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {

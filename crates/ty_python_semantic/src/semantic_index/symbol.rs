@@ -291,6 +291,7 @@ impl SymbolTable {
         &self.symbols[symbol_id.into()]
     }
 
+    #[allow(unused)]
     pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopedSymbolId> {
         self.symbols.indices()
     }
@@ -385,10 +386,6 @@ impl SymbolTableBuilder {
 
     pub(super) fn symbols(&self) -> impl Iterator<Item = &Symbol> {
         self.table.symbols()
-    }
-
-    pub(super) fn symbol_ids(&self) -> impl Iterator<Item = ScopedSymbolId> {
-        self.table.symbol_ids()
     }
 
     pub(super) fn symbol_id_by_name(&self, name: &str) -> Option<ScopedSymbolId> {
