@@ -96,6 +96,10 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn contains_todo(&self, db: &'db dyn Db) -> bool {
         self.members().any(|member| member.ty.contains_todo(db))
     }
+
+    pub(super) fn normalized(&self, db: &'db dyn Db) -> Self {
+        self.clone()
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]

@@ -5,6 +5,8 @@ use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
 use crate::Db;
 
+pub(super) use synthesized::SynthesizedProtocolType;
+
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         if class.class_literal(db).0.is_protocol(db) {
@@ -237,9 +239,7 @@ impl<'db> ProtocolInstanceType<'db> {
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
-#[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, salsa::Supertype, PartialOrd, Ord,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
 pub(super) enum Protocol<'db> {
     FromClass(ClassType<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
@@ -260,14 +260,35 @@ impl<'db> Protocol<'db> {
     }
 }
 
-/// A "synthesized" protocol type that is dissociated from a class definition in source code.
-///
-/// Two synthesized protocol types with the same members will share the same Salsa ID,
-/// making them easy to compare for equivalence. A synthesized protocol type is therefore
-/// returned by [`ProtocolInstanceType::normalized`] so that two protocols with the same members
-/// will be understood as equivalent even in the context of differently ordered unions or intersections.
-#[salsa::interned(debug)]
-pub(super) struct SynthesizedProtocolType<'db> {
-    #[return_ref]
-    pub(super) interface: ProtocolInterface<'db>,
+mod synthesized {
+    use crate::db::Db;
+    use crate::types::protocol_class::ProtocolInterface;
+
+    /// A "synthesized" protocol type that is dissociated from a class definition in source code.
+    ///
+    /// Two synthesized protocol types with the same members will share the same Salsa ID,
+    /// making them easy to compare for equivalence. A synthesized protocol type is therefore
+    /// returned by [`ProtocolInstanceType::normalized`] so that two protocols with the same members
+    /// will be understood as equivalent even in the context of differently ordered unions or intersections.
+    ///
+    /// The constructor method of this type maintains the invariant that a synthesized protocol type
+    /// is always constructed from a *normalized* protocol interface.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
+    pub(in crate::types) struct SynthesizedProtocolType<'db>(SynthesizedProtocolTypeInner<'db>);
+
+    impl<'db> SynthesizedProtocolType<'db> {
+        pub(super) fn new(db: &'db dyn Db, interface: &'db ProtocolInterface<'db>) -> Self {
+            Self(SynthesizedProtocolTypeInner::new(db, interface.normalized(db)))
+        }
+
+        pub(in crate::types) fn interface(self, db: &'db dyn Db) -> &'db ProtocolInterface<'db> {
+            self.0.interface(db)
+        }
+    }
+
+    #[salsa::interned(debug)]
+    struct SynthesizedProtocolTypeInner<'db> {
+        #[return_ref]
+        interface: ProtocolInterface<'db>,
+    }
 }
