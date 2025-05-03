@@ -18,10 +18,10 @@ import {
 import { useCallback, useEffect, useRef } from "react";
 import { Theme } from "shared";
 import {
-  Range as KnotRange,
+  Range as TyRange,
   Severity,
   type Workspace,
-  Position as KnotPosition,
+  Position as TyPosition,
 } from "ty_wasm";
 
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
@@ -194,7 +194,7 @@ class PlaygroundServer
 
     const inlayHints = workspace.inlayHints(
       selectedHandle,
-      iRangeToKnotRange(range),
+      MonacoRangeToTyRange(range),
     );
 
     if (inlayHints.length === 0) {
@@ -300,7 +300,7 @@ class PlaygroundServer
 
     const hover = workspace.hover(
       selectedHandle,
-      new KnotPosition(position.lineNumber, position.column),
+      new TyPosition(position.lineNumber, position.column),
     );
 
     if (hover == null) {
@@ -308,7 +308,7 @@ class PlaygroundServer
     }
 
     return {
-      range: knotRangeToIRange(hover.range),
+      range: tyRangeToMonacoRange(hover.range),
       contents: [{ value: hover.markdown, isTrusted: true }],
     };
   }
@@ -334,7 +334,7 @@ class PlaygroundServer
 
     const links = workspace.gotoTypeDefinition(
       selectedHandle,
-      new KnotPosition(position.lineNumber, position.column),
+      new TyPosition(position.lineNumber, position.column),
     );
 
     return (
@@ -343,16 +343,16 @@ class PlaygroundServer
           const targetSelection =
             link.selection_range == null
               ? undefined
-              : knotRangeToIRange(link.selection_range);
+              : tyRangeToMonacoRange(link.selection_range);
 
           const originSelection =
             link.origin_selection_range == null
               ? undefined
-              : knotRangeToIRange(link.origin_selection_range);
+              : tyRangeToMonacoRange(link.origin_selection_range);
 
           return {
             uri: Uri.parse(link.path),
-            range: knotRangeToIRange(link.full_range),
+            range: tyRangeToMonacoRange(link.full_range),
             targetSelectionRange: targetSelection,
             originSelectionRange: originSelection,
           } as languages.LocationLink;
@@ -450,7 +450,7 @@ class PlaygroundServer
   }
 }
 
-function knotRangeToIRange(range: KnotRange): IRange {
+function tyRangeToMonacoRange(range: TyRange): IRange {
   return {
     startLineNumber: range.start.line,
     startColumn: range.start.column,
@@ -459,9 +459,9 @@ function knotRangeToIRange(range: KnotRange): IRange {
   };
 }
 
-function iRangeToKnotRange(range: IRange): KnotRange {
-  return new KnotRange(
-    new KnotPosition(range.startLineNumber, range.startColumn),
-    new KnotPosition(range.endLineNumber, range.endColumn),
+function MonacoRangeToTyRange(range: IRange): TyRange {
+  return new TyRange(
+    new TyPosition(range.startLineNumber, range.startColumn),
+    new TyPosition(range.endLineNumber, range.endColumn),
   );
 }

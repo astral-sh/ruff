@@ -23,28 +23,28 @@ impl ConfigurationFile {
             return Ok(None);
         };
 
-        let knot_toml_path = configuration_directory.join("ty").join("ty.toml");
+        let ty_toml_path = configuration_directory.join("ty").join("ty.toml");
 
         tracing::debug!(
             "Searching for a user-level configuration at `{path}`",
-            path = &knot_toml_path
+            path = &ty_toml_path
         );
 
-        let Ok(knot_toml_str) = system.read_to_string(&knot_toml_path) else {
+        let Ok(ty_toml_str) = system.read_to_string(&ty_toml_path) else {
             return Ok(None);
         };
 
         match Options::from_toml_str(
-            &knot_toml_str,
-            ValueSource::File(Arc::new(knot_toml_path.clone())),
+            &ty_toml_str,
+            ValueSource::File(Arc::new(ty_toml_path.clone())),
         ) {
             Ok(options) => Ok(Some(Self {
-                path: knot_toml_path,
+                path: ty_toml_path,
                 options,
             })),
-            Err(error) => Err(ConfigurationFileError::InvalidKnotToml {
+            Err(error) => Err(ConfigurationFileError::InvalidTyToml {
                 source: Box::new(error),
-                path: knot_toml_path,
+                path: ty_toml_path,
             }),
         }
     }
@@ -62,7 +62,7 @@ impl ConfigurationFile {
 #[derive(Debug, Error)]
 pub enum ConfigurationFileError {
     #[error("{path} is not a valid `ty.toml`: {source}")]
-    InvalidKnotToml {
+    InvalidTyToml {
         source: Box<TyTomlError>,
         path: SystemPathBuf,
     },

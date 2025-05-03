@@ -35,7 +35,7 @@ impl<'a> ProjectFilesFilter<'a> {
     /// Returns `true` if a file is part of the project and included in the paths to check.
     ///
     /// A file is included in the checked files if it is a sub path of the project's root
-    /// (when no CLI path arguments are specified) or if it is a sub path of any path provided on the CLI (`knot check <paths>`) AND:
+    /// (when no CLI path arguments are specified) or if it is a sub path of any path provided on the CLI (`ty check <paths>`) AND:
     ///
     /// * It matches a positive `include` pattern and isn't excluded by a later negative `include` pattern.
     /// * It doesn't match a positive `exclude` pattern or is re-included by a later negative `exclude` pattern.

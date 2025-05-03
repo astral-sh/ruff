@@ -84,7 +84,7 @@ pub struct Project {
     /// However, it's sometimes desired to only check a subset of the project, e.g. to see
     /// the diagnostics for a single file or a folder.
     ///
-    /// This list gets initialized by the paths passed to `knot check <paths>`
+    /// This list gets initialized by the paths passed to `ty check <paths>`
     ///
     /// ## How is this different from `open_files`?
     ///
@@ -139,7 +139,7 @@ impl Project {
     /// Returns `true` if `path` is both part of the project and included (see `included_paths_list`).
     ///
     /// Unlike [Self::files], this method does not respect `.gitignore` files. It only checks
-    /// the project's include and exclude settings as well as the paths that were passed to `knot check <paths>`.
+    /// the project's include and exclude settings as well as the paths that were passed to `ty check <paths>`.
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
     pub fn is_path_included(self, db: &dyn Db, path: &SystemPath) -> bool {
@@ -301,7 +301,7 @@ impl Project {
     ///
     /// The default is to check the entire project in which case this method returns
     /// the project root. However, users can specify to only check specific sub-folders or
-    /// even files of a project by using `knot check <paths>`. In that case, this method
+    /// even files of a project by using `ty check <paths>`. In that case, this method
     /// returns the provided absolute paths.
     ///
     /// Note: The CLI doesn't prohibit users from specifying paths outside the project root.

@@ -13,10 +13,10 @@ import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
 import { FileHandle, PositionEncoding, Workspace } from "ty_wasm";
 import { persist, persistLocal, restore } from "./Editor/persist";
 import { loader } from "@monaco-editor/react";
-import knotSchema from "../../../knot.schema.json";
+import tySchema from "../../../ty.schema.json";
 import Chrome, { formatError } from "./Editor/Chrome";
 
-export const SETTINGS_FILE_NAME = "knot.json";
+export const SETTINGS_FILE_NAME = "ty.json";
 
 export default function Playground() {
   const [theme, setTheme] = useTheme();
@@ -230,7 +230,7 @@ print(with_style("ty is a fast type checker for Python.", "fast", "underlined"))
 const DEFAULT_WORKSPACE = {
   files: {
     "main.py": DEFAULT_PROGRAM,
-    "knot.json": DEFAULT_SETTINGS,
+    "ty.json": DEFAULT_SETTINGS,
   },
   current: "main.py",
 };
@@ -268,7 +268,7 @@ interface FilesState {
    * The database file handles by file id.
    *
    * Files without a file handle are well-known files that are only handled by the
-   * playground (e.g. knot.json)
+   * playground (e.g. ty.json)
    */
   handles: Readonly<{ [id: FileId]: FileHandle | null }>;
 
@@ -456,9 +456,9 @@ async function startPlayground(): Promise<InitializedPlayground> {
   const monaco = await loader.init();
 
   setupMonaco(monaco, {
-    uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/knot.schema.json",
-    fileMatch: ["knot.json"],
-    schema: knotSchema,
+    uri: "https://raw.githubusercontent.com/astral-sh/ruff/main/ty.schema.json",
+    fileMatch: ["ty.json"],
+    schema: tySchema,
   });
 
   const restored = await restore();
@@ -483,7 +483,7 @@ function updateOptions(
     workspace?.updateOptions(settings);
     setError(null);
   } catch (error) {
-    setError(`Failed to update 'knot.json' options: ${formatError(error)}`);
+    setError(`Failed to update 'ty.json' options: ${formatError(error)}`);
   }
 }
 
@@ -520,8 +520,17 @@ function restoreWorkspace(
 ) {
   let hasSettings = false;
 
-  for (const [name, content] of Object.entries(state.files)) {
+  for (let [name, content] of Object.entries(state.files)) {
     let handle = null;
+
+    if (
+      name === "knot.json" &&
+      !Object.keys(state.files).includes(SETTINGS_FILE_NAME)
+    ) {
+      console.log("Rename to", SETTINGS_FILE_NAME);
+      name = SETTINGS_FILE_NAME;
+    }
+
     if (name === SETTINGS_FILE_NAME) {
       updateOptions(workspace, content, setError);
       hasSettings = true;
@@ -536,8 +545,11 @@ function restoreWorkspace(
     updateOptions(workspace, null, setError);
   }
 
+  const selected =
+    state.current === "knot.json" ? SETTINGS_FILE_NAME : state.current;
+
   dispatchFiles({
     type: "selectFileByName",
-    name: state.current,
+    name: selected,
   });
 }

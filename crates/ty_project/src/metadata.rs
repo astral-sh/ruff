@@ -136,16 +136,16 @@ impl ProjectMetadata {
             };
 
             // A `ty.toml` takes precedence over a `pyproject.toml`.
-            let knot_toml_path = project_root.join("ty.toml");
-            if let Ok(knot_str) = system.read_to_string(&knot_toml_path) {
+            let ty_toml_path = project_root.join("ty.toml");
+            if let Ok(ty_str) = system.read_to_string(&ty_toml_path) {
                 let options = match Options::from_toml_str(
-                    &knot_str,
-                    ValueSource::File(Arc::new(knot_toml_path.clone())),
+                    &ty_str,
+                    ValueSource::File(Arc::new(ty_toml_path.clone())),
                 ) {
                     Ok(options) => options,
                     Err(error) => {
-                        return Err(ProjectDiscoveryError::InvalidKnotToml {
-                            path: knot_toml_path,
+                        return Err(ProjectDiscoveryError::InvalidTyToml {
+                            path: ty_toml_path,
                             source: Box::new(error),
                         })
                     }
@@ -156,7 +156,7 @@ impl ProjectMetadata {
                     .is_some_and(|project| project.ty().is_some())
                 {
                     // TODO: Consider using a diagnostic here
-                    tracing::warn!("Ignoring the `tool.ty` section in `{pyproject_path}` because `{knot_toml_path}` takes precedence.");
+                    tracing::warn!("Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence.");
                 }
 
                 tracing::debug!("Found project at '{}'", project_root);
@@ -179,7 +179,7 @@ impl ProjectMetadata {
             }
 
             if let Some(pyproject) = pyproject {
-                let has_knot_section = pyproject.ty().is_some();
+                let has_ty_section = pyproject.ty().is_some();
                 let metadata =
                     ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
                         .map_err(
@@ -189,7 +189,7 @@ impl ProjectMetadata {
                             },
                         )?;
 
-                if has_knot_section {
+                if has_ty_section {
                     tracing::debug!("Found project at '{}'", project_root);
 
                     return Ok(metadata);
@@ -288,7 +288,7 @@ pub enum ProjectDiscoveryError {
     },
 
     #[error("{path} is not a valid `ty.toml`: {source}")]
-    InvalidKnotToml {
+    InvalidTyToml {
         source: Box<TyTomlError>,
         path: SystemPathBuf,
     },
@@ -523,7 +523,7 @@ expected `.`, `]`
     }
 
     #[test]
-    fn nested_projects_without_knot_sections() -> anyhow::Result<()> {
+    fn nested_projects_without_ty_sections() -> anyhow::Result<()> {
         let system = TestSystem::default();
         let root = SystemPathBuf::from("/app");
 
@@ -563,7 +563,7 @@ expected `.`, `]`
     }
 
     #[test]
-    fn nested_projects_with_outer_knot_section() -> anyhow::Result<()> {
+    fn nested_projects_with_outer_ty_section() -> anyhow::Result<()> {
         let system = TestSystem::default();
         let root = SystemPathBuf::from("/app");
 
@@ -614,7 +614,7 @@ expected `.`, `]`
     /// However, the `pyproject.toml` is still loaded to get the project name and, in the future,
     /// the requires-python constraint.
     #[test]
-    fn project_with_knot_and_pyproject_toml() -> anyhow::Result<()> {
+    fn project_with_ty_and_pyproject_toml() -> anyhow::Result<()> {
         let system = TestSystem::default();
         let root = SystemPathBuf::from("/app");
 

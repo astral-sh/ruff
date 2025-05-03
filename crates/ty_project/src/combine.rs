@@ -22,7 +22,7 @@ use ty_python_semantic::{PythonPath, PythonPlatform};
 /// For example: patterns coming last in file inclusion and exclusion patterns
 /// allow overriding earlier patterns, matching the `gitignore` behavior.
 /// Generally speaking, it feels more intuitive if later values override earlier values
-/// than the other way around: `knot --exclude png --exclude "!important.png"`.
+/// than the other way around: `ty --exclude png --exclude "!important.png"`.
 ///
 /// The main downside of this approach is that the ordering can be surprising in cases
 /// where the option has a "first match" semantic and not a "last match" wins.
@@ -35,7 +35,7 @@ use ty_python_semantic::{PythonPath, PythonPlatform};
 /// ```
 ///
 /// ```bash
-/// knot --extra-paths a
+/// ty --extra-paths a
 /// ```
 ///
 /// That's why a user might expect that this configuration results in `["a", "b", "c"]`,
