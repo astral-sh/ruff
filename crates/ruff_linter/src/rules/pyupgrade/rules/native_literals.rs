@@ -253,7 +253,7 @@ pub(crate) fn native_literals(
             if let Ok(token_idx) =
                 tokens.binary_search_by(|token| token.range().end().cmp(&call_range.end()))
             {
-                let token = tokens.get(token_idx).unwrap();
+                let token = &tokens[token_idx];
                 needs_space = tokens.get(token_idx + 1).is_some_and(|next_token| {
                     next_token.kind().is_keyword()
                         && token.range().end() == next_token.range().start()
