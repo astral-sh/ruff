@@ -96,7 +96,10 @@ impl Project {
             return Ok(None);
         };
 
-        let minor = versions.next().copied().unwrap_or_default();
+        let mut minor = versions.next().copied().unwrap_or_default();
+
+        // Ensure minor is at least 9
+        minor = minor.max(9);
 
         tracing::debug!("Resolved requires-python constraint to: {major}.{minor}");
 
