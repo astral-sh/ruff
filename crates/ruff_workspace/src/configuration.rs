@@ -1172,7 +1172,7 @@ impl LintConfiguration {
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
             ruff: self.ruff.combine(config.ruff),
-            typing_extensions: self.typing_extensions,
+            typing_extensions: self.typing_extensions.or(config.typing_extensions),
         }
     }
 }

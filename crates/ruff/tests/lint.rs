@@ -5654,3 +5654,34 @@ fn semantic_syntax_errors() -> Result<()> {
 
     Ok(())
 }
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/17821>.
+///
+/// `lint.typing-extensions = false` with Python 3.9 should disable the PYI019 lint because it would
+/// try to import `Self` from `typing_extensions`
+#[test]
+fn combine_typing_extensions_config() {
+    let contents = "
+from typing import TypeVar
+T = TypeVar('T')
+class Foo:
+    def f(self: T) -> T: ...
+";
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "lint.typing-extensions = false"])
+            .arg("--select=PYI019")
+            .arg("--target-version=py39")
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+}
