@@ -22,7 +22,7 @@ To show the diagnostics diff between two Git revisions (e.g. your feature branch
 
 ```sh
 mypy_primer \
-    --type-checker knot \
+    --type-checker ty \
     --old origin/main \
     --new my/feature \
     --debug \
