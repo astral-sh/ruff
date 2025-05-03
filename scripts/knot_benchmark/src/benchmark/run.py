@@ -19,7 +19,7 @@ if typing.TYPE_CHECKING:
 def main() -> None:
     """Run the benchmark."""
     parser = argparse.ArgumentParser(
-        description="Benchmark knot against other packaging tools."
+        description="Benchmark ty against other packaging tools."
     )
     parser.add_argument(
         "--verbose", "-v", action="store_true", help="Print verbose output."
@@ -64,13 +64,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--knot",
-        help="Whether to benchmark knot (assumes a red_knot binary exists at `./target/release/red_knot`).",
+        help="Whether to benchmark knot (assumes a ty binary exists at `./target/release/ty`).",
         action="store_true",
     )
     parser.add_argument(
         "--knot-path",
         type=Path,
-        help="Path(s) to the red_knot binary to benchmark.",
+        help="Path(s) to the ty binary to benchmark.",
         action="append",
     )
 

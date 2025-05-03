@@ -624,7 +624,7 @@ impl<'r> RenderableAnnotation<'r> {
 /// For example, at time of writing (2025-03-07), the plan is (roughly) for
 /// Ruff to grow its own interner of file paths so that a `Span` can store an
 /// interned ID instead of a (roughly) `Arc<Path>`. This interner is planned
-/// to be entirely separate from the Salsa interner used by Red Knot, and so,
+/// to be entirely separate from the Salsa interner used by ty, and so,
 /// callers will need to pass in a different "resolver" for turning `Span`s
 /// into actual file paths/contents. The infrastructure for this isn't fully in
 /// place, but this type serves to demarcate the intended abstraction boundary.

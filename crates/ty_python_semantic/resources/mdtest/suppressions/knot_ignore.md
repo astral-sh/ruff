@@ -50,7 +50,7 @@ a = 10 / 0  # knot: ignore[division-by-zero, unused-ignore-comment]
 
 ## Multiple unused comments
 
-Today, Red Knot emits a diagnostic for every unused code. We might want to group the codes by
+Today, ty emits a diagnostic for every unused code. We might want to group the codes by
 comment at some point in the future.
 
 ```py

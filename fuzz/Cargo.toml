@@ -38,8 +38,8 @@ tracing = { version = "0.1.40" }
 members = ["."]
 
 [[bin]]
-name = "red_knot_check_invalid_syntax"
-path = "fuzz_targets/red_knot_check_invalid_syntax.rs"
+name = "ty_check_invalid_syntax"
+path = "fuzz_targets/ty_check_invalid_syntax.rs"
 
 [[bin]]
 name = "ruff_parse_simple"

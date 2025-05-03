@@ -1,6 +1,6 @@
 # NewType
 
-Currently, red-knot doesn't support `typing.NewType` in type annotations.
+Currently, ty doesn't support `typing.NewType` in type annotations.
 
 ## Valid forms
 

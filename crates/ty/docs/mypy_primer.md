@@ -33,13 +33,13 @@ mypy_primer \
 This will show the diagnostics diff for the `black` project between the `main` branch and your `my/feature` branch. To run the
 diff for all projects we currently enable in CI, use `--project-selector "/($(paste -s -d'|' crates/ty_python_semantic/resources/primer/good.txt))\$"`.
 
-You can also take a look at the [full list of ecosystem projects]. Note that some of them might still need a `knot_paths` configuration
+You can also take a look at the [full list of ecosystem projects]. Note that some of them might still need a `ty_paths` configuration
 option to work correctly.
 
 ## Avoiding recompilation
 
 If you want to run `mypy_primer` repeatedly, e.g. for different projects, but for the same combination of `--old` and `--new`, you
-can use set the `MYPY_PRIMER_NO_REBUILD` environment variable to avoid recompilation of Red Knot:
+can use set the `MYPY_PRIMER_NO_REBUILD` environment variable to avoid recompilation of ty:
 
 ```sh
 MYPY_PRIMER_NO_REBUILD=1 mypy_primer …

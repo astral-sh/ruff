@@ -1,16 +1,16 @@
-//! Code for representing Red Knot's release version number.
+//! Code for representing ty's release version number.
 use std::fmt;
 
-/// Information about the git repository where Red Knot was built from.
+/// Information about the git repository where ty was built from.
 pub(crate) struct CommitInfo {
     short_commit_hash: String,
     commit_date: String,
     commits_since_last_tag: u32,
 }
 
-/// Red Knot's version.
+/// ty's version.
 pub(crate) struct VersionInfo {
-    /// Red Knot's version, such as "0.5.1"
+    /// ty's version, such as "0.5.1"
     version: String,
     /// Information about the git commit we may have been built from.
     ///
@@ -34,7 +34,7 @@ impl fmt::Display for VersionInfo {
     }
 }
 
-/// Returns information about Red Knot's version.
+/// Returns information about ty's version.
 pub(crate) fn version() -> VersionInfo {
     // Environment variables are only read at compile-time
     macro_rules! option_env_str {
@@ -47,14 +47,13 @@ pub(crate) fn version() -> VersionInfo {
     let version = option_env_str!("CARGO_PKG_VERSION").unwrap();
 
     // Commit info is pulled from git and set by `build.rs`
-    let commit_info =
-        option_env_str!("RED_KNOT_COMMIT_SHORT_HASH").map(|short_commit_hash| CommitInfo {
-            short_commit_hash,
-            commit_date: option_env_str!("RED_KNOT_COMMIT_DATE").unwrap(),
-            commits_since_last_tag: option_env_str!("RED_KNOT_LAST_TAG_DISTANCE")
-                .as_deref()
-                .map_or(0, |value| value.parse::<u32>().unwrap_or(0)),
-        });
+    let commit_info = option_env_str!("TY_COMMIT_SHORT_HASH").map(|short_commit_hash| CommitInfo {
+        short_commit_hash,
+        commit_date: option_env_str!("TY_COMMIT_DATE").unwrap(),
+        commits_since_last_tag: option_env_str!("TY_LAST_TAG_DISTANCE")
+            .as_deref()
+            .map_or(0, |value| value.parse::<u32>().unwrap_or(0)),
+    });
 
     VersionInfo {
         version,

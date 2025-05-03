@@ -79,5 +79,5 @@ jobs:
               repo: "ruff",
               title: `Automated typeshed sync failed on ${new Date().toDateString()}`,
               body: "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              labels: ["bug", "red-knot"],
+              labels: ["bug", "ty"],
             })

@@ -60,11 +60,11 @@ class Knot(Tool):
     def __init__(self, *, path: Path | None = None):
         self.name = str(path) or "knot"
         self.path = path or (
-            (Path(__file__) / "../../../../../target/release/red_knot").resolve()
+            (Path(__file__) / "../../../../../target/release/ty").resolve()
         )
 
         assert self.path.is_file(), (
-            f"Red Knot not found at '{self.path}'. Run `cargo build --release --bin red_knot`."
+            f"ty not found at '{self.path}'. Run `cargo build --release --bin ty`."
         )
 
     def cold_command(self, project: Project, venv: Venv) -> Command:

@@ -1,9 +1,9 @@
-//! TOML-deserializable Red Knot configuration, similar to `knot.toml`, to be able to
+//! TOML-deserializable ty configuration, similar to `knot.toml`, to be able to
 //! control some configuration options from Markdown files. For now, this supports the
 //! following limited structure:
 //!
 //! ```toml
-//! log = true # or log = "red_knot=WARN"
+//! log = true # or log = "ty=WARN"
 //! [environment]
 //! python-version = "3.10"
 //! ```
@@ -68,9 +68,9 @@ pub(crate) struct Environment {
     /// Additional search paths to consider when resolving modules.
     pub(crate) extra_paths: Option<Vec<SystemPathBuf>>,
 
-    /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
+    /// Path to the Python installation from which ty resolves type information and third-party dependencies.
     ///
-    /// Red Knot will search in the path's `site-packages` directories for type information and
+    /// ty will search in the path's `site-packages` directories for type information and
     /// third-party imports.
     ///
     /// This option is commonly used to specify the path to a virtual environment.

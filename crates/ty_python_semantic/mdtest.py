@@ -1,4 +1,4 @@
-"""A runner for Markdown-based tests for Red Knot"""
+"""A runner for Markdown-based tests for ty"""
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
@@ -20,10 +20,10 @@ from watchfiles import Change, watch
 
 CRATE_NAME: Final = "ty_python_semantic"
 CRATE_ROOT: Final = Path(__file__).resolve().parent
-RED_KNOT_VENDORED: Final = CRATE_ROOT.parent / "ty_vendored"
+TY_VENDORED: Final = CRATE_ROOT.parent / "ty_vendored"
 DIRS_TO_WATCH: Final = (
     CRATE_ROOT,
-    RED_KNOT_VENDORED,
+    TY_VENDORED,
     CRATE_ROOT.parent / "ty_test/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
@@ -176,7 +176,7 @@ class MDTestRunner:
                 match path.suffix:
                     case ".rs":
                         rust_code_has_changed = True
-                    case ".pyi" if path.is_relative_to(RED_KNOT_VENDORED):
+                    case ".pyi" if path.is_relative_to(TY_VENDORED):
                         vendored_typeshed_has_changed = True
                     case ".md":
                         pass

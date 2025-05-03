@@ -2473,39 +2473,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "red_knot"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "argfile",
- "clap",
- "colored 3.0.0",
- "countme",
- "crossbeam",
- "ctrlc",
- "filetime",
- "insta",
- "insta-cmd",
- "jiff",
- "rayon",
- "regex",
- "ruff_db",
- "ruff_python_ast",
- "ruff_python_trivia",
- "salsa",
- "tempfile",
- "toml",
- "tracing",
- "tracing-flame",
- "tracing-subscriber",
- "tracing-tree",
- "ty_project",
- "ty_python_semantic",
- "ty_server",
- "wild",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3971,6 +3938,39 @@ dependencies = [
  "ignore",
  "libtest-mimic",
  "snapbox",
+]
+
+[[package]]
+name = "ty"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "argfile",
+ "clap",
+ "colored 3.0.0",
+ "countme",
+ "crossbeam",
+ "ctrlc",
+ "filetime",
+ "insta",
+ "insta-cmd",
+ "jiff",
+ "rayon",
+ "regex",
+ "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_trivia",
+ "salsa",
+ "tempfile",
+ "toml",
+ "tracing",
+ "tracing-flame",
+ "tracing-subscriber",
+ "tracing-tree",
+ "ty_project",
+ "ty_python_semantic",
+ "ty_server",
+ "wild",
 ]
 
 [[package]]

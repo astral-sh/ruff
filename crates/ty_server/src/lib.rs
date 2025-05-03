@@ -13,8 +13,8 @@ mod server;
 mod session;
 mod system;
 
-pub(crate) const SERVER_NAME: &str = "red-knot";
-pub(crate) const DIAGNOSTIC_NAME: &str = "Red Knot";
+pub(crate) const SERVER_NAME: &str = "ty";
+pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
 
 /// A common result type used in most cases where a
 /// result type is needed.

@@ -7,11 +7,7 @@ use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_python_semantic::lint;
 
 #[derive(Debug, Parser)]
-#[command(
-    author,
-    name = "red-knot",
-    about = "An extremely fast Python type checker."
-)]
+#[command(author, name = "ty", about = "An extremely fast Python type checker.")]
 #[command(version)]
 pub(crate) struct Args {
     #[command(subcommand)]
@@ -26,7 +22,7 @@ pub(crate) enum Command {
     /// Start the language server
     Server,
 
-    /// Display Red Knot's version
+    /// Display ty's version
     Version,
 }
 
@@ -48,11 +44,11 @@ pub(crate) struct CheckCommand {
     #[arg(long, value_name = "PROJECT")]
     pub(crate) project: Option<SystemPathBuf>,
 
-    /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
+    /// Path to the Python installation from which ty resolves type information and third-party dependencies.
     ///
-    /// If not specified, Red Knot will look at the `VIRTUAL_ENV` environment variable.
+    /// If not specified, ty will look at the `VIRTUAL_ENV` environment variable.
     ///
-    /// Red Knot will search in the path's `site-packages` directories for type information and
+    /// ty will search in the path's `site-packages` directories for type information and
     /// third-party imports.
     ///
     /// This option is commonly used to specify the path to a virtual environment.

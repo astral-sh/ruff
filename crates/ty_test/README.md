@@ -237,7 +237,7 @@ This test suite contains two tests, one named "Same-file invalid assignment" and
 "Cross-file invalid assignment". The first test involves only a single embedded file, and the second
 test involves two embedded files.
 
-The tests are run independently, in independent in-memory file systems and with new red-knot
+The tests are run independently, in independent in-memory file systems and with new ty
 [Salsa](https://github.com/salsa-rs/salsa) databases. This means that each is a from-scratch run of
 the type checker, with no data persisting from any previous test.
 
@@ -284,7 +284,7 @@ deeply-nested headers (headers with more `#`), but it cannot contain both.
 
 ## Configuration
 
-The test framework supports a TOML-based configuration format, which is a subset of the full red-knot
+The test framework supports a TOML-based configuration format, which is a subset of the full ty
 configuration format. This configuration can be specified in fenced code blocks with `toml` as the
 language tag:
 
@@ -326,7 +326,7 @@ python = ".venv"
 ```
 ````
 
-Red-knot will reject virtual environments that do not have valid `pyvenv.cfg` files at the
+ty will reject virtual environments that do not have valid `pyvenv.cfg` files at the
 virtual-environment directory root (here, `.venv/pyvenv.cfg`). However, if a `pyvenv.cfg` file does
 not have its contents specified by the test, mdtest will automatically generate one for you, to
 make mocking a virtual environment more ergonomic.
@@ -406,10 +406,10 @@ an assertion ended by `>>>>`, etc.
 
 ### Configuring search paths and kinds
 
-The red-knot TOML configuration format hasn't been finalized, and we may want to implement
+The ty TOML configuration format hasn't been finalized, and we may want to implement
 support in the test framework for configuring search paths before it is designed. If so, we can
 define some configuration options for now under the `[tests]` namespace. In the future, perhaps
-some of these can be replaced by real red-knot configuration options; some or all may also be
+some of these can be replaced by real ty configuration options; some or all may also be
 kept long-term as test-specific options.
 
 Some configuration options we will want to provide:
@@ -454,7 +454,7 @@ x = 1
 reveal_type(x)
 ```
 
-This is just an example, not a proposal that red-knot would ever actually output diagnostics in
+This is just an example, not a proposal that ty would ever actually output diagnostics in
 precisely this format:
 
 ```output

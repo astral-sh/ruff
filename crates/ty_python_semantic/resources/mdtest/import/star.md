@@ -485,7 +485,7 @@ reveal_type(s)  # revealed: Unknown
 reveal_type(t)  # revealed: Unknown
 
 # TODO: these should all reveal `Unknown | int` and should not emit errors.
-# (We don't generally model elsewhere in red-knot that bindings from walruses
+# (We don't generally model elsewhere in ty that bindings from walruses
 # "leak" from comprehension scopes into outer scopes, but we should.)
 # See https://github.com/astral-sh/ruff/issues/16954
 # error: [unresolved-reference]
@@ -1374,7 +1374,7 @@ from foo import *  # error: [unresolved-import] "Cannot resolve import `foo`"
 
 ### Nested scope
 
-A `*` import in a nested scope are always a syntax error. Red-knot does not infer any bindings from
+A `*` import in a nested scope are always a syntax error. Ty does not infer any bindings from
 them:
 
 `exporter.py`:

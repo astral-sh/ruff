@@ -631,7 +631,7 @@ def f(arg: HasXWithDefault):
     reveal_type(type(arg).x)  # revealed: int
 ```
 
-Assignments in a class body of a protocol -- of any kind -- are not permitted by red-knot unless the
+Assignments in a class body of a protocol -- of any kind -- are not permitted by ty unless the
 symbol being assigned to is also explicitly declared in the protocol's class body. Note that this is
 stricter validation of protocol members than many other type checkers currently apply (as of
 2025/04/21).

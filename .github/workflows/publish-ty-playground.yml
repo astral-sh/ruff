@@ -1,18 +1,18 @@
-# Publish the Red Knot playground.
-name: "[Knot Playground] Release"
+# Publish the ty playground.
+name: "[Ty Playground] Release"
 
-permissions: {}
+permissions: { }
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     paths:
-      - "crates/red_knot*/**"
+      - "crates/ty*/**"
       - "crates/ruff_db/**"
       - "crates/ruff_python_ast/**"
       - "crates/ruff_python_parser/**"
       - "playground/**"
-      - ".github/workflows/publish-knot-playground.yml"
+      - ".github/workflows/publish-ty-playground.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}
@@ -45,8 +45,8 @@ jobs:
       - name: "Run TypeScript checks"
         run: npm run check
         working-directory: playground
-      - name: "Build Knot playground"
-        run: npm run build --workspace knot-playground
+      - name: "Build ty playground"
+        run: npm run build --workspace ty-playground
         working-directory: playground
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
@@ -55,4 +55,4 @@ jobs:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
           # `github.head_ref` is only set during pull requests and for manual runs or tags we use `main` to deploy to production
-          command: pages deploy playground/knot/dist --project-name=knot-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}
+          command: pages deploy playground/ty/dist --project-name=ty-playground --branch ${{ github.head_ref || 'main' }} --commit-hash ${GITHUB_SHA}

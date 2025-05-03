@@ -33,7 +33,7 @@ name = "formatter"
 harness = false
 
 [[bench]]
-name = "red_knot"
+name = "ty"
 harness = false
 
 [dependencies]

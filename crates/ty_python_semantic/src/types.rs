@@ -257,7 +257,7 @@ fn member_lookup_cycle_initial<'db>(
     Symbol::bound(Type::Never).into()
 }
 
-/// Meta data for `Type::Todo`, which represents a known limitation in red-knot.
+/// Meta data for `Type::Todo`, which represents a known limitation in ty.
 #[cfg(debug_assertions)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TodoType(pub &'static str);
@@ -1246,7 +1246,7 @@ impl<'db> Type<'db> {
                 .metaclass_instance_type(db)
                 .is_subtype_of(db, target),
 
-            // `type[str]` (== `SubclassOf("str")` in red-knot) describes all possible runtime subclasses
+            // `type[str]` (== `SubclassOf("str")` in ty) describes all possible runtime subclasses
             // of the class object `str`. It is a subtype of `type` (== `Instance("type")`) because `str`
             // is an instance of `type`, and so all possible subclasses of `str` will also be instances of `type`.
             //
@@ -5379,7 +5379,7 @@ pub enum DynamicType {
     Unknown,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
-    /// This variant should eventually be removed once red-knot is spec-compliant.
+    /// This variant should eventually be removed once ty is spec-compliant.
     ///
     /// General rule: `Todo` should only propagate when the presence of the input `Todo` caused the
     /// output to be unknown. An output should only be `Todo` if fixing all `Todo` inputs to be not

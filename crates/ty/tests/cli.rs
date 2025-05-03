@@ -604,7 +604,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Red Knot warns about unknown rules specified in a configuration file
+/// ty warns about unknown rules specified in a configuration file
 #[test]
 fn configuration_unknown_rules() -> anyhow::Result<()> {
     let case = TestCase::with_files([
@@ -638,7 +638,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Red Knot warns about unknown rules specified in a CLI argument
+/// ty warns about unknown rules specified in a CLI argument
 #[test]
 fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = TestCase::with_file("test.py", "print(10)")?;
@@ -1267,7 +1267,7 @@ impl TestCase {
     }
 
     fn command(&self) -> Command {
-        let mut command = Command::new(get_cargo_bin("red_knot"));
+        let mut command = Command::new(get_cargo_bin("ty"));
         command.current_dir(&self.project_dir).arg("check");
         command
     }

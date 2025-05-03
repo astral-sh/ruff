@@ -9,7 +9,7 @@ homepage = { workspace = true }
 documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
-description = "WebAssembly bindings for Red Knot"
+description = "WebAssembly bindings for ty"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

@@ -1,6 +1,6 @@
 # Syntax errors
 
-Test cases to ensure that red knot does not panic if there are syntax errors in the source code.
+Test cases to ensure that ty does not panic if there are syntax errors in the source code.
 
 The parser cannot recover from certain syntax errors completely which is why the number of syntax
 errors could be more than expected in the following examples. For instance, if there's a keyword

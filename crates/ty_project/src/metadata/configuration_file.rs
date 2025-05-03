@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::metadata::value::ValueSource;
 
-use super::options::{KnotTomlError, Options};
+use super::options::{Options, TyTomlError};
 
 /// A `knot.toml` configuration file with the options it contains.
 pub(crate) struct ConfigurationFile {
@@ -63,7 +63,7 @@ impl ConfigurationFile {
 pub enum ConfigurationFileError {
     #[error("{path} is not a valid `knot.toml`: {source}")]
     InvalidKnotToml {
-        source: Box<KnotTomlError>,
+        source: Box<TyTomlError>,
         path: SystemPathBuf,
     },
 }

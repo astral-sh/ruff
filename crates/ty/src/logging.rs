@@ -1,4 +1,4 @@
-//! Sets up logging for Red Knot
+//! Sets up logging for ty
 
 use anyhow::Context;
 use colored::Colorize;
@@ -42,14 +42,14 @@ impl Verbosity {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) enum VerbosityLevel {
-    /// Default output level. Only shows Ruff and Red Knot events up to the [`WARN`](tracing::Level::WARN).
+    /// Default output level. Only shows Ruff and ty events up to the [`WARN`](tracing::Level::WARN).
     Default,
 
-    /// Enables verbose output. Emits Ruff and Red Knot events up to the [`INFO`](tracing::Level::INFO).
+    /// Enables verbose output. Emits Ruff and ty events up to the [`INFO`](tracing::Level::INFO).
     /// Corresponds to `-v`.
     Verbose,
 
-    /// Enables a more verbose tracing format and emits Ruff and Red Knot events up to [`DEBUG`](tracing::Level::DEBUG).
+    /// Enables a more verbose tracing format and emits Ruff and ty events up to [`DEBUG`](tracing::Level::DEBUG).
     /// Corresponds to `-vv`
     ExtraVerbose,
 
@@ -79,11 +79,11 @@ impl VerbosityLevel {
 pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuard> {
     use tracing_subscriber::prelude::*;
 
-    // The `RED_KNOT_LOG` environment variable overrides the default log level.
-    let filter = if let Ok(log_env_variable) = std::env::var("RED_KNOT_LOG") {
+    // The `TY_LOG` environment variable overrides the default log level.
+    let filter = if let Ok(log_env_variable) = std::env::var("TY_LOG") {
         EnvFilter::builder()
             .parse(log_env_variable)
-            .context("Failed to parse directives specified in RED_KNOT_LOG environment variable.")?
+            .context("Failed to parse directives specified in TY_LOG environment variable.")?
     } else {
         match level {
             VerbosityLevel::Default => {
@@ -93,9 +93,9 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
             level => {
                 let level_filter = level.level_filter();
 
-                // Show info|debug|trace events, but allow `RED_KNOT_LOG` to override
+                // Show info|debug|trace events, but allow `TY_LOG` to override
                 let filter = EnvFilter::default().add_directive(
-                    format!("red_knot={level_filter}")
+                    format!("ty={level_filter}")
                         .parse()
                         .expect("Hardcoded directive to be valid"),
                 );
@@ -131,7 +131,7 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
     } else {
         let subscriber = registry.with(
             tracing_subscriber::fmt::layer()
-                .event_format(RedKnotFormat {
+                .event_format(TyFormat {
                     display_level: true,
                     display_timestamp: level.is_extra_verbose(),
                     show_spans: false,
@@ -155,7 +155,7 @@ fn setup_profile<S>() -> (
 where
     S: Subscriber + for<'span> LookupSpan<'span>,
 {
-    if let Ok("1" | "true") = std::env::var("RED_KNOT_LOG_PROFILE").as_deref() {
+    if let Ok("1" | "true") = std::env::var("TY_LOG_PROFILE").as_deref() {
         let (layer, guard) = tracing_flame::FlameLayer::with_file("tracing.folded")
             .expect("Flame layer to be created");
         (Some(layer), Some(guard))
@@ -168,14 +168,14 @@ pub(crate) struct TracingGuard {
     _flame_guard: Option<tracing_flame::FlushGuard<BufWriter<File>>>,
 }
 
-struct RedKnotFormat {
+struct TyFormat {
     display_timestamp: bool,
     display_level: bool,
     show_spans: bool,
 }
 
 /// See <https://docs.rs/tracing-subscriber/0.3.18/src/tracing_subscriber/fmt/format/mod.rs.html#1026-1156>
-impl<S, N> FormatEvent<S, N> for RedKnotFormat
+impl<S, N> FormatEvent<S, N> for TyFormat
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
     N: for<'a> FormatFields<'a> + 'static,

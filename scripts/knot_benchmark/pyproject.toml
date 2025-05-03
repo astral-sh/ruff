@@ -1,7 +1,7 @@
 [project]
 name = "knot_benchmark"
 version = "0.0.1"
-description = "Package for running end-to-end Red Knot benchmarks"
+description = "Package for running end-to-end ty benchmarks"
 requires-python = ">=3.12"
 dependencies = ["mypy", "pyright"]
 

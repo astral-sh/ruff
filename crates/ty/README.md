@@ -1,14 +1,14 @@
-# Red Knot
+# ty
 
-Red Knot is an extremely fast type checker.
+ty is an extremely fast type checker.
 Currently, it is a work-in-progress and not ready for user testing.
 
-Red Knot is designed to prioritize good type inference, even in unannotated code,
+ty is designed to prioritize good type inference, even in unannotated code,
 and aims to avoid false positives.
 
-While Red Knot will produce similar results to mypy and pyright on many codebases,
+While ty will produce similar results to mypy and pyright on many codebases,
 100% compatibility with these tools is a non-goal.
-On some codebases, Red Knot's design decisions lead to different outcomes
+On some codebases, ty's design decisions lead to different outcomes
 than you would get from running one of these more established tools.
 
 ## Contributing
@@ -21,5 +21,5 @@ on the test framework itself.
 The list of open issues can be found [here][open-issues].
 
 [mdtest-readme]: ../ty_test/README.md
-[open-issues]: https://github.com/astral-sh/ruff/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20label%3Ared-knot
+[open-issues]: https://github.com/astral-sh/ty/issues
 [resources-mdtest]: ../ty_python_semantic/resources/mdtest

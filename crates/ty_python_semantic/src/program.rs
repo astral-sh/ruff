@@ -111,7 +111,7 @@ pub struct SearchPathSettings {
     /// bundled as a zip file in the binary
     pub custom_typeshed: Option<SystemPathBuf>,
 
-    /// Path to the Python installation from which Red Knot resolves third party dependencies
+    /// Path to the Python installation from which ty resolves third party dependencies
     /// and their type information.
     pub python_path: PythonPath,
 }

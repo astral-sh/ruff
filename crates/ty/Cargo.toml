@@ -1,5 +1,5 @@
 [package]
-name = "red_knot"
+name = "ty"
 version = "0.0.0"
 edition.workspace = true
 rust-version.workspace = true
@@ -12,11 +12,11 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ruff_db = { workspace = true, features = ["os", "cache"] }
+ruff_python_ast = { workspace = true }
 ty_python_semantic = { workspace = true }
 ty_project = { workspace = true, features = ["zstd"] }
 ty_server = { workspace = true }
-ruff_db = { workspace = true, features = ["os", "cache"] }
-ruff_python_ast = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }

@@ -1,4 +1,4 @@
-//! The logging system for `red_knot server`.
+//! The logging system for `ty server`.
 //!
 //! Log messages are controlled by the `logLevel` setting which defaults to `"info"`. Log messages
 //! are written to `stderr` by default, which should appear in the logs for most LSP clients. A
@@ -99,7 +99,7 @@ impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
         meta: &tracing::Metadata<'_>,
         _: &tracing_subscriber::layer::Context<'_, S>,
     ) -> bool {
-        let filter = if meta.target().starts_with("red_knot") {
+        let filter = if meta.target().starts_with("ty") {
             self.filter.trace_level()
         } else {
             tracing::Level::WARN

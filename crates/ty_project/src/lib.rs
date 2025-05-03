@@ -605,10 +605,10 @@ where
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
             diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,
-                "This indicates a bug in Red Knot.",
+                "This indicates a bug in ty.",
             ));
 
-            let report_message = "If you could open an issue at https://github.com/astral-sh/ruff/issues/new?title=%5Bred-knot%5D:%20panic we'd be very appreciative!";
+            let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D we'd be very appreciative!";
             diagnostic.sub(SubDiagnostic::new(Severity::Info, report_message));
             diagnostic.sub(SubDiagnostic::new(
                 Severity::Info,

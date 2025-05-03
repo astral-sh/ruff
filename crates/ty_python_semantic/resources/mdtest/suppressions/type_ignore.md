@@ -87,7 +87,7 @@ a = test \
 
 ## Codes
 
-Mypy supports `type: ignore[code]`. Red Knot doesn't understand mypy's rule names. Therefore, ignore
+Mypy supports `type: ignore[code]`. ty doesn't understand mypy's rule names. Therefore, ignore
 the codes and suppress all errors.
 
 ```py
@@ -116,7 +116,7 @@ a = test + 2  # type: ignoree
 ## Invalid - ignore on opening parentheses
 
 `type: ignore` comments after an opening parentheses suppress any type errors inside the parentheses
-in Pyright. Neither Ruff, nor mypy support this and neither does Red Knot.
+in Pyright. Neither Ruff, nor mypy support this and neither does ty.
 
 ```py
 # fmt: off

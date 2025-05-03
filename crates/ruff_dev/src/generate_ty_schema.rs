@@ -13,7 +13,7 @@ use ty_project::metadata::options::Options;
 
 #[derive(clap::Args)]
 pub(crate) struct Args {
-    /// Write the generated table to stdout (rather than to `knot.schema.json`).
+    /// Write the generated table to stdout (rather than to `ty.schema.json`).
     #[arg(long, default_value_t, value_enum)]
     pub(crate) mode: Mode,
 }
@@ -21,7 +21,7 @@ pub(crate) struct Args {
 pub(crate) fn main(args: &Args) -> Result<()> {
     let schema = schema_for!(Options);
     let schema_string = serde_json::to_string_pretty(&schema).unwrap();
-    let filename = "knot.schema.json";
+    let filename = "ty.schema.json";
     let schema_path = PathBuf::from(ROOT_DIR).join(filename);
 
     match args.mode {
@@ -62,7 +62,7 @@ mod tests {
 
     #[test]
     fn test_generate_json_schema() -> Result<()> {
-        let mode = if env::var("KNOT_UPDATE_SCHEMA").as_deref() == Ok("1") {
+        let mode = if env::var("TY_UPDATE_SCHEMA").as_deref() == Ok("1") {
             Mode::Write
         } else {
             Mode::Check

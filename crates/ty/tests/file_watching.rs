@@ -1546,7 +1546,7 @@ mod unix {
         //
         // I further tested how good editor support is for symlinked files and it is not good ;)
         // * VS Code doesn't update the file content if a file gets changed through a symlink
-        // * PyCharm doesn't update diagnostics if a symlinked module is changed (same as red knot).
+        // * PyCharm doesn't update diagnostics if a symlinked module is changed (same as ty).
         //
         // That's why I think it's fine to not support this case for now.
 
@@ -1658,7 +1658,7 @@ mod unix {
         // It would be nice if this is supported but the underlying file system watchers
         // only emit a single event. For reference
         // * VS Code doesn't update the file content if a file gets changed through a symlink
-        // * PyCharm doesn't update diagnostics if a symlinked module is changed (same as red knot).
+        // * PyCharm doesn't update diagnostics if a symlinked module is changed (same as ty).
         // We could add support for it by keeping a reverse map from `real_path` to symlinked path but
         // it doesn't seem worth doing considering that as prominent tools like PyCharm don't support it.
         // Pyright does support it, thanks to chokidar.
@@ -1793,7 +1793,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
 ///
 /// This test currently fails on case-insensitive systems because `Files` is case-sensitive
 /// but the `System::metadata` call isn't. This means that
-/// Red Knot considers both `Lib.py` and `lib.py` to exist when only `lib.py` does
+/// ty considers both `Lib.py` and `lib.py` to exist when only `lib.py` does
 ///
 /// The incoming change events then are no-ops because they don't change either file's
 /// status nor does it update their last modified time (renaming a file doesn't bump it's
@@ -1805,7 +1805,7 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
 /// `System` calls should be case sensitive. This would be the most consistent
 /// but might be hard to pull off.
 ///
-/// What the right solution is also depends on if Red Knot itself should be case
+/// What the right solution is also depends on if ty itself should be case
 /// sensitive or not. E.g. should `include="src"` be case sensitive on all systems
 /// or only on case-sensitive systems?
 ///

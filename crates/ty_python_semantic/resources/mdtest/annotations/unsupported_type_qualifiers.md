@@ -2,7 +2,7 @@
 
 ## Not yet fully supported
 
-Several type qualifiers are unsupported by red-knot currently. However, we also don't emit
+Several type qualifiers are unsupported by ty currently. However, we also don't emit
 false-positive errors if you use one in an annotation:
 
 ```py

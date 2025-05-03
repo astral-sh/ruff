@@ -40,7 +40,7 @@ stat = add(10, 15)
 
 ## Using `from` with an unknown current module
 
-This is another case handled separately in Red Knot, where a `.` provokes relative module name
+This is another case handled separately in ty, where a `.` provokes relative module name
 resolution, but where the module name is not resolvable.
 
 ```py

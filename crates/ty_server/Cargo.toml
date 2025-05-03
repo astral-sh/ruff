@@ -11,14 +11,14 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ty_ide = { workspace = true }
-ty_project = { workspace = true }
-ty_python_semantic = { workspace = true }
-
 ruff_db = { workspace = true, features = ["os"] }
 ruff_notebook = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
+
+ty_ide = { workspace = true }
+ty_project = { workspace = true }
+ty_python_semantic = { workspace = true }
 
 anyhow = { workspace = true }
 crossbeam = { workspace = true }

@@ -32,9 +32,9 @@ pub fn main() -> ExitStatus {
         // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
         let mut stderr = std::io::stderr().lock();
 
-        // This communicates that this isn't a linter error but Red Knot itself hard-errored for
+        // This communicates that this isn't a linter error but ty itself hard-errored for
         // some reason (e.g. failed to resolve the configuration)
-        writeln!(stderr, "{}", "Red Knot failed".red().bold()).ok();
+        writeln!(stderr, "{}", "ty failed".red().bold()).ok();
         // Currently we generally only see one error, but e.g. with io errors when resolving
         // the configuration it is help to chain errors ("resolving configuration failed" ->
         // "failed to read file: subdir/pyproject.toml")
@@ -71,7 +71,7 @@ fn run() -> anyhow::Result<ExitStatus> {
 pub(crate) fn version() -> Result<()> {
     let mut stdout = BufWriter::new(io::stdout().lock());
     let version_info = crate::version::version();
-    writeln!(stdout, "red knot {}", &version_info)?;
+    writeln!(stdout, "ty {}", &version_info)?;
     Ok(())
 }
 
@@ -90,7 +90,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         SystemPathBuf::from_path_buf(cwd)
             .map_err(|path| {
                 anyhow!(
-                    "The current working directory `{}` contains non-Unicode characters. Red Knot only supports Unicode paths.",
+                    "The current working directory `{}` contains non-Unicode characters. ty only supports Unicode paths.",
                     path.display()
                 )
             })?
@@ -172,7 +172,7 @@ pub enum ExitStatus {
     /// Checking failed due to an invocation error (e.g. the current directory no longer exists, incorrect CLI arguments, ...)
     Error = 2,
 
-    /// Internal Red Knot error (panic, or any other error that isn't due to the user using the
+    /// Internal ty error (panic, or any other error that isn't due to the user using the
     /// program incorrectly or transient environment errors).
     InternalError = 101,
 }

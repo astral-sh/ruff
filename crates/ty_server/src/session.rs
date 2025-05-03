@@ -113,13 +113,13 @@ impl Session {
     /// Returns a reference to the default project [`ProjectDatabase`]. The default project is the
     /// minimum root path in the project map.
     pub(crate) fn default_project_db(&self) -> &ProjectDatabase {
-        // SAFETY: Currently, red knot only support a single project.
+        // SAFETY: Currently, ty only support a single project.
         self.projects_by_workspace_folder.values().next().unwrap()
     }
 
     /// Returns a mutable reference to the default project [`ProjectDatabase`].
     pub(crate) fn default_project_db_mut(&mut self) -> &mut ProjectDatabase {
-        // SAFETY: Currently, red knot only support a single project.
+        // SAFETY: Currently, ty only support a single project.
         self.projects_by_workspace_folder
             .values_mut()
             .next()

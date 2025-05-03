@@ -4,7 +4,7 @@
 //! The routines exposed by this module have different behaviour depending
 //! on the platform of the *host machine*, which may be
 //! different from the *target platform for type checking*. (A user
-//! might be running red-knot on a Windows machine, but might
+//! might be running ty on a Windows machine, but might
 //! reasonably ask us to type-check code assuming that the code runs
 //! on Linux.)
 

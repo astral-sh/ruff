@@ -8,8 +8,8 @@ use ty_python_semantic::ProgramSettings;
 use crate::combine::Combine;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
 use crate::metadata::value::ValueSource;
-use options::KnotTomlError;
 use options::Options;
+use options::TyTomlError;
 
 mod configuration_file;
 pub mod options;
@@ -292,7 +292,7 @@ pub enum ProjectDiscoveryError {
 
     #[error("{path} is not a valid `knot.toml`: {source}")]
     InvalidKnotToml {
-        source: Box<KnotTomlError>,
+        source: Box<TyTomlError>,
         path: SystemPathBuf,
     },
 

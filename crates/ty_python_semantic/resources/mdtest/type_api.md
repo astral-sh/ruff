@@ -7,7 +7,7 @@ well as testing various type system properties.
 
 The Python language itself allows us to perform a variety of operations on types. For example, we
 can build a union of types like `int | None`, or we can use type constructors such as `list[int]`
-and `type[int]` to create new types. But some type-level operations that we rely on in Red Knot,
+and `type[int]` to create new types. But some type-level operations that we rely on in ty,
 like intersections, cannot yet be expressed in Python. The `knot_extensions` module provides the
 `Intersection` and `Not` type constructors (special forms) which allow us to construct these types
 directly.

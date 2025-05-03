@@ -6,7 +6,7 @@ In-browser playground for Ruff. Available [https://play.ruff.rs/](https://play.r
 
 Install the NPM dependencies with `npm install`, and run, and run the development server with
 `npm start --workspace ruff-playground` or `npm start --workspace knot-playground`.
-You may need to restart the server after making changes to Ruff or Red Knot to re-build the WASM
+You may need to restart the server after making changes to Ruff or ty to re-build the WASM
 module.
 
 To run the datastore, which is based

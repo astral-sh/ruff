@@ -38,7 +38,7 @@ pub struct Options {
 }
 
 impl Options {
-    pub(crate) fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, KnotTomlError> {
+    pub(crate) fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let options = toml::from_str(content)?;
         Ok(options)
@@ -233,17 +233,17 @@ pub struct EnvironmentOptions {
     /// Specifies the version of Python that will be used to analyze the source code.
     /// The version should be specified as a string in the format `M.m` where `M` is the major version
     /// and `m` is the minor (e.g. "3.0" or "3.6").
-    /// If a version is provided, knot will generate errors if the source code makes use of language features
+    /// If a version is provided, ty will generate errors if the source code makes use of language features
     /// that are not supported in that version.
     /// It will also tailor its use of type stub files, which conditionalizes type definitions based on the version.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub python_version: Option<RangedValue<PythonVersion>>,
 
     /// Specifies the target platform that will be used to analyze the source code.
-    /// If specified, Red Knot will tailor its use of type stub files,
+    /// If specified, ty will tailor its use of type stub files,
     /// which conditionalize type definitions based on the platform.
     ///
-    /// If no platform is specified, knot will use the current platform:
+    /// If no platform is specified, ty will use the current platform:
     /// - `win32` for Windows
     /// - `darwin` for macOS
     /// - `android` for Android
@@ -264,9 +264,9 @@ pub struct EnvironmentOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub typeshed: Option<RelativePathBuf>,
 
-    /// Path to the Python installation from which Red Knot resolves type information and third-party dependencies.
+    /// Path to the Python installation from which ty resolves type information and third-party dependencies.
     ///
-    /// Red Knot will search in the path's `site-packages` directories for type information and
+    /// ty will search in the path's `site-packages` directories for type information and
     /// third-party imports.
     ///
     /// This option is commonly used to specify the path to a virtual environment.
@@ -366,8 +366,8 @@ mod schema {
                 instance_type: Some(InstanceType::Object.into()),
                 object: Some(Box::new(ObjectValidation {
                     properties,
-                    // Allow unknown rules: Red Knot will warn about them.
-                    // It gives a better experience when using an older Red Knot version because
+                    // Allow unknown rules: ty will warn about them.
+                    // It gives a better experience when using an older ty version because
                     // the schema will not deny rules that have been removed in newer versions.
                     additional_properties: Some(Box::new(level_schema)),
                     ..ObjectValidation::default()
@@ -380,7 +380,7 @@ mod schema {
 }
 
 #[derive(Error, Debug)]
-pub enum KnotTomlError {
+pub enum TyTomlError {
     #[error(transparent)]
     TomlSyntax(#[from] toml::de::Error),
 }

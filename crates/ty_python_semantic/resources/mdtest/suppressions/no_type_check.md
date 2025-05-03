@@ -93,7 +93,7 @@ def test() -> Undefined:
 
 ## `no_type_check` on classes isn't supported
 
-Red Knot does not support decorating classes with `no_type_check`. The behaviour of `no_type_check`
+ty does not support decorating classes with `no_type_check`. The behaviour of `no_type_check`
 when applied to classes is
 [not specified currently](https://typing.python.org/en/latest/spec/directives.html#no-type-check),
 and is not supported by Pyright or mypy.
