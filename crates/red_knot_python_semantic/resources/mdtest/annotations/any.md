@@ -82,10 +82,10 @@ class OtherFinalClass: ...
 f: FinalClass | OtherFinalClass = SubclassOfAny()  # error: [invalid-assignment]
 ```
 
-A subclass of `Any` can also be assigned to arbitrary `Callable` types:
+A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` types:
 
 ```py
-from typing import Callable, Any
+from typing import Callable, Any, Protocol
 
 def takes_callable1(f: Callable):
     f()
@@ -96,6 +96,25 @@ def takes_callable2(f: Callable[[int], None]):
     f(1)
 
 takes_callable2(SubclassOfAny())
+
+class CallbackProtocol(Protocol):
+    def __call__(self, x: int, /) -> None: ...
+
+def takes_callback_proto(f: CallbackProtocol):
+    f(1)
+
+takes_callback_proto(SubclassOfAny())
+
+class OtherProtocol(Protocol):
+    x: int
+    @property
+    def foo(self) -> bytes: ...
+    @foo.setter
+    def foo(self, x: str) -> None: ...
+
+def takes_other_protocol(f: OtherProtocol): ...
+
+takes_other_protocol(SubclassOfAny())
 ```
 
 A subclass of `Any` cannot be assigned to literal types, since those can not be subclassed:
