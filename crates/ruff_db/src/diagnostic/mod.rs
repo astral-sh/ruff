@@ -426,6 +426,19 @@ impl Annotation {
     pub fn get_tags(&self) -> &[DiagnosticTag] {
         &self.tags
     }
+
+    /// Attaches this tag to this annotation.
+    ///
+    /// It will not replace any existing tags.
+    pub fn tag(mut self, tag: DiagnosticTag) -> Annotation {
+        self.tags.push(tag);
+        self
+    }
+
+    /// Attaches an additional tag to this annotation.
+    pub fn push_tag(&mut self, tag: DiagnosticTag) {
+        self.tags.push(tag);
+    }
 }
 
 /// Tags that can be associated with an annotation.

@@ -1,6 +1,7 @@
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
+use ruff_db::diagnostic::DiagnosticTag;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
     files::File,
@@ -258,6 +259,21 @@ impl LintDiagnosticGuard<'_, '_> {
         // true as of 2025-04-11.)
         let ann = self.primary_annotation_mut().unwrap();
         ann.set_message(message);
+    }
+
+    /// Adds a tag on the primary annotation for this diagnostic.
+    ///
+    /// This tag is associated with the primary annotation created
+    /// for every `Diagnostic` that uses the `LintDiagnosticGuard` API.
+    /// Specifically, the annotation is derived from the `TextRange` given to
+    /// the `InferContext::report_lint` API.
+    ///
+    /// Callers can add additional primary or secondary annotations via the
+    /// `DerefMut` trait implementation to a `Diagnostic`.
+    #[expect(dead_code)]
+    pub(super) fn add_primary_tag(&mut self, tag: DiagnosticTag) {
+        let ann = self.primary_annotation_mut().unwrap();
+        ann.push_tag(tag);
     }
 }
 
