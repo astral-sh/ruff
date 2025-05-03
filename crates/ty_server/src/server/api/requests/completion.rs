@@ -2,8 +2,8 @@ use std::borrow::Cow;
 
 use lsp_types::request::Completion;
 use lsp_types::{CompletionItem, CompletionParams, CompletionResponse, Url};
-use red_knot_ide::completion;
 use ruff_db::source::{line_index, source_text};
+use ty_ide::completion;
 use ty_project::ProjectDatabase;
 
 use crate::document::PositionExt;

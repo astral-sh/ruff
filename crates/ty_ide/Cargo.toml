@@ -1,5 +1,5 @@
 [package]
-name = "red_knot_ide"
+name = "ty_ide"
 version = "0.0.0"
 publish = false
 authors = { workspace = true }

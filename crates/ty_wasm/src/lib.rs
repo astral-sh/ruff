@@ -1,7 +1,6 @@
 use std::any::Any;
 
 use js_sys::{Error, JsString};
-use red_knot_ide::{goto_type_definition, hover, inlay_hints, MarkupKind};
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File, FileRange};
 use ruff_db::source::{line_index, source_text};
@@ -15,6 +14,7 @@ use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
+use ty_ide::{goto_type_definition, hover, inlay_hints, MarkupKind};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};

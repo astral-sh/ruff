@@ -2506,23 +2506,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "red_knot_ide"
-version = "0.0.0"
-dependencies = [
- "insta",
- "ruff_db",
- "ruff_python_ast",
- "ruff_python_parser",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "salsa",
- "smallvec",
- "tracing",
- "ty_python_semantic",
- "ty_vendored",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3991,6 +3974,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ty_ide"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "salsa",
+ "smallvec",
+ "tracing",
+ "ty_python_semantic",
+ "ty_vendored",
+]
+
+[[package]]
 name = "ty_project"
 version = "0.0.0"
 dependencies = [
@@ -4001,7 +4001,6 @@ dependencies = [
  "notify",
  "pep440_rs",
  "rayon",
- "red_knot_ide",
  "ruff_cache",
  "ruff_db",
  "ruff_macros",
@@ -4015,6 +4014,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml",
  "tracing",
+ "ty_ide",
  "ty_python_semantic",
  "ty_vendored",
 ]
@@ -4074,7 +4074,6 @@ dependencies = [
  "libc",
  "lsp-server",
  "lsp-types",
- "red_knot_ide",
  "ruff_db",
  "ruff_notebook",
  "ruff_source_file",
@@ -4085,6 +4084,7 @@ dependencies = [
  "shellexpand",
  "tracing",
  "tracing-subscriber",
+ "ty_ide",
  "ty_project",
  "ty_python_semantic",
 ]
@@ -4137,13 +4137,13 @@ dependencies = [
  "getrandom 0.3.2",
  "js-sys",
  "log",
- "red_knot_ide",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_formatter",
  "ruff_source_file",
  "ruff_text_size",
  "serde-wasm-bindgen",
+ "ty_ide",
  "ty_project",
  "ty_python_semantic",
  "wasm-bindgen",

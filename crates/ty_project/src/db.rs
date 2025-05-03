@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use crate::DEFAULT_LINT_REGISTRY;
 use crate::{Project, ProjectMetadata};
-use red_knot_ide::Db as IdeDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
@@ -11,6 +10,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
+use ty_ide::Db as IdeDb;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
 

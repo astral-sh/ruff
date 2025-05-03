@@ -11,7 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-red_knot_ide = { workspace = true }
+ty_ide = { workspace = true }
 ty_project = { workspace = true }
 ty_python_semantic = { workspace = true }
 
