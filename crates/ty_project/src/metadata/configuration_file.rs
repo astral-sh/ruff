@@ -7,7 +7,7 @@ use crate::metadata::value::ValueSource;
 
 use super::options::{Options, TyTomlError};
 
-/// A `knot.toml` configuration file with the options it contains.
+/// A `ty.toml` configuration file with the options it contains.
 pub(crate) struct ConfigurationFile {
     path: SystemPathBuf,
     options: Options,
@@ -23,7 +23,7 @@ impl ConfigurationFile {
             return Ok(None);
         };
 
-        let knot_toml_path = configuration_directory.join("knot").join("knot.toml");
+        let knot_toml_path = configuration_directory.join("ty").join("ty.toml");
 
         tracing::debug!(
             "Searching for a user-level configuration at `{path}`",
@@ -61,7 +61,7 @@ impl ConfigurationFile {
 
 #[derive(Debug, Error)]
 pub enum ConfigurationFileError {
-    #[error("{path} is not a valid `knot.toml`: {source}")]
+    #[error("{path} is not a valid `ty.toml`: {source}")]
     InvalidKnotToml {
         source: Box<TyTomlError>,
         path: SystemPathBuf,

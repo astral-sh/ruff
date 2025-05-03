@@ -79,7 +79,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Test that we can set to false via config file
-    case.write_file("knot.toml", "respect-ignore-files = false")?;
+    case.write_file("ty.toml", "respect-ignore-files = false")?;
     assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
@@ -97,7 +97,7 @@ fn test_respect_ignore_files() -> anyhow::Result<()> {
     ");
 
     // Ensure CLI takes precedence
-    case.write_file("knot.toml", "respect-ignore-files = true")?;
+    case.write_file("ty.toml", "respect-ignore-files = true")?;
     assert_cmd_snapshot!(case.command().arg("--no-respect-ignore-files"), @r"
     success: false
     exit_code: 1
@@ -123,7 +123,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
         (
             "pyproject.toml",
             r#"
-            [tool.knot.environment]
+            [tool.ty.environment]
             python-version = "3.11"
             "#,
         ),
@@ -174,7 +174,7 @@ fn config_override_python_platform() -> anyhow::Result<()> {
         (
             "pyproject.toml",
             r#"
-            [tool.knot.environment]
+            [tool.ty.environment]
             python-platform = "linux"
             "#,
         ),
@@ -249,7 +249,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
         (
             "pyproject.toml",
             r#"
-            [tool.knot.environment]
+            [tool.ty.environment]
             python-version = "3.11"
             "#,
         ),
@@ -320,7 +320,7 @@ fn paths_in_configuration_files_are_relative_to_the_project_root() -> anyhow::Re
         (
             "pyproject.toml",
             r#"
-            [tool.knot.environment]
+            [tool.ty.environment]
             python-version = "3.11"
             extra-paths = ["libs"]
             "#,
@@ -401,7 +401,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     case.write_file(
         "pyproject.toml",
         r#"
-        [tool.knot.rules]
+        [tool.ty.rules]
         division-by-zero = "warn" # demote to warn
         possibly-unresolved-reference = "ignore"
     "#,
@@ -611,7 +611,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
         (
             "pyproject.toml",
             r#"
-            [tool.knot.rules]
+            [tool.ty.rules]
             division-by-zer = "warn" # incorrect rule name
             "#,
         ),
@@ -625,7 +625,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     warning: unknown-rule
      --> pyproject.toml:3:1
       |
-    2 | [tool.knot.rules]
+    2 | [tool.ty.rules]
     3 | division-by-zer = "warn" # incorrect rule name
       | ^^^^^^^^^^^^^^^ Unknown lint rule `division-by-zer`
       |
@@ -768,7 +768,7 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
     let case = TestCase::with_files([
         ("test.py", r"print(x)  # [unresolved-reference]"),
         (
-            "knot.toml",
+            "ty.toml",
             r#"
             [terminal]
             error-on-warning = true
@@ -913,7 +913,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
 fn user_configuration() -> anyhow::Result<()> {
     let case = TestCase::with_files([
         (
-            "project/knot.toml",
+            "project/ty.toml",
             r#"
             [rules]
             division-by-zero = "warn"
@@ -973,7 +973,7 @@ fn user_configuration() -> anyhow::Result<()> {
     // Changing the level for `division-by-zero` has no effect, because the project-level configuration
     // has higher precedence.
     case.write_file(
-        config_directory.join("knot/knot.toml"),
+        config_directory.join("ty/ty.toml"),
         r#"
         [rules]
         division-by-zero = "error"

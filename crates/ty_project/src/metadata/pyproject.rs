@@ -18,8 +18,8 @@ pub struct PyProject {
 }
 
 impl PyProject {
-    pub(crate) fn knot(&self) -> Option<&Options> {
-        self.tool.as_ref().and_then(|tool| tool.knot.as_ref())
+    pub(crate) fn ty(&self) -> Option<&Options> {
+        self.tool.as_ref().and_then(|tool| tool.ty.as_ref())
     }
 }
 
@@ -126,7 +126,7 @@ pub enum ResolveRequiresPythonError {
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub struct Tool {
-    pub knot: Option<Options>,
+    pub ty: Option<Options>,
 }
 
 /// The normalized name of a package.

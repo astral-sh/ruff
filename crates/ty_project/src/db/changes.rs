@@ -44,7 +44,7 @@ impl ProjectDatabase {
             if let Some(path) = change.system_path() {
                 if matches!(
                     path.file_name(),
-                    Some(".gitignore" | ".ignore" | "knot.toml" | "pyproject.toml")
+                    Some(".gitignore" | ".ignore" | "ty.toml" | "pyproject.toml")
                 ) {
                     // Changes to ignore files or settings can change the project structure or add/remove files.
                     project_changed = true;

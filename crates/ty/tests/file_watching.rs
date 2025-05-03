@@ -173,9 +173,7 @@ impl TestCase {
             self.project_path("pyproject.toml").as_std_path(),
             toml::to_string(&PyProject {
                 project: None,
-                tool: Some(Tool {
-                    knot: Some(options),
-                }),
+                tool: Some(Tool { ty: Some(options) }),
             })
             .context("Failed to serialize options")?,
         )
@@ -382,9 +380,7 @@ where
             project_path.join("pyproject.toml").as_std_path(),
             toml::to_string(&PyProject {
                 project: None,
-                tool: Some(Tool {
-                    knot: Some(options),
-                }),
+                tool: Some(Tool { ty: Some(options) }),
             })
             .context("Failed to serialize options")?,
         )
@@ -1682,7 +1678,7 @@ fn nested_projects_delete_root() -> anyhow::Result<()> {
             [project]
             name = "inner"
 
-            [tool.knot]
+            [tool.ty]
             "#,
         )?;
 
@@ -1692,7 +1688,7 @@ fn nested_projects_delete_root() -> anyhow::Result<()> {
             [project]
             name = "outer"
 
-            [tool.knot]
+            [tool.ty]
             "#,
         )?;
 
@@ -1732,9 +1728,9 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
         )?;
 
         let config_directory = context.join_root_path("home/.config");
-        std::fs::create_dir_all(config_directory.join("knot").as_std_path())?;
+        std::fs::create_dir_all(config_directory.join("ty").as_std_path())?;
         std::fs::write(
-            config_directory.join("knot/knot.toml").as_std_path(),
+            config_directory.join("ty/ty.toml").as_std_path(),
             r#"
             [rules]
             division-by-zero = "ignore"
@@ -1765,14 +1761,14 @@ fn changes_to_user_configuration() -> anyhow::Result<()> {
 
     // Enable division-by-zero in the user configuration with warning severity
     update_file(
-        case.root_path().join("home/.config/knot/knot.toml"),
+        case.root_path().join("home/.config/ty/ty.toml"),
         r#"
         [rules]
         division-by-zero = "warn"
         "#,
     )?;
 
-    let changes = case.stop_watch(event_for_file("knot.toml"));
+    let changes = case.stop_watch(event_for_file("ty.toml"));
 
     case.apply_changes(changes);
 

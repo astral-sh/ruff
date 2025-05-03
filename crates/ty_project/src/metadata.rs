@@ -54,10 +54,7 @@ impl ProjectMetadata {
         root: SystemPathBuf,
     ) -> Result<Self, ResolveRequiresPythonError> {
         Self::from_options(
-            pyproject
-                .tool
-                .and_then(|tool| tool.knot)
-                .unwrap_or_default(),
+            pyproject.tool.and_then(|tool| tool.ty).unwrap_or_default(),
             root,
             pyproject.project.as_ref(),
         )
@@ -103,7 +100,7 @@ impl ProjectMetadata {
     /// The algorithm traverses upwards in the `path`'s ancestor chain and uses the following precedence
     /// the resolve the project's root.
     ///
-    /// 1. The closest `pyproject.toml` with a `tool.knot` section or `knot.toml`.
+    /// 1. The closest `pyproject.toml` with a `tool.ty` section or `ty.toml`.
     /// 1. The closest `pyproject.toml`.
     /// 1. Fallback to use `path` as the root and use the default settings.
     pub fn discover(
@@ -138,8 +135,8 @@ impl ProjectMetadata {
                 None
             };
 
-            // A `knot.toml` takes precedence over a `pyproject.toml`.
-            let knot_toml_path = project_root.join("knot.toml");
+            // A `ty.toml` takes precedence over a `pyproject.toml`.
+            let knot_toml_path = project_root.join("ty.toml");
             if let Ok(knot_str) = system.read_to_string(&knot_toml_path) {
                 let options = match Options::from_toml_str(
                     &knot_str,
@@ -156,10 +153,10 @@ impl ProjectMetadata {
 
                 if pyproject
                     .as_ref()
-                    .is_some_and(|project| project.knot().is_some())
+                    .is_some_and(|project| project.ty().is_some())
                 {
                     // TODO: Consider using a diagnostic here
-                    tracing::warn!("Ignoring the `tool.knot` section in `{pyproject_path}` because `{knot_toml_path}` takes precedence.");
+                    tracing::warn!("Ignoring the `tool.ty` section in `{pyproject_path}` because `{knot_toml_path}` takes precedence.");
                 }
 
                 tracing::debug!("Found project at '{}'", project_root);
@@ -182,7 +179,7 @@ impl ProjectMetadata {
             }
 
             if let Some(pyproject) = pyproject {
-                let has_knot_section = pyproject.knot().is_some();
+                let has_knot_section = pyproject.ty().is_some();
                 let metadata =
                     ProjectMetadata::from_pyproject(pyproject, project_root.to_path_buf())
                         .map_err(
@@ -208,7 +205,7 @@ impl ProjectMetadata {
         // No project found, but maybe a pyproject.toml was found.
         let metadata = if let Some(closest_project) = closest_project {
             tracing::debug!(
-                "Project without `tool.knot` section: '{}'",
+                "Project without `tool.ty` section: '{}'",
                 closest_project.root()
             );
 
@@ -290,7 +287,7 @@ pub enum ProjectDiscoveryError {
         path: SystemPathBuf,
     },
 
-    #[error("{path} is not a valid `knot.toml`: {source}")]
+    #[error("{path} is not a valid `ty.toml`: {source}")]
     InvalidKnotToml {
         source: Box<TyTomlError>,
         path: SystemPathBuf,
@@ -400,7 +397,7 @@ mod tests {
                     [project]
                     name = "backend"
 
-                    [tool.knot
+                    [tool.ty
                     "#,
                 ),
                 (root.join("db/__init__.py"), ""),
@@ -413,10 +410,10 @@ mod tests {
 
         assert_error_eq(
             &error,
-            r#"/app/pyproject.toml is not a valid `pyproject.toml`: TOML parse error at line 5, column 31
+            r#"/app/pyproject.toml is not a valid `pyproject.toml`: TOML parse error at line 5, column 29
   |
-5 |                     [tool.knot
-  |                               ^
+5 |                     [tool.ty
+  |                             ^
 invalid table header
 expected `.`, `]`
 "#,
@@ -439,7 +436,7 @@ expected `.`, `]`
                     [project]
                     name = "project-root"
 
-                    [tool.knot.src]
+                    [tool.ty.src]
                     root = "src"
                     "#,
                 ),
@@ -449,7 +446,7 @@ expected `.`, `]`
                     [project]
                     name = "nested-project"
 
-                    [tool.knot.src]
+                    [tool.ty.src]
                     root = "src"
                     "#,
                 ),
@@ -489,7 +486,7 @@ expected `.`, `]`
                     [project]
                     name = "project-root"
 
-                    [tool.knot.src]
+                    [tool.ty.src]
                     root = "src"
                     "#,
                 ),
@@ -499,7 +496,7 @@ expected `.`, `]`
                     [project]
                     name = "nested-project"
 
-                    [tool.knot.src]
+                    [tool.ty.src]
                     root = "src"
                     "#,
                 ),
@@ -579,7 +576,7 @@ expected `.`, `]`
                     [project]
                     name = "project-root"
 
-                    [tool.knot.environment]
+                    [tool.ty.environment]
                     python-version = "3.10"
                     "#,
                 ),
@@ -612,7 +609,7 @@ expected `.`, `]`
         Ok(())
     }
 
-    /// A `knot.toml` takes precedence over any `pyproject.toml`.
+    /// A `ty.toml` takes precedence over any `pyproject.toml`.
     ///
     /// However, the `pyproject.toml` is still loaded to get the project name and, in the future,
     /// the requires-python constraint.
@@ -631,12 +628,12 @@ expected `.`, `]`
                     name = "super-app"
                     requires-python = ">=3.12"
 
-                    [tool.knot.src]
+                    [tool.ty.src]
                     root = "this_option_is_ignored"
                     "#,
                 ),
                 (
-                    root.join("knot.toml"),
+                    root.join("ty.toml"),
                     r#"
                     [src]
                     root = "src"
@@ -834,7 +831,7 @@ expected `.`, `]`
                 [project]
                 requires-python = ">=3.12"
 
-                [tool.knot.environment]
+                [tool.ty.environment]
                 python-version = "3.10"
                 "#,
             )

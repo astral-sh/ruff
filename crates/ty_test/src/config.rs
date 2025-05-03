@@ -1,4 +1,4 @@
-//! TOML-deserializable ty configuration, similar to `knot.toml`, to be able to
+//! TOML-deserializable ty configuration, similar to `ty.toml`, to be able to
 //! control some configuration options from Markdown files. For now, this supports the
 //! following limited structure:
 //!
