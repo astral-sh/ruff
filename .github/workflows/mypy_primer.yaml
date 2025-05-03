@@ -1,6 +1,6 @@
 name: Run mypy_primer
 
-permissions: { }
+permissions: {}
 
 on:
   pull_request:
@@ -68,7 +68,7 @@ jobs:
             --from="git+https://github.com/hauntsaninja/mypy_primer@5061f12eecd7279e6d94fce6b78e6ffd178063eb" \
             mypy_primer \
             --repo ruff \
-            --type-checker knot \
+            --type-checker ty \
             --old base_commit \
             --new "$GITHUB_SHA" \
             --project-selector "/($PRIMER_SELECTOR)\$" \
