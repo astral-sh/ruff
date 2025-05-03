@@ -1492,7 +1492,7 @@ signature implied by the `Callable` type is assignable to the signature of the `
 specified by the protocol:
 
 ```py
-from knot_extensions import TypeOf
+from ty_extensions import TypeOf
 
 class Foo(Protocol):
     def __call__(self, x: int, /) -> str: ...
