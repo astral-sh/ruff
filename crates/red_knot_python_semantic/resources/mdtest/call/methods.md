@@ -94,7 +94,7 @@ function object. We model this explicitly, which means that we can access `__kwd
 methods, even though it is not available on `types.MethodType`:
 
 ```py
-reveal_type(bound_method.__kwdefaults__)  # revealed: @Todo(specialized non-generic class) | None
+reveal_type(bound_method.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
 ## Basic method calls on class objects and instances

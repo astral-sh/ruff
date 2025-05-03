@@ -145,10 +145,10 @@ def f(x: int) -> int:
     return x**2
 
 # TODO: Should be `_lru_cache_wrapper[int]`
-reveal_type(f)  # revealed: @Todo(specialized non-generic class)
+reveal_type(f)  # revealed: _lru_cache_wrapper[_T]
 
 # TODO: Should be `int`
-reveal_type(f(1))  # revealed: @Todo(specialized non-generic class)
+reveal_type(f(1))  # revealed: Unknown
 ```
 
 ## Lambdas as decorators

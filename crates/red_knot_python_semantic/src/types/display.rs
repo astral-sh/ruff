@@ -14,7 +14,7 @@ use crate::types::{
     StringLiteralType, SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance,
     UnionType, WrapperDescriptorKind,
 };
-use crate::Db;
+use crate::{Db, FxOrderSet};
 use rustc_hash::FxHashMap;
 
 impl<'db> Type<'db> {
@@ -113,7 +113,7 @@ impl Display for DisplayRepresentation<'_> {
                 SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
-            Type::KnownInstance(known_instance) => f.write_str(known_instance.repr()),
+            Type::KnownInstance(known_instance) => write!(f, "{}", known_instance.repr(self.db)),
             Type::FunctionLiteral(function) => {
                 let signature = function.signature(self.db);
 
@@ -317,7 +317,7 @@ impl<'db> GenericContext<'db> {
 }
 
 pub struct DisplayGenericContext<'db> {
-    typevars: &'db [TypeVarInstance<'db>],
+    typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     db: &'db dyn Db,
 }
 
@@ -376,7 +376,7 @@ impl<'db> Specialization<'db> {
 }
 
 pub struct DisplaySpecialization<'db> {
-    typevars: &'db [TypeVarInstance<'db>],
+    typevars: &'db FxOrderSet<TypeVarInstance<'db>>,
     types: &'db [Type<'db>],
     db: &'db dyn Db,
     full: bool,

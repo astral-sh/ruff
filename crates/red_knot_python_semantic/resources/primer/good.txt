@@ -78,7 +78,6 @@ pycryptodome
 pydantic
 pyinstrument
 pyjwt
-pylint
 pylox
 pyodide
 pyp
@@ -101,7 +100,6 @@ static-frame
 stone
 strawberry
 tornado
-trio
 twine
 typeshed-stats
 urllib3

@@ -454,14 +454,52 @@ impl<'db> ClassLiteral<'db> {
         self.known(db) == Some(known_class)
     }
 
-    #[salsa::tracked]
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        // Several typeshed definitions examine `sys.version_info`. To break cycles, we hard-code
+        // the knowledge that this class is not generic.
+        if self.is_known(db, KnownClass::VersionInfo) {
+            return None;
+        }
+
+        // We've already verified that the class literal does not contain both a PEP-695 generic
+        // scope and a `typing.Generic` base class.
+        //
+        // Note that if a class has an explicit legacy generic context (by inheriting from
+        // `typing.Generic`), and also an implicit one (by inheriting from other generic classes,
+        // specialized by typevars), the explicit one takes precedence.
+        self.pep695_generic_context(db)
+            .or_else(|| self.legacy_generic_context(db))
+            .or_else(|| self.inherited_legacy_generic_context(db))
+    }
+
+    #[salsa::tracked]
+    pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let class_def_node = scope.node(db).expect_class();
         class_def_node.type_params.as_ref().map(|type_params| {
             let index = semantic_index(db, scope.file(db));
             GenericContext::from_type_params(db, index, type_params)
         })
+    }
+
+    pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        self.explicit_bases(db).iter().find_map(|base| match base {
+            Type::KnownInstance(KnownInstanceType::Generic(generic_context)) => *generic_context,
+            _ => None,
+        })
+    }
+
+    pub(crate) fn inherited_legacy_generic_context(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<GenericContext<'db>> {
+        GenericContext::from_base_classes(
+            db,
+            self.explicit_bases(db)
+                .iter()
+                .copied()
+                .filter(|ty| matches!(ty, Type::GenericAlias(_))),
+        )
     }
 
     /// Return `true` if this class represents the builtin class `object`
@@ -919,10 +957,8 @@ impl<'db> ClassLiteral<'db> {
 
         for superclass in mro_iter {
             match superclass {
-                ClassBase::Dynamic(
-                    DynamicType::SubscriptedGeneric | DynamicType::SubscriptedProtocol,
-                )
-                | ClassBase::Generic
+                ClassBase::Dynamic(DynamicType::SubscriptedProtocol)
+                | ClassBase::Generic(_)
                 | ClassBase::Protocol => {
                     // TODO: We currently skip `Protocol` when looking up class members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
@@ -1264,10 +1300,8 @@ impl<'db> ClassLiteral<'db> {
 
         for superclass in self.iter_mro(db, specialization) {
             match superclass {
-                ClassBase::Dynamic(
-                    DynamicType::SubscriptedProtocol | DynamicType::SubscriptedGeneric,
-                )
-                | ClassBase::Generic
+                ClassBase::Dynamic(DynamicType::SubscriptedProtocol)
+                | ClassBase::Generic(_)
                 | ClassBase::Protocol => {
                     // TODO: We currently skip these when looking up instance members, in order to
                     // avoid creating many dynamic types in our test suite that would otherwise
@@ -2235,6 +2269,43 @@ impl<'db> KnownClass {
             .to_class_type(db)
             .map(|class| Type::instance(db, class))
             .unwrap_or_else(Type::unknown)
+    }
+
+    /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
+    /// representing all possible instances of the generic class with a specialization.
+    ///
+    /// If the class cannot be found in typeshed, or if you provide a specialization with the wrong
+    /// number of types, a debug-level log message will be emitted stating this.
+    pub(crate) fn to_specialized_instance(
+        self,
+        db: &'db dyn Db,
+        specialization: impl IntoIterator<Item = Type<'db>>,
+    ) -> Type<'db> {
+        let class_literal = self.to_class_literal(db).expect_class_literal();
+        let Some(generic_context) = class_literal.generic_context(db) else {
+            return Type::unknown();
+        };
+
+        let types = specialization.into_iter().collect::<Box<[_]>>();
+        if types.len() != generic_context.len(db) {
+            // a cache of the `KnownClass`es that we have already seen mismatched-arity
+            // specializations for (and therefore that we've already logged a warning for)
+            static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
+            if MESSAGES.lock().unwrap().insert(self) {
+                tracing::info!(
+                    "Wrong number of types when specializing {}. \
+                     Falling back to `Unknown` for the symbol instead.",
+                    self.display(db)
+                );
+            }
+            return Type::unknown();
+        }
+
+        let specialization = generic_context.specialize(db, types);
+        Type::instance(
+            db,
+            ClassType::Generic(GenericAlias::new(db, class_literal, specialization)),
+        )
     }
 
     /// Attempt to lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.

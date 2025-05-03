@@ -116,6 +116,6 @@ from typing import Tuple
 class C(Tuple): ...
 
 # TODO: generic protocols
-# revealed: tuple[Literal[C], Literal[tuple], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), @Todo(`Generic[]` subscript), Literal[object]]
+# revealed: tuple[Literal[C], Literal[tuple], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, Literal[object]]
 reveal_type(C.__mro__)
 ```

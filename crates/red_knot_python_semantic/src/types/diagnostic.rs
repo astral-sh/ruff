@@ -9,6 +9,7 @@ use crate::types::string_annotation::{
     RAW_STRING_TYPE_ANNOTATION,
 };
 use crate::types::{class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
+use crate::Db;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
@@ -35,6 +36,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_GENERIC_CLASS);
     registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_METACLASS);
     registry.register_lint(&INVALID_OVERLOAD);
@@ -388,6 +390,32 @@ declare_lint! {
     ///  This rule corresponds to Ruff's [`except-with-non-exception-classes` (`B030`)](https://docs.astral.sh/ruff/rules/except-with-non-exception-classes)
     pub(crate) static INVALID_EXCEPTION_CAUGHT = {
         summary: "detects exception handlers that catch classes that do not inherit from `BaseException`",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid generic classes
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when defining a generic class.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")  # okay
+    ///
+    /// # error: class uses both PEP-695 syntax and legacy syntax
+    /// class C[U](Generic[T]): ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    pub(crate) static INVALID_GENERIC_CLASS = {
+        summary: "detects invalid generic classes",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1378,6 +1406,7 @@ pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: 
 }
 
 pub(crate) fn report_invalid_arguments_to_annotated(
+    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1387,7 +1416,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        KnownInstanceType::Annotated.repr()
+        KnownInstanceType::Annotated.repr(db)
     ));
 }
 
@@ -1427,6 +1456,7 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
 }
 
 pub(crate) fn report_invalid_arguments_to_callable(
+    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1435,7 +1465,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
     };
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        KnownInstanceType::Callable.repr()
+        KnownInstanceType::Callable.repr(db)
     ));
 }
 

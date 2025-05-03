@@ -72,10 +72,11 @@ use crate::types::diagnostic::{
     report_possibly_unbound_attribute, TypeCheckDiagnostics, CALL_NON_CALLABLE,
     CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
     CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO,
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DECLARATION,
-    INVALID_LEGACY_TYPE_VARIABLE, INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT, UNSUPPORTED_OPERATOR,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
+    UNSUPPORTED_OPERATOR,
 };
 use crate::types::generics::GenericContext;
 use crate::types::mro::MroErrorKind;
@@ -92,7 +93,7 @@ use crate::types::{
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
-use crate::Db;
+use crate::{Db, FxOrderSet};
 
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
@@ -767,7 +768,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let DefinitionKind::Class(class) = definition.kind(self.db()) {
                     ty.inner_type()
                         .into_class_literal()
-                        .map(|ty| (ty, class.node()))
+                        .map(|class_literal| (class_literal, class.node()))
                 } else {
                     None
                 }
@@ -801,7 +802,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             //     - If the class is a protocol class: check for inheritance from a non-protocol class
             for (i, base_class) in class.explicit_bases(self.db()).iter().enumerate() {
                 let base_class = match base_class {
-                    Type::KnownInstance(KnownInstanceType::Generic) => {
+                    Type::KnownInstance(KnownInstanceType::Generic(None)) => {
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_BASE, &class_node.bases()[i])
@@ -973,6 +974,35 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 ));
                             }
                         }
+                    }
+                }
+            }
+
+            // (5) Check that a generic class does not have invalid or conflicting generic
+            // contexts.
+            if class.pep695_generic_context(self.db()).is_some()
+                && class.legacy_generic_context(self.db()).is_some()
+            {
+                if let Some(builder) = self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+                {
+                    builder.into_diagnostic(
+                        "Cannot both inherit from `Generic` and use PEP 695 type variables",
+                    );
+                }
+            }
+
+            if let (Some(legacy), Some(inherited)) = (
+                class.legacy_generic_context(self.db()),
+                class.inherited_legacy_generic_context(self.db()),
+            ) {
+                if !inherited.is_subset_of(self.db(), legacy) {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+                    {
+                        builder.into_diagnostic(
+                            "`Generic` base class must include all type \
+                            variables used in other base classes",
+                        );
                     }
                 }
             }
@@ -2011,9 +2041,11 @@ impl<'db> TypeInferenceBuilder<'db> {
         definition: Definition<'db>,
     ) {
         if let Some(annotation) = parameter.annotation() {
-            let _annotated_ty = self.file_expression_type(annotation);
-            // TODO `dict[str, annotated_type]`
-            let ty = KnownClass::Dict.to_instance(self.db());
+            let annotated_ty = self.file_expression_type(annotation);
+            let ty = KnownClass::Dict.to_specialized_instance(
+                self.db(),
+                [KnownClass::Str.to_instance(self.db()), annotated_ty],
+            );
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
@@ -2023,8 +2055,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             self.add_binding(
                 parameter.into(),
                 definition,
-                // TODO `dict[str, Unknown]`
-                KnownClass::Dict.to_instance(self.db()),
+                KnownClass::Dict.to_specialized_instance(
+                    self.db(),
+                    [KnownClass::Str.to_instance(self.db()), Type::unknown()],
+                ),
             );
         }
     }
@@ -5547,8 +5581,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             | (_, todo @ Type::Dynamic(DynamicType::Todo(_)), _) => Some(todo),
             (todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _, _)
             | (_, todo @ Type::Dynamic(DynamicType::SubscriptedProtocol), _) => Some(todo),
-            (todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _, _)
-            | (_, todo @ Type::Dynamic(DynamicType::SubscriptedGeneric), _) => Some(todo),
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::Add) => Some(
@@ -6641,9 +6673,16 @@ impl<'db> TypeInferenceBuilder<'db> {
     ) -> Type<'db> {
         let slice_node = subscript.slice.as_ref();
         let call_argument_types = match slice_node {
-            ast::Expr::Tuple(tuple) => CallArgumentTypes::positional(
-                tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
-            ),
+            ast::Expr::Tuple(tuple) => {
+                let arguments = CallArgumentTypes::positional(
+                    tuple.elts.iter().map(|elt| self.infer_type_expression(elt)),
+                );
+                self.store_expression_type(
+                    slice_node,
+                    TupleType::from_elements(self.db(), arguments.iter().map(|(_, ty)| ty)),
+                );
+                arguments
+            }
             _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
         };
         let signatures = Signatures::single(CallableSignature::single(
@@ -6812,8 +6851,14 @@ impl<'db> TypeInferenceBuilder<'db> {
             (Type::KnownInstance(KnownInstanceType::Protocol), _) => {
                 Type::Dynamic(DynamicType::SubscriptedProtocol)
             }
-            (Type::KnownInstance(KnownInstanceType::Generic), _) => {
-                Type::Dynamic(DynamicType::SubscriptedGeneric)
+            (Type::KnownInstance(KnownInstanceType::Generic(None)), Type::Tuple(typevars)) => {
+                self.infer_subscript_legacy_generic_class(value_node, typevars.elements(self.db()))
+            }
+            (Type::KnownInstance(KnownInstanceType::Generic(None)), typevar) => self
+                .infer_subscript_legacy_generic_class(value_node, std::slice::from_ref(&typevar)),
+            (Type::KnownInstance(KnownInstanceType::Generic(Some(_))), _) => {
+                // TODO: emit a diagnostic
+                todo_type!("doubly-specialized typing.Generic")
             }
             (Type::KnownInstance(known_instance), _)
                 if known_instance.class().is_special_form() =>
@@ -6934,7 +6979,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if !value_ty.into_class_literal().is_some_and(|class| {
                         class
                             .iter_mro(self.db(), None)
-                            .contains(&ClassBase::Dynamic(DynamicType::SubscriptedGeneric))
+                            .any(|base| matches!(base, ClassBase::Generic(_)))
                     }) {
                         report_non_subscriptable(
                             &self.context,
@@ -6967,6 +7012,35 @@ impl<'db> TypeInferenceBuilder<'db> {
                 }
             }
         }
+    }
+
+    fn infer_subscript_legacy_generic_class(
+        &mut self,
+        value_node: &ast::Expr,
+        typevars: &[Type<'db>],
+    ) -> Type<'db> {
+        let typevars: Option<FxOrderSet<_>> = typevars
+            .iter()
+            .map(|typevar| match typevar {
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(*typevar),
+                _ => {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "`{}` is not a valid argument to `typing.Generic`",
+                            typevar.display(self.db()),
+                        ));
+                    }
+                    None
+                }
+            })
+            .collect();
+        let Some(typevars) = typevars else {
+            return Type::unknown();
+        };
+        let generic_context = GenericContext::new(self.db(), typevars);
+        Type::KnownInstance(KnownInstanceType::Generic(Some(generic_context)))
     }
 
     fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
@@ -7137,7 +7211,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }) = slice
                         {
                             if arguments.len() < 2 {
-                                report_invalid_arguments_to_annotated(&self.context, subscript);
+                                report_invalid_arguments_to_annotated(
+                                    self.db(),
+                                    &self.context,
+                                    subscript,
+                                );
                             }
 
                             if let [inner_annotation, metadata @ ..] = &arguments[..] {
@@ -7155,7 +7233,11 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 TypeAndQualifiers::unknown()
                             }
                         } else {
-                            report_invalid_arguments_to_annotated(&self.context, subscript);
+                            report_invalid_arguments_to_annotated(
+                                self.db(),
+                                &self.context,
+                                subscript,
+                            );
                             self.infer_annotation_expression_impl(slice)
                         }
                     }
@@ -7169,7 +7251,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 builder.into_diagnostic(format_args!(
                                     "Type qualifier `{type_qualifier}` \
                                      expects exactly one type parameter",
-                                    type_qualifier = known_instance.repr(),
+                                    type_qualifier = known_instance.repr(self.db()),
                                 ));
                             }
                             Type::unknown().into()
@@ -7829,7 +7911,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     elts: arguments, ..
                 }) = arguments_slice
                 else {
-                    report_invalid_arguments_to_annotated(&self.context, subscript);
+                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
 
                     // `Annotated[]` with less than two arguments is an error at runtime.
                     // However, we still treat `Annotated[T]` as `T` here for the purpose of
@@ -7839,7 +7921,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if arguments.len() < 2 {
-                    report_invalid_arguments_to_annotated(&self.context, subscript);
+                    report_invalid_arguments_to_annotated(self.db(), &self.context, subscript);
                 }
 
                 let [type_expr, metadata @ ..] = &arguments[..] else {
@@ -7923,7 +8005,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 };
 
                 if !correct_argument_number {
-                    report_invalid_arguments_to_callable(&self.context, subscript);
+                    report_invalid_arguments_to_callable(self.db(), &self.context, subscript);
                 }
 
                 let callable_type = if let (Some(parameters), Some(return_type), true) =
@@ -7952,7 +8034,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr()
+                            known_instance.repr(self.db())
                         ));
                     }
                     Type::unknown()
@@ -7979,7 +8061,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr()
+                            known_instance.repr(self.db())
                         ));
                     }
                     Type::unknown()
@@ -7995,7 +8077,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         builder.into_diagnostic(format_args!(
                             "Special form `{}` expected exactly one type parameter",
-                            known_instance.repr()
+                            known_instance.repr(self.db())
                         ));
                     }
                     Type::unknown()
@@ -8028,7 +8110,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                 "Expected the first argument to `{}` \
                                  to be a callable object, \
                                  but got an object of type `{}`",
-                                known_instance.repr(),
+                                known_instance.repr(self.db()),
                                 argument_type.display(db)
                             ));
                         }
@@ -8093,7 +8175,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                     builder.into_diagnostic(format_args!(
                         "Type qualifier `{}` is not allowed in type expressions \
                          (only in annotation expressions)",
-                        known_instance.repr()
+                        known_instance.repr(self.db())
                     ));
                 }
                 self.infer_type_expression(arguments_slice)
@@ -8122,9 +8204,14 @@ impl<'db> TypeInferenceBuilder<'db> {
                 self.infer_type_expression(arguments_slice);
                 Type::Dynamic(DynamicType::SubscriptedProtocol)
             }
-            KnownInstanceType::Generic => {
+            KnownInstanceType::Generic(_) => {
                 self.infer_type_expression(arguments_slice);
-                Type::Dynamic(DynamicType::SubscriptedGeneric)
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "`typing.Generic` is not allowed in type expressions",
+                    ));
+                }
+                Type::unknown()
             }
             KnownInstanceType::NoReturn
             | KnownInstanceType::Never
@@ -8136,7 +8223,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "Type `{}` expected no type parameter",
-                        known_instance.repr()
+                        known_instance.repr(self.db())
                     ));
                 }
                 Type::unknown()
@@ -8150,7 +8237,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     builder.into_diagnostic(format_args!(
                         "Special form `{}` expected no type parameter",
-                        known_instance.repr()
+                        known_instance.repr(self.db())
                     ));
                 }
                 Type::unknown()
@@ -8161,7 +8248,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let mut diag = builder.into_diagnostic(format_args!(
                         "Type `{}` expected no type parameter",
-                        known_instance.repr()
+                        known_instance.repr(self.db())
                     ));
                     diag.info("Did you mean to use `Literal[...]` instead?");
                 }

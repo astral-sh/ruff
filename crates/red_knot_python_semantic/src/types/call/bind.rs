@@ -564,6 +564,27 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::GenericContext) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                // TODO: Handle generic functions, and unions/intersections of
+                                // generic types
+                                overload.set_return_type(match ty {
+                                    Type::ClassLiteral(class) => match class.generic_context(db) {
+                                        Some(generic_context) => TupleType::from_elements(
+                                            db,
+                                            generic_context
+                                                .variables(db)
+                                                .iter()
+                                                .map(|typevar| Type::TypeVar(*typevar)),
+                                        ),
+                                        None => Type::none(db),
+                                    },
+
+                                    _ => Type::none(db),
+                                });
+                            }
+                        }
+
                         Some(KnownFunction::Len) => {
                             if let [Some(first_arg)] = overload.parameter_types() {
                                 if let Some(len_ty) = first_arg.len(db) {

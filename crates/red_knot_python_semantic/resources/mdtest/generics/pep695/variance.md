@@ -1,4 +1,4 @@
-# Variance
+# Variance: PEP 695 syntax
 
 ```toml
 [environment]

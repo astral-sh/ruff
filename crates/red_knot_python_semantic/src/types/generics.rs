@@ -16,7 +16,7 @@ use crate::{Db, FxOrderSet};
 #[salsa::interned(debug)]
 pub struct GenericContext<'db> {
     #[return_ref]
-    pub(crate) variables: Box<[TypeVarInstance<'db>]>,
+    pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
 }
 
 impl<'db> GenericContext<'db> {
@@ -26,7 +26,7 @@ impl<'db> GenericContext<'db> {
         index: &'db SemanticIndex<'db>,
         type_params_node: &ast::TypeParams,
     ) -> Self {
-        let variables: Box<[_]> = type_params_node
+        let variables: FxOrderSet<_> = type_params_node
             .iter()
             .filter_map(|type_param| Self::variable_from_type_param(db, index, type_param))
             .collect();
@@ -54,7 +54,7 @@ impl<'db> GenericContext<'db> {
         }
     }
 
-    /// Creates a generic context from the legecy `TypeVar`s that appear in a function parameter
+    /// Creates a generic context from the legacy `TypeVar`s that appear in a function parameter
     /// list.
     pub(crate) fn from_function_params(
         db: &'db dyn Db,
@@ -76,8 +76,27 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        let variables: Box<[_]> = variables.into_iter().collect();
         Some(Self::new(db, variables))
+    }
+
+    /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
+    /// list.
+    pub(crate) fn from_base_classes(
+        db: &'db dyn Db,
+        bases: impl Iterator<Item = Type<'db>>,
+    ) -> Option<Self> {
+        let mut variables = FxOrderSet::default();
+        for base in bases {
+            base.find_legacy_typevars(db, &mut variables);
+        }
+        if variables.is_empty() {
+            return None;
+        }
+        Some(Self::new(db, variables))
+    }
+
+    pub(crate) fn len(self, db: &'db dyn Db) -> usize {
+        self.variables(db).len()
     }
 
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
@@ -130,11 +149,18 @@ impl<'db> GenericContext<'db> {
         self.specialize(db, types.into())
     }
 
+    pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
+        self.variables(db).is_subset(other.variables(db))
+    }
+
+    /// Creates a specialization of this generic context. Panics if the length of `types` does not
+    /// match the number of typevars in the generic context.
     pub(crate) fn specialize(
         self,
         db: &'db dyn Db,
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
+        assert!(self.variables(db).len() == types.len());
         Specialization::new(db, self, types)
     }
 }
@@ -205,12 +231,11 @@ impl<'db> Specialization<'db> {
     /// Returns the type that a typevar is specialized to, or None if the typevar isn't part of
     /// this specialization.
     pub(crate) fn get(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> Option<Type<'db>> {
-        self.generic_context(db)
+        let index = self
+            .generic_context(db)
             .variables(db)
-            .into_iter()
-            .zip(self.types(db))
-            .find(|(var, _)| **var == typevar)
-            .map(|(_, ty)| *ty)
+            .get_index_of(&typevar)?;
+        Some(self.types(db)[index])
     }
 
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, other: Specialization<'db>) -> bool {
@@ -323,6 +348,16 @@ impl<'db> Specialization<'db> {
         }
 
         true
+    }
+
+    pub(crate) fn find_legacy_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &mut FxOrderSet<TypeVarInstance<'db>>,
+    ) {
+        for ty in self.types(db) {
+            ty.find_legacy_typevars(db, typevars);
+        }
     }
 }
 

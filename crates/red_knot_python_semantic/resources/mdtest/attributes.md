@@ -1677,7 +1677,7 @@ functions are instances of that class:
 def f(): ...
 
 reveal_type(f.__defaults__)  # revealed: @Todo(full tuple[...] support) | None
-reveal_type(f.__kwdefaults__)  # revealed: @Todo(specialized non-generic class) | None
+reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
 Some attributes are special-cased, however:
@@ -1944,7 +1944,8 @@ reveal_type(C.a_float)  # revealed: int | float
 reveal_type(C.a_complex)  # revealed: int | float | complex
 reveal_type(C.a_tuple)  # revealed: tuple[int]
 reveal_type(C.a_range)  # revealed: range
-reveal_type(C.a_slice)  # revealed: slice
+# TODO: revealed: slice[Any, Literal[1], Any]
+reveal_type(C.a_slice)  # revealed: slice[Any, _StartT_co, _StartT_co | _StopT_co]
 reveal_type(C.a_type)  # revealed: type
 reveal_type(C.a_none)  # revealed: None
 ```

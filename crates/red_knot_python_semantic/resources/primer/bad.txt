@@ -17,6 +17,7 @@ pandas  # slow
 pandas-stubs  # cycle panics (try_metaclass_)
 pandera  # cycle panics (try_metaclass_)
 prefect # slow
+pylint  # cycle panics (self-recursive type alias)
 pytest  # cycle panics (signature_)
 pywin32  # bad use-def map (binding with definitely-visible unbound)
 schemathesis  # cycle panics (signature_)
@@ -27,4 +28,5 @@ spark  # cycle panics (try_metaclass_)
 steam.py  # cycle panics (try_metaclass_), often hangs when multi-threaded
 streamlit  # cycle panic (signature_)
 sympy  # stack overflow
+trio  # cycle panics (deferred annotatation resolving in wrong scope)
 xarray  # cycle panics (try_metaclass_)

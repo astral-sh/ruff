@@ -589,11 +589,7 @@ impl<'db> Type<'db> {
 
     pub fn contains_todo(&self, db: &'db dyn Db) -> bool {
         match self {
-            Self::Dynamic(
-                DynamicType::Todo(_)
-                | DynamicType::SubscriptedProtocol
-                | DynamicType::SubscriptedGeneric,
-            ) => true,
+            Self::Dynamic(DynamicType::Todo(_) | DynamicType::SubscriptedProtocol) => true,
 
             Self::AlwaysFalsy
             | Self::AlwaysTruthy
@@ -636,9 +632,7 @@ impl<'db> Type<'db> {
 
             Self::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::SubscriptedProtocol
-                    | DynamicType::SubscriptedGeneric,
+                    DynamicType::Todo(_) | DynamicType::SubscriptedProtocol,
                 ) => true,
                 SubclassOfInner::Dynamic(DynamicType::Unknown | DynamicType::Any) => false,
                 SubclassOfInner::Class(_) => false,
@@ -656,17 +650,11 @@ impl<'db> Type<'db> {
             Self::BoundSuper(bound_super) => {
                 matches!(
                     bound_super.pivot_class(db),
-                    ClassBase::Dynamic(
-                        DynamicType::Todo(_)
-                            | DynamicType::SubscriptedGeneric
-                            | DynamicType::SubscriptedProtocol
-                    )
+                    ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::SubscriptedProtocol)
                 ) || matches!(
                     bound_super.owner(db),
                     SuperOwnerKind::Dynamic(
-                        DynamicType::Todo(_)
-                            | DynamicType::SubscriptedGeneric
-                            | DynamicType::SubscriptedProtocol
+                        DynamicType::Todo(_) | DynamicType::SubscriptedProtocol
                     )
                 )
             }
@@ -4432,18 +4420,19 @@ impl<'db> Type<'db> {
         // have the class's typevars still in the method signature when we attempt to call it. To
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
-        let (generic_origin, self_type) = match self {
+        let (generic_origin, generic_context, self_type) = match self {
             Type::ClassLiteral(class) => match class.generic_context(db) {
                 Some(generic_context) => {
                     let specialization = generic_context.identity_specialization(db);
                     (
                         Some(class),
+                        Some(generic_context),
                         Type::GenericAlias(GenericAlias::new(db, class, specialization)),
                     )
                 }
-                _ => (None, self),
+                _ => (None, None, self),
             },
-            _ => (None, self),
+            _ => (None, None, self),
         };
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
@@ -4555,12 +4544,18 @@ impl<'db> Type<'db> {
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(|binding| combine_binding_specialization(db, binding));
+                    .and_then(|binding| combine_binding_specialization(db, binding))
+                    .filter(|specialization| {
+                        Some(specialization.generic_context(db)) == generic_context
+                    });
                 let init_specialization = init_call_outcome
                     .and_then(Result::ok)
                     .as_ref()
                     .and_then(Bindings::single_element)
-                    .and_then(|binding| combine_binding_specialization(db, binding));
+                    .and_then(|binding| combine_binding_specialization(db, binding))
+                    .filter(|specialization| {
+                        Some(specialization.generic_context(db)) == generic_context
+                    });
                 let specialization =
                     combine_specializations(db, new_specialization, init_specialization);
                 let specialized = specialization
@@ -4741,7 +4736,7 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::Generic => Err(InvalidTypeExpressionError {
+                KnownInstanceType::Generic(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
@@ -5141,6 +5136,10 @@ impl<'db> Type<'db> {
                 }
             }
 
+            Type::GenericAlias(alias) => {
+                alias.specialization(db).find_legacy_typevars(db, typevars);
+            }
+
             Type::Dynamic(_)
             | Type::Never
             | Type::AlwaysTruthy
@@ -5151,7 +5150,6 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
-            | Type::GenericAlias(_)
             | Type::SubclassOf(_)
             | Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
@@ -5176,7 +5174,10 @@ impl<'db> Type<'db> {
         match self {
             Type::IntLiteral(_) | Type::BooleanLiteral(_) => self.repr(db),
             Type::StringLiteral(_) | Type::LiteralString => *self,
-            Type::KnownInstance(known_instance) => Type::string_literal(db, known_instance.repr()),
+            Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
+                db,
+                known_instance.repr(db).to_string().into_boxed_str(),
+            )),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -5194,7 +5195,10 @@ impl<'db> Type<'db> {
                 Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
             }
             Type::LiteralString => Type::LiteralString,
-            Type::KnownInstance(known_instance) => Type::string_literal(db, known_instance.repr()),
+            Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
+                db,
+                known_instance.repr(db).to_string().into_boxed_str(),
+            )),
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -5390,9 +5394,6 @@ pub enum DynamicType {
     /// Temporary type until we support generic protocols.
     /// We use a separate variant (instead of `Todo(…)`) in order to be able to match on them explicitly.
     SubscriptedProtocol,
-    /// Temporary type until we support old-style generics.
-    /// We use a separate variant (instead of `Todo(…)`) in order to be able to match on them explicitly.
-    SubscriptedGeneric,
 }
 
 impl std::fmt::Display for DynamicType {
@@ -5405,11 +5406,6 @@ impl std::fmt::Display for DynamicType {
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
             DynamicType::SubscriptedProtocol => f.write_str(if cfg!(debug_assertions) {
                 "@Todo(`Protocol[]` subscript)"
-            } else {
-                "@Todo"
-            }),
-            DynamicType::SubscriptedGeneric => f.write_str(if cfg!(debug_assertions) {
-                "@Todo(`Generic[]` subscript)"
             } else {
                 "@Todo"
             }),
@@ -5568,12 +5564,12 @@ impl<'db> InvalidTypeExpression<'db> {
                     InvalidTypeExpression::TypeQualifier(qualifier) => write!(
                         f,
                         "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions)",
-                        q = qualifier.repr()
+                        q = qualifier.repr(self.db)
                     ),
                     InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier) => write!(
                         f,
                         "Type qualifier `{q}` is not allowed in type expressions (only in annotation expressions, and only with exactly one argument)",
-                        q = qualifier.repr()
+                        q = qualifier.repr(self.db)
                     ),
                     InvalidTypeExpression::InvalidType(ty) => write!(
                         f,
@@ -6932,6 +6928,8 @@ pub enum KnownFunction {
     IsSingleton,
     /// `knot_extensions.is_single_valued`
     IsSingleValued,
+    /// `knot_extensions.generic_context`
+    GenericContext,
 }
 
 impl KnownFunction {
@@ -6987,6 +6985,7 @@ impl KnownFunction {
             | Self::IsSingleValued
             | Self::IsSingleton
             | Self::IsSubtypeOf
+            | Self::GenericContext
             | Self::StaticAssert => module.is_knot_extensions(),
         }
     }
@@ -8383,6 +8382,7 @@ pub(crate) mod tests {
 
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
+                | KnownFunction::GenericContext
                 | KnownFunction::StaticAssert
                 | KnownFunction::IsFullyStatic
                 | KnownFunction::IsDisjointFrom
