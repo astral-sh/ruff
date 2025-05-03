@@ -7,7 +7,7 @@
 
 ```py
 from typing_extensions import assert_never, Never, Any
-from knot_extensions import Unknown
+from ty_extensions import Unknown
 
 def _(never: Never, any_: Any, unknown: Unknown, flag: bool):
     assert_never(never)  # fine

@@ -119,7 +119,7 @@ pub enum KnownModule {
     Dataclasses,
     Collections,
     Inspect,
-    KnotExtensions,
+    TyExtensions,
 }
 
 impl KnownModule {
@@ -136,7 +136,7 @@ impl KnownModule {
             Self::Dataclasses => "dataclasses",
             Self::Collections => "collections",
             Self::Inspect => "inspect",
-            Self::KnotExtensions => "knot_extensions",
+            Self::TyExtensions => "ty_extensions",
         }
     }
 
@@ -164,8 +164,8 @@ impl KnownModule {
         matches!(self, Self::Typing)
     }
 
-    pub const fn is_knot_extensions(self) -> bool {
-        matches!(self, Self::KnotExtensions)
+    pub const fn is_ty_extensions(self) -> bool {
+        matches!(self, Self::TyExtensions)
     }
 
     pub const fn is_inspect(self) -> bool {

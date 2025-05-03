@@ -7,7 +7,7 @@ This means that it is known that no possible runtime object inhabits both types 
 
 ```py
 from typing_extensions import Literal, LiteralString, Any
-from knot_extensions import Intersection, Not, TypeOf, is_disjoint_from, static_assert
+from ty_extensions import Intersection, Not, TypeOf, is_disjoint_from, static_assert
 
 static_assert(is_disjoint_from(bool, str))
 static_assert(not is_disjoint_from(bool, bool))
@@ -27,7 +27,7 @@ static_assert(not is_disjoint_from(str, type[Any]))
 ## Class hierarchies
 
 ```py
-from knot_extensions import is_disjoint_from, static_assert, Intersection, is_subtype_of
+from ty_extensions import is_disjoint_from, static_assert, Intersection, is_subtype_of
 from typing import final
 
 class A: ...
@@ -75,7 +75,7 @@ static_assert(is_disjoint_from(UsesMeta1, UsesMeta2))
 
 ```py
 from typing_extensions import Literal, Never
-from knot_extensions import TypeOf, is_disjoint_from, static_assert
+from ty_extensions import TypeOf, is_disjoint_from, static_assert
 
 static_assert(is_disjoint_from(tuple[()], TypeOf[object]))
 static_assert(is_disjoint_from(tuple[()], TypeOf[Literal]))
@@ -97,7 +97,7 @@ static_assert(not is_disjoint_from(tuple[Literal[1], Literal[2]], tuple[Literal[
 
 ```py
 from typing_extensions import Literal
-from knot_extensions import Intersection, is_disjoint_from, static_assert
+from ty_extensions import Intersection, is_disjoint_from, static_assert
 
 static_assert(is_disjoint_from(Literal[1, 2], Literal[3]))
 static_assert(is_disjoint_from(Literal[1, 2], Literal[3, 4]))
@@ -110,7 +110,7 @@ static_assert(not is_disjoint_from(Literal[1, 2], Literal[2, 3]))
 
 ```py
 from typing_extensions import Literal, final, Any
-from knot_extensions import Intersection, is_disjoint_from, static_assert, Not
+from ty_extensions import Intersection, is_disjoint_from, static_assert, Not
 
 @final
 class P: ...
@@ -175,7 +175,7 @@ static_assert(is_disjoint_from(Not[int], Intersection[int, Any]))
 
 ```py
 from typing_extensions import Never
-from knot_extensions import is_disjoint_from, static_assert
+from ty_extensions import is_disjoint_from, static_assert
 
 static_assert(is_disjoint_from(Never, Never))
 static_assert(is_disjoint_from(Never, None))
@@ -187,7 +187,7 @@ static_assert(is_disjoint_from(Never, object))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from knot_extensions import is_disjoint_from, static_assert, Intersection, Not
+from ty_extensions import is_disjoint_from, static_assert, Intersection, Not
 
 static_assert(is_disjoint_from(None, Literal[True]))
 static_assert(is_disjoint_from(None, Literal[1]))
@@ -209,7 +209,7 @@ static_assert(is_disjoint_from(None, Intersection[int, Not[str]]))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from knot_extensions import Intersection, Not, TypeOf, is_disjoint_from, static_assert, AlwaysFalsy, AlwaysTruthy
+from ty_extensions import Intersection, Not, TypeOf, is_disjoint_from, static_assert, AlwaysFalsy, AlwaysTruthy
 
 static_assert(is_disjoint_from(Literal[True], Literal[False]))
 static_assert(is_disjoint_from(Literal[True], Literal[1]))
@@ -266,7 +266,7 @@ python-version = "3.12"
 
 ```py
 from types import ModuleType, FunctionType
-from knot_extensions import TypeOf, is_disjoint_from, static_assert
+from ty_extensions import TypeOf, is_disjoint_from, static_assert
 
 class A: ...
 class B: ...
@@ -306,7 +306,7 @@ static_assert(not is_disjoint_from(TypeOf[f], object))
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
 ```py
-from knot_extensions import AlwaysFalsy, AlwaysTruthy, is_disjoint_from, static_assert
+from ty_extensions import AlwaysFalsy, AlwaysTruthy, is_disjoint_from, static_assert
 from typing import Literal
 
 static_assert(is_disjoint_from(None, AlwaysTruthy))
@@ -327,7 +327,7 @@ the instance type is not a subclass of `T`'s metaclass.
 
 ```py
 from typing import final
-from knot_extensions import is_disjoint_from, static_assert
+from ty_extensions import is_disjoint_from, static_assert
 
 @final
 class Foo: ...
@@ -360,7 +360,7 @@ metaclass of `T` is disjoint from the metaclass of `S`.
 
 ```py
 from typing import final
-from knot_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert, is_disjoint_from
 
 @final
 class Meta1(type): ...
@@ -383,7 +383,7 @@ As such, for any two callable types, it is possible to conceive of a runtime cal
 would inhabit both types simultaneously.
 
 ```py
-from knot_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Callable, Literal, Never
 
 def mixed(a: int, /, b: str, *args: int, c: int = 2, **kwargs: int) -> None: ...
@@ -404,7 +404,7 @@ static_assert(not is_disjoint_from(Callable[[Never], str], Callable[[Never], int
 A callable type is disjoint from all literal types.
 
 ```py
-from knot_extensions import CallableTypeOf, is_disjoint_from, static_assert
+from ty_extensions import CallableTypeOf, is_disjoint_from, static_assert
 from typing_extensions import Callable, Literal, Never
 
 static_assert(is_disjoint_from(Callable[[], None], Literal[""]))

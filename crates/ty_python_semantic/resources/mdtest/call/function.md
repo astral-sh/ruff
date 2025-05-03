@@ -291,7 +291,7 @@ reveal_type(1, 2)
 ### `static_assert`
 
 ```py
-from knot_extensions import static_assert
+from ty_extensions import static_assert
 
 # error: [missing-argument] "No argument provided for required parameter `condition` of function `static_assert`"
 static_assert()
@@ -313,7 +313,7 @@ len([], 1)
 ### Type API predicates
 
 ```py
-from knot_extensions import is_subtype_of, is_fully_static
+from ty_extensions import is_subtype_of, is_fully_static
 
 # error: [missing-argument]
 is_subtype_of()

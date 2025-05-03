@@ -173,7 +173,7 @@ def _(
 
 ```py
 from typing import Callable, Union
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 def _(
     c: Intersection[Callable[[Union[int, str]], int], int],

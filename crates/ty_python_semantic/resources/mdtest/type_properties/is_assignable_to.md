@@ -13,7 +13,7 @@ Fully static types participate in subtyping. If a type `S` is a subtype of `T`, 
 assignable to `T`. Two equivalent types are subtypes of each other:
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 
 class Parent: ...
 class Child1(Parent): ...
@@ -40,7 +40,7 @@ Gradual types do not participate in subtyping, but can still be assignable to ot
 static types can be assignable to gradual types):
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, is_assignable_to, Unknown
 from typing import Any, Literal
 
 static_assert(is_assignable_to(Unknown, Literal[1]))
@@ -64,7 +64,7 @@ static_assert(not is_assignable_to(int, SubtypeOfAny))
 which is in turn a subtype of `int`:
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 from typing import Literal
 
 static_assert(is_assignable_to(Literal[True], Literal[True]))
@@ -78,7 +78,7 @@ static_assert(not is_assignable_to(bool, Literal[True]))
 ### Integer literals
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 from typing import Literal
 
 static_assert(is_assignable_to(Literal[1], Literal[1]))
@@ -95,7 +95,7 @@ All string-literal types are subtypes of (and therefore assignable to) `LiteralS
 turn a subtype of `str`:
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 from typing_extensions import Literal, LiteralString
 
 static_assert(is_assignable_to(Literal["foo"], Literal["foo"]))
@@ -112,7 +112,7 @@ static_assert(not is_assignable_to(str, LiteralString))
 ### Byte literals
 
 ```py
-from knot_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 from typing_extensions import Literal, LiteralString
 
 static_assert(is_assignable_to(Literal[b"foo"], bytes))
@@ -136,7 +136,7 @@ Both `TypeOf[str]` and `type[str]` are subtypes of `type` and `type[object]`, wh
 is known to be no larger than the set of possible objects represented by `type`.
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, Unknown, TypeOf
+from ty_extensions import static_assert, is_assignable_to, Unknown, TypeOf
 from typing import Any
 
 static_assert(is_assignable_to(type, type))
@@ -190,7 +190,7 @@ static_assert(is_assignable_to(Meta, type[Unknown]))
 ## Tuple types
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, is_assignable_to, AlwaysTruthy, AlwaysFalsy
 from typing import Literal, Any
 
 static_assert(is_assignable_to(tuple[()], tuple[()]))
@@ -224,7 +224,7 @@ static_assert(not is_assignable_to(tuple[Any, Literal[2]], tuple[int, str]))
 ## Union types
 
 ```py
-from knot_extensions import AlwaysTruthy, AlwaysFalsy, static_assert, is_assignable_to, Unknown
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, static_assert, is_assignable_to, Unknown
 from typing_extensions import Literal, Any, LiteralString
 
 static_assert(is_assignable_to(int, int | str))
@@ -259,7 +259,7 @@ static_assert(not is_assignable_to(Literal[True] | AlwaysFalsy, Literal[False] |
 ## Intersection types
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, Intersection, Not, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import static_assert, is_assignable_to, Intersection, Not, AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Any, Literal, final, LiteralString
 
 class Parent: ...
@@ -347,7 +347,7 @@ See also: our property tests in `property_tests.rs`.
 `object` is Python's top type; the set of all possible objects at runtime:
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, is_assignable_to, Unknown
 from typing import Literal, Any
 
 static_assert(is_assignable_to(str, object))
@@ -367,7 +367,7 @@ static_assert(is_assignable_to(type[Any], object))
 any type is assignable to them:
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, is_assignable_to, Unknown
 from typing import Literal, Any
 
 static_assert(is_assignable_to(str, Any))
@@ -397,7 +397,7 @@ static_assert(is_assignable_to(type[Any], Unknown))
 assignable to any arbitrary type.
 
 ```py
-from knot_extensions import static_assert, is_assignable_to, Unknown
+from ty_extensions import static_assert, is_assignable_to, Unknown
 from typing_extensions import Never, Any, Literal
 
 static_assert(is_assignable_to(Never, str))
@@ -420,7 +420,7 @@ are covered in the [subtyping tests](./is_subtype_of.md#callable).
 ### Return type
 
 ```py
-from knot_extensions import CallableTypeOf, Unknown, static_assert, is_assignable_to
+from ty_extensions import CallableTypeOf, Unknown, static_assert, is_assignable_to
 from typing import Any, Callable
 
 static_assert(is_assignable_to(Callable[[], Any], Callable[[], int]))
@@ -450,7 +450,7 @@ A `Callable` which uses the gradual form (`...`) for the parameter types is cons
 input signature.
 
 ```py
-from knot_extensions import CallableTypeOf, static_assert, is_assignable_to
+from ty_extensions import CallableTypeOf, static_assert, is_assignable_to
 from typing import Any, Callable
 
 static_assert(is_assignable_to(Callable[[], None], Callable[..., None]))
@@ -576,7 +576,7 @@ c: Callable[[int], str] = overloaded
 
 ```py
 from typing import Callable, Any
-from knot_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 
 class TakesAny:
     def __call__(self, a: Any) -> str:

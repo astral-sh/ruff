@@ -55,7 +55,7 @@ def _(a: type[int]):
 from typing import Any
 from typing_extensions import Literal, assert_type
 
-from knot_extensions import Unknown
+from ty_extensions import Unknown
 
 # Any and Unknown are considered equivalent
 def _(a: Unknown, b: Any):
@@ -80,7 +80,7 @@ Tuple types with the same elements are the same.
 ```py
 from typing_extensions import Any, assert_type
 
-from knot_extensions import Unknown
+from ty_extensions import Unknown
 
 def _(a: tuple[int, str, bytes]):
     assert_type(a, tuple[int, str, bytes])  # fine
@@ -122,7 +122,7 @@ regardless of order.
 ```py
 from typing_extensions import assert_type
 
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 class A: ...
 class B: ...

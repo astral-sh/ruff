@@ -1220,7 +1220,7 @@ A.X = 100
 ### Attribute only available on one element
 
 ```py
-from knot_extensions import Intersection
+from ty_extensions import Intersection
 
 class A:
     x: int = 1
@@ -1242,7 +1242,7 @@ def _(a_and_b: Intersection[type[A], type[B]]):
 ### Attribute available on both elements
 
 ```py
-from knot_extensions import Intersection
+from ty_extensions import Intersection
 
 class P: ...
 class Q: ...
@@ -1267,7 +1267,7 @@ def _(a_and_b: Intersection[type[A], type[B]]):
 ### Possible unboundness
 
 ```py
-from knot_extensions import Intersection
+from ty_extensions import Intersection
 
 class P: ...
 class Q: ...
@@ -1355,7 +1355,7 @@ def _(flag: bool):
 ### Intersection of implicit instance attributes
 
 ```py
-from knot_extensions import Intersection
+from ty_extensions import Intersection
 
 class P: ...
 class Q: ...

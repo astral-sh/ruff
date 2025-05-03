@@ -102,7 +102,7 @@ is similar to how you can assign an expression whose type is not fully static to
 is.)
 
 ```py
-from knot_extensions import is_fully_static, static_assert
+from ty_extensions import is_fully_static, static_assert
 from typing import Any
 
 def unbounded_unconstrained[T](t: T) -> None:
@@ -133,7 +133,7 @@ specialization. Thus, the typevar is a subtype of itself and of `object`, but no
 (including other typevars).
 
 ```py
-from knot_extensions import is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert
 
 class Super: ...
 class Base(Super): ...
@@ -233,7 +233,7 @@ the constraints individually. None of the constraints are subtypes of the typeva
 intersection of all of its constraints is a subtype of the typevar.
 
 ```py
-from knot_extensions import Intersection
+from ty_extensions import Intersection
 
 def constrained[T: (Base, Unrelated)](t: T) -> None:
     static_assert(not is_assignable_to(T, Super))
@@ -329,7 +329,7 @@ An unbounded, unconstrained typevar is not a singleton, because it can be specia
 non-singleton type.
 
 ```py
-from knot_extensions import is_singleton, is_single_valued, static_assert
+from ty_extensions import is_singleton, is_single_valued, static_assert
 
 def unbounded_unconstrained[T](t: T) -> None:
     static_assert(not is_singleton(T))
@@ -443,7 +443,7 @@ The intersection of an unbounded unconstrained typevar with any other type canno
 since there is no guarantee what type the typevar will be specialized to.
 
 ```py
-from knot_extensions import Intersection
+from ty_extensions import Intersection
 from typing import Any
 
 class Super: ...
@@ -530,7 +530,7 @@ We can simplify the intersection similarly when removing a type from a constrain
 this is modeled internally as an intersection with a negation.
 
 ```py
-from knot_extensions import Not
+from ty_extensions import Not
 
 def remove_constraint[T: (int, str, bool)](t: T) -> None:
     def _(x: Intersection[T, Not[int]]) -> None:
@@ -557,7 +557,7 @@ The intersection of a typevar with any other type is assignable to (and if fully
 of) itself.
 
 ```py
-from knot_extensions import is_assignable_to, is_subtype_of, static_assert, Not
+from ty_extensions import is_assignable_to, is_subtype_of, static_assert, Not
 
 def intersection_is_assignable[T](t: T) -> None:
     static_assert(is_assignable_to(Intersection[T, None], T))

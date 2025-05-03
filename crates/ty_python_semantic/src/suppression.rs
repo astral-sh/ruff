@@ -14,7 +14,7 @@ use thiserror::Error;
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `type: ignore` or `knot: ignore` directives that are no longer applicable.
+    /// Checks for `type: ignore` or `ty: ignore` directives that are no longer applicable.
     ///
     /// ## Why is this bad?
     /// A `type: ignore` directive that no longer matches any diagnostic violations is likely
@@ -22,7 +22,7 @@ declare_lint! {
     ///
     /// ## Examples
     /// ```py
-    /// a = 20 / 2  # knot: ignore[division-by-zero]
+    /// a = 20 / 2  # ty: ignore[division-by-zero]
     /// ```
     ///
     /// Use instead:
@@ -39,24 +39,24 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `knot: ignore[code]` where `code` isn't a known lint rule.
+    /// Checks for `ty: ignore[code]` where `code` isn't a known lint rule.
     ///
     /// ## Why is this bad?
-    /// A `knot: ignore[code]` directive with a `code` that doesn't match
+    /// A `ty: ignore[code]` directive with a `code` that doesn't match
     /// any known rule will not suppress any type errors, and is probably a mistake.
     ///
     /// ## Examples
     /// ```py
-    /// a = 20 / 0  # knot: ignore[division-by-zer]
+    /// a = 20 / 0  # ty: ignore[division-by-zer]
     /// ```
     ///
     /// Use instead:
     ///
     /// ```py
-    /// a = 20 / 0  # knot: ignore[division-by-zero]
+    /// a = 20 / 0  # ty: ignore[division-by-zero]
     /// ```
     pub(crate) static UNKNOWN_RULE = {
-        summary: "detects `knot: ignore` comments that reference unknown rules",
+        summary: "detects `ty: ignore` comments that reference unknown rules",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Warn,
     }
@@ -64,7 +64,7 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for `type: ignore` and `knot: ignore` comments that are syntactically incorrect.
+    /// Checks for `type: ignore` and `ty: ignore` comments that are syntactically incorrect.
     ///
     /// ## Why is this bad?
     /// A syntactically incorrect ignore comment is probably a mistake and is useless.
@@ -141,7 +141,7 @@ pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut Type
     check_unused_suppressions(&mut context);
 }
 
-/// Checks for `knot: ignore` comments that reference unknown rules.
+/// Checks for `ty: ignore` comments that reference unknown rules.
 fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
     if context.is_lint_disabled(&UNKNOWN_RULE) {
         return;
@@ -241,7 +241,7 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
         // This looks silly but it's necessary to check again if a `unused-ignore-comment` is indeed unused
         // in case the "unused" directive comes after it:
         // ```py
-        // a = 10 / 2  # knot: ignore[unused-ignore-comment, division-by-zero]
+        // a = 10 / 2  # ty: ignore[unused-ignore-comment, division-by-zero]
         // ```
         if context.diagnostics.is_used(suppression.id()) {
             continue;
@@ -416,7 +416,7 @@ impl<'a> IntoIterator for &'a Suppressions {
     }
 }
 
-/// A `type: ignore` or `knot: ignore` suppression.
+/// A `type: ignore` or `ty: ignore` suppression.
 ///
 /// Suppression comments that suppress multiple codes
 /// create multiple suppressions: one for every code.
@@ -474,7 +474,7 @@ enum SuppressionTarget {
     /// Suppress the lint with the given id
     Lint(LintId),
 
-    /// Suppresses no lint, e.g. `knot: ignore[]`
+    /// Suppresses no lint, e.g. `ty: ignore[]`
     Empty,
 }
 
@@ -577,7 +577,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 });
             }
 
-            // `knot: ignore[]`
+            // `ty: ignore[]`
             Some([]) => {
                 self.line.push(Suppression {
                     target: SuppressionTarget::Empty,
@@ -588,7 +588,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 });
             }
 
-            // `knot: ignore[a, b]`
+            // `ty: ignore[a, b]`
             Some(codes) => {
                 for code_range in codes {
                     let code = &self.source[*code_range];
@@ -695,8 +695,8 @@ impl<'src> SuppressionParser<'src> {
     fn eat_kind(&mut self) -> Option<SuppressionKind> {
         let kind = if self.cursor.as_str().starts_with("type") {
             SuppressionKind::TypeIgnore
-        } else if self.cursor.as_str().starts_with("knot") {
-            SuppressionKind::Knot
+        } else if self.cursor.as_str().starts_with("ty") {
+            SuppressionKind::Ty
         } else {
             return None;
         };
@@ -737,7 +737,7 @@ impl<'src> SuppressionParser<'src> {
 
             self.eat_whitespace();
 
-            // `knot: ignore[]` or `knot: ignore[a,]`
+            // `ty: ignore[]` or `ty: ignore[a,]`
             if self.cursor.eat_char(']') {
                 break Ok(Some(codes));
             }
@@ -757,7 +757,7 @@ impl<'src> SuppressionParser<'src> {
                 if self.cursor.eat_char(']') {
                     break Ok(Some(codes));
                 }
-                // `knot: ignore[a b]
+                // `ty: ignore[a b]
                 return self.syntax_error(ParseErrorKind::CodesMissingComma(kind));
             }
         }
@@ -843,7 +843,7 @@ struct SuppressionComment {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum SuppressionKind {
     TypeIgnore,
-    Knot,
+    Ty,
 }
 
 impl SuppressionKind {
@@ -854,7 +854,7 @@ impl SuppressionKind {
     fn len_utf8(self) -> usize {
         match self {
             SuppressionKind::TypeIgnore => "type".len(),
-            SuppressionKind::Knot => "knot".len(),
+            SuppressionKind::Ty => "ty".len(),
         }
     }
 }
@@ -863,7 +863,7 @@ impl fmt::Display for SuppressionKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             SuppressionKind::TypeIgnore => f.write_str("type: ignore"),
-            SuppressionKind::Knot => f.write_str("knot: ignore"),
+            SuppressionKind::Ty => f.write_str("ty: ignore"),
         }
     }
 }
@@ -911,11 +911,11 @@ enum ParseErrorKind {
     #[error("expected a comma separating the rule codes")]
     CodesMissingComma(SuppressionKind),
 
-    /// `knot: ignore[*.*]`
+    /// `ty: ignore[*.*]`
     #[error("expected a alphanumeric character or `-` or `_` as code")]
     InvalidCode(SuppressionKind),
 
-    /// `knot: ignore[a, b`
+    /// `ty: ignore[a, b`
     #[error("expected a closing bracket")]
     CodesMissingClosingBracket(SuppressionKind),
 }

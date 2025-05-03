@@ -11,7 +11,7 @@ At its simplest, to define a generic class using PEP 695 syntax, you add a list 
 the class name.
 
 ```py
-from knot_extensions import generic_context
+from ty_extensions import generic_context
 
 class SingleTypevar[T]: ...
 class MultipleTypevars[T, S]: ...

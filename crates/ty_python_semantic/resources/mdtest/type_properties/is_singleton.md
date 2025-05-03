@@ -6,7 +6,7 @@ A type is a singleton type iff it has exactly one inhabitant.
 
 ```py
 from typing_extensions import Literal, Never, Callable
-from knot_extensions import is_singleton, static_assert
+from ty_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(None))
 static_assert(is_singleton(Literal[True]))
@@ -39,7 +39,7 @@ python-version = "3.12"
 
 ```py
 from typing_extensions import _NoDefaultType
-from knot_extensions import is_singleton, static_assert
+from ty_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(_NoDefaultType))
 ```
@@ -53,7 +53,7 @@ python-version = "3.13"
 
 ```py
 from typing import _NoDefaultType
-from knot_extensions import is_singleton, static_assert
+from ty_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(_NoDefaultType))
 ```
@@ -72,7 +72,7 @@ python-version = "3.9"
 ```
 
 ```py
-from knot_extensions import is_singleton, static_assert
+from ty_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(Ellipsis.__class__))
 static_assert(is_singleton((...).__class__))
@@ -90,7 +90,7 @@ python-version = "3.10"
 
 ```py
 import types
-from knot_extensions import static_assert, is_singleton
+from ty_extensions import static_assert, is_singleton
 
 static_assert(is_singleton(types.EllipsisType))
 ```
@@ -108,7 +108,7 @@ python-version = "3.9"
 ```
 
 ```py
-from knot_extensions import is_singleton, static_assert
+from ty_extensions import is_singleton, static_assert
 
 static_assert(is_singleton(NotImplemented.__class__))
 ```
@@ -126,7 +126,7 @@ python-version = "3.10"
 
 ```py
 import types
-from knot_extensions import static_assert, is_singleton
+from ty_extensions import static_assert, is_singleton
 
 static_assert(is_singleton(types.NotImplementedType))
 ```
@@ -145,7 +145,7 @@ have to hold true; it's more of a unit test for our current implementation.
 ```py
 import types
 from typing import Callable
-from knot_extensions import static_assert, is_singleton, TypeOf
+from ty_extensions import static_assert, is_singleton, TypeOf
 
 class A:
     def method(self): ...

@@ -6906,25 +6906,25 @@ pub enum KnownFunction {
     /// `inspect.getattr_static`
     GetattrStatic,
 
-    /// `knot_extensions.static_assert`
+    /// `ty_extensions.static_assert`
     StaticAssert,
-    /// `knot_extensions.is_equivalent_to`
+    /// `ty_extensions.is_equivalent_to`
     IsEquivalentTo,
-    /// `knot_extensions.is_subtype_of`
+    /// `ty_extensions.is_subtype_of`
     IsSubtypeOf,
-    /// `knot_extensions.is_assignable_to`
+    /// `ty_extensions.is_assignable_to`
     IsAssignableTo,
-    /// `knot_extensions.is_disjoint_from`
+    /// `ty_extensions.is_disjoint_from`
     IsDisjointFrom,
-    /// `knot_extensions.is_gradual_equivalent_to`
+    /// `ty_extensions.is_gradual_equivalent_to`
     IsGradualEquivalentTo,
-    /// `knot_extensions.is_fully_static`
+    /// `ty_extensions.is_fully_static`
     IsFullyStatic,
-    /// `knot_extensions.is_singleton`
+    /// `ty_extensions.is_singleton`
     IsSingleton,
-    /// `knot_extensions.is_single_valued`
+    /// `ty_extensions.is_single_valued`
     IsSingleValued,
-    /// `knot_extensions.generic_context`
+    /// `ty_extensions.generic_context`
     GenericContext,
 }
 
@@ -6982,7 +6982,7 @@ impl KnownFunction {
             | Self::IsSingleton
             | Self::IsSubtypeOf
             | Self::GenericContext
-            | Self::StaticAssert => module.is_knot_extensions(),
+            | Self::StaticAssert => module.is_ty_extensions(),
         }
     }
 }
@@ -8385,7 +8385,7 @@ pub(crate) mod tests {
                 | KnownFunction::IsSingleValued
                 | KnownFunction::IsAssignableTo
                 | KnownFunction::IsEquivalentTo
-                | KnownFunction::IsGradualEquivalentTo => KnownModule::KnotExtensions,
+                | KnownFunction::IsGradualEquivalentTo => KnownModule::TyExtensions,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

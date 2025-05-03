@@ -69,19 +69,19 @@ pub enum KnownInstanceType<'db> {
     TypeVar(TypeVarInstance<'db>),
     /// A single instance of `typing.TypeAliasType` (PEP 695 type alias)
     TypeAliasType(TypeAliasType<'db>),
-    /// The symbol `knot_extensions.Unknown`
+    /// The symbol `ty_extensions.Unknown`
     Unknown,
-    /// The symbol `knot_extensions.AlwaysTruthy`
+    /// The symbol `ty_extensions.AlwaysTruthy`
     AlwaysTruthy,
-    /// The symbol `knot_extensions.AlwaysFalsy`
+    /// The symbol `ty_extensions.AlwaysFalsy`
     AlwaysFalsy,
-    /// The symbol `knot_extensions.Not`
+    /// The symbol `ty_extensions.Not`
     Not,
-    /// The symbol `knot_extensions.Intersection`
+    /// The symbol `ty_extensions.Intersection`
     Intersection,
-    /// The symbol `knot_extensions.TypeOf`
+    /// The symbol `ty_extensions.TypeOf`
     TypeOf,
-    /// The symbol `knot_extensions.CallableTypeOf`
+    /// The symbol `ty_extensions.CallableTypeOf`
     CallableTypeOf,
     /// The symbol `typing.Callable`
     /// (which can also be found as `typing_extensions.Callable` or as `collections.abc.Callable`)
@@ -334,7 +334,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Not
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeOf => module.is_knot_extensions(),
+            | Self::CallableTypeOf => module.is_ty_extensions(),
         }
     }
 
@@ -396,13 +396,13 @@ impl Display for KnownInstanceRepr<'_> {
             // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
             KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
             KnownInstanceType::TypeAliasType(_) => f.write_str("typing.TypeAliasType"),
-            KnownInstanceType::Unknown => f.write_str("knot_extensions.Unknown"),
-            KnownInstanceType::AlwaysTruthy => f.write_str("knot_extensions.AlwaysTruthy"),
-            KnownInstanceType::AlwaysFalsy => f.write_str("knot_extensions.AlwaysFalsy"),
-            KnownInstanceType::Not => f.write_str("knot_extensions.Not"),
-            KnownInstanceType::Intersection => f.write_str("knot_extensions.Intersection"),
-            KnownInstanceType::TypeOf => f.write_str("knot_extensions.TypeOf"),
-            KnownInstanceType::CallableTypeOf => f.write_str("knot_extensions.CallableTypeOf"),
+            KnownInstanceType::Unknown => f.write_str("ty_extensions.Unknown"),
+            KnownInstanceType::AlwaysTruthy => f.write_str("ty_extensions.AlwaysTruthy"),
+            KnownInstanceType::AlwaysFalsy => f.write_str("ty_extensions.AlwaysFalsy"),
+            KnownInstanceType::Not => f.write_str("ty_extensions.Not"),
+            KnownInstanceType::Intersection => f.write_str("ty_extensions.Intersection"),
+            KnownInstanceType::TypeOf => f.write_str("ty_extensions.TypeOf"),
+            KnownInstanceType::CallableTypeOf => f.write_str("ty_extensions.CallableTypeOf"),
         }
     }
 }

@@ -6,7 +6,7 @@ Many types are illegal in the context of a type expression:
 
 ```py
 import typing
-from knot_extensions import AlwaysTruthy, AlwaysFalsy
+from ty_extensions import AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Literal, Never
 
 class A: ...

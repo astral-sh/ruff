@@ -8,7 +8,7 @@ intersection types (note that we display negative contributions at the end; the 
 matter):
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 class P: ...
 class Q: ...
@@ -35,7 +35,7 @@ classes.
 We use `P`, `Q`, `R`, … to denote types that are non-disjoint:
 
 ```py
-from knot_extensions import static_assert, is_disjoint_from
+from ty_extensions import static_assert, is_disjoint_from
 
 class P: ...
 class Q: ...
@@ -56,7 +56,7 @@ We use `Literal[1]`, `Literal[2]`, … as examples of pairwise-disjoint types, a
 supertype of these:
 
 ```py
-from knot_extensions import static_assert, is_disjoint_from, is_subtype_of
+from ty_extensions import static_assert, is_disjoint_from, is_subtype_of
 from typing import Literal
 
 static_assert(is_disjoint_from(Literal[1], Literal[2]))
@@ -73,7 +73,7 @@ static_assert(is_subtype_of(Literal[3], int))
 Finally, we use `A <: B <: C` and `A <: B1`, `A <: B2` to denote hierarchies of (proper) subtypes:
 
 ```py
-from knot_extensions import static_assert, is_subtype_of, is_disjoint_from
+from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
 
 class A: ...
 class B(A): ...
@@ -111,7 +111,7 @@ If we have an intersection with a single element, we can simplify to that elemen
 show an intersection with a single negative contribution as just the negation of that element.
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 class P: ...
 
@@ -128,7 +128,7 @@ def _(
 We eagerly flatten nested intersections types.
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 class P: ...
 class Q: ...
@@ -179,7 +179,7 @@ We always normalize our representation to a _union of intersections_, so when we
 intersection_, we distribute the union over the respective elements:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 class P: ...
 class Q: ...
@@ -231,7 +231,7 @@ Distribution also applies to a negation operation. This is a manifestation of on
 [De Morgan's laws], namely `~(P | Q) = ~P & ~Q`:
 
 ```py
-from knot_extensions import Not
+from ty_extensions import Not
 from typing import Literal
 
 class P: ...
@@ -251,7 +251,7 @@ def example_literals(i: Not[Literal[1, 2]]) -> None:
 The other of [De Morgan's laws], `~(P & Q) = ~P | ~Q`, also holds:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 class P: ...
 class Q: ...
@@ -272,7 +272,7 @@ def _(
 of the [complement laws] of set theory.
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 from typing_extensions import Never
 
 def _(
@@ -290,7 +290,7 @@ in intersections, and can be eagerly simplified out. `object & P` is equivalent 
 `object & ~P` is equivalent to `~P` for any type `P`.
 
 ```py
-from knot_extensions import Intersection, Not, is_equivalent_to, static_assert
+from ty_extensions import Intersection, Not, is_equivalent_to, static_assert
 
 class P: ...
 
@@ -304,7 +304,7 @@ Continuing with more [complement laws], if we see both `P` and `~P` in an inters
 simplify to `Never`, even in the presence of other types:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 from typing import Any
 
 class P: ...
@@ -331,7 +331,7 @@ def _(
 Similarly, if we have both `P` and `~P` in a _union_, we can simplify that to `object`.
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 class P: ...
 class Q: ...
@@ -353,7 +353,7 @@ def _(
 The final of the [complement laws] states that negating twice is equivalent to not negating at all:
 
 ```py
-from knot_extensions import Not
+from ty_extensions import Not
 
 class P: ...
 
@@ -380,7 +380,7 @@ If we intersect with `Never`, we can simplify the whole intersection to `Never`,
 dynamic types involved:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 from typing_extensions import Never, Any
 
 class P: ...
@@ -405,7 +405,7 @@ def _(
 If we intersect disjoint types, we can simplify to `Never`, even in the presence of other types:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 from typing import Literal, Any
 
 class P: ...
@@ -443,7 +443,7 @@ If we intersect a type `X` with the negation `~Y` of a disjoint type `Y`, we can
 contribution `~Y`, as `~Y` must fully contain the positive contribution `X` as a subtype:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 from typing import Literal
 
 def _(
@@ -476,7 +476,7 @@ Subtypes are contained within their supertypes, so we can simplify intersections
 superfluous supertypes:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 from typing import Any
 
 class A: ...
@@ -535,7 +535,7 @@ def _(
 For negative contributions, this property is reversed. Here we can remove superfluous _subtypes_:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 from typing import Any
 
 class A: ...
@@ -594,7 +594,7 @@ def _(
 If there are multiple negative subtypes, all of them can be removed:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 class A: ...
 class B1(A): ...
@@ -622,7 +622,7 @@ When `A` is a supertype of `B`, its negation `~A` is disjoint from `B`, so we ca
 intersection to `Never`:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 from typing import Any
 
 class A: ...
@@ -662,7 +662,7 @@ Nonetheless, intersections of `AlwaysFalsy` or `AlwaysTruthy` with `bool` _can_ 
 to the fact that `bool` is a `@final` class at runtime that cannot be subclassed.
 
 ```py
-from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Literal
 
 class P: ...
@@ -709,7 +709,7 @@ simplified, due to the fact that a `LiteralString` inhabitant is known to have `
 exactly `str` (and not a subclass of `str`):
 
 ```py
-from knot_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy, Unknown
+from ty_extensions import Intersection, Not, AlwaysTruthy, AlwaysFalsy, Unknown
 from typing_extensions import LiteralString
 
 def f(
@@ -742,7 +742,7 @@ This slightly strange-looking test is a regression test for a mistake that was n
 <https://github.com/astral-sh/ruff/pull/15475#discussion_r1915041987>.
 
 ```py
-from knot_extensions import AlwaysFalsy, Intersection, Unknown
+from ty_extensions import AlwaysFalsy, Intersection, Unknown
 from typing_extensions import Literal
 
 def _(x: Intersection[str, Unknown, AlwaysFalsy, Literal[""]]):
@@ -758,7 +758,7 @@ is still an unknown set of runtime values, so `~Any` is equivalent to `Any`. We 
 simplify `~Any` to `Any` in intersections. The same applies to `Unknown`.
 
 ```py
-from knot_extensions import Intersection, Not, Unknown
+from ty_extensions import Intersection, Not, Unknown
 from typing_extensions import Any, Never
 
 class P: ...
@@ -788,7 +788,7 @@ The intersection of an unknown set of runtime values with (another) unknown set 
 still an unknown set of runtime values:
 
 ```py
-from knot_extensions import Intersection, Not, Unknown
+from ty_extensions import Intersection, Not, Unknown
 from typing_extensions import Any
 
 class P: ...
@@ -823,7 +823,7 @@ of another unknown set of values is not necessarily empty, so we keep the positi
 
 ```py
 from typing import Any
-from knot_extensions import Intersection, Not, Unknown
+from ty_extensions import Intersection, Not, Unknown
 
 def any(
     i1: Intersection[Any, Not[Any]],
@@ -846,7 +846,7 @@ Gradually-equivalent types can be simplified out of intersections:
 
 ```py
 from typing import Any
-from knot_extensions import Intersection, Not, Unknown
+from ty_extensions import Intersection, Not, Unknown
 
 def mixed(
     i1: Intersection[Any, Unknown],
@@ -863,13 +863,13 @@ def mixed(
 ## Invalid
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
-# error: [invalid-type-form] "`knot_extensions.Intersection` requires at least one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.Intersection` requires at least one argument when used in a type expression"
 def f(x: Intersection) -> None:
     reveal_type(x)  # revealed: Unknown
 
-# error: [invalid-type-form] "`knot_extensions.Not` requires exactly one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.Not` requires exactly one argument when used in a type expression"
 def f(x: Not) -> None:
     reveal_type(x)  # revealed: Unknown
 ```

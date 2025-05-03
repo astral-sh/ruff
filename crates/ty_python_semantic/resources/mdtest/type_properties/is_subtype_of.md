@@ -21,7 +21,7 @@ See the [typing documentation] for more information.
     as `int | float` and `int | float | complex`, respectively.
 
 ```py
-from knot_extensions import is_subtype_of, static_assert, TypeOf
+from ty_extensions import is_subtype_of, static_assert, TypeOf
 
 type JustFloat = TypeOf[1.0]
 type JustComplex = TypeOf[1j]
@@ -49,7 +49,7 @@ static_assert(is_subtype_of(FloatingPointError, Exception))
 ## Class hierarchies
 
 ```py
-from knot_extensions import is_subtype_of, static_assert
+from ty_extensions import is_subtype_of, static_assert
 from typing_extensions import Never
 
 class A: ...
@@ -88,7 +88,7 @@ static_assert(is_subtype_of(C, object))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from knot_extensions import is_subtype_of, static_assert, TypeOf
+from ty_extensions import is_subtype_of, static_assert, TypeOf
 
 type JustFloat = TypeOf[1.0]
 
@@ -121,7 +121,7 @@ static_assert(is_subtype_of(Literal[b"foo"], object))
 ## Tuple types
 
 ```py
-from knot_extensions import is_subtype_of, static_assert
+from ty_extensions import is_subtype_of, static_assert
 
 class A1: ...
 class B1(A1): ...
@@ -157,7 +157,7 @@ static_assert(is_subtype_of(tuple[int], tuple))
 ## Union types
 
 ```py
-from knot_extensions import is_subtype_of, static_assert
+from ty_extensions import is_subtype_of, static_assert
 from typing import Literal
 
 class A: ...
@@ -198,7 +198,7 @@ static_assert(not is_subtype_of(Literal[1, "two", 3], int))
 
 ```py
 from typing_extensions import Literal, LiteralString
-from knot_extensions import Intersection, Not, is_subtype_of, static_assert
+from ty_extensions import Intersection, Not, is_subtype_of, static_assert
 
 class A: ...
 class B1(A): ...
@@ -266,7 +266,7 @@ static_assert(not is_subtype_of(Literal[1], Intersection[int, Not[Literal[1]]]))
 
 ```py
 from typing_extensions import Literal, Never
-from knot_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(Never, Never))
 static_assert(is_subtype_of(Never, Literal[True]))
@@ -281,7 +281,7 @@ static_assert(is_subtype_of(Never, AlwaysFalsy))
 ### `AlwaysTruthy` and `AlwaysFalsy`
 
 ```py
-from knot_extensions import AlwaysTruthy, AlwaysFalsy, Intersection, Not, is_subtype_of, static_assert
+from ty_extensions import AlwaysTruthy, AlwaysFalsy, Intersection, Not, is_subtype_of, static_assert
 from typing_extensions import Literal, LiteralString
 
 static_assert(is_subtype_of(Literal[1], AlwaysTruthy))
@@ -323,7 +323,7 @@ static_assert(is_subtype_of(Intersection[LiteralString, Not[Literal["", "a"]]], 
 
 ```py
 from types import ModuleType
-from knot_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import TypeOf, is_subtype_of, static_assert
 from typing_extensions import assert_type
 import typing
 
@@ -335,7 +335,7 @@ static_assert(is_subtype_of(TypeOf[typing], ModuleType))
 ### Slice literals
 
 ```py
-from knot_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(TypeOf[1:2:3], slice))
 ```
@@ -344,7 +344,7 @@ static_assert(is_subtype_of(TypeOf[1:2:3], slice))
 
 ```py
 from typing import _SpecialForm, Literal
-from knot_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(TypeOf[Literal], _SpecialForm))
 static_assert(is_subtype_of(TypeOf[Literal], object))
@@ -359,7 +359,7 @@ static_assert(not is_subtype_of(_SpecialForm, TypeOf[Literal]))
 ```py
 from typing import _SpecialForm
 from typing_extensions import Literal, assert_type
-from knot_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 class Meta(type): ...
 class HasCustomMetaclass(metaclass=Meta): ...
@@ -425,7 +425,7 @@ static_assert(not is_subtype_of(Meta, type[type]))
 
 ```py
 from typing_extensions import assert_type
-from knot_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 class Base: ...
 class Derived(Base): ...
@@ -458,7 +458,7 @@ static_assert(is_subtype_of(LiteralBase | LiteralUnrelated, object))
 `Any`, `Unknown`, `Todo` and derivatives thereof do not participate in subtyping.
 
 ```py
-from knot_extensions import Unknown, is_subtype_of, static_assert, Intersection
+from ty_extensions import Unknown, is_subtype_of, static_assert, Intersection
 from typing_extensions import Any
 
 static_assert(not is_subtype_of(Any, Any))
@@ -499,7 +499,7 @@ Return types are covariant.
 
 ```py
 from typing import Callable
-from knot_extensions import is_subtype_of, static_assert, TypeOf
+from ty_extensions import is_subtype_of, static_assert, TypeOf
 
 static_assert(is_subtype_of(Callable[[], int], Callable[[], float]))
 static_assert(not is_subtype_of(Callable[[], float], Callable[[], int]))
@@ -509,7 +509,7 @@ static_assert(not is_subtype_of(Callable[[], float], Callable[[], int]))
 
 ```py
 from typing import Callable
-from knot_extensions import is_subtype_of, static_assert, TypeOf
+from ty_extensions import is_subtype_of, static_assert, TypeOf
 
 flag: bool = True
 
@@ -535,7 +535,7 @@ Parameter types are contravariant.
 
 ```py
 from typing import Callable
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert, TypeOf
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert, TypeOf
 
 def float_param(a: float, /) -> None: ...
 def int_param(a: int, /) -> None: ...
@@ -580,7 +580,7 @@ corresponding position in the supertype does not need to have a default value.
 
 ```py
 from typing import Callable
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert, TypeOf
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert, TypeOf
 
 def float_with_default(a: float = 1, /) -> None: ...
 def int_with_default(a: int = 1, /) -> None: ...
@@ -626,7 +626,7 @@ If a parameter is declared as positional-only, then the corresponding parameter 
 cannot be any other parameter kind.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def positional_only(a: int, /) -> None: ...
 def standard(a: int) -> None: ...
@@ -647,7 +647,7 @@ A standard parameter is either a positional or a keyword parameter.
 Unlike positional-only parameters, standard parameters should have the same name in the subtype.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def int_param_a(a: int) -> None: ...
 def int_param_b(b: int) -> None: ...
@@ -709,7 +709,7 @@ parameter in the subtype with the same name. This is because a standard paramete
 than a keyword-only parameter.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def standard_a(a: int) -> None: ...
 def keyword_b(*, b: int) -> None: ...
@@ -747,7 +747,7 @@ parameter in the subtype at the same position. This is because a standard parame
 than a positional-only parameter.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def standard_a(a: int) -> None: ...
 def positional_b(b: int, /) -> None: ...
@@ -787,7 +787,7 @@ A variadic or keyword-variadic parameter in the supertype cannot be substituted 
 parameter in the subtype.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def standard(a: int) -> None: ...
 def variadic(*a: int) -> None: ...
@@ -802,7 +802,7 @@ static_assert(not is_subtype_of(CallableTypeOf[standard], CallableTypeOf[keyword
 The name of the variadic parameter does not need to be the same in the subtype.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def variadic_float(*args2: float) -> None: ...
 def variadic_int(*args1: int) -> None: ...
@@ -826,7 +826,7 @@ If the subtype has a variadic parameter then any unmatched positional-only param
 supertype should be checked against the variadic parameter.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def variadic(a: int, /, *args: float) -> None: ...
 
@@ -846,7 +846,7 @@ Variadic parameter in a subtype can only be used to match against an unmatched p
 parameters from the supertype, not any other parameter kind.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def variadic(*args: int) -> None: ...
 
@@ -914,7 +914,7 @@ static_assert(not is_subtype_of(CallableTypeOf[variadic_b], CallableTypeOf[stand
 For keyword-only parameters, the name should be the same:
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def keyword_int(*, a: int) -> None: ...
 def keyword_float(*, a: float) -> None: ...
@@ -938,7 +938,7 @@ static_assert(not is_subtype_of(CallableTypeOf[keyword_ba], CallableTypeOf[keywo
 #### Keyword-only with default
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def float_with_default(*, a: float = 1) -> None: ...
 def int_with_default(*, a: int = 1) -> None: ...
@@ -969,7 +969,7 @@ static_assert(not is_subtype_of(CallableTypeOf[int_keyword], CallableTypeOf[mixe
 #### Keyword-only with standard
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def keywords1(*, a: int, b: int) -> None: ...
 def standard(b: float, a: float) -> None: ...
@@ -1019,7 +1019,7 @@ static_assert(is_subtype_of(CallableTypeOf[mixed_variadic], CallableTypeOf[keywo
 The name of the keyword-variadic parameter does not need to be the same in the subtype.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def kwargs_float(**kwargs2: float) -> None: ...
 def kwargs_int(**kwargs1: int) -> None: ...
@@ -1043,7 +1043,7 @@ If the subtype has a keyword-variadic parameter then any unmatched keyword-only 
 supertype should be checked against the keyword-variadic parameter.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def kwargs(**kwargs: float) -> None: ...
 def keyword_only(*, a: int, b: float, c: bool) -> None: ...
@@ -1071,7 +1071,7 @@ When the supertype has an empty list of parameters, then the subtype can have an
 as long as they contain the default values for non-variadic parameters.
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 def empty() -> None: ...
 def mixed(a: int = 1, /, b: int = 2, *args: int, c: int = 3, **kwargs: int) -> None: ...
@@ -1083,7 +1083,7 @@ static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[mixed]))
 #### Object
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert, TypeOf
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert, TypeOf
 from typing import Callable
 
 def f1(a: int, b: str, /, *c: float, d: int = 1, **e: float) -> None: ...
@@ -1108,7 +1108,7 @@ static_assert(not is_subtype_of(object, TypeOf[C.foo]))
 
 ```py
 from typing import Callable
-from knot_extensions import TypeOf, is_subtype_of, static_assert, is_assignable_to
+from ty_extensions import TypeOf, is_subtype_of, static_assert, is_assignable_to
 
 class A:
     def __call__(self, a: int) -> int:
@@ -1132,7 +1132,7 @@ f(a)
 ```py
 from typing import Callable, overload
 from typing_extensions import Self
-from knot_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class MetaWithReturn(type):
     def __call__(cls) -> "A":
@@ -1170,7 +1170,7 @@ static_assert(is_subtype_of(TypeOf[C], Callable[[], str]))
 
 ```py
 from typing import Callable
-from knot_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A:
     def __new__(cls, a: int) -> int:
@@ -1202,7 +1202,7 @@ If `__call__` and `__new__` are both present, `__call__` takes precedence.
 
 ```py
 from typing import Callable
-from knot_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class MetaWithIntReturn(type):
     def __call__(cls) -> int:
@@ -1220,7 +1220,7 @@ static_assert(not is_subtype_of(TypeOf[F], Callable[[], str]))
 
 ```py
 from typing import Callable
-from knot_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A:
     def f(self, a: int) -> int:
@@ -1267,7 +1267,7 @@ def overloaded(x: B) -> None: ...
 ```
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 from overloaded import A, B, C, overloaded
 
 def accepts_a(x: A) -> None: ...
@@ -1302,7 +1302,7 @@ def overloaded(a: Grandparent) -> None: ...
 ```
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 from overloaded import Grandparent, Parent, Child, overloaded
 
 # This is a subtype of only the first overload
@@ -1373,7 +1373,7 @@ def empty_cp(a: Parent) -> None: ...
 ```
 
 ```py
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 from overloaded import pg, po, go, cpg, empty_go, empty_cp
 
 static_assert(is_subtype_of(CallableTypeOf[pg], CallableTypeOf[cpg]))
@@ -1420,7 +1420,7 @@ def overload_ba(x: A) -> None: ...
 
 ```py
 from overloaded import overload_ab, overload_ba
-from knot_extensions import CallableTypeOf, is_subtype_of, static_assert
+from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(CallableTypeOf[overload_ab], CallableTypeOf[overload_ba]))
 static_assert(is_subtype_of(CallableTypeOf[overload_ba], CallableTypeOf[overload_ab]))

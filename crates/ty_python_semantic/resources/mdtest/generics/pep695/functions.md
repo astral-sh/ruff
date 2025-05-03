@@ -239,7 +239,7 @@ Protocol types can be used as TypeVar bounds, just like nominal types.
 
 ```py
 from typing import Any, Protocol
-from knot_extensions import static_assert, is_assignable_to
+from ty_extensions import static_assert, is_assignable_to
 
 class SupportsClose(Protocol):
     def close(self) -> None: ...

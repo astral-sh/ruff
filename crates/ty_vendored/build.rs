@@ -15,11 +15,11 @@ use zip::write::{FileOptions, ZipWriter};
 use zip::CompressionMethod;
 
 const TYPESHED_SOURCE_DIR: &str = "vendor/typeshed";
-const KNOT_EXTENSIONS_STUBS: &str = "knot_extensions/knot_extensions.pyi";
+const TY_EXTENSIONS_STUBS: &str = "ty_extensions/ty_extensions.pyi";
 const TYPESHED_ZIP_LOCATION: &str = "/zipped_typeshed.zip";
 
 /// Recursively zip the contents of the entire typeshed directory and patch typeshed
-/// on the fly to include the `knot_extensions` module.
+/// on the fly to include the `ty_extensions` module.
 ///
 /// This routine is adapted from a recipe at
 /// <https://github.com/zip-rs/zip-old/blob/5d0f198124946b7be4e5969719a7f29f363118cd/examples/write_dir.rs>
@@ -62,9 +62,9 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
             let mut f = File::open(absolute_path)?;
             std::io::copy(&mut f, &mut zip).unwrap();
 
-            // Patch the VERSIONS file to make `knot_extensions` available
+            // Patch the VERSIONS file to make `ty_extensions` available
             if normalized_relative_path == "stdlib/VERSIONS" {
-                writeln!(&mut zip, "knot_extensions: 3.0-")?;
+                writeln!(&mut zip, "ty_extensions: 3.0-")?;
             }
         } else if !normalized_relative_path.is_empty() {
             // Only if not root! Avoids path spec / warning
@@ -74,10 +74,10 @@ fn write_zipped_typeshed_to(writer: File) -> ZipResult<File> {
         }
     }
 
-    // Patch typeshed and add the stubs for the `knot_extensions` module
-    println!("adding file {KNOT_EXTENSIONS_STUBS} as stdlib/knot_extensions.pyi ...");
-    zip.start_file("stdlib/knot_extensions.pyi", options)?;
-    let mut f = File::open(KNOT_EXTENSIONS_STUBS)?;
+    // Patch typeshed and add the stubs for the `ty_extensions` module
+    println!("adding file {TY_EXTENSIONS_STUBS} as stdlib/ty_extensions.pyi ...");
+    zip.start_file("stdlib/ty_extensions.pyi", options)?;
+    let mut f = File::open(TY_EXTENSIONS_STUBS)?;
     std::io::copy(&mut f, &mut zip).unwrap();
 
     zip.finish()

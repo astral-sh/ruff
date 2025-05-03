@@ -170,7 +170,7 @@ But if there is a variable annotation with a function or class literal type, the
 `__init__` will include this field:
 
 ```py
-from knot_extensions import TypeOf
+from ty_extensions import TypeOf
 
 class SomeClass: ...
 

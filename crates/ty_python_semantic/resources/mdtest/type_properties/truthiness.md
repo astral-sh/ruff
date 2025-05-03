@@ -4,7 +4,7 @@
 
 ```py
 from typing_extensions import Literal, LiteralString
-from knot_extensions import AlwaysFalsy, AlwaysTruthy
+from ty_extensions import AlwaysFalsy, AlwaysTruthy
 
 def _(
     a: Literal[1],
@@ -106,7 +106,7 @@ python-version = "3.12"
 import types
 import typing
 import sys
-from knot_extensions import AlwaysTruthy, static_assert, is_subtype_of
+from ty_extensions import AlwaysTruthy, static_assert, is_subtype_of
 from typing_extensions import _NoDefaultType
 
 static_assert(is_subtype_of(sys.version_info.__class__, AlwaysTruthy))

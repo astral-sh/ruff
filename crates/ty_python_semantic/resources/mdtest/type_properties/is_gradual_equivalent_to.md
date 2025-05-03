@@ -8,7 +8,7 @@ materializations of `B`, and all materializations of `B` are also materializatio
 ```py
 from typing import Any
 from typing_extensions import Literal, LiteralString, Never
-from knot_extensions import AlwaysFalsy, AlwaysTruthy, TypeOf, Unknown, is_gradual_equivalent_to, static_assert
+from ty_extensions import AlwaysFalsy, AlwaysTruthy, TypeOf, Unknown, is_gradual_equivalent_to, static_assert
 
 static_assert(is_gradual_equivalent_to(Any, Any))
 static_assert(is_gradual_equivalent_to(Unknown, Unknown))
@@ -34,7 +34,7 @@ static_assert(not is_gradual_equivalent_to(type[object], type[Any]))
 
 ```py
 from typing import Any
-from knot_extensions import Intersection, Not, Unknown, is_gradual_equivalent_to, static_assert
+from ty_extensions import Intersection, Not, Unknown, is_gradual_equivalent_to, static_assert
 
 static_assert(is_gradual_equivalent_to(str | int, str | int))
 static_assert(is_gradual_equivalent_to(str | int | Any, str | int | Unknown))
@@ -54,7 +54,7 @@ static_assert(is_gradual_equivalent_to(Unknown, Intersection[Unknown, Any]))
 ## Tuples
 
 ```py
-from knot_extensions import Unknown, is_gradual_equivalent_to, static_assert
+from ty_extensions import Unknown, is_gradual_equivalent_to, static_assert
 from typing import Any
 
 static_assert(is_gradual_equivalent_to(tuple[str, Any], tuple[str, Unknown]))
@@ -70,7 +70,7 @@ gradual types. The cases with fully static types and using different combination
 are covered in the [equivalence tests](./is_equivalent_to.md#callable).
 
 ```py
-from knot_extensions import Unknown, CallableTypeOf, is_gradual_equivalent_to, static_assert
+from ty_extensions import Unknown, CallableTypeOf, is_gradual_equivalent_to, static_assert
 from typing import Any, Callable
 
 static_assert(is_gradual_equivalent_to(Callable[..., int], Callable[..., int]))

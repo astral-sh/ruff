@@ -1052,7 +1052,7 @@ declare_lint! {
     ///
     /// ## Examples
     /// ```python
-    /// from knot_extensions import static_assert
+    /// from ty_extensions import static_assert
     ///
     /// static_assert(1 + 1 == 3)  # error: evaluates to `False`
     ///

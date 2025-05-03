@@ -10,7 +10,7 @@ zero element in multiplication, similar to how a Cartesian product with the empt
 set.
 
 ```py
-from knot_extensions import static_assert, is_equivalent_to
+from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never, NoReturn
 
 static_assert(is_equivalent_to(Never, tuple[Never]))

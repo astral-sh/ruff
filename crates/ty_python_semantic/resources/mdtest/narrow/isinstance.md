@@ -181,7 +181,7 @@ def _(x: object, y: type[int]):
 We used to incorrectly infer `Literal` booleans for some of these.
 
 ```py
-from knot_extensions import Not, Intersection, AlwaysTruthy, AlwaysFalsy
+from ty_extensions import Not, Intersection, AlwaysTruthy, AlwaysFalsy
 
 class P: ...
 

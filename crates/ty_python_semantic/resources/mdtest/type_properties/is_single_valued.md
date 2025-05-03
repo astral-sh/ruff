@@ -5,7 +5,7 @@ A type is single-valued iff it is not empty and all inhabitants of it compare eq
 ```py
 import types
 from typing_extensions import Any, Literal, LiteralString, Never, Callable
-from knot_extensions import is_single_valued, static_assert, TypeOf
+from ty_extensions import is_single_valued, static_assert, TypeOf
 
 static_assert(is_single_valued(None))
 static_assert(is_single_valued(Literal[True]))

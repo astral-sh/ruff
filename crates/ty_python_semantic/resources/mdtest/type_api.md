@@ -1,6 +1,6 @@
-# Type API (`knot_extensions`)
+# Type API (`ty_extensions`)
 
-This document describes the internal `knot_extensions` API for creating and manipulating types as
+This document describes the internal `ty_extensions` API for creating and manipulating types as
 well as testing various type system properties.
 
 ## Type extensions
@@ -8,7 +8,7 @@ well as testing various type system properties.
 The Python language itself allows us to perform a variety of operations on types. For example, we
 can build a union of types like `int | None`, or we can use type constructors such as `list[int]`
 and `type[int]` to create new types. But some type-level operations that we rely on in ty,
-like intersections, cannot yet be expressed in Python. The `knot_extensions` module provides the
+like intersections, cannot yet be expressed in Python. The `ty_extensions` module provides the
 `Intersection` and `Not` type constructors (special forms) which allow us to construct these types
 directly.
 
@@ -16,14 +16,14 @@ directly.
 
 ```py
 from typing import Literal
-from knot_extensions import Not, static_assert
+from ty_extensions import Not, static_assert
 
 def negate(n1: Not[int], n2: Not[Not[int]], n3: Not[Not[Not[int]]]) -> None:
     reveal_type(n1)  # revealed: ~int
     reveal_type(n2)  # revealed: int
     reveal_type(n3)  # revealed: ~int
 
-# error: "Special form `knot_extensions.Not` expected exactly one type parameter"
+# error: "Special form `ty_extensions.Not` expected exactly one type parameter"
 n: Not[int, str]
 
 def static_truthiness(not_one: Not[Literal[1]]) -> None:
@@ -48,7 +48,7 @@ python-version = "3.12"
 ```
 
 ```py
-from knot_extensions import Intersection, Not, is_subtype_of, static_assert
+from ty_extensions import Intersection, Not, is_subtype_of, static_assert
 from typing_extensions import Literal, Never
 
 class S: ...
@@ -87,7 +87,7 @@ The `Unknown` type is a special type that we use to represent actually unknown t
 annotation), as opposed to `Any` which represents an explicitly unknown type.
 
 ```py
-from knot_extensions import Unknown, static_assert, is_assignable_to, is_fully_static
+from ty_extensions import Unknown, static_assert, is_assignable_to, is_fully_static
 
 static_assert(is_assignable_to(Unknown, int))
 static_assert(is_assignable_to(int, Unknown))
@@ -108,7 +108,7 @@ class C(Unknown): ...
 # revealed: tuple[Literal[C], Unknown, Literal[object]]
 reveal_type(C.__mro__)
 
-# error: "Special form `knot_extensions.Unknown` expected no type parameter"
+# error: "Special form `ty_extensions.Unknown` expected no type parameter"
 u: Unknown[str]
 ```
 
@@ -122,7 +122,7 @@ They do not accept any type arguments.
 ```py
 from typing_extensions import Literal
 
-from knot_extensions import AlwaysFalsy, AlwaysTruthy, is_subtype_of, static_assert
+from ty_extensions import AlwaysFalsy, AlwaysTruthy, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(Literal[True], AlwaysTruthy))
 static_assert(is_subtype_of(Literal[False], AlwaysFalsy))
@@ -146,12 +146,12 @@ def f(
 
 ### Basics
 
-The `knot_extensions` module provides a `static_assert` function that can be used to enforce
+The `ty_extensions` module provides a `static_assert` function that can be used to enforce
 properties at type-check time. The function takes an arbitrary expression and raises a type error if
 the expression is not of statically known truthiness.
 
 ```py
-from knot_extensions import static_assert
+from ty_extensions import static_assert
 from typing import TYPE_CHECKING
 import sys
 
@@ -182,7 +182,7 @@ static_assert(sys.version_info >= (3, 6))
 Static assertions can be used to enforce narrowing constraints:
 
 ```py
-from knot_extensions import static_assert
+from ty_extensions import static_assert
 
 def f(x: int | None) -> None:
     if x is not None:
@@ -196,7 +196,7 @@ def f(x: int | None) -> None:
 See also: <https://docs.python.org/3/library/stdtypes.html#truth-value-testing>
 
 ```py
-from knot_extensions import static_assert
+from ty_extensions import static_assert
 
 static_assert(True)
 static_assert(False)  # error: "Static assertion error: argument evaluates to `False`"
@@ -221,7 +221,7 @@ static_assert(b"")  # error: "Static assertion error: argument of type `Literal[
 We provide various tailored error messages for wrong argument types to `static_assert`:
 
 ```py
-from knot_extensions import static_assert
+from ty_extensions import static_assert
 
 static_assert(2 * 3 == 6)
 
@@ -244,7 +244,7 @@ static_assert(InvalidBoolDunder())
 Alternatively, users can provide custom error messages:
 
 ```py
-from knot_extensions import static_assert
+from ty_extensions import static_assert
 
 # error: "Static assertion error: I really want this to be true"
 static_assert(1 + 1 == 3, "I really want this to be true")
@@ -266,14 +266,14 @@ static_assert(False, shouted_message)
 
 ## Type predicates
 
-The `knot_extensions` module also provides predicates to test various properties of types. These are
+The `ty_extensions` module also provides predicates to test various properties of types. These are
 implemented as functions that return `Literal[True]` or `Literal[False]` depending on the result of
 the test.
 
 ### Equivalence
 
 ```py
-from knot_extensions import is_equivalent_to, static_assert
+from ty_extensions import is_equivalent_to, static_assert
 from typing_extensions import Never, Union
 
 static_assert(is_equivalent_to(type, type[object]))
@@ -287,7 +287,7 @@ static_assert(not is_equivalent_to(int | str, int | str | bytes))
 ### Subtyping
 
 ```py
-from knot_extensions import is_subtype_of, static_assert
+from ty_extensions import is_subtype_of, static_assert
 
 static_assert(is_subtype_of(bool, int))
 static_assert(not is_subtype_of(str, int))
@@ -311,7 +311,7 @@ static_assert(not is_subtype_of(Base, Unrelated))
 ### Assignability
 
 ```py
-from knot_extensions import is_assignable_to, static_assert
+from ty_extensions import is_assignable_to, static_assert
 from typing import Any
 
 static_assert(is_assignable_to(int, Any))
@@ -322,7 +322,7 @@ static_assert(not is_assignable_to(int, str))
 ### Disjointness
 
 ```py
-from knot_extensions import is_disjoint_from, static_assert
+from ty_extensions import is_disjoint_from, static_assert
 from typing import Literal
 
 static_assert(is_disjoint_from(None, int))
@@ -332,7 +332,7 @@ static_assert(not is_disjoint_from(Literal[2] | str, int))
 ### Fully static types
 
 ```py
-from knot_extensions import is_fully_static, static_assert
+from ty_extensions import is_fully_static, static_assert
 from typing import Any
 
 static_assert(is_fully_static(int | str))
@@ -345,7 +345,7 @@ static_assert(not is_fully_static(type[Any]))
 ### Singleton types
 
 ```py
-from knot_extensions import is_singleton, static_assert
+from ty_extensions import is_singleton, static_assert
 from typing import Literal
 
 static_assert(is_singleton(None))
@@ -358,7 +358,7 @@ static_assert(not is_singleton(Literal["a"]))
 ### Single-valued types
 
 ```py
-from knot_extensions import is_single_valued, static_assert
+from ty_extensions import is_single_valued, static_assert
 from typing import Literal
 
 static_assert(is_single_valued(None))
@@ -378,7 +378,7 @@ type `str` itself is a subtype of `type[str]`. Instead, we can use `TypeOf[str]`
 the expression `str`:
 
 ```py
-from knot_extensions import TypeOf, is_subtype_of, static_assert
+from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
 # error: "Static assertion error: argument evaluates to `False`"
@@ -402,10 +402,10 @@ def type_of_annotation() -> None:
     s1: type[Base] = Base
     s2: type[Base] = Derived  # no error here
 
-# error: "Special form `knot_extensions.TypeOf` expected exactly one type parameter"
+# error: "Special form `ty_extensions.TypeOf` expected exactly one type parameter"
 t: TypeOf[int, str, bytes]
 
-# error: [invalid-type-form] "`knot_extensions.TypeOf` requires exactly one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a type expression"
 def f(x: TypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
@@ -419,7 +419,7 @@ which can then be used to test various type properties.
 It accepts a single type parameter which is expected to be a callable object.
 
 ```py
-from knot_extensions import CallableTypeOf
+from ty_extensions import CallableTypeOf
 
 def f1():
     return
@@ -430,13 +430,13 @@ def f2() -> int:
 def f3(x: int, y: str) -> None:
     return
 
-# error: [invalid-type-form] "Special form `knot_extensions.CallableTypeOf` expected exactly one type parameter"
+# error: [invalid-type-form] "Special form `ty_extensions.CallableTypeOf` expected exactly one type parameter"
 c1: CallableTypeOf[f1, f2]
 
-# error: [invalid-type-form] "Expected the first argument to `knot_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
+# error: [invalid-type-form] "Expected the first argument to `ty_extensions.CallableTypeOf` to be a callable object, but got an object of type `Literal["foo"]`"
 c2: CallableTypeOf["foo"]
 
-# error: [invalid-type-form] "`knot_extensions.CallableTypeOf` requires exactly one argument when used in a type expression"
+# error: [invalid-type-form] "`ty_extensions.CallableTypeOf` requires exactly one argument when used in a type expression"
 def f(x: CallableTypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 ```

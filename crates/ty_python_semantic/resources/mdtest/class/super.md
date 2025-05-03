@@ -271,7 +271,7 @@ python-version = "3.12"
 ```
 
 ```py
-from knot_extensions import TypeOf, static_assert, is_subtype_of
+from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A[T]:
     def f(self, a: T) -> T:

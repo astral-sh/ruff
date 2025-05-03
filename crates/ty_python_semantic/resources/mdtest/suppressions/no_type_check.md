@@ -117,6 +117,6 @@ from typing import no_type_check
 
 @no_type_check
 def test():
-    # error: [unused-ignore-comment] "Unused `knot: ignore` directive: 'unresolved-reference'"
-    return x + 5  # knot: ignore[unresolved-reference]
+    # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+    return x + 5  # ty: ignore[unresolved-reference]
 ```

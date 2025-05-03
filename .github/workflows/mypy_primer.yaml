@@ -68,7 +68,7 @@ jobs:
             --from="git+https://github.com/hauntsaninja/mypy_primer@b83b9eade0b7ed2f4b9b129b163acac1ecb48f71" \
             mypy_primer \
             --repo ruff \
-            --type-checker ty \
+            --type-checker knot \
             --old base_commit \
             --new "$GITHUB_SHA" \
             --project-selector "/($PRIMER_SELECTOR)\$" \

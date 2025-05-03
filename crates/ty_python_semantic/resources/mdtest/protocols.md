@@ -193,7 +193,7 @@ of that protocol (more on that below). However, classes that explicitly inherit 
 class are understood as subtypes of that protocol, the same as with nominal types:
 
 ```py
-from knot_extensions import static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to
 
 static_assert(is_subtype_of(SubclassOfMyProtocol, MyProtocol))
 static_assert(is_assignable_to(SubclassOfMyProtocol, MyProtocol))
@@ -253,7 +253,7 @@ reveal_type(issubclass(MyProtocol, Protocol))  # revealed: bool
 ```py
 import typing
 import typing_extensions
-from knot_extensions import static_assert, is_equivalent_to, TypeOf
+from ty_extensions import static_assert, is_equivalent_to, TypeOf
 
 static_assert(is_equivalent_to(TypeOf[typing.Protocol], TypeOf[typing_extensions.Protocol]))
 static_assert(is_equivalent_to(int | str | TypeOf[typing.Protocol], TypeOf[typing_extensions.Protocol] | str | int))
@@ -491,7 +491,7 @@ python-version = "3.12"
 
 ```py
 from typing import Protocol
-from knot_extensions import static_assert, is_assignable_to, is_subtype_of
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
 
 class HasX(Protocol):
     x: int
@@ -738,7 +738,7 @@ static_assert(is_subtype_of(object, UniversalSet))
 Which means that `UniversalSet` here is in fact an equivalent type to `object`:
 
 ```py
-from knot_extensions import is_equivalent_to
+from ty_extensions import is_equivalent_to
 
 static_assert(is_equivalent_to(UniversalSet, object))
 ```
@@ -789,7 +789,7 @@ different names:
 
 ```py
 from typing import Protocol
-from knot_extensions import is_equivalent_to, static_assert
+from ty_extensions import is_equivalent_to, static_assert
 
 class HasX(Protocol):
     x: int
@@ -839,7 +839,7 @@ from both `X` and `Y`:
 
 ```py
 from typing import Protocol
-from knot_extensions import Intersection, static_assert, is_equivalent_to
+from ty_extensions import Intersection, static_assert, is_equivalent_to
 
 class HasX(Protocol):
     x: int
@@ -869,7 +869,7 @@ that would lead to it satisfying `X`'s interface:
 
 ```py
 from typing import final
-from knot_extensions import is_disjoint_from
+from ty_extensions import is_disjoint_from
 
 class NotFinalNominal: ...
 
@@ -902,7 +902,7 @@ x: int = 42
 ```py
 import module
 from typing import Protocol
-from knot_extensions import is_subtype_of, is_assignable_to, static_assert, TypeOf
+from ty_extensions import is_subtype_of, is_assignable_to, static_assert, TypeOf
 
 class HasX(Protocol):
     x: int
@@ -944,7 +944,7 @@ a readable `x` attribute must be accessible on any inhabitant of `ClassVarX`, an
 
 ```py
 from typing import ClassVar, Protocol
-from knot_extensions import is_subtype_of, is_assignable_to, static_assert
+from ty_extensions import is_subtype_of, is_assignable_to, static_assert
 
 class ClassVarXProto(Protocol):
     x: ClassVar[int]
@@ -992,7 +992,7 @@ read/write property, a `Final` attribute, or a `ClassVar` attribute:
 
 ```py
 from typing import ClassVar, Final, Protocol
-from knot_extensions import is_subtype_of, is_assignable_to, static_assert
+from ty_extensions import is_subtype_of, is_assignable_to, static_assert
 
 class HasXProperty(Protocol):
     @property
@@ -1098,7 +1098,7 @@ A protocol with a read/write property `x` is exactly equivalent to a protocol wi
 attribute `x`. Both are subtypes of a protocol with a read-only prooperty `x`:
 
 ```py
-from knot_extensions import is_equivalent_to
+from ty_extensions import is_equivalent_to
 
 class HasMutableXAttr(Protocol):
     x: int
@@ -1358,7 +1358,7 @@ A protocol is only fully static if all of its members are fully static:
 
 ```py
 from typing import Protocol, Any
-from knot_extensions import is_fully_static, static_assert
+from ty_extensions import is_fully_static, static_assert
 
 class FullyStatic(Protocol):
     x: int
@@ -1374,7 +1374,7 @@ Non-fully-static protocols do not participate in subtyping or equivalence, only 
 gradual equivalence:
 
 ```py
-from knot_extensions import is_subtype_of, is_assignable_to, is_equivalent_to, is_gradual_equivalent_to
+from ty_extensions import is_subtype_of, is_assignable_to, is_equivalent_to, is_gradual_equivalent_to
 
 class NominalWithX:
     x: int = 42
@@ -1473,7 +1473,7 @@ right signature:
 
 ```py
 from typing import Callable
-from knot_extensions import is_subtype_of, is_assignable_to, static_assert
+from ty_extensions import is_subtype_of, is_assignable_to, static_assert
 
 static_assert(is_subtype_of(CallMeMaybe, Callable[[int], str]))
 static_assert(is_assignable_to(CallMeMaybe, Callable[[int], str]))
@@ -1530,7 +1530,7 @@ worth it. Such cases should anyway be exceedingly rare and/or contrived.
 
 ```py
 from typing import Protocol, Callable
-from knot_extensions import is_singleton, is_single_valued
+from ty_extensions import is_singleton, is_single_valued
 
 class WeirdAndWacky(Protocol):
     @property

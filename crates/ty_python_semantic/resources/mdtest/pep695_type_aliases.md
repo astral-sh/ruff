@@ -79,7 +79,7 @@ reveal_type(ListOrSet.__type_params__)  # revealed: @Todo(full tuple[...] suppor
 Two `TypeAliasType`s are distinct and disjoint, even if they refer to the same type
 
 ```py
-from knot_extensions import static_assert, is_equivalent_to, is_disjoint_from, TypeOf
+from ty_extensions import static_assert, is_equivalent_to, is_disjoint_from, TypeOf
 
 type Alias1 = int
 type Alias2 = int

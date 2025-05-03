@@ -166,7 +166,7 @@ def _(flag: bool):
 
 ```py
 from typing import Literal
-from knot_extensions import Not, AlwaysFalsy, static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import Not, AlwaysFalsy, static_assert, is_subtype_of, is_assignable_to
 
 static_assert(is_subtype_of(Literal["a", ""], Literal["a", ""] | Not[AlwaysFalsy]))
 static_assert(is_subtype_of(Not[AlwaysFalsy], Literal["", "a"] | Not[AlwaysFalsy]))
@@ -203,7 +203,7 @@ def _(
 ## Cannot use an argument as both a value and a type form
 
 ```py
-from knot_extensions import is_fully_static
+from ty_extensions import is_fully_static
 
 def _(flag: bool):
     if flag:
@@ -246,7 +246,7 @@ If two types are gradually equivalent, we can keep just one of them in a union:
 
 ```py
 from typing import Any, Union
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 def _(x: Union[Intersection[Any, Not[int]], Intersection[Any, Not[int]]]):
     reveal_type(x)  # revealed: Any & ~int

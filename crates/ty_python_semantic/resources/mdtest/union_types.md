@@ -117,7 +117,7 @@ def _(
 ## Do not erase `Unknown`
 
 ```py
-from knot_extensions import Unknown
+from ty_extensions import Unknown
 
 def _(u1: Unknown | str, u2: str | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
@@ -130,7 +130,7 @@ Since `Unknown` is a gradual type, it is not a subtype of anything, but multiple
 union are still redundant:
 
 ```py
-from knot_extensions import Unknown
+from ty_extensions import Unknown
 
 def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknown | Unknown) -> None:
     reveal_type(u1)  # revealed: Unknown | str
@@ -143,7 +143,7 @@ def _(u1: Unknown | Unknown | str, u2: Unknown | str | Unknown, u3: str | Unknow
 Simplifications still apply when `Unknown` is present.
 
 ```py
-from knot_extensions import Unknown
+from ty_extensions import Unknown
 
 def _(u1: int | Unknown | bool) -> None:
     reveal_type(u1)  # revealed: int | Unknown
@@ -154,7 +154,7 @@ def _(u1: int | Unknown | bool) -> None:
 We can simplify unions of intersections:
 
 ```py
-from knot_extensions import Intersection, Not
+from ty_extensions import Intersection, Not
 
 class P: ...
 class Q: ...
@@ -176,7 +176,7 @@ python-version = "3.12"
 
 ```py
 from typing import Literal
-from knot_extensions import AlwaysTruthy, AlwaysFalsy
+from ty_extensions import AlwaysTruthy, AlwaysFalsy
 
 type strings = Literal["foo", ""]
 type ints = Literal[0, 1]

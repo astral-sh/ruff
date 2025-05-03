@@ -32,7 +32,7 @@ def _(subclass_of_c: type[C]):
 
 ```py
 from typing import Any
-from knot_extensions import Unknown
+from ty_extensions import Unknown
 
 def _(subclass_of_any: type[Any], subclass_of_unknown: type[Unknown]):
     reveal_type(subclass_of_any())  # revealed: Any

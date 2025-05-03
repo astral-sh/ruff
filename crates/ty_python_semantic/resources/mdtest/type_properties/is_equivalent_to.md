@@ -9,7 +9,7 @@ Two types `A` and `B` are equivalent iff `A` is a subtype of `B` and `B` is a su
 ```py
 from typing import Any
 from typing_extensions import Literal
-from knot_extensions import Unknown, is_equivalent_to, static_assert
+from ty_extensions import Unknown, is_equivalent_to, static_assert
 
 static_assert(is_equivalent_to(Literal[1, 2], Literal[1, 2]))
 static_assert(is_equivalent_to(type[object], type))
@@ -25,7 +25,7 @@ static_assert(not is_equivalent_to(Literal[1, 2], Literal[1, 2, 3]))
 
 ```py
 from typing_extensions import Literal
-from knot_extensions import is_equivalent_to, static_assert
+from ty_extensions import is_equivalent_to, static_assert
 
 static_assert(is_equivalent_to(type, type[object]))
 static_assert(not is_equivalent_to(Literal[1, 0], Literal[1, 2]))
@@ -35,7 +35,7 @@ static_assert(not is_equivalent_to(Literal[1, 2, 3], Literal[1, 2]))
 ## Differently ordered intersections and unions are equivalent
 
 ```py
-from knot_extensions import is_equivalent_to, static_assert, Intersection, Not
+from ty_extensions import is_equivalent_to, static_assert, Intersection, Not
 
 class P: ...
 class Q: ...
@@ -69,7 +69,7 @@ static_assert(is_equivalent_to(Intersection[Q | R, Not[P | S]], Intersection[Not
 ## Tuples containing equivalent but differently ordered unions/intersections are equivalent
 
 ```py
-from knot_extensions import is_equivalent_to, TypeOf, static_assert, Intersection, Not
+from ty_extensions import is_equivalent_to, TypeOf, static_assert, Intersection, Not
 from typing import Literal
 
 class P: ...
@@ -87,7 +87,7 @@ static_assert(
 ## Unions containing tuples containing tuples containing unions (etc.)
 
 ```py
-from knot_extensions import is_equivalent_to, static_assert, Intersection
+from ty_extensions import is_equivalent_to, static_assert, Intersection
 
 class P: ...
 class Q: ...
@@ -109,7 +109,7 @@ static_assert(
 ## Intersections containing tuples containing unions
 
 ```py
-from knot_extensions import is_equivalent_to, static_assert, Intersection
+from ty_extensions import is_equivalent_to, static_assert, Intersection
 
 class P: ...
 class Q: ...
@@ -127,7 +127,7 @@ the parameter in one of the callable has a default value then the corresponding 
 other callable should also have a default value.
 
 ```py
-from knot_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
 from typing import Callable
 
 def f1(a: int = 1) -> None: ...
@@ -163,7 +163,7 @@ static_assert(is_equivalent_to(CallableTypeOf[f5] | bool | CallableTypeOf[f6], C
 There are multiple cases when two callable types are not equivalent which are enumerated below.
 
 ```py
-from knot_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
 from typing import Callable
 ```
 
@@ -249,7 +249,7 @@ Differently ordered unions inside `Callable`s inside unions can still be equival
 
 ```py
 from typing import Callable
-from knot_extensions import is_equivalent_to, static_assert
+from ty_extensions import is_equivalent_to, static_assert
 
 static_assert(is_equivalent_to(int | Callable[[int | str], None], Callable[[str | int], None] | int))
 ```
@@ -276,7 +276,7 @@ def overloaded(a: Grandparent) -> None: ...
 ```
 
 ```py
-from knot_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
 from overloaded import Grandparent, Parent, Child, overloaded
 
 def grandparent(a: Grandparent) -> None: ...
@@ -310,7 +310,7 @@ def cpg(a: Grandparent) -> None: ...
 ```
 
 ```py
-from knot_extensions import CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import CallableTypeOf, is_equivalent_to, static_assert
 from overloaded import pg, cpg
 
 static_assert(is_equivalent_to(CallableTypeOf[pg], CallableTypeOf[cpg]))

@@ -6,7 +6,7 @@ At its simplest, to define a generic class using the legacy syntax, you inherit 
 `typing.Generic` special form, which is "specialized" with the generic class's type variables.
 
 ```py
-from knot_extensions import generic_context
+from ty_extensions import generic_context
 from typing import Generic, TypeVar
 
 T = TypeVar("T")

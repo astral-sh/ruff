@@ -57,7 +57,7 @@ the context of some opt-in diagnostics, as it indicates that the gradual type ha
 an invalid annotation, missing annotation or missing type argument somewhere.
 
 ```py
-from knot_extensions import Unknown
+from ty_extensions import Unknown
 
 def f(x: Any, y: Unknown, z: Any | str | int):
     a = cast(dict[str, Any], x)
