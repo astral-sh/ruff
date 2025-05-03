@@ -1,28 +1,25 @@
-use std::collections::VecDeque;
+use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
 use super::Type;
 
 /// Arguments for a single call, in source order.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct CallArguments<'a>(VecDeque<Argument<'a>>);
+pub(crate) struct CallArguments<'a>(Vec<Argument<'a>>);
 
 impl<'a> CallArguments<'a> {
-    /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
-    /// parameter) prepended to the front of this argument list. (If `bound_self` is none, the
-    /// function is invoked with the unmodified argument list.)
-    pub(crate) fn with_self<F, R>(&mut self, bound_self: Option<Type<'_>>, f: F) -> R
-    where
-        F: FnOnce(&mut Self) -> R,
-    {
+    /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
+    /// of this argument list. (If `bound_self` is none, we return the the argument list
+    /// unmodified.)
+    pub(crate) fn with_self(&self, bound_self: Option<Type<'_>>) -> Cow<Self> {
         if bound_self.is_some() {
-            self.0.push_front(Argument::Synthetic);
+            let arguments = std::iter::once(Argument::Synthetic)
+                .chain(self.0.iter().copied())
+                .collect();
+            Cow::Owned(CallArguments(arguments))
+        } else {
+            Cow::Borrowed(self)
         }
-        let result = f(self);
-        if bound_self.is_some() {
-            self.0.pop_front();
-        }
-        result
     }
 
     pub(crate) fn len(&self) -> usize {
@@ -55,24 +52,23 @@ pub(crate) enum Argument<'a> {
 }
 
 /// Arguments for a single call, in source order, along with inferred types for each argument.
+#[derive(Clone, Debug, Default)]
 pub(crate) struct CallArgumentTypes<'a, 'db> {
     arguments: CallArguments<'a>,
-    types: VecDeque<Type<'db>>,
+    types: Vec<Type<'db>>,
 }
 
 impl<'a, 'db> CallArgumentTypes<'a, 'db> {
     /// Create a [`CallArgumentTypes`] with no arguments.
     pub(crate) fn none() -> Self {
-        let arguments = CallArguments::default();
-        let types = VecDeque::default();
-        Self { arguments, types }
+        Self::default()
     }
 
     /// Create a [`CallArgumentTypes`] from an iterator over non-variadic positional argument
     /// types.
     pub(crate) fn positional(positional_tys: impl IntoIterator<Item = Type<'db>>) -> Self {
-        let types: VecDeque<_> = positional_tys.into_iter().collect();
-        let arguments = CallArguments(vec![Argument::Positional; types.len()].into());
+        let types: Vec<_> = positional_tys.into_iter().collect();
+        let arguments = CallArguments(vec![Argument::Positional; types.len()]);
         Self { arguments, types }
     }
 
@@ -90,23 +86,23 @@ impl<'a, 'db> CallArgumentTypes<'a, 'db> {
         Self { arguments, types }
     }
 
-    /// Invoke a function with an optional extra synthetic argument (for a `self` or `cls`
-    /// parameter) prepended to the front of this argument list. (If `bound_self` is none, the
-    /// function is invoked with the unmodified argument list.)
-    pub(crate) fn with_self<F, R>(&mut self, bound_self: Option<Type<'db>>, f: F) -> R
-    where
-        F: FnOnce(&mut Self) -> R,
-    {
+    /// Prepend an optional extra synthetic argument (for a `self` or `cls` parameter) to the front
+    /// of this argument list. (If `bound_self` is none, we return the the argument list
+    /// unmodified.)
+    pub(crate) fn with_self(&self, bound_self: Option<Type<'db>>) -> Cow<Self> {
         if let Some(bound_self) = bound_self {
-            self.arguments.0.push_front(Argument::Synthetic);
-            self.types.push_front(bound_self);
+            let arguments = CallArguments(
+                std::iter::once(Argument::Synthetic)
+                    .chain(self.arguments.0.iter().copied())
+                    .collect(),
+            );
+            let types = std::iter::once(bound_self)
+                .chain(self.types.iter().copied())
+                .collect();
+            Cow::Owned(CallArgumentTypes { arguments, types })
+        } else {
+            Cow::Borrowed(self)
         }
-        let result = f(self);
-        if bound_self.is_some() {
-            self.arguments.0.pop_front();
-            self.types.pop_front();
-        }
-        result
     }
 
     pub(crate) fn iter(&self) -> impl Iterator<Item = (Argument<'a>, Type<'db>)> + '_ {

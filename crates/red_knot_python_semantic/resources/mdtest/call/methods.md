@@ -94,7 +94,7 @@ function object. We model this explicitly, which means that we can access `__kwd
 methods, even though it is not available on `types.MethodType`:
 
 ```py
-reveal_type(bound_method.__kwdefaults__)  # revealed: @Todo(specialized non-generic class) | None
+reveal_type(bound_method.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
 ## Basic method calls on class objects and instances
@@ -205,7 +205,7 @@ reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or
 
 The `__get__` method on `types.FunctionType` has the following overloaded signature in typeshed:
 
-```py
+```pyi
 from types import FunctionType, MethodType
 from typing import overload
 

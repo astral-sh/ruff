@@ -33,7 +33,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unreso
 
 ```
 error: lint:unresolved-import: Cannot resolve import `....foo`
- --> /src/package/subpackage/subsubpackage/__init__.py:1:10
+ --> src/package/subpackage/subsubpackage/__init__.py:1:10
   |
 1 | from ....foo import add  # error: [unresolved-import]
   |          ^^^

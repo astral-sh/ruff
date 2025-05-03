@@ -32,6 +32,9 @@ pub struct Options {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terminal: Option<TerminalOptions>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub respect_ignore_files: Option<bool>,
 }
 
 impl Options {
@@ -65,9 +68,7 @@ impl Options {
             .and_then(|env| env.python_platform.as_deref().cloned())
             .unwrap_or_else(|| {
                 let default = PythonPlatform::default();
-                tracing::info!(
-                    "Defaulting to default python version for this platform: '{default}'",
-                );
+                tracing::info!("Defaulting to python-platform `{default}`");
                 default
             });
         ProgramSettings {
@@ -133,7 +134,7 @@ impl Options {
     pub(crate) fn to_settings(&self, db: &dyn Db) -> (Settings, Vec<OptionDiagnostic>) {
         let (rules, diagnostics) = self.to_rule_selection(db);
 
-        let mut settings = Settings::new(rules);
+        let mut settings = Settings::new(rules, self.respect_ignore_files);
 
         if let Some(terminal) = self.terminal.as_ref() {
             settings.set_terminal(TerminalSettings {

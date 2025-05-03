@@ -2,10 +2,12 @@ AutoSplit
 PyGithub
 PyWinCtl
 SinbadCogs
+aiohttp
 aiohttp-devtools
 aioredis
 aiortc
 alectryon
+alerta
 anyio
 apprise
 arviz
@@ -47,6 +49,7 @@ jinja
 koda-validate
 kopf
 kornia
+meson
 mitmproxy
 mkdocs
 mkosi
@@ -75,7 +78,6 @@ pycryptodome
 pydantic
 pyinstrument
 pyjwt
-pylint
 pylox
 pyodide
 pyp
@@ -92,6 +94,7 @@ scrapy
 setuptools
 sockeye
 speedrun.com_global_scoreboard_webapp
+sphinx
 starlette
 static-frame
 stone

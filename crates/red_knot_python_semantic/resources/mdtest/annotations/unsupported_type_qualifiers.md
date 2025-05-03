@@ -11,8 +11,6 @@ from typing_extensions import Final, Required, NotRequired, ReadOnly, TypedDict
 X: Final = 42
 Y: Final[int] = 42
 
-# TODO: `TypedDict` is actually valid as a base
-# error: [invalid-base]
 class Bar(TypedDict):
     x: Required[int]
     y: NotRequired[str]

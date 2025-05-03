@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use ruff_source_file::SourceLocation;
+use ruff_source_file::LineColumn;
 
 use crate::message::{Emitter, EmitterContext, Message};
 
@@ -20,7 +20,7 @@ impl Emitter for AzureEmitter {
             let location = if context.is_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
-                SourceLocation::default()
+                LineColumn::default()
             } else {
                 message.compute_start_location()
             };
@@ -30,7 +30,7 @@ impl Emitter for AzureEmitter {
                 "##vso[task.logissue type=error\
                         ;sourcepath={filename};linenumber={line};columnnumber={col};{code}]{body}",
                 filename = message.filename(),
-                line = location.row,
+                line = location.line,
                 col = location.column,
                 code = message
                     .rule()

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
-use ruff_python_ast::{self as ast, Expr, ExprCall, PythonVersion};
+use ruff_python_ast::{self as ast, Expr, ExprCall, Number, PythonVersion};
 use ruff_source_file::find_newline;
 use ruff_text_size::Ranged;
 
@@ -115,6 +115,17 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     let Some(base) = Base::from_str(id) else {
         return;
     };
+  
+      // float and complex numbers are false positives, ignore them.
+    if matches!(
+        arg,
+        Expr::NumberLiteral(ast::ExprNumberLiteral {
+            value: Number::Float(_) | Number::Complex { .. },
+            ..
+        })
+    ) {
+        return;
+    }
 
     let applicability = if matches!(arg, Expr::NumberLiteral(_)) {
         Applicability::Safe

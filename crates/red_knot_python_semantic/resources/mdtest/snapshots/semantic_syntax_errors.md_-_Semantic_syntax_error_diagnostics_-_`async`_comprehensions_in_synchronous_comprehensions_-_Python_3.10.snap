@@ -33,7 +33,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/semant
 
 ```
 error: invalid-syntax
- --> /src/mdtest_snippet.py:6:19
+ --> src/mdtest_snippet.py:6:19
   |
 4 | async def f():
 5 |     # error: 19 [invalid-syntax] "cannot use an asynchronous comprehension inside of a synchronous comprehension on Python 3.10 (synt...

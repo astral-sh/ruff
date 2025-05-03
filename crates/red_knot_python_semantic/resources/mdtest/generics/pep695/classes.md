@@ -1,60 +1,73 @@
-# Generic classes
+# Generic classes: PEP 695 syntax
 
 ```toml
 [environment]
 python-version = "3.13"
 ```
 
-## PEP 695 syntax
+## Defining a generic class
 
-TODO: Add a `red_knot_extension` function that asserts whether a function or class is generic.
-
-This is a generic class defined using PEP 695 syntax:
-
-```py
-class C[T]: ...
-```
-
-A class that inherits from a generic class, and fills its type parameters with typevars, is generic:
+At its simplest, to define a generic class using PEP 695 syntax, you add a list of typevars after
+the class name.
 
 ```py
-class D[U](C[U]): ...
+from knot_extensions import generic_context
+
+class SingleTypevar[T]: ...
+class MultipleTypevars[T, S]: ...
+
+reveal_type(generic_context(SingleTypevar))  # revealed: tuple[T]
+reveal_type(generic_context(MultipleTypevars))  # revealed: tuple[T, S]
 ```
 
-A class that inherits from a generic class, but fills its type parameters with concrete types, is
-_not_ generic:
+You cannot use the same typevar more than once.
 
 ```py
-class E(C[int]): ...
+# error: [invalid-syntax] "duplicate type parameter"
+class RepeatedTypevar[T, T]: ...
 ```
 
-A class that inherits from a generic class, and doesn't fill its type parameters at all, implicitly
-uses the default value for the typevar. In this case, that default type is `Unknown`, so `F`
-inherits from `C[Unknown]` and is not itself generic.
+You can only use typevars (TODO: or param specs or typevar tuples) in the class's generic context.
 
 ```py
-class F(C): ...
+# TODO: error
+class GenericOfType[int]: ...
 ```
 
-## Legacy syntax
+You can also define a generic class by inheriting from some _other_ generic class, and specializing
+it with typevars. With PEP 695 syntax, you must explicitly list all of the typevars that you use in
+your base classes.
 
-This is a generic class defined using the legacy syntax:
+```py
+class InheritedGeneric[U, V](MultipleTypevars[U, V]): ...
+class InheritedGenericPartiallySpecialized[U](MultipleTypevars[U, int]): ...
+class InheritedGenericFullySpecialized(MultipleTypevars[str, int]): ...
+
+reveal_type(generic_context(InheritedGeneric))  # revealed: tuple[U, V]
+reveal_type(generic_context(InheritedGenericPartiallySpecialized))  # revealed: tuple[U]
+reveal_type(generic_context(InheritedGenericFullySpecialized))  # revealed: None
+```
+
+If you don't specialize a generic base class, we use the default specialization, which maps each
+typevar to its default value or `Any`. Since that base class is fully specialized, it does not make
+the inheriting class generic.
+
+```py
+class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
+
+reveal_type(generic_context(InheritedGenericDefaultSpecialization))  # revealed: None
+```
+
+You cannot use PEP-695 syntax and the legacy syntax in the same class definition.
 
 ```py
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
-class C(Generic[T]): ...
+# error: [invalid-generic-class] "Cannot both inherit from `Generic` and use PEP 695 type variables"
+class BothGenericSyntaxes[U](Generic[T]): ...
 ```
-
-A class that inherits from a generic class, and fills its type parameters with typevars, is generic.
-
-```py
-class D(C[T]): ...
-```
-
-(Examples `E` and `F` from above do not have analogues in the legacy syntax.)
 
 ## Specializing generic classes explicitly
 
@@ -84,10 +97,12 @@ class IntSubclass(int): ...
 reveal_type(Bounded[int]())  # revealed: Bounded[int]
 reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
 
+# TODO: update this diagnostic to talk about type parameters and specializations
 # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `str`"
 reveal_type(Bounded[str]())  # revealed: Unknown
 
-# error:  [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `int | str`"
+# TODO: update this diagnostic to talk about type parameters and specializations
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int`, found `int | str`"
 reveal_type(Bounded[int | str]())  # revealed: Unknown
 
 reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
@@ -113,6 +128,7 @@ reveal_type(Constrained[str]())  # revealed: Constrained[str]
 # TODO: revealed: Unknown
 reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 
+# TODO: update this diagnostic to talk about type parameters and specializations
 # error: [invalid-argument-type] "Argument to this function is incorrect: Expected `int | str`, found `object`"
 reveal_type(Constrained[object]())  # revealed: Unknown
 ```
@@ -158,7 +174,7 @@ If the type of a constructor parameter is a class typevar, we can use that to in
 parameter. The types inferred from a type context and from a constructor parameter must be
 consistent with each other.
 
-## `__new__` only
+### `__new__` only
 
 ```py
 class C[T]:
@@ -171,7 +187,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
-## `__init__` only
+### `__init__` only
 
 ```py
 class C[T]:
@@ -183,7 +199,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
-## Identical `__new__` and `__init__` signatures
+### Identical `__new__` and `__init__` signatures
 
 ```py
 class C[T]:
@@ -198,7 +214,7 @@ reveal_type(C(1))  # revealed: C[Literal[1]]
 wrong_innards: C[int] = C("five")
 ```
 
-## Compatible `__new__` and `__init__` signatures
+### Compatible `__new__` and `__init__` signatures
 
 ```py
 class C[T]:
@@ -224,9 +240,23 @@ reveal_type(D(1))  # revealed: D[Literal[1]]
 wrong_innards: D[int] = D("five")
 ```
 
-## `__init__` is itself generic
+### Both present, `__new__` inherited from a generic base class
 
-TODO: These do not currently work yet, because we don't correctly model the nested generic contexts.
+If either method comes from a generic base class, we don't currently use its inferred specialization
+to specialize the class.
+
+```py
+class C[T, U]:
+    def __new__(cls, *args, **kwargs) -> "C[T, U]":
+        return object.__new__(cls)
+
+class D[V](C[V, int]):
+    def __init__(self, x: V) -> None: ...
+
+reveal_type(D(1))  # revealed: D[Literal[1]]
+```
+
+### `__init__` is itself generic
 
 ```py
 class C[T]:

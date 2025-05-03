@@ -25,10 +25,7 @@ def h() -> TypeIs[int]: ...
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
     # TODO: should understand the annotation
     reveal_type(args)  # revealed: tuple
-
-    # TODO: should understand the annotation
-    reveal_type(kwargs)  # revealed: dict
-
+    reveal_type(kwargs)  # revealed: dict[str, @Todo(Support for `typing.ParamSpec`)]
     return callback(42, *args, **kwargs)
 
 class Foo:
@@ -89,9 +86,12 @@ python-version = "3.12"
 Some of these are not subscriptable:
 
 ```py
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self, TypeAlias, TypeVar
 
-X: TypeAlias[T] = int  # error: [invalid-type-form]
+T = TypeVar("T")
+
+# error: [invalid-type-form] "Special form `typing.TypeAlias` expected no type parameter"
+X: TypeAlias[T] = int
 
 class Foo[T]:
     # error: [invalid-type-form] "Special form `typing.Self` expected no type parameter"

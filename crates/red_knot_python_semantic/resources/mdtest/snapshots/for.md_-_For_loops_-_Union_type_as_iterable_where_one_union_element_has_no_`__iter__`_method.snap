@@ -31,8 +31,8 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/loops/for.md
 # Diagnostics
 
 ```
-error: lint:not-iterable: Object of type `Test | Literal[42]` may not be iterable because it may not have an `__iter__` method and it doesn't have a `__getitem__` method
-  --> /src/mdtest_snippet.py:13:14
+error: lint:not-iterable: Object of type `Test | Literal[42]` may not be iterable
+  --> src/mdtest_snippet.py:13:14
    |
 11 | def _(flag: bool):
 12 |     # error: [not-iterable]
@@ -40,12 +40,13 @@ error: lint:not-iterable: Object of type `Test | Literal[42]` may not be iterabl
    |              ^^^^^^^^^^^^^^^^^^^^^^
 14 |         reveal_type(x)  # revealed: int
    |
+info: It may not have an `__iter__` method and it doesn't have a `__getitem__` method
 
 ```
 
 ```
 info: revealed-type: Revealed type
-  --> /src/mdtest_snippet.py:14:9
+  --> src/mdtest_snippet.py:14:9
    |
 12 |     # error: [not-iterable]
 13 |     for x in Test() if flag else 42:

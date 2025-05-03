@@ -58,8 +58,7 @@ reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: ob
 
 reveal_type(typing.__class__)  # revealed: Literal[ModuleType]
 
-# TODO: needs support generics; should be `dict[str, Any]`:
-reveal_type(typing.__dict__)  # revealed: @Todo(specialized non-generic class)
+reveal_type(typing.__dict__)  # revealed: dict[str, Any]
 ```
 
 Typeshed includes a fake `__getattr__` method in the stub for `types.ModuleType` to help out with
@@ -91,9 +90,8 @@ reveal_type(__dict__)  # revealed: Literal["foo"]
 import foo
 from foo import __dict__ as foo_dict
 
-# TODO: needs support generics; should be `dict[str, Any]` for both of these:
-reveal_type(foo.__dict__)  # revealed: @Todo(specialized non-generic class)
-reveal_type(foo_dict)  # revealed: @Todo(specialized non-generic class)
+reveal_type(foo.__dict__)  # revealed: dict[str, Any]
+reveal_type(foo_dict)  # revealed: dict[str, Any]
 ```
 
 ## Conditionally global or `ModuleType` attribute

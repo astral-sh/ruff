@@ -24,7 +24,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attrib
 
 ```
 error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `Literal[C]`.
- --> /src/mdtest_snippet.py:3:1
+ --> src/mdtest_snippet.py:3:1
   |
 1 | class C: ...
 2 |
@@ -38,7 +38,7 @@ error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `L
 
 ```
 error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `C`.
- --> /src/mdtest_snippet.py:6:1
+ --> src/mdtest_snippet.py:6:1
   |
 5 | instance = C()
 6 | instance.non_existent = 1  # error: [unresolved-attribute]

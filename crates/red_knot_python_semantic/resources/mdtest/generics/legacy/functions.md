@@ -1,9 +1,4 @@
-# Generic functions
-
-```toml
-[environment]
-python-version = "3.12"
-```
+# Generic functions: Legacy syntax
 
 ## Typevar must be used at least twice
 
@@ -11,12 +6,18 @@ If you're only using a typevar for a single parameter, you don't need the typeva
 `object` (or the typevar's upper bound):
 
 ```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
 # TODO: error, should be (x: object)
-def typevar_not_needed[T](x: T) -> None:
+def typevar_not_needed(x: T) -> None:
     pass
 
+BoundedT = TypeVar("BoundedT", bound=int)
+
 # TODO: error, should be (x: int)
-def bounded_typevar_not_needed[T: int](x: T) -> None:
+def bounded_typevar_not_needed(x: BoundedT) -> None:
     pass
 ```
 
@@ -24,21 +25,21 @@ Typevars are only needed if you use them more than once. For instance, to specif
 parameters must both have the same type:
 
 ```py
-def two_params[T](x: T, y: T) -> T:
+def two_params(x: T, y: T) -> T:
     return x
 ```
 
 or to specify that a return value is the same as a parameter:
 
 ```py
-def return_value[T](x: T) -> T:
+def return_value(x: T) -> T:
     return x
 ```
 
 Each typevar must also appear _somewhere_ in the parameter list:
 
 ```py
-def absurd[T]() -> T:
+def absurd() -> T:
     # There's no way to construct a T!
     raise ValueError("absurd")
 ```
@@ -49,7 +50,11 @@ If the type of a generic function parameter is a typevar, then we can infer what
 is bound to at each call site.
 
 ```py
-def f[T](x: T) -> T:
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def f(x: T) -> T:
     return x
 
 reveal_type(f(1))  # revealed: Literal[1]
@@ -64,11 +69,54 @@ The matching up of call arguments and discovery of constraints on typevars can b
 process for arbitrarily-nested generic types in parameters.
 
 ```py
-def f[T](x: list[T]) -> T:
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def f(x: list[T]) -> T:
     return x[0]
 
 # TODO: revealed: float
 reveal_type(f([1.0, 2.0]))  # revealed: Unknown
+```
+
+## Inferring a bound typevar
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar
+from typing_extensions import reveal_type
+
+T = TypeVar("T", bound=int)
+
+def f(x: T) -> T:
+    return x
+
+reveal_type(f(1))  # revealed: Literal[1]
+reveal_type(f(True))  # revealed: Literal[True]
+# error: [invalid-argument-type]
+reveal_type(f("string"))  # revealed: Unknown
+```
+
+## Inferring a constrained typevar
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar
+from typing_extensions import reveal_type
+
+T = TypeVar("T", int, None)
+
+def f(x: T) -> T:
+    return x
+
+reveal_type(f(1))  # revealed: int
+reveal_type(f(True))  # revealed: int
+reveal_type(f(None))  # revealed: None
+# error: [invalid-argument-type]
+reveal_type(f("string"))  # revealed: Unknown
 ```
 
 ## Typevar constraints
@@ -78,7 +126,11 @@ typevar. This effectively adds the upper bound as an intersection to every appea
 in the function.
 
 ```py
-def good_param[T: int](x: T) -> None:
+from typing import TypeVar
+
+T = TypeVar("T", bound=int)
+
+def good_param(x: T) -> None:
     reveal_type(x)  # revealed: T
 ```
 
@@ -88,10 +140,10 @@ assignable to that typevar, since return types are contravariant. In `bad`, we c
 return value is not guaranteed to be compatible for all `T: int`.
 
 ```py
-def good_return[T: int](x: T) -> T:
+def good_return(x: T) -> T:
     return x
 
-def bad_return[T: int](x: T) -> T:
+def bad_return(x: T) -> T:
     # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `int`"
     return x + 1
 ```
@@ -101,14 +153,19 @@ def bad_return[T: int](x: T) -> T:
 If a typevar appears multiple times in a function signature, all occurrences have the same type.
 
 ```py
-def different_types[T, S](cond: bool, t: T, s: S) -> T:
+from typing import TypeVar
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+def different_types(cond: bool, t: T, s: S) -> T:
     if cond:
         return t
     else:
         # error: [invalid-return-type] "Return type does not match returned value: Expected `T`, found `S`"
         return s
 
-def same_types[T](cond: bool, t1: T, t2: T) -> T:
+def same_types(cond: bool, t1: T, t2: T) -> T:
     if cond:
         return t1
     else:
@@ -121,7 +178,11 @@ The above is true even when the typevars are constrained. Here, both `int` and `
 methods that are compatible with the return type, so the `return` expression is always well-typed:
 
 ```py
-def same_constrained_types[T: (int, str)](t1: T, t2: T) -> T:
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+
+def same_constrained_types(t1: T, t2: T) -> T:
     # TODO: no error
     # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T` and `T`"
     return t1 + t2
@@ -144,7 +205,11 @@ eagerly for each parameter in turn. We must solve a unification problem involvin
 parameters simultaneously.
 
 ```py
-def two_params[T](x: T, y: T) -> T:
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def two_params(x: T, y: T) -> T:
     return x
 
 reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
@@ -155,7 +220,7 @@ When one of the parameters is a union, we attempt to find the smallest specializ
 all of the constraints.
 
 ```py
-def union_param[T](x: T | None) -> T:
+def union_param(x: T | None) -> T:
     if x is None:
         raise ValueError
     return x
@@ -166,7 +231,7 @@ reveal_type(union_param(None))  # revealed: Unknown
 ```
 
 ```py
-def union_and_nonunion_params[T](x: T | int, y: T) -> T:
+def union_and_nonunion_params(x: T | int, y: T) -> T:
     return y
 
 reveal_type(union_and_nonunion_params(1, "a"))  # revealed: Literal["a"]
@@ -177,7 +242,9 @@ reveal_type(union_and_nonunion_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
 ```py
-def tuple_param[T, S](x: T | S, y: tuple[T, S]) -> tuple[T, S]:
+S = TypeVar("S")
+
+def tuple_param(x: T | S, y: tuple[T, S]) -> tuple[T, S]:
     return y
 
 reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
@@ -190,10 +257,14 @@ We can infer type assignments in nested calls to multiple generic functions. If 
 type variable, we do not confuse the two; `T@f` and `T@g` have separate types in each example below.
 
 ```py
-def f[T](x: T) -> tuple[T, int]:
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def f(x: T) -> tuple[T, int]:
     return (x, 1)
 
-def g[T](x: T) -> T | None:
+def g(x: T) -> T | None:
     return x
 
 reveal_type(f(g("a")))  # revealed: tuple[Literal["a"] | None, int]

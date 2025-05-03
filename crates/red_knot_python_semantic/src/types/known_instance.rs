@@ -1,6 +1,6 @@
 //! The `KnownInstance` type.
 //!
-//! Despite its name, this is quite a different type from [`super::InstanceType`].
+//! Despite its name, this is quite a different type from [`super::NominalInstanceType`].
 //! For the vast majority of instance-types in Python, we cannot say how many possible
 //! inhabitants there are or could be of that type at runtime. Each variant of the
 //! [`KnownInstanceType`] enum, however, represents a specific runtime symbol
@@ -8,6 +8,9 @@
 //! variant can only be inhabited by one or two specific objects at runtime with
 //! locations that are known in advance.
 
+use std::fmt::Display;
+
+use super::generics::GenericContext;
 use super::{class::KnownClass, ClassType, Truthiness, Type, TypeAliasType, TypeVarInstance};
 use crate::db::Db;
 use crate::module_resolver::{file_to_module, KnownModule};
@@ -59,7 +62,7 @@ pub enum KnownInstanceType<'db> {
     /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
     Protocol,
     /// The symbol `typing.Generic` (which can also be found as `typing_extensions.Generic`)
-    Generic,
+    Generic(Option<GenericContext<'db>>),
     /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
     Type,
     /// A single instance of `typing.TypeVar`
@@ -95,6 +98,7 @@ pub enum KnownInstanceType<'db> {
     NotRequired,
     TypeAlias,
     TypeGuard,
+    TypedDict,
     TypeIs,
     ReadOnly,
     // TODO: fill this enum out with more special forms, etc.
@@ -108,6 +112,10 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Literal
             | Self::LiteralString
             | Self::Optional
+            // This is a legacy `TypeVar` _outside_ of any generic class or function, so it's
+            // AlwaysTrue. The truthiness of a typevar inside of a generic class or function
+            // depends on its bounds and constraints; but that's represented by `Type::TypeVar` and
+            // handled in elsewhere.
             | Self::TypeVar(_)
             | Self::Union
             | Self::NoReturn
@@ -125,6 +133,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::NotRequired
             | Self::TypeAlias
             | Self::TypeGuard
+            | Self::TypedDict
             | Self::TypeIs
             | Self::List
             | Self::Dict
@@ -136,7 +145,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::ChainMap
             | Self::OrderedDict
             | Self::Protocol
-            | Self::Generic
+            | Self::Generic(_)
             | Self::ReadOnly
             | Self::TypeAliasType(_)
             | Self::Unknown
@@ -150,50 +159,10 @@ impl<'db> KnownInstanceType<'db> {
     }
 
     /// Return the repr of the symbol at runtime
-    pub(crate) fn repr(self, db: &'db dyn Db) -> &'db str {
-        match self {
-            Self::Annotated => "typing.Annotated",
-            Self::Literal => "typing.Literal",
-            Self::LiteralString => "typing.LiteralString",
-            Self::Optional => "typing.Optional",
-            Self::Union => "typing.Union",
-            Self::NoReturn => "typing.NoReturn",
-            Self::Never => "typing.Never",
-            Self::Any => "typing.Any",
-            Self::Tuple => "typing.Tuple",
-            Self::Type => "typing.Type",
-            Self::TypingSelf => "typing.Self",
-            Self::Final => "typing.Final",
-            Self::ClassVar => "typing.ClassVar",
-            Self::Callable => "typing.Callable",
-            Self::Concatenate => "typing.Concatenate",
-            Self::Unpack => "typing.Unpack",
-            Self::Required => "typing.Required",
-            Self::NotRequired => "typing.NotRequired",
-            Self::TypeAlias => "typing.TypeAlias",
-            Self::TypeGuard => "typing.TypeGuard",
-            Self::TypeIs => "typing.TypeIs",
-            Self::List => "typing.List",
-            Self::Dict => "typing.Dict",
-            Self::DefaultDict => "typing.DefaultDict",
-            Self::Set => "typing.Set",
-            Self::FrozenSet => "typing.FrozenSet",
-            Self::Counter => "typing.Counter",
-            Self::Deque => "typing.Deque",
-            Self::ChainMap => "typing.ChainMap",
-            Self::OrderedDict => "typing.OrderedDict",
-            Self::Protocol => "typing.Protocol",
-            Self::Generic => "typing.Generic",
-            Self::ReadOnly => "typing.ReadOnly",
-            Self::TypeVar(typevar) => typevar.name(db),
-            Self::TypeAliasType(_) => "typing.TypeAliasType",
-            Self::Unknown => "knot_extensions.Unknown",
-            Self::AlwaysTruthy => "knot_extensions.AlwaysTruthy",
-            Self::AlwaysFalsy => "knot_extensions.AlwaysFalsy",
-            Self::Not => "knot_extensions.Not",
-            Self::Intersection => "knot_extensions.Intersection",
-            Self::TypeOf => "knot_extensions.TypeOf",
-            Self::CallableTypeOf => "knot_extensions.CallableTypeOf",
+    pub(crate) fn repr(self, db: &'db dyn Db) -> impl Display + 'db {
+        KnownInstanceRepr {
+            known_instance: self,
+            db,
         }
     }
 
@@ -220,6 +189,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::NotRequired => KnownClass::SpecialForm,
             Self::TypeAlias => KnownClass::SpecialForm,
             Self::TypeGuard => KnownClass::SpecialForm,
+            Self::TypedDict => KnownClass::SpecialForm,
             Self::TypeIs => KnownClass::SpecialForm,
             Self::ReadOnly => KnownClass::SpecialForm,
             Self::List => KnownClass::StdlibAlias,
@@ -232,7 +202,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::ChainMap => KnownClass::StdlibAlias,
             Self::OrderedDict => KnownClass::StdlibAlias,
             Self::Protocol => KnownClass::SpecialForm, // actually `_ProtocolMeta` at runtime but this is what typeshed says
-            Self::Generic => KnownClass::SpecialForm, // actually `type` at runtime but this is what typeshed says
+            Self::Generic(_) => KnownClass::SpecialForm, // actually `type` at runtime but this is what typeshed says
             Self::TypeVar(_) => KnownClass::TypeVar,
             Self::TypeAliasType(_) => KnownClass::TypeAliasType,
             Self::TypeOf => KnownClass::SpecialForm,
@@ -249,7 +219,7 @@ impl<'db> KnownInstanceType<'db> {
     ///
     /// For example, the symbol `typing.Literal` is an instance of `typing._SpecialForm`,
     /// so `KnownInstanceType::Literal.instance_fallback(db)`
-    /// returns `Type::Instance(InstanceType { class: <typing._SpecialForm> })`.
+    /// returns `Type::NominalInstance(NominalInstanceType { class: <typing._SpecialForm> })`.
     pub(super) fn instance_fallback(self, db: &dyn Db) -> Type {
         self.class().to_instance(db)
     }
@@ -276,7 +246,7 @@ impl<'db> KnownInstanceType<'db> {
             "Counter" => Self::Counter,
             "ChainMap" => Self::ChainMap,
             "OrderedDict" => Self::OrderedDict,
-            "Generic" => Self::Generic,
+            "Generic" => Self::Generic(None),
             "Protocol" => Self::Protocol,
             "Optional" => Self::Optional,
             "Union" => Self::Union,
@@ -293,6 +263,7 @@ impl<'db> KnownInstanceType<'db> {
             "Required" => Self::Required,
             "TypeAlias" => Self::TypeAlias,
             "TypeGuard" => Self::TypeGuard,
+            "TypedDict" => Self::TypedDict,
             "TypeIs" => Self::TypeIs,
             "ReadOnly" => Self::ReadOnly,
             "Concatenate" => Self::Concatenate,
@@ -335,7 +306,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::NoReturn
             | Self::Tuple
             | Self::Type
-            | Self::Generic
+            | Self::Generic(_)
             | Self::Callable => module.is_typing(),
             Self::Annotated
             | Self::Protocol
@@ -350,6 +321,7 @@ impl<'db> KnownInstanceType<'db> {
             | Self::NotRequired
             | Self::TypeAlias
             | Self::TypeGuard
+            | Self::TypedDict
             | Self::TypeIs
             | Self::ReadOnly
             | Self::TypeAliasType(_)
@@ -368,5 +340,69 @@ impl<'db> KnownInstanceType<'db> {
 
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         self.class().to_class_literal(db)
+    }
+}
+
+struct KnownInstanceRepr<'db> {
+    known_instance: KnownInstanceType<'db>,
+    db: &'db dyn Db,
+}
+
+impl Display for KnownInstanceRepr<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.known_instance {
+            KnownInstanceType::Annotated => f.write_str("typing.Annotated"),
+            KnownInstanceType::Literal => f.write_str("typing.Literal"),
+            KnownInstanceType::LiteralString => f.write_str("typing.LiteralString"),
+            KnownInstanceType::Optional => f.write_str("typing.Optional"),
+            KnownInstanceType::Union => f.write_str("typing.Union"),
+            KnownInstanceType::NoReturn => f.write_str("typing.NoReturn"),
+            KnownInstanceType::Never => f.write_str("typing.Never"),
+            KnownInstanceType::Any => f.write_str("typing.Any"),
+            KnownInstanceType::Tuple => f.write_str("typing.Tuple"),
+            KnownInstanceType::Type => f.write_str("typing.Type"),
+            KnownInstanceType::TypingSelf => f.write_str("typing.Self"),
+            KnownInstanceType::Final => f.write_str("typing.Final"),
+            KnownInstanceType::ClassVar => f.write_str("typing.ClassVar"),
+            KnownInstanceType::Callable => f.write_str("typing.Callable"),
+            KnownInstanceType::Concatenate => f.write_str("typing.Concatenate"),
+            KnownInstanceType::Unpack => f.write_str("typing.Unpack"),
+            KnownInstanceType::Required => f.write_str("typing.Required"),
+            KnownInstanceType::NotRequired => f.write_str("typing.NotRequired"),
+            KnownInstanceType::TypeAlias => f.write_str("typing.TypeAlias"),
+            KnownInstanceType::TypeGuard => f.write_str("typing.TypeGuard"),
+            KnownInstanceType::TypedDict => f.write_str("typing.TypedDict"),
+            KnownInstanceType::TypeIs => f.write_str("typing.TypeIs"),
+            KnownInstanceType::List => f.write_str("typing.List"),
+            KnownInstanceType::Dict => f.write_str("typing.Dict"),
+            KnownInstanceType::DefaultDict => f.write_str("typing.DefaultDict"),
+            KnownInstanceType::Set => f.write_str("typing.Set"),
+            KnownInstanceType::FrozenSet => f.write_str("typing.FrozenSet"),
+            KnownInstanceType::Counter => f.write_str("typing.Counter"),
+            KnownInstanceType::Deque => f.write_str("typing.Deque"),
+            KnownInstanceType::ChainMap => f.write_str("typing.ChainMap"),
+            KnownInstanceType::OrderedDict => f.write_str("typing.OrderedDict"),
+            KnownInstanceType::Protocol => f.write_str("typing.Protocol"),
+            KnownInstanceType::Generic(generic_context) => {
+                f.write_str("typing.Generic")?;
+                if let Some(generic_context) = generic_context {
+                    write!(f, "{}", generic_context.display(self.db))?;
+                }
+                Ok(())
+            }
+            KnownInstanceType::ReadOnly => f.write_str("typing.ReadOnly"),
+            // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
+            // it as an instance of `typing.TypeVar`. Inside of a generic class or function, we'll
+            // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
+            KnownInstanceType::TypeVar(_) => f.write_str("typing.TypeVar"),
+            KnownInstanceType::TypeAliasType(_) => f.write_str("typing.TypeAliasType"),
+            KnownInstanceType::Unknown => f.write_str("knot_extensions.Unknown"),
+            KnownInstanceType::AlwaysTruthy => f.write_str("knot_extensions.AlwaysTruthy"),
+            KnownInstanceType::AlwaysFalsy => f.write_str("knot_extensions.AlwaysFalsy"),
+            KnownInstanceType::Not => f.write_str("knot_extensions.Not"),
+            KnownInstanceType::Intersection => f.write_str("knot_extensions.Intersection"),
+            KnownInstanceType::TypeOf => f.write_str("knot_extensions.TypeOf"),
+            KnownInstanceType::CallableTypeOf => f.write_str("knot_extensions.CallableTypeOf"),
+        }
     }
 }

@@ -286,7 +286,7 @@ class Test:
     def __iter__(self) -> TestIter | int:
         return TestIter()
 
-# error: [not-iterable] "Object of type `Test` may not be iterable because its `__iter__` method returns an object of type `TestIter | int`, which may not have a `__next__` method"
+# error: [not-iterable] "Object of type `Test` may not be iterable"
 for x in Test():
     reveal_type(x)  # revealed: int
 ```
@@ -316,12 +316,12 @@ def _(flag: bool):
         else:
             __iter__: None = None
 
-    # error: [not-iterable] "Object of type `Iterable1` may not be iterable because its `__iter__` attribute (with type `CustomCallable`) may not be callable"
+    # error: [not-iterable] "Object of type `Iterable1` may not be iterable"
     for x in Iterable1():
         # TODO... `int` might be ideal here?
         reveal_type(x)  # revealed: int | Unknown
 
-    # error: [not-iterable] "Object of type `Iterable2` may not be iterable because its `__iter__` attribute (with type `(bound method Iterable2.__iter__() -> Iterator) | None`) may not be callable"
+    # error: [not-iterable] "Object of type `Iterable2` may not be iterable"
     for y in Iterable2():
         # TODO... `int` might be ideal here?
         reveal_type(y)  # revealed: int | Unknown
@@ -376,7 +376,7 @@ def _(flag: bool):
         def __iter__(self) -> Iterator:
             return Iterator()
 
-    # error: [not-iterable] "Object of type `Iterable` may not be iterable because its `__iter__` method returns an object of type `Iterator`, which may not have a `__next__` method"
+    # error: [not-iterable] "Object of type `Iterable` may not be iterable"
     for x in Iterable():
         reveal_type(x)  # revealed: int
 ```
@@ -461,7 +461,7 @@ def _(flag: bool):
                 return Iterator()
         __getitem__: None = None
 
-    # error: [not-iterable] "Object of type `Iterable` may not be iterable because it may not have an `__iter__` method and its `__getitem__` attribute has type `None`, which is not callable"
+    # error: [not-iterable] "Object of type `Iterable` may not be iterable"
     for x in Iterable():
         reveal_type(x)  # revealed: int
 ```

@@ -23,7 +23,7 @@ impl Emitter for PylintEmitter {
                 // so we show one that's clearly a fallback
                 OneIndexed::from_zero_indexed(0)
             } else {
-                message.compute_start_location().row
+                message.compute_start_location().line
             };
 
             let body = if let Some(rule) = message.rule() {

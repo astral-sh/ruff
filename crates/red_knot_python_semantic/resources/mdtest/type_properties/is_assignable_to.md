@@ -529,6 +529,18 @@ c: Callable[[Any], str] = A().f
 c: Callable[[Any], str] = A().g
 ```
 
+### Class literal types
+
+```py
+from typing import Any, Callable
+
+c: Callable[[str], Any] = str
+c: Callable[[str], Any] = int
+
+# error: [invalid-assignment]
+c: Callable[[str], Any] = object
+```
+
 ### Overloads
 
 `overloaded.pyi`:

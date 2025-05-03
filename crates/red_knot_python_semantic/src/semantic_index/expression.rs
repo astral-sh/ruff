@@ -44,6 +44,17 @@ pub(crate) struct Expression<'db> {
     #[return_ref]
     pub(crate) node_ref: AstNodeRef<ast::Expr>,
 
+    /// An assignment statement, if this expression is immediately used as the rhs of that
+    /// assignment.
+    ///
+    /// (Note that this is the _immediately_ containing assignment — if a complex expression is
+    /// assigned to some target, only the outermost expression node has this set. The inner
+    /// expressions are used to build up the assignment result, and are not "immediately assigned"
+    /// to the target, and so have `None` for this field.)
+    #[no_eq]
+    #[tracked]
+    pub(crate) assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
+
     /// Should this expression be inferred as a normal expression or a type expression?
     pub(crate) kind: ExpressionKind,
 

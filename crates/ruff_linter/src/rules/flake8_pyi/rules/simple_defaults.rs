@@ -217,6 +217,16 @@ impl Violation for UnassignedSpecialVariableInStub {
 ///
 /// Vector: TypeAlias = list[float]
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for Python versions
+/// before 3.10, its diagnostic will not be emitted, and no fix will be offered, if
+/// `typing_extensions` imports have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct TypeAliasWithoutAnnotation {
     module: TypingModule,
@@ -672,6 +682,10 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         TypingModule::TypingExtensions
     };
 
+    let Some(importer) = checker.typing_importer("TypeAlias", PythonVersion::PY310) else {
+        return;
+    };
+
     let mut diagnostic = Diagnostic::new(
         TypeAliasWithoutAnnotation {
             module,
@@ -681,8 +695,7 @@ pub(crate) fn type_alias_without_annotation(checker: &Checker, value: &Expr, tar
         target.range(),
     );
     diagnostic.try_set_fix(|| {
-        let (import_edit, binding) =
-            checker.import_from_typing("TypeAlias", target.start(), PythonVersion::PY310)?;
+        let (import_edit, binding) = importer.import(target.start())?;
         Ok(Fix::safe_edits(
             Edit::range_replacement(format!("{id}: {binding}"), target.range()),
             [import_edit],

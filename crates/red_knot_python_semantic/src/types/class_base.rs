@@ -1,3 +1,4 @@
+use crate::types::generics::GenericContext;
 use crate::types::{
     todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroIterator, Type,
 };
@@ -21,7 +22,7 @@ pub enum ClassBase<'db> {
     /// Bare `Generic` cannot be subclassed directly in user code,
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
     /// `Protocol[T]`, or bare `Protocol`.
-    Generic,
+    Generic(Option<GenericContext<'db>>),
 }
 
 impl<'db> ClassBase<'db> {
@@ -50,7 +51,13 @@ impl<'db> ClassBase<'db> {
                         write!(f, "<class '{}'>", alias.display(self.db))
                     }
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
-                    ClassBase::Generic => f.write_str("typing.Generic"),
+                    ClassBase::Generic(generic_context) => {
+                        f.write_str("typing.Generic")?;
+                        if let Some(generic_context) = generic_context {
+                            write!(f, "{}", generic_context.display(self.db))?;
+                        }
+                        Ok(())
+                    }
                 }
             }
         }
@@ -72,18 +79,24 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => Some(if literal.is_known(db, KnownClass::Any) {
-                Self::Dynamic(DynamicType::Any)
-            } else {
-                Self::Class(literal.default_specialization(db))
-            }),
+            Type::ClassLiteral(literal) => {
+                if literal.is_known(db, KnownClass::Any) {
+                    Some(Self::Dynamic(DynamicType::Any))
+                } else if literal.is_known(db, KnownClass::NamedTuple) {
+                    Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db))
+                } else {
+                    Some(Self::Class(literal.default_specialization(db)))
+                }
+            }
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
-            Type::Instance(instance) if instance.class().is_known(db, KnownClass::GenericAlias) => {
+            Type::NominalInstance(instance)
+                if instance.class().is_known(db, KnownClass::GenericAlias) =>
+            {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"))
             }
             Type::Union(_) => None, // TODO -- forces consideration of multiple possible MROs?
             Type::Intersection(_) => None, // TODO -- probably incorrect?
-            Type::Instance(_) => None, // TODO -- handle `__mro_entries__`?
+            Type::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
             Type::PropertyInstance(_) => None,
             Type::Never
             | Type::BooleanLiteral(_)
@@ -104,6 +117,7 @@ impl<'db> ClassBase<'db> {
             | Type::SubclassOf(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
+            | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy => None,
             Type::KnownInstance(known_instance) => match known_instance {
@@ -169,11 +183,14 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::OrderedDict => {
                     Self::try_from_type(db, KnownClass::OrderedDict.to_class_literal(db))
                 }
+                KnownInstanceType::TypedDict => Self::try_from_type(db, todo_type!("TypedDict")),
                 KnownInstanceType::Callable => {
                     Self::try_from_type(db, todo_type!("Support for Callable as a base class"))
                 }
                 KnownInstanceType::Protocol => Some(ClassBase::Protocol),
-                KnownInstanceType::Generic => Some(ClassBase::Generic),
+                KnownInstanceType::Generic(generic_context) => {
+                    Some(ClassBase::Generic(generic_context))
+                }
             },
         }
     }
@@ -181,20 +198,22 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::Dynamic(_) | Self::Generic | Self::Protocol => None,
+            Self::Dynamic(_) | Self::Generic(_) | Self::Protocol => None,
         }
     }
 
     /// Iterate over the MRO of this base
     pub(super) fn mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
-            ClassBase::Dynamic(DynamicType::SubscriptedProtocol) => ClassBaseMroIterator::length_3(
-                db,
-                self,
-                ClassBase::Dynamic(DynamicType::SubscriptedGeneric),
-            ),
-            ClassBase::Dynamic(_) | ClassBase::Generic => ClassBaseMroIterator::length_2(db, self),
+            ClassBase::Protocol => {
+                ClassBaseMroIterator::length_3(db, self, ClassBase::Generic(None))
+            }
+            ClassBase::Dynamic(DynamicType::SubscriptedProtocol) => {
+                ClassBaseMroIterator::length_3(db, self, ClassBase::Generic(None))
+            }
+            ClassBase::Dynamic(_) | ClassBase::Generic(_) => {
+                ClassBaseMroIterator::length_2(db, self)
+            }
             ClassBase::Class(class) => ClassBaseMroIterator::from_class(db, class),
         }
     }
@@ -212,7 +231,9 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Class(class) => class.into(),
             ClassBase::Protocol => Type::KnownInstance(KnownInstanceType::Protocol),
-            ClassBase::Generic => Type::KnownInstance(KnownInstanceType::Generic),
+            ClassBase::Generic(generic_context) => {
+                Type::KnownInstance(KnownInstanceType::Generic(generic_context))
+            }
         }
     }
 }

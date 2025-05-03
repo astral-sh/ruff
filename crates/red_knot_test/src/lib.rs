@@ -18,6 +18,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
+use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
 
 mod assertion;
@@ -324,17 +325,31 @@ fn run_test(
                         Some(location) => messages.push(format!("panicked at {location}")),
                         None => messages.push("panicked at unknown location".to_string()),
                     }
-                    match info.payload {
-                        Some(payload) => messages.push(payload),
+                    match info.payload.as_str() {
+                        Some(message) => messages.push(message.to_string()),
                         // Mimic the default panic hook's rendering of the panic payload if it's
                         // not a string.
                         None => messages.push("Box<dyn Any>".to_string()),
                     }
                     if let Some(backtrace) = info.backtrace {
-                        if std::env::var("RUST_BACKTRACE").is_ok() {
-                            messages.extend(backtrace.to_string().split('\n').map(String::from));
+                        match backtrace.status() {
+                            BacktraceStatus::Disabled => {
+                                let msg = "run with `RUST_BACKTRACE=1` environment variable to display a backtrace";
+                                messages.push(msg.to_string());
+                            }
+                            BacktraceStatus::Captured => {
+                                messages.extend(backtrace.to_string().split('\n').map(String::from));
+                            }
+                            _ => {}
                         }
                     }
+
+                    if let Some(backtrace) = info.salsa_backtrace {
+                        salsa::attach(db, || {
+                            messages.extend(format!("{backtrace:#}").split('\n').map(String::from));
+                        });
+                    }
+
                     by_line.push(OneIndexed::from_zero_indexed(0), messages);
                     return Some(FileFailures {
                         backtick_offsets: test_file.backtick_offsets,

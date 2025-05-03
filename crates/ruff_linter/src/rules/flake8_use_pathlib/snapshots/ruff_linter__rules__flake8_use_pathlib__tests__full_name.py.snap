@@ -317,3 +317,33 @@ full_name.py:47:1: PTH123 `open()` should be replaced by `Path.open()`
    | ^^^^ PTH123
 48 | open(p, 'r', - 1, None, None, None, False, opener)
    |
+
+full_name.py:65:1: PTH123 `open()` should be replaced by `Path.open()`
+   |
+63 | open(f())
+64 |
+65 | open(b"foo")
+   | ^^^^ PTH123
+66 | byte_str = b"bar"
+67 | open(byte_str)
+   |
+
+full_name.py:67:1: PTH123 `open()` should be replaced by `Path.open()`
+   |
+65 | open(b"foo")
+66 | byte_str = b"bar"
+67 | open(byte_str)
+   | ^^^^ PTH123
+68 |
+69 | def bytes_str_func() -> bytes:
+   |
+
+full_name.py:71:1: PTH123 `open()` should be replaced by `Path.open()`
+   |
+69 | def bytes_str_func() -> bytes:
+70 |     return b"foo"
+71 | open(bytes_str_func())
+   | ^^^^ PTH123
+72 |
+73 | # https://github.com/astral-sh/ruff/issues/17693
+   |

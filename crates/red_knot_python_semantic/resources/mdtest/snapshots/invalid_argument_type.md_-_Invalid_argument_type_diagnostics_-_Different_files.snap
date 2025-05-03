@@ -28,7 +28,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/invali
 
 ```
 error: lint:invalid-argument-type: Argument to this function is incorrect
- --> /src/mdtest_snippet.py:3:13
+ --> src/mdtest_snippet.py:3:13
   |
 1 | import package
 2 |
@@ -36,7 +36,7 @@ error: lint:invalid-argument-type: Argument to this function is incorrect
   |             ^^^^^^^ Expected `int`, found `Literal["hello"]`
   |
 info: Function defined here
- --> /src/package.py:1:5
+ --> src/package.py:1:5
   |
 1 | def foo(x: int) -> int:
   |     ^^^ ------ Parameter declared here

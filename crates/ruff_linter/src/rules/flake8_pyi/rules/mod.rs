@@ -1,5 +1,14 @@
 use std::fmt;
 
+use anyhow::Result;
+
+use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_python_ast::{name::Name, Expr, ExprContext, ExprName, ExprSubscript, ExprTuple};
+use ruff_python_codegen::Generator;
+use ruff_text_size::{Ranged, TextRange};
+
+use crate::checkers::ast::TypingImporter;
+
 pub(crate) use any_eq_ne_annotation::*;
 pub(crate) use bad_generator_return_type::*;
 pub(crate) use bad_version_info_comparison::*;
@@ -107,4 +116,40 @@ impl fmt::Display for TypingModule {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.write_str(self.as_str())
     }
+}
+
+/// Generate a [`Fix`] for two or more type expressions, e.g. `typing.Union[int, float, complex]`.
+fn generate_union_fix(
+    generator: Generator,
+    importer: &TypingImporter,
+    nodes: Vec<&Expr>,
+    annotation: &Expr,
+    applicability: Applicability,
+) -> Result<Fix> {
+    debug_assert!(nodes.len() >= 2, "At least two nodes required");
+
+    let (import_edit, binding) = importer.import(annotation.start())?;
+
+    // Construct the expression as `Subscript[typing.Union, Tuple[expr, [expr, ...]]]`
+    let new_expr = Expr::Subscript(ExprSubscript {
+        range: TextRange::default(),
+        value: Box::new(Expr::Name(ExprName {
+            id: Name::new(binding),
+            ctx: ExprContext::Store,
+            range: TextRange::default(),
+        })),
+        slice: Box::new(Expr::Tuple(ExprTuple {
+            elts: nodes.into_iter().cloned().collect(),
+            range: TextRange::default(),
+            ctx: ExprContext::Load,
+            parenthesized: false,
+        })),
+        ctx: ExprContext::Load,
+    });
+
+    Ok(Fix::applicable_edits(
+        Edit::range_replacement(generator.expr(&new_expr), annotation.range()),
+        [import_edit],
+        applicability,
+    ))
 }

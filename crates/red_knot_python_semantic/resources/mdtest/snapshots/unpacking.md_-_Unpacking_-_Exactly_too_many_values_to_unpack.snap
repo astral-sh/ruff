@@ -19,7 +19,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/unpack
 
 ```
 error: lint:invalid-assignment: Too many values to unpack
- --> /src/mdtest_snippet.py:1:1
+ --> src/mdtest_snippet.py:1:1
   |
 1 | a, b = (1, 2, 3)  # error: [invalid-assignment]
   | ^^^^   --------- Got 3

@@ -71,8 +71,8 @@ impl Serialize for SerializedMessages<'_> {
                 })
             } else {
                 json!({
-                    "begin": start_location.row,
-                    "end": end_location.row
+                    "begin": start_location.line,
+                    "end": end_location.line
                 })
             };
 

@@ -55,3 +55,35 @@ x = 2
 open(x)
 def foo(y: int):
     open(y)
+
+
+# https://github.com/astral-sh/ruff/issues/17691
+def f() -> int:
+    return 1
+open(f())
+
+open(b"foo")
+byte_str = b"bar"
+open(byte_str)
+
+def bytes_str_func() -> bytes:
+    return b"foo"
+open(bytes_str_func())
+
+# https://github.com/astral-sh/ruff/issues/17693
+os.stat(1)
+os.stat(x)
+
+
+def func() -> int:
+    return 2
+os.stat(func())
+
+
+def bar(x: int):
+    os.stat(x)
+
+# https://github.com/astral-sh/ruff/issues/17694
+os.rename("src", "dst", src_dir_fd=3, dst_dir_fd=4)
+os.rename("src", "dst", src_dir_fd=3)
+os.rename("src", "dst", dst_dir_fd=4)

@@ -263,7 +263,7 @@ impl Matcher {
             .and_then(|span| span.range())
             .map(|range| {
                 self.line_index
-                    .source_location(range.start(), &self.source)
+                    .line_column(range.start(), &self.source)
                     .column
             })
             .unwrap_or(OneIndexed::from_zero_indexed(0))

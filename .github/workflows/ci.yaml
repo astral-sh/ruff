@@ -239,11 +239,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
+        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
+        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
         with:
           tool: cargo-insta
       - name: Red-knot mdtests (GitHub annotations)
@@ -276,6 +276,10 @@ jobs:
         with:
           name: ruff
           path: target/debug/ruff
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: red_knot
+          path: target/debug/red_knot
 
   cargo-test-linux-release:
     name: "cargo test (linux, release)"
@@ -293,11 +297,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
+        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
+        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -320,7 +324,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
+        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
         with:
           tool: cargo-nextest
       - name: "Run tests"
@@ -403,11 +407,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
+        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
+        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -631,6 +635,53 @@ jobs:
         with:
           name: ecosystem-result
           path: ecosystem-result
+
+  fuzz-redknot:
+    name: "Fuzz for new red-knot panics"
+    runs-on: depot-ubuntu-22.04-16
+    needs:
+      - cargo-test-linux
+      - determine_changes
+    # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.red_knot == 'true' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
+        name: Download new red-knot binary
+        id: redknot-new
+        with:
+          name: red_knot
+          path: target/debug
+      - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
+        name: Download baseline red-knot binary
+        with:
+          name: red_knot
+          branch: ${{ github.event.pull_request.base.ref }}
+          workflow: "ci.yaml"
+          check_artifacts: true
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+      - name: Fuzz
+        env:
+          FORCE_COLOR: 1
+          NEW_REDKNOT: ${{ steps.redknot-new.outputs.download-path }}
+        run: |
+          # Make executable, since artifact download doesn't preserve this
+          chmod +x "${PWD}/red_knot" "${NEW_REDKNOT}/red_knot"
+
+          (
+            uvx \
+            --python="${PYTHON_VERSION}" \
+            --from=./python/py-fuzzer \
+            fuzz \
+            --test-executable="${NEW_REDKNOT}/red_knot" \
+            --baseline-executable="${PWD}/red_knot" \
+            --only-new-bugs \
+            --bin=red_knot \
+            0-500
+          )
 
   cargo-shear:
     name: "cargo shear"
@@ -857,7 +908,7 @@ jobs:
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@09dc018eee06ae1c9e0409786563f534210ceb83 # v2
+        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
         with:
           tool: cargo-codspeed
 

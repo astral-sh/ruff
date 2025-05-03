@@ -29,7 +29,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/comparison/instanc
 
 ```
 error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`
-  --> /src/mdtest_snippet.py:9:1
+  --> src/mdtest_snippet.py:9:1
    |
  8 | # error: [unsupported-bool-conversion]
  9 | 10 in WithContains()
@@ -43,7 +43,7 @@ info: `__bool__` on `NotBoolable` must be callable
 
 ```
 error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for type `NotBoolable`
-  --> /src/mdtest_snippet.py:11:1
+  --> src/mdtest_snippet.py:11:1
    |
  9 | 10 in WithContains()
 10 | # error: [unsupported-bool-conversion]

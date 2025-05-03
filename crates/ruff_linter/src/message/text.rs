@@ -7,7 +7,7 @@ use colored::Colorize;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
 
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::{OneIndexed, SourceLocation};
+use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::fs::relativize_path;
@@ -86,14 +86,14 @@ impl Emitter for TextEmitter {
                     writer,
                     "cell {cell}{sep}",
                     cell = notebook_index
-                        .cell(start_location.row)
+                        .cell(start_location.line)
                         .unwrap_or(OneIndexed::MIN),
                     sep = ":".cyan(),
                 )?;
 
-                SourceLocation {
-                    row: notebook_index
-                        .cell_row(start_location.row)
+                LineColumn {
+                    line: notebook_index
+                        .cell_row(start_location.line)
                         .unwrap_or(OneIndexed::MIN),
                     column: start_location.column,
                 }
@@ -104,7 +104,7 @@ impl Emitter for TextEmitter {
             writeln!(
                 writer,
                 "{row}{sep}{col}{sep} {code_and_body}",
-                row = diagnostic_location.row,
+                row = diagnostic_location.line,
                 col = diagnostic_location.column,
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {

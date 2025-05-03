@@ -27,7 +27,7 @@ mdtest path: crates/red_knot_python_semantic/resources/mdtest/diagnostics/attrib
 
 ```
 warning: lint:possibly-unbound-attribute: Attribute `attr` on type `Literal[C]` is possibly unbound
- --> /src/mdtest_snippet.py:6:5
+ --> src/mdtest_snippet.py:6:5
   |
 4 |             attr: int = 0
 5 |
@@ -41,7 +41,7 @@ warning: lint:possibly-unbound-attribute: Attribute `attr` on type `Literal[C]` 
 
 ```
 warning: lint:possibly-unbound-attribute: Attribute `attr` on type `C` is possibly unbound
- --> /src/mdtest_snippet.py:9:5
+ --> src/mdtest_snippet.py:9:5
   |
 8 |     instance = C()
 9 |     instance.attr = 1  # error: [possibly-unbound-attribute]

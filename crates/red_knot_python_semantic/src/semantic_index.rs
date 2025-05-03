@@ -18,7 +18,8 @@ use crate::semantic_index::builder::SemanticIndexBuilder;
 use crate::semantic_index::definition::{Definition, DefinitionNodeKey, Definitions};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::symbol::{
-    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopedSymbolId, SymbolTable,
+    FileScopeId, NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopedSymbolId,
+    SymbolTable,
 };
 use crate::semantic_index::use_def::{EagerBindingsKey, ScopedEagerBindingsId, UseDefMap};
 use crate::Db;
@@ -109,12 +110,26 @@ pub(crate) fn attribute_assignments<'db, 's>(
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
 
-    ChildrenIter::new(index, class_scope_id).filter_map(|(file_scope_id, maybe_method)| {
-        maybe_method.node().as_function()?;
-        let attribute_table = index.instance_attribute_table(file_scope_id);
+    ChildrenIter::new(index, class_scope_id).filter_map(|(child_scope_id, scope)| {
+        let (function_scope_id, function_scope) =
+            if scope.node().scope_kind() == ScopeKind::Annotation {
+                // This could be a generic method with a type-params scope.
+                // Go one level deeper to find the function scope. The first
+                // descendant is the (potential) function scope.
+                let function_scope_id = scope.descendants().start;
+                (function_scope_id, index.scope(function_scope_id))
+            } else {
+                (child_scope_id, scope)
+            };
+
+        function_scope.node().as_function()?;
+        let attribute_table = index.instance_attribute_table(function_scope_id);
         let symbol = attribute_table.symbol_id_by_name(name)?;
-        let use_def = &index.use_def_maps[file_scope_id];
-        Some((use_def.instance_attribute_bindings(symbol), file_scope_id))
+        let use_def = &index.use_def_maps[function_scope_id];
+        Some((
+            use_def.instance_attribute_bindings(symbol),
+            function_scope_id,
+        ))
     })
 }
 

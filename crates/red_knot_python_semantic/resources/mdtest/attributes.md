@@ -1677,7 +1677,7 @@ functions are instances of that class:
 def f(): ...
 
 reveal_type(f.__defaults__)  # revealed: @Todo(full tuple[...] support) | None
-reveal_type(f.__kwdefaults__)  # revealed: @Todo(specialized non-generic class) | None
+reveal_type(f.__kwdefaults__)  # revealed: dict[str, Any] | None
 ```
 
 Some attributes are special-cased, however:
@@ -1944,9 +1944,31 @@ reveal_type(C.a_float)  # revealed: int | float
 reveal_type(C.a_complex)  # revealed: int | float | complex
 reveal_type(C.a_tuple)  # revealed: tuple[int]
 reveal_type(C.a_range)  # revealed: range
-reveal_type(C.a_slice)  # revealed: slice
+# TODO: revealed: slice[Any, Literal[1], Any]
+reveal_type(C.a_slice)  # revealed: slice[Any, _StartT_co, _StartT_co | _StopT_co]
 reveal_type(C.a_type)  # revealed: type
 reveal_type(C.a_none)  # revealed: None
+```
+
+### Generic methods
+
+We also detect implicit instance attributes on methods that are themselves generic. We have an extra
+test for this because generic functions have an extra type-params scope in between the function body
+scope and the outer scope, so we need to make sure that our implementation can still recognize `f`
+as a method of `C` here:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C:
+    def f[T](self, t: T) -> T:
+        self.x: int = 1
+        return t
+
+reveal_type(C().x)  # revealed: int
 ```
 
 ## Enum classes

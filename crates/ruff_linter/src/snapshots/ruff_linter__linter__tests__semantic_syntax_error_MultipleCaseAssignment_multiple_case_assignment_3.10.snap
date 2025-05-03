@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:3:14: SyntaxError: multiple assignments to name `a` in pattern
+  |
+2 | match x:
+3 |     case [a, a]:
+  |              ^
+4 |         pass
+5 |     case _:
+  |

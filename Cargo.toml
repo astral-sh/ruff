@@ -124,7 +124,7 @@ rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 rustc-hash = { version = "2.0.0" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "87bf6b6c2d5f6479741271da73bd9d30c2580c26" }
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "42f15835c0005c4b37aaf5bc1a15e3e1b3df14b7" }
 schemars = { version = "0.8.16" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }
@@ -230,10 +230,6 @@ unused_peekable = "warn"
 
 # Diagnostics are not actionable: Enable once https://github.com/rust-lang/rust-clippy/issues/13774 is resolved.
 large_stack_arrays = "allow"
-
-# Salsa generates functions with parameters for each field of a `salsa::interned` struct.
-# If we don't allow this, we get warnings for structs with too many fields.
-too_many_arguments = "allow"
 
 [profile.release]
 # Note that we set these explicitly, and these values
@@ -342,5 +338,5 @@ global = "depot-ubuntu-latest-4"
 [workspace.metadata.dist.github-action-commits]
 "actions/checkout" = "85e6279cec87321a52edac9c87bce653a07cf6c2" # v4
 "actions/upload-artifact" = "6027e3dd177782cd8ab9af838c04fd81a07f1d47" # v4.6.2
-"actions/download-artifact" = "95815c38cf2ff2164869cbab79da8d1f422bc89e" # v4.2.1
+"actions/download-artifact" = "d3f86a106a0bac45b974a628896c90dbdf5c8093" # v4.3.0
 "actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3

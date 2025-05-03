@@ -1,5 +1,6 @@
 use super::context::InferContext;
 use super::ClassLiteral;
+use crate::db::Db;
 use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::suppression::FileSuppressionId;
@@ -8,7 +9,7 @@ use crate::types::string_annotation::{
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
-use crate::types::{class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
+use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::Ranged;
@@ -35,7 +36,10 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_CONTEXT_MANAGER);
     registry.register_lint(&INVALID_DECLARATION);
     registry.register_lint(&INVALID_EXCEPTION_CAUGHT);
+    registry.register_lint(&INVALID_GENERIC_CLASS);
+    registry.register_lint(&INVALID_LEGACY_TYPE_VARIABLE);
     registry.register_lint(&INVALID_METACLASS);
+    registry.register_lint(&INVALID_OVERLOAD);
     registry.register_lint(&INVALID_PARAMETER_DEFAULT);
     registry.register_lint(&INVALID_PROTOCOL);
     registry.register_lint(&INVALID_RAISE);
@@ -393,6 +397,60 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for the creation of invalid generic classes
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when defining a generic class.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")  # okay
+    ///
+    /// # error: class uses both PEP-695 syntax and legacy syntax
+    /// class C[U](Generic[T]): ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    pub(crate) static INVALID_GENERIC_CLASS = {
+        summary: "detects invalid generic classes",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for the creation of invalid legacy `TypeVar`s
+    ///
+    /// ## Why is this bad?
+    /// There are several requirements that you must follow when creating a legacy `TypeVar`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import TypeVar
+    ///
+    /// T = TypeVar("T")  # okay
+    /// Q = TypeVar("S")  # error: TypeVar name must match the variable it's assigned to
+    /// T = TypeVar("T")  # error: TypeVars should not be redefined
+    ///
+    /// # error: TypeVar must be immediately assigned to a variable
+    /// def f(t: TypeVar("U")): ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    pub(crate) static INVALID_LEGACY_TYPE_VARIABLE = {
+        summary: "detects invalid legacy type variables",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for arguments to `metaclass=` that are invalid.
     ///
     /// ## Why is this bad?
@@ -413,6 +471,49 @@ declare_lint! {
     /// - [Python documentation: Metaclasses](https://docs.python.org/3/reference/datamodel.html#metaclasses)
     pub(crate) static INVALID_METACLASS = {
         summary: "detects invalid `metaclass=` arguments",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for various invalid `@overload` usages.
+    ///
+    /// ## Why is this bad?
+    /// The `@overload` decorator is used to define functions and methods that accepts different
+    /// combinations of arguments and return different types based on the arguments passed. This is
+    /// mainly beneficial for type checkers. But, if the `@overload` usage is invalid, the type
+    /// checker may not be able to provide correct type information.
+    ///
+    /// ## Example
+    ///
+    /// Defining only one overload:
+    ///
+    /// ```py
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def foo(x: int) -> int: ...
+    /// def foo(x: int | None) -> int | None:
+    ///     return x
+    /// ```
+    ///
+    /// Or, not providing an implementation for the overloaded definition:
+    ///
+    /// ```py
+    /// from typing import overload
+    ///
+    /// @overload
+    /// def foo() -> None: ...
+    /// @overload
+    /// def foo(x: int) -> int: ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)
+    pub(crate) static INVALID_OVERLOAD = {
+        summary: "detects invalid `@overload` usages",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
     }
@@ -1305,6 +1406,7 @@ pub(crate) fn report_base_with_incompatible_slots(context: &InferContext, node: 
 }
 
 pub(crate) fn report_invalid_arguments_to_annotated(
+    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1314,7 +1416,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        KnownInstanceType::Annotated.repr(context.db())
+        KnownInstanceType::Annotated.repr(db)
     ));
 }
 
@@ -1354,6 +1456,7 @@ pub(crate) fn report_bad_argument_to_get_protocol_members(
 }
 
 pub(crate) fn report_invalid_arguments_to_callable(
+    db: &dyn Db,
     context: &InferContext,
     subscript: &ast::ExprSubscript,
 ) {
@@ -1362,7 +1465,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
     };
     builder.into_diagnostic(format_args!(
         "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        KnownInstanceType::Callable.repr(context.db())
+        KnownInstanceType::Callable.repr(db)
     ));
 }
 
