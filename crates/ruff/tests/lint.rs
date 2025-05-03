@@ -5676,12 +5676,10 @@ class Foo:
             .arg("-")
             .pass_stdin(contents),
         @r"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
-    -:5:10: PYI019 [*] Use `Self` instead of custom TypeVar `T`
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
+    All checks passed!
 
     ----- stderr -----
     "
