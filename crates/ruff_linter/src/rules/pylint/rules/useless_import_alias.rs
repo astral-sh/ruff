@@ -29,8 +29,8 @@ use crate::checkers::ast::Checker;
 /// ```
 ///
 /// ## Fix safety
-/// This fix is sometimes unsafe. When an import with a useless alias (e.g., `import numpy as numpy`) 
-/// is also configured as a required import in isort settings, removing the alias would conflict with 
+/// This fix is sometimes unsafe. When an import with a useless alias (e.g., `import numpy as numpy`)
+/// is also configured as a required import in isort settings, removing the alias would conflict with
 /// that requirement. This issue was fixed in Ruff by detecting this conflict and disabling the automatic
 /// fix in such cases, preventing an infinite loop where Ruff would repeatedly add and remove the alias
 ///
