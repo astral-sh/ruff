@@ -359,16 +359,11 @@ impl<'db> UseDefMap<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> ConstraintsIterator<'_, 'db> {
-        let Some(narrowing_constraint) = self.bindings_by_use[use_id].narrowing_constraint_at_use
-        else {
-            let mut bindings = self.bindings_iterator(&self.bindings_by_use[use_id]);
-            return bindings.next().unwrap().narrowing_constraint;
-        };
         ConstraintsIterator {
             predicates: &self.predicates,
             constraint_ids: self
                 .narrowing_constraints
-                .iter_predicates(narrowing_constraint),
+                .iter_predicates(self.bindings_by_use[use_id].narrowing_constraint()),
         }
     }
 

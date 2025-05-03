@@ -191,6 +191,13 @@ pub(super) struct SymbolBindings {
     live_bindings: SmallVec<[LiveBinding; INLINE_DEFINITIONS_PER_SYMBOL]>,
 }
 
+impl SymbolBindings {
+    pub(super) fn narrowing_constraint(&self) -> ScopedNarrowingConstraint {
+        self.narrowing_constraint_at_use
+            .unwrap_or(self.live_bindings[0].narrowing_constraint)
+    }
+}
+
 /// One of the live bindings for a single symbol at some point in control flow.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct LiveBinding {
