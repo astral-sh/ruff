@@ -115,8 +115,8 @@ pub(crate) fn fstring_number_format(checker: &Checker, subscript: &ast::ExprSubs
     let Some(base) = Base::from_str(id) else {
         return;
     };
-  
-      // float and complex numbers are false positives, ignore them.
+
+    // float and complex numbers are false positives, ignore them.
     if matches!(
         arg,
         Expr::NumberLiteral(ast::ExprNumberLiteral {
