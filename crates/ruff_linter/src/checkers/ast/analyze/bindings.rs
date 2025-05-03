@@ -1,11 +1,11 @@
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{self, Checker};
 use crate::codes::Rule;
 use crate::rules::{
-    flake8_import_conventions, flake8_pyi, flake8_pytest_style, flake8_type_checking, pyflakes,
-    pylint, pyupgrade, refurb, ruff,
+    flake8_import_conventions, flake8_pyi, flake8_pytest_style, flake8_return,
+    flake8_type_checking, pyflakes, pylint, pyupgrade, refurb, ruff,
 };
 
 /// Run lint rules over the [`Binding`]s.
@@ -25,11 +25,19 @@ pub(crate) fn bindings(checker: &Checker) {
         Rule::ForLoopWrites,
         Rule::CustomTypeVarForSelf,
         Rule::PrivateTypeParameter,
+        Rule::UnnecessaryAssign,
     ]) {
         return;
     }
 
     for (binding_id, binding) in checker.semantic.bindings.iter_enumerated() {
+        if checker.enabled(Rule::UnnecessaryAssign) {
+            if let Some(ast::Stmt::FunctionDef(function_def)) =
+                binding.statement(checker.semantic())
+            {
+                flake8_return::rules::unnecessary_assign(checker, function_def);
+            }
+        }
         if checker.enabled(Rule::UnusedVariable) {
             if binding.kind.is_bound_exception()
                 && binding.is_unused()
