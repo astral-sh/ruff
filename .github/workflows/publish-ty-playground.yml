@@ -1,11 +1,11 @@
 # Publish the ty playground.
 name: "[Ty Playground] Release"
 
-permissions: { }
+permissions: {}
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - "crates/ty*/**"
       - "crates/ruff_db/**"

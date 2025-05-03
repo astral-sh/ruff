@@ -8,10 +8,9 @@ Reference:
 
 ## Builtins scope
 
-When looking up for a name, ty will fallback to using the builtins scope if the name is not
-found in the global scope. The `builtins.pyi` file, that will be used to resolve any symbol in the
-builtins scope, contains multiple symbols from other modules (e.g., `typing`) but those are not
-re-exported.
+When looking up for a name, ty will fallback to using the builtins scope if the name is not found in
+the global scope. The `builtins.pyi` file, that will be used to resolve any symbol in the builtins
+scope, contains multiple symbols from other modules (e.g., `typing`) but those are not re-exported.
 
 ```py
 # These symbols are being imported in `builtins.pyi` but shouldn't be considered as being

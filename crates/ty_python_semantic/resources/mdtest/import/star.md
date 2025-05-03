@@ -1374,8 +1374,7 @@ from foo import *  # error: [unresolved-import] "Cannot resolve import `foo`"
 
 ### Nested scope
 
-A `*` import in a nested scope are always a syntax error. Ty does not infer any bindings from
-them:
+A `*` import in a nested scope are always a syntax error. Ty does not infer any bindings from them:
 
 `exporter.py`:
 

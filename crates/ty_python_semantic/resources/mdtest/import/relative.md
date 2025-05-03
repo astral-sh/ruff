@@ -222,8 +222,8 @@ reveal_type(package.foo.X)  # revealed: Unknown
 ## Relative imports at the top of a search path
 
 Relative imports at the top of a search path result in a runtime error:
-`ImportError: attempted relative import with no known parent package`. That's why ty should
-disallow them.
+`ImportError: attempted relative import with no known parent package`. That's why ty should disallow
+them.
 
 `parser.py`:
 

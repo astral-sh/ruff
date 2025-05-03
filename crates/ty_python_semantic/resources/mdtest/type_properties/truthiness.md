@@ -94,8 +94,8 @@ reveal_type(bool(PossiblyUnboundTrue()))  # revealed: bool
 
 ### Special-cased classes
 
-Some special-cased `@final` classes are known by ty to have instances that are either always
-truthy or always falsy.
+Some special-cased `@final` classes are known by ty to have instances that are either always truthy
+or always falsy.
 
 ```toml
 [environment]

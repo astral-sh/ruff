@@ -50,8 +50,8 @@ a = 10 / 0  # ty: ignore[division-by-zero, unused-ignore-comment]
 
 ## Multiple unused comments
 
-Today, ty emits a diagnostic for every unused code. We might want to group the codes by
-comment at some point in the future.
+Today, ty emits a diagnostic for every unused code. We might want to group the codes by comment at
+some point in the future.
 
 ```py
 # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'division-by-zero'"

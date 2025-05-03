@@ -2,8 +2,8 @@
 
 ## Not yet supported
 
-Several special forms are unsupported by ty currently. However, we also don't emit
-false-positive errors if you use one in an annotation:
+Several special forms are unsupported by ty currently. However, we also don't emit false-positive
+errors if you use one in an annotation:
 
 ```py
 from typing_extensions import Self, TypeVarTuple, Unpack, TypeGuard, TypeIs, Concatenate, ParamSpec, TypeAlias, Callable, TypeVar

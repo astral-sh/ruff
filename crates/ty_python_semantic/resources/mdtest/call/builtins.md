@@ -16,8 +16,8 @@ bool(NotBool())
 ## Calls to `type()`
 
 A single-argument call to `type()` returns an object that has the argument's meta-type. (This is
-tested more extensively in `crates/ty_python_semantic/resources/mdtest/attributes.md`,
-alongside the tests for the `__class__` attribute.)
+tested more extensively in `crates/ty_python_semantic/resources/mdtest/attributes.md`, alongside the
+tests for the `__class__` attribute.)
 
 ```py
 reveal_type(type(1))  # revealed: Literal[int]

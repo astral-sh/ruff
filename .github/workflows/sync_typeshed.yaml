@@ -65,7 +65,7 @@ jobs:
   create-issue-on-failure:
     name: Create an issue if the typeshed sync failed
     runs-on: ubuntu-latest
-    needs: [ sync ]
+    needs: [sync]
     if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.sync.result == 'failure' }}
     permissions:
       issues: write

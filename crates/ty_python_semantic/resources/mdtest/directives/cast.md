@@ -51,10 +51,10 @@ def f(x: Callable[[dict[str, int]], None], y: tuple[dict[str, int]]):
 ```
 
 A cast from `Todo` or `Unknown` to `Any` is not considered a "redundant cast": even if these are
-understood as gradually equivalent types by ty, they are understood as different types by
-human readers of ty's output. For `Unknown` in particular, we may consider it differently in
-the context of some opt-in diagnostics, as it indicates that the gradual type has come about due to
-an invalid annotation, missing annotation or missing type argument somewhere.
+understood as gradually equivalent types by ty, they are understood as different types by human
+readers of ty's output. For `Unknown` in particular, we may consider it differently in the context
+of some opt-in diagnostics, as it indicates that the gradual type has come about due to an invalid
+annotation, missing annotation or missing type argument somewhere.
 
 ```py
 from ty_extensions import Unknown

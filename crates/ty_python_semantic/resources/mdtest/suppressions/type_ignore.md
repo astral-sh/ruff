@@ -87,8 +87,8 @@ a = test \
 
 ## Codes
 
-Mypy supports `type: ignore[code]`. ty doesn't understand mypy's rule names. Therefore, ignore
-the codes and suppress all errors.
+Mypy supports `type: ignore[code]`. ty doesn't understand mypy's rule names. Therefore, ignore the
+codes and suppress all errors.
 
 ```py
 a = test  # type: ignore[name-defined]

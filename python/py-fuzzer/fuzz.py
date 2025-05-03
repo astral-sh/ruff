@@ -140,9 +140,7 @@ class FuzzResult:
                 case Executable.RUFF:
                     panic_message = f"The following code triggers a {new}parser bug:"
                 case Executable.TY:
-                    panic_message = (
-                        f"The following code triggers a {new}ty panic:"
-                    )
+                    panic_message = f"The following code triggers a {new}ty panic:"
                 case _ as unreachable:
                     assert_never(unreachable)
 

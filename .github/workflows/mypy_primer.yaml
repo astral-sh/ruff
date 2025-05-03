@@ -1,6 +1,6 @@
 name: Run mypy_primer
 
-permissions: { }
+permissions: {}
 
 on:
   pull_request:

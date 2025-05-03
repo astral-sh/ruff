@@ -144,8 +144,8 @@ import b.foo  # error: [unresolved-import] "Cannot resolve import `b.foo`"
 ## Long paths
 
 It's unlikely that a single module component is as long as in this example, but Windows treats paths
-that are longer than 200 and something specially. This test ensures that ty can handle those
-paths gracefully.
+that are longer than 200 and something specially. This test ensures that ty can handle those paths
+gracefully.
 
 ```toml
 system = "os"

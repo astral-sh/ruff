@@ -2,8 +2,8 @@
 
 ## Not yet fully supported
 
-Several type qualifiers are unsupported by ty currently. However, we also don't emit
-false-positive errors if you use one in an annotation:
+Several type qualifiers are unsupported by ty currently. However, we also don't emit false-positive
+errors if you use one in an annotation:
 
 ```py
 from typing_extensions import Final, Required, NotRequired, ReadOnly, TypedDict

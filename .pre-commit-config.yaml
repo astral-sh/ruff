@@ -55,7 +55,7 @@ repos:
     rev: 1.19.1
     hooks:
       - id: blacken-docs
-        args: [ "--pyi", "--line-length", "130" ]
+        args: ["--pyi", "--line-length", "130"]
         files: '^crates/.*/resources/mdtest/.*\.md'
         exclude: |
           (?x)^(
@@ -75,7 +75,7 @@ repos:
         name: cargo fmt
         entry: cargo fmt --
         language: system
-        types: [ rust ]
+        types: [rust]
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
@@ -83,8 +83,8 @@ repos:
     hooks:
       - id: ruff-format
       - id: ruff
-        args: [ --fix, --exit-non-zero-on-fix ]
-        types_or: [ python, pyi ]
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
         require_serial: true
 
   # Prettier
@@ -92,7 +92,7 @@ repos:
     rev: v3.5.3
     hooks:
       - id: prettier
-        types: [ yaml ]
+        types: [yaml]
 
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
@@ -127,4 +127,4 @@ repos:
           - "github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.10.0"
 
 ci:
-  skip: [ cargo-fmt, dev-generate-all ]
+  skip: [cargo-fmt, dev-generate-all]
