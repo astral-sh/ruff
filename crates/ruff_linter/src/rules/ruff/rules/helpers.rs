@@ -1,4 +1,5 @@
 use ruff_python_ast::helpers::{map_callable, map_subscript, Truthiness};
+use ruff_python_ast::visitor::source_order;
 use ruff_python_ast::{self as ast, Expr, ExprCall};
 use ruff_python_semantic::{analyze, BindingKind, Modules, SemanticModel};
 
@@ -208,4 +209,63 @@ pub(super) fn is_descriptor_class(func: &Expr, semantic: &SemanticModel) -> bool
                 .is_some_and(|id| semantic.binding(id).kind.is_function_definition())
         })
     })
+}
+
+/// Very nearly `crate::node::StmtFunctionDef.visit_preorder`, except it is specialized and,
+/// crucially, doesn't traverse the body.
+pub(super) fn function_def_visit_preorder_except_body<'a, V>(
+    function_def: &'a ast::StmtFunctionDef,
+    visitor: &mut V,
+) where
+    V: source_order::SourceOrderVisitor<'a>,
+{
+    let ast::StmtFunctionDef {
+        parameters,
+        decorator_list,
+        returns,
+        type_params,
+        ..
+    } = function_def;
+
+    for decorator in decorator_list {
+        visitor.visit_decorator(decorator);
+    }
+
+    if let Some(type_params) = type_params {
+        visitor.visit_type_params(type_params);
+    }
+
+    visitor.visit_parameters(parameters);
+
+    if let Some(expr) = returns {
+        visitor.visit_annotation(expr);
+    }
+}
+
+/// Very nearly `crate::node::StmtClassDef.visit_preorder`, except it is specialized and,
+/// crucially, doesn't traverse the body.
+pub(super) fn class_def_visit_preorder_except_body<'a, V>(
+    class_def: &'a ast::StmtClassDef,
+    visitor: &mut V,
+) where
+    V: source_order::SourceOrderVisitor<'a>,
+{
+    let ast::StmtClassDef {
+        arguments,
+        decorator_list,
+        type_params,
+        ..
+    } = class_def;
+
+    for decorator in decorator_list {
+        visitor.visit_decorator(decorator);
+    }
+
+    if let Some(type_params) = type_params {
+        visitor.visit_type_params(type_params);
+    }
+
+    if let Some(arguments) = arguments {
+        visitor.visit_arguments(arguments);
+    }
 }
