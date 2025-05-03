@@ -2,7 +2,7 @@ import { Icons, Theme } from "shared";
 import classNames from "classnames";
 import { useState } from "react";
 import { FileId } from "../Playground";
-import { type FileHandle } from "red_knot_wasm";
+import { type FileHandle } from "ty_wasm";
 
 export interface Props {
   // The file names

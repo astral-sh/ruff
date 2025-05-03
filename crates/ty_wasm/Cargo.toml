@@ -1,5 +1,5 @@
 [package]
-name = "red_knot_wasm"
+name = "ty_wasm"
 version = "0.0.0"
 publish = false
 authors = { workspace = true }

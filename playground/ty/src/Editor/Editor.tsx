@@ -22,7 +22,7 @@ import {
   Severity,
   type Workspace,
   Position as KnotPosition,
-} from "red_knot_wasm";
+} from "ty_wasm";
 
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 import { FileId, ReadonlyFiles } from "../Playground";

@@ -1,6 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
-use red_knot_wasm::{Position, PositionEncoding, Workspace};
+use ty_wasm::{Position, PositionEncoding, Workspace};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[wasm_bindgen_test]

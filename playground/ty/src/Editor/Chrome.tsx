@@ -13,7 +13,7 @@ import {
   Theme,
   VerticalResizeHandle,
 } from "shared";
-import type { Workspace } from "red_knot_wasm";
+import type { Workspace } from "ty_wasm";
 import { Panel, PanelGroup } from "react-resizable-panels";
 import { Files, isPythonFile } from "./Files";
 import SecondarySideBar from "./SecondarySideBar";

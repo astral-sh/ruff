@@ -1,4 +1,4 @@
-import type { Severity, Range, TextRange } from "red_knot_wasm";
+import type { Severity, Range, TextRange } from "ty_wasm";
 import classNames from "classnames";
 import { Theme } from "shared";
 import { useMemo } from "react";

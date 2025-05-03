@@ -1,10 +1,10 @@
 name: CI
 
-permissions: {}
+permissions: { }
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -221,7 +221,7 @@ jobs:
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm -p red_knot_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
+        run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
   cargo-test-linux:
     name: "cargo test (linux)"
@@ -362,9 +362,9 @@ jobs:
         run: |
           cd crates/ruff_wasm
           wasm-pack test --node
-      - name: "Test red_knot_wasm"
+      - name: "Test ty_wasm"
         run: |
-          cd crates/red_knot_wasm
+          cd crates/ty_wasm
           wasm-pack test --node
 
   cargo-build-release:

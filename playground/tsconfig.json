@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ESNext",
     "useDefineForClassFields": true,
-    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "lib": [
+      "DOM",
+      "DOM.Iterable",
+      "ESNext"
+    ],
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": false,
@@ -16,6 +20,13 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["ruff/src", "knot/src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": [
+    "ruff/src",
+    "ty/src"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ]
 }
