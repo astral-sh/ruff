@@ -7,9 +7,9 @@ use crate::DocumentSnapshot;
 use lsp_types::request::HoverRequest;
 use lsp_types::{HoverContents, HoverParams, MarkupContent, Url};
 use red_knot_ide::{hover, MarkupKind};
-use red_knot_project::ProjectDatabase;
 use ruff_db::source::{line_index, source_text};
 use ruff_text_size::Ranged;
+use ty_project::ProjectDatabase;
 
 pub(crate) struct HoverRequestHandler;
 

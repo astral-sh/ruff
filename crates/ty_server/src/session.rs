@@ -8,10 +8,10 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use lsp_types::{ClientCapabilities, TextDocumentContentChangeEvent, Url};
 
-use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::system::SystemPath;
 use ruff_db::Db;
+use ty_project::{ProjectDatabase, ProjectMetadata};
 
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::system::{url_to_any_system_path, AnySystemPath, LSPSystem};

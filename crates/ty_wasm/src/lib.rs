@@ -2,11 +2,6 @@ use std::any::Any;
 
 use js_sys::{Error, JsString};
 use red_knot_ide::{goto_type_definition, hover, inlay_hints, MarkupKind};
-use red_knot_project::metadata::options::Options;
-use red_knot_project::metadata::value::ValueSource;
-use red_knot_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
-use red_knot_project::ProjectMetadata;
-use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::{self, DisplayDiagnosticConfig};
 use ruff_db::files::{system_path_to_file, File, FileRange};
 use ruff_db::source::{line_index, source_text};
@@ -20,6 +15,11 @@ use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
+use ty_project::metadata::options::Options;
+use ty_project::metadata::value::ValueSource;
+use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
+use ty_project::ProjectMetadata;
+use ty_project::{Db, ProjectDatabase};
 use ty_python_semantic::Program;
 use wasm_bindgen::prelude::*;
 

@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use lsp_types::request::Completion;
 use lsp_types::{CompletionItem, CompletionParams, CompletionResponse, Url};
 use red_knot_ide::completion;
-use red_knot_project::ProjectDatabase;
 use ruff_db::source::{line_index, source_text};
+use ty_project::ProjectDatabase;
 
 use crate::document::PositionExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};

@@ -3,8 +3,8 @@ use std::borrow::Cow;
 use lsp_types::request::{GotoTypeDefinition, GotoTypeDefinitionParams};
 use lsp_types::{GotoDefinitionResponse, Url};
 use red_knot_ide::goto_type_definition;
-use red_knot_project::ProjectDatabase;
 use ruff_db::source::{line_index, source_text};
+use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToLink};
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};

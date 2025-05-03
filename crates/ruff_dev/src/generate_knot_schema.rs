@@ -9,7 +9,7 @@ use schemars::schema_for;
 
 use crate::generate_all::{Mode, REGENERATE_ALL_COMMAND};
 use crate::ROOT_DIR;
-use red_knot_project::metadata::options::Options;
+use ty_project::metadata::options::Options;
 
 #[derive(clap::Args)]
 pub(crate) struct Args {

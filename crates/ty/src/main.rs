@@ -10,13 +10,13 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
-use red_knot_project::metadata::options::Options;
-use red_knot_project::watch::ProjectWatcher;
-use red_knot_project::{watch, Db};
-use red_knot_project::{ProjectDatabase, ProjectMetadata};
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
+use ty_project::metadata::options::Options;
+use ty_project::watch::ProjectWatcher;
+use ty_project::{watch, Db};
+use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 
 mod args;

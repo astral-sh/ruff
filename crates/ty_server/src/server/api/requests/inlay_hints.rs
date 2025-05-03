@@ -7,8 +7,8 @@ use crate::DocumentSnapshot;
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
 use red_knot_ide::inlay_hints;
-use red_knot_project::ProjectDatabase;
 use ruff_db::source::{line_index, source_text};
+use ty_project::ProjectDatabase;
 
 pub(crate) struct InlayHintRequestHandler;
 

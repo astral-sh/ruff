@@ -11,9 +11,9 @@ use crate::document::ToRangeExt;
 use crate::server::api::traits::{BackgroundDocumentRequestHandler, RequestHandler};
 use crate::server::{client::Notifier, Result};
 use crate::session::DocumentSnapshot;
-use red_knot_project::{Db, ProjectDatabase};
 use ruff_db::diagnostic::Severity;
 use ruff_db::source::{line_index, source_text};
+use ty_project::{Db, ProjectDatabase};
 
 pub(crate) struct DocumentDiagnosticRequestHandler;
 

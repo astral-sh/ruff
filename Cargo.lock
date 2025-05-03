@@ -2488,7 +2488,6 @@ dependencies = [
  "insta-cmd",
  "jiff",
  "rayon",
- "red_knot_project",
  "regex",
  "ruff_db",
  "ruff_python_ast",
@@ -2500,6 +2499,7 @@ dependencies = [
  "tracing-flame",
  "tracing-subscriber",
  "tracing-tree",
+ "ty_project",
  "ty_python_semantic",
  "ty_server",
  "wild",
@@ -2520,57 +2520,6 @@ dependencies = [
  "tracing",
  "ty_python_semantic",
  "ty_vendored",
-]
-
-[[package]]
-name = "red_knot_project"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "crossbeam",
- "glob",
- "insta",
- "notify",
- "pep440_rs",
- "rayon",
- "red_knot_ide",
- "ruff_cache",
- "ruff_db",
- "ruff_macros",
- "ruff_python_ast",
- "ruff_python_formatter",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "salsa",
- "schemars",
- "serde",
- "thiserror 2.0.12",
- "toml",
- "tracing",
- "ty_python_semantic",
- "ty_vendored",
-]
-
-[[package]]
-name = "red_knot_wasm"
-version = "0.0.0"
-dependencies = [
- "console_error_panic_hook",
- "console_log",
- "getrandom 0.3.2",
- "js-sys",
- "log",
- "red_knot_ide",
- "red_knot_project",
- "ruff_db",
- "ruff_notebook",
- "ruff_python_formatter",
- "ruff_source_file",
- "ruff_text_size",
- "serde-wasm-bindgen",
- "ty_python_semantic",
- "wasm-bindgen",
- "wasm-bindgen-test",
 ]
 
 [[package]]
@@ -2729,7 +2678,6 @@ dependencies = [
  "criterion",
  "mimalloc",
  "rayon",
- "red_knot_project",
  "ruff_db",
  "ruff_linter",
  "ruff_python_ast",
@@ -2738,6 +2686,7 @@ dependencies = [
  "ruff_python_trivia",
  "rustc-hash 2.1.1",
  "tikv-jemallocator",
+ "ty_project",
 ]
 
 [[package]]
@@ -2804,7 +2753,6 @@ dependencies = [
  "libcst",
  "pretty_assertions",
  "rayon",
- "red_knot_project",
  "regex",
  "ruff",
  "ruff_diagnostics",
@@ -2827,6 +2775,7 @@ dependencies = [
  "tracing",
  "tracing-indicatif",
  "tracing-subscriber",
+ "ty_project",
 ]
 
 [[package]]
@@ -4042,6 +3991,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "ty_project"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "crossbeam",
+ "glob",
+ "insta",
+ "notify",
+ "pep440_rs",
+ "rayon",
+ "red_knot_ide",
+ "ruff_cache",
+ "ruff_db",
+ "ruff_macros",
+ "ruff_python_ast",
+ "ruff_python_formatter",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "salsa",
+ "schemars",
+ "serde",
+ "thiserror 2.0.12",
+ "toml",
+ "tracing",
+ "ty_python_semantic",
+ "ty_vendored",
+]
+
+[[package]]
 name = "ty_python_semantic"
 version = "0.0.0"
 dependencies = [
@@ -4097,7 +4075,6 @@ dependencies = [
  "lsp-server",
  "lsp-types",
  "red_knot_ide",
- "red_knot_project",
  "ruff_db",
  "ruff_notebook",
  "ruff_source_file",
@@ -4108,6 +4085,7 @@ dependencies = [
  "shellexpand",
  "tracing",
  "tracing-subscriber",
+ "ty_project",
  "ty_python_semantic",
 ]
 
@@ -4148,6 +4126,28 @@ dependencies = [
  "ruff_db",
  "walkdir",
  "zip",
+]
+
+[[package]]
+name = "ty_wasm"
+version = "0.0.0"
+dependencies = [
+ "console_error_panic_hook",
+ "console_log",
+ "getrandom 0.3.2",
+ "js-sys",
+ "log",
+ "red_knot_ide",
+ "ruff_db",
+ "ruff_notebook",
+ "ruff_python_formatter",
+ "ruff_source_file",
+ "ruff_text_size",
+ "serde-wasm-bindgen",
+ "ty_project",
+ "ty_python_semantic",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]

@@ -12,7 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 red_knot_ide = { workspace = true }
-red_knot_project = { workspace = true }
+ty_project = { workspace = true }
 ty_python_semantic = { workspace = true }
 
 ruff_db = { workspace = true, features = ["os"] }

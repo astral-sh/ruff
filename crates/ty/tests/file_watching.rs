@@ -3,11 +3,6 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Context};
-use red_knot_project::metadata::options::{EnvironmentOptions, Options};
-use red_knot_project::metadata::pyproject::{PyProject, Tool};
-use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
-use red_knot_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
-use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -15,6 +10,11 @@ use ruff_db::system::{
 };
 use ruff_db::{Db as _, Upcast};
 use ruff_python_ast::PythonVersion;
+use ty_project::metadata::options::{EnvironmentOptions, Options};
+use ty_project::metadata::pyproject::{PyProject, Tool};
+use ty_project::metadata::value::{RangedValue, RelativePathBuf};
+use ty_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
+use ty_project::{Db, ProjectDatabase, ProjectMetadata};
 use ty_python_semantic::{resolve_module, ModuleName, PythonPlatform};
 
 struct TestCase {
