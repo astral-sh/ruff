@@ -24,6 +24,12 @@ use crate::checkers::ast::Checker;
 /// directly on the variable itself (e.g., `set.add()`), as opposed to
 /// modifications within other function calls (e.g., `some_function(set)`).
 ///
+/// ## Fix safety
+/// This fix is always marked as unsafe because it changes the iteration target
+/// from the original set to a copy of the set. While this prevents the RuntimeError
+/// that would occur when modifying a set during iteration, it may change the behavior
+/// of the code if the original set is modified elsewhere during the iteration.
+///
 /// ## Example
 /// ```python
 /// nums = {1, 2, 3}
