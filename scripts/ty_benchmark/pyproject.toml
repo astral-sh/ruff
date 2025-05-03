@@ -1,5 +1,5 @@
 [project]
-name = "knot_benchmark"
+name = "ty_benchmark"
 version = "0.0.1"
 description = "Package for running end-to-end ty benchmarks"
 requires-python = ">=3.12"

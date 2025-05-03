@@ -8,7 +8,7 @@ import typing
 from pathlib import Path
 
 from benchmark import Hyperfine
-from benchmark.cases import Benchmark, Knot, Mypy, Pyright, Tool, Venv
+from benchmark.cases import Benchmark, Mypy, Pyright, Tool, Ty, Venv
 from benchmark.projects import ALL as all_projects
 from benchmark.projects import DEFAULT as default_projects
 
@@ -63,12 +63,12 @@ def main() -> None:
         action="store_true",
     )
     parser.add_argument(
-        "--knot",
-        help="Whether to benchmark knot (assumes a ty binary exists at `./target/release/ty`).",
+        "--ty",
+        help="Whether to benchmark ty (assumes a ty binary exists at `./target/release/ty`).",
         action="store_true",
     )
     parser.add_argument(
-        "--knot-path",
+        "--ty-path",
         type=Path,
         help="Path(s) to the ty binary to benchmark.",
         action="append",
@@ -90,17 +90,17 @@ def main() -> None:
     if args.pyright:
         suites.append(Pyright())
 
-    if args.knot:
-        suites.append(Knot())
+    if args.ty:
+        suites.append(Ty())
 
-    for path in args.knot_path or []:
-        suites.append(Knot(path=path))
+    for path in args.ty_path or []:
+        suites.append(Ty(path=path))
 
     if args.mypy:
         suites.append(Mypy())
 
     # If no tools were specified, default to benchmarking all tools.
-    suites = suites or [Knot(), Pyright(), Mypy()]
+    suites = suites or [Ty(), Pyright(), Mypy()]
 
     # Determine the benchmarks to run, based on user input.
     benchmarks = (

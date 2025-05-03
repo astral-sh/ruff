@@ -53,12 +53,12 @@ class Tool(abc.ABC):
         return None
 
 
-class Knot(Tool):
+class Ty(Tool):
     path: Path
     name: str
 
     def __init__(self, *, path: Path | None = None):
-        self.name = str(path) or "knot"
+        self.name = str(path) or "ty"
         self.path = path or (
             (Path(__file__) / "../../../../../target/release/ty").resolve()
         )
@@ -73,7 +73,7 @@ class Knot(Tool):
         command.extend(["--python", str(venv.path)])
 
         return Command(
-            name="knot",
+            name="ty",
             command=command,
         )
 
