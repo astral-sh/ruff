@@ -76,7 +76,7 @@ impl Display for DisplayRepresentation<'_> {
                     (_, Some(KnownClass::NoneType)) => f.write_str("None"),
                     (_, Some(KnownClass::NoDefaultType)) => f.write_str("NoDefault"),
                     (ClassType::NonGeneric(class), _) => f.write_str(class.name(self.db)),
-                    (ClassType::Generic(alias), _) => write!(f, "{}", alias.display(self.db)),
+                    (ClassType::Generic(alias), _) => alias.display(self.db).fmt(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner() {
@@ -104,16 +104,14 @@ impl Display for DisplayRepresentation<'_> {
             }
             // TODO functions and classes should display using a fully qualified name
             Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
-            Type::GenericAlias(generic) => {
-                write!(f, "{}", generic.display(self.db))
-            }
+            Type::GenericAlias(generic) => generic.display(self.db).fmt(f),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].
                 SubclassOfInner::Class(class) => write!(f, "type[{}]", class.name(self.db)),
                 SubclassOfInner::Dynamic(dynamic) => write!(f, "type[{dynamic}]"),
             },
-            Type::KnownInstance(known_instance) => write!(f, "{}", known_instance.repr(self.db)),
+            Type::KnownInstance(known_instance) => known_instance.repr(self.db).fmt(f),
             Type::FunctionLiteral(function) => {
                 let signature = function.signature(self.db);
 
@@ -263,9 +261,7 @@ impl Display for DisplayRepresentation<'_> {
                 }
                 f.write_str("]")
             }
-            Type::TypeVar(typevar) => {
-                write!(f, "{}", typevar.name(self.db))
-            }
+            Type::TypeVar(typevar) => f.write_str(typevar.name(self.db)),
             Type::AlwaysTruthy => f.write_str("AlwaysTruthy"),
             Type::AlwaysFalsy => f.write_str("AlwaysFalsy"),
             Type::BoundSuper(bound_super) => {
@@ -328,7 +324,7 @@ impl Display for DisplayGenericContext<'_> {
             if idx > 0 {
                 f.write_str(", ")?;
             }
-            write!(f, "{}", var.name(self.db))?;
+            f.write_str(var.name(self.db))?;
             match var.bound_or_constraints(self.db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                     write!(f, ": {}", bound.display(self.db))?;
@@ -339,7 +335,7 @@ impl Display for DisplayGenericContext<'_> {
                         if idx > 0 {
                             f.write_str(", ")?;
                         }
-                        write!(f, "{}", constraint.display(self.db))?;
+                        constraint.display(self.db).fmt(f)?;
                     }
                     f.write_char(')')?;
                 }
@@ -399,7 +395,7 @@ impl Display for DisplaySpecialization<'_> {
                 if idx > 0 {
                     f.write_str(", ")?;
                 }
-                write!(f, "{}", ty.display(self.db))?;
+                ty.display(self.db).fmt(f)?;
             }
             f.write_char(']')
         }
@@ -423,7 +419,7 @@ pub(crate) struct DisplayCallableType<'db> {
 impl Display for DisplayCallableType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self.signatures {
-            [signature] => write!(f, "{}", signature.display(self.db)),
+            [signature] => signature.display(self.db).fmt(f),
             signatures => {
                 // TODO: How to display overloads?
                 f.write_str("Overload[")?;
@@ -490,9 +486,7 @@ impl Display for DisplaySignature<'_> {
             f,
             ") -> {}",
             self.return_ty.unwrap_or(Type::unknown()).display(self.db)
-        )?;
-
-        Ok(())
+        )
     }
 }
 
@@ -510,7 +504,7 @@ struct DisplayParameter<'db> {
 impl Display for DisplayParameter<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if let Some(name) = self.param.display_name() {
-            write!(f, "{name}")?;
+            f.write_str(&name)?;
             if let Some(annotated_type) = self.param.annotated_type() {
                 write!(f, ": {}", annotated_type.display(self.db))?;
             }
@@ -767,9 +761,9 @@ impl Display for DisplayStringLiteralType<'_> {
             match ch {
                 // `escape_debug` will escape even single quotes, which is not necessary for our
                 // use case as we are already using double quotes to wrap the string.
-                '\'' => f.write_char('\'')?,
-                _ => write!(f, "{}", ch.escape_debug())?,
-            }
+                '\'' => f.write_char('\''),
+                _ => ch.escape_debug().fmt(f),
+            }?;
         }
         f.write_char('"')
     }
