@@ -1,0 +1,288 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/duplicate_keyword_args.py
+snapshot_kind: text
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..74,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 0..15,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..10,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 8..9,
+                                parameter: Parameter {
+                                    range: 8..9,
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 8..9,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 12..15,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 12..15,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 16..29,
+                    value: Call(
+                        ExprCall {
+                            range: 16..29,
+                            func: Name(
+                                ExprName {
+                                    range: 16..19,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 19..29,
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 20..23,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 20..21,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 22..23,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 25..28,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("x"),
+                                                range: 25..26,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 27..28,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+            FunctionDef(
+                StmtFunctionDef {
+                    range: 30..51,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("baz"),
+                        range: 34..37,
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 37..46,
+                        posonlyargs: [],
+                        args: [
+                            ParameterWithDefault {
+                                range: 38..39,
+                                parameter: Parameter {
+                                    range: 38..39,
+                                    name: Identifier {
+                                        id: Name("x"),
+                                        range: 38..39,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 41..42,
+                                parameter: Parameter {
+                                    range: 41..42,
+                                    name: Identifier {
+                                        id: Name("y"),
+                                        range: 41..42,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                            ParameterWithDefault {
+                                range: 44..45,
+                                parameter: Parameter {
+                                    range: 44..45,
+                                    name: Identifier {
+                                        id: Name("z"),
+                                        range: 44..45,
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                range: 48..51,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        range: 48..51,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 52..73,
+                    value: Call(
+                        ExprCall {
+                            range: 52..73,
+                            func: Name(
+                                ExprName {
+                                    range: 52..55,
+                                    id: Name("baz"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 55..73,
+                                args: [
+                                    Name(
+                                        ExprName {
+                                            range: 56..57,
+                                            id: Name("x"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                ],
+                                keywords: [
+                                    Keyword {
+                                        range: 59..62,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("y"),
+                                                range: 59..60,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 61..62,
+                                                value: Int(
+                                                    1,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 64..67,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("z"),
+                                                range: 64..65,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 66..67,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                    Keyword {
+                                        range: 69..72,
+                                        arg: Some(
+                                            Identifier {
+                                                id: Name("y"),
+                                                range: 69..70,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                range: 71..72,
+                                                value: Int(
+                                                    4,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(x): ...
+2 | foo(x=1, x=2)
+  |          ^^^ Syntax Error: Duplicate keyword argument "x"
+3 | def baz(x, y, z): ...
+4 | baz(x, y=1, z=3, y=4)
+  |
+
+
+  |
+2 | foo(x=1, x=2)
+3 | def baz(x, y, z): ...
+4 | baz(x, y=1, z=3, y=4)
+  |                  ^^^ Syntax Error: Duplicate keyword argument "y"
+  |
