@@ -166,7 +166,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
         match self.0 {
             Protocol::FromClass(_) => Type::ProtocolInstance(Self(Protocol::Synthesized(
-                SynthesizedProtocolType::new(db, self.0.interface(db)),
+                SynthesizedProtocolType::new(db, self.0.interface(db).clone()),
             ))),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
@@ -277,8 +277,11 @@ mod synthesized {
     pub(in crate::types) struct SynthesizedProtocolType<'db>(SynthesizedProtocolTypeInner<'db>);
 
     impl<'db> SynthesizedProtocolType<'db> {
-        pub(super) fn new(db: &'db dyn Db, interface: &'db ProtocolInterface<'db>) -> Self {
-            Self(SynthesizedProtocolTypeInner::new(db, interface.normalized(db)))
+        pub(super) fn new(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> Self {
+            Self(SynthesizedProtocolTypeInner::new(
+                db,
+                interface.normalized(db),
+            ))
         }
 
         pub(in crate::types) fn interface(self, db: &'db dyn Db) -> &'db ProtocolInterface<'db> {

@@ -97,8 +97,13 @@ impl<'db> ProtocolInterface<'db> {
         self.members().any(|member| member.ty.contains_todo(db))
     }
 
-    pub(super) fn normalized(&self, db: &'db dyn Db) -> Self {
-        self.clone()
+    pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
+        Self(
+            self.0
+                .into_iter()
+                .map(|(name, data)| (name, data.normalized(db)))
+                .collect(),
+        )
     }
 }
 
@@ -106,6 +111,15 @@ impl<'db> ProtocolInterface<'db> {
 struct ProtocolMemberData<'db> {
     ty: Type<'db>,
     qualifiers: TypeQualifiers,
+}
+
+impl<'db> ProtocolMemberData<'db> {
+    fn normalized(self, db: &'db dyn Db) -> Self {
+        Self {
+            ty: self.ty.normalized(db),
+            qualifiers: self.qualifiers,
+        }
+    }
 }
 
 /// A single member of a protocol interface.
