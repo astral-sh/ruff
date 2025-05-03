@@ -300,12 +300,7 @@ from typing import Callable
 def _(c: Callable[[int], int]):
     reveal_type(c.__init__)  # revealed: def __init__(self) -> None
     reveal_type(c.__class__)  # revealed: type
-
-    # TODO: The member lookup for `Callable` uses `object` which does not have a `__call__`
-    # attribute. We could special case `__call__` in this context. Refer to
-    # https://github.com/astral-sh/ruff/pull/16493#discussion_r1985098508 for more details.
-    # error: [unresolved-attribute] "Type `(int, /) -> int` has no attribute `__call__`"
-    reveal_type(c.__call__)  # revealed: Unknown
+    reveal_type(c.__call__)  # revealed: (int, /) -> int
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

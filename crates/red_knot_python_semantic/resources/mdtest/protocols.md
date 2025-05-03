@@ -1476,26 +1476,32 @@ signature implied by the `Callable` type is assignable to the signature of the `
 specified by the protocol:
 
 ```py
+from knot_extensions import TypeOf
+
 class Foo(Protocol):
     def __call__(self, x: int, /) -> str: ...
 
-# TODO: these fail because we don't yet understand that all `Callable` types have a `__call__` method,
-# and we therefore don't think that the `Callable` type is assignable to `Foo`. They should pass.
-static_assert(is_subtype_of(Callable[[int], str], Foo))  # error: [static-assert-error]
-static_assert(is_assignable_to(Callable[[int], str], Foo))  # error: [static-assert-error]
+static_assert(is_subtype_of(Callable[[int], str], Foo))
+static_assert(is_assignable_to(Callable[[int], str], Foo))
 
-static_assert(not is_subtype_of(Callable[[str], str], Foo))
-static_assert(not is_assignable_to(Callable[[str], str], Foo))
-static_assert(not is_subtype_of(Callable[[CallMeMaybe, int], str], Foo))
-static_assert(not is_assignable_to(Callable[[CallMeMaybe, int], str], Foo))
+# TODO: these should pass
+static_assert(not is_subtype_of(Callable[[str], str], Foo))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Callable[[str], str], Foo))  # error: [static-assert-error]
+static_assert(not is_subtype_of(Callable[[CallMeMaybe, int], str], Foo))  # error: [static-assert-error]
+static_assert(not is_assignable_to(Callable[[CallMeMaybe, int], str], Foo))  # error: [static-assert-error]
 
 def h(obj: Callable[[int], str], obj2: Foo, obj3: Callable[[str], str]):
-    # TODO: this fails because we don't yet understand that all `Callable` types have a `__call__` method,
-    # and we therefore don't think that the `Callable` type is assignable to `Foo`. It should pass.
-    obj2 = obj  # error: [invalid-assignment]
+    obj2 = obj
 
-    # This diagnostic is correct, however.
-    obj2 = obj3  # error: [invalid-assignment]
+    # TODO: we should emit [invalid-assignment] here because the signature of `obj3` is not assignable
+    # to the declared type of `obj2`
+    obj2 = obj3
+
+def satisfies_foo(x: int) -> str:
+    return "foo"
+
+static_assert(is_subtype_of(TypeOf[satisfies_foo], Foo))
+static_assert(is_assignable_to(TypeOf[satisfies_foo], Foo))
 ```
 
 ## Protocols are never singleton types, and are never single-valued types

@@ -2953,6 +2953,10 @@ impl<'db> Type<'db> {
             Type::DataclassDecorator(_) => KnownClass::FunctionType
                 .to_instance(db)
                 .member_lookup_with_policy(db, name, policy),
+
+            Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
+                Symbol::bound(self).into()
+            }
             Type::Callable(_) | Type::DataclassTransformer(_) => KnownClass::Object
                 .to_instance(db)
                 .member_lookup_with_policy(db, name, policy),
