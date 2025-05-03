@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::num::NonZeroU8;
 
 use ruff_text_size::TextRange;
-#[expect(clippy::enum_glob_use)]
+#[allow(clippy::enum_glob_use)]
 use Tag::*;
 
 use crate::format_element::tag::{Condition, Tag};

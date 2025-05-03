@@ -32,7 +32,7 @@ impl ruff_text_size::Ranged for Mod {
     }
 }
 
-#[expect(clippy::match_wildcard_for_single_variants)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl Mod {
     #[inline]
     pub const fn is_module(&self) -> bool {
@@ -321,7 +321,7 @@ impl ruff_text_size::Ranged for Stmt {
     }
 }
 
-#[expect(clippy::match_wildcard_for_single_variants)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl Stmt {
     #[inline]
     pub const fn is_function_def_stmt(&self) -> bool {
@@ -1517,7 +1517,7 @@ impl ruff_text_size::Ranged for Expr {
     }
 }
 
-#[expect(clippy::match_wildcard_for_single_variants)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl Expr {
     #[inline]
     pub const fn is_bool_op_expr(&self) -> bool {
@@ -2724,7 +2724,7 @@ impl ruff_text_size::Ranged for ExceptHandler {
     }
 }
 
-#[expect(clippy::match_wildcard_for_single_variants)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl ExceptHandler {
     #[inline]
     pub const fn is_except_handler(&self) -> bool {
@@ -2787,7 +2787,7 @@ impl ruff_text_size::Ranged for FStringElement {
     }
 }
 
-#[expect(clippy::match_wildcard_for_single_variants)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl FStringElement {
     #[inline]
     pub const fn is_expression(&self) -> bool {
@@ -2940,7 +2940,7 @@ impl ruff_text_size::Ranged for Pattern {
     }
 }
 
-#[expect(clippy::match_wildcard_for_single_variants)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl Pattern {
     #[inline]
     pub const fn is_match_value(&self) -> bool {
@@ -3275,7 +3275,7 @@ impl ruff_text_size::Ranged for TypeParam {
     }
 }
 
-#[expect(clippy::match_wildcard_for_single_variants)]
+#[allow(dead_code, clippy::match_wildcard_for_single_variants)]
 impl TypeParam {
     #[inline]
     pub const fn is_type_var(&self) -> bool {
@@ -3942,7 +3942,7 @@ impl ruff_text_size::Ranged for crate::Identifier {
 }
 
 impl Mod {
-    #[expect(unused)]
+    #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
@@ -3955,6 +3955,7 @@ impl Mod {
 }
 
 impl Stmt {
+    #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
@@ -3990,7 +3991,7 @@ impl Stmt {
 }
 
 impl Expr {
-    #[expect(unused)]
+    #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
@@ -4033,7 +4034,7 @@ impl Expr {
 }
 
 impl ExceptHandler {
-    #[expect(unused)]
+    #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
@@ -4045,7 +4046,7 @@ impl ExceptHandler {
 }
 
 impl FStringElement {
-    #[expect(unused)]
+    #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
@@ -4058,7 +4059,7 @@ impl FStringElement {
 }
 
 impl Pattern {
-    #[expect(unused)]
+    #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,
@@ -4077,6 +4078,7 @@ impl Pattern {
 }
 
 impl TypeParam {
+    #[allow(unused)]
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,

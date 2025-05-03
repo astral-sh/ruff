@@ -152,7 +152,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(js_name = "closeFile")]
-    #[expect(
+    #[allow(
         clippy::needless_pass_by_value,
         reason = "It's intentional that the file handle is consumed because it is no longer valid after closing"
     )]

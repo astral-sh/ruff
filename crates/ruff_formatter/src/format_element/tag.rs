@@ -127,7 +127,7 @@ impl Tag {
     }
 
     pub const fn kind(&self) -> TagKind {
-        #[expect(clippy::enum_glob_use)]
+        #[allow(clippy::enum_glob_use)]
         use Tag::*;
 
         match self {

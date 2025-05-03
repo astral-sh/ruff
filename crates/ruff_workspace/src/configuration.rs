@@ -1192,7 +1192,6 @@ pub struct FormatConfiguration {
 }
 
 impl FormatConfiguration {
-    #[expect(clippy::needless_pass_by_value)]
     pub fn from_options(options: FormatOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             // `--extension` is a hidden command-line argument that isn't supported in configuration
@@ -1230,7 +1229,6 @@ impl FormatConfiguration {
     }
 
     #[must_use]
-    #[expect(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
@@ -1259,7 +1257,6 @@ pub struct AnalyzeConfiguration {
 }
 
 impl AnalyzeConfiguration {
-    #[expect(clippy::needless_pass_by_value)]
     pub fn from_options(options: AnalyzeOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             exclude: options.exclude.map(|paths| {
@@ -1286,7 +1283,6 @@ impl AnalyzeConfiguration {
     }
 
     #[must_use]
-    #[expect(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
@@ -1658,7 +1654,6 @@ mod tests {
         Rule::BlankLinesBeforeNestedDefinition,
     ];
 
-    #[expect(clippy::needless_pass_by_value)]
     fn resolve_rules(
         selections: impl IntoIterator<Item = RuleSelection>,
         preview: Option<PreviewOptions>,

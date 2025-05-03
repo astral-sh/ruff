@@ -94,7 +94,7 @@ impl<'a> Printer<'a> {
         queue: &mut PrintQueue<'a>,
         element: &'a FormatElement,
     ) -> PrintResult<()> {
-        #[expect(clippy::enum_glob_use)]
+        #[allow(clippy::enum_glob_use)]
         use Tag::*;
 
         let args = stack.top();
@@ -1151,7 +1151,7 @@ impl<'a, 'print> FitsMeasurer<'a, 'print> {
 
     /// Tests if the passed element fits on the current line or not.
     fn fits_element(&mut self, element: &'a FormatElement) -> PrintResult<Fits> {
-        #[expect(clippy::enum_glob_use)]
+        #[allow(clippy::enum_glob_use)]
         use Tag::*;
 
         let args = self.stack.top();

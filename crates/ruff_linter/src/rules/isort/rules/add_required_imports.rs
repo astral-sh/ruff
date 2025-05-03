@@ -85,7 +85,6 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
     }
 }
 
-#[expect(clippy::too_many_arguments)]
 fn add_required_import(
     required_import: &NameImport,
     parsed: &Parsed<ModModule>,

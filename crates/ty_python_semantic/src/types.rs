@@ -6785,7 +6785,7 @@ impl<'db> FunctionType<'db> {
     /// 3. third `foo` definition, it would contain both overloads and the implementation which is
     ///    itself
     fn to_overloaded(self, db: &'db dyn Db) -> Option<&'db OverloadedFunction<'db>> {
-        #[expect(clippy::ref_option)] // TODO: Remove once salsa supports deref (https://github.com/salsa-rs/salsa/pull/772)
+        #[allow(clippy::ref_option)]
         #[salsa::tracked(return_ref)]
         fn to_overloaded_impl<'db>(
             db: &'db dyn Db,

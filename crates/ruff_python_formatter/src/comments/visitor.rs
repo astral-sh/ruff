@@ -6,7 +6,7 @@ use ruff_python_ast::{AnyNodeRef, Identifier};
 use ruff_python_ast::{Mod, Stmt};
 // The interface is designed to only export the members relevant for iterating nodes in
 // pre-order.
-#[expect(clippy::wildcard_imports)]
+#[allow(clippy::wildcard_imports)]
 use ruff_python_ast::visitor::source_order::*;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges};
 use ruff_text_size::{Ranged, TextRange, TextSize};

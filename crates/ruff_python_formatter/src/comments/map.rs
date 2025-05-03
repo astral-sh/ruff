@@ -244,7 +244,6 @@ impl<K: std::hash::Hash + Eq, V> MultiMap<K, V> {
     }
 
     /// Returns `true` if `key` has any *leading*, *dangling*, or *trailing* parts.
-
     pub(super) fn has(&self, key: &K) -> bool {
         self.index.contains_key(key)
     }

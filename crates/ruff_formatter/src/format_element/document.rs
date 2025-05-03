@@ -254,7 +254,7 @@ impl FormatOptions for IrFormatOptions {
 
 impl Format<IrFormatContext<'_>> for &[FormatElement] {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
-        #[expect(clippy::enum_glob_use)]
+        #[allow(clippy::enum_glob_use)]
         use Tag::*;
 
         write!(f, [ContentArrayStart])?;

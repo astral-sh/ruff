@@ -63,7 +63,6 @@ fn find_pyproject_config(
 }
 
 /// Find files that ruff would check so we can format them. Adapted from `ruff`.
-#[expect(clippy::type_complexity)]
 fn ruff_check_paths<'a>(
     pyproject_config: &'a PyprojectConfig,
     cli: &FormatArguments,

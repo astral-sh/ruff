@@ -168,7 +168,6 @@ impl Server {
         .join()
     }
 
-    #[expect(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
     fn event_loop(
         connection: &Connection,
         _client_capabilities: &ClientCapabilities,

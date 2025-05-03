@@ -341,7 +341,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
         """)
 
         out.append(
-            "#[expect(dead_code, clippy::match_wildcard_for_single_variants)]"
+            "#[allow(dead_code, clippy::match_wildcard_for_single_variants)]"
         )  # Not all is_methods are used
         out.append(f"impl {group.name} {{")
         for node in group.nodes:
@@ -439,7 +439,7 @@ def write_owned_enum(out: list[str], ast: Ast) -> None:
     for group in ast.groups:
         out.append(f"""
             impl {group.owned_enum_ty} {{
-                #[expect(unused)]
+                #[allow(unused)]
                 pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
                 where
                     V: crate::visitor::source_order::SourceOrderVisitor<'a> + ?Sized,

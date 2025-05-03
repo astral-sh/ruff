@@ -14,7 +14,6 @@ pub(crate) fn read_from_stdin() -> Result<String> {
     Ok(buffer)
 }
 
-#[expect(clippy::print_stdout)]
 fn main() -> Result<()> {
     let cli: Cli = Cli::parse();
 

@@ -834,7 +834,6 @@ mod tests {
         // Regression test for issue #3086.
 
         #[cfg(unix)]
-        #[expect(clippy::items_after_statements)]
         fn flip_execute_permission_bit(path: &Path) -> io::Result<()> {
             use std::os::unix::fs::PermissionsExt;
             let file = fs::OpenOptions::new().write(true).open(path)?;
@@ -843,7 +842,6 @@ mod tests {
         }
 
         #[cfg(windows)]
-        #[expect(clippy::items_after_statements)]
         fn flip_read_only_permission(path: &Path) -> io::Result<()> {
             let file = fs::OpenOptions::new().write(true).open(path)?;
             let mut perms = file.metadata()?.permissions();

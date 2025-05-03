@@ -50,7 +50,6 @@ impl OsSystem {
 
         Self {
             // Spreading `..Default` because it isn't possible to feature gate the initializer of a single field.
-            #[expect(clippy::needless_update)]
             inner: Arc::new(OsSystemInner {
                 cwd: cwd.to_path_buf(),
                 case_sensitivity,

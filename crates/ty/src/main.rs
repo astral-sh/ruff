@@ -24,7 +24,6 @@ mod logging;
 mod python_version;
 mod version;
 
-#[expect(clippy::print_stdout, clippy::unnecessary_wraps, clippy::print_stderr)]
 pub fn main() -> ExitStatus {
     run().unwrap_or_else(|error| {
         use std::io::Write;

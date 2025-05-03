@@ -538,7 +538,6 @@ fn diagnostics_to_messages(
 
 /// Generate `Diagnostic`s from source code content, iteratively fixing
 /// until stable.
-#[expect(clippy::too_many_arguments)]
 pub fn lint_fix<'a>(
     path: &Path,
     package: Option<PackageRoot<'_>>,

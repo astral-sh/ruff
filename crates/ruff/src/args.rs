@@ -1271,7 +1271,6 @@ pub struct AnalyzeGraphArgs {
 /// Configuration overrides provided via dedicated CLI flags:
 /// `--line-length`, `--respect-gitignore`, etc.
 #[derive(Clone, Default)]
-#[expect(clippy::struct_excessive_bools)]
 struct ExplicitConfigOverrides {
     dummy_variable_rgx: Option<Regex>,
     exclude: Option<Vec<FilePattern>>,

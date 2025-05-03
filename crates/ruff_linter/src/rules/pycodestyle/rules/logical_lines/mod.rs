@@ -392,7 +392,6 @@ impl LogicalLinesBuilder {
     }
 
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
-    #[expect(clippy::cast_possible_truncation)]
     fn push_token(&mut self, kind: TokenKind, range: TextRange) {
         let line = &mut self.current_line;
 
