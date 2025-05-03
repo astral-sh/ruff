@@ -5,7 +5,7 @@ use super::{ClassType, KnownClass, SubclassOfType, Type};
 use crate::symbol::{Symbol, SymbolAndQualifiers};
 use crate::Db;
 
-pub(super) use synthesized::SynthesizedProtocolType;
+pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
@@ -260,7 +260,7 @@ impl<'db> Protocol<'db> {
     }
 }
 
-mod synthesized {
+mod synthesized_protocol {
     use crate::db::Db;
     use crate::types::protocol_class::ProtocolInterface;
 
@@ -268,7 +268,7 @@ mod synthesized {
     ///
     /// Two synthesized protocol types with the same members will share the same Salsa ID,
     /// making them easy to compare for equivalence. A synthesized protocol type is therefore
-    /// returned by [`ProtocolInstanceType::normalized`] so that two protocols with the same members
+    /// returned by [`super::ProtocolInstanceType::normalized`] so that two protocols with the same members
     /// will be understood as equivalent even in the context of differently ordered unions or intersections.
     ///
     /// The constructor method of this type maintains the invariant that a synthesized protocol type
