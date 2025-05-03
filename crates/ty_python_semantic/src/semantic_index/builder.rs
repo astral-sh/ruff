@@ -239,7 +239,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         let children_start = self.scopes.next_index() + 1;
 
         // SAFETY: `node` is guaranteed to be a child of `self.module`
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         let node_with_kind = unsafe { node.to_kind(self.module.clone()) };
 
         let scope = Scope::new(
@@ -457,7 +457,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         definition_node: impl Into<DefinitionNodeRef<'db>>,
     ) -> (Definition<'db>, usize) {
         let definition_node: DefinitionNodeRef<'_> = definition_node.into();
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         // SAFETY: `definition_node` is guaranteed to be a child of `self.module`
         let kind = unsafe { definition_node.into_owned(self.module.clone()) };
         let category = kind.category(self.source_type.is_stub());
@@ -801,11 +801,11 @@ impl<'db> SemanticIndexBuilder<'db> {
             self.db,
             self.file,
             self.current_scope(),
-            #[allow(unsafe_code)]
+            #[expect(unsafe_code)]
             unsafe {
                 AstNodeRef::new(self.module.clone(), expression_node)
             },
-            #[allow(unsafe_code)]
+            #[expect(unsafe_code)]
             assigned_to
                 .map(|assigned_to| unsafe { AstNodeRef::new(self.module.clone(), assigned_to) }),
             expression_kind,
@@ -1009,7 +1009,7 @@ impl<'db> SemanticIndexBuilder<'db> {
                     value_file_scope,
                     self.current_scope(),
                     // SAFETY: `target` belongs to the `self.module` tree
-                    #[allow(unsafe_code)]
+                    #[expect(unsafe_code)]
                     unsafe {
                         AstNodeRef::new(self.module.clone(), target)
                     },
@@ -2188,7 +2188,7 @@ where
                     match self.current_assignment() {
                         Some(CurrentAssignment::Assign { node, unpack, .. }) => {
                             // SAFETY: `value` and `expr` belong to the `self.module` tree
-                            #[allow(unsafe_code)]
+                            #[expect(unsafe_code)]
                             let assignment = AssignmentDefinitionKind::new(
                                 TargetKind::from(unpack),
                                 unsafe { AstNodeRef::new(self.module.clone(), &node.value) },
@@ -2203,7 +2203,7 @@ where
                         Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                             self.add_standalone_type_expression(&ann_assign.annotation);
                             // SAFETY: `annotation`, `value` and `expr` belong to the `self.module` tree
-                            #[allow(unsafe_code)]
+                            #[expect(unsafe_code)]
                             let assignment = AnnotatedAssignmentDefinitionKind::new(
                                 unsafe {
                                     AstNodeRef::new(self.module.clone(), &ann_assign.annotation)
@@ -2221,7 +2221,7 @@ where
                         }
                         Some(CurrentAssignment::For { node, unpack, .. }) => {
                             // // SAFETY: `iter` and `expr` belong to the `self.module` tree
-                            #[allow(unsafe_code)]
+                            #[expect(unsafe_code)]
                             let assignment = ForStmtDefinitionKind::new(
                                 TargetKind::from(unpack),
                                 unsafe { AstNodeRef::new(self.module.clone(), &node.iter) },
@@ -2241,7 +2241,7 @@ where
                             ..
                         }) => {
                             // SAFETY: `context_expr` and `expr` belong to the `self.module` tree
-                            #[allow(unsafe_code)]
+                            #[expect(unsafe_code)]
                             let assignment = WithItemDefinitionKind::new(
                                 TargetKind::from(unpack),
                                 unsafe { AstNodeRef::new(self.module.clone(), &item.context_expr) },
@@ -2260,7 +2260,7 @@ where
                             first,
                         }) => {
                             // SAFETY: `iter` and `expr` belong to the `self.module` tree
-                            #[allow(unsafe_code)]
+                            #[expect(unsafe_code)]
                             let assignment = ComprehensionDefinitionKind {
                                 target_kind: TargetKind::from(unpack),
                                 iterable: unsafe {

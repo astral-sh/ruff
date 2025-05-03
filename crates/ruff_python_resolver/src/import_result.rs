@@ -6,7 +6,7 @@ use crate::implicit_imports::ImplicitImports;
 use crate::py_typed::PyTypedInfo;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct ImportResult {
     /// Whether the import name was relative (e.g., ".foo").
     pub(crate) is_relative: bool,
@@ -76,7 +76,7 @@ pub(crate) struct ImportResult {
 
     /// If the import resolved to a type hint (i.e., a `.pyi` file), then
     /// a non-type-hint resolution will be stored here.
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     pub(crate) non_stub_import_result: Option<Box<ImportResult>>,
 
     /// Information extracted from the `py.typed` in the package used to

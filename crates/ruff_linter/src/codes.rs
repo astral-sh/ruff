@@ -61,7 +61,7 @@ pub enum RuleGroup {
 
 #[ruff_macros::map_codes]
 pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
-    #[allow(clippy::enum_glob_use)]
+    #[expect(clippy::enum_glob_use)]
     use Linter::*;
 
     #[rustfmt::skip]

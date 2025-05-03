@@ -27,7 +27,7 @@ pub(crate) mod tests {
         rule_selection: Arc<RuleSelection>,
     }
 
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     impl TestDb {
         pub(crate) fn new() -> Self {
             Self {

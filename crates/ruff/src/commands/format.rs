@@ -362,7 +362,7 @@ pub(crate) fn format_source(
                 })
             } else {
                 // Using `Printed::into_code` requires adding `ruff_formatter` as a direct dependency, and I suspect that Rust can optimize the closure away regardless.
-                #[allow(clippy::redundant_closure_for_method_calls)]
+                #[expect(clippy::redundant_closure_for_method_calls)]
                 format_module_source(unformatted, options).map(|formatted| formatted.into_code())
             };
 

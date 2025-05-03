@@ -172,7 +172,6 @@ mod tests {
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::Locator;
 
-    #[allow(deprecated)]
     fn create_diagnostics(
         filename: &str,
         source: &str,

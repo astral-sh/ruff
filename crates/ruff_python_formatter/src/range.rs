@@ -546,7 +546,7 @@ impl NarrowRange<'_> {
         Some(SavedLevel { level: saved_level })
     }
 
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn leave_level(&mut self, saved_state: SavedLevel) {
         self.level = saved_state.level;
     }

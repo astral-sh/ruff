@@ -186,7 +186,7 @@ impl Debouncer {
         }
     }
 
-    #[allow(clippy::unused_self, clippy::needless_pass_by_value)]
+    #[expect(clippy::unused_self, clippy::needless_pass_by_value)]
     fn add_error(&mut self, error: notify::Error) {
         // Micha: I skimmed through some of notify's source code and it seems the most common errors
         // are IO errors. All other errors should really only happen when adding or removing a watched folders.

@@ -105,7 +105,7 @@ enum Constant {
 }
 
 impl Constant {
-    #[allow(clippy::approx_constant)]
+    #[expect(clippy::approx_constant)]
     fn from_value(value: f64) -> Option<Self> {
         if (3.14..3.15).contains(&value) {
             matches_constant(std::f64::consts::PI, value).then_some(Self::Pi)

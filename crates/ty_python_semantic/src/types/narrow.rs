@@ -127,7 +127,7 @@ fn constraints_for_expression_cycle_initial<'db>(
     None
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 fn negative_constraints_for_expression_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<NarrowingConstraints<'db>>,

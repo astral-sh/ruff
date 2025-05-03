@@ -37,7 +37,7 @@ impl Violation for UselessImportAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        #[allow(clippy::if_not_else)]
+        #[expect(clippy::if_not_else)]
         if !self.required_import_conflict {
             "Import alias does not rename original package".to_string()
         } else {

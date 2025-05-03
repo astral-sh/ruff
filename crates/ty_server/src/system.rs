@@ -258,6 +258,6 @@ fn virtual_path_not_found(path: impl Display) -> std::io::Error {
 fn document_revision(document: &DocumentQuery) -> FileRevision {
     // The file revision is just an opaque number which doesn't have any significant meaning other
     // than that the file has changed if the revisions are different.
-    #[allow(clippy::cast_sign_loss)]
+    #[expect(clippy::cast_sign_loss)]
     FileRevision::new(document.version() as u128)
 }

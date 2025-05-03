@@ -248,7 +248,7 @@ mod tests {
     use super::NotebookDocument;
 
     enum TestCellContent {
-        #[allow(dead_code)]
+        #[expect(dead_code)]
         Markup(String),
         Code(String),
     }

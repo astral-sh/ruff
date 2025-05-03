@@ -79,16 +79,16 @@ enum Reason<'a> {
     Future,
     KnownStandardLibrary,
     SamePackage,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     SourceMatch(&'a Path),
     NoMatch,
     UserDefinedSection,
     NoSections,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     DisabledSection(&'a ImportSection),
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn categorize<'a>(
     module_name: &str,
     is_relative: bool,
@@ -172,7 +172,7 @@ fn match_sources<'a>(paths: &'a [PathBuf], base: &str) -> Option<&'a Path> {
     None
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],

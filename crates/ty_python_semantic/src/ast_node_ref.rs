@@ -43,7 +43,7 @@ pub struct AstNodeRef<T> {
     node: std::ptr::NonNull<T>,
 }
 
-#[allow(unsafe_code)]
+#[expect(unsafe_code)]
 impl<T> AstNodeRef<T> {
     /// Creates a new `AstNodeRef` that references `node`. The `parsed` is the [`ParsedModule`] to
     /// which the `AstNodeRef` belongs.
@@ -112,7 +112,7 @@ where
     }
 }
 
-#[allow(unsafe_code)]
+#[expect(unsafe_code)]
 unsafe impl<T> salsa::Update for AstNodeRef<T> {
     unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
         let old_ref = &mut (*old_pointer);
@@ -126,9 +126,9 @@ unsafe impl<T> salsa::Update for AstNodeRef<T> {
     }
 }
 
-#[allow(unsafe_code)]
+#[expect(unsafe_code)]
 unsafe impl<T> Send for AstNodeRef<T> where T: Send {}
-#[allow(unsafe_code)]
+#[expect(unsafe_code)]
 unsafe impl<T> Sync for AstNodeRef<T> where T: Sync {}
 
 #[cfg(test)]
@@ -139,7 +139,7 @@ mod tests {
     use ruff_python_parser::parse_unchecked_source;
 
     #[test]
-    #[allow(unsafe_code)]
+    #[expect(unsafe_code)]
     fn equality() {
         let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
         let parsed = ParsedModule::new(parsed_raw.clone());
@@ -167,7 +167,7 @@ mod tests {
         assert_ne!(node1, other_node);
     }
 
-    #[allow(unsafe_code)]
+    #[expect(unsafe_code)]
     #[test]
     fn inequality() {
         let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
@@ -186,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(unsafe_code)]
+    #[expect(unsafe_code)]
     fn debug() {
         let parsed_raw = parse_unchecked_source("1 + 2", PySourceType::Python);
         let parsed = ParsedModule::new(parsed_raw);

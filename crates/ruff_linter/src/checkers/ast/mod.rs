@@ -234,14 +234,14 @@ pub(crate) struct Checker<'a> {
     /// The target [`PythonVersion`] for version-dependent checks.
     target_version: PythonVersion,
     /// Helper visitor for detecting semantic syntax errors.
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
 
 impl<'a> Checker<'a> {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
         parsed_annotations_arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
@@ -362,7 +362,7 @@ impl<'a> Checker<'a> {
 
     /// Returns the [`SourceRow`] for the given offset.
     pub(crate) fn compute_source_row(&self, offset: TextSize) -> SourceRow {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let line = self.locator.compute_line_index(offset);
 
         if let Some(notebook_index) = self.notebook_index {
@@ -2909,7 +2909,7 @@ impl<'a> ParsedAnnotationsCache<'a> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_ast(
     parsed: &Parsed<ModModule>,
     locator: &Locator,

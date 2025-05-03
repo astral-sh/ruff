@@ -4078,7 +4078,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
     }
 
-    #[allow(clippy::unused_self)]
+    #[expect(clippy::unused_self)]
     fn infer_boolean_literal_expression(&mut self, literal: &ast::ExprBooleanLiteral) -> Type<'db> {
         let ast::ExprBooleanLiteral { range: _, value } = literal;
 

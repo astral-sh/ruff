@@ -12,7 +12,7 @@ use crate::import_result::{ImportResult, ImportType};
 use crate::module_descriptor::ImportModuleDescriptor;
 use crate::{host, native_module, py_typed, search};
 
-#[allow(clippy::fn_params_excessive_bools)]
+#[expect(clippy::fn_params_excessive_bools)]
 fn resolve_module_descriptor(
     root: &Path,
     module_descriptor: &ImportModuleDescriptor,
@@ -206,7 +206,7 @@ fn resolve_module_descriptor(
 /// defined in [PEP 420].
 ///
 /// [PEP 420]: https://peps.python.org/pep-0420/
-#[allow(clippy::fn_params_excessive_bools)]
+#[expect(clippy::fn_params_excessive_bools)]
 fn resolve_absolute_import(
     root: &Path,
     module_descriptor: &ImportModuleDescriptor,

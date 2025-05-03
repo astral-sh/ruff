@@ -267,7 +267,7 @@ impl Idx for ScopedVisibilityConstraintId {
     #[inline]
     fn new(value: usize) -> Self {
         assert!(value <= (SMALLEST_TERMINAL.0 as usize));
-        #[allow(clippy::cast_possible_truncation)]
+        #[expect(clippy::cast_possible_truncation)]
         Self(value as u32)
     }
 

@@ -150,7 +150,7 @@ impl Violation for MissingTypeKwargs {
 #[deprecated(note = "ANN101 has been removed")]
 pub(crate) struct MissingTypeSelf;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for MissingTypeSelf {
     fn message(&self) -> String {
         unreachable!("ANN101 has been removed");
@@ -194,7 +194,7 @@ impl Violation for MissingTypeSelf {
 #[deprecated(note = "ANN102 has been removed")]
 pub(crate) struct MissingTypeCls;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for MissingTypeCls {
     fn message(&self) -> String {
         unreachable!("ANN102 has been removed")

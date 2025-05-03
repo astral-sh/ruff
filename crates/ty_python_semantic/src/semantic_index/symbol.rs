@@ -287,7 +287,7 @@ impl SymbolTable {
         &self.symbols[symbol_id.into()]
     }
 
-    #[allow(unused)]
+    #[expect(unused)]
     pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopedSymbolId> {
         self.symbols.indices()
     }
@@ -420,7 +420,7 @@ impl NodeWithScopeRef<'_> {
     ///
     /// # Safety
     /// The node wrapped by `self` must be a child of `module`.
-    #[allow(unsafe_code)]
+    #[expect(unsafe_code)]
     pub(super) unsafe fn to_kind(self, module: ParsedModule) -> NodeWithScopeKind {
         match self {
             NodeWithScopeRef::Module => NodeWithScopeKind::Module,

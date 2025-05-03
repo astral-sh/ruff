@@ -76,7 +76,7 @@ fn typeshed_no_panic() -> anyhow::Result<()> {
     ))
 }
 
-#[allow(clippy::print_stdout)]
+#[expect(clippy::print_stdout)]
 fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     let root = SystemPathBuf::from("/src");
 

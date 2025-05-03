@@ -244,7 +244,7 @@ macro_rules! declare_lint {
         }
     ) => {
         $( #[doc = $doc] )+
-        #[allow(clippy::needless_update)]
+        #[expect(clippy::needless_update)]
         $vis static $name: $crate::lint::LintMetadata = $crate::lint::LintMetadata {
             name: ruff_db::diagnostic::LintName::of(ruff_macros::kebab_case!($name)),
             summary: $summary,

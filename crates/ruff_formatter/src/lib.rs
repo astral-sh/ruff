@@ -925,7 +925,7 @@ pub struct FormatState<Context> {
     group_id_builder: UniqueGroupIdBuilder,
 }
 
-#[allow(clippy::missing_fields_in_debug)]
+#[expect(clippy::missing_fields_in_debug)]
 impl<Context> std::fmt::Debug for FormatState<Context>
 where
     Context: std::fmt::Debug,
