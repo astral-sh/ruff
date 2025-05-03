@@ -517,6 +517,33 @@ impl SemanticSyntaxChecker {
         }
     }
 
+    fn duplicate_keyword_args<Ctx: SemanticSyntaxContext>(args: &ast::Arguments, ctx: &Ctx) {
+        let mut unique_keyword_args = FxHashSet::default();
+        for key in args.keywords.iter() {
+            if let Some(ident) = &key.arg {
+                if !unique_keyword_args.insert(ident) {
+                    let range = ident.range();
+                    // test_err duplicate_keyword_args
+                    // def foo(x): ...
+                    // foo(x=1, x=2)
+                    // def baz(x, y, z): ...
+                    // baz(x, y=1, z=3, y=4)
+
+                    // test_ok non_duplicate_keyword_args
+                    // def foo(x): ...
+                    // foo(x=1)
+                    // def bar(x, y, z): ...
+                    // foo(x="a", y=1, z=True)
+                    Self::add_error(
+                        ctx,
+                        SemanticSyntaxErrorKind::DuplicateKeywordArgs(ident.to_string()),
+                        range,
+                    );
+                }
+            }
+        }
+    }
+
     fn irrefutable_match_case<Ctx: SemanticSyntaxContext>(stmt: &ast::StmtMatch, ctx: &Ctx) {
         // test_ok irrefutable_case_pattern_at_end
         // match x:
@@ -715,6 +742,9 @@ impl SemanticSyntaxChecker {
                 ..
             }) => {
                 Self::duplicate_parameter_name(parameters, ctx);
+            }
+            Expr::Call(ast::ExprCall { arguments, .. }) => {
+                Self::duplicate_keyword_args(arguments, ctx);
             }
             _ => {}
         }
@@ -964,6 +994,9 @@ impl Display for SemanticSyntaxError {
             }
             SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
                 write!(f, "nonlocal declaration not allowed at module level")
+            }
+            SemanticSyntaxErrorKind::DuplicateKeywordArgs(arg) => {
+                write!(f, "keyword argument repeated: {arg}")
             }
         }
     }
@@ -1286,6 +1319,16 @@ pub enum SemanticSyntaxErrorKind {
     /// lambda x, x: ...
     /// ```
     DuplicateParameter(String),
+
+    /// Represents duplicated keyword arguments in a function call.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// def f(x): ...
+    /// f(x=1, x=2)
+    /// ```
+    DuplicateKeywordArgs(String),
 
     /// Represents a nonlocal declaration at module level
     NonlocalDeclarationAtModuleLevel,
