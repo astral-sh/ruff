@@ -250,14 +250,12 @@ pub(crate) fn native_literals(
             // next to it without any space separating them. Without this check, the fix for this
             // rule would create a syntax error.
             // Ex) `bool(True)and None` no space between `)` and the keyword `and`.
-            if let Ok(token_idx) =
-                tokens.binary_search_by(|token| token.range().end().cmp(&call_range.end()))
+            //
+            // Subtract 1 from the end of the range to include `Rpar` token in the slice.
+            if let [paren_token, next_token, ..] = tokens.after(call_range.sub_end(1.into()).end())
             {
-                let token = &tokens[token_idx];
-                needs_space = tokens.get(token_idx + 1).is_some_and(|next_token| {
-                    next_token.kind().is_keyword()
-                        && token.range().end() == next_token.range().start()
-                });
+                needs_space = next_token.kind().is_keyword()
+                    && paren_token.range().end() == next_token.range().start();
             }
 
             let mut content = match (parent_expr, literal_type, has_unary_op) {
