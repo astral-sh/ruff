@@ -2473,216 +2473,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "red_knot"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "argfile",
- "clap",
- "colored 3.0.0",
- "countme",
- "crossbeam",
- "ctrlc",
- "filetime",
- "insta",
- "insta-cmd",
- "jiff",
- "rayon",
- "red_knot_project",
- "red_knot_python_semantic",
- "red_knot_server",
- "regex",
- "ruff_db",
- "ruff_python_ast",
- "ruff_python_trivia",
- "salsa",
- "tempfile",
- "toml",
- "tracing",
- "tracing-flame",
- "tracing-subscriber",
- "tracing-tree",
- "wild",
-]
-
-[[package]]
-name = "red_knot_ide"
-version = "0.0.0"
-dependencies = [
- "insta",
- "red_knot_python_semantic",
- "red_knot_vendored",
- "ruff_db",
- "ruff_python_ast",
- "ruff_python_parser",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "salsa",
- "smallvec",
- "tracing",
-]
-
-[[package]]
-name = "red_knot_project"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "crossbeam",
- "glob",
- "insta",
- "notify",
- "pep440_rs",
- "rayon",
- "red_knot_ide",
- "red_knot_python_semantic",
- "red_knot_vendored",
- "ruff_cache",
- "ruff_db",
- "ruff_macros",
- "ruff_python_ast",
- "ruff_python_formatter",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "salsa",
- "schemars",
- "serde",
- "thiserror 2.0.12",
- "toml",
- "tracing",
-]
-
-[[package]]
-name = "red_knot_python_semantic"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bitflags 2.9.0",
- "camino",
- "compact_str",
- "countme",
- "dir-test",
- "drop_bomb",
- "hashbrown 0.15.2",
- "indexmap",
- "insta",
- "itertools 0.14.0",
- "memchr",
- "ordermap",
- "quickcheck",
- "quickcheck_macros",
- "red_knot_test",
- "red_knot_vendored",
- "ruff_db",
- "ruff_index",
- "ruff_macros",
- "ruff_python_ast",
- "ruff_python_literal",
- "ruff_python_parser",
- "ruff_python_stdlib",
- "ruff_python_trivia",
- "ruff_source_file",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "salsa",
- "schemars",
- "serde",
- "smallvec",
- "static_assertions",
- "strum",
- "strum_macros",
- "tempfile",
- "test-case",
- "thiserror 2.0.12",
- "tracing",
-]
-
-[[package]]
-name = "red_knot_server"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "crossbeam",
- "jod-thread",
- "libc",
- "lsp-server",
- "lsp-types",
- "red_knot_ide",
- "red_knot_project",
- "red_knot_python_semantic",
- "ruff_db",
- "ruff_notebook",
- "ruff_source_file",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "serde",
- "serde_json",
- "shellexpand",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "red_knot_test"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "camino",
- "colored 3.0.0",
- "insta",
- "memchr",
- "red_knot_python_semantic",
- "red_knot_vendored",
- "regex",
- "ruff_db",
- "ruff_index",
- "ruff_notebook",
- "ruff_python_ast",
- "ruff_python_trivia",
- "ruff_source_file",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "salsa",
- "serde",
- "smallvec",
- "tempfile",
- "thiserror 2.0.12",
- "toml",
- "tracing",
-]
-
-[[package]]
-name = "red_knot_vendored"
-version = "0.0.0"
-dependencies = [
- "path-slash",
- "ruff_db",
- "walkdir",
- "zip",
-]
-
-[[package]]
-name = "red_knot_wasm"
-version = "0.0.0"
-dependencies = [
- "console_error_panic_hook",
- "console_log",
- "getrandom 0.3.2",
- "js-sys",
- "log",
- "red_knot_ide",
- "red_knot_project",
- "red_knot_python_semantic",
- "ruff_db",
- "ruff_notebook",
- "ruff_python_formatter",
- "ruff_source_file",
- "ruff_text_size",
- "serde-wasm-bindgen",
- "wasm-bindgen",
- "wasm-bindgen-test",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2838,7 +2628,6 @@ dependencies = [
  "criterion",
  "mimalloc",
  "rayon",
- "red_knot_project",
  "ruff_db",
  "ruff_linter",
  "ruff_python_ast",
@@ -2847,6 +2636,7 @@ dependencies = [
  "ruff_python_trivia",
  "rustc-hash 2.1.1",
  "tikv-jemallocator",
+ "ty_project",
 ]
 
 [[package]]
@@ -2913,7 +2703,6 @@ dependencies = [
  "libcst",
  "pretty_assertions",
  "rayon",
- "red_knot_project",
  "regex",
  "ruff",
  "ruff_diagnostics",
@@ -2936,6 +2725,7 @@ dependencies = [
  "tracing",
  "tracing-indicatif",
  "tracing-subscriber",
+ "ty_project",
 ]
 
 [[package]]
@@ -2971,7 +2761,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "red_knot_python_semantic",
  "ruff_cache",
  "ruff_db",
  "ruff_linter",
@@ -2981,6 +2770,7 @@ dependencies = [
  "salsa",
  "schemars",
  "serde",
+ "ty_python_semantic",
  "zip",
 ]
 
@@ -4148,6 +3938,216 @@ dependencies = [
  "ignore",
  "libtest-mimic",
  "snapbox",
+]
+
+[[package]]
+name = "ty"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "argfile",
+ "clap",
+ "colored 3.0.0",
+ "countme",
+ "crossbeam",
+ "ctrlc",
+ "filetime",
+ "insta",
+ "insta-cmd",
+ "jiff",
+ "rayon",
+ "regex",
+ "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_trivia",
+ "salsa",
+ "tempfile",
+ "toml",
+ "tracing",
+ "tracing-flame",
+ "tracing-subscriber",
+ "tracing-tree",
+ "ty_project",
+ "ty_python_semantic",
+ "ty_server",
+ "wild",
+]
+
+[[package]]
+name = "ty_ide"
+version = "0.0.0"
+dependencies = [
+ "insta",
+ "ruff_db",
+ "ruff_python_ast",
+ "ruff_python_parser",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "salsa",
+ "smallvec",
+ "tracing",
+ "ty_python_semantic",
+ "ty_vendored",
+]
+
+[[package]]
+name = "ty_project"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "crossbeam",
+ "glob",
+ "insta",
+ "notify",
+ "pep440_rs",
+ "rayon",
+ "ruff_cache",
+ "ruff_db",
+ "ruff_macros",
+ "ruff_python_ast",
+ "ruff_python_formatter",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "salsa",
+ "schemars",
+ "serde",
+ "thiserror 2.0.12",
+ "toml",
+ "tracing",
+ "ty_ide",
+ "ty_python_semantic",
+ "ty_vendored",
+]
+
+[[package]]
+name = "ty_python_semantic"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.9.0",
+ "camino",
+ "compact_str",
+ "countme",
+ "dir-test",
+ "drop_bomb",
+ "hashbrown 0.15.2",
+ "indexmap",
+ "insta",
+ "itertools 0.14.0",
+ "memchr",
+ "ordermap",
+ "quickcheck",
+ "quickcheck_macros",
+ "ruff_db",
+ "ruff_index",
+ "ruff_macros",
+ "ruff_python_ast",
+ "ruff_python_literal",
+ "ruff_python_parser",
+ "ruff_python_stdlib",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "salsa",
+ "schemars",
+ "serde",
+ "smallvec",
+ "static_assertions",
+ "strum",
+ "strum_macros",
+ "tempfile",
+ "test-case",
+ "thiserror 2.0.12",
+ "tracing",
+ "ty_test",
+ "ty_vendored",
+]
+
+[[package]]
+name = "ty_server"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "crossbeam",
+ "jod-thread",
+ "libc",
+ "lsp-server",
+ "lsp-types",
+ "ruff_db",
+ "ruff_notebook",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "serde",
+ "serde_json",
+ "shellexpand",
+ "tracing",
+ "tracing-subscriber",
+ "ty_ide",
+ "ty_project",
+ "ty_python_semantic",
+]
+
+[[package]]
+name = "ty_test"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "colored 3.0.0",
+ "insta",
+ "memchr",
+ "regex",
+ "ruff_db",
+ "ruff_index",
+ "ruff_notebook",
+ "ruff_python_ast",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "salsa",
+ "serde",
+ "smallvec",
+ "tempfile",
+ "thiserror 2.0.12",
+ "toml",
+ "tracing",
+ "ty_python_semantic",
+ "ty_vendored",
+]
+
+[[package]]
+name = "ty_vendored"
+version = "0.0.0"
+dependencies = [
+ "path-slash",
+ "ruff_db",
+ "walkdir",
+ "zip",
+]
+
+[[package]]
+name = "ty_wasm"
+version = "0.0.0"
+dependencies = [
+ "console_error_panic_hook",
+ "console_log",
+ "getrandom 0.3.2",
+ "js-sys",
+ "log",
+ "ruff_db",
+ "ruff_notebook",
+ "ruff_python_formatter",
+ "ruff_source_file",
+ "ruff_text_size",
+ "serde-wasm-bindgen",
+ "ty_ide",
+ "ty_project",
+ "ty_python_semantic",
+ "wasm-bindgen",
+ "wasm-bindgen-test",
 ]
 
 [[package]]

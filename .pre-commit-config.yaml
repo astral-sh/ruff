@@ -3,8 +3,8 @@ fail_fast: false
 exclude: |
   (?x)^(
     .github/workflows/release.yml|
-    crates/red_knot_vendored/vendor/.*|
-    crates/red_knot_project/resources/.*|
+    crates/ty_vendored/vendor/.*|
+    crates/ty_project/resources/.*|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|

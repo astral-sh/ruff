@@ -134,20 +134,20 @@ impl Diagnostic {
     /// NOTE: At present, this routine will return the first primary
     /// annotation's message as the primary message when the main diagnostic
     /// message is empty. This is meant to facilitate an incremental migration
-    /// in Red Knot over to the new diagnostic data model. (The old data model
+    /// in ty over to the new diagnostic data model. (The old data model
     /// didn't distinguish between messages on the entire diagnostic and
     /// messages attached to a particular span.)
     pub fn primary_message(&self) -> &str {
         if !self.inner.message.as_str().is_empty() {
             return self.inner.message.as_str();
         }
-        // FIXME: As a special case, while we're migrating Red Knot
+        // FIXME: As a special case, while we're migrating ty
         // to the new diagnostic data model, we'll look for a primary
         // message from the primary annotation. This is because most
-        // Red Knot diagnostics are created with an empty diagnostic
+        // ty diagnostics are created with an empty diagnostic
         // message and instead attach the message to the annotation.
         // Fixing this will require touching basically every diagnostic
-        // in Red Knot, so we do it this way for now to match the old
+        // in ty, so we do it this way for now to match the old
         // semantics. ---AG
         self.primary_annotation()
             .and_then(|ann| ann.get_message())
@@ -165,7 +165,7 @@ impl Diagnostic {
     ///
     /// The reason why we don't just always return both the main diagnostic
     /// message and the primary annotation message is because this was written
-    /// in the midst of an incremental migration of Red Knot over to the new
+    /// in the midst of an incremental migration of ty over to the new
     /// diagnostic data model. At time of writing, diagnostics were still
     /// constructed in the old model where the main diagnostic message and the
     /// primary annotation message were not distinguished from each other. So

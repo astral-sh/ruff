@@ -36,8 +36,8 @@ jobs:
       code: ${{ steps.check_code.outputs.changed }}
       # Flag that is raised when any code that affects the fuzzer is changed
       fuzz: ${{ steps.check_fuzzer.outputs.changed }}
-      # Flag that is set to "true" when code related to red-knot changes.
-      red_knot: ${{ steps.check_red_knot.outputs.changed }}
+      # Flag that is set to "true" when code related to ty changes.
+      ty: ${{ steps.check_ty.outputs.changed }}
 
       # Flag that is set to "true" when code related to the playground changes.
       playground: ${{ steps.check_playground.outputs.changed }}
@@ -84,7 +84,7 @@ jobs:
           if git diff --quiet "${MERGE_BASE}...HEAD" -- ':Cargo.toml' \
             ':Cargo.lock' \
             ':crates/**' \
-            ':!crates/red_knot*/**' \
+            ':!crates/ty*/**' \
             ':!crates/ruff_python_formatter/**' \
             ':!crates/ruff_formatter/**' \
             ':!crates/ruff_dev/**' \
@@ -145,7 +145,7 @@ jobs:
         run: |
           if git diff --quiet "${MERGE_BASE}...HEAD" -- ':**' \
             ':!**/*.md' \
-            ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' \
+            ':crates/ty_python_semantic/resources/mdtest/**/*.md' \
             ':!docs/**' \
             ':!assets/**' \
             ':.github/workflows/ci.yaml' \
@@ -168,15 +168,15 @@ jobs:
               echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Check if the red-knot code changed
-        id: check_red_knot
+      - name: Check if the ty code changed
+        id: check_ty
         env:
           MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
         run: |
           if git diff --quiet "${MERGE_BASE}...HEAD" -- \
             ':Cargo.toml' \
             ':Cargo.lock' \
-            ':crates/red_knot*/**' \
+            ':crates/ty*/**' \
             ':crates/ruff_db/**' \
             ':crates/ruff_annotate_snippets/**' \
             ':crates/ruff_python_ast/**' \
@@ -221,7 +221,7 @@ jobs:
       - name: "Clippy"
         run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
       - name: "Clippy (wasm)"
-        run: cargo clippy -p ruff_wasm -p red_knot_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
+        run: cargo clippy -p ruff_wasm -p ty_wasm --target wasm32-unknown-unknown --all-features --locked -- -D warnings
 
   cargo-test-linux:
     name: "cargo test (linux)"
@@ -246,14 +246,14 @@ jobs:
         uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
         with:
           tool: cargo-insta
-      - name: Red-knot mdtests (GitHub annotations)
-        if: ${{ needs.determine_changes.outputs.red_knot == 'true' }}
+      - name: ty mdtests (GitHub annotations)
+        if: ${{ needs.determine_changes.outputs.ty == 'true' }}
         env:
           NO_COLOR: 1
           MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
         # Ignore errors if this step fails; we want to continue to later steps in the workflow anyway.
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
-        run: cargo test -p red_knot_python_semantic --test mdtest || true
+        run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         shell: bash
         env:
@@ -268,7 +268,7 @@ jobs:
       # sync, not just public items. Eventually we should do this for all
       # crates; for now add crates here as they are warning-clean to prevent
       # regression.
-      - run: cargo doc --no-deps -p red_knot_python_semantic -p red_knot -p red_knot_test -p ruff_db --document-private-items
+      - run: cargo doc --no-deps -p ty_python_semantic -p ty -p ty_test -p ruff_db --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
@@ -278,8 +278,8 @@ jobs:
           path: target/debug/ruff
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: red_knot
-          path: target/debug/red_knot
+          name: ty
+          path: target/debug/ty
 
   cargo-test-linux-release:
     name: "cargo test (linux, release)"
@@ -362,9 +362,9 @@ jobs:
         run: |
           cd crates/ruff_wasm
           wasm-pack test --node
-      - name: "Test red_knot_wasm"
+      - name: "Test ty_wasm"
         run: |
-          cd crates/red_knot_wasm
+          cd crates/ty_wasm
           wasm-pack test --node
 
   cargo-build-release:
@@ -636,29 +636,29 @@ jobs:
           name: ecosystem-result
           path: ecosystem-result
 
-  fuzz-redknot:
-    name: "Fuzz for new red-knot panics"
+  fuzz-ty:
+    name: "Fuzz for new ty panics"
     runs-on: depot-ubuntu-22.04-16
     needs:
       - cargo-test-linux
       - determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.red_knot == 'true' }}
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.ty == 'true' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           persist-credentials: false
       - uses: actions/download-artifact@95815c38cf2ff2164869cbab79da8d1f422bc89e # v4.2.1
-        name: Download new red-knot binary
-        id: redknot-new
+        name: Download new ty binary
+        id: ty-new
         with:
-          name: red_knot
+          name: ty
           path: target/debug
       - uses: dawidd6/action-download-artifact@20319c5641d495c8a52e688b7dc5fada6c3a9fbc # v8
-        name: Download baseline red-knot binary
+        name: Download baseline ty binary
         with:
-          name: red_knot
+          name: ty
           branch: ${{ github.event.pull_request.base.ref }}
           workflow: "ci.yaml"
           check_artifacts: true
@@ -666,20 +666,20 @@ jobs:
       - name: Fuzz
         env:
           FORCE_COLOR: 1
-          NEW_REDKNOT: ${{ steps.redknot-new.outputs.download-path }}
+          NEW_TY: ${{ steps.ty-new.outputs.download-path }}
         run: |
           # Make executable, since artifact download doesn't preserve this
-          chmod +x "${PWD}/red_knot" "${NEW_REDKNOT}/red_knot"
+          chmod +x "${PWD}/ty" "${NEW_TY}/ty"
 
           (
             uvx \
             --python="${PYTHON_VERSION}" \
             --from=./python/py-fuzzer \
             fuzz \
-            --test-executable="${NEW_REDKNOT}/red_knot" \
-            --baseline-executable="${PWD}/red_knot" \
+            --test-executable="${NEW_TY}/ty" \
+            --baseline-executable="${PWD}/ty" \
             --only-new-bugs \
-            --bin=red_knot \
+            --bin=ty \
             0-500
           )
 

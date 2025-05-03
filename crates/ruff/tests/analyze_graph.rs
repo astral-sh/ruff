@@ -552,7 +552,7 @@ fn venv() -> Result<()> {
     });
 
     // test the error message for a non-existent venv. it's important that the `ruff analyze graph`
-    // flag matches the red-knot flag used to generate the error message (`--python`)
+    // flag matches the ty flag used to generate the error message (`--python`)
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
