@@ -19,6 +19,8 @@ use ruff_text_size::Ranged;
 /// Prefer `sys.exit()`, as the `sys` module is guaranteed to exist in all
 /// contexts.
 ///
+/// ## Fix safety
+///
 /// ## Example
 /// ```python
 /// if __name__ == "__main__":
