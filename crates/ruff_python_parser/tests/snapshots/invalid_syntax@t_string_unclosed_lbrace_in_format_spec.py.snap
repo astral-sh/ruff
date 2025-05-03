@@ -1,0 +1,154 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/t_string_unclosed_lbrace_in_format_spec.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        range: 0..29,
+        body: [
+            Expr(
+                StmtExpr {
+                    range: 0..12,
+                    value: TString(
+                        ExprTString {
+                            range: 0..12,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 0..12,
+                                            elements: [
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 2..8,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 8..12,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 9..10,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            TStringFormatSpec {
+                                                                range: 11..12,
+                                                                elements: [],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    range: 13..29,
+                    value: TString(
+                        ExprTString {
+                            range: 13..29,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString(
+                                        TString {
+                                            range: 13..29,
+                                            elements: [
+                                                Literal(
+                                                    TStringLiteralElement {
+                                                        range: 15..21,
+                                                        value: "hello ",
+                                                    },
+                                                ),
+                                                Interpolation(
+                                                    TStringInterpolationElement {
+                                                        range: 21..29,
+                                                        interpolation: Name(
+                                                            ExprName {
+                                                                range: 22..23,
+                                                                id: Name("x"),
+                                                                ctx: Load,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: Some(
+                                                            TStringFormatSpec {
+                                                                range: 24..29,
+                                                                elements: [
+                                                                    Literal(
+                                                                        TStringLiteralElement {
+                                                                            range: 24..27,
+                                                                            value: ".3f",
+                                                                        },
+                                                                    ),
+                                                                ],
+                                                            },
+                                                        ),
+                                                    },
+                                                ),
+                                            ],
+                                            flags: TStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                            },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | t"hello {x:"
+  |            ^ Syntax Error: Expected a t-string element or a '}'
+2 | t"hello {x:.3f"
+  |
+
+
+  |
+1 | t"hello {x:"
+  |             ^ Syntax Error: t-string: unterminated string
+2 | t"hello {x:.3f"
+  |
+
+
+  |
+1 | t"hello {x:"
+2 | t"hello {x:.3f"
+  |               ^ Syntax Error: Expected a t-string element or a '}'
+  |
+
+
+  |
+1 | t"hello {x:"
+2 | t"hello {x:.3f"
+  |                ^ Syntax Error: unexpected EOF while parsing
+  |
