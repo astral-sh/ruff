@@ -127,7 +127,7 @@ impl Tag {
     }
 
     pub const fn kind(&self) -> TagKind {
-        #[allow(clippy::enum_glob_use)]
+        #[expect(clippy::enum_glob_use)]
         use Tag::*;
 
         match self {
@@ -379,7 +379,7 @@ impl PartialEq for LabelId {
 }
 
 impl LabelId {
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub fn of<T: LabelDefinition>(label: T) -> Self {
         Self {
             value: label.value(),

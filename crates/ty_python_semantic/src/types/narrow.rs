@@ -66,7 +66,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     }
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 #[salsa::tracked(return_ref)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
@@ -75,7 +75,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), true).finish()
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 #[salsa::tracked(
     return_ref,
     cycle_fn=constraints_for_expression_cycle_recover,
@@ -88,7 +88,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), true).finish()
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 #[salsa::tracked(
     return_ref,
     cycle_fn=negative_constraints_for_expression_cycle_recover,
@@ -101,7 +101,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Expression(expression), false).finish()
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 #[salsa::tracked(return_ref)]
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
@@ -110,7 +110,7 @@ fn all_negative_narrowing_constraints_for_pattern<'db>(
     NarrowingConstraintsBuilder::new(db, PredicateNode::Pattern(pattern), false).finish()
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 fn constraints_for_expression_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<NarrowingConstraints<'db>>,
@@ -127,7 +127,7 @@ fn constraints_for_expression_cycle_initial<'db>(
     None
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 fn negative_constraints_for_expression_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<NarrowingConstraints<'db>>,

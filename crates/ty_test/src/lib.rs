@@ -33,7 +33,7 @@ const MDTEST_TEST_FILTER: &str = "MDTEST_TEST_FILTER";
 /// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.
-#[allow(clippy::print_stdout)]
+#[expect(clippy::print_stdout)]
 pub fn run(
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,

@@ -7,7 +7,7 @@ use ty_test::OutputFormat;
     dir: "$CARGO_MANIFEST_DIR/resources/mdtest",
     glob: "**/*.md"
 )]
-#[allow(clippy::needless_pass_by_value)]
+#[expect(clippy::needless_pass_by_value)]
 fn mdtest(fixture: Fixture<&str>) {
     let absolute_fixture_path = Utf8Path::new(fixture.path());
     let crate_dir = Utf8Path::new(env!("CARGO_MANIFEST_DIR"));

@@ -103,7 +103,7 @@ impl std::fmt::Display for StrRepr<'_, '_> {
 impl UnicodeEscape<'_> {
     const REPR_RESERVED_LEN: usize = 2; // for quotes
 
-    #[allow(
+    #[expect(
         clippy::cast_possible_wrap,
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss
@@ -265,7 +265,7 @@ impl<'a> AsciiEscape<'a> {
 }
 
 impl AsciiEscape<'_> {
-    #[allow(
+    #[expect(
         clippy::cast_possible_wrap,
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss

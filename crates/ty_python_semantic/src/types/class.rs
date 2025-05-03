@@ -70,7 +70,7 @@ fn try_mro_cycle_recover<'db>(
     salsa::CycleRecoveryAction::Iterate
 }
 
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 fn try_mro_cycle_initial<'db>(
     db: &'db dyn Db,
     self_: ClassLiteral<'db>,
@@ -82,7 +82,7 @@ fn try_mro_cycle_initial<'db>(
     ))
 }
 
-#[allow(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
+#[expect(clippy::ref_option, clippy::trivially_copy_pass_by_ref)]
 fn inheritance_cycle_recover<'db>(
     _db: &'db dyn Db,
     _value: &Option<InheritanceCycle>,

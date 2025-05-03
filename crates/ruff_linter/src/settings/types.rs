@@ -249,12 +249,12 @@ pub struct FilePatternSet {
     cache_key: u64,
     // This field is only for displaying the internals
     // of `set`.
-    #[allow(clippy::used_underscore_binding)]
+    #[expect(clippy::used_underscore_binding)]
     _set_internals: Vec<FilePattern>,
 }
 
 impl FilePatternSet {
-    #[allow(clippy::used_underscore_binding)]
+    #[expect(clippy::used_underscore_binding)]
     pub fn try_from_iter<I>(patterns: I) -> Result<Self, anyhow::Error>
     where
         I: IntoIterator<Item = FilePattern>,

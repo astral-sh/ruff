@@ -147,7 +147,7 @@ pub(crate) fn setup_tracing(level: VerbosityLevel) -> anyhow::Result<TracingGuar
     })
 }
 
-#[allow(clippy::type_complexity)]
+#[expect(clippy::type_complexity)]
 fn setup_profile<S>() -> (
     Option<tracing_flame::FlameLayer<S, BufWriter<File>>>,
     Option<tracing_flame::FlushGuard<BufWriter<File>>>,

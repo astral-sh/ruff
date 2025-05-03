@@ -98,7 +98,7 @@ pub struct FixerResult<'a> {
 }
 
 /// Generate [`Message`]s from the source code contents at the given `Path`.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn check_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
@@ -538,7 +538,7 @@ fn diagnostics_to_messages(
 
 /// Generate `Diagnostic`s from source code content, iteratively fixing
 /// until stable.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn lint_fix<'a>(
     path: &Path,
     package: Option<PackageRoot<'_>>,
@@ -672,7 +672,7 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
         .join(", ")
 }
 
-#[allow(clippy::print_stderr)]
+#[expect(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, messages: &[Message]) {
     let codes = collect_rule_codes(messages.iter().filter_map(Message::rule));
     if cfg!(debug_assertions) {
@@ -705,7 +705,7 @@ This indicates a bug in Ruff. If you could open an issue at:
     }
 }
 
-#[allow(clippy::print_stderr)]
+#[expect(clippy::print_stderr)]
 fn report_fix_syntax_error(
     path: &Path,
     transformed: &str,

@@ -376,7 +376,7 @@ struct Renderable<'r> {
     // (At time of writing, 2025-03-13, we currently render the diagnostic
     // ID into the main message of the parent diagnostic. We don't use this
     // specific field to do that though.)
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     id: &'r str,
     diagnostics: Vec<RenderableDiagnostic<'r>>,
 }

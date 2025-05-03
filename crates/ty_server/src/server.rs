@@ -2,7 +2,7 @@
 
 use std::num::NonZeroUsize;
 // The new PanicInfoHook name requires MSRV >= 1.82
-#[allow(deprecated)]
+#[expect(deprecated)]
 use std::panic::PanicInfo;
 
 use lsp_server::Message;
@@ -114,7 +114,7 @@ impl Server {
 
     pub(crate) fn run(self) -> crate::Result<()> {
         // The new PanicInfoHook name requires MSRV >= 1.82
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,
@@ -168,7 +168,7 @@ impl Server {
         .join()
     }
 
-    #[allow(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
+    #[expect(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
     fn event_loop(
         connection: &Connection,
         _client_capabilities: &ClientCapabilities,

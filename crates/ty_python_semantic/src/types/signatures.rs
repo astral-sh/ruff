@@ -1485,7 +1485,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::many_single_char_names)]
+    #[expect(clippy::many_single_char_names)]
     fn full() {
         let mut db = setup_db();
         db.write_dedented(

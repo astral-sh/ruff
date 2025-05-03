@@ -257,7 +257,7 @@ impl<'db> SemanticIndex<'db> {
     }
 
     /// Returns the parent scope of `scope_id`.
-    #[allow(unused)]
+    #[expect(unused)]
     #[track_caller]
     pub(crate) fn parent_scope(&self, scope_id: FileScopeId) -> Option<&Scope> {
         Some(&self.scopes[self.parent_scope_id(scope_id)?])

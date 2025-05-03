@@ -254,7 +254,7 @@ impl FormatOptions for IrFormatOptions {
 
 impl Format<IrFormatContext<'_>> for &[FormatElement] {
     fn fmt(&self, f: &mut Formatter<IrFormatContext>) -> FormatResult<()> {
-        #[allow(clippy::enum_glob_use)]
+        #[expect(clippy::enum_glob_use)]
         use Tag::*;
 
         write!(f, [ContentArrayStart])?;
@@ -280,7 +280,7 @@ impl Format<IrFormatContext<'_>> for &[FormatElement] {
                 | FormatElement::SourceCodeSlice { .. }) => {
                     fn write_escaped(element: &FormatElement, f: &mut Formatter<IrFormatContext>) {
                         let (text, text_width) = match element {
-                            #[allow(clippy::cast_possible_truncation)]
+                            #[expect(clippy::cast_possible_truncation)]
                             FormatElement::Token { text } => {
                                 (*text, TextWidth::Width(Width::new(text.len() as u32)))
                             }

@@ -300,7 +300,7 @@ pub(crate) struct MatchPatternDefinitionNodeRef<'a> {
 }
 
 impl<'db> DefinitionNodeRef<'db> {
-    #[allow(unsafe_code)]
+    #[expect(unsafe_code)]
     pub(super) unsafe fn into_owned(self, parsed: ParsedModule) -> DefinitionKind<'db> {
         match self {
             DefinitionNodeRef::Import(ImportDefinitionNodeRef {

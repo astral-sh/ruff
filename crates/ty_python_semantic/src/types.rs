@@ -5617,7 +5617,6 @@ impl<'db> TypeVarInstance<'db> {
         matches!(self.kind(db), TypeVarKind::Legacy)
     }
 
-    #[allow(unused)]
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
             Some(ty)
@@ -5626,7 +5625,6 @@ impl<'db> TypeVarInstance<'db> {
         }
     }
 
-    #[allow(unused)]
     pub(crate) fn constraints(self, db: &'db dyn Db) -> Option<&'db [Type<'db>]> {
         if let Some(TypeVarBoundOrConstraints::Constraints(tuple)) = self.bound_or_constraints(db) {
             Some(tuple.elements(db))
@@ -5856,7 +5854,7 @@ impl<'db> IterationError<'db> {
             /// Emit a diagnostic that is certain that `iterable_type` is not iterable.
             ///
             /// `because` should explain why `iterable_type` is not iterable.
-            #[allow(clippy::wrong_self_convention)]
+            #[expect(clippy::wrong_self_convention)]
             fn is_not(self, because: impl std::fmt::Display) -> LintDiagnosticGuard<'a, 'a> {
                 let mut diag = self.builder.into_diagnostic(format_args!(
                     "Object of type `{iterable_type}` is not iterable",
@@ -6787,7 +6785,7 @@ impl<'db> FunctionType<'db> {
     /// 3. third `foo` definition, it would contain both overloads and the implementation which is
     ///    itself
     fn to_overloaded(self, db: &'db dyn Db) -> Option<&'db OverloadedFunction<'db>> {
-        #[allow(clippy::ref_option)] // TODO: Remove once salsa supports deref (https://github.com/salsa-rs/salsa/pull/772)
+        #[expect(clippy::ref_option)] // TODO: Remove once salsa supports deref (https://github.com/salsa-rs/salsa/pull/772)
         #[salsa::tracked(return_ref)]
         fn to_overloaded_impl<'db>(
             db: &'db dyn Db,

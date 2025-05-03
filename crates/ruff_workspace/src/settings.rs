@@ -19,7 +19,7 @@ use std::fmt;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, CacheKey)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct Settings {
     #[cache_key(ignore)]
     pub cache_dir: PathBuf,

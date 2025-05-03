@@ -29,7 +29,6 @@ pub(crate) struct Normalizer;
 
 impl Normalizer {
     /// Transform an AST module into a normalized representation.
-    #[allow(dead_code)]
     pub(crate) fn visit_module(&self, module: &mut ast::Mod) {
         match module {
             ast::Mod::Module(module) => {

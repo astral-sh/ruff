@@ -43,7 +43,7 @@ impl LineIndex {
                 b'\r' if bytes.get(i + 1) == Some(&b'\n') => continue,
                 b'\n' | b'\r' => {
                     // SAFETY: Assertion above guarantees `i <= u32::MAX`
-                    #[allow(clippy::cast_possible_truncation)]
+                    #[expect(clippy::cast_possible_truncation)]
                     line_starts.push(TextSize::from(i as u32) + TextSize::from(1));
                 }
                 _ => {}

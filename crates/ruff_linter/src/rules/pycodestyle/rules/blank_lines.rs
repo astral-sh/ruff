@@ -818,7 +818,7 @@ impl<'a> BlankLinesChecker<'a> {
         }
     }
 
-    #[allow(clippy::nonminimal_bool)]
+    #[expect(clippy::nonminimal_bool)]
     fn check_line(
         &self,
         line: &LogicalLineInfo,

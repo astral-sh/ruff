@@ -77,7 +77,7 @@ fn matches_ignoring_indentation(val1: &str, val2: &str) -> bool {
         })
 }
 
-#[allow(clippy::cast_sign_loss, clippy::too_many_arguments)]
+#[expect(clippy::cast_sign_loss, clippy::too_many_arguments)]
 /// I001
 pub(crate) fn organize_imports(
     block: &Block,

@@ -127,7 +127,7 @@ impl<T> PySlice for [T] {
         if len == 0 {
             // The iterator needs to have the same type as the step>0 case below,
             // so we need to use `.skip(0)`.
-            #[allow(clippy::iter_skip_zero)]
+            #[expect(clippy::iter_skip_zero)]
             return Ok(Either::Left(self.iter().skip(0).take(0).step_by(1)));
         }
 
@@ -192,7 +192,7 @@ impl<T> PySlice for [T] {
 }
 
 #[cfg(test)]
-#[allow(clippy::redundant_clone)]
+#[expect(clippy::redundant_clone)]
 mod tests {
     use crate::util::subscript::{OutOfBoundsError, StepSizeZeroError};
 

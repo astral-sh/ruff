@@ -183,14 +183,14 @@ mod imp {
             QoSClass::Background => libc::qos_class_t::QOS_CLASS_BACKGROUND,
         };
 
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         let code = unsafe { libc::pthread_set_qos_class_self_np(c, 0) };
 
         if code == 0 {
             return;
         }
 
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         let errno = unsafe { *libc::__error() };
 
         match errno {
@@ -223,10 +223,10 @@ mod imp {
     }
 
     pub(super) fn get_current_thread_qos_class() -> Option<QoSClass> {
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         let current_thread = unsafe { libc::pthread_self() };
         let mut qos_class_raw = libc::qos_class_t::QOS_CLASS_UNSPECIFIED;
-        #[allow(unsafe_code)]
+        #[expect(unsafe_code)]
         let code = unsafe {
             libc::pthread_get_qos_class_np(current_thread, &mut qos_class_raw, std::ptr::null_mut())
         };
@@ -241,7 +241,7 @@ mod imp {
             // ones which we cannot handle anyway
             //
             // 0: https://github.com/apple-oss-distributions/libpthread/blob/67e155c94093be9a204b69637d198eceff2c7c46/src/qos.c#L171-L177
-            #[allow(unsafe_code)]
+            #[expect(unsafe_code)]
             let errno = unsafe { *libc::__error() };
             unreachable!("`pthread_get_qos_class_np` failed unexpectedly (os error {errno})");
         }

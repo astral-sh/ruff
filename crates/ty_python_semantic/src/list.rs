@@ -180,7 +180,7 @@ impl<K, V> ListBuilder<K, V> {
     /// as our return type, since we never return `None`. However, for consistency with our other
     /// methods, we always use `Option<I>` as the return type for any method that can return a
     /// list.
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     fn add_cell(&mut self, rest: Option<ListCellId>, key: K, value: V) -> Option<ListCellId> {
         Some(self.storage.cells.push(ListCell { rest, key, value }))
     }
@@ -319,7 +319,7 @@ impl<K, V> ListBuilder<K, V> {
     /// Returns the intersection of two lists. The result will contain an entry for any key that
     /// appears in both lists. The corresponding values will be combined using the `combine`
     /// function that you provide.
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub(crate) fn intersect_with<F>(
         &mut self,
         a: List<K, V>,
@@ -372,7 +372,7 @@ impl<K, V> ListBuilder<K, V> {
 
 impl<K> ListStorage<K, ()> {
     /// Iterates through the elements in a set _in reverse order_.
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     pub(crate) fn iter_set_reverse(&self, set: List<K, ()>) -> ListSetReverseIterator<K> {
         ListSetReverseIterator {
             storage: self,
@@ -513,7 +513,7 @@ mod tests {
 
     impl<K, V> ListStorage<K, V> {
         /// Iterates through the entries in a list _in reverse order by key_.
-        #[allow(clippy::needless_pass_by_value)]
+        #[expect(clippy::needless_pass_by_value)]
         pub(crate) fn iter_reverse(&self, list: List<K, V>) -> ListReverseIterator<'_, K, V> {
             ListReverseIterator {
                 storage: self,
@@ -649,7 +649,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn roundtrip_set_from_vec(elements: Vec<u16>) -> bool {
         let mut builder = ListBuilder::default();
         let set = builder.set_from_elements(&elements);
@@ -660,7 +660,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn roundtrip_set_intersection(a_elements: Vec<u16>, b_elements: Vec<u16>) -> bool {
         let mut builder = ListBuilder::default();
         let a = builder.set_from_elements(&a_elements);
@@ -712,7 +712,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn roundtrip_list_from_vec(pairs: Vec<(u16, u16)>) -> bool {
         let mut builder = ListBuilder::default();
         let list = builder.set_from_pairs(&pairs);
@@ -723,7 +723,7 @@ mod property_tests {
 
     #[quickcheck_macros::quickcheck]
     #[ignore]
-    #[allow(clippy::needless_pass_by_value)]
+    #[expect(clippy::needless_pass_by_value)]
     fn roundtrip_list_intersection(
         a_elements: Vec<(u16, u16)>,
         b_elements: Vec<(u16, u16)>,
