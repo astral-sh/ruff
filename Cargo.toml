@@ -40,7 +40,7 @@ ruff_workspace = { path = "crates/ruff_workspace" }
 red_knot_ide = { path = "crates/ty_ide" }
 red_knot_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
-red_knot_server = { path = "crates/red_knot_server" }
+ty_server = { path = "crates/ty_server" }
 ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }
 

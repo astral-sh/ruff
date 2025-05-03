@@ -1,5 +1,5 @@
 [package]
-name = "red_knot_server"
+name = "ty_server"
 version = "0.0.0"
 publish = false
 authors = { workspace = true }

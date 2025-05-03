@@ -2489,7 +2489,6 @@ dependencies = [
  "jiff",
  "rayon",
  "red_knot_project",
- "red_knot_server",
  "regex",
  "ruff_db",
  "ruff_python_ast",
@@ -2502,6 +2501,7 @@ dependencies = [
  "tracing-subscriber",
  "tracing-tree",
  "ty_python_semantic",
+ "ty_server",
  "wild",
 ]
 
@@ -2549,31 +2549,6 @@ dependencies = [
  "tracing",
  "ty_python_semantic",
  "ty_vendored",
-]
-
-[[package]]
-name = "red_knot_server"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "crossbeam",
- "jod-thread",
- "libc",
- "lsp-server",
- "lsp-types",
- "red_knot_ide",
- "red_knot_project",
- "ruff_db",
- "ruff_notebook",
- "ruff_source_file",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "serde",
- "serde_json",
- "shellexpand",
- "tracing",
- "tracing-subscriber",
- "ty_python_semantic",
 ]
 
 [[package]]
@@ -4109,6 +4084,31 @@ dependencies = [
  "tracing",
  "ty_test",
  "ty_vendored",
+]
+
+[[package]]
+name = "ty_server"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "crossbeam",
+ "jod-thread",
+ "libc",
+ "lsp-server",
+ "lsp-types",
+ "red_knot_ide",
+ "red_knot_project",
+ "ruff_db",
+ "ruff_notebook",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "serde",
+ "serde_json",
+ "shellexpand",
+ "tracing",
+ "tracing-subscriber",
+ "ty_python_semantic",
 ]
 
 [[package]]

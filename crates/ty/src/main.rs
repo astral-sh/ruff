@@ -14,10 +14,10 @@ use red_knot_project::metadata::options::Options;
 use red_knot_project::watch::ProjectWatcher;
 use red_knot_project::{watch, Db};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
-use red_knot_server::run_server;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
+use ty_server::run_server;
 
 mod args;
 mod logging;
