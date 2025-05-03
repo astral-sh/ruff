@@ -1,9 +1,9 @@
 use configuration_file::{ConfigurationFile, ConfigurationFileError};
-use red_knot_python_semantic::ProgramSettings;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
+use ty_python_semantic::ProgramSettings;
 
 use crate::combine::Combine;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};

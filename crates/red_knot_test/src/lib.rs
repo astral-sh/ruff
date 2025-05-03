@@ -4,10 +4,6 @@ use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
-use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{
-    Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings, SysPrefixPathOrigin,
-};
 use ruff_db::diagnostic::{
     create_parse_diagnostic, create_unsupported_syntax_diagnostic, Diagnostic,
     DisplayDiagnosticConfig,
@@ -20,6 +16,10 @@ use ruff_db::testing::{setup_logging, setup_logging_with_filter};
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::Write;
+use ty_python_semantic::types::check_types;
+use ty_python_semantic::{
+    Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings, SysPrefixPathOrigin,
+};
 
 mod assertion;
 mod config;
@@ -104,7 +104,7 @@ pub fn run(
                     "\nTo rerun this specific test, set the environment variable: {MDTEST_TEST_FILTER}='{escaped_test_name}'",
                 );
                 println!(
-                    "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p red_knot_python_semantic --test mdtest -- {test_name}",
+                    "{MDTEST_TEST_FILTER}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
                 );
             }
         }

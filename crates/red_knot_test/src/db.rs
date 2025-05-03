@@ -1,6 +1,4 @@
 use camino::{Utf8Component, Utf8PathBuf};
-use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-use red_knot_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
     CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
@@ -12,6 +10,8 @@ use ruff_notebook::{Notebook, NotebookError};
 use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
+use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
 
 #[salsa::db]
 #[derive(Clone)]

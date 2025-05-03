@@ -489,12 +489,12 @@ pub(crate) enum ErrorAssertionParseError<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use red_knot_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
 
     fn get_assertions(source: &str) -> InlineFileAssertions {
         let mut db = Db::setup();

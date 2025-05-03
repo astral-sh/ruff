@@ -3,10 +3,10 @@ use std::hash::Hasher;
 
 use tracing::info;
 
-use red_knot_python_semantic::system_module_search_paths;
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_db::Upcast;
+use ty_python_semantic::system_module_search_paths;
 
 use crate::db::{Db, ProjectDatabase};
 use crate::watch::Watcher;

@@ -15,7 +15,7 @@ ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
 ruff_text_size = { workspace = true }
-red_knot_python_semantic = { workspace = true }
+ty_python_semantic = { workspace = true }
 
 rustc-hash = { workspace = true }
 salsa = { workspace = true }

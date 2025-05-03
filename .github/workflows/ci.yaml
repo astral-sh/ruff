@@ -145,7 +145,7 @@ jobs:
         run: |
           if git diff --quiet "${MERGE_BASE}...HEAD" -- ':**' \
             ':!**/*.md' \
-            ':crates/red_knot_python_semantic/resources/mdtest/**/*.md' \
+            ':crates/ty_python_semantic/resources/mdtest/**/*.md' \
             ':!docs/**' \
             ':!assets/**' \
             ':.github/workflows/ci.yaml' \
@@ -253,7 +253,7 @@ jobs:
           MDTEST_GITHUB_ANNOTATIONS_FORMAT: 1
         # Ignore errors if this step fails; we want to continue to later steps in the workflow anyway.
         # This step is just to get nice GitHub annotations on the PR diff in the files-changed tab.
-        run: cargo test -p red_knot_python_semantic --test mdtest || true
+        run: cargo test -p ty_python_semantic --test mdtest || true
       - name: "Run tests"
         shell: bash
         env:
@@ -268,7 +268,7 @@ jobs:
       # sync, not just public items. Eventually we should do this for all
       # crates; for now add crates here as they are warning-clean to prevent
       # regression.
-      - run: cargo doc --no-deps -p red_knot_python_semantic -p red_knot -p red_knot_test -p ruff_db --document-private-items
+      - run: cargo doc --no-deps -p ty_python_semantic -p red_knot -p red_knot_test -p ruff_db --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"

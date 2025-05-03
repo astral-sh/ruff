@@ -3,7 +3,7 @@
 Any Markdown file can be a test suite.
 
 In order for it to be run as one, `red_knot_test::run` must be called with its path; see
-`crates/red_knot_python_semantic/tests/mdtest.rs` for an example that treats all Markdown files
+`crates/ty_python_semantic/tests/mdtest.rs` for an example that treats all Markdown files
 under a certain directory as test suites.
 
 A Markdown test suite can contain any number of tests. A test consists of one or more embedded
@@ -32,14 +32,14 @@ syntax, it's just how this README embeds an example mdtest Markdown document.)
 --->
 
 See actual example mdtest suites in
-[`crates/red_knot_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/resources/mdtest).
+[`crates/ty_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/ty_python_semantic/resources/mdtest).
 
 > [!NOTE]
 > If you use `dir-test`, `rstest` or similar to generate a separate test for all Markdown files in a certain directory,
-> as with the example in `crates/red_knot_python_semantic/tests/mdtest.rs`,
+> as with the example in `crates/ty_python_semantic/tests/mdtest.rs`,
 > you will likely want to also make sure that the crate the tests are in is rebuilt every time a
 > Markdown file is added or removed from the directory. See
-> [`crates/red_knot_python_semantic/build.rs`](https://github.com/astral-sh/ruff/tree/main/crates/red_knot_python_semantic/build.rs)
+> [`crates/ty_python_semantic/build.rs`](https://github.com/astral-sh/ruff/tree/main/crates/ty_python_semantic/build.rs)
 > for an example of how to do this.
 >
 > This is because these macros generate their tests at build time rather than at runtime.
@@ -373,13 +373,13 @@ All Markdown-based tests are executed in a normal `cargo test` / `cargo run next
 *only*, you can filter the tests using `mdtest__`:
 
 ```bash
-cargo test -p red_knot_python_semantic -- mdtest__
+cargo test -p ty_python_semantic -- mdtest__
 ```
 
 Alternatively, you can use the `mdtest.py` runner which has a watch mode that will re-run corresponding tests when Markdown files change, and recompile automatically when Rust code changes:
 
 ```bash
-uv run crates/red_knot_python_semantic/mdtest.py
+uv run crates/ty_python_semantic/mdtest.py
 ```
 
 ## Planned features
@@ -538,5 +538,5 @@ cold, to validate equivalence of cold and incremental check results.
 [^extensions]: `typing-extensions` is a third-party module, but typeshed, and thus type checkers
     also, treat it as part of the standard library.
 
-[custom-typeshed markdown test]: ../red_knot_python_semantic/resources/mdtest/mdtest_custom_typeshed.md
+[custom-typeshed markdown test]: ../ty_python_semantic/resources/mdtest/mdtest_custom_typeshed.md
 [typeshed `versions`]: https://github.com/python/typeshed/blob/c546278aae47de0b2b664973da4edb613400f6ce/stdlib/VERSIONS#L1-L18%3E

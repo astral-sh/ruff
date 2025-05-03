@@ -1,5 +1,5 @@
-use red_knot_python_semantic::Db as SemanticDb;
 use ruff_db::{Db as SourceDb, Upcast};
+use ty_python_semantic::Db as SemanticDb;
 
 #[salsa::db]
 pub trait Db: SemanticDb + Upcast<dyn SemanticDb> + Upcast<dyn SourceDb> {}
@@ -9,12 +9,12 @@ pub(crate) mod tests {
     use std::sync::Arc;
 
     use super::Db;
-    use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-    use red_knot_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
     use ruff_db::files::{File, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
+    use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+    use ty_python_semantic::{default_lint_registry, Db as SemanticDb, Program};
 
     #[salsa::db]
     #[derive(Clone)]

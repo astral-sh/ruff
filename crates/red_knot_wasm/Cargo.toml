@@ -24,7 +24,7 @@ red_knot_project = { workspace = true, default-features = false, features = [
     "deflate",
     "format"
 ] }
-red_knot_python_semantic = { workspace = true }
+ty_python_semantic = { workspace = true }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
 ruff_notebook = { workspace = true }

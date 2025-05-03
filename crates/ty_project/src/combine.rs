@@ -1,8 +1,8 @@
 use std::{collections::HashMap, hash::BuildHasher};
 
-use red_knot_python_semantic::{PythonPath, PythonPlatform};
 use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
+use ty_python_semantic::{PythonPath, PythonPlatform};
 
 /// Combine two values, preferring the values in `self`.
 ///

@@ -1,6 +1,4 @@
 use crate::Db;
-use red_knot_python_semantic::types::Type;
-use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
@@ -8,6 +6,8 @@ use ruff_python_ast::{AnyNodeRef, Expr, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
+use ty_python_semantic::types::Type;
+use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct InlayHint<'db> {
@@ -157,11 +157,11 @@ mod tests {
 
     use crate::db::tests::TestDb;
 
-    use red_knot_python_semantic::{
-        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
-    };
     use ruff_db::system::{DbWithWritableSystem, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
+    use ty_python_semantic::{
+        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+    };
 
     pub(super) fn inlay_hint_test(source: &str) -> InlayHintTest {
         const START: &str = "<START>";

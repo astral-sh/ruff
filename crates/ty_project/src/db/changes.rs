@@ -5,11 +5,11 @@ use crate::{Project, ProjectMetadata};
 use std::collections::BTreeSet;
 
 use crate::walk::ProjectFilesWalker;
-use red_knot_python_semantic::Program;
 use ruff_db::files::{File, Files};
 use ruff_db::system::SystemPath;
 use ruff_db::Db as _;
 use rustc_hash::FxHashSet;
+use ty_python_semantic::Program;
 
 impl ProjectDatabase {
     #[tracing::instrument(level = "debug", skip(self, changes, cli_options))]

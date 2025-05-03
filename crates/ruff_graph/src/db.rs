@@ -2,16 +2,16 @@ use anyhow::Result;
 use std::sync::Arc;
 use zip::CompressionMethod;
 
-use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-use red_knot_python_semantic::{
-    default_lint_registry, Db, Program, ProgramSettings, PythonPath, PythonPlatform,
-    SearchPathSettings,
-};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
+use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::{
+    default_lint_registry, Db, Program, ProgramSettings, PythonPath, PythonPlatform,
+    SearchPathSettings,
+};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
     let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);

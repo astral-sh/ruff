@@ -4,8 +4,6 @@ use std::sync::Arc;
 use crate::DEFAULT_LINT_REGISTRY;
 use crate::{Project, ProjectMetadata};
 use red_knot_ide::Db as IdeDb;
-use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-use red_knot_python_semantic::{Db as SemanticDb, Program};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
@@ -13,6 +11,8 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 use salsa::plumbing::ZalsaDatabase;
 use salsa::{Cancelled, Event};
+use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+use ty_python_semantic::{Db as SemanticDb, Program};
 
 mod changes;
 
@@ -210,12 +210,12 @@ pub(crate) mod tests {
 
     use salsa::Event;
 
-    use red_knot_python_semantic::lint::{LintRegistry, RuleSelection};
-    use red_knot_python_semantic::{Db as SemanticDb, Program};
     use ruff_db::files::Files;
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_db::{Db as SourceDb, Upcast};
+    use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+    use ty_python_semantic::{Db as SemanticDb, Program};
 
     use crate::db::Db;
     use crate::DEFAULT_LINT_REGISTRY;
@@ -310,7 +310,7 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
-    impl red_knot_python_semantic::Db for TestDb {
+    impl ty_python_semantic::Db for TestDb {
         fn is_file_open(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
         }

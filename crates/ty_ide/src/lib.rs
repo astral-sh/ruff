@@ -16,9 +16,9 @@ pub use markup::MarkupKind;
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
 
-use red_knot_python_semantic::types::{Type, TypeDefinition};
 use ruff_db::files::{File, FileRange};
 use ruff_text_size::{Ranged, TextRange};
+use ty_python_semantic::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
@@ -201,14 +201,14 @@ impl HasNavigationTargets for TypeDefinition<'_> {
 mod tests {
     use crate::db::tests::TestDb;
     use insta::internals::SettingsBindDropGuard;
-    use red_knot_python_semantic::{
-        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
-    };
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_ast::PythonVersion;
     use ruff_text_size::TextSize;
+    use ty_python_semantic::{
+        Program, ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings,
+    };
 
     pub(super) fn cursor_test(source: &str) -> CursorTest {
         let mut db = TestDb::new();

@@ -3,7 +3,6 @@ use std::fmt::Display;
 use std::sync::Arc;
 
 use lsp_types::Url;
-use red_knot_python_semantic::Db;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
@@ -12,6 +11,7 @@ use ruff_db::system::{
     System, SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf,
 };
 use ruff_notebook::{Notebook, NotebookError};
+use ty_python_semantic::Db;
 
 use crate::session::index::Index;
 use crate::DocumentQuery;

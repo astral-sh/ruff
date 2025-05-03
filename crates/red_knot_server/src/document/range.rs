@@ -5,13 +5,13 @@ use crate::system::file_to_url;
 use lsp_types as types;
 use lsp_types::Location;
 
-use red_knot_python_semantic::Db;
 use ruff_db::files::FileRange;
 use ruff_db::source::{line_index, source_text};
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::LineIndex;
 use ruff_source_file::{OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_python_semantic::Db;
 
 #[expect(dead_code)]
 pub(crate) struct NotebookRange {

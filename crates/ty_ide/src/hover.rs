@@ -1,12 +1,12 @@
 use crate::goto::{find_goto_target, GotoTarget};
 use crate::{Db, MarkupKind, RangedValue};
-use red_knot_python_semantic::types::Type;
-use red_knot_python_semantic::SemanticModel;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
+use ty_python_semantic::types::Type;
+use ty_python_semantic::SemanticModel;
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover>> {
     let parsed = parsed_module(db.upcast(), file);

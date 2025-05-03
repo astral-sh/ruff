@@ -1,12 +1,12 @@
 use crate::find_node::covering_node;
 use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
-use red_knot_python_semantic::types::Type;
-use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{parsed_module, ParsedModule};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_parser::TokenKind;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_python_semantic::types::Type;
+use ty_python_semantic::{HasType, SemanticModel};
 
 pub fn goto_type_definition(
     db: &dyn Db,

@@ -2489,7 +2489,6 @@ dependencies = [
  "jiff",
  "rayon",
  "red_knot_project",
- "red_knot_python_semantic",
  "red_knot_server",
  "regex",
  "ruff_db",
@@ -2502,6 +2501,7 @@ dependencies = [
  "tracing-flame",
  "tracing-subscriber",
  "tracing-tree",
+ "ty_python_semantic",
  "wild",
 ]
 
@@ -2510,7 +2510,6 @@ name = "red_knot_ide"
 version = "0.0.0"
 dependencies = [
  "insta",
- "red_knot_python_semantic",
  "ruff_db",
  "ruff_python_ast",
  "ruff_python_parser",
@@ -2519,6 +2518,7 @@ dependencies = [
  "salsa",
  "smallvec",
  "tracing",
+ "ty_python_semantic",
  "ty_vendored",
 ]
 
@@ -2534,7 +2534,6 @@ dependencies = [
  "pep440_rs",
  "rayon",
  "red_knot_ide",
- "red_knot_python_semantic",
  "ruff_cache",
  "ruff_db",
  "ruff_macros",
@@ -2548,51 +2547,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml",
  "tracing",
- "ty_vendored",
-]
-
-[[package]]
-name = "red_knot_python_semantic"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "bitflags 2.9.0",
- "camino",
- "compact_str",
- "countme",
- "dir-test",
- "drop_bomb",
- "hashbrown 0.15.2",
- "indexmap",
- "insta",
- "itertools 0.14.0",
- "memchr",
- "ordermap",
- "quickcheck",
- "quickcheck_macros",
- "red_knot_test",
- "ruff_db",
- "ruff_index",
- "ruff_macros",
- "ruff_python_ast",
- "ruff_python_literal",
- "ruff_python_parser",
- "ruff_python_stdlib",
- "ruff_python_trivia",
- "ruff_source_file",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "salsa",
- "schemars",
- "serde",
- "smallvec",
- "static_assertions",
- "strum",
- "strum_macros",
- "tempfile",
- "test-case",
- "thiserror 2.0.12",
- "tracing",
+ "ty_python_semantic",
  "ty_vendored",
 ]
 
@@ -2608,7 +2563,6 @@ dependencies = [
  "lsp-types",
  "red_knot_ide",
  "red_knot_project",
- "red_knot_python_semantic",
  "ruff_db",
  "ruff_notebook",
  "ruff_source_file",
@@ -2619,6 +2573,7 @@ dependencies = [
  "shellexpand",
  "tracing",
  "tracing-subscriber",
+ "ty_python_semantic",
 ]
 
 [[package]]
@@ -2630,7 +2585,6 @@ dependencies = [
  "colored 3.0.0",
  "insta",
  "memchr",
- "red_knot_python_semantic",
  "regex",
  "ruff_db",
  "ruff_index",
@@ -2647,6 +2601,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml",
  "tracing",
+ "ty_python_semantic",
  "ty_vendored",
 ]
 
@@ -2661,13 +2616,13 @@ dependencies = [
  "log",
  "red_knot_ide",
  "red_knot_project",
- "red_knot_python_semantic",
  "ruff_db",
  "ruff_notebook",
  "ruff_python_formatter",
  "ruff_source_file",
  "ruff_text_size",
  "serde-wasm-bindgen",
+ "ty_python_semantic",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
@@ -2961,7 +2916,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
- "red_knot_python_semantic",
  "ruff_cache",
  "ruff_db",
  "ruff_linter",
@@ -2971,6 +2925,7 @@ dependencies = [
  "salsa",
  "schemars",
  "serde",
+ "ty_python_semantic",
  "zip",
 ]
 
@@ -4138,6 +4093,51 @@ dependencies = [
  "ignore",
  "libtest-mimic",
  "snapbox",
+]
+
+[[package]]
+name = "ty_python_semantic"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.9.0",
+ "camino",
+ "compact_str",
+ "countme",
+ "dir-test",
+ "drop_bomb",
+ "hashbrown 0.15.2",
+ "indexmap",
+ "insta",
+ "itertools 0.14.0",
+ "memchr",
+ "ordermap",
+ "quickcheck",
+ "quickcheck_macros",
+ "red_knot_test",
+ "ruff_db",
+ "ruff_index",
+ "ruff_macros",
+ "ruff_python_ast",
+ "ruff_python_literal",
+ "ruff_python_parser",
+ "ruff_python_stdlib",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "salsa",
+ "schemars",
+ "serde",
+ "smallvec",
+ "static_assertions",
+ "strum",
+ "strum_macros",
+ "tempfile",
+ "test-case",
+ "thiserror 2.0.12",
+ "tracing",
+ "ty_vendored",
 ]
 
 [[package]]

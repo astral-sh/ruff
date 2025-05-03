@@ -343,7 +343,6 @@ impl Matcher {
 #[cfg(test)]
 mod tests {
     use super::FailuresByLine;
-    use red_knot_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
     use ruff_db::files::{system_path_to_file, File};
     use ruff_db::system::DbWithWritableSystem as _;
@@ -351,6 +350,7 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,

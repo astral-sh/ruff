@@ -8,7 +8,6 @@ use red_knot_project::metadata::pyproject::{PyProject, Tool};
 use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
 use red_knot_project::watch::{directory_watcher, ChangeEvent, ProjectWatcher};
 use red_knot_project::{Db, ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::{resolve_module, ModuleName, PythonPlatform};
 use ruff_db::files::{system_path_to_file, File, FileError};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -16,6 +15,7 @@ use ruff_db::system::{
 };
 use ruff_db::{Db as _, Upcast};
 use ruff_python_ast::PythonVersion;
+use ty_python_semantic::{resolve_module, ModuleName, PythonPlatform};
 
 struct TestCase {
     db: ProjectDatabase,

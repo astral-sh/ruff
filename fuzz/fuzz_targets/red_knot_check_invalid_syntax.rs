@@ -7,12 +7,6 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 use libfuzzer_sys::{fuzz_target, Corpus};
 
-use red_knot_python_semantic::lint::LintRegistry;
-use red_knot_python_semantic::types::check_types;
-use red_knot_python_semantic::{
-    default_lint_registry, lint::RuleSelection, Db as SemanticDb, Program, ProgramSettings,
-    PythonPlatform, SearchPathSettings,
-};
 use ruff_db::files::{system_path_to_file, File, Files};
 use ruff_db::system::{
     DbWithTestSystem, DbWithWritableSystem as _, System, SystemPathBuf, TestSystem,
@@ -21,6 +15,12 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_db::{Db as SourceDb, Upcast};
 use ruff_python_ast::PythonVersion;
 use ruff_python_parser::{parse_unchecked, Mode, ParseOptions};
+use ty_python_semantic::lint::LintRegistry;
+use ty_python_semantic::types::check_types;
+use ty_python_semantic::{
+    default_lint_registry, lint::RuleSelection, Db as SemanticDb, Program, ProgramSettings,
+    PythonPlatform, SearchPathSettings,
+};
 
 /// Database that can be used for testing.
 ///

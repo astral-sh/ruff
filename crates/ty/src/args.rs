@@ -3,8 +3,8 @@ use crate::python_version::PythonVersion;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use red_knot_project::metadata::options::{EnvironmentOptions, Options, TerminalOptions};
 use red_knot_project::metadata::value::{RangedValue, RelativePathBuf};
-use red_knot_python_semantic::lint;
 use ruff_db::system::SystemPathBuf;
+use ty_python_semantic::lint;
 
 #[derive(Debug, Parser)]
 #[command(

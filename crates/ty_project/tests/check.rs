@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Context};
 use red_knot_project::{ProjectDatabase, ProjectMetadata};
-use red_knot_python_semantic::{HasType, SemanticModel};
 use ruff_db::files::{system_path_to_file, File};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
@@ -9,6 +8,7 @@ use ruff_python_ast::visitor::source_order::SourceOrderVisitor;
 use ruff_python_ast::{
     self as ast, Alias, Comprehension, Expr, Parameter, ParameterWithDefault, Stmt,
 };
+use ty_python_semantic::{HasType, SemanticModel};
 
 fn setup_db(project_root: &SystemPath, system: TestSystem) -> anyhow::Result<ProjectDatabase> {
     let project = ProjectMetadata::discover(project_root, &system)?;

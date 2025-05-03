@@ -1,6 +1,6 @@
 name: Run mypy_primer
 
-permissions: {}
+permissions: { }
 
 on:
   pull_request:
@@ -50,7 +50,7 @@ jobs:
         run: |
           cd ruff
 
-          PRIMER_SELECTOR="$(paste -s -d'|' crates/red_knot_python_semantic/resources/primer/good.txt)"
+          PRIMER_SELECTOR="$(paste -s -d'|' crates/ty_python_semantic/resources/primer/good.txt)"
 
           echo "new commit"
           git rev-list --format=%s --max-count=1 "$GITHUB_SHA"

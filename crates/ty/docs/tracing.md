@@ -44,10 +44,10 @@ RED_KNOT_LOG=ruff=trace,red_knot=trace,salsa=info
 
 #### Show typing traces
 
-Only show traces for the `red_knot_python_semantic::types` module.
+Only show traces for the `ty_python_semantic::types` module.
 
 ```bash
-RED_KNOT_LOG="red_knot_python_semantic::types"
+RED_KNOT_LOG="ty_python_semantic::types"
 ```
 
 Note: Ensure that you use `-vvv` to see tracing spans.

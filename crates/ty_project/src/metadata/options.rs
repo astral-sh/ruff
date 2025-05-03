@@ -1,7 +1,5 @@
 use crate::metadata::value::{RangedValue, RelativePathBuf, ValueSource, ValueSourceGuard};
 use crate::Db;
-use red_knot_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
-use red_knot_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, Severity, Span};
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath};
@@ -11,6 +9,8 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use thiserror::Error;
+use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
+use ty_python_semantic::{ProgramSettings, PythonPath, PythonPlatform, SearchPathSettings};
 
 use super::settings::{Settings, TerminalSettings};
 
@@ -319,12 +319,12 @@ pub struct TerminalOptions {
 #[cfg(feature = "schemars")]
 mod schema {
     use crate::DEFAULT_LINT_REGISTRY;
-    use red_knot_python_semantic::lint::Level;
     use schemars::gen::SchemaGenerator;
     use schemars::schema::{
         InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SubschemaValidation,
     };
     use schemars::JsonSchema;
+    use ty_python_semantic::lint::Level;
 
     pub(super) struct Rules;
 

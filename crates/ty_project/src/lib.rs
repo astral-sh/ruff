@@ -6,9 +6,6 @@ pub use db::{Db, ProjectDatabase};
 use files::{Index, Indexed, IndexedFiles};
 use metadata::settings::Settings;
 pub use metadata::{ProjectDiscoveryError, ProjectMetadata};
-use red_knot_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
-use red_knot_python_semantic::register_lints;
-use red_knot_python_semantic::types::check_types;
 use ruff_db::diagnostic::{
     create_parse_diagnostic, create_unsupported_syntax_diagnostic, Annotation, Diagnostic,
     DiagnosticId, Severity, Span, SubDiagnostic,
@@ -25,6 +22,9 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::error;
+use ty_python_semantic::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
+use ty_python_semantic::register_lints;
+use ty_python_semantic::types::check_types;
 
 pub mod combine;
 
@@ -659,14 +659,14 @@ where
 mod tests {
     use crate::db::tests::TestDb;
     use crate::{check_file_impl, ProjectMetadata};
-    use red_knot_python_semantic::types::check_types;
-    use red_knot_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
     use ruff_python_ast::PythonVersion;
+    use ty_python_semantic::types::check_types;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, SearchPathSettings};
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {

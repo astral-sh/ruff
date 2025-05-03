@@ -9,10 +9,10 @@
 //! ```
 
 use anyhow::Context;
-use red_knot_python_semantic::PythonPlatform;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
+use ty_python_semantic::PythonPlatform;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "kebab-case", deny_unknown_fields)]
