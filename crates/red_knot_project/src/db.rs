@@ -139,7 +139,7 @@ impl SemanticDb for ProjectDatabase {
 #[salsa::db]
 impl SourceDb for ProjectDatabase {
     fn vendored(&self) -> &VendoredFileSystem {
-        red_knot_vendored::file_system()
+        ty_vendored::file_system()
     }
 
     fn system(&self) -> &dyn System {
@@ -237,7 +237,7 @@ pub(crate) mod tests {
             let mut db = Self {
                 storage: salsa::Storage::default(),
                 system: TestSystem::default(),
-                vendored: red_knot_vendored::file_system().clone(),
+                vendored: ty_vendored::file_system().clone(),
                 files: Files::default(),
                 events: Arc::default(),
                 project: None,

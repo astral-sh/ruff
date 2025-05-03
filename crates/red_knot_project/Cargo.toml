@@ -20,7 +20,7 @@ ruff_python_formatter = { workspace = true, optional = true }
 ruff_text_size = { workspace = true }
 red_knot_ide = { workspace = true }
 red_knot_python_semantic = { workspace = true, features = ["serde"] }
-red_knot_vendored = { workspace = true }
+ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 crossbeam = { workspace = true }
@@ -43,13 +43,13 @@ insta = { workspace = true, features = ["redactions", "ron"] }
 
 [features]
 default = ["zstd"]
-deflate = ["red_knot_vendored/deflate"]
+deflate = ["ty_vendored/deflate"]
 schemars = [
     "dep:schemars",
     "ruff_db/schemars",
     "red_knot_python_semantic/schemars",
 ]
-zstd = ["red_knot_vendored/zstd"]
+zstd = ["ty_vendored/zstd"]
 format = ["ruff_python_formatter"]
 
 [lints]

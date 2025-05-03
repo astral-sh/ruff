@@ -72,7 +72,7 @@ fn linter_stubs_no_panic() -> anyhow::Result<()> {
 fn typeshed_no_panic() -> anyhow::Result<()> {
     let workspace_root = get_cargo_workspace_root()?;
     run_corpus_tests(&format!(
-        "{workspace_root}/crates/red_knot_vendored/vendor/typeshed/**/*.pyi"
+        "{workspace_root}/crates/ty_vendored/vendor/typeshed/**/*.pyi"
     ))
 }
 

@@ -1802,7 +1802,7 @@ impl InheritanceCycle {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum KnownClass {
-    // To figure out where an stdlib symbol is defined, you can go into `crates/red_knot_vendored`
+    // To figure out where an stdlib symbol is defined, you can go into `crates/ty_vendored`
     // and grep for the symbol name in any `.pyi` file.
 
     // Builtins

@@ -2511,7 +2511,6 @@ version = "0.0.0"
 dependencies = [
  "insta",
  "red_knot_python_semantic",
- "red_knot_vendored",
  "ruff_db",
  "ruff_python_ast",
  "ruff_python_parser",
@@ -2520,6 +2519,7 @@ dependencies = [
  "salsa",
  "smallvec",
  "tracing",
+ "ty_vendored",
 ]
 
 [[package]]
@@ -2535,7 +2535,6 @@ dependencies = [
  "rayon",
  "red_knot_ide",
  "red_knot_python_semantic",
- "red_knot_vendored",
  "ruff_cache",
  "ruff_db",
  "ruff_macros",
@@ -2549,6 +2548,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml",
  "tracing",
+ "ty_vendored",
 ]
 
 [[package]]
@@ -2571,7 +2571,6 @@ dependencies = [
  "quickcheck",
  "quickcheck_macros",
  "red_knot_test",
- "red_knot_vendored",
  "ruff_db",
  "ruff_index",
  "ruff_macros",
@@ -2594,6 +2593,7 @@ dependencies = [
  "test-case",
  "thiserror 2.0.12",
  "tracing",
+ "ty_vendored",
 ]
 
 [[package]]
@@ -2631,7 +2631,6 @@ dependencies = [
  "insta",
  "memchr",
  "red_knot_python_semantic",
- "red_knot_vendored",
  "regex",
  "ruff_db",
  "ruff_index",
@@ -2648,16 +2647,7 @@ dependencies = [
  "thiserror 2.0.12",
  "toml",
  "tracing",
-]
-
-[[package]]
-name = "red_knot_vendored"
-version = "0.0.0"
-dependencies = [
- "path-slash",
- "ruff_db",
- "walkdir",
- "zip",
+ "ty_vendored",
 ]
 
 [[package]]
@@ -4148,6 +4138,16 @@ dependencies = [
  "ignore",
  "libtest-mimic",
  "snapbox",
+]
+
+[[package]]
+name = "ty_vendored"
+version = "0.0.0"
+dependencies = [
+ "path-slash",
+ "ruff_db",
+ "walkdir",
+ "zip",
 ]
 
 [[package]]

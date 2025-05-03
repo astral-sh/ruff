@@ -30,7 +30,7 @@ impl Db {
         Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::default(),
-            vendored: red_knot_vendored::file_system().clone(),
+            vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             rule_selection: Arc::new(rule_selection),
         }

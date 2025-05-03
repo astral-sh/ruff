@@ -20,7 +20,7 @@ from watchfiles import Change, watch
 
 CRATE_NAME: Final = "red_knot_python_semantic"
 CRATE_ROOT: Final = Path(__file__).resolve().parent
-RED_KNOT_VENDORED: Final = CRATE_ROOT.parent / "red_knot_vendored"
+RED_KNOT_VENDORED: Final = CRATE_ROOT.parent / "ty_vendored"
 DIRS_TO_WATCH: Final = (
     CRATE_ROOT,
     RED_KNOT_VENDORED,

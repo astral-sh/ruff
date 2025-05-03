@@ -41,7 +41,7 @@ impl TestDb {
         Self {
             storage: salsa::Storage::default(),
             system: TestSystem::default(),
-            vendored: red_knot_vendored::file_system().clone(),
+            vendored: ty_vendored::file_system().clone(),
             events: Arc::default(),
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),

@@ -23,7 +23,7 @@ smallvec = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-red_knot_vendored = { workspace = true }
+ty_vendored = { workspace = true }
 
 insta = { workspace = true, features = ["filters"] }
 

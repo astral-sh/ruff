@@ -18,7 +18,7 @@ cargo-fuzz = true
 
 [dependencies]
 red_knot_python_semantic = { path = "../crates/red_knot_python_semantic" }
-red_knot_vendored = { path = "../crates/red_knot_vendored" }
+ty_vendored = { path = "../crates/ty_vendored" }
 ruff_db = { path = "../crates/ruff_db" }
 ruff_linter = { path = "../crates/ruff_linter" }
 ruff_python_ast = { path = "../crates/ruff_python_ast" }
