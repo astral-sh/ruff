@@ -2577,35 +2577,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "red_knot_test"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "camino",
- "colored 3.0.0",
- "insta",
- "memchr",
- "regex",
- "ruff_db",
- "ruff_index",
- "ruff_notebook",
- "ruff_python_ast",
- "ruff_python_trivia",
- "ruff_source_file",
- "ruff_text_size",
- "rustc-hash 2.1.1",
- "salsa",
- "serde",
- "smallvec",
- "tempfile",
- "thiserror 2.0.12",
- "toml",
- "tracing",
- "ty_python_semantic",
- "ty_vendored",
-]
-
-[[package]]
 name = "red_knot_wasm"
 version = "0.0.0"
 dependencies = [
@@ -4114,7 +4085,6 @@ dependencies = [
  "ordermap",
  "quickcheck",
  "quickcheck_macros",
- "red_knot_test",
  "ruff_db",
  "ruff_index",
  "ruff_macros",
@@ -4137,6 +4107,36 @@ dependencies = [
  "test-case",
  "thiserror 2.0.12",
  "tracing",
+ "ty_test",
+ "ty_vendored",
+]
+
+[[package]]
+name = "ty_test"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "colored 3.0.0",
+ "insta",
+ "memchr",
+ "regex",
+ "ruff_db",
+ "ruff_index",
+ "ruff_notebook",
+ "ruff_python_ast",
+ "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
+ "rustc-hash 2.1.1",
+ "salsa",
+ "serde",
+ "smallvec",
+ "tempfile",
+ "thiserror 2.0.12",
+ "toml",
+ "tracing",
+ "ty_python_semantic",
  "ty_vendored",
 ]
 

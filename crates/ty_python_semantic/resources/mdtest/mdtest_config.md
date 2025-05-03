@@ -1,4 +1,4 @@
-This test makes sure that `red_knot_test` correctly parses the TOML configuration blocks and applies
+This test makes sure that `ty_test` correctly parses the TOML configuration blocks and applies
 the correct settings hierarchically.
 
 The following configuration will be attached to the *root* section (without any heading):

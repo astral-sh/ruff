@@ -1,8 +1,8 @@
 use camino::Utf8Path;
 use dir_test::{dir_test, Fixture};
-use red_knot_test::OutputFormat;
+use ty_test::OutputFormat;
 
-/// See `crates/red_knot_test/README.md` for documentation on these tests.
+/// See `crates/ty_test/README.md` for documentation on these tests.
 #[dir_test(
     dir: "$CARGO_MANIFEST_DIR/resources/mdtest",
     glob: "**/*.md"
@@ -25,7 +25,7 @@ fn mdtest(fixture: Fixture<&str>) {
         OutputFormat::Cli
     };
 
-    red_knot_test::run(
+    ty_test::run(
         absolute_fixture_path,
         relative_fixture_path,
         &snapshot_path,

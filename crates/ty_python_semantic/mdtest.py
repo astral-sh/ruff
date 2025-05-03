@@ -24,7 +24,7 @@ RED_KNOT_VENDORED: Final = CRATE_ROOT.parent / "ty_vendored"
 DIRS_TO_WATCH: Final = (
     CRATE_ROOT,
     RED_KNOT_VENDORED,
-    CRATE_ROOT.parent / "red_knot_test/src",
+    CRATE_ROOT.parent / "ty_test/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
 

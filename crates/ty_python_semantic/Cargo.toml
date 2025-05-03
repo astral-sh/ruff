@@ -48,7 +48,7 @@ strum_macros = { workspace = true }
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
 ruff_python_parser = { workspace = true }
-red_knot_test = { workspace = true }
+ty_test = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }

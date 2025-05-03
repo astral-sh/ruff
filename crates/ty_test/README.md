@@ -2,7 +2,7 @@
 
 Any Markdown file can be a test suite.
 
-In order for it to be run as one, `red_knot_test::run` must be called with its path; see
+In order for it to be run as one, `ty_test::run` must be called with its path; see
 `crates/ty_python_semantic/tests/mdtest.rs` for an example that treats all Markdown files
 under a certain directory as test suites.
 
@@ -298,7 +298,7 @@ python-version = "3.10"
 This configuration will apply to all tests in the same section, and all nested sections within that
 section. Nested sections can override configurations from their parent sections.
 
-See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/red_knot_test/src/config.rs) for the full list of supported configuration options.
+See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/src/config.rs) for the full list of supported configuration options.
 
 ### Specifying a custom typeshed
 

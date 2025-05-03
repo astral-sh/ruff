@@ -1,5 +1,5 @@
 ---
-source: crates/red_knot_test/src/lib.rs
+source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
 ---
