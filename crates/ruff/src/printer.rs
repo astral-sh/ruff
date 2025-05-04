@@ -241,7 +241,6 @@ impl Printer {
         }
 
         if !self.flags.intersects(Flags::SHOW_VIOLATIONS) {
-            #[allow(deprecated)]
             if matches!(
                 self.format,
                 OutputFormat::Full | OutputFormat::Concise | OutputFormat::Grouped

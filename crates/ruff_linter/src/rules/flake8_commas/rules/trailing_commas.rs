@@ -74,7 +74,7 @@ impl From<(TokenKind, TextRange)> for SimpleToken {
             TokenKind::Import => TokenType::Named,
             _ => TokenType::Irrelevant,
         };
-        #[allow(clippy::inconsistent_struct_constructor)]
+        #[expect(clippy::inconsistent_struct_constructor)]
         Self { range, ty }
     }
 }

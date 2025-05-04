@@ -1,8 +1,8 @@
-use red_knot_python_semantic::ModuleName;
 use ruff_python_ast::visitor::source_order::{
     walk_expr, walk_module, walk_stmt, SourceOrderVisitor,
 };
 use ruff_python_ast::{self as ast, Expr, Mod, Stmt};
+use ty_python_semantic::ModuleName;
 
 /// Collect all imports for a given Python file.
 #[derive(Default, Debug)]

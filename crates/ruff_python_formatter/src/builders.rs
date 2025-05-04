@@ -178,7 +178,6 @@ impl<'fmt, 'ast, 'buf> JoinCommaSeparatedBuilder<'fmt, 'ast, 'buf> {
         self
     }
 
-    #[allow(unused)]
     pub(crate) fn entries<T, I, F>(&mut self, entries: I) -> &mut Self
     where
         T: Ranged,

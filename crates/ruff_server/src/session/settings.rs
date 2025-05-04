@@ -19,7 +19,7 @@ pub(crate) type WorkspaceSettingsMap = FxHashMap<Url, ClientSettings>;
 /// sends them.
 #[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct ResolvedClientSettings {
     fix_all: bool,
     organize_imports: bool,

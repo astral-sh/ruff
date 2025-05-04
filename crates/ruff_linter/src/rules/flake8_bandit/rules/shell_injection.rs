@@ -1,5 +1,6 @@
 //! Checks relating to shell injection.
 
+use crate::preview::is_shell_injection_only_trusted_input_enabled;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::helpers::Truthiness;
@@ -324,7 +325,9 @@ pub(crate) fn shell_injection(checker: &Checker, call: &ast::ExprCall) {
                 }
                 // S603
                 _ => {
-                    if !is_trusted_input(arg) || checker.settings.preview.is_disabled() {
+                    if !is_trusted_input(arg)
+                        || !is_shell_injection_only_trusted_input_enabled(checker.settings)
+                    {
                         if checker.enabled(Rule::SubprocessWithoutShellEqualsTrue) {
                             checker.report_diagnostic(Diagnostic::new(
                                 SubprocessWithoutShellEqualsTrue,

@@ -1,0 +1,41 @@
+[package]
+name = "ty_server"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_db = { workspace = true, features = ["os"] }
+ruff_notebook = { workspace = true }
+ruff_source_file = { workspace = true }
+ruff_text_size = { workspace = true }
+
+ty_ide = { workspace = true }
+ty_project = { workspace = true }
+ty_python_semantic = { workspace = true }
+
+anyhow = { workspace = true }
+crossbeam = { workspace = true }
+jod-thread = { workspace = true }
+lsp-server = { workspace = true }
+lsp-types = { workspace = true }
+rustc-hash = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+shellexpand = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[dev-dependencies]
+
+[target.'cfg(target_vendor = "apple")'.dependencies]
+libc = { workspace = true }
+
+[lints]
+workspace = true

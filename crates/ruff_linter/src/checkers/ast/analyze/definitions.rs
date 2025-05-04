@@ -184,14 +184,14 @@ pub(crate) fn definitions(checker: &mut Checker) {
 
             // We don't recognise implicitly concatenated strings as valid docstrings in our model currently.
             let Some(sole_string_part) = string_literal.as_single_part_string() else {
-                #[allow(deprecated)]
+                #[expect(deprecated)]
                 let location = checker
                     .locator
                     .compute_source_location(string_literal.start());
                 warn_user!(
                     "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
                     relativize_path(checker.path),
-                    location.row,
+                    location.line,
                     location.column
                 );
                 continue;

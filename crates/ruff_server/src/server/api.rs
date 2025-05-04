@@ -143,7 +143,7 @@ fn local_notification_task<'a, N: traits::SyncNotificationHandler>(
     }))
 }
 
-#[allow(dead_code)]
+#[expect(dead_code)]
 fn background_notification_thread<'a, N: traits::BackgroundDocumentNotificationHandler>(
     req: server::Notification,
     schedule: BackgroundSchedule,

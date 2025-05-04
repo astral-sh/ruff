@@ -21,6 +21,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::fix::edits::adjust_indentation;
+use crate::preview::is_only_add_return_none_at_end_enabled;
 use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_return::helpers::end_of_last_statement;
 use crate::Locator;
@@ -552,7 +553,7 @@ fn implicit_return(checker: &Checker, function_def: &ast::StmtFunctionDef, stmt:
         return;
     }
 
-    if checker.settings.preview.is_enabled() {
+    if is_only_add_return_none_at_end_enabled(checker.settings) {
         add_return_none(checker, stmt, function_def.range());
     } else {
         for implicit_stmt in implicit_stmts {

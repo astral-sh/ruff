@@ -813,6 +813,41 @@ pub enum UnsupportedSyntaxErrorKind {
     /// [PEG parser rewrite]: https://peps.python.org/pep-0617/
     /// [Python 3.11 release]: https://docs.python.org/3/whatsnew/3.11.html#other-language-changes
     UnparenthesizedUnpackInFor,
+    /// Represents the use of multiple exception names in an except clause without an `as` binding, before Python 3.14.
+    ///
+    /// ## Examples
+    /// Before Python 3.14, catching multiple exceptions required
+    /// parentheses like so:
+    ///
+    /// ```python
+    /// try:
+    ///     ...
+    /// except (ExceptionA, ExceptionB, ExceptionC):
+    ///     ...
+    /// ```
+    ///
+    /// Starting with Python 3.14, thanks to [PEP 758], it was permitted
+    /// to omit the parentheses:
+    ///
+    /// ```python
+    /// try:
+    ///     ...
+    /// except ExceptionA, ExceptionB, ExceptionC:
+    ///     ...
+    /// ```
+    ///
+    /// However, parentheses are still required in the presence of an `as`:
+    ///
+    /// ```python
+    /// try:
+    ///     ...
+    /// except (ExceptionA, ExceptionB, ExceptionC) as e:
+    ///     ...
+    /// ```
+    ///
+    ///
+    /// [PEP 758]: https://peps.python.org/pep-0758/
+    UnparenthesizedExceptionTypes,
 }
 
 impl Display for UnsupportedSyntaxError {
@@ -888,6 +923,9 @@ impl Display for UnsupportedSyntaxError {
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 "Cannot use iterable unpacking in `for` statements"
             }
+            UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
+                "Multiple exception types must be parenthesized"
+            }
         };
 
         write!(
@@ -954,6 +992,9 @@ impl UnsupportedSyntaxErrorKind {
             UnsupportedSyntaxErrorKind::StarAnnotation => Change::Added(PythonVersion::PY311),
             UnsupportedSyntaxErrorKind::UnparenthesizedUnpackInFor => {
                 Change::Added(PythonVersion::PY39)
+            }
+            UnsupportedSyntaxErrorKind::UnparenthesizedExceptionTypes => {
+                Change::Added(PythonVersion::PY314)
             }
         }
     }

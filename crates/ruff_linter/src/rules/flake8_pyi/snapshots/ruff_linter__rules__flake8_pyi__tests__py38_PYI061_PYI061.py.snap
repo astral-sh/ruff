@@ -464,7 +464,6 @@ PYI061.py:79:20: PYI061 Use `None` rather than `Literal[None]`
 79 | d: None | (Literal[None] | None)
    |                    ^^^^ PYI061
 80 | e: None | ((None | Literal[None]) | None) | None
-81 | f: Literal[None] | Literal[None]
    |
    = help: Replace with `None`
 
@@ -473,25 +472,6 @@ PYI061.py:80:28: PYI061 Use `None` rather than `Literal[None]`
 78 | c: (None | Literal[None]) | None
 79 | d: None | (Literal[None] | None)
 80 | e: None | ((None | Literal[None]) | None) | None
-   |                            ^^^^ PYI061
-81 | f: Literal[None] | Literal[None]
-   |
-   = help: Replace with `None`
-
-PYI061.py:81:12: PYI061 Use `None` rather than `Literal[None]`
-   |
-79 | d: None | (Literal[None] | None)
-80 | e: None | ((None | Literal[None]) | None) | None
-81 | f: Literal[None] | Literal[None]
-   |            ^^^^ PYI061
-   |
-   = help: Replace with `None`
-
-PYI061.py:81:28: PYI061 Use `None` rather than `Literal[None]`
-   |
-79 | d: None | (Literal[None] | None)
-80 | e: None | ((None | Literal[None]) | None) | None
-81 | f: Literal[None] | Literal[None]
    |                            ^^^^ PYI061
    |
    = help: Replace with `None`

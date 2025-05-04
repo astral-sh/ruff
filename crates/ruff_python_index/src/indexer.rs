@@ -53,7 +53,7 @@ impl Indexer {
                 continuation_lines.push(line_start);
 
                 // SAFETY: Safe because of the len assertion at the top of the function.
-                #[allow(clippy::cast_possible_truncation)]
+                #[expect(clippy::cast_possible_truncation)]
                 {
                     line_start = prev_end + TextSize::new((index + 1) as u32);
                 }

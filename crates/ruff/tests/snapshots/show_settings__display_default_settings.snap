@@ -213,6 +213,7 @@ linter.task_tags = [
 	XXX,
 ]
 linter.typing_modules = []
+linter.typing_extensions = true
 
 # Linter Plugins
 linter.flake8_annotations.mypy_init_return = false

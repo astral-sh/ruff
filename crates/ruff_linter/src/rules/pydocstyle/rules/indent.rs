@@ -10,7 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::Docstring;
 use crate::registry::Rule;
 
-#[allow(clippy::tabs_in_doc_comments)]
+#[expect(clippy::tabs_in_doc_comments)]
 /// ## What it does
 /// Checks for docstrings that are indented with tabs.
 ///

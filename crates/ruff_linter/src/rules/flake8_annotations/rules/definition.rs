@@ -150,7 +150,7 @@ impl Violation for MissingTypeKwargs {
 #[deprecated(note = "ANN101 has been removed")]
 pub(crate) struct MissingTypeSelf;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for MissingTypeSelf {
     fn message(&self) -> String {
         unreachable!("ANN101 has been removed");
@@ -194,7 +194,7 @@ impl Violation for MissingTypeSelf {
 #[deprecated(note = "ANN102 has been removed")]
 pub(crate) struct MissingTypeCls;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for MissingTypeCls {
     fn message(&self) -> String {
         unreachable!("ANN102 has been removed")
@@ -224,6 +224,16 @@ impl Violation for MissingTypeCls {
 /// def add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for some Python versions,
+/// its diagnostic will not be emitted, and no fix will be offered, if `typing_extensions` imports
+/// have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
@@ -267,6 +277,16 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 /// def _add(a: int, b: int) -> int:
 ///     return a + b
 /// ```
+///
+/// ## Availability
+///
+/// Because this rule relies on the third-party `typing_extensions` module for some Python versions,
+/// its diagnostic will not be emitted, and no fix will be offered, if `typing_extensions` imports
+/// have been disabled by the [`lint.typing-extensions`] linter option.
+///
+/// ## Options
+///
+/// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
 pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,

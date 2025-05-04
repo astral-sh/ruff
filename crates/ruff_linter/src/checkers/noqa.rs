@@ -13,6 +13,7 @@ use crate::fix::edits::delete_comment;
 use crate::noqa::{
     Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
 };
+use crate::preview::is_check_file_level_directives_enabled;
 use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::pygrep_hooks;
@@ -21,7 +22,7 @@ use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
 use crate::Locator;
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
     diagnostics: &mut Vec<Diagnostic>,
     path: &Path,
@@ -110,7 +111,7 @@ pub(crate) fn check_noqa(
         && !exemption.includes(Rule::UnusedNOQA)
         && !per_file_ignores.contains(Rule::UnusedNOQA)
     {
-        let directives: Vec<_> = if settings.preview.is_enabled() {
+        let directives: Vec<_> = if is_check_file_level_directives_enabled(settings) {
             noqa_directives
                 .lines()
                 .iter()

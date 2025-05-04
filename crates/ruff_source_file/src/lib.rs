@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-pub use crate::line_index::{LineIndex, OneIndexed};
+pub use crate::line_index::{LineIndex, OneIndexed, PositionEncoding};
 pub use crate::line_ranges::LineRanges;
 pub use crate::newlines::{
     find_newline, Line, LineEnding, NewlineWithTrailingNewline, UniversalNewlineIterator,
@@ -18,7 +18,7 @@ mod line_index;
 mod line_ranges;
 mod newlines;
 
-/// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`SourceLocation`].
+/// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`LineColumn`].
 #[derive(Debug)]
 pub struct SourceCode<'src, 'index> {
     text: &'src str,
@@ -33,10 +33,20 @@ impl<'src, 'index> SourceCode<'src, 'index> {
         }
     }
 
-    /// Computes the one indexed row and column numbers for `offset`.
+    /// Computes the one indexed line and column numbers for `offset`, skipping any potential BOM.
     #[inline]
-    pub fn source_location(&self, offset: TextSize) -> SourceLocation {
-        self.index.source_location(offset, self.text)
+    pub fn line_column(&self, offset: TextSize) -> LineColumn {
+        self.index.line_column(offset, self.text)
+    }
+
+    #[inline]
+    pub fn source_location(
+        &self,
+        offset: TextSize,
+        position_encoding: PositionEncoding,
+    ) -> SourceLocation {
+        self.index
+            .source_location(offset, self.text, position_encoding)
     }
 
     #[inline]
@@ -229,34 +239,62 @@ impl PartialEq for SourceFileInner {
 
 impl Eq for SourceFileInner {}
 
-#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+/// The line and column of an offset in a source file.
+///
+/// See [`LineIndex::line_column`] for more information.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct SourceLocation {
-    pub row: OneIndexed,
+pub struct LineColumn {
+    /// The line in the source text.
+    pub line: OneIndexed,
+    /// The column (UTF scalar values) relative to the start of the line except any
+    /// potential BOM on the first line.
     pub column: OneIndexed,
 }
 
-impl Default for SourceLocation {
+impl Default for LineColumn {
     fn default() -> Self {
         Self {
-            row: OneIndexed::MIN,
+            line: OneIndexed::MIN,
             column: OneIndexed::MIN,
         }
     }
 }
 
-impl Debug for SourceLocation {
+impl Debug for LineColumn {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SourceLocation")
-            .field("row", &self.row.get())
+        f.debug_struct("LineColumn")
+            .field("line", &self.line.get())
             .field("column", &self.column.get())
             .finish()
     }
 }
 
-impl std::fmt::Display for SourceLocation {
+impl std::fmt::Display for LineColumn {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{row}:{column}", row = self.row, column = self.column)
+        write!(f, "{line}:{column}", line = self.line, column = self.column)
+    }
+}
+
+/// A position into a source file represented by the line number and the offset to that character relative to the start of that line.
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct SourceLocation {
+    /// The line in the source text.
+    pub line: OneIndexed,
+    /// The offset from the start of the line to the character.
+    ///
+    /// This can be a byte offset, the number of UTF16 code points, or the UTF8 code units, depending on the
+    /// [`PositionEncoding`] used.
+    pub character_offset: OneIndexed,
+}
+
+impl Default for SourceLocation {
+    fn default() -> Self {
+        Self {
+            line: OneIndexed::MIN,
+            character_offset: OneIndexed::MIN,
+        }
     }
 }
 

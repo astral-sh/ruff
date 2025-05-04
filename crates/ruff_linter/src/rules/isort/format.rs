@@ -40,7 +40,7 @@ pub(crate) fn format_import(
 }
 
 /// Add an import-from statement to the [`RopeBuilder`].
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn format_import_from(
     import_from: &ImportFromData,
     comments: &ImportFromCommentSet,

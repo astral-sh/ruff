@@ -9,7 +9,7 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
 
     Ok(quote! {
         #[automatically_derived]
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         impl ruff_diagnostics::ViolationMetadata for #name {
             fn rule_name() -> &'static str {
                 stringify!(#name)

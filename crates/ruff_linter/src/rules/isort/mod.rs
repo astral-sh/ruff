@@ -63,7 +63,7 @@ pub(crate) enum AnnotatedImport<'a> {
     },
 }
 
-#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn format_imports(
     block: &Block,
     comments: Vec<Comment>,
@@ -149,7 +149,7 @@ pub(crate) fn format_imports(
     output
 }
 
-#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
+#[expect(clippy::too_many_arguments)]
 fn format_import_block(
     block: ImportBlock,
     line_length: LineLength,

@@ -98,7 +98,7 @@ fn reachable(cfg: &ControlFlowGraph) -> HashSet<BlockId> {
 /// Returns `Some(true)` if the condition is always true, e.g. `if True`, same
 /// with `Some(false)` if it's never taken. If it can't be determined it returns
 /// `None`, e.g. `if i == 100`.
-#[allow(clippy::unnecessary_wraps)]
+#[expect(clippy::unnecessary_wraps)]
 fn taken(condition: &Condition) -> Option<bool> {
     match condition {
         Condition::Always => Some(true),

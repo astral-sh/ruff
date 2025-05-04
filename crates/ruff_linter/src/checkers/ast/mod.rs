@@ -65,6 +65,7 @@ use crate::docstrings::extraction::ExtractionTarget;
 use crate::importer::{ImportRequest, Importer, ResolutionError};
 use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
+use crate::preview::{is_semantic_errors_enabled, is_undefined_export_in_dunder_init_enabled};
 use crate::registry::Rule;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, ReturnOutsideFunction, YieldOutsideFunction,
@@ -233,14 +234,14 @@ pub(crate) struct Checker<'a> {
     /// The target [`PythonVersion`] for version-dependent checks.
     target_version: PythonVersion,
     /// Helper visitor for detecting semantic syntax errors.
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     semantic_checker: SemanticSyntaxChecker,
     /// Errors collected by the `semantic_checker`.
     semantic_errors: RefCell<Vec<SemanticSyntaxError>>,
 }
 
 impl<'a> Checker<'a> {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     pub(crate) fn new(
         parsed: &'a Parsed<ModModule>,
         parsed_annotations_arena: &'a typed_arena::Arena<Result<ParsedAnnotation, ParseError>>,
@@ -361,7 +362,7 @@ impl<'a> Checker<'a> {
 
     /// Returns the [`SourceRow`] for the given offset.
     pub(crate) fn compute_source_row(&self, offset: TextSize) -> SourceRow {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let line = self.locator.compute_line_index(offset);
 
         if let Some(notebook_index) = self.notebook_index {
@@ -533,26 +534,50 @@ impl<'a> Checker<'a> {
         self.semantic_checker = checker;
     }
 
-    /// Attempt to create an [`Edit`] that imports `member`.
+    /// Create a [`TypingImporter`] that will import `member` from either `typing` or
+    /// `typing_extensions`.
     ///
     /// On Python <`version_added_to_typing`, `member` is imported from `typing_extensions`, while
     /// on Python >=`version_added_to_typing`, it is imported from `typing`.
     ///
-    /// See [`Importer::get_or_import_symbol`] for more details on the returned values.
-    pub(crate) fn import_from_typing(
-        &self,
-        member: &str,
-        position: TextSize,
+    /// If the Python version is less than `version_added_to_typing` but
+    /// `LinterSettings::typing_extensions` is `false`, this method returns `None`.
+    pub(crate) fn typing_importer<'b>(
+        &'b self,
+        member: &'b str,
         version_added_to_typing: PythonVersion,
-    ) -> Result<(Edit, String), ResolutionError> {
+    ) -> Option<TypingImporter<'b, 'a>> {
         let source_module = if self.target_version() >= version_added_to_typing {
             "typing"
+        } else if !self.settings.typing_extensions {
+            return None;
         } else {
             "typing_extensions"
         };
-        let request = ImportRequest::import_from(source_module, member);
-        self.importer()
-            .get_or_import_symbol(&request, position, self.semantic())
+        Some(TypingImporter {
+            checker: self,
+            source_module,
+            member,
+        })
+    }
+}
+
+pub(crate) struct TypingImporter<'a, 'b> {
+    checker: &'a Checker<'b>,
+    source_module: &'static str,
+    member: &'a str,
+}
+
+impl TypingImporter<'_, '_> {
+    /// Create an [`Edit`] that makes the requested symbol available at `position`.
+    ///
+    /// See [`Importer::get_or_import_symbol`] for more details on the returned values and
+    /// [`Checker::typing_importer`] for a way to construct a [`TypingImporter`].
+    pub(crate) fn import(&self, position: TextSize) -> Result<(Edit, String), ResolutionError> {
+        let request = ImportRequest::import_from(self.source_module, self.member);
+        self.checker
+            .importer
+            .get_or_import_symbol(&request, position, self.checker.semantic())
     }
 }
 
@@ -618,7 +643,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(_)
             | SemanticSyntaxErrorKind::DuplicateParameter(_)
             | SemanticSyntaxErrorKind::NonlocalDeclarationAtModuleLevel => {
-                if self.settings.preview.is_enabled() {
+                if is_semantic_errors_enabled(self.settings) {
                     self.semantic_errors.borrow_mut().push(error);
                 }
             }
@@ -2827,7 +2852,7 @@ impl<'a> Checker<'a> {
                         }
                     } else {
                         if self.enabled(Rule::UndefinedExport) {
-                            if self.settings.preview.is_enabled()
+                            if is_undefined_export_in_dunder_init_enabled(self.settings)
                                 || !self.path.ends_with("__init__.py")
                             {
                                 self.diagnostics.get_mut().push(
@@ -2884,7 +2909,7 @@ impl<'a> ParsedAnnotationsCache<'a> {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_ast(
     parsed: &Parsed<ModModule>,
     locator: &Locator,

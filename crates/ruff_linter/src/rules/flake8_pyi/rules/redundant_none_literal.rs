@@ -5,7 +5,7 @@ use ruff_python_ast::{
     self as ast,
     helpers::{pep_604_union, typing_optional},
     name::Name,
-    Expr, ExprBinOp, ExprContext, ExprNoneLiteral, ExprSubscript, Operator, PythonVersion,
+    Expr, ExprBinOp, ExprContext, ExprNoneLiteral, Operator, PythonVersion,
 };
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
 use ruff_text_size::{Ranged, TextRange};
@@ -130,6 +130,12 @@ pub(crate) fn redundant_none_literal<'a>(checker: &Checker, literal_expr: &'a Ex
                 literal_elements.clone(),
                 union_kind,
             )
+            // Isolate the fix to ensure multiple fixes on the same expression (like
+            // `Literal[None,] | Literal[None,]` -> `None | None`) happen across separate passes,
+            // preventing the production of invalid code.
+            .map(|fix| {
+                fix.map(|fix| fix.isolate(Checker::isolation(semantic.current_statement_id())))
+            })
         });
         checker.report_diagnostic(diagnostic);
     }
@@ -172,17 +178,8 @@ fn create_fix(
 
         traverse_union(
             &mut |expr, _| {
-                if matches!(expr, Expr::NoneLiteral(_)) {
+                if expr.is_none_literal_expr() {
                     is_fixable = false;
-                }
-                if expr != literal_expr {
-                    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
-                        if semantic.match_typing_expr(value, "Literal")
-                            && matches!(**slice, Expr::NoneLiteral(_))
-                        {
-                            is_fixable = false;
-                        }
-                    }
                 }
             },
             semantic,
@@ -225,11 +222,11 @@ fn create_fix(
 
     let fix = match union_kind {
         UnionKind::TypingOptional => {
-            let (import_edit, bound_name) = checker.import_from_typing(
-                "Optional",
-                literal_expr.start(),
-                PythonVersion::lowest(),
-            )?;
+            let Some(importer) = checker.typing_importer("Optional", PythonVersion::lowest())
+            else {
+                return Ok(None);
+            };
+            let (import_edit, bound_name) = importer.import(literal_expr.start())?;
             let optional_expr = typing_optional(new_literal_expr, Name::from(bound_name));
             let content = checker.generator().expr(&optional_expr);
             let optional_edit = Edit::range_replacement(content, literal_expr.range());

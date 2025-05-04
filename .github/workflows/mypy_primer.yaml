@@ -5,7 +5,7 @@ permissions: {}
 on:
   pull_request:
     paths:
-      - "crates/red_knot*/**"
+      - "crates/ty*/**"
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
@@ -41,19 +41,16 @@ jobs:
       - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6 # v2.7.8
         with:
           workspaces: "ruff"
+
       - name: Install Rust toolchain
         run: rustup show
-
-      - name: Install mypy_primer
-        run: |
-          uv tool install "git+https://github.com/hauntsaninja/mypy_primer@4c22d192a456e27badf85b3ea0f830707375d2b7"
 
       - name: Run mypy_primer
         shell: bash
         run: |
           cd ruff
 
-          PRIMER_SELECTOR="$(paste -s -d'|' crates/red_knot_python_semantic/resources/primer/good.txt)"
+          PRIMER_SELECTOR="$(paste -s -d'|' crates/ty_python_semantic/resources/primer/good.txt)"
 
           echo "new commit"
           git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
@@ -67,9 +64,11 @@ jobs:
 
           echo "Project selector: $PRIMER_SELECTOR"
           # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
-          uvx mypy_primer \
+          uvx \
+            --from="git+https://github.com/hauntsaninja/mypy_primer@4b15cf3b07db69db67bbfaebfffb2a8a28040933" \
+            mypy_primer \
             --repo ruff \
-            --type-checker knot \
+            --type-checker ty \
             --old base_commit \
             --new "$GITHUB_SHA" \
             --project-selector "/($PRIMER_SELECTOR)\$" \

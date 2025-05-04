@@ -1,6 +1,9 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
-use crate::{checkers::ast::Checker, rules::perflint::helpers::statement_deletion_range};
+use crate::{
+    checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
+    rules::perflint::helpers::statement_deletion_range,
+};
 use anyhow::{anyhow, Result};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 
@@ -335,7 +338,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     );
 
     // TODO: once this fix is stabilized, change the rule to always fixable
-    if checker.settings.preview.is_enabled() {
+    if is_fix_manual_list_comprehension_enabled(checker.settings) {
         diagnostic.try_set_fix(|| {
             convert_to_list_extend(
                 comprehension_type,

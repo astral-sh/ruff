@@ -3,7 +3,7 @@ use std::path::Path;
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
-use ruff_source_file::SourceLocation;
+use ruff_source_file::LineColumn;
 
 use crate::message::{
     group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
@@ -47,14 +47,14 @@ impl Emitter for JunitEmitter {
                     let location = if context.is_notebook(message.filename()) {
                         // We can't give a reasonable location for the structured formats,
                         // so we show one that's clearly a fallback
-                        SourceLocation::default()
+                        LineColumn::default()
                     } else {
                         start_location
                     };
 
                     status.set_description(format!(
                         "line {row}, col {col}, {body}",
-                        row = location.row,
+                        row = location.line,
                         col = location.column,
                         body = message.body()
                     ));
@@ -72,7 +72,7 @@ impl Emitter for JunitEmitter {
                     case.set_classname(classname.to_str().unwrap());
                     case.extra.insert(
                         XmlString::new("line"),
-                        XmlString::new(location.row.to_string()),
+                        XmlString::new(location.line.to_string()),
                     );
                     case.extra.insert(
                         XmlString::new("column"),
