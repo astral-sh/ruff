@@ -2,7 +2,7 @@ use std::fmt;
 
 use anyhow::{Context, Result};
 
-use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
+use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 
 use ruff_python_ast::name::Name;
@@ -10,6 +10,7 @@ use ruff_python_ast::{self as ast, Expr, Operator, Parameters};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_implicit_optional_fix_safe;
 
 use ruff_python_ast::PythonVersion;
 
@@ -120,7 +121,12 @@ impl From<PythonVersion> for ConversionType {
 }
 
 /// Generate a [`Fix`] for the given [`Expr`] as per the [`ConversionType`].
-fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr) -> Result<Fix> {
+fn generate_fix(
+    checker: &Checker,
+    conversion_type: ConversionType,
+    expr: &Expr,
+    applicability: Applicability,
+) -> Result<Fix> {
     match conversion_type {
         ConversionType::BinOpOr => {
             let new_expr = Expr::BinOp(ast::ExprBinOp {
@@ -130,10 +136,10 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 range: TextRange::default(),
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::unsafe_edit(Edit::range_replacement(
-                content,
-                expr.range(),
-            )))
+            Ok(Fix::applicable_edit(
+                Edit::range_replacement(content, expr.range()),
+                applicability,
+            ))
         }
         ConversionType::Optional => {
             let importer = checker
@@ -151,9 +157,10 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
                 ctx: ast::ExprContext::Load,
             });
             let content = checker.generator().expr(&new_expr);
-            Ok(Fix::unsafe_edits(
+            Ok(Fix::applicable_edits(
                 Edit::range_replacement(content, expr.range()),
                 [import_edit],
+                applicability,
             ))
         }
     }
@@ -161,6 +168,11 @@ fn generate_fix(checker: &Checker, conversion_type: ConversionType, expr: &Expr)
 
 /// RUF013
 pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
+    let applicability = if is_implicit_optional_fix_safe(checker.settings) {
+        Applicability::Safe
+    } else {
+        Applicability::Unsafe
+    };
     for parameter in parameters.iter_non_variadic_params() {
         let Some(Expr::NoneLiteral(_)) = parameter.default() else {
             continue;
@@ -184,7 +196,9 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
                 let mut diagnostic =
                     Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
                 if parsed_annotation.kind().is_simple() {
-                    diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
+                    diagnostic.try_set_fix(|| {
+                        generate_fix(checker, conversion_type, expr, applicability)
+                    });
                 }
                 checker.report_diagnostic(diagnostic);
             }
@@ -199,7 +213,7 @@ pub(crate) fn implicit_optional(checker: &Checker, parameters: &Parameters) {
 
             let mut diagnostic =
                 Diagnostic::new(ImplicitOptional { conversion_type }, expr.range());
-            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr));
+            diagnostic.try_set_fix(|| generate_fix(checker, conversion_type, expr, applicability));
             checker.report_diagnostic(diagnostic);
         }
     }

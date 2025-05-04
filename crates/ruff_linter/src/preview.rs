@@ -125,3 +125,7 @@ pub(crate) const fn is_check_file_level_directives_enabled(settings: &LinterSett
 pub(crate) const fn is_readlines_in_for_fix_safe(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+pub(crate) const fn is_implicit_optional_fix_safe(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
