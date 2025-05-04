@@ -469,6 +469,11 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_0.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_1.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_2.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_3.py"))]
+    #[test_case(Rule::ImplicitOptional, Path::new("RUF013_4.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
