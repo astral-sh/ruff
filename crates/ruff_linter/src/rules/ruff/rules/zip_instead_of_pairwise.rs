@@ -31,9 +31,8 @@ use crate::{checkers::ast::Checker, importer::ImportRequest};
 ///
 /// ## Fix safety
 ///
-/// This fix is always marked as unsafe because the `zip` operator takes as argument a sequence
-/// object and this last one could have a custom implementation of the `__getitem__` method, and
-/// `pairwise(iterable)` assumes standard slicing behavior.
+/// This fix is always marked as unsafe because the import `from itertools import pairwise` could
+/// be shadowed by a custom pairwise function in the same scope.
 ///
 /// ## References
 /// - [Python documentation: `itertools.pairwise`](https://docs.python.org/3/library/itertools.html#itertools.pairwise)
