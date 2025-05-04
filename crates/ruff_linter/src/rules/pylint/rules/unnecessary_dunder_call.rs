@@ -15,6 +15,12 @@ use ruff_python_ast::PythonVersion;
 /// Dunder names are not meant to be called explicitly and, in most cases, can
 /// be replaced with builtins or operators.
 ///
+/// ## Fix safety
+/// This fix is sometimes unsafe. When replacing dunder method calls with operators
+/// or builtins, the fix must carefully consider operator precedence to avoid changing
+/// the code's behavior. For example, without proper handling, changing `(-a).__sub__(b)`
+/// to `-a - b` would change the execution order due to operator precedence rules.
+///
 /// ## Example
 /// ```python
 /// three = (3.0).__str__()
