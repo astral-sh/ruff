@@ -74,8 +74,11 @@ use super::super::typing::type_hint_explicitly_allows_none;
 ///
 /// ## Fix safety
 ///
-/// This fix is always marked as unsafe because it is not possible to establish if the equality
-/// with `None` has specific semantics different from `Optional`.
+/// This fix is always marked as unsafe because:
+///  - strict type checkers might suddenly flag previously passing code,
+///  - code generation tools might alter their behavior based on the new types,
+///  - frameworks using reflection could change runtime behavior unexpectedly, and
+///  - dependent code making assumptions based on the original type annotations might break in complex systems.
 ///
 /// [PEP 484]: https://peps.python.org/pep-0484/#union-types
 #[derive(ViolationMetadata)]
