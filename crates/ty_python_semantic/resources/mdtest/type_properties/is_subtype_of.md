@@ -1199,17 +1199,15 @@ class F:
     @overload
     def __new__(cls) -> int: ...
     @overload
-    def __new__(cls, x: int) -> "H": ...
-    def __new__(cls, x: int | None = None) -> "int | H":
+    def __new__(cls, x: int) -> "F": ...
+    def __new__(cls, x: int | None = None) -> "int | F":
         return 1
 
     def __init__(self, y: str) -> None: ...
 
-class H(F): ...
-
-static_assert(is_subtype_of(TypeOf[F], Callable[[int], H]))
+static_assert(is_subtype_of(TypeOf[F], Callable[[int], F]))
 static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
-static_assert(not is_subtype_of(TypeOf[F], Callable[[str], H]))
+static_assert(not is_subtype_of(TypeOf[F], Callable[[str], F]))
 ```
 
 #### Classes with `__call__` and `__new__`
