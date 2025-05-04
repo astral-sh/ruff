@@ -1201,7 +1201,7 @@ class F:
     @overload
     def __new__(cls, x: int) -> "F": ...
     def __new__(cls, x: int | None = None) -> "int | F":
-        return F() if x is not None else 1
+        return 1 if x is None else object.__new__(cls)
 
     def __init__(self, y: str) -> None: ...
 
@@ -1281,7 +1281,7 @@ class B:
     def __init__(self, a: str) -> None: ...
 
 static_assert(is_subtype_of(TypeOf[B], Callable[[int], int]))
-static_assert(not is_subtype_of(TypeOf[B], Callable[[str], int]))
+static_assert(not is_subtype_of(TypeOf[B], Callable[[str], B]))
 
 class C:
     def __new__(cls, *args, **kwargs) -> "C":
@@ -1306,6 +1306,29 @@ class E:
 
 static_assert(is_subtype_of(TypeOf[E], Callable[[int], D]))
 static_assert(is_subtype_of(TypeOf[E], Callable[[], int]))
+```
+
+#### Classes with `__call__`, `__new__` and `__init__`
+
+If `__call__`, `__new__` and `__init__` are all present, `__call__` takes precedence.
+
+```py
+from typing import Callable
+from ty_extensions import TypeOf, static_assert, is_subtype_of
+
+class MetaWithIntReturn(type):
+    def __call__(cls) -> int:
+        return super().__call__()
+
+class F(metaclass=MetaWithIntReturn):
+    def __new__(cls) -> str:
+        return super().__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
+static_assert(not is_subtype_of(TypeOf[F], Callable[[], str]))
+static_assert(not is_subtype_of(TypeOf[F], Callable[[int], F]))
 ```
 
 ### Bound methods
