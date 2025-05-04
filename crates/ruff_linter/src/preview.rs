@@ -126,6 +126,7 @@ pub(crate) const fn is_readlines_in_for_fix_safe(settings: &LinterSettings) -> b
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/17836
 pub(crate) const fn is_implicit_optional_fix_safe(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
