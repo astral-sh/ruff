@@ -19,6 +19,12 @@ use ruff_text_size::Ranged;
 /// Prefer `sys.exit()`, as the `sys` module is guaranteed to exist in all
 /// contexts.
 ///
+/// ## Fix safety
+/// This fix is sometimes unsafe. The fix automatically adds the necessary `import sys`
+/// statement if not already present, but it can only safely handle simple cases with
+/// at most one argument. Complex calls with multiple arguments or keyword arguments
+/// cannot be automatically fixed.
+///
 /// ## Example
 /// ```python
 /// if __name__ == "__main__":
