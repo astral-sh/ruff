@@ -1,11 +1,10 @@
-use std::hash::BuildHasherDefault;
-
-use ruff_python_ast::PythonVersion;
-use rustc_hash::FxHasher;
-
 use crate::files::Files;
 use crate::system::System;
 use crate::vendored::VendoredFileSystem;
+use ruff_python_ast::PythonVersion;
+use rustc_hash::FxHasher;
+use std::hash::BuildHasherDefault;
+use std::num::NonZeroUsize;
 
 pub mod diagnostic;
 pub mod display;
@@ -35,6 +34,29 @@ pub trait Db: salsa::Database {
 pub trait Upcast<T: ?Sized> {
     fn upcast(&self) -> &T;
     fn upcast_mut(&mut self) -> &mut T;
+}
+
+/// Returns the maximum number of tasks that ty is allowed
+/// to process in parallel.
+///
+/// Returns [`std::thread::available_parallelism`], unless the environment
+/// variable `TY_MAX_PARALLELISM` or `RAYON_NUM_THREADS` is set. `TY_MAX_PARALLELISM` takes
+/// precedence over `RAYON_NUM_THREADS`.
+///
+/// Falls back to `1` if `available_parallelism` is not available.
+///
+/// Setting `TY_MAX_PARALLELISM` to `2` only restricts the number of threads that ty spawns
+/// to process work in parallel. For example, to index a directory or checking the files of a project.
+/// ty can still spawn more threads for other tasks, e.g. to wait for a Ctrl+C signal or
+/// watching the files for changes.
+pub fn max_parallelism() -> NonZeroUsize {
+    std::env::var("TY_MAX_PARALLELISM")
+        .or_else(|_| std::env::var("RAYON_NUM_THREADS"))
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism().unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
+        })
 }
 
 #[cfg(test)]
