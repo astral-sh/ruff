@@ -3,5 +3,5 @@
 ## Empty list
 
 ```py
-reveal_type([])  # revealed: list
+reveal_type([])  # revealed: list[Unknown]
 ```

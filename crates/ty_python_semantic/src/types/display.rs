@@ -174,7 +174,9 @@ impl Display for DisplayRepresentation<'_> {
                     function = function.name(self.db),
                     specialization = if let Some(specialization) = function.specialization(self.db)
                     {
-                        specialization.display_short(self.db).to_string()
+                        specialization
+                            .display_short(self.db, TupleSpecialization::No)
+                            .to_string()
                     } else {
                         String::new()
                     },
@@ -187,7 +189,9 @@ impl Display for DisplayRepresentation<'_> {
                     function = function.name(self.db),
                     specialization = if let Some(specialization) = function.specialization(self.db)
                     {
-                        specialization.display_short(self.db).to_string()
+                        specialization
+                            .display_short(self.db, TupleSpecialization::No)
+                            .to_string()
                     } else {
                         String::new()
                     },
@@ -274,7 +278,10 @@ impl Display for DisplayGenericAlias<'_> {
             f,
             "{origin}{specialization}",
             origin = self.origin.name(self.db),
-            specialization = self.specialization.display_short(self.db),
+            specialization = self.specialization.display_short(
+                self.db,
+                TupleSpecialization::from_class(self.db, self.origin)
+            ),
         )
     }
 }
@@ -327,22 +334,32 @@ impl Display for DisplayGenericContext<'_> {
 
 impl<'db> Specialization<'db> {
     /// Renders the specialization in full, e.g. `{T = int, U = str}`.
-    pub fn display(&'db self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+    pub fn display(
+        &'db self,
+        db: &'db dyn Db,
+        tuple_specialization: TupleSpecialization,
+    ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
             typevars: self.generic_context(db).variables(db),
             types: self.types(db),
             db,
             full: true,
+            tuple_specialization,
         }
     }
 
     /// Renders the specialization as it would appear in a subscript expression, e.g. `[int, str]`.
-    pub fn display_short(&'db self, db: &'db dyn Db) -> DisplaySpecialization<'db> {
+    pub fn display_short(
+        &'db self,
+        db: &'db dyn Db,
+        tuple_specialization: TupleSpecialization,
+    ) -> DisplaySpecialization<'db> {
         DisplaySpecialization {
             typevars: self.generic_context(db).variables(db),
             types: self.types(db),
             db,
             full: false,
+            tuple_specialization,
         }
     }
 }
@@ -352,6 +369,7 @@ pub struct DisplaySpecialization<'db> {
     types: &'db [Type<'db>],
     db: &'db dyn Db,
     full: bool,
+    tuple_specialization: TupleSpecialization,
 }
 
 impl Display for DisplaySpecialization<'_> {
@@ -373,7 +391,30 @@ impl Display for DisplaySpecialization<'_> {
                 }
                 ty.display(self.db).fmt(f)?;
             }
+            if self.tuple_specialization.is_yes() {
+                f.write_str(", ...")?;
+            }
             f.write_char(']')
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TupleSpecialization {
+    Yes,
+    No,
+}
+
+impl TupleSpecialization {
+    const fn is_yes(self) -> bool {
+        matches!(self, Self::Yes)
+    }
+
+    fn from_class(db: &dyn Db, class: ClassLiteral) -> Self {
+        if class.is_known(db, KnownClass::Tuple) {
+            Self::Yes
+        } else {
+            Self::No
         }
     }
 }

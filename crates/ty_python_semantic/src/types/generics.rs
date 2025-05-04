@@ -4,8 +4,8 @@ use rustc_hash::FxHashMap;
 use crate::semantic_index::SemanticIndex;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
-    declaration_type, KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance,
-    TypeVarVariance, UnionType,
+    declaration_type, todo_type, KnownInstanceType, Type, TypeVarBoundOrConstraints,
+    TypeVarInstance, TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderSet};
 
@@ -17,6 +17,7 @@ use crate::{Db, FxOrderSet};
 pub struct GenericContext<'db> {
     #[returns(ref)]
     pub(crate) variables: FxOrderSet<TypeVarInstance<'db>>,
+    pub(crate) origin: GenericContextOrigin,
 }
 
 impl<'db> GenericContext<'db> {
@@ -30,7 +31,7 @@ impl<'db> GenericContext<'db> {
             .iter()
             .filter_map(|type_param| Self::variable_from_type_param(db, index, type_param))
             .collect();
-        Self::new(db, variables)
+        Self::new(db, variables, GenericContextOrigin::TypeParameterList)
     }
 
     fn variable_from_type_param(
@@ -76,7 +77,11 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables))
+        Some(Self::new(
+            db,
+            variables,
+            GenericContextOrigin::LegacyGenericFunction,
+        ))
     }
 
     /// Creates a generic context from the legacy `TypeVar`s that appear in class's base class
@@ -92,7 +97,7 @@ impl<'db> GenericContext<'db> {
         if variables.is_empty() {
             return None;
         }
-        Some(Self::new(db, variables))
+        Some(Self::new(db, variables, GenericContextOrigin::Inherited))
     }
 
     pub(crate) fn len(self, db: &'db dyn Db) -> usize {
@@ -131,6 +136,20 @@ impl<'db> GenericContext<'db> {
 
     pub(crate) fn default_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
         self.specialize_partial(db, &vec![None; self.variables(db).len()])
+    }
+
+    #[allow(unused_variables)] // Only unused in release builds
+    pub(crate) fn todo_specialization(
+        self,
+        db: &'db dyn Db,
+        todo: &'static str,
+    ) -> Specialization<'db> {
+        let types = self
+            .variables(db)
+            .iter()
+            .map(|typevar| typevar.default_ty(db).unwrap_or(todo_type!(todo)))
+            .collect();
+        self.specialize(db, types)
     }
 
     pub(crate) fn identity_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
@@ -206,6 +225,58 @@ impl<'db> GenericContext<'db> {
         }
 
         Specialization::new(db, self, expanded.into_boxed_slice())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum GenericContextOrigin {
+    LegacyBase(LegacyGenericBase),
+    Inherited,
+    LegacyGenericFunction,
+    TypeParameterList,
+}
+
+impl GenericContextOrigin {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::LegacyBase(base) => base.as_str(),
+            Self::Inherited => "inherited",
+            Self::LegacyGenericFunction => "legacy generic function",
+            Self::TypeParameterList => "type parameter list",
+        }
+    }
+}
+
+impl std::fmt::Display for GenericContextOrigin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum LegacyGenericBase {
+    Generic,
+    Protocol,
+}
+
+impl LegacyGenericBase {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Generic => "`typing.Generic`",
+            Self::Protocol => "subscripted `typing.Protocol`",
+        }
+    }
+}
+
+impl std::fmt::Display for LegacyGenericBase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<LegacyGenericBase> for GenericContextOrigin {
+    fn from(base: LegacyGenericBase) -> Self {
+        Self::LegacyBase(base)
     }
 }
 

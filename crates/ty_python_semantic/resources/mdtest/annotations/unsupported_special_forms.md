@@ -16,7 +16,7 @@ Alias: TypeAlias = int
 
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     # TODO: should understand the annotation
-    reveal_type(args)  # revealed: tuple
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
 
     reveal_type(Alias)  # revealed: @Todo(Support for `typing.TypeAlias`)
 
@@ -24,7 +24,7 @@ def g() -> TypeGuard[int]: ...
 def h() -> TypeIs[int]: ...
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
     # TODO: should understand the annotation
-    reveal_type(args)  # revealed: tuple
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
     reveal_type(kwargs)  # revealed: dict[str, @Todo(Support for `typing.ParamSpec`)]
     return callback(42, *args, **kwargs)
 

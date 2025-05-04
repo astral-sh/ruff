@@ -38,6 +38,7 @@ T = TypeVar("T")
 U: TypeVar = TypeVar("U")
 
 # error: [invalid-legacy-type-variable] "A legacy `typing.TypeVar` must be immediately assigned to a variable"
+# error: [invalid-type-form] "Function calls are not allowed in type expressions"
 TestList = list[TypeVar("W")]
 ```
 

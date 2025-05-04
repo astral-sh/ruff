@@ -153,11 +153,15 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (ClassBase::Class(left), ClassBase::Class(right)) => left.cmp(&right),
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
-                (ClassBase::Protocol, _) => Ordering::Less,
-                (_, ClassBase::Protocol) => Ordering::Greater,
+
+                (ClassBase::Protocol(left), ClassBase::Protocol(right)) => left.cmp(&right),
+                (ClassBase::Protocol(_), _) => Ordering::Less,
+                (_, ClassBase::Protocol(_)) => Ordering::Greater,
+
                 (ClassBase::Generic(left), ClassBase::Generic(right)) => left.cmp(&right),
                 (ClassBase::Generic(_), _) => Ordering::Less,
                 (_, ClassBase::Generic(_)) => Ordering::Greater,
+
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
@@ -253,8 +257,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (KnownInstanceType::Generic(_), _) => Ordering::Less,
                 (_, KnownInstanceType::Generic(_)) => Ordering::Greater,
 
-                (KnownInstanceType::Protocol, _) => Ordering::Less,
-                (_, KnownInstanceType::Protocol) => Ordering::Greater,
+                (KnownInstanceType::Protocol(left), KnownInstanceType::Protocol(right)) => {
+                    left.cmp(right)
+                }
+                (KnownInstanceType::Protocol(_), _) => Ordering::Less,
+                (_, KnownInstanceType::Protocol(_)) => Ordering::Greater,
 
                 (KnownInstanceType::NoReturn, _) => Ordering::Less,
                 (_, KnownInstanceType::NoReturn) => Ordering::Greater,

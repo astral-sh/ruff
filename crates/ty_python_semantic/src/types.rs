@@ -3939,6 +3939,9 @@ impl<'db> Type<'db> {
                     );
                     Signatures::single(signature)
                 }
+                Some(KnownClass::NamedTuple) => {
+                    Signatures::single(CallableSignature::todo("functional `NamedTuple` syntax"))
+                }
                 Some(KnownClass::Object) => {
                     // ```py
                     // class object:
@@ -4326,6 +4329,12 @@ impl<'db> Type<'db> {
     fn try_iterate(self, db: &'db dyn Db) -> Result<Type<'db>, IterationError<'db>> {
         if let Type::Tuple(tuple_type) = self {
             return Ok(UnionType::from_elements(db, tuple_type.elements(db)));
+        }
+
+        if let Type::GenericAlias(alias) = self {
+            if alias.origin(db).is_known(db, KnownClass::Tuple) {
+                return Ok(todo_type!("*tuple[] annotations"));
+            }
         }
 
         let try_call_dunder_getitem = || {
@@ -4826,7 +4835,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
                 KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
-                KnownInstanceType::Protocol => Err(InvalidTypeExpressionError {
+                KnownInstanceType::Protocol(_) => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::Protocol],
                     fallback_type: Type::unknown(),
                 }),
@@ -4930,9 +4939,6 @@ impl<'db> Type<'db> {
                 )),
                 Some(KnownClass::UnionType) => Ok(todo_type!(
                     "Support for `types.UnionType` instances in type expressions"
-                )),
-                Some(KnownClass::NamedTuple) => Ok(todo_type!(
-                    "Support for functional `typing.NamedTuple` syntax"
                 )),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(

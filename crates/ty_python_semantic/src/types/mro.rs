@@ -174,7 +174,7 @@ impl<'db> Mro<'db> {
                             continue;
                         }
                         match base {
-                            ClassBase::Class(_) | ClassBase::Generic(_) | ClassBase::Protocol => {
+                            ClassBase::Class(_) | ClassBase::Generic(_) | ClassBase::Protocol(_) => {
                                 errors.push(DuplicateBaseError {
                                     duplicate_base: base,
                                     first_index: *first_index,

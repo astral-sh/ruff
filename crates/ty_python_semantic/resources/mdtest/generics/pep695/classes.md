@@ -65,7 +65,7 @@ from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
-# error: [invalid-generic-class] "Cannot both inherit from `Generic` and use PEP 695 type variables"
+# error: [invalid-generic-class] "Cannot both inherit from `typing.Generic` and use PEP 695 type variables"
 class BothGenericSyntaxes[U](Generic[T]): ...
 ```
 

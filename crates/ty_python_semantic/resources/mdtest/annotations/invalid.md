@@ -99,6 +99,8 @@ async def outer():  # avoid unrelated syntax errors on yield, yield from, and aw
 def _(
     a: {1: 2},  # error: [invalid-type-form] "Dict literals are not allowed in type expressions"
     b: {1, 2},  # error: [invalid-type-form] "Set literals are not allowed in type expressions"
+    # TODO: the `[not-iterable]` error here is a false positive
+    # error: [not-iterable] "Object of type `_T` is not iterable"
     c: {k: v for k, v in [(1, 2)]},  # error: [invalid-type-form] "Dict comprehensions are not allowed in type expressions"
     d: [k for k in [1, 2]],  # error: [invalid-type-form] "List comprehensions are not allowed in type expressions"
     e: {k for k in [1, 2]},  # error: [invalid-type-form] "Set comprehensions are not allowed in type expressions"

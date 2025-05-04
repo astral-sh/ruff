@@ -9,13 +9,13 @@ A list can be indexed into with:
 
 ```py
 x = [1, 2, 3]
-reveal_type(x)  # revealed: list
+reveal_type(x)  # revealed: list[Unknown]
 
 # TODO reveal int
 reveal_type(x[0])  # revealed: Unknown
 
 # TODO reveal list
-reveal_type(x[0:1])  # revealed: @Todo(specialized non-generic class)
+reveal_type(x[0:1])  # revealed: list[Unknown]
 
 # error: [call-non-callable]
 reveal_type(x["a"])  # revealed: Unknown
