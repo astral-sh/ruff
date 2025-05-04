@@ -10,7 +10,9 @@ use anyhow::{anyhow, Context};
 use clap::Parser;
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
+use rayon::ThreadPoolBuilder;
 use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
+use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use salsa::plumbing::ZalsaDatabase;
 use ty_project::metadata::options::Options;
@@ -25,6 +27,8 @@ mod python_version;
 mod version;
 
 pub fn main() -> ExitStatus {
+    setup_rayon();
+
     run().unwrap_or_else(|error| {
         use std::io::Write;
 
@@ -391,4 +395,12 @@ fn set_colored_override(color: Option<TerminalColor>) {
             colored::control::set_override(false);
         }
     }
+}
+
+/// Initializes the global rayon thread pool to never use more than `TY_MAX_PARALLELISM` threads.
+fn setup_rayon() {
+    ThreadPoolBuilder::default()
+        .num_threads(max_parallelism().get())
+        .build_global()
+        .unwrap();
 }
