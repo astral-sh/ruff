@@ -1201,7 +1201,7 @@ class F:
     @overload
     def __new__(cls, x: int) -> "F": ...
     def __new__(cls, x: int | None = None) -> "int | F":
-        return 1
+        return F() if x is None else 1
 
     def __init__(self, y: str) -> None: ...
 
