@@ -884,14 +884,14 @@ impl<'db> ClassLiteral<'db> {
             )
             .symbol;
 
-        if let Symbol::Type(Type::BoundMethod(metaclass__dunder_call_function), _) =
+        if let Symbol::Type(Type::BoundMethod(metaclass_dunder_call_function), _) =
             metaclass_dunder_call_function_symbol
         {
             // TODO: this intentionally diverges from step 1 in
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
             // by always respecting the signature of the metaclass `__call__`, rather than
             // using a heuristic which makes unwarranted assumptions to sometimes ignore it.
-            return metaclass__dunder_call_function.into_callable_type(db);
+            return metaclass_dunder_call_function.into_callable_type(db);
         }
 
         let dunder_new_function_symbol = self_ty
