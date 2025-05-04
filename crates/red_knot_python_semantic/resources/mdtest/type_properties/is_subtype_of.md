@@ -1268,6 +1268,15 @@ class B:
 
 static_assert(is_subtype_of(TypeOf[B], Callable[[int], int]))
 static_assert(not is_subtype_of(TypeOf[B], Callable[[str], int]))
+
+class C:
+    def __new__(cls, *args, **kwargs) -> "C":
+        return super().__new__(cls)
+
+    def __init__(self, x: int) -> None: ...
+
+static_assert(not is_subtype_of(TypeOf[C], Callable[[int], C]))
+static_assert(not is_subtype_of(TypeOf[C], Callable[[], C]))
 ```
 
 ### Bound methods

@@ -803,17 +803,20 @@ impl<'db> ClassLiteral<'db> {
 
         let new_function =
             if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+                // Step 3: If the return type of the `__new__` evaluates to a type that is not a subclass of this class,
+                // then we should ignore the `__init__` and just return the `__new__` method.
                 let new_return_ty = match new_function.signature(db) {
                     FunctionSignature::Single(signature)
                     | FunctionSignature::Overloaded(_, Some(signature)) => signature.return_ty,
                     FunctionSignature::Overloaded(..) => None,
                 };
+
                 if let Some(new_return_ty) = new_return_ty {
-                    if !self_ty.is_subtype_of(db, new_return_ty) {
+                    if !new_return_ty.to_meta_type(db).is_subtype_of(db, self_ty) {
                         return new_function.into_bound_method_type(db, self_ty);
                     }
                 }
-                Some(new_function)
+                Some(new_function.into_bound_method_type(db, self_ty))
             } else {
                 None
             };
@@ -830,6 +833,9 @@ impl<'db> ClassLiteral<'db> {
         // TODO: should be the concrete value of `Self`
         let correct_return_type = Type::instance(ClassType::NonGeneric(self));
 
+        // If the class defines an `__init__` method, then we synthesize a `__init__` method
+        // that has the same parameters as the `__init__` method after it is bound, and with the return type
+        // of the concrete value of `Self`.
         let synthesized_init_function =
             if let Symbol::Type(Type::FunctionLiteral(init_function), _) = init_function_symbol {
                 let synthesized_signature = |signature: Signature<'db>| {
@@ -854,33 +860,33 @@ impl<'db> ClassLiteral<'db> {
                 None
             };
 
-        let new_function =
-            new_function.map(|new_function| new_function.into_bound_method_type(db, self_ty));
+        let functions: Vec<_> = [new_function, synthesized_init_function]
+            .into_iter()
+            .flatten()
+            .collect();
 
-        match (new_function, synthesized_init_function) {
-            (Some(new_function), Some(synthesized_init_function)) => {
-                UnionType::from_elements(db, [new_function, synthesized_init_function])
-            }
-            (Some(new_function), None) => new_function,
-            (None, Some(synthesized_init_function)) => synthesized_init_function,
-            (None, None) => {
-                let new_function_symbol = self_ty
-                    .member_lookup_with_policy(
-                        db,
-                        "__new__".into(),
-                        MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-                    )
-                    .symbol;
+        if functions.is_empty() {
+            // If no `__new__` or `__init__` method is found, then we fall back to looking for
+            // an `object.__new__` method.
+            let new_function_symbol = self_ty
+                .member_lookup_with_policy(
+                    db,
+                    "__new__".into(),
+                    MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                )
+                .symbol;
 
-                if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-                    new_function.into_bound_method_type(db, self_ty)
-                } else {
-                    Type::Callable(CallableType::single(
-                        db,
-                        Signature::new(Parameters::empty(), Some(correct_return_type)),
-                    ))
-                }
+            if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+                new_function.into_bound_method_type(db, self_ty)
+            } else {
+                // Fallback if no `object.__new__` is found.
+                Type::Callable(CallableType::single(
+                    db,
+                    Signature::new(Parameters::empty(), Some(correct_return_type)),
+                ))
             }
+        } else {
+            UnionType::from_elements(db, functions)
         }
     }
 
