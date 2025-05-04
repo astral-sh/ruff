@@ -283,11 +283,11 @@ class D2:
 
 # TODO: these should not be errors
 D1("a")  # error: [too-many-positional-arguments]
-D2("a")  # error: [too-many-positional-arguments]
+D2("a")
 
 # TODO: these should be invalid-argument-type errors
 D1(1.2)  # error: [too-many-positional-arguments]
-D2(1.2)  # error: [too-many-positional-arguments]
+D2(1.2)  # error: [invalid-argument-type]
 ```
 
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
