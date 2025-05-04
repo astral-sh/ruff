@@ -1169,7 +1169,7 @@ static_assert(is_subtype_of(TypeOf[C], Callable[[], str]))
 #### Classes with `__new__`
 
 ```py
-from typing import Callable
+from typing import Callable, overload
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A:
@@ -1194,6 +1194,22 @@ static_assert(is_subtype_of(TypeOf[E], Callable[[], C]))
 static_assert(is_subtype_of(TypeOf[E], Callable[[], B]))
 static_assert(not is_subtype_of(TypeOf[D], Callable[[], C]))
 static_assert(is_subtype_of(TypeOf[D], Callable[[], B]))
+
+class F:
+    @overload
+    def __new__(cls) -> int: ...
+    @overload
+    def __new__(cls, x: int) -> "H": ...
+    def __new__(cls, x: int | None = None) -> "int | H":
+        return 1
+
+    def __init__(self, y: str) -> None: ...
+
+class H(F): ...
+
+static_assert(is_subtype_of(TypeOf[F], Callable[[int], H]))
+static_assert(is_subtype_of(TypeOf[F], Callable[[], int]))
+static_assert(not is_subtype_of(TypeOf[F], Callable[[str], H]))
 ```
 
 #### Classes with `__call__` and `__new__`
@@ -1248,7 +1264,7 @@ static_assert(is_subtype_of(TypeOf[C], Callable[[], C]))
 #### Classes with `__init__` and `__new__`
 
 ```py
-from typing import Callable
+from typing import Callable, overload
 from ty_extensions import TypeOf, static_assert, is_subtype_of
 
 class A:
@@ -1277,6 +1293,21 @@ class C:
 
 static_assert(not is_subtype_of(TypeOf[C], Callable[[int], C]))
 static_assert(not is_subtype_of(TypeOf[C], Callable[[], C]))
+
+class D: ...
+
+class E:
+    @overload
+    def __new__(cls) -> int: ...
+    @overload
+    def __new__(cls, x: int) -> D: ...
+    def __new__(cls, x: int | None = None) -> int | D:
+        return D()
+
+    def __init__(self, y: str) -> None: ...
+
+static_assert(is_subtype_of(TypeOf[E], Callable[[int], D]))
+static_assert(is_subtype_of(TypeOf[E], Callable[[], int]))
 ```
 
 ### Bound methods

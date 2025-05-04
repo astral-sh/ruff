@@ -915,12 +915,15 @@ impl<'db> ClassLiteral<'db> {
                     FunctionSignature::Overloaded(..) => None,
                 };
 
+                let dunder_new_bound_method =
+                    dunder_new_function.into_bound_method_type(db, self_ty);
+
                 if let Some(new_return_ty) = new_return_ty {
                     if !new_return_ty.to_meta_type(db).is_subtype_of(db, self_ty) {
-                        return dunder_new_function.into_bound_method_type(db, self_ty);
+                        return dunder_new_bound_method;
                     }
                 }
-                Some(dunder_new_function.into_bound_method_type(db, self_ty))
+                Some(dunder_new_bound_method)
             } else {
                 None
             };
@@ -966,34 +969,36 @@ impl<'db> ClassLiteral<'db> {
                 None
             };
 
-        let concrete_dunder_functions: Vec<_> =
-            [dunder_new_function, synthesized_dunder_init_callable]
-                .into_iter()
-                .flatten()
-                .collect();
-
-        if concrete_dunder_functions.is_empty() {
-            // If no `__new__` or `__init__` method is found, then we fall back to looking for
-            // an `object.__new__` method.
-            let new_function_symbol = self_ty
-                .member_lookup_with_policy(
+        match (dunder_new_function, synthesized_dunder_init_callable) {
+            (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
+                UnionType::from_elements(
                     db,
-                    "__new__".into(),
-                    MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    vec![dunder_new_function, synthesized_dunder_init_callable],
                 )
-                .symbol;
-
-            if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
-                new_function.into_bound_method_type(db, self_ty)
-            } else {
-                // Fallback if no `object.__new__` is found.
-                Type::Callable(CallableType::single(
-                    db,
-                    Signature::new(Parameters::empty(), Some(correct_return_type)),
-                ))
             }
-        } else {
-            UnionType::from_elements(db, concrete_dunder_functions)
+            (Some(dunder_constructor_function), None)
+            | (None, Some(dunder_constructor_function)) => dunder_constructor_function,
+            (None, None) => {
+                // If no `__new__` or `__init__` method is found, then we fall back to looking for
+                // an `object.__new__` method.
+                let new_function_symbol = self_ty
+                    .member_lookup_with_policy(
+                        db,
+                        "__new__".into(),
+                        MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+                    )
+                    .symbol;
+
+                if let Symbol::Type(Type::FunctionLiteral(new_function), _) = new_function_symbol {
+                    new_function.into_bound_method_type(db, self_ty)
+                } else {
+                    // Fallback if no `object.__new__` is found.
+                    Type::Callable(CallableType::single(
+                        db,
+                        Signature::new(Parameters::empty(), Some(correct_return_type)),
+                    ))
+                }
+            }
         }
     }
 
