@@ -6495,6 +6495,11 @@ impl<'db> FunctionSignature<'db> {
     pub(crate) fn iter(&self) -> Iter<Signature<'db>> {
         self.as_slice().iter()
     }
+
+    /// Returns the "bottom" signature (subtype of all fully-static signatures.)
+    pub(crate) fn bottom(db: &'db dyn Db) -> Self {
+        Self::Single(Signature::bottom(db))
+    }
 }
 
 impl<'db> IntoIterator for &'db FunctionSignature<'db> {
@@ -6639,7 +6644,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(return_ref)]
+    #[salsa::tracked(return_ref, cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature::Overloaded(
@@ -6847,6 +6852,22 @@ impl<'db> FunctionType<'db> {
         // function once it's supported.
         to_overloaded_impl(db, self).as_ref()
     }
+}
+
+fn signature_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &FunctionSignature<'db>,
+    _count: u32,
+    _function: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<FunctionSignature<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn signature_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _function: FunctionType<'db>,
+) -> FunctionSignature<'db> {
+    FunctionSignature::bottom(db)
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might

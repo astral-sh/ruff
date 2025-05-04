@@ -291,6 +291,16 @@ impl<'db> Signature<'db> {
         }
     }
 
+    /// Return the "bottom" signature, subtype of all other fully-static signatures.
+    pub(crate) fn bottom(db: &'db dyn Db) -> Self {
+        Self {
+            generic_context: None,
+            inherited_generic_context: None,
+            parameters: Parameters::object(db),
+            return_ty: Some(Type::Never),
+        }
+    }
+
     pub(crate) fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
             generic_context: self.generic_context,
@@ -957,7 +967,6 @@ impl<'db> Parameters<'db> {
     }
 
     /// Return parameters that represents `(*args: object, **kwargs: object)`.
-    #[cfg(test)]
     pub(crate) fn object(db: &'db dyn Db) -> Self {
         Self {
             value: vec![
