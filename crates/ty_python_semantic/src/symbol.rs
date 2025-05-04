@@ -284,12 +284,40 @@ pub(crate) fn global_symbol<'db>(
         .or_fall_back_to(db, || module_type_implicit_global_symbol(db, name))
 }
 
+/// Infers the public type of an imported symbol via a `from ... import *` statement.
+pub(crate) fn star_imported_symbol<'db>(
+    db: &'db dyn Db,
+    file: File,
+    name: &str,
+    // TODO: Should this be non-optional?
+    requires_explicit_reexport: Option<RequiresExplicitReExport>,
+) -> SymbolAndQualifiers<'db> {
+    imported_symbol_impl(db, file, name, requires_explicit_reexport)
+}
+
 /// Infers the public type of an imported symbol.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     name: &str,
 ) -> SymbolAndQualifiers<'db> {
+    imported_symbol_impl(db, file, name, None)
+}
+
+pub(crate) fn imported_symbol_impl<'db>(
+    db: &'db dyn Db,
+    file: File,
+    name: &str,
+    requires_explicit_reexport: Option<RequiresExplicitReExport>,
+) -> SymbolAndQualifiers<'db> {
+    let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
+        if file.is_stub(db.upcast()) {
+            RequiresExplicitReExport::Yes
+        } else {
+            RequiresExplicitReExport::No
+        }
+    });
+
     // If it's not found in the global scope, check if it's present as an instance on
     // `types.ModuleType` or `builtins.object`.
     //
@@ -305,13 +333,16 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    external_symbol_impl(db, file, name).or_fall_back_to(db, || {
-        if name == "__getattr__" {
-            Symbol::Unbound.into()
-        } else {
-            KnownClass::ModuleType.to_instance(db).member(db, name)
-        }
-    })
+    symbol_impl(db, global_scope(db, file), name, requires_explicit_reexport).or_fall_back_to(
+        db,
+        || {
+            if name == "__getattr__" {
+                Symbol::Unbound.into()
+            } else {
+                KnownClass::ModuleType.to_instance(db).member(db, name)
+            }
+        },
+    )
 }
 
 /// Lookup the type of `symbol` in the builtins namespace.
@@ -324,7 +355,13 @@ pub(crate) fn imported_symbol<'db>(
 pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &KnownModule::Builtins.name())
         .map(|module| {
-            external_symbol_impl(db, module.file(), symbol).or_fall_back_to(db, || {
+            symbol_impl(
+                db,
+                global_scope(db, module.file()),
+                symbol,
+                RequiresExplicitReExport::Yes,
+            )
+            .or_fall_back_to(db, || {
                 // We're looking up in the builtins namespace and not the module, so we should
                 // do the normal lookup in `types.ModuleType` and not the special one as in
                 // `imported_symbol`.
@@ -665,11 +702,11 @@ fn symbol_impl<'db>(
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> SymbolAndQualifiers<'db> {
-    let _span = tracing::trace_span!("symbol", ?name).entered();
+    let file = scope.file(db);
+    let _span = tracing::trace_span!("symbol", ?name, ?file).entered();
 
     if name == "platform"
-        && file_to_module(db, scope.file(db))
-            .is_some_and(|module| module.is_known(KnownModule::Sys))
+        && file_to_module(db, file).is_some_and(|module| module.is_known(KnownModule::Sys))
     {
         match Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
@@ -1015,26 +1052,8 @@ mod implicit_globals {
     }
 }
 
-/// Implementation of looking up a module-global symbol as seen from outside the file (e.g. via
-/// imports).
-///
-/// This will take into account whether the definition of the symbol is being explicitly
-/// re-exported from a stub file or not.
-fn external_symbol_impl<'db>(db: &'db dyn Db, file: File, name: &str) -> SymbolAndQualifiers<'db> {
-    symbol_impl(
-        db,
-        global_scope(db, file),
-        name,
-        if file.is_stub(db.upcast()) {
-            RequiresExplicitReExport::Yes
-        } else {
-            RequiresExplicitReExport::No
-        },
-    )
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-enum RequiresExplicitReExport {
+pub(crate) enum RequiresExplicitReExport {
     Yes,
     No,
 }

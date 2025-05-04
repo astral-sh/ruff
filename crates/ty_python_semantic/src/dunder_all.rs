@@ -1,0 +1,384 @@
+use rustc_hash::FxHashSet;
+
+use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
+use ruff_python_ast::visitor::{walk_stmt, Visitor};
+use ruff_python_ast::{self as ast, name::Name};
+
+use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
+use crate::semantic_index::symbol::ScopeId;
+use crate::semantic_index::{global_scope, semantic_index, SemanticIndex};
+use crate::symbol::{symbol_from_bindings, Boundness, Symbol};
+use crate::types::{infer_expression_types, Truthiness};
+use crate::{resolve_module, Db, ModuleName};
+
+// #[allow(clippy::ref_option)]
+// fn dunder_all_names_cycle_recover(
+//     _db: &dyn Db,
+//     _value: &Option<FxHashSet<Name>>,
+//     _count: u32,
+//     _file: File,
+// ) -> salsa::CycleRecoveryAction<Option<FxHashSet<Name>>> {
+//     salsa::CycleRecoveryAction::Iterate
+// }
+
+// fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet<Name>> {
+//     None
+// }
+
+pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<&FxHashSet<Name>> {
+    let _span = tracing::trace_span!("dunder_all_names", ?file).entered();
+
+    #[allow(clippy::ref_option)]
+    #[salsa::tracked(return_ref)]
+    fn dunder_all_names_impl(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
+        let module = parsed_module(db.upcast(), file);
+        let index = semantic_index(db, file);
+        let mut collector = DunderAllNamesCollector::new(db, file, index);
+        collector.visit_body(module.suite());
+        collector.into_names()
+    }
+
+    dunder_all_names_impl(db, file).as_ref()
+}
+
+struct DunderAllNamesCollector<'db> {
+    db: &'db dyn Db,
+    file: File,
+
+    /// The scope in which the `__all__` names are being collected from.
+    ///
+    /// This is always going to be the global scope of the module.
+    scope: ScopeId<'db>,
+
+    /// The semantic index for the module.
+    index: &'db SemanticIndex<'db>,
+
+    origin: Option<DunderAllOrigin>,
+
+    /// A set of names found in `__all__` for the current module.
+    names: FxHashSet<Name>,
+}
+
+impl<'db> DunderAllNamesCollector<'db> {
+    fn new(db: &'db dyn Db, file: File, index: &'db SemanticIndex<'db>) -> Self {
+        Self {
+            db,
+            file,
+            scope: global_scope(db, file),
+            index,
+            origin: None,
+            names: FxHashSet::default(),
+        }
+    }
+
+    /// Updates the origin of `__all__` in the current module.
+    ///
+    /// This will clear existing names if the origin is changed to mimic the behavior of overriding
+    /// `__all__` in the current module.
+    fn update_origin(&mut self, origin: DunderAllOrigin) {
+        if self.origin.is_some() {
+            self.names.clear();
+        }
+        self.origin = Some(origin);
+    }
+
+    fn extend_from_list_or_submodule(&mut self, expr: &ast::Expr) {
+        match expr {
+            // `__all__ += [...]`
+            // `__all__.extend([...])`
+            ast::Expr::List(ast::ExprList { elts, .. }) => {
+                self.add_names(elts);
+            }
+
+            // `__all__ += submodule.__all__`
+            // `__all__.extend(submodule.__all__)`
+            ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                if attr != "__all__" {
+                    return;
+                }
+                let Some(name_node) = value.as_name_expr() else {
+                    return;
+                };
+                let Symbol::Type(ty, Boundness::Bound) = symbol_from_bindings(
+                    self.db,
+                    self.index
+                        .use_def_map(self.scope.file_scope_id(self.db))
+                        .bindings_at_use(name_node.scoped_use_id(self.db, self.scope)),
+                ) else {
+                    return;
+                };
+                let Some(module_literal) = ty.into_module_literal() else {
+                    return;
+                };
+                // TODO: Do we need to check if the module is a submodule of the current
+                // module?
+                let Some(module_dunder_all_names) =
+                    dunder_all_names(self.db, module_literal.module(self.db).file())
+                else {
+                    return;
+                };
+                self.names.extend(module_dunder_all_names.iter().cloned());
+            }
+
+            _ => {}
+        }
+    }
+
+    fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
+        infer_expression_types(self.db, self.index.expression(expr))
+            .expression_type(expr.scoped_expression_id(self.db, self.scope))
+            .try_bool(self.db)
+            .ok()
+    }
+
+    fn add_names(&mut self, exprs: &[ast::Expr]) {
+        for expr in exprs {
+            let Some(name) = name_from_string_literal(expr) else {
+                continue;
+            };
+            self.names.insert(name);
+        }
+    }
+
+    fn into_names(mut self) -> Option<FxHashSet<Name>> {
+        if let DunderAllOrigin::ExternalModule(external_module) = self.origin? {
+            // TODO: Should this be done eagerly instead of lazily?
+            if let Some(module) = resolve_module(self.db, &external_module) {
+                if let Some(all_names) = dunder_all_names(self.db, module.file()) {
+                    self.names.extend(all_names.iter().cloned());
+                }
+            }
+        }
+
+        Some(self.names)
+    }
+}
+
+impl<'db> Visitor<'db> for DunderAllNamesCollector<'db> {
+    fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+        match stmt {
+            ast::Stmt::ImportFrom(import_from @ ast::StmtImportFrom { names, .. }) => {
+                for ast::Alias { name, asname, .. } in names {
+                    // `from module import *` where `module` is a module with a top-level `__all__`
+                    // variable that contains the "__all__" name.
+                    if name == "*" {
+                        let Ok(module_name) =
+                            ModuleName::from_import_statement(self.db, self.file, import_from)
+                        else {
+                            continue;
+                        };
+                        let Some(module) = resolve_module(self.db, &module_name) else {
+                            continue;
+                        };
+                        // Here, we need to use the `dunder_all_names` query instead of the
+                        // `exported_names` query because a `*`-import does not import the
+                        // `__all__` attribute unless it is explicitly included in the `__all__` of
+                        // the module.
+                        let Some(all_names) = dunder_all_names(self.db, module.file()) else {
+                            continue;
+                        };
+                        if all_names.contains(&Name::new_static("__all__")) {
+                            self.update_origin(DunderAllOrigin::StarImport);
+                        }
+                        continue;
+                    }
+
+                    // `from module import __all__`
+                    // `from module import __all__ as __all__`
+                    if name != "__all__"
+                        || asname.as_ref().is_some_and(|asname| asname != "__all__")
+                    {
+                        continue;
+                    }
+                    if let Ok(module_name) =
+                        ModuleName::from_import_statement(self.db, self.file, import_from)
+                    {
+                        self.update_origin(DunderAllOrigin::ExternalModule(module_name));
+                    }
+                }
+            }
+
+            ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                let [target] = targets.as_slice() else {
+                    return;
+                };
+                if !is_dunder_all(target) {
+                    return;
+                }
+                match &**value {
+                    // `__all__ = [...]`
+                    // `__all__ = (...)`
+                    ast::Expr::List(ast::ExprList { elts, .. })
+                    | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                        self.update_origin(DunderAllOrigin::CurrentModule);
+                        self.add_names(elts);
+                    }
+                    _ => {}
+                }
+            }
+
+            ast::Stmt::AugAssign(ast::StmtAugAssign {
+                target,
+                op: ast::Operator::Add,
+                value,
+                ..
+            }) => {
+                if self.origin.is_none() {
+                    // We can't update `__all__` if it doesn't already exist.
+                    return;
+                }
+                if !is_dunder_all(target) {
+                    return;
+                }
+                self.extend_from_list_or_submodule(value);
+            }
+
+            ast::Stmt::AnnAssign(ast::StmtAnnAssign {
+                target,
+                value: Some(value),
+                ..
+            }) => {
+                if !is_dunder_all(target) {
+                    return;
+                }
+                // `__all__: list[str] = [...]`
+                if let ast::Expr::List(ast::ExprList { elts, .. }) = &**value {
+                    self.update_origin(DunderAllOrigin::CurrentModule);
+                    self.add_names(elts);
+                }
+            }
+
+            ast::Stmt::Expr(ast::StmtExpr { value: expr, .. }) => {
+                if self.origin.is_none() {
+                    // We can't update `__all__` if it doesn't already exist.
+                    return;
+                }
+                let Some(ast::ExprCall {
+                    func, arguments, ..
+                }) = expr.as_call_expr()
+                else {
+                    return;
+                };
+                let Some(ast::ExprAttribute {
+                    value,
+                    attr,
+                    ctx: ast::ExprContext::Load,
+                    ..
+                }) = func.as_attribute_expr()
+                else {
+                    return;
+                };
+                if arguments.len() != 1 || !is_dunder_all(value) {
+                    return;
+                }
+                let Some(argument) = arguments.find_positional(0) else {
+                    return;
+                };
+                match attr.as_str() {
+                    // `__all__.extend([...])`
+                    // `__all__.extend(submodule.__all__)`
+                    "extend" => self.extend_from_list_or_submodule(argument),
+
+                    // `__all__.append(...)`
+                    "append" => {
+                        let Some(name) = name_from_string_literal(argument) else {
+                            return;
+                        };
+                        self.names.insert(name);
+                    }
+
+                    // `__all__.remove(...)`
+                    "remove" => {
+                        let Some(name) = name_from_string_literal(argument) else {
+                            return;
+                        };
+                        self.names.remove(&name);
+                    }
+
+                    _ => {}
+                }
+            }
+
+            ast::Stmt::If(ast::StmtIf {
+                test,
+                body,
+                elif_else_clauses,
+                ..
+            }) => match self.evaluate_test_expr(test) {
+                Some(Truthiness::AlwaysTrue) => self.visit_body(body),
+                Some(Truthiness::AlwaysFalse) => {
+                    for ast::ElifElseClause { test, body, .. } in elif_else_clauses {
+                        if let Some(test) = test {
+                            match self.evaluate_test_expr(test) {
+                                Some(Truthiness::AlwaysTrue) => {
+                                    self.visit_body(body);
+                                    break;
+                                }
+                                Some(Truthiness::AlwaysFalse) => {}
+                                Some(Truthiness::Ambiguous) | None => {
+                                    break;
+                                }
+                            }
+                        } else {
+                            self.visit_body(body);
+                        }
+                    }
+                }
+                Some(Truthiness::Ambiguous) | None => {}
+            },
+
+            ast::Stmt::For(..)
+            | ast::Stmt::While(..)
+            | ast::Stmt::With(..)
+            | ast::Stmt::Match(..)
+            | ast::Stmt::Try(..) => {
+                walk_stmt(self, stmt);
+            }
+
+            ast::Stmt::FunctionDef(..) | ast::Stmt::ClassDef(..) => {
+                // Avoid recursing into any nested scopes as `__all__` is only valid at the module
+                // level.
+            }
+
+            ast::Stmt::AugAssign(..)
+            | ast::Stmt::AnnAssign(..)
+            | ast::Stmt::Delete(..)
+            | ast::Stmt::Return(..)
+            | ast::Stmt::Raise(..)
+            | ast::Stmt::Assert(..)
+            | ast::Stmt::Import(..)
+            | ast::Stmt::Global(..)
+            | ast::Stmt::Nonlocal(..)
+            | ast::Stmt::TypeAlias(..)
+            | ast::Stmt::Pass(..)
+            | ast::Stmt::Break(..)
+            | ast::Stmt::Continue(..)
+            | ast::Stmt::IpyEscapeCommand(..) => {}
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum DunderAllOrigin {
+    /// The `__all__` variable is defined in the current module.
+    CurrentModule,
+
+    /// The `__all__` variable is imported from another module.
+    ExternalModule(ModuleName),
+
+    /// The `__all__` variable is imported from a module via a `*`-import.
+    StarImport,
+}
+
+fn is_dunder_all(expr: &ast::Expr) -> bool {
+    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
+}
+
+fn name_from_string_literal(expr: &ast::Expr) -> Option<Name> {
+    let ast::ExprStringLiteral { value, .. } = expr.as_string_literal_expr()?;
+    if value.is_implicit_concatenated() {
+        return None;
+    }
+    Some(Name::new(value.to_str()))
+}
