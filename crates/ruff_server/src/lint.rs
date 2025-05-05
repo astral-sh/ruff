@@ -18,7 +18,7 @@ use ruff_linter::{
     package::PackageRoot,
     packaging::detect_package_root,
     registry::AsRule,
-    settings::{flags, TargetVersion},
+    settings::flags,
     source_kind::SourceKind,
     Locator,
 };
@@ -98,7 +98,7 @@ pub(crate) fn check(
     let target_version = if let Some(path) = &document_path {
         settings.linter.resolve_target_version(path)
     } else {
-        TargetVersion(settings.linter.unresolved_target_version)
+        settings.linter.unresolved_target_version
     };
 
     let parse_options =

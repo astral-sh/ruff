@@ -33,7 +33,9 @@ use ruff_linter::settings::types::{
     FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
     RequiredVersion, UnsafeFixes,
 };
-use ruff_linter::settings::{LinterSettings, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS};
+use ruff_linter::settings::{
+    LinterSettings, TargetVersion, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, TASK_TAGS,
+};
 use ruff_linter::{
     fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message, RuleSelector,
     RUFF_PKG_VERSION,
@@ -164,7 +166,7 @@ impl Configuration {
             }
         }
 
-        let linter_target_version = self.target_version;
+        let linter_target_version = TargetVersion(self.target_version);
         let target_version = self.target_version.unwrap_or_default();
         let global_preview = self.preview.unwrap_or_default();
 

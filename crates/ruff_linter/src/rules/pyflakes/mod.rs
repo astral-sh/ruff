@@ -27,7 +27,7 @@ mod tests {
     use crate::rules::isort;
     use crate::rules::pyflakes;
     use crate::settings::types::PreviewMode;
-    use crate::settings::{flags, LinterSettings, TargetVersion};
+    use crate::settings::{flags, LinterSettings};
     use crate::source_kind::SourceKind;
     use crate::test::{test_contents, test_path, test_snippet};
     use crate::Locator;
@@ -219,7 +219,7 @@ mod tests {
         let diagnostics = test_snippet(
             "PythonFinalizationError",
             &LinterSettings {
-                unresolved_target_version: Some(ruff_python_ast::PythonVersion::PY312),
+                unresolved_target_version: ruff_python_ast::PythonVersion::PY312.into(),
                 ..LinterSettings::for_rule(Rule::UndefinedName)
             },
         );
@@ -744,7 +744,7 @@ mod tests {
         let source_type = PySourceType::default();
         let source_kind = SourceKind::Python(contents.to_string());
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
-        let target_version = TargetVersion(settings.unresolved_target_version);
+        let target_version = settings.unresolved_target_version;
         let options =
             ParseOptions::from(source_type).with_target_version(target_version.parser_version());
         let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)

@@ -1081,7 +1081,7 @@ mod tests {
             contents,
             &LinterSettings {
                 rules: settings::rule_table::RuleTable::empty(),
-                unresolved_target_version: Some(python_version),
+                unresolved_target_version: python_version.into(),
                 preview: settings::types::PreviewMode::Enabled,
                 ..Default::default()
             },
@@ -1099,7 +1099,7 @@ mod tests {
             &SourceKind::IpyNotebook(Notebook::from_path(path)?),
             path,
             &LinterSettings {
-                unresolved_target_version: Some(python_version),
+                unresolved_target_version: python_version.into(),
                 rules: settings::rule_table::RuleTable::empty(),
                 preview: settings::types::PreviewMode::Enabled,
                 ..Default::default()
@@ -1163,7 +1163,7 @@ mod tests {
         "pyi019_adds_typing_extensions",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: Some(PythonVersion::PY310),
+			unresolved_target_version: PythonVersion::PY310.into(),
 			typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1172,7 +1172,7 @@ mod tests {
         "pyi019_does_not_add_typing_extensions",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: Some(PythonVersion::PY310),
+			unresolved_target_version: PythonVersion::PY310.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1181,7 +1181,7 @@ mod tests {
         "pyi019_adds_typing_without_extensions_disabled",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: Some(PythonVersion::PY311),
+			unresolved_target_version: PythonVersion::PY311.into(),
 			typing_extensions: true,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1190,7 +1190,7 @@ mod tests {
         "pyi019_adds_typing_with_extensions_disabled",
 		PYI019_EXAMPLE,
 		&LinterSettings {
-			unresolved_target_version: Some(PythonVersion::PY311),
+			unresolved_target_version: PythonVersion::PY311.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::CustomTypeVarForSelf)
 		}
@@ -1202,7 +1202,7 @@ mod tests {
 			def __new__(cls) -> C: ...
 		",
 		&LinterSettings {
-			unresolved_target_version: Some(PythonVersion { major: 3, minor: 10 }),
+			unresolved_target_version: PythonVersion { major: 3, minor: 10 }.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::NonSelfReturnType)
 		}
@@ -1219,7 +1219,7 @@ mod tests {
 			return commons
 		"#,
 		&LinterSettings {
-			unresolved_target_version: Some(PythonVersion { major: 3, minor: 8 }),
+			unresolved_target_version: PythonVersion { major: 3, minor: 8 }.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::FastApiNonAnnotatedDependency)
 		}
@@ -1234,7 +1234,7 @@ mod tests {
 		"pyi026_disabled",
 		"Vector = list[float]",
 		&LinterSettings {
-			unresolved_target_version: Some(PythonVersion { major: 3, minor: 9 }),
+			unresolved_target_version: PythonVersion { major: 3, minor: 9 }.into(),
 			typing_extensions: false,
 			..LinterSettings::for_rule(Rule::TypeAliasWithoutAnnotation)
 		}

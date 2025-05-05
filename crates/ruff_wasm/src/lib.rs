@@ -12,7 +12,7 @@ use ruff_linter::directives;
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::linter::check_path;
 use ruff_linter::registry::AsRule;
-use ruff_linter::settings::{flags, TargetVersion, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
+use ruff_linter::settings::{flags, DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX};
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::Locator;
 use ruff_python_ast::{Mod, PySourceType};
@@ -163,7 +163,7 @@ impl Workspace {
         let source_kind = SourceKind::Python(contents.to_string());
 
         // Use the unresolved version because we don't have a file path.
-        let target_version = TargetVersion(self.settings.linter.unresolved_target_version);
+        let target_version = self.settings.linter.unresolved_target_version;
 
         // Parse once.
         let options =

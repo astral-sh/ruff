@@ -225,7 +225,7 @@ pub struct LinterSettings {
     ///
     /// Otherwise, see [`LinterSettings::resolve_target_version`] for a way to obtain the Python
     /// version for a given file, while respecting the overrides in `per_file_target_version`.
-    pub unresolved_target_version: Option<PythonVersion>,
+    pub unresolved_target_version: TargetVersion,
     /// Path-specific overrides to `unresolved_target_version`.
     ///
     /// If you have a `Checker` available, see its `target_version` method instead.
@@ -296,7 +296,7 @@ impl Display for LinterSettings {
                 self.per_file_ignores,
                 self.fix_safety | nested,
 
-                self.unresolved_target_version | optional,
+                self.unresolved_target_version,
                 self.per_file_target_version,
                 self.preview,
                 self.explicit_preview_rules,
@@ -378,7 +378,7 @@ impl LinterSettings {
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
             rules: RuleTable::from_iter([rule_code]),
-            unresolved_target_version: Some(PythonVersion::latest()),
+            unresolved_target_version: PythonVersion::latest().into(),
             ..Self::default()
         }
     }
@@ -386,7 +386,7 @@ impl LinterSettings {
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
             rules: RuleTable::from_iter(rules),
-            unresolved_target_version: Some(PythonVersion::latest()),
+            unresolved_target_version: PythonVersion::latest().into(),
             ..Self::default()
         }
     }
@@ -394,7 +394,7 @@ impl LinterSettings {
     pub fn new(project_root: &Path) -> Self {
         Self {
             exclude: FilePatternSet::default(),
-            unresolved_target_version: None,
+            unresolved_target_version: TargetVersion(None),
             per_file_target_version: CompiledPerFileTargetVersionList::default(),
             project_root: project_root.to_path_buf(),
             rules: DEFAULT_SELECTORS
@@ -458,21 +458,19 @@ impl LinterSettings {
 
     #[must_use]
     pub fn with_target_version(mut self, target_version: PythonVersion) -> Self {
-        self.unresolved_target_version = Some(target_version);
+        self.unresolved_target_version = target_version.into();
         self
     }
 
-    /// Resolve the [`PythonVersion`] to use for linting.
+    /// Resolve the [`TargetVersion`] to use for linting.
     ///
     /// This method respects the per-file version overrides in
     /// [`LinterSettings::per_file_target_version`] and falls back on
     /// [`LinterSettings::unresolved_target_version`] if none of the override patterns match.
     pub fn resolve_target_version(&self, path: &Path) -> TargetVersion {
-        TargetVersion(
-            self.per_file_target_version
-                .is_match(path)
-                .or(self.unresolved_target_version),
-        )
+        self.per_file_target_version
+            .is_match(path)
+            .map_or(self.unresolved_target_version, TargetVersion::from)
     }
 }
 
@@ -490,7 +488,7 @@ impl Default for LinterSettings {
 /// unset. In contrast, we want to default to `PythonVersion::default()` for lint rules. These
 /// correspond to the [`TargetVersion::parser_version`] and [`TargetVersion::linter_version`]
 /// methods, respectively.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, CacheKey)]
 pub struct TargetVersion(pub Option<PythonVersion>);
 
 impl TargetVersion {
@@ -508,5 +506,21 @@ impl TargetVersion {
     /// if unset.
     pub fn linter_version(&self) -> PythonVersion {
         self.0.unwrap_or_default()
+    }
+}
+
+impl From<PythonVersion> for TargetVersion {
+    fn from(value: PythonVersion) -> Self {
+        Self(Some(value))
+    }
+}
+
+impl Display for TargetVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        // manual inlining of display_settings!
+        match self.0 {
+            Some(value) => write!(f, "{value}"),
+            None => f.write_str("none"),
+        }
     }
 }
