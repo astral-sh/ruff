@@ -644,7 +644,7 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Tracks whether or not the scope start is visible at the current point in control flow.
     /// This is subtly different from `scope_start_visibility`, as we apply these constraints
-    /// at the beginnging of a branch. Visibility constraints, on the other hand, need to be
+    /// at the beginning of a branch. Visibility constraints, on the other hand, need to be
     /// applied at the end of a branch, as we apply them retroactively to all live bindings:
     /// ```py
     /// y = 1
