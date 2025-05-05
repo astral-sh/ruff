@@ -399,7 +399,7 @@ In a specialized generic alias, the specialization is applied to the attributes 
 class.
 
 ```py
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Protocol
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -425,6 +425,33 @@ reveal_type(c.y)  # revealed: str
 reveal_type(c.method1())  # revealed: int
 reveal_type(c.method2())  # revealed: str
 reveal_type(c.method3())  # revealed: LinkedList[int]
+
+class SomeProtocol(Protocol[T]):
+    x: T
+
+class Foo:
+    x: int
+
+class D(Generic[T, U]):
+    x: T
+    y: U
+
+    def method1(self) -> T:
+        return self.x
+
+    def method2(self) -> U:
+        return self.y
+
+    def method3(self) -> SomeProtocol[T]:
+        return Foo()
+
+d = D[int, str]()
+reveal_type(d.x)  # revealed: int
+reveal_type(d.y)  # revealed: str
+reveal_type(d.method1())  # revealed: int
+reveal_type(d.method2())  # revealed: str
+reveal_type(d.method3())  # revealed: SomeProtocol[int]
+reveal_type(d.method3().x)  # revealed: int
 ```
 
 ## Cyclic class definitions
