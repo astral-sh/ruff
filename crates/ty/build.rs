@@ -12,12 +12,39 @@ fn main() {
         .join("..")
         .join("..");
 
+    version_info(&workspace_root);
     commit_info(&workspace_root);
 
     let target = std::env::var("TARGET").unwrap();
     println!("cargo::rustc-env=RUST_HOST_TARGET={target}");
 }
 
+/// Retrieve the version from the `dist-workspace.toml` file and set `TY_VERSION`.
+fn version_info(workspace_root: &Path) {
+    let dist_file = workspace_root.join("dist-workspace.toml");
+    if !dist_file.exists() {
+        return;
+    }
+
+    println!("cargo:rerun-if-changed={}", dist_file.display());
+
+    let dist_file = fs::read_to_string(dist_file);
+    if let Ok(dist_file) = dist_file {
+        let lines = dist_file.lines();
+        for line in lines {
+            if line.starts_with("version =") {
+                let (_key, version) = line.split_once('=').unwrap();
+                println!(
+                    "cargo::rustc-env=TY_VERSION={}",
+                    version.trim().trim_matches('"')
+                );
+                break;
+            }
+        }
+    }
+}
+
+/// Retrieve commit information from the Git repository.
 fn commit_info(workspace_root: &Path) {
     // If not in a git repository, do not attempt to retrieve commit information
     let git_dir = workspace_root.join(".git");
