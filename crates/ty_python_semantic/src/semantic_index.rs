@@ -194,6 +194,9 @@ pub(crate) struct SemanticIndex<'db> {
 
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
+
+    /// Set of all generator functions in this file.
+    generator_functions: FxHashSet<FileScopeId>,
 }
 
 impl<'db> SemanticIndex<'db> {

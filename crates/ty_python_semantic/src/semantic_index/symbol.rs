@@ -13,7 +13,7 @@ use rustc_hash::FxHasher;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
 use crate::semantic_index::visibility_constraints::ScopedVisibilityConstraintId;
-use crate::semantic_index::{semantic_index, SymbolMap};
+use crate::semantic_index::{semantic_index, SemanticIndex, SymbolMap};
 use crate::Db;
 
 #[derive(Eq, PartialEq, Debug)]
@@ -169,6 +169,10 @@ impl FileScopeId {
     pub fn to_scope_id(self, db: &dyn Db, file: File) -> ScopeId<'_> {
         let index = semantic_index(db, file);
         index.scope_ids_by_scope[self]
+    }
+
+    pub(crate) fn is_generator_function(self, index: &SemanticIndex) -> bool {
+        index.generator_functions.contains(&self)
     }
 }
 
