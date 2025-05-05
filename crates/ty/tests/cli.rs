@@ -1,6 +1,7 @@
 use anyhow::Context;
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
@@ -1191,6 +1192,42 @@ fn concise_revealed_type() -> anyhow::Result<()> {
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
+    let mut content = String::new();
+    writeln!(
+        &mut content,
+        "
+        from typing_extensions import reveal_type
+        total = 1{plus_one_repeated}
+        reveal_type(total)
+        ",
+        plus_one_repeated = " + 1".repeat(2000 - 1)
+    )?;
+
+    let case = TestCase::with_file("test.py", &ruff_python_trivia::textwrap::dedent(&content))?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    info: revealed-type: Revealed type
+     --> test.py:4:1
+      |
+    2 | from typing_extensions import reveal_type
+    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1...
+    4 | reveal_type(total)
+      | ^^^^^^^^^^^^^^^^^^ `Literal[2000]`
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
