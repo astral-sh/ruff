@@ -1376,7 +1376,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             // we can't defer again, or we'll infinitely recurse!
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
-            && (self.semantic.future_annotations_or_stub()||self.target_version.defers_annotations())
+            && (self.semantic.future_annotations_or_stub()||self.target_version().defers_annotations())
             && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(string_literal) = expr {
@@ -2604,7 +2604,7 @@ impl<'a> Checker<'a> {
                 // annotations` is active, or they are type definitions in a stub file.
                 debug_assert!(
                     (self.semantic.future_annotations_or_stub()
-                        || self.target_version.defers_annotations())
+                        || self.target_version().defers_annotations())
                         && (self.source_type.is_stub() || self.semantic.in_annotation())
                 );
 
