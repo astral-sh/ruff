@@ -811,7 +811,7 @@ impl<'db> Bindings<'db> {
                                     .overloads
                                     .iter()
                                     .for_each(&mut handle_dataclass_transformer_params);
-                            };
+                            }
 
                             handle_dataclass_transformer_params(&function_type);
                         }

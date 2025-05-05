@@ -2121,6 +2121,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             if let Type::FunctionLiteral(f) = decorator_ty {
+                // We do not yet detect or flag `@dataclass_transformer` applied to more than one
+                // overload, or an overload and the implementation both. Nevertheless, this is not
+                // allowed. We do not try to treat the offenders intelligently -- just use the
+                // params of the last seen usage of `@dataclass_transformer`
+                if let Some(overloaded) = f.to_overloaded(self.db()) {
+                    overloaded.overloads.iter().for_each(|overload| {
+                        if let Some(params) = overload.dataclass_transformer_params(self.db()) {
+                            dataclass_params = Some(params.into());
+                        }
+                    });
+                }
                 if let Some(params) = f.dataclass_transformer_params(self.db()) {
                     dataclass_params = Some(params.into());
                     continue;
