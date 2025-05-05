@@ -83,6 +83,8 @@ fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
                 })
         }
     }
+}
+
 fn add_required_import(
     required_import: &NameImport,
     parsed: &Parsed<ModModule>,
