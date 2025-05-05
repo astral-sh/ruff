@@ -5145,7 +5145,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .globals_by_scope(file_scope_id)
                 .is_some_and(|globals| globals.contains(symbol_name));
 
-            if is_global {
+            if is_global && file_scope_id != FileScopeId::global() {
                 return symbol(
                     db,
                     FileScopeId::global().to_scope_id(db, current_file),
