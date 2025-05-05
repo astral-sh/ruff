@@ -340,3 +340,57 @@ def f() -> int:
 def f(cond: bool) -> str:
     return "hello" if cond else NotImplemented
 ```
+
+## Generator functions
+
+<!-- snapshot-diagnostics -->
+
+A function with a `yield` statement anywhere in its body is a
+[generator function](https://docs.python.org/3/glossary.html#term-generator). A generator function
+implicitly returns an instance of `types.GeneratorType` even if it does not contain any `return`
+statements.
+
+```py
+import types
+import typing
+
+def f() -> types.GeneratorType:
+    yield 42
+
+def g() -> typing.Generator:
+    yield 42
+
+def h() -> typing.Iterator:
+    yield 42
+
+def i() -> typing.Iterable:
+    yield 42
+
+def j() -> str:  # error: [invalid-return-type]
+    yield 42
+```
+
+If it is an `async` function with a `yield` statement in its body, it is an
+[asynchronous generator function](https://docs.python.org/3/glossary.html#term-asynchronous-generator).
+An asynchronous generator function implicitly returns an instance of `types.AsyncGeneratorType` even
+if it does not contain any `return` statements.
+
+```py
+import types
+import typing
+
+async def f() -> types.AsyncGeneratorType:
+    yield 42
+
+async def g() -> typing.AsyncGenerator:
+    yield 42
+
+async def h() -> typing.AsyncIterator:
+    yield 42
+
+async def i() -> typing.AsyncIterable:
+    yield 42
+
+async def j() -> str:  # error: [invalid-return-type]
+    yield 42
+```

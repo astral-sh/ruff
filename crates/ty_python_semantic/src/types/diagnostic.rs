@@ -1,5 +1,5 @@
 use super::context::InferContext;
-use super::ClassLiteral;
+use super::{ClassLiteral, KnownClass};
 use crate::db::Db;
 use crate::declare_lint;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
@@ -12,7 +12,7 @@ use crate::types::string_annotation::{
 use crate::types::{protocol_class::ProtocolClassLiteral, KnownFunction, KnownInstanceType, Type};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Severity, Span, SubDiagnostic};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::Formatter;
 
@@ -1305,6 +1305,41 @@ pub(super) fn report_invalid_return_type(
             expected_ty = expected_ty.display(context.db()),
         )),
     );
+}
+
+pub(super) fn report_invalid_generator_function_return_type(
+    context: &InferContext,
+    return_type_range: TextRange,
+    inferred_return: KnownClass,
+    expected_ty: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_RETURN_TYPE, return_type_range) else {
+        return;
+    };
+
+    let mut diag = builder.into_diagnostic("Return type does not match returned value");
+    let inferred_ty = inferred_return.display(context.db());
+    diag.set_primary_message(format_args!(
+        "Expected `{expected_ty}`, found `{inferred_ty}`",
+        expected_ty = expected_ty.display(context.db()),
+    ));
+
+    let (description, link) = if inferred_return == KnownClass::AsyncGeneratorType {
+        (
+            "an async generator function",
+            "https://docs.python.org/3/glossary.html#term-asynchronous-generator",
+        )
+    } else {
+        (
+            "a generator function",
+            "https://docs.python.org/3/glossary.html#term-generator",
+        )
+    };
+
+    diag.info(format_args!(
+        "Function is inferred as returning `{inferred_ty}` because it is {description}"
+    ));
+    diag.info(format_args!("See {link} for more details"));
 }
 
 pub(super) fn report_implicit_return_type(
