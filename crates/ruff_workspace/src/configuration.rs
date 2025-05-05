@@ -164,7 +164,8 @@ impl Configuration {
             }
         }
 
-        let target_version = self.target_version;
+        let linter_target_version = self.target_version;
+        let target_version = self.target_version.unwrap_or_default();
         let global_preview = self.preview.unwrap_or_default();
 
         let format = self.format;
@@ -185,7 +186,7 @@ impl Configuration {
             exclude: FilePatternSet::try_from_iter(format.exclude.unwrap_or_default())?,
             extension: self.extension.clone().unwrap_or_default(),
             preview: format_preview,
-            unresolved_target_version: target_version.unwrap_or_default(),
+            unresolved_target_version: target_version,
             per_file_target_version: per_file_target_version.clone(),
             line_width: self
                 .line_length
@@ -218,7 +219,7 @@ impl Configuration {
         let analyze = AnalyzeSettings {
             exclude: FilePatternSet::try_from_iter(analyze.exclude.unwrap_or_default())?,
             preview: analyze_preview,
-            target_version: target_version.unwrap_or_default(),
+            target_version,
             extension: self.extension.clone().unwrap_or_default(),
             detect_string_imports: analyze
                 .detect_string_imports
@@ -279,7 +280,7 @@ impl Configuration {
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
                 extension: self.extension.unwrap_or_default(),
                 preview: lint_preview,
-                unresolved_target_version: target_version,
+                unresolved_target_version: linter_target_version,
                 per_file_target_version,
                 project_root: project_root.to_path_buf(),
                 allowed_confusables: lint
