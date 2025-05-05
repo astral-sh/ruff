@@ -276,7 +276,6 @@ impl Configuration {
                 project_root: project_root.to_path_buf(),
             },
 
-            #[allow(deprecated)]
             linter: LinterSettings {
                 rules,
                 exclude: FilePatternSet::try_from_iter(lint.exclude.unwrap_or_default())?,
@@ -671,7 +670,7 @@ pub struct LintConfiguration {
 
 impl LintConfiguration {
     fn from_options(options: LintOptions, project_root: &Path) -> Result<Self> {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let ignore = options
             .common
             .ignore
@@ -679,7 +678,7 @@ impl LintConfiguration {
             .flatten()
             .chain(options.common.extend_ignore.into_iter().flatten())
             .collect();
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let unfixable = options
             .common
             .unfixable
@@ -688,7 +687,7 @@ impl LintConfiguration {
             .chain(options.common.extend_unfixable.into_iter().flatten())
             .collect();
 
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let ignore_init_module_imports = {
             if options.common.ignore_init_module_imports.is_some() {
                 warn_user_once!("The `ignore-init-module-imports` option is deprecated and will be removed in a future release. Ruff's handling of imports in `__init__.py` files has been improved (in preview) and unused imports will always be flagged.");
@@ -1176,7 +1175,7 @@ impl LintConfiguration {
             pylint: self.pylint.combine(config.pylint),
             pyupgrade: self.pyupgrade.combine(config.pyupgrade),
             ruff: self.ruff.combine(config.ruff),
-            typing_extensions: self.typing_extensions,
+            typing_extensions: self.typing_extensions.or(config.typing_extensions),
         }
     }
 }
@@ -1196,7 +1195,6 @@ pub struct FormatConfiguration {
 }
 
 impl FormatConfiguration {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: FormatOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             // `--extension` is a hidden command-line argument that isn't supported in configuration
@@ -1234,7 +1232,6 @@ impl FormatConfiguration {
     }
 
     #[must_use]
-    #[allow(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
@@ -1263,7 +1260,6 @@ pub struct AnalyzeConfiguration {
 }
 
 impl AnalyzeConfiguration {
-    #[allow(clippy::needless_pass_by_value)]
     pub fn from_options(options: AnalyzeOptions, project_root: &Path) -> Result<Self> {
         Ok(Self {
             exclude: options.exclude.map(|paths| {
@@ -1290,7 +1286,6 @@ impl AnalyzeConfiguration {
     }
 
     #[must_use]
-    #[allow(clippy::needless_pass_by_value)]
     pub fn combine(self, config: Self) -> Self {
         Self {
             exclude: self.exclude.or(config.exclude),
@@ -1342,7 +1337,7 @@ fn warn_about_deprecated_top_level_lint_options(
     top_level_options: &LintCommonOptions,
     path: Option<&Path>,
 ) {
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     let LintCommonOptions {
         allowed_confusables,
         dummy_variable_rgx,
@@ -1662,7 +1657,6 @@ mod tests {
         Rule::BlankLinesBeforeNestedDefinition,
     ];
 
-    #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(
         selections: impl IntoIterator<Item = RuleSelection>,
         preview: Option<PreviewOptions>,

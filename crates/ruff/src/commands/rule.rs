@@ -19,7 +19,7 @@ struct Explanation<'a> {
     summary: &'a str,
     message_formats: &'a [&'a str],
     fix: String,
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     explanation: Option<&'a str>,
     preview: bool,
 }

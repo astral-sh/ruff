@@ -1,0 +1,24 @@
+Tanjun  # hangs
+altair  # cycle panics (try_metaclass_)
+antidote  # hangs / slow
+artigraph  # cycle panics (value_type_)
+colour  # cycle panics (try_metaclass_)
+core  # cycle panics (value_type_)
+cpython  # access to field whilst being initialized, too many cycle iterations
+discord.py  # some kind of hang, only when multi-threaded?
+freqtrade  # cycle panics (try_metaclass_)
+hydpy  # cycle panics (try_metaclass_)
+ibis  # cycle panics (try_metaclass_)
+manticore  # stack overflow, see https://github.com/astral-sh/ruff/issues/17863
+pandas  # slow
+pandas-stubs  # cycle panics (try_metaclass_)
+pandera  # cycle panics (try_metaclass_)
+prefect # slow
+pylint  # cycle panics (self-recursive type alias)
+pywin32  # bad use-def map (binding with definitely-visible unbound)
+schemathesis  # salsa cycle.rs:164 assertion fails, only in CI
+scikit-learn  # success, but mypy-primer hangs processing the output
+spack  # success, but mypy-primer hangs processing the output
+spark  # cycle panics (try_metaclass_)
+steam.py  # cycle panics (try_metaclass_), often hangs when multi-threaded
+xarray  # cycle panics (try_metaclass_)

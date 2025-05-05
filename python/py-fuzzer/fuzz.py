@@ -48,13 +48,13 @@ Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
 
-def redknot_contains_bug(code: str, *, red_knot_executable: Path) -> bool:
+def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
     """Return `True` if the code triggers a panic in type-checking code."""
     with tempfile.TemporaryDirectory() as tempdir:
         input_file = Path(tempdir, "input.py")
         input_file.write_text(code)
         completed_process = subprocess.run(
-            [red_knot_executable, "check", input_file], capture_output=True, text=True
+            [ty_executable, "check", input_file], capture_output=True, text=True
         )
     return completed_process.returncode not in {0, 1, 2}
 
@@ -85,8 +85,8 @@ def contains_bug(code: str, *, executable: Executable, executable_path: Path) ->
     match executable:
         case Executable.RUFF:
             return ruff_contains_bug(code, ruff_executable=executable_path)
-        case Executable.RED_KNOT:
-            return redknot_contains_bug(code, red_knot_executable=executable_path)
+        case Executable.TY:
+            return ty_contains_bug(code, ty_executable=executable_path)
         case _ as unreachable:
             assert_never(unreachable)
 
@@ -139,10 +139,8 @@ class FuzzResult:
             match self.executable:
                 case Executable.RUFF:
                     panic_message = f"The following code triggers a {new}parser bug:"
-                case Executable.RED_KNOT:
-                    panic_message = (
-                        f"The following code triggers a {new}red-knot panic:"
-                    )
+                case Executable.TY:
+                    panic_message = f"The following code triggers a {new}ty panic:"
                 case _ as unreachable:
                     assert_never(unreachable)
 
@@ -292,7 +290,7 @@ def parse_seed_argument(arg: str) -> int | range:
 
 class Executable(enum.StrEnum):
     RUFF = "ruff"
-    RED_KNOT = "red_knot"
+    TY = "ty"
 
 
 @dataclass(slots=True)

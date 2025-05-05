@@ -134,7 +134,7 @@ pub fn run(
     {
         let default_panic_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            #[allow(clippy::print_stderr)]
+            #[expect(clippy::print_stderr)]
             {
                 eprintln!(
                     r#"
@@ -326,7 +326,7 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
             commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments)?;
         if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
-            #[allow(clippy::print_stderr)]
+            #[expect(clippy::print_stderr)]
             {
                 eprintln!("Added {modifications} noqa directive{s}.");
             }

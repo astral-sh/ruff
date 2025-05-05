@@ -517,7 +517,6 @@ impl DocumentController {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn as_text(&self) -> Option<&TextDocument> {
         match self {
             Self::Text(document) => Some(document),

@@ -210,7 +210,7 @@ pub(crate) struct TokenSourceCheckpoint {
 /// of `contents`.
 ///
 /// See [#9546](https://github.com/astral-sh/ruff/pull/9546) for a more detailed explanation.
-#[allow(dead_code)]
+#[expect(dead_code)]
 fn allocate_tokens_vec(contents: &str) -> Vec<Token> {
     let lower_bound = contents.len().saturating_mul(15) / 100;
     Vec::with_capacity(lower_bound)

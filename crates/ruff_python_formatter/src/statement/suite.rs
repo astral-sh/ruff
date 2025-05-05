@@ -170,7 +170,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         } else {
             first.fmt(f)?;
 
-            #[allow(clippy::if_same_then_else)]
             let empty_line_after_docstring = if matches!(first, SuiteChildStatement::Docstring(_))
                 && self.kind == SuiteKind::Class
             {

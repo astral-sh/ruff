@@ -73,6 +73,10 @@ impl PythonVersion {
     pub fn supports_pep_701(self) -> bool {
         self >= Self::PY312
     }
+
+    pub fn defers_annotations(self) -> bool {
+        self >= Self::PY314
+    }
 }
 
 impl Default for PythonVersion {

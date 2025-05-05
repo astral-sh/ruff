@@ -274,7 +274,7 @@ fn extract_options(source: &str) -> Option<ParseOptions> {
 // Use it for quickly debugging a parser issue.
 #[test]
 #[ignore]
-#[allow(clippy::print_stdout)]
+#[expect(clippy::print_stdout)]
 fn parser_quick_test() {
     let source = "\
 f'{'

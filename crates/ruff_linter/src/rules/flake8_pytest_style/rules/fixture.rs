@@ -218,7 +218,7 @@ impl AlwaysFixableViolation for PytestExtraneousScopeFunction {
 #[deprecated(note = "PT004 has been removed")]
 pub(crate) struct PytestMissingFixtureNameUnderscore;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for PytestMissingFixtureNameUnderscore {
     fn message(&self) -> String {
         unreachable!("PT004 has been removed");
@@ -283,7 +283,7 @@ impl Violation for PytestMissingFixtureNameUnderscore {
 #[deprecated(note = "PT005 has been removed")]
 pub(crate) struct PytestIncorrectFixtureNameUnderscore;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for PytestIncorrectFixtureNameUnderscore {
     fn message(&self) -> String {
         unreachable!("PT005 has been removed");

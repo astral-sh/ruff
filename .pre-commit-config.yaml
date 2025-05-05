@@ -3,8 +3,8 @@ fail_fast: false
 exclude: |
   (?x)^(
     .github/workflows/release.yml|
-    crates/red_knot_vendored/vendor/.*|
-    crates/red_knot_project/resources/.*|
+    crates/ty_vendored/vendor/.*|
+    crates/ty_project/resources/.*|
     crates/ruff_benchmark/resources/.*|
     crates/ruff_linter/resources/.*|
     crates/ruff_linter/src/rules/.*/snapshots/.*|
@@ -65,7 +65,7 @@ repos:
           - black==25.1.0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.31.1
+    rev: v1.32.0
     hooks:
       - id: typos
 
@@ -79,7 +79,7 @@ repos:
         pass_filenames: false # This makes it a lot faster
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.7
+    rev: v0.11.8
     hooks:
       - id: ruff-format
       - id: ruff

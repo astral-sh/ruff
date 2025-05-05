@@ -133,7 +133,7 @@ pub(crate) fn mutable_argument_default(checker: &Checker, function_def: &ast::St
 
 /// Generate a [`Fix`] to move a mutable argument default initialization
 /// into the function body.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 fn move_initialization(
     function_def: &ast::StmtFunctionDef,
     parameter: &Parameter,

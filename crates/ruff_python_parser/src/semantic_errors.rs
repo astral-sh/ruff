@@ -941,7 +941,7 @@ impl Display for SemanticSyntaxError {
                 write!(f, "name `{name}` is used prior to global declaration")
             }
             SemanticSyntaxErrorKind::InvalidStarExpression => {
-                f.write_str("can't use starred expression here")
+                f.write_str("Starred expression cannot be used here")
             }
             SemanticSyntaxErrorKind::AsyncComprehensionInSyncComprehension(python_version) => {
                 write!(

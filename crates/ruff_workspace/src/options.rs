@@ -1150,14 +1150,14 @@ impl Flake8BanditOptions {
             extend_markup_names: self
                 .extend_markup_names
                 .or_else(|| {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     ruff_options.and_then(|options| options.extend_markup_names.clone())
                 })
                 .unwrap_or_default(),
             allowed_markup_calls: self
                 .allowed_markup_calls
                 .or_else(|| {
-                    #[allow(deprecated)]
+                    #[expect(deprecated)]
                     ruff_options.and_then(|options| options.allowed_markup_calls.clone())
                 })
                 .unwrap_or_default(),
@@ -1308,7 +1308,7 @@ pub struct Flake8BuiltinsOptions {
 
 impl Flake8BuiltinsOptions {
     pub fn into_settings(self) -> ruff_linter::rules::flake8_builtins::settings::Settings {
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         ruff_linter::rules::flake8_builtins::settings::Settings {
             ignorelist: self
                 .ignorelist
@@ -3951,7 +3951,7 @@ impl From<LintOptionsWire> for LintOptions {
         } = value;
 
         LintOptions {
-            #[allow(deprecated)]
+            #[expect(deprecated)]
             common: LintCommonOptions {
                 allowed_confusables,
                 dummy_variable_rgx,

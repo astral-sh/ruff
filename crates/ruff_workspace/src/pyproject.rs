@@ -399,7 +399,7 @@ strict-checking = false
 "#,
         )?;
 
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         let expected = Flake8BuiltinsOptions {
             builtins_allowed_modules: Some(vec!["asyncio".to_string()]),
             allowed_modules: Some(vec!["sys".to_string()]),
