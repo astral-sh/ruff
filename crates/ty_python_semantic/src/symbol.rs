@@ -1,5 +1,6 @@
 use ruff_db::files::File;
 
+use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::file_to_module;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::{ScopeId, ScopedSymbolId};
@@ -284,6 +285,8 @@ pub(crate) fn global_symbol<'db>(
         .or_fall_back_to(db, || module_type_implicit_global_symbol(db, name))
 }
 
+// TODO: Maybe merge the following two functions with a single `is_star_import` parameter?
+
 /// Infers the public type of an imported symbol via a `from ... import *` statement.
 pub(crate) fn star_imported_symbol<'db>(
     db: &'db dyn Db,
@@ -301,7 +304,17 @@ pub(crate) fn imported_symbol<'db>(
     file: File,
     name: &str,
 ) -> SymbolAndQualifiers<'db> {
-    imported_symbol_impl(db, file, name, None)
+    let requires_explicit_reexport = if file.is_stub(db.upcast()) {
+        dunder_all_names(db, file).and_then(|all_names| {
+            all_names
+                .contains(name)
+                .then_some(RequiresExplicitReExport::No)
+        })
+    } else {
+        None
+    };
+
+    imported_symbol_impl(db, file, name, requires_explicit_reexport)
 }
 
 pub(crate) fn imported_symbol_impl<'db>(
