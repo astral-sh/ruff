@@ -100,6 +100,26 @@ match 2:
         ...
 ```
 
+## Duplicate `match` class attribute
+
+Attribute names in class patterns must be unique:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+class Point:
+    pass
+
+obj = Point()
+match obj:
+    # error: [invalid-syntax] "attribute name `x` repeated in class pattern"
+    case Point(x=1, x=2):
+        pass
+```
+
 ## `return`, `yield`, `yield from`, and `await` outside function
 
 ```py
@@ -183,6 +203,28 @@ class C[T, T]:
 
 # error: [invalid-syntax] "duplicate type parameter"
 def f[X, Y, X]():
+    pass
+```
+
+## Invalid star expression
+
+Star expressions can't be used in certain contexts:
+
+```py
+def func():
+    # error: [invalid-syntax] "Starred expression cannot be used here"
+    return *[1, 2, 3]
+
+def gen():
+    # error: [invalid-syntax] "Starred expression cannot be used here"
+    yield * [1, 2, 3]
+
+# error: [invalid-syntax] "Starred expression cannot be used here"
+for *x in range(10):
+    pass
+
+# error: [invalid-syntax] "Starred expression cannot be used here"
+for x in *range(10):
     pass
 ```
 

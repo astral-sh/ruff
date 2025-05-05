@@ -1063,6 +1063,53 @@ mod tests {
         PythonVersion::PY310,
         "MultipleCaseAssignment"
     )]
+    #[test_case(
+        "duplicate_match_key",
+        "
+        match x:
+            case {'key': 1, 'key': 2}:
+                pass
+        ",
+        PythonVersion::PY310,
+        "DuplicateMatchKey"
+    )]
+    #[test_case(
+        "duplicate_match_class_attribute",
+        "
+        match x:
+            case Point(x=1, x=2):
+                pass
+        ",
+        PythonVersion::PY310,
+        "DuplicateMatchClassAttribute"
+    )]
+    #[test_case(
+        "invalid_star_expression",
+        "
+        def func():
+            return *x
+        ",
+        PythonVersion::PY310,
+        "InvalidStarExpression"
+    )]
+    #[test_case(
+        "invalid_star_expression_for",
+        "
+        for *x in range(10):
+            pass
+        ",
+        PythonVersion::PY310,
+        "InvalidStarExpression"
+    )]
+    #[test_case(
+        "invalid_star_expression_yield",
+        "
+        def func():
+            yield *x
+        ",
+        PythonVersion::PY310,
+        "InvalidStarExpression"
+    )]
     fn test_semantic_errors(
         name: &str,
         contents: &str,
