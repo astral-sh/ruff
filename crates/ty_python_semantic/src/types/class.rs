@@ -146,6 +146,19 @@ impl<'db> GenericAlias<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
+
+    pub(super) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db)
+                .apply_specialization(db, specialization),
+        )
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
@@ -208,6 +221,19 @@ impl<'db> ClassType<'db> {
     /// Return `true` if this class represents the builtin class `object`
     pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Object)
+    }
+
+    pub(super) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => {
+                Self::Generic(generic.apply_specialization(db, specialization))
+            }
+        }
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
