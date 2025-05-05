@@ -6690,10 +6690,8 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
             _ => CallArgumentTypes::positional([self.infer_type_expression(slice_node)]),
         };
-        let signatures = Signatures::single(CallableSignature::single(
-            value_ty,
-            generic_context.signature(self.db()),
-        ));
+        let signature = generic_context.signature(self.db());
+        let signatures = Signatures::single(CallableSignature::single(value_ty, signature.clone()));
         let bindings = match Bindings::match_parameters(signatures, &call_argument_types)
             .check_types(self.db(), &call_argument_types)
         {
@@ -6711,14 +6709,10 @@ impl<'db> TypeInferenceBuilder<'db> {
             .matching_overloads()
             .next()
             .expect("valid bindings should have matching overload");
-        let specialization = generic_context.specialize(
-            self.db(),
-            overload
-                .parameter_types()
-                .iter()
-                .map(|ty| ty.unwrap_or(Type::unknown()))
-                .collect(),
-        );
+        let parameters = overload
+            .parameter_types_with_defaults(&signature)
+            .expect("matching overload should not have missing arguments");
+        let specialization = generic_context.specialize(self.db(), parameters);
         Type::from(GenericAlias::new(self.db(), generic_class, specialization))
     }
 

@@ -150,6 +150,16 @@ reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
 reveal_type(Constrained[object]())  # revealed: Unknown
 ```
 
+If the type variable has a default, it can be omitted:
+
+```py
+WithDefaultU = TypeVar("WithDefaultU", default=int)
+
+class WithDefault(Generic[T, WithDefaultU]): ...
+
+reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
+```
+
 ## Inferring generic class parameters
 
 We can infer the type parameter from a type context:
