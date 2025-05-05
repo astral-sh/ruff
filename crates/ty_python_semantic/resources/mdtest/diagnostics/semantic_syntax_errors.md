@@ -212,18 +212,18 @@ Star expressions can't be used in certain contexts:
 
 ```py
 def func():
-    # error: [invalid-syntax] "can't use starred expression here"
+    # error: [invalid-syntax] "Starred expression cannot be used here"
     return *[1, 2, 3]
 
 def gen():
-    # error: [invalid-syntax] "can't use starred expression here"
+    # error: [invalid-syntax] "Starred expression cannot be used here"
     yield * [1, 2, 3]
 
-# error: [invalid-syntax] "can't use starred expression here"
+# error: [invalid-syntax] "Starred expression cannot be used here"
 for *x in range(10):
     pass
 
-# error: [invalid-syntax] "can't use starred expression here"
+# error: [invalid-syntax] "Starred expression cannot be used here"
 for x in *range(10):
     pass
 ```
