@@ -674,6 +674,10 @@ impl Severity {
             Severity::Fatal => AnnotateLevel::Error,
         }
     }
+
+    pub const fn is_fatal(self) -> bool {
+        matches!(self, Severity::Fatal)
+    }
 }
 
 /// Configuration for rendering diagnostics.
