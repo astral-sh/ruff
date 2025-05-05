@@ -1326,18 +1326,18 @@ pub(super) fn report_invalid_generator_function_return_type(
 
     let (description, link) = if inferred_return == KnownClass::AsyncGeneratorType {
         (
-            "async generator function",
+            "an async generator function",
             "https://docs.python.org/3/glossary.html#term-asynchronous-generator",
         )
     } else {
         (
-            "generator function",
+            "a generator function",
             "https://docs.python.org/3/glossary.html#term-generator",
         )
     };
 
     diag.info(format_args!(
-        "Function is inferred as returning `{inferred_ty}` because it is a {description}"
+        "Function is inferred as returning `{inferred_ty}` because it is {description}"
     ));
     diag.info(format_args!("See {link} for more details"));
 }

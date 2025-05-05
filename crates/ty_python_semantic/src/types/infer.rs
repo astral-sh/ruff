@@ -1641,6 +1641,12 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
             if scope_id.is_generator_function(self.index) {
+                // TODO: `AsyncGeneratorType` and `GeneratorType` are both generic classes.
+                //
+                // If type arguments are supplied to `(Async)Iterable`, `(Async)Iterator`,
+                // `(Async)Generator` or `(Async)GeneratorType` in the return annotation,
+                // we should iterate over the `yield` expressions and `return` statements in the function
+                // to check that they are consistent with the type arguments provided.
                 let inferred_return = if function.is_async {
                     KnownClass::AsyncGeneratorType
                 } else {

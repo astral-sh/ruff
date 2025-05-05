@@ -76,7 +76,7 @@ error: lint:invalid-return-type: Return type does not match returned value
    |                  ^^^ Expected `str`, found `types.AsyncGeneratorType`
 34 |     yield 42
    |
-info: Function is inferred as returning `types.AsyncGeneratorType` because it is a async generator function
+info: Function is inferred as returning `types.AsyncGeneratorType` because it is an async generator function
 info: See https://docs.python.org/3/glossary.html#term-asynchronous-generator for more details
 
 ```
