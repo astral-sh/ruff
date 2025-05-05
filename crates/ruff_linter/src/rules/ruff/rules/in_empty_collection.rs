@@ -36,17 +36,38 @@ pub(crate) fn in_empty_collection(checker: &Checker, compare: &ast::ExprCompare)
     };
 
     let semantic = checker.semantic();
+    let collection_methods = [
+        "list",
+        "tuple",
+        "set",
+        "frozenset",
+        "dict",
+        "bytes",
+        "bytearray",
+        "str",
+    ];
 
     let is_empty_collection = match right {
         Expr::List(ast::ExprList { elts, .. }) => elts.is_empty(),
         Expr::Tuple(ast::ExprTuple { elts, .. }) => elts.is_empty(),
         Expr::Set(ast::ExprSet { elts, .. }) => elts.is_empty(),
+        Expr::Dict(ast::ExprDict { items, .. }) => items.is_empty(),
+        Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => value.is_empty(),
+        Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => value.is_empty(),
+        Expr::FString(s) => s
+            .value
+            .elements()
+            .all(|elt| elt.as_literal().is_some_and(|elt| elt.is_empty())),
         Expr::Call(ast::ExprCall {
             func,
             arguments,
             range: _,
-        }) => semantic.match_builtin_expr(func, "set") && arguments.is_empty(),
-        Expr::Dict(ast::ExprDict { range: _, items }) => items.is_empty(),
+        }) => {
+            arguments.is_empty()
+                && collection_methods
+                    .iter()
+                    .any(|s| semantic.match_builtin_expr(func, s))
+        }
         _ => false,
     };
 
