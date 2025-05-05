@@ -178,9 +178,10 @@ impl SymbolDeclarations {
 }
 
 /// A snapshot of a symbol state that can be used to resolve a reference in a nested eager scope.
-/// If there are bindings in a scope other than class, they are stored in `Bindings`.
-/// Even if it's a class scope (class variables are not visible in eager nested scopes) or there are no bindings,
-/// the current narrowing constraint is necessary for narrowing, so it's stored in `Constraint`.
+/// If there are bindings in a (non-class) scope , they are stored in `Bindings`.
+/// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
+/// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
+/// `Constraint`.
 #[derive(Clone, Debug, PartialEq, Eq, salsa::Update)]
 pub(super) enum EagerSnapshot {
     Constraint(ScopedNarrowingConstraint),
@@ -191,12 +192,13 @@ pub(super) enum EagerSnapshot {
 /// with a set of narrowing constraints and a visibility constraint.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolBindings {
-    /// A narrowing constraint that applies when the symbol is used at the current location.
-    /// This is used for cross-scope narrowing.
-    /// This has the same role as an unbound binding narrowing constraint,
-    /// and is usually `None` (to avoid extra cost), but only has a value in a class scope.
-    /// This is because symbol bindings in a class scope are not visible in eager nested scopes.
-    pub(super) narrowing_constraint_at_use: Option<ScopedNarrowingConstraint>,
+    /// A narrowing constraint that applies when the symbol is used in a nested eager scope.
+    /// This has the same role as an unbound-binding narrowing constraint,
+    /// and is usually `None` (to avoid extra cost), but can be `Some` in a class scope.
+    /// This is because symbol bindings in a class scope are not visible in eager nested scopes,
+    /// so we need to know the narrowing applicable to the "unbound" binding, even if the unbound
+    /// binding is not visible.
+    narrowing_constraint_at_use: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this symbol, sorted by their `ScopedDefinitionId`
     live_bindings: SmallVec<[LiveBinding; INLINE_DEFINITIONS_PER_SYMBOL]>,
 }

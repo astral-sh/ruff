@@ -144,6 +144,9 @@ def f(x: str | Literal[1] | None):
             # This class variable is not visible from the nested class scope.
             g = None
 
-            class E:
-                reveal_type(g)  # revealed: str | Literal[1]
+            # This additional constraint is not relevant to nested scopes, since it only applies to
+            # a binding of `g` that they cannot see:
+            if g is None:
+                class E:
+                    reveal_type(g)  # revealed: str | Literal[1]
 ```

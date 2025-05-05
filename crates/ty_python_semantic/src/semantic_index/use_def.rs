@@ -509,8 +509,8 @@ impl<'db> UseDefMap<'db> {
     }
 }
 
-/// Uniquely identifies a snapshot of an eager symbol state that can be used to resolve a reference in a nested
-/// eager scope.
+/// Uniquely identifies a snapshot of a symbol state that can be used to resolve a reference in a
+/// nested eager scope.
 ///
 /// An eager scope has its entire body executed immediately at the location where it is defined.
 /// For any free references in the nested scope, we use the bindings that are visible at the point
@@ -735,8 +735,8 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Currently live bindings for each instance attribute.
     instance_attribute_states: IndexVec<ScopedSymbolId, SymbolState>,
 
-    /// Snapshot of eager states in this scope that can be used to resolve a reference in a nested
-    /// eager scope.
+    /// Snapshots of symbol states in this scope that can be used to resolve a reference in a
+    /// nested eager scope.
     eager_snapshots: EagerSnapshots,
 }
 
