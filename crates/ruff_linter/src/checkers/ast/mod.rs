@@ -1004,7 +1004,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 // Function annotations are always evaluated at runtime, unless future annotations
-                // are enabled.
+                // are enabled or the Python version is at least 3.14.
                 let annotation = AnnotationContext::from_function(
                     function_def,
                     &self.semantic,
