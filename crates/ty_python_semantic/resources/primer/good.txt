@@ -90,6 +90,7 @@ rclip
 rich
 rotki
 schema_salad
+scipy
 scrapy
 setuptools
 sockeye
