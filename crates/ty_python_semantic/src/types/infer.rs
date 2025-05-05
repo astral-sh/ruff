@@ -57,7 +57,9 @@ use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::symbol::{
     FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind,
 };
-use crate::semantic_index::{semantic_index, EagerBindingsResult, SemanticIndex};
+use crate::semantic_index::{
+    semantic_index, symbol_table, use_def_map, EagerBindingsResult, SemanticIndex,
+};
 use crate::symbol::{
     builtins_module_scope, builtins_symbol, explicit_global_symbol,
     module_type_implicit_global_symbol, symbol, symbol_from_bindings, symbol_from_declarations,
@@ -102,8 +104,9 @@ use super::diagnostic::{
     report_invalid_exception_raised, report_invalid_type_checking_constant,
     report_non_subscriptable, report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
-    report_unresolved_reference, INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL,
-    REDUNDANT_CAST, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
+    report_undeclared_protocol_member, report_unresolved_reference, INVALID_METACLASS,
+    INVALID_OVERLOAD, INVALID_PROTOCOL, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
+    SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
 };
 use super::slots::check_class_slots;
 use super::string_annotation::{
@@ -1004,6 +1007,56 @@ impl<'db> TypeInferenceBuilder<'db> {
                             variables used in other base classes",
                         );
                     }
+                }
+            }
+
+            if let Some(protocol) = class.into_protocol_class(self.db()) {
+                let interface = protocol.interface(self.db());
+                let class_symbol_table = symbol_table(self.db(), class.body_scope(self.db()));
+
+                for (symbol_id, mut bindings_iterator) in
+                    use_def_map(self.db(), class.body_scope(self.db())).all_public_bindings()
+                {
+                    let symbol_name = class_symbol_table.symbol(symbol_id).name();
+
+                    if !interface.includes_member(symbol_name) {
+                        continue;
+                    }
+
+                    let has_declaration = class
+                        .iter_mro(self.db(), None)
+                        .filter_map(ClassBase::into_class)
+                        .any(|superclass| {
+                            let superclass_scope =
+                                superclass.class_literal(self.db()).0.body_scope(self.db());
+                            let Some(scoped_symbol_id) = symbol_table(self.db(), superclass_scope)
+                                .symbol_id_by_name(symbol_name)
+                            else {
+                                return false;
+                            };
+                            symbol_from_declarations(
+                                self.db(),
+                                use_def_map(self.db(), superclass_scope)
+                                    .public_declarations(scoped_symbol_id),
+                            )
+                            .is_ok_and(|symbol| !symbol.symbol.is_unbound())
+                        });
+
+                    if has_declaration {
+                        continue;
+                    }
+
+                    let Some(first_binding) = bindings_iterator.find_map(|binding| binding.binding)
+                    else {
+                        continue;
+                    };
+
+                    report_undeclared_protocol_member(
+                        &self.context,
+                        first_binding,
+                        protocol,
+                        &class_symbol_table,
+                    );
                 }
             }
         }

@@ -420,6 +420,8 @@ reveal_type(get_protocol_members(Baz2))
 
 ## Protocol members in statically known branches
 
+<!-- snapshot-diagnostics -->
+
 The list of protocol members does not include any members declared in branches that are statically
 known to be unreachable:
 
@@ -430,7 +432,7 @@ python-version = "3.9"
 
 ```py
 import sys
-from typing_extensions import Protocol, get_protocol_members
+from typing_extensions import Protocol, get_protocol_members, reveal_type
 
 class Foo(Protocol):
     if sys.version_info >= (3, 10):
@@ -439,7 +441,7 @@ class Foo(Protocol):
         def c(self) -> None: ...
     else:
         d: int
-        e = 56
+        e = 56  # error: [invalid-protocol] "not declared as a protocol member"
         def f(self) -> None: ...
 
 # TODO: actually a frozenset
@@ -658,25 +660,69 @@ class LotsOfBindings(Protocol):
 
     class Nested: ...  # also weird, but we should also probably allow it
     class NestedProtocol(Protocol): ...  # same here...
-    e = 72  # TODO: this should error with `[invalid-protocol]` (`e` is not declared)
+    e = 72  # error: [invalid-protocol] "not declared as a protocol member"
 
-    f, g = (1, 2)  # TODO: this should error with `[invalid-protocol]` (`f` and `g` are not declared)
+    # error: [invalid-protocol] "Cannot assign to variable `f` in body of protocol class `LotsOfBindings`"
+    # error: [invalid-protocol] "Cannot assign to variable `g` in body of protocol class `LotsOfBindings`"
+    f, g = (1, 2)
 
-    h: int = (i := 3)  # TODO: this should error with `[invalid-protocol]` (`i` is not declared)
+    h: int = (i := 3)  # error: [invalid-protocol] "not declared as a protocol member"
 
-    for j in range(42):  # TODO: this should error with `[invalid-protocol]` (`j` is not declared)
+    for j in range(42):  # error: [invalid-protocol] "not declared as a protocol member"
         pass
 
-    with MyContext() as k:  # TODO: this should error with `[invalid-protocol]` (`k` is not declared)
+    with MyContext() as k:  # error: [invalid-protocol] "not declared as a protocol member"
         pass
 
     match object():
-        case l:  # TODO: this should error with `[invalid-protocol]` (`l` is not declared)
+        case l:  # error: [invalid-protocol] "not declared as a protocol member"
             ...
 
 # TODO: actually a frozenset
 # revealed: tuple[Literal["Nested"], Literal["NestedProtocol"], Literal["a"], Literal["b"], Literal["c"], Literal["d"], Literal["e"], Literal["f"], Literal["g"], Literal["h"], Literal["i"], Literal["j"], Literal["k"], Literal["l"]]
 reveal_type(get_protocol_members(LotsOfBindings))
+```
+
+A binding-without-declaration will not be reported if it occurs in a branch that we can statically
+determine to be unreachable. The reason is that we don't consider it to be a protocol member at all
+if all definitions for the variable are in unreachable blocks:
+
+```py
+import sys
+
+class Protocol694(Protocol):
+    if sys.version_info > (3, 694):
+        x = 42  # no error!
+```
+
+If there are multiple bindings of the variable in the class body, however, and at least one of the
+bindings occurs in a block of code that is understood to be (possibly) reachable, a diagnostic will
+be reported. The diagnostic will be attached to the first binding that occurs in the class body,
+even if that first definition occurs in an unreachable block:
+
+```py
+class Protocol695(Protocol):
+    if sys.version_info > (3, 695):
+        x = 42
+    else:
+        x = 42
+
+    # error: [invalid-protocol] "not declared as a protocol member"
+    x = 56
+```
+
+In order for the variable to be considered declared, the declaration of the variable must also take
+place in a block of code that is understood to be (possibly) reachable:
+
+```py
+class Protocol696(Protocol):
+    if sys.version_info > (3, 696):
+        x: int
+    else:
+        x = 42  # error: [invalid-protocol] "not declared as a protocol member"
+        y: int
+
+    y = 56  # no error
 ```
 
 Attribute members are allowed to have assignments in methods on the protocol class, just like

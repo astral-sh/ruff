@@ -78,6 +78,10 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
+    pub(super) fn includes_member(&self, name: &str) -> bool {
+        self.0.contains_key(name)
+    }
+
     /// Return `true` if all members of this protocol are fully static.
     pub(super) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
         self.members().all(|member| member.ty.is_fully_static(db))
