@@ -109,6 +109,10 @@ pub(super) struct SemanticIndexBuilder<'db> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
+    /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
+    ///
+    /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
+    generator_functions: FxHashSet<FileScopeId>,
     eager_bindings: FxHashMap<EagerBindingsKey, ScopedEagerBindingsId>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
@@ -142,6 +146,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             expressions_by_node: FxHashMap::default(),
 
             imported_modules: FxHashSet::default(),
+            generator_functions: FxHashSet::default(),
 
             eager_bindings: FxHashMap::default(),
 
@@ -1081,6 +1086,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
         self.eager_bindings.shrink_to_fit();
+        self.generator_functions.shrink_to_fit();
 
         SemanticIndex {
             symbol_tables,
@@ -1097,6 +1103,7 @@ impl<'db> SemanticIndexBuilder<'db> {
             has_future_annotations: self.has_future_annotations,
             eager_bindings: self.eager_bindings,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
+            generator_functions: self.generator_functions,
         }
     }
 
@@ -2303,6 +2310,13 @@ where
                 self.current_use_def_map_mut()
                     .record_node_reachability(node_key);
 
+                walk_expr(self, expr);
+            }
+            ast::Expr::Yield(_) => {
+                let scope = self.current_scope();
+                if self.scopes[scope].kind() == ScopeKind::Function {
+                    self.generator_functions.insert(scope);
+                }
                 walk_expr(self, expr);
             }
             _ => {

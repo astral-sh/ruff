@@ -68,12 +68,12 @@ use crate::types::class::MetaclassErrorKind;
 use crate::types::diagnostic::{
     report_implicit_return_type, report_invalid_arguments_to_annotated,
     report_invalid_arguments_to_callable, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_return_type,
-    report_possibly_unbound_attribute, TypeCheckDiagnostics, CALL_NON_CALLABLE,
-    CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
-    CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
+    report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
+    report_invalid_return_type, report_possibly_unbound_attribute, TypeCheckDiagnostics,
+    CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
+    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
+    INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
     UNSUPPORTED_OPERATOR,
@@ -1611,11 +1611,7 @@ impl<'db> TypeInferenceBuilder<'db> {
         }
         self.infer_body(&function.body);
 
-        if let Some(declared_ty) = function
-            .returns
-            .as_deref()
-            .map(|ret| self.file_expression_type(ret))
-        {
+        if let Some(returns) = function.returns.as_deref() {
             fn is_stub_suite(suite: &[ast::Stmt]) -> bool {
                 match suite {
                     [ast::Stmt::Expr(ast::StmtExpr { value: first, .. }), ast::Stmt::Expr(ast::StmtExpr { value: second, .. }), ..] => {
@@ -1641,6 +1637,30 @@ impl<'db> TypeInferenceBuilder<'db> {
                 return;
             }
 
+            let declared_ty = self.file_expression_type(returns);
+
+            let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
+            if scope_id.is_generator_function(self.index) {
+                let inferred_return = if function.is_async {
+                    KnownClass::AsyncGeneratorType
+                } else {
+                    KnownClass::GeneratorType
+                };
+
+                if !inferred_return
+                    .to_instance(self.db())
+                    .is_assignable_to(self.db(), declared_ty)
+                {
+                    report_invalid_generator_function_return_type(
+                        &self.context,
+                        returns.range(),
+                        inferred_return,
+                        declared_ty,
+                    );
+                }
+                return;
+            }
+
             for invalid in self
                 .return_types_and_ranges
                 .iter()
@@ -1660,23 +1680,18 @@ impl<'db> TypeInferenceBuilder<'db> {
                 report_invalid_return_type(
                     &self.context,
                     invalid.range,
-                    function.returns.as_ref().unwrap().range(),
+                    returns.range(),
                     declared_ty,
                     invalid.ty,
                 );
             }
-            let scope_id = self.index.node_scope(NodeWithScopeRef::Function(function));
             let use_def = self.index.use_def_map(scope_id);
             if use_def.can_implicit_return(self.db())
                 && !KnownClass::NoneType
                     .to_instance(self.db())
                     .is_assignable_to(self.db(), declared_ty)
             {
-                report_implicit_return_type(
-                    &self.context,
-                    function.returns.as_ref().unwrap().range(),
-                    declared_ty,
-                );
+                report_implicit_return_type(&self.context, returns.range(), declared_ty);
             }
         }
     }
