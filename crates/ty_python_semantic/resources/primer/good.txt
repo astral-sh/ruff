@@ -105,6 +105,7 @@ static-frame
 stone
 strawberry
 streamlit
+sympy
 tornado
 trio
 twine
