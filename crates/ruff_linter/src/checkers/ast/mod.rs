@@ -1004,9 +1004,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
 
                 // Function annotations are always evaluated at runtime, unless future annotations
-                // are enabled.
-                let annotation =
-                    AnnotationContext::from_function(function_def, &self.semantic, self.settings);
+                // are enabled or the Python version is at least 3.14.
+                let annotation = AnnotationContext::from_function(
+                    function_def,
+                    &self.semantic,
+                    self.settings,
+                    self.target_version(),
+                );
 
                 // The first parameter may be a single dispatch.
                 let singledispatch =
@@ -1203,7 +1207,11 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 value,
                 ..
             }) => {
-                match AnnotationContext::from_model(&self.semantic, self.settings) {
+                match AnnotationContext::from_model(
+                    &self.semantic,
+                    self.settings,
+                    self.target_version(),
+                ) {
                     AnnotationContext::RuntimeRequired => {
                         self.visit_runtime_required_annotation(annotation);
                     }
@@ -1358,7 +1366,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             // we can't defer again, or we'll infinitely recurse!
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
-            && self.semantic.future_annotations_or_stub()
+            && (self.semantic.future_annotations_or_stub()||self.target_version.defers_annotations())
             && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(string_literal) = expr {
@@ -2585,7 +2593,8 @@ impl<'a> Checker<'a> {
                 // if they are annotations in a module where `from __future__ import
                 // annotations` is active, or they are type definitions in a stub file.
                 debug_assert!(
-                    self.semantic.future_annotations_or_stub()
+                    (self.semantic.future_annotations_or_stub()
+                        || self.target_version.defers_annotations())
                         && (self.source_type.is_stub() || self.semantic.in_annotation())
                 );
 
