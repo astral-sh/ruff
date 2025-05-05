@@ -11,7 +11,6 @@ freqtrade  # cycle panics (try_metaclass_)
 hydpy  # cycle panics (try_metaclass_)
 ibis  # cycle panics (try_metaclass_)
 manticore  # stack overflow
-materialize  # stack overflow
 mypy  # cycle panic (signature_)
 pandas  # slow
 pandas-stubs  # cycle panics (try_metaclass_)

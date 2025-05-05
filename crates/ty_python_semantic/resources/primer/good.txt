@@ -49,6 +49,7 @@ jinja
 koda-validate
 kopf
 kornia
+materialize
 meson
 mitmproxy
 mkdocs
