@@ -102,7 +102,8 @@ declare_lint! {
     /// ## What it does
     /// Checks for calls to possibly unbound methods.
     ///
-    /// TODO #14889
+    /// ## Why is this bad?
+    /// Calling an unbound method will raise an `AttributeError` at runtime.
     pub(crate) static CALL_POSSIBLY_UNBOUND_METHOD = {
         summary: "detects calls to possibly unbound methods",
         status: LintStatus::preview("1.0.0"),
@@ -121,7 +122,11 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks whether a variable has been declared as two conflicting types.
+    ///
+    /// ## Why is this bad
+    /// A variable with two conflicting declarations likely indicates a mistake. Moreover, it could lead to incorrect or ill-defined type inference for other code that relies on these variables.
     pub(crate) static CONFLICTING_DECLARATIONS = {
         summary: "detects conflicting declarations",
         status: LintStatus::preview("1.0.0"),
@@ -170,7 +175,11 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for class definitions with duplicate bases.
+    ///
+    /// ## Why is this bad?
+    /// Class definitions with duplicate bases raise a `TypeError` at runtime.
     pub(crate) static DUPLICATE_BASE = {
         summary: "detects class definitions with duplicate bases",
         status: LintStatus::preview("1.0.0"),
@@ -265,7 +274,11 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for classes with an inconsistent method resolution order (MRO).
+    ///
+    /// ## Why is this bad?
+    /// Classes with an inconsistent MRO will raise a `TypeError` at runtime.
     pub(crate) static INCONSISTENT_MRO = {
         summary: "detects class definitions with an inconsistent MRO",
         status: LintStatus::preview("1.0.0"),
@@ -275,7 +288,10 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// TODO #14889
+    /// Checks for attempts to use an out of bounds index to get an item from a container.
+    ///
+    /// ## Why is this bad?
+    /// Using an out of bounds index will raise an `IndexError` at runtime.
     pub(crate) static INDEX_OUT_OF_BOUNDS = {
         summary: "detects index out of bounds errors",
         status: LintStatus::preview("1.0.0"),
@@ -790,7 +806,8 @@ declare_lint! {
     /// ## What it does
     /// Checks for possibly unbound attributes.
     ///
-    /// TODO #14889
+    /// ## Why is this bad?
+    /// Attempting to access an unbound attribute will raise an `AttributeError` at runtime.
     pub(crate) static POSSIBLY_UNBOUND_ATTRIBUTE = {
         summary: "detects references to possibly unbound attributes",
         status: LintStatus::preview("1.0.0"),
@@ -799,7 +816,11 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for imports of symbols that may be unbound.
+    ///
+    /// ## Why is this bad?
+    /// Importing an unbound module or name will raise a `ModuleNotFoundError` or `ImportError` at runtime.
     pub(crate) static POSSIBLY_UNBOUND_IMPORT = {
         summary: "detects possibly unbound imports",
         status: LintStatus::preview("1.0.0"),
@@ -975,7 +996,8 @@ declare_lint! {
     /// ## What it does
     /// Checks for unresolved attributes.
     ///
-    /// TODO #14889
+    /// ## Why is this bad?
+    /// Accessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is not guaranteed to exist from the type alone, so this could also indicate that the object is not of the type that the user expects.
     pub(crate) static UNRESOLVED_ATTRIBUTE = {
         summary: "detects references to unresolved attributes",
         status: LintStatus::preview("1.0.0"),
@@ -1019,7 +1041,8 @@ declare_lint! {
     /// ## What it does
     /// Checks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.
     ///
-    /// TODO #14889
+    /// ## Why is this bad?
+    /// Attempting to use an unsupported operator will raise a `TypeError` at runtime.
     pub(crate) static UNSUPPORTED_OPERATOR = {
         summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
         status: LintStatus::preview("1.0.0"),
