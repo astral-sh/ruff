@@ -226,8 +226,8 @@ impl<'db> SemanticIndexBuilder<'db> {
 
     fn push_scope(&mut self, node: NodeWithScopeRef) {
         let parent = self.current_scope();
-        let reachabililty = self.current_use_def_map().reachability;
-        self.push_scope_with_parent(node, Some(parent), reachabililty);
+        let reachability = self.current_use_def_map().reachability;
+        self.push_scope_with_parent(node, Some(parent), reachability);
     }
 
     fn push_scope_with_parent(
