@@ -20,10 +20,18 @@ use ruff_text_size::Ranged;
 /// contexts.
 ///
 /// ## Fix safety
-/// This fix is sometimes unsafe. The fix automatically adds the necessary `import sys`
-/// statement if not already present, but it can only safely handle simple cases with
-/// at most one argument. Complex calls with multiple arguments or keyword arguments
-/// cannot be automatically fixed.
+/// This fix is always unsafe. When replacing `exit` or `quit` with `sys.exit`,
+/// the behavior can change in the following ways:
+///
+/// 1. If the code runs in an environment where the `site` module is not imported
+///    (e.g., with `python -S`), the original code would raise a `NameError`, while
+///    the fixed code would execute normally.
+///
+/// 2. `site.exit` and `sys.exit` handle tuple arguments differently. `site.exit`
+///    treats tuples as regular objects and always returns exit code 1, while `sys.exit`
+///    interprets tuple contents to determine the exit code: an empty tuple () results in
+///    exit code 0, and a single-element tuple like (2,) uses that element's value (2) as
+///    the exit code.
 ///
 /// ## Example
 /// ```python
