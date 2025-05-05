@@ -14,7 +14,7 @@ reveal_type(x)  # revealed: list[Unknown]
 # TODO reveal int
 reveal_type(x[0])  # revealed: Unknown
 
-# TODO reveal list
+# TODO reveal list[int]
 reveal_type(x[0:1])  # revealed: list[Unknown]
 
 # error: [call-non-callable]

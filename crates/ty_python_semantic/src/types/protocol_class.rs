@@ -8,7 +8,7 @@ use crate::{
     db::Db,
     semantic_index::{symbol_table, use_def_map},
     symbol::{symbol_from_bindings, symbol_from_declarations},
-    types::{ClassBase, ClassLiteral, KnownFunction, Type, TypeQualifiers},
+    types::{ClassBase, ClassLiteral, KnownFunction, Specialization, Type, TypeQualifiers},
 };
 
 impl<'db> ClassLiteral<'db> {
@@ -146,6 +146,19 @@ impl<'db> ProtocolInterface<'db> {
             Self::SelfReference => Self::SelfReference,
         }
     }
+
+    pub(super) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        Self(
+            self.0
+                .into_iter()
+                .map(|(name, data)| (name, data.apply_specialization(db, specialization)))
+                .collect(),
+        )
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
@@ -158,6 +171,13 @@ impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
             ty: self.ty.normalized(db),
+            qualifiers: self.qualifiers,
+        }
+    }
+
+    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        Self {
+            ty: self.ty.apply_specialization(db, specialization),
             qualifiers: self.qualifiers,
         }
     }

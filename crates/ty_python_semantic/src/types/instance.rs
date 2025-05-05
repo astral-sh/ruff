@@ -260,6 +260,27 @@ impl<'db> ProtocolInstanceType<'db> {
                 .unwrap_or_else(|| KnownClass::Object.to_instance(db).instance_member(db, name)),
         }
     }
+
+    pub(super) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        match self.0 {
+            Protocol::FromClass(class) => Self(Protocol::FromClass(
+                class.apply_specialization(db, specialization),
+            )),
+            Protocol::Synthesized(synthesized) => {
+                Self(Protocol::Synthesized(SynthesizedProtocolType::new(
+                    db,
+                    synthesized
+                        .interface(db)
+                        .clone()
+                        .apply_specialization(db, specialization),
+                )))
+            }
+        }
+    }
 }
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class

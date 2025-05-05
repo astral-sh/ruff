@@ -5099,6 +5099,10 @@ impl<'db> Type<'db> {
                 instance.apply_type_mapping(db, type_mapping),
             ),
 
+            Type::ProtocolInstance(instance) => {
+                Type::ProtocolInstance(instance.apply_specialization(db, specialization))
+            }
+
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
                     function.apply_type_mapping(db, type_mapping),
@@ -5182,8 +5186,6 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::BoundSuper(_)
-            // Same for `ProtocolInstance`
-            | Type::ProtocolInstance(_)
             | Type::KnownInstance(_) => self,
         }
     }
