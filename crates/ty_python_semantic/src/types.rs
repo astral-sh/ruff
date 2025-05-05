@@ -4833,6 +4833,17 @@ impl<'db> Type<'db> {
                 Some(KnownClass::UnionType) => Ok(todo_type!(
                     "Support for `types.UnionType` instances in type expressions"
                 )),
+                Some(KnownClass::NamedTuple) => Ok(todo_type!(
+                    "Support for functional `typing.NamedTuple` syntax"
+                )),
+                _ if instance
+                    .class()
+                    .iter_mro(db)
+                    .filter_map(ClassBase::into_class)
+                    .any(|class| class.is_known(db, KnownClass::Enum)) =>
+                {
+                    Ok(todo_type!("Support for functional `enum` syntax"))
+                }
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
                         *self
