@@ -291,7 +291,7 @@ impl SymbolTable {
         &self.symbols[symbol_id.into()]
     }
 
-    #[allow(unused)]
+    #[expect(unused)]
     pub(crate) fn symbol_ids(&self) -> impl Iterator<Item = ScopedSymbolId> {
         self.symbols.indices()
     }
