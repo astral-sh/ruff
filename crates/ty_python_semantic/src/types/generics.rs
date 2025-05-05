@@ -123,6 +123,9 @@ impl<'db> GenericContext<'db> {
             }
             None => {}
         }
+        if let Some(default_ty) = typevar.default_ty(db) {
+            parameter = parameter.with_default_type(default_ty);
+        }
         parameter
     }
 

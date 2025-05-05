@@ -1316,8 +1316,25 @@ impl<'db> Binding<'db> {
         self.inherited_specialization
     }
 
+    /// Returns the bound types for each parameter, in parameter source order, or `None` if no
+    /// argument was matched to that parameter.
     pub(crate) fn parameter_types(&self) -> &[Option<Type<'db>>] {
         &self.parameter_tys
+    }
+
+    /// Returns the bound types for each parameter, in parameter source order, with default values
+    /// applied for arguments that weren't matched to a parameter. Returns `None` if there are any
+    /// non-default arguments that weren't matched to a parameter.
+    pub(crate) fn parameter_types_with_defaults(
+        &self,
+        signature: &Signature<'db>,
+    ) -> Option<Box<[Type<'db>]>> {
+        signature
+            .parameters()
+            .iter()
+            .zip(&self.parameter_tys)
+            .map(|(parameter, parameter_ty)| parameter_ty.or(parameter.default_type()))
+            .collect()
     }
 
     pub(crate) fn arguments_for_parameter<'a>(
