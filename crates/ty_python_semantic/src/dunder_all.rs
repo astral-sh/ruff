@@ -54,7 +54,14 @@ struct DunderAllNamesCollector<'db> {
     /// The semantic index for the module.
     index: &'db SemanticIndex<'db>,
 
+    /// The origin of the `__all__` variable in the current module.
     origin: Option<DunderAllOrigin>,
+
+    /// A flag indicating whether there are any invalid elements in `__all__`.
+    ///
+    /// An invalid element is any element that is not a string literal including an implicitly
+    /// concatenated string literal.
+    contains_invalid_element: bool,
 
     /// A set of names found in `__all__` for the current module.
     names: FxHashSet<Name>,
@@ -68,6 +75,7 @@ impl<'db> DunderAllNamesCollector<'db> {
             scope: global_scope(db, file),
             index,
             origin: None,
+            contains_invalid_element: false,
             names: FxHashSet::default(),
         }
     }
@@ -132,9 +140,21 @@ impl<'db> DunderAllNamesCollector<'db> {
             .ok()
     }
 
+    fn create_name(&mut self, expr: &ast::Expr) -> Option<Name> {
+        let Some(ast::ExprStringLiteral { value, .. }) = expr.as_string_literal_expr() else {
+            self.contains_invalid_element = true;
+            return None;
+        };
+        if value.is_implicit_concatenated() {
+            self.contains_invalid_element = true;
+            return None;
+        }
+        Some(Name::new(value.to_str()))
+    }
+
     fn add_names(&mut self, exprs: &[ast::Expr]) {
         for expr in exprs {
-            let Some(name) = name_from_string_literal(expr) else {
+            let Some(name) = self.create_name(expr) else {
                 continue;
             };
             self.names.insert(name);
@@ -142,6 +162,11 @@ impl<'db> DunderAllNamesCollector<'db> {
     }
 
     fn into_names(mut self) -> Option<FxHashSet<Name>> {
+        if self.contains_invalid_element {
+            tracing::trace!("`__all__` contains invalid elements");
+            return None;
+        }
+
         if let DunderAllOrigin::ExternalModule(external_module) = self.origin? {
             // TODO: Should this be done eagerly instead of lazily?
             if let Some(module) = resolve_module(self.db, &external_module) {
@@ -282,7 +307,7 @@ impl<'db> Visitor<'db> for DunderAllNamesCollector<'db> {
 
                     // `__all__.append(...)`
                     "append" => {
-                        let Some(name) = name_from_string_literal(argument) else {
+                        let Some(name) = self.create_name(argument) else {
                             return;
                         };
                         self.names.insert(name);
@@ -290,7 +315,7 @@ impl<'db> Visitor<'db> for DunderAllNamesCollector<'db> {
 
                     // `__all__.remove(...)`
                     "remove" => {
-                        let Some(name) = name_from_string_literal(argument) else {
+                        let Some(name) = self.create_name(argument) else {
                             return;
                         };
                         self.names.remove(&name);
@@ -373,12 +398,4 @@ enum DunderAllOrigin {
 
 fn is_dunder_all(expr: &ast::Expr) -> bool {
     matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
-}
-
-fn name_from_string_literal(expr: &ast::Expr) -> Option<Name> {
-    let ast::ExprStringLiteral { value, .. } = expr.as_string_literal_expr()?;
-    if value.is_implicit_concatenated() {
-        return None;
-    }
-    Some(Name::new(value.to_str()))
 }
