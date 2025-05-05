@@ -43,6 +43,7 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for t
 14 | 10 < Comparable() < Comparable()
    |
 info: `__bool__` on `NotBoolable` must be callable
+info: `lint:unsupported-bool-conversion` is on by default
 
 ```
 
@@ -58,5 +59,6 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for t
 16 | Comparable() < Comparable()  # fine
    |
 info: `__bool__` on `NotBoolable` must be callable
+info: `lint:unsupported-bool-conversion` is on by default
 
 ```

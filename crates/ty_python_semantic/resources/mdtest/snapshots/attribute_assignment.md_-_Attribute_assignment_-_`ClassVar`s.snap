@@ -36,6 +36,7 @@ error: lint:invalid-assignment: Object of type `Literal["wrong"]` is not assigna
 8 |
 9 | instance = C()
   |
+info: `lint:invalid-assignment` is on by default
 
 ```
 
@@ -47,5 +48,6 @@ error: lint:invalid-attribute-access: Cannot assign to ClassVar `attr` from an i
 10 | instance.attr = 1  # error: [invalid-attribute-access]
    | ^^^^^^^^^^^^^
    |
+info: `lint:invalid-attribute-access` is on by default
 
 ```

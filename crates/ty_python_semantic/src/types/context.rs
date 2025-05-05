@@ -1,7 +1,7 @@
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
-use ruff_db::diagnostic::DiagnosticTag;
+use ruff_db::diagnostic::{DiagnosticTag, SubDiagnostic};
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
     files::File,
@@ -10,6 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use super::{binding_type, Type, TypeCheckDiagnostics};
 
+use crate::lint::LintSource;
 use crate::semantic_index::symbol::ScopeId;
 use crate::{
     lint::{LintId, LintMetadata},
@@ -222,6 +223,8 @@ pub(super) struct LintDiagnosticGuard<'db, 'ctx> {
     ///
     /// This is always `Some` until the `Drop` impl.
     diag: Option<Diagnostic>,
+
+    source: LintSource,
 }
 
 impl LintDiagnosticGuard<'_, '_> {
@@ -310,7 +313,17 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         // OK because the only way `self.diag` is `None`
         // is via this impl, which can only run at most
         // once.
-        let diag = self.diag.take().unwrap();
+        let mut diag = self.diag.take().unwrap();
+
+        diag.sub(SubDiagnostic::new(
+            Severity::Info,
+            match self.source {
+                LintSource::Default => format!("`{}` is on by default", diag.id()),
+                LintSource::Cli => format!("`{}` is enabled on the command line", diag.id()),
+                LintSource::File => format!("`{}` is enabled in a configuration file", diag.id()),
+            },
+        ));
+
         self.ctx.diagnostics.borrow_mut().push(diag);
     }
 }
@@ -345,6 +358,7 @@ pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
     ctx: &'ctx InferContext<'db>,
     id: DiagnosticId,
     severity: Severity,
+    source: LintSource,
     primary_span: Span,
 }
 
@@ -371,7 +385,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         let lint_id = LintId::of(lint);
         // Skip over diagnostics if the rule
         // is disabled.
-        let severity = ctx.db.rule_selection().severity(lint_id)?;
+        let (severity, source) = ctx.db.rule_selection().get(lint_id)?;
         // If we're not in type checking mode,
         // we can bail now.
         if ctx.is_in_no_type_check() {
@@ -390,6 +404,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
             ctx,
             id,
             severity,
+            source,
             primary_span,
         })
     }
@@ -417,6 +432,7 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         diag.annotate(Annotation::primary(self.primary_span.clone()));
         LintDiagnosticGuard {
             ctx: self.ctx,
+            source: self.source,
             diag: Some(diag),
         }
     }
@@ -479,6 +495,11 @@ impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
 /// being type checked.
 impl Drop for DiagnosticGuard<'_, '_> {
     fn drop(&mut self) {
+        if std::thread::panicking() {
+            // Don't submit diagnostics when panicking because they might be incomplete.
+            return;
+        }
+
         // OK because the only way `self.diag` is `None`
         // is via this impl, which can only run at most
         // once.

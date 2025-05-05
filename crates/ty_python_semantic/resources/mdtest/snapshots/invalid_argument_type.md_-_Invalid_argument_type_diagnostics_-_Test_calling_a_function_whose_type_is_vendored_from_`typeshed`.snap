@@ -40,5 +40,6 @@ info: Function defined here
 41 |     *,
 42 |     cls: type[JSONDecoder] | None = None,
    |
+info: `lint:invalid-argument-type` is on by default
 
 ```

@@ -35,6 +35,7 @@ error: lint:not-iterable: Object of type `Bad` is not iterable
 9 |     reveal_type(x)  # revealed: Unknown
   |
 info: Its `__iter__` method returns an object of type `int`, which has no `__next__` method
+info: `lint:not-iterable` is on by default
 
 ```
 

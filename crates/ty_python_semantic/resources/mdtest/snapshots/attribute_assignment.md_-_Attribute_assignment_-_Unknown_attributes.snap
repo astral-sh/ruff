@@ -33,6 +33,7 @@ error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `L
 4 |
 5 | instance = C()
   |
+info: `lint:unresolved-attribute` is on by default
 
 ```
 
@@ -44,5 +45,6 @@ error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `C
 6 | instance.non_existent = 1  # error: [unresolved-attribute]
   | ^^^^^^^^^^^^^^^^^^^^^
   |
+info: `lint:unresolved-attribute` is on by default
 
 ```

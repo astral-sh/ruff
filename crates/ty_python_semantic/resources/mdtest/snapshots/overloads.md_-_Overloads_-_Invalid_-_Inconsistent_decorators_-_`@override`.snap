@@ -93,6 +93,7 @@ error: lint:invalid-overload: `@override` decorator should be applied only to th
    |         Implementation defined here
 28 |         return x
    |
+info: `lint:invalid-overload` is on by default
 
 ```
 
@@ -108,6 +109,7 @@ error: lint:invalid-overload: `@override` decorator should be applied only to th
    |         Implementation defined here
 38 |         return x
    |
+info: `lint:invalid-overload` is on by default
 
 ```
 
@@ -125,5 +127,6 @@ error: lint:invalid-overload: `@override` decorator should be applied only to th
 22 |     def method(self, x: str) -> str: ...
    |         ^^^^^^
    |
+info: `lint:invalid-overload` is on by default
 
 ```

@@ -44,5 +44,6 @@ info: Function defined here
 4 |     z: int,
 5 | ) -> int:
   |
+info: `lint:invalid-argument-type` is on by default
 
 ```

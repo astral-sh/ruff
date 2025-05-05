@@ -38,5 +38,6 @@ info: Function defined here
   |         ^^^^^^^^       ------ Parameter declared here
 3 |         return 1
   |
+info: `lint:invalid-argument-type` is on by default
 
 ```

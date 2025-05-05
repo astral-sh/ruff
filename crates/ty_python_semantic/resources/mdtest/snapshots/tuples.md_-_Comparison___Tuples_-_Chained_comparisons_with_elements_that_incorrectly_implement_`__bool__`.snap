@@ -44,5 +44,6 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for t
 17 | a < b  # fine
    |
 info: `__bool__` on `NotBoolable | Literal[False]` must be callable
+info: `lint:unsupported-bool-conversion` is on by default
 
 ```

@@ -45,6 +45,7 @@ error: lint:invalid-return-type: Return type does not match returned value
 7 |
 8 | def f(cond: bool) -> str:
   |
+info: `lint:invalid-return-type` is on by default
 
 ```
 
@@ -63,6 +64,7 @@ error: lint:invalid-return-type: Return type does not match returned value
 12 |     else:
 13 |         # error: [invalid-return-type]
    |
+info: `lint:invalid-return-type` is on by default
 
 ```
 
@@ -84,5 +86,6 @@ error: lint:invalid-return-type: Return type does not match returned value
  9 |     if cond:
 10 |         # error: [invalid-return-type]
    |
+info: `lint:invalid-return-type` is on by default
 
 ```

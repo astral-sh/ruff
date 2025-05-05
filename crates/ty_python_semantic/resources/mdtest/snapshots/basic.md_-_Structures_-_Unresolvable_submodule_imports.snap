@@ -36,6 +36,7 @@ error: lint:unresolved-import: Cannot resolve imported module `a.foo`
 3 |
 4 | # Topmost component unresolvable:
   |
+info: `lint:unresolved-import` is on by default
 
 ```
 
@@ -47,5 +48,6 @@ error: lint:unresolved-import: Cannot resolve imported module `b.foo`
 5 | import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.foo`"
   |        ^^^^^
   |
+info: `lint:unresolved-import` is on by default
 
 ```

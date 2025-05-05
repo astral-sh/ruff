@@ -52,6 +52,7 @@ error: lint:invalid-return-type: Return type does not match returned value
 5 |
 6 | # error: [invalid-return-type]
   |
+info: `lint:invalid-return-type` is on by default
 
 ```
 
@@ -65,6 +66,7 @@ error: lint:invalid-return-type: Function can implicitly return `None`, which is
 8 |     if cond:
 9 |         return 1
   |
+info: `lint:invalid-return-type` is on by default
 
 ```
 
@@ -78,6 +80,7 @@ error: lint:invalid-return-type: Function can implicitly return `None`, which is
 13 |     if cond:
 14 |         raise ValueError()
    |
+info: `lint:invalid-return-type` is on by default
 
 ```
 
@@ -91,5 +94,6 @@ error: lint:invalid-return-type: Function can implicitly return `None`, which is
 18 |     if cond:
 19 |         cond = False
    |
+info: `lint:invalid-return-type` is on by default
 
 ```

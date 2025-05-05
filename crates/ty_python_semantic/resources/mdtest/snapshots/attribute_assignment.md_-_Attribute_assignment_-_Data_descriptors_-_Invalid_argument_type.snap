@@ -36,5 +36,6 @@ error: lint:invalid-assignment: Invalid assignment to data descriptor attribute 
 12 | instance.attr = "wrong"  # error: [invalid-assignment]
    | ^^^^^^^^^^^^^
    |
+info: `lint:invalid-assignment` is on by default
 
 ```
