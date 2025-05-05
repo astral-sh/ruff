@@ -12,26 +12,26 @@ use crate::symbol::{symbol_from_bindings, Boundness, Symbol};
 use crate::types::{infer_expression_types, Truthiness};
 use crate::{resolve_module, Db, ModuleName};
 
-// #[allow(clippy::ref_option)]
-// fn dunder_all_names_cycle_recover(
-//     _db: &dyn Db,
-//     _value: &Option<FxHashSet<Name>>,
-//     _count: u32,
-//     _file: File,
-// ) -> salsa::CycleRecoveryAction<Option<FxHashSet<Name>>> {
-//     salsa::CycleRecoveryAction::Iterate
-// }
+#[allow(clippy::ref_option)]
+fn dunder_all_names_cycle_recover(
+    _db: &dyn Db,
+    _value: &Option<FxHashSet<Name>>,
+    _count: u32,
+    _file: File,
+) -> salsa::CycleRecoveryAction<Option<FxHashSet<Name>>> {
+    salsa::CycleRecoveryAction::Iterate
+}
 
-// fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet<Name>> {
-//     None
-// }
+fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet<Name>> {
+    None
+}
 
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<&FxHashSet<Name>> {
-    let _span = tracing::trace_span!("dunder_all_names", ?file).entered();
-
     #[allow(clippy::ref_option)]
-    #[salsa::tracked(return_ref)]
+    #[salsa::tracked(return_ref, cycle_fn=dunder_all_names_cycle_recover, cycle_initial=dunder_all_names_cycle_initial)]
     fn dunder_all_names_impl(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
+        let _span = tracing::trace_span!("dunder_all_names", ?file).entered();
+
         let module = parsed_module(db.upcast(), file);
         let index = semantic_index(db, file);
         let mut collector = DunderAllNamesCollector::new(db, file, index);
