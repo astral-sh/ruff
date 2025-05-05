@@ -133,10 +133,9 @@ python-version = "3.11"
 from typing import Self
 
 class Shape:
-    def union(self: Self) -> Self | None:
+    def union(self: Self, other: Self | None):
+        reveal_type(other)  # revealed: Shape | None
         return self
-
-reveal_type(Shape().union())  # revealed: @Todo(Support for `typing.Self`) | None
 ```
 
 ## Invalid Usage
@@ -181,7 +180,7 @@ class Bar(Generic[T]):
     def bar(self) -> T:
         return self.foo
 
-# TODO: rejected
+# error: [invalid-type-form]
 class Baz(Bar[Self]): ...
 
 class MyMetaclass(type):

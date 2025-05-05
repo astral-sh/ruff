@@ -9,6 +9,7 @@ use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use salsa::Update;
+use symbol::NodeWithScopeKind;
 
 use crate::module_name::ModuleName;
 use crate::node_key::NodeKey;
@@ -23,6 +24,7 @@ use crate::semantic_index::symbol::{
     SymbolTable,
 };
 use crate::semantic_index::use_def::{EagerSnapshotKey, ScopedEagerSnapshotId, UseDefMap};
+use crate::types::{infer_definition_types, Type};
 use crate::Db;
 
 pub mod ast_ids;
@@ -424,6 +426,30 @@ impl<'db> SemanticIndex<'db> {
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
         &self.semantic_syntax_errors
+    }
+
+    /// Returns the type of the nearest enclosing class for the given scope.
+    ///
+    /// This function walks up the ancestor scopes starting from the given scope,
+    /// and finds the closest class definition.
+    ///
+    /// Returns `None` if no enclosing class is found.a
+    pub(crate) fn enclosing_class_symbol(
+        &self,
+        db: &'db dyn Db,
+        scope: ScopeId,
+    ) -> Option<Type<'db>> {
+        self.ancestor_scopes(scope.file_scope_id(db))
+            .find_map(|(_, ancestor_scope)| {
+                if let NodeWithScopeKind::Class(class) = ancestor_scope.node() {
+                    let definition = self.expect_single_definition(class.node());
+                    let result = infer_definition_types(db, definition);
+
+                    Some(result.declaration_type(definition).inner_type())
+                } else {
+                    None
+                }
+            })
     }
 }
 

@@ -35,7 +35,7 @@ use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopeId;
-use crate::semantic_index::{imported_modules, semantic_index};
+use crate::semantic_index::{imported_modules, semantic_index, SemanticIndex};
 use crate::suppression::check_suppressions;
 use crate::symbol::{
     imported_symbol, symbol_from_bindings, Boundness, Symbol, SymbolAndQualifiers,
@@ -4678,6 +4678,7 @@ impl<'db> Type<'db> {
     pub fn in_type_expression(
         &self,
         db: &'db dyn Db,
+        context: TypeExpressionContext<'db>,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -4762,8 +4763,36 @@ impl<'db> Type<'db> {
                 // TODO: Use an opt-in rule for a bare `Callable`
                 KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
-                // For self we need access to scopes to get the
-                KnownInstanceType::TypingSelf => Ok(todo_type!("Support for `typing.Self`")),
+                KnownInstanceType::TypingSelf => {
+                    let scope = context.scope_id;
+                    let Some(class_ty) = context.index.enclosing_class_symbol(db, scope) else {
+                        return Err(InvalidTypeExpressionError {
+                            fallback_type: Type::unknown(),
+                            invalid_expressions: smallvec::smallvec![
+                                InvalidTypeExpression::InvalidType(*self)
+                            ],
+                        });
+                    };
+                    let class = class_ty.expect_class_type(db);
+                    let Some(class_def) = class_ty.definition(db) else {
+                        debug_assert!(false, "enclosing_class_symbol must return a class type");
+                        return Ok(Type::unknown());
+                    };
+                    let TypeDefinition::Class(d) = class_def else {
+                        debug_assert!(false, "class type must have a definition");
+                        return Ok(Type::unknown());
+                    };
+                    Ok(Type::TypeVar(TypeVarInstance::new(
+                        db,
+                        class.name(db),
+                        d,
+                        Some(TypeVarBoundOrConstraints::UpperBound(Type::instance(
+                            db, class,
+                        ))),
+                        None,
+                        TypeVarKind::Legacy,
+                    )))
+                }
                 KnownInstanceType::TypeAlias => Ok(todo_type!("Support for `typing.TypeAlias`")),
                 KnownInstanceType::TypedDict => Ok(todo_type!("Support for `typing.TypedDict`")),
 
@@ -4830,7 +4859,7 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db) {
+                    match element.in_type_expression(db, context) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
@@ -5549,6 +5578,12 @@ impl<'db> InvalidTypeExpressionError<'db> {
         }
         fallback_type
     }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct TypeExpressionContext<'db> {
+    scope_id: ScopeId<'db>,
+    index: &'db SemanticIndex<'db>,
 }
 
 /// Enumeration of various types that are invalid in type-expression contexts
