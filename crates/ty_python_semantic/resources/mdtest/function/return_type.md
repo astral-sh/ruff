@@ -340,3 +340,28 @@ def f() -> int:
 def f(cond: bool) -> str:
     return "hello" if cond else NotImplemented
 ```
+
+## Generator functions
+
+A function with a `yield` statement anywhere in its body is a [generator function](https://docs.python.org/3/glossary.html#term-generator).
+These functions implicitly return an instance of `types.GeneratorType` even if they do not contain any `return` statements.
+
+```py
+import types
+import typing
+
+def f() -> types.GeneratorType:
+    yield 42
+
+def g() -> typing.Generator:
+    yield 42
+
+def h() -> typing.Iterator:
+    yield 42
+
+def i() -> typing.Iterable:
+    yield 42
+
+def j() -> str:  # error: [invalid-return-type] "Function implicitly returns `types.GeneratorType`, which is not assignable to return type `str`"
+    yield 42
+```
