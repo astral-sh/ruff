@@ -190,7 +190,6 @@ impl<'db> ProtocolInstanceType<'db> {
 
     /// Return `true` if this protocol type is fully static.
     pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
-        dbg!(self);
         self.0.interface(db).is_fully_static(db)
     }
 
