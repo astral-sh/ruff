@@ -239,11 +239,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
+        uses: taiki-e/install-action@86c23eed46c17b80677df6d8151545ce3e236c61 # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
+        uses: taiki-e/install-action@86c23eed46c17b80677df6d8151545ce3e236c61 # v2
         with:
           tool: cargo-insta
       - name: ty mdtests (GitHub annotations)
@@ -297,11 +297,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
+        uses: taiki-e/install-action@86c23eed46c17b80677df6d8151545ce3e236c61 # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
+        uses: taiki-e/install-action@86c23eed46c17b80677df6d8151545ce3e236c61 # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -324,7 +324,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
+        uses: taiki-e/install-action@86c23eed46c17b80677df6d8151545ce3e236c61 # v2
         with:
           tool: cargo-nextest
       - name: "Run tests"
@@ -407,11 +407,11 @@ jobs:
       - name: "Install mold"
         uses: rui314/setup-mold@e16410e7f8d9e167b74ad5697a9089a35126eb50 # v1
       - name: "Install cargo nextest"
-        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
+        uses: taiki-e/install-action@86c23eed46c17b80677df6d8151545ce3e236c61 # v2
         with:
           tool: cargo-nextest
       - name: "Install cargo insta"
-        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
+        uses: taiki-e/install-action@86c23eed46c17b80677df6d8151545ce3e236c61 # v2
         with:
           tool: cargo-insta
       - name: "Run tests"
@@ -908,7 +908,7 @@ jobs:
         run: rustup show
 
       - name: "Install codspeed"
-        uses: taiki-e/install-action@ab3728c7ba6948b9b429627f4d55a68842b27f18 # v2
+        uses: taiki-e/install-action@86c23eed46c17b80677df6d8151545ce3e236c61 # v2
         with:
           tool: cargo-codspeed
 
