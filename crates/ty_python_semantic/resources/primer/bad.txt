@@ -22,7 +22,6 @@ pytest  # cycle panics (signature_)
 pywin32  # bad use-def map (binding with definitely-visible unbound)
 schemathesis  # cycle panics (signature_)
 scikit-learn  # success, but mypy-primer hangs processing the output
-scipy  # missing expression type ("expression should belong to this TypeInference region")
 spack  # success, but mypy-primer hangs processing the output
 spark  # cycle panics (try_metaclass_)
 steam.py  # cycle panics (try_metaclass_), often hangs when multi-threaded
