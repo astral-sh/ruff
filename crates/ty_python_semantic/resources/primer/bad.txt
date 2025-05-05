@@ -1,5 +1,4 @@
-Expression  # cycle panic (signature_)
-Tanjun  # cycle panic (signature_)
+Tanjun  # hangs
 altair  # cycle panics (try_metaclass_)
 antidote  # hangs / slow
 artigraph  # cycle panics (value_type_)
@@ -11,20 +10,16 @@ freqtrade  # cycle panics (try_metaclass_)
 hydpy  # cycle panics (try_metaclass_)
 ibis  # cycle panics (try_metaclass_)
 manticore  # stack overflow
-mypy  # cycle panic (signature_)
 pandas  # slow
 pandas-stubs  # cycle panics (try_metaclass_)
 pandera  # cycle panics (try_metaclass_)
 prefect # slow
 pylint  # cycle panics (self-recursive type alias)
-pytest  # cycle panics (signature_)
 pywin32  # bad use-def map (binding with definitely-visible unbound)
-schemathesis  # cycle panics (signature_)
+schemathesis  # salsa cycle.rs:164 assertion fails, only in CI
 scikit-learn  # success, but mypy-primer hangs processing the output
 spack  # success, but mypy-primer hangs processing the output
 spark  # cycle panics (try_metaclass_)
 steam.py  # cycle panics (try_metaclass_), often hangs when multi-threaded
-streamlit  # cycle panic (signature_)
 sympy  # stack overflow
-trio  # cycle panics (deferred annotatation resolving in wrong scope)
 xarray  # cycle panics (try_metaclass_)
