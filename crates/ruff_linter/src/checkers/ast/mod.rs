@@ -590,6 +590,11 @@ impl TypingImporter<'_, '_> {
 
 impl SemanticSyntaxContext for Checker<'_> {
     fn python_version(&self) -> PythonVersion {
+        // Default to `PythonVersion::latest` here instead of `PythonVersion::default` (or the
+        // `Checker::target_version` method, which uses `default` internally) to minimize
+        // version-related semantic syntax errors when `target_version` is unset. This is in line
+        // with the use of `PythonVersion::latest` for calls into the parser, which will suppress
+        // version-related parse errors.
         self.target_version.unwrap_or_else(PythonVersion::latest)
     }
 
