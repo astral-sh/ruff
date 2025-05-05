@@ -202,9 +202,9 @@ class AnyFoo: ...
 Here, the symbol is re-exported using the `__all__` variable.
 
 ```py
-# TODO: This should *not* be an error but we don't understand `__all__` yet.
-# error: "Module `a` has no member `Foo`"
 from a import Foo
+
+reveal_type(Foo)  # revealed: Literal[Foo]
 ```
 
 `a.pyi`:
