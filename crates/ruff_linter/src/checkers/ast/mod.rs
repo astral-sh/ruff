@@ -72,7 +72,7 @@ use crate::rules::pyflakes::rules::{
 };
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
-use crate::settings::{flags, LinterSettings};
+use crate::settings::{flags, LinterSettings, TargetVersion};
 use crate::{docstrings, noqa, Locator};
 
 mod analyze;
@@ -232,7 +232,7 @@ pub(crate) struct Checker<'a> {
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
     /// The target [`PythonVersion`] for version-dependent checks.
-    target_version: Option<PythonVersion>,
+    target_version: TargetVersion,
     /// Helper visitor for detecting semantic syntax errors.
     #[allow(clippy::struct_field_names)]
     semantic_checker: SemanticSyntaxChecker,
@@ -257,7 +257,7 @@ impl<'a> Checker<'a> {
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
-        target_version: Option<PythonVersion>,
+        target_version: TargetVersion,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -532,7 +532,7 @@ impl<'a> Checker<'a> {
     /// parser or the [`SemanticSyntaxChecker`], which should instead default to the _latest_
     /// supported Python version.
     pub(crate) fn target_version(&self) -> PythonVersion {
-        self.target_version.unwrap_or_default()
+        self.target_version.linter_version()
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
@@ -590,12 +590,10 @@ impl TypingImporter<'_, '_> {
 
 impl SemanticSyntaxContext for Checker<'_> {
     fn python_version(&self) -> PythonVersion {
-        // Default to `PythonVersion::latest` here instead of `PythonVersion::default` (or the
-        // `Checker::target_version` method, which uses `default` internally) to minimize
-        // version-related semantic syntax errors when `target_version` is unset. This is in line
-        // with the use of `PythonVersion::latest` for calls into the parser, which will suppress
-        // version-related parse errors.
-        self.target_version.unwrap_or_else(PythonVersion::latest)
+        // Reuse `parser_version` here, which should default to `PythonVersion::latest` instead of
+        // `PythonVersion::default` to minimize version-related semantic syntax errors when
+        // `target_version` is unset.
+        self.target_version.parser_version()
     }
 
     fn global(&self, name: &str) -> Option<TextRange> {
@@ -2935,7 +2933,7 @@ pub(crate) fn check_ast(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
-    target_version: Option<PythonVersion>,
+    target_version: TargetVersion,
 ) -> (Vec<Diagnostic>, Vec<SemanticSyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)

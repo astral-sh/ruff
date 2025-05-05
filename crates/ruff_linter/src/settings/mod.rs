@@ -467,15 +467,46 @@ impl LinterSettings {
     /// This method respects the per-file version overrides in
     /// [`LinterSettings::per_file_target_version`] and falls back on
     /// [`LinterSettings::unresolved_target_version`] if none of the override patterns match.
-    pub fn resolve_target_version(&self, path: &Path) -> Option<PythonVersion> {
-        self.per_file_target_version
-            .is_match(path)
-            .or(self.unresolved_target_version)
+    pub fn resolve_target_version(&self, path: &Path) -> TargetVersion {
+        TargetVersion(
+            self.per_file_target_version
+                .is_match(path)
+                .or(self.unresolved_target_version),
+        )
     }
 }
 
 impl Default for LinterSettings {
     fn default() -> Self {
         Self::new(fs::get_cwd())
+    }
+}
+
+/// A thin wrapper around `Option<PythonVersion>` to clarify the reason for different `unwrap`
+/// calls in various places.
+///
+/// For example, we want to default to `PythonVersion::latest()` for parsing and detecting semantic
+/// syntax errors because this will minimize version-related diagnostics when the Python version is
+/// unset. In contrast, we want to default to `PythonVersion::default()` for lint rules. These
+/// correspond to the [`TargetVersion::parser_version`] and [`TargetVersion::linter_version`]
+/// methods, respectively.
+#[derive(Clone, Copy)]
+pub struct TargetVersion(pub Option<PythonVersion>);
+
+impl TargetVersion {
+    /// Return the [`PythonVersion`] to use for parsing.
+    ///
+    /// This will be either the Python version specified by the user or the latest supported
+    /// version if unset.
+    pub fn parser_version(&self) -> PythonVersion {
+        self.0.unwrap_or_else(PythonVersion::latest)
+    }
+
+    /// Return the [`PythonVersion`] to use for version-dependent lint rules.
+    ///
+    /// This will either be the Python version specified by the user or the default Python version
+    /// if unset.
+    pub fn linter_version(&self) -> PythonVersion {
+        self.0.unwrap_or_default()
     }
 }

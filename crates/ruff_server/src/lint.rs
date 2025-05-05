@@ -1,6 +1,5 @@
 //! Access to the Ruff linting API for the LSP
 
-use ruff_python_ast::PythonVersion;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -19,7 +18,7 @@ use ruff_linter::{
     package::PackageRoot,
     packaging::detect_package_root,
     registry::AsRule,
-    settings::flags,
+    settings::{flags, TargetVersion},
     source_kind::SourceKind,
     Locator,
 };
@@ -99,11 +98,11 @@ pub(crate) fn check(
     let target_version = if let Some(path) = &document_path {
         settings.linter.resolve_target_version(path)
     } else {
-        settings.linter.unresolved_target_version
+        TargetVersion(settings.linter.unresolved_target_version)
     };
 
-    let parse_options = ParseOptions::from(source_type)
-        .with_target_version(target_version.unwrap_or_else(PythonVersion::latest));
+    let parse_options =
+        ParseOptions::from(source_type).with_target_version(target_version.parser_version());
 
     // Parse once.
     let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), parse_options)

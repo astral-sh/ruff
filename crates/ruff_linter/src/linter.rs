@@ -35,7 +35,7 @@ use crate::registry::{AsRule, Rule, RuleSet};
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TestRule, TEST_RULES};
 use crate::settings::types::UnsafeFixes;
-use crate::settings::{flags, LinterSettings};
+use crate::settings::{flags, LinterSettings, TargetVersion};
 use crate::source_kind::SourceKind;
 use crate::{directives, fs, warn_user_once, Locator};
 
@@ -111,7 +111,7 @@ pub fn check_path(
     source_kind: &SourceKind,
     source_type: PySourceType,
     parsed: &Parsed<ModModule>,
-    target_version: Option<PythonVersion>,
+    target_version: TargetVersion,
 ) -> Vec<Message> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -160,7 +160,7 @@ pub fn check_path(
             locator,
             comment_ranges,
             settings,
-            target_version.unwrap_or_default(),
+            target_version.linter_version(),
         ));
     }
 
@@ -215,7 +215,7 @@ pub fn check_path(
                     package,
                     source_type,
                     cell_offsets,
-                    target_version.unwrap_or_default(),
+                    target_version.linter_version(),
                 );
 
                 diagnostics.extend(import_diagnostics);
@@ -390,7 +390,7 @@ pub fn add_noqa_to_path(
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
-    let parsed = parse_unchecked_source(source_kind, source_type, target_version);
+    let parsed = parse_unchecked_source(source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -451,11 +451,13 @@ pub fn lint_only(
 ) -> LinterResult {
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version, Some(PythonVersion::PY314)) && !is_py314_support_enabled(settings) {
+    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
+        && !is_py314_support_enabled(settings)
+    {
         warn_user_once!("Support for Python 3.14 is under development and may be unstable. Enable `preview` to remove this warning.");
     }
 
-    let parsed = source.into_parsed(source_kind, source_type, target_version);
+    let parsed = source.into_parsed(source_kind, source_type, target_version.parser_version());
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(source_kind.source_code());
@@ -564,14 +566,17 @@ pub fn lint_fix<'a>(
 
     let target_version = settings.resolve_target_version(path);
 
-    if matches!(target_version, Some(PythonVersion::PY314)) && !is_py314_support_enabled(settings) {
+    if matches!(target_version, TargetVersion(Some(PythonVersion::PY314)))
+        && !is_py314_support_enabled(settings)
+    {
         warn_user_once!("Support for Python 3.14 is under development and may be unstable. Enable `preview` to remove this warning.");
     }
 
     // Continuously fix until the source code stabilizes.
     loop {
         // Parse once.
-        let parsed = parse_unchecked_source(&transformed, source_type, target_version);
+        let parsed =
+            parse_unchecked_source(&transformed, source_type, target_version.parser_version());
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(transformed.source_code());
@@ -757,7 +762,7 @@ impl ParseSource {
         self,
         source_kind: &SourceKind,
         source_type: PySourceType,
-        target_version: Option<PythonVersion>,
+        target_version: PythonVersion,
     ) -> Parsed<ModModule> {
         match self {
             ParseSource::None => parse_unchecked_source(source_kind, source_type, target_version),
@@ -771,10 +776,9 @@ impl ParseSource {
 fn parse_unchecked_source(
     source_kind: &SourceKind,
     source_type: PySourceType,
-    target_version: Option<PythonVersion>,
+    target_version: PythonVersion,
 ) -> Parsed<ModModule> {
-    let options = ParseOptions::from(source_type)
-        .with_target_version(target_version.unwrap_or_else(PythonVersion::latest));
+    let options = ParseOptions::from(source_type).with_target_version(target_version);
     // SAFETY: Safe because `PySourceType` always parses to a `ModModule`. See
     // `ruff_python_parser::parse_unchecked_source`. We use `parse_unchecked` (and thus
     // have to unwrap) in order to pass the `PythonVersion` via `ParseOptions`.
@@ -974,11 +978,9 @@ mod tests {
         settings: &LinterSettings,
     ) -> Vec<Message> {
         let source_type = PySourceType::from(path);
-        let options = ParseOptions::from(source_type).with_target_version(
-            settings
-                .unresolved_target_version
-                .unwrap_or_else(PythonVersion::latest),
-        );
+        let target_version = settings.resolve_target_version(path);
+        let options =
+            ParseOptions::from(source_type).with_target_version(target_version.parser_version());
         let parsed = ruff_python_parser::parse_unchecked(source_kind.source_code(), options)
             .try_into_module()
             .expect("PySourceType always parses into a module");
@@ -1003,7 +1005,7 @@ mod tests {
             source_kind,
             source_type,
             &parsed,
-            settings.unresolved_target_version,
+            target_version,
         );
         messages.sort_by_key(Ranged::start);
         messages
