@@ -98,7 +98,7 @@ pub struct FixerResult<'a> {
 }
 
 /// Generate [`Message`]s from the source code contents at the given `Path`.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub fn check_path(
     path: &Path,
     package: Option<PackageRoot<'_>>,
@@ -538,7 +538,6 @@ fn diagnostics_to_messages(
 
 /// Generate `Diagnostic`s from source code content, iteratively fixing
 /// until stable.
-#[allow(clippy::too_many_arguments)]
 pub fn lint_fix<'a>(
     path: &Path,
     package: Option<PackageRoot<'_>>,
@@ -672,7 +671,7 @@ fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
         .join(", ")
 }
 
-#[allow(clippy::print_stderr)]
+#[expect(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, messages: &[Message]) {
     let codes = collect_rule_codes(messages.iter().filter_map(Message::rule));
     if cfg!(debug_assertions) {
@@ -705,7 +704,7 @@ This indicates a bug in Ruff. If you could open an issue at:
     }
 }
 
-#[allow(clippy::print_stderr)]
+#[expect(clippy::print_stderr)]
 fn report_fix_syntax_error(
     path: &Path,
     transformed: &str,
@@ -1064,6 +1063,53 @@ mod tests {
         PythonVersion::PY310,
         "MultipleCaseAssignment"
     )]
+    #[test_case(
+        "duplicate_match_key",
+        "
+        match x:
+            case {'key': 1, 'key': 2}:
+                pass
+        ",
+        PythonVersion::PY310,
+        "DuplicateMatchKey"
+    )]
+    #[test_case(
+        "duplicate_match_class_attribute",
+        "
+        match x:
+            case Point(x=1, x=2):
+                pass
+        ",
+        PythonVersion::PY310,
+        "DuplicateMatchClassAttribute"
+    )]
+    #[test_case(
+        "invalid_star_expression",
+        "
+        def func():
+            return *x
+        ",
+        PythonVersion::PY310,
+        "InvalidStarExpression"
+    )]
+    #[test_case(
+        "invalid_star_expression_for",
+        "
+        for *x in range(10):
+            pass
+        ",
+        PythonVersion::PY310,
+        "InvalidStarExpression"
+    )]
+    #[test_case(
+        "invalid_star_expression_yield",
+        "
+        def func():
+            yield *x
+        ",
+        PythonVersion::PY310,
+        "InvalidStarExpression"
+    )]
     fn test_semantic_errors(
         name: &str,
         contents: &str,
@@ -1111,6 +1157,8 @@ mod tests {
         Rule::LoadBeforeGlobalDeclaration,
         Path::new("load_before_global_declaration.py")
     )]
+    #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async_function.py"))]
+    #[test_case(Rule::AwaitOutsideAsync, Path::new("async_comprehension.py"))]
     fn test_syntax_errors(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);

@@ -93,7 +93,7 @@ pub struct Args {
     pub(crate) global_options: GlobalConfigArgs,
 }
 
-#[allow(clippy::large_enum_variant)]
+#[expect(clippy::large_enum_variant)]
 #[derive(Debug, clap::Subcommand)]
 pub enum Command {
     /// Run Ruff on the given files or directories.
@@ -184,7 +184,7 @@ pub struct AnalyzeGraphCommand {
 
 // The `Parser` derive is for ruff_dev, for ruff `Args` would be sufficient
 #[derive(Clone, Debug, clap::Parser)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct CheckCommand {
     /// List of files or directories to check.
     #[clap(help = "List of files or directories to check [default: .]")]
@@ -446,7 +446,7 @@ pub struct CheckCommand {
 }
 
 #[derive(Clone, Debug, clap::Parser)]
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct FormatCommand {
     /// List of files or directories to format.
     #[clap(help = "List of files or directories to format [default: .]")]
@@ -560,7 +560,7 @@ pub enum HelpFormat {
     Json,
 }
 
-#[allow(clippy::module_name_repetitions)]
+#[expect(clippy::module_name_repetitions)]
 #[derive(Debug, Default, Clone, clap::Args)]
 pub struct LogLevelArgs {
     /// Enable verbose logging.
@@ -1031,7 +1031,7 @@ Possible choices:
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct CheckArguments {
     pub add_noqa: bool,
     pub diff: bool,
@@ -1050,7 +1050,7 @@ pub struct CheckArguments {
 
 /// CLI settings that are distinct from configuration (commands, lists of files,
 /// etc.).
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub struct FormatArguments {
     pub check: bool,
     pub no_cache: bool,
@@ -1271,7 +1271,6 @@ pub struct AnalyzeGraphArgs {
 /// Configuration overrides provided via dedicated CLI flags:
 /// `--line-length`, `--respect-gitignore`, etc.
 #[derive(Clone, Default)]
-#[allow(clippy::struct_excessive_bools)]
 struct ExplicitConfigOverrides {
     dummy_variable_rgx: Option<Regex>,
     exclude: Option<Vec<FilePattern>>,

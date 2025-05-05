@@ -63,7 +63,6 @@ fn find_pyproject_config(
 }
 
 /// Find files that ruff would check so we can format them. Adapted from `ruff`.
-#[allow(clippy::type_complexity)]
 fn ruff_check_paths<'a>(
     pyproject_config: &'a PyprojectConfig,
     cli: &FormatArguments,
@@ -135,12 +134,12 @@ impl Statistics {
     }
 
     /// We currently prefer the similarity index, but i'd like to keep this around
-    #[allow(clippy::cast_precision_loss, unused)]
+    #[expect(clippy::cast_precision_loss, unused)]
     pub(crate) fn jaccard_index(&self) -> f32 {
         self.intersection as f32 / (self.black_input + self.ruff_output + self.intersection) as f32
     }
 
-    #[allow(clippy::cast_precision_loss)]
+    #[expect(clippy::cast_precision_loss)]
     pub(crate) fn similarity_index(&self) -> f32 {
         self.intersection as f32 / (self.black_input + self.intersection) as f32
     }
@@ -177,7 +176,7 @@ pub(crate) enum Format {
     Full,
 }
 
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 #[derive(clap::Args)]
 pub(crate) struct Args {
     /// Like `ruff check`'s files. See `--multi-project` if you want to format an ecosystem
@@ -222,7 +221,7 @@ pub(crate) struct Args {
     #[arg(long)]
     pub(crate) files_with_errors: Option<u32>,
     #[clap(flatten)]
-    #[allow(clippy::struct_field_names)]
+    #[expect(clippy::struct_field_names)]
     pub(crate) log_level_args: LogLevelArgs,
 }
 

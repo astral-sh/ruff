@@ -523,7 +523,6 @@ impl<'ast> IntoFormat<PyFormatContext<'ast>> for Expr {
 /// * The expression contains at least one parenthesized sub expression (optimization to avoid unnecessary work)
 ///
 /// This mimics Black's [`_maybe_split_omitting_optional_parens`](https://github.com/psf/black/blob/d1248ca9beaf0ba526d265f4108836d89cf551b7/src/black/linegen.py#L746-L820)
-#[allow(clippy::if_same_then_else)]
 pub(crate) fn can_omit_optional_parentheses(expr: &Expr, context: &PyFormatContext) -> bool {
     let mut visitor = CanOmitOptionalParenthesesVisitor::new(context);
     visitor.visit_subexpression(expr);
@@ -679,7 +678,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
             // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
             // because each comparison requires a left operand, and `n` `operands` and right sides.
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             Expr::BoolOp(ast::ExprBoolOp {
                 range: _,
                 op: _,
@@ -702,7 +701,7 @@ impl<'input> CanOmitOptionalParenthesesVisitor<'input> {
 
             // It's impossible for a file smaller or equal to 4GB to contain more than 2^32 comparisons
             // because each comparison requires a left operand, and `n` `operands` and right sides.
-            #[allow(clippy::cast_possible_truncation)]
+            #[expect(clippy::cast_possible_truncation)]
             Expr::Compare(ast::ExprCompare {
                 range: _,
                 left: _,

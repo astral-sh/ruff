@@ -5,7 +5,7 @@ use lsp_types as types;
 use lsp_types::InitializeParams;
 use std::num::NonZeroUsize;
 // The new PanicInfoHook name requires MSRV >= 1.82
-#[allow(deprecated)]
+#[expect(deprecated)]
 use std::panic::PanicInfo;
 use std::str::FromStr;
 use types::ClientCapabilities;
@@ -116,7 +116,7 @@ impl Server {
 
     pub fn run(self) -> crate::Result<()> {
         // The new PanicInfoHook name requires MSRV >= 1.82
-        #[allow(deprecated)]
+        #[expect(deprecated)]
         type PanicHook = Box<dyn Fn(&PanicInfo<'_>) + 'static + Sync + Send>;
         struct RestorePanicHook {
             hook: Option<PanicHook>,
@@ -170,7 +170,6 @@ impl Server {
         .join()
     }
 
-    #[allow(clippy::needless_pass_by_value)] // this is because we aren't using `next_request_id` yet.
     fn event_loop(
         connection: &Connection,
         client_capabilities: &ClientCapabilities,

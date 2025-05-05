@@ -14,11 +14,11 @@
 # flake8-pyi
 /crates/ruff_linter/src/rules/flake8_pyi/ @AlexWaygood
 
-# Script for fuzzing the parser/red-knot etc.
+# Script for fuzzing the parser/ty etc.
 /python/py-fuzzer/ @AlexWaygood
 
-# red-knot
-/crates/red_knot* @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+# ty
+/crates/ty* @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
 /crates/ruff_db/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
-/scripts/knot_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
-/crates/red_knot_python_semantic @carljm @AlexWaygood @sharkdp @dcreager
+/scripts/ty_benchmark/ @carljm @MichaReiser @AlexWaygood @sharkdp @dcreager
+/crates/ty_python_semantic @carljm @AlexWaygood @sharkdp @dcreager

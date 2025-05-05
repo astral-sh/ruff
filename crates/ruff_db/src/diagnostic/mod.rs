@@ -134,20 +134,20 @@ impl Diagnostic {
     /// NOTE: At present, this routine will return the first primary
     /// annotation's message as the primary message when the main diagnostic
     /// message is empty. This is meant to facilitate an incremental migration
-    /// in Red Knot over to the new diagnostic data model. (The old data model
+    /// in ty over to the new diagnostic data model. (The old data model
     /// didn't distinguish between messages on the entire diagnostic and
     /// messages attached to a particular span.)
     pub fn primary_message(&self) -> &str {
         if !self.inner.message.as_str().is_empty() {
             return self.inner.message.as_str();
         }
-        // FIXME: As a special case, while we're migrating Red Knot
+        // FIXME: As a special case, while we're migrating ty
         // to the new diagnostic data model, we'll look for a primary
         // message from the primary annotation. This is because most
-        // Red Knot diagnostics are created with an empty diagnostic
+        // ty diagnostics are created with an empty diagnostic
         // message and instead attach the message to the annotation.
         // Fixing this will require touching basically every diagnostic
-        // in Red Knot, so we do it this way for now to match the old
+        // in ty, so we do it this way for now to match the old
         // semantics. ---AG
         self.primary_annotation()
             .and_then(|ann| ann.get_message())
@@ -165,7 +165,7 @@ impl Diagnostic {
     ///
     /// The reason why we don't just always return both the main diagnostic
     /// message and the primary annotation message is because this was written
-    /// in the midst of an incremental migration of Red Knot over to the new
+    /// in the midst of an incremental migration of ty over to the new
     /// diagnostic data model. At time of writing, diagnostics were still
     /// constructed in the old model where the main diagnostic message and the
     /// primary annotation message were not distinguished from each other. So
@@ -226,6 +226,11 @@ impl Diagnostic {
     /// added to this diagnostic is returned.
     pub fn primary_span(&self) -> Option<Span> {
         self.primary_annotation().map(|ann| ann.span.clone())
+    }
+
+    /// Returns the tags from the primary annotation of this diagnostic if it exists.
+    pub fn primary_tags(&self) -> Option<&[DiagnosticTag]> {
+        self.primary_annotation().map(|ann| ann.tags.as_slice())
     }
 }
 
@@ -338,6 +343,8 @@ pub struct Annotation {
     /// Whether this annotation is "primary" or not. When it isn't primary, an
     /// annotation is said to be "secondary."
     is_primary: bool,
+    /// The diagnostic tags associated with this annotation.
+    tags: Vec<DiagnosticTag>,
 }
 
 impl Annotation {
@@ -355,6 +362,7 @@ impl Annotation {
             span,
             message: None,
             is_primary: true,
+            tags: Vec::new(),
         }
     }
 
@@ -370,6 +378,7 @@ impl Annotation {
             span,
             message: None,
             is_primary: false,
+            tags: Vec::new(),
         }
     }
 
@@ -412,6 +421,36 @@ impl Annotation {
     pub fn get_span(&self) -> &Span {
         &self.span
     }
+
+    /// Returns the tags associated with this annotation.
+    pub fn get_tags(&self) -> &[DiagnosticTag] {
+        &self.tags
+    }
+
+    /// Attaches this tag to this annotation.
+    ///
+    /// It will not replace any existing tags.
+    pub fn tag(mut self, tag: DiagnosticTag) -> Annotation {
+        self.tags.push(tag);
+        self
+    }
+
+    /// Attaches an additional tag to this annotation.
+    pub fn push_tag(&mut self, tag: DiagnosticTag) {
+        self.tags.push(tag);
+    }
+}
+
+/// Tags that can be associated with an annotation.
+///
+/// These tags are used to provide additional information about the annotation.
+/// and are passed through to the language server protocol.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum DiagnosticTag {
+    /// Unused or unnecessary code. Used for unused parameters, unreachable code, etc.
+    Unnecessary,
+    /// Deprecated or obsolete code.
+    Deprecated,
 }
 
 /// A string identifier for a lint rule.

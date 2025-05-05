@@ -39,13 +39,13 @@ jobs:
       - name: Sync typeshed
         id: sync
         run: |
-          rm -rf ruff/crates/red_knot_vendored/vendor/typeshed
-          mkdir ruff/crates/red_knot_vendored/vendor/typeshed
-          cp typeshed/README.md ruff/crates/red_knot_vendored/vendor/typeshed
-          cp typeshed/LICENSE ruff/crates/red_knot_vendored/vendor/typeshed
-          cp -r typeshed/stdlib ruff/crates/red_knot_vendored/vendor/typeshed/stdlib
-          rm -rf ruff/crates/red_knot_vendored/vendor/typeshed/stdlib/@tests
-          git -C typeshed rev-parse HEAD > ruff/crates/red_knot_vendored/vendor/typeshed/source_commit.txt
+          rm -rf ruff/crates/ty_vendored/vendor/typeshed
+          mkdir ruff/crates/ty_vendored/vendor/typeshed
+          cp typeshed/README.md ruff/crates/ty_vendored/vendor/typeshed
+          cp typeshed/LICENSE ruff/crates/ty_vendored/vendor/typeshed
+          cp -r typeshed/stdlib ruff/crates/ty_vendored/vendor/typeshed/stdlib
+          rm -rf ruff/crates/ty_vendored/vendor/typeshed/stdlib/@tests
+          git -C typeshed rev-parse HEAD > ruff/crates/ty_vendored/vendor/typeshed/source_commit.txt
       - name: Commit the changes
         id: commit
         if: ${{ steps.sync.outcome == 'success' }}
@@ -79,5 +79,5 @@ jobs:
               repo: "ruff",
               title: `Automated typeshed sync failed on ${new Date().toDateString()}`,
               body: "Run listed here: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
-              labels: ["bug", "red-knot"],
+              labels: ["bug", "ty"],
             })

@@ -66,7 +66,7 @@ impl Violation for IOError {
 #[deprecated(note = "E999 has been removed")]
 pub(crate) struct SyntaxError;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Violation for SyntaxError {
     fn message(&self) -> String {
         unreachable!("E999 has been removed")

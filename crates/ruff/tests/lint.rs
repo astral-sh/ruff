@@ -1900,6 +1900,40 @@ def first_square():
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ruff/issues/2253>
+#[test]
+fn add_noqa_parent() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let test_path = tempdir.path().join("noqa.py");
+    fs::write(
+        &test_path,
+        r#"
+from foo import (  # noqa: F401
+		bar
+)
+		"#,
+    )?;
+
+    insta::with_settings!({
+        filters => vec![(tempdir_filter(&tempdir).as_str(), "[TMP]/")]
+    }, {
+        assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
+                .args(STDIN_BASE_OPTIONS)
+                .arg("--add-noqa")
+                .arg("--select=F401")
+                .arg("noqa.py")
+                .current_dir(&tempdir), @r"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+
+        ----- stderr -----
+        ");
+    });
+
+    Ok(())
+}
+
 /// Infer `3.11` from `requires-python` in `pyproject.toml`.
 #[test]
 fn requires_python() -> Result<()> {
@@ -5619,4 +5653,35 @@ fn semantic_syntax_errors() -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Regression test for <https://github.com/astral-sh/ruff/issues/17821>.
+///
+/// `lint.typing-extensions = false` with Python 3.9 should disable the PYI019 lint because it would
+/// try to import `Self` from `typing_extensions`
+#[test]
+fn combine_typing_extensions_config() {
+    let contents = "
+from typing import TypeVar
+T = TypeVar('T')
+class Foo:
+    def f(self: T) -> T: ...
+";
+    assert_cmd_snapshot!(
+        Command::new(get_cargo_bin(BIN_NAME))
+            .args(STDIN_BASE_OPTIONS)
+            .args(["--config", "lint.typing-extensions = false"])
+            .arg("--select=PYI019")
+            .arg("--target-version=py39")
+            .arg("-")
+            .pass_stdin(contents),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
 }

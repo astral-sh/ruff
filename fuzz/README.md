@@ -74,9 +74,9 @@ Each fuzzer harness in [`fuzz_targets`](fuzz_targets) targets a different aspect
 them in different ways. While there is implementation-specific documentation in the source code
 itself, each harness is briefly described below.
 
-### `red_knot_check_invalid_syntax`
+### `ty_check_invalid_syntax`
 
-This fuzz harness checks that the type checker (Red Knot) does not panic when checking a source
+This fuzz harness checks that the type checker (ty) does not panic when checking a source
 file with invalid syntax. This rejects any corpus entries that is already valid Python code.
 Currently, this is limited to syntax errors that's produced by Ruff's Python parser which means
 that it does not cover all possible syntax errors (<https://github.com/astral-sh/ruff/issues/11934>).

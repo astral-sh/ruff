@@ -487,7 +487,7 @@ enum SuppressionComments<'a> {
 
     /// Comments that all fall into the formatted range.
     Formatted {
-        #[allow(unused)]
+        #[expect(unused)]
         comments: &'a [SourceComment],
     },
 }

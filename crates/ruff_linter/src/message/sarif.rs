@@ -137,7 +137,7 @@ impl SarifResult {
     }
 
     #[cfg(target_arch = "wasm32")]
-    #[allow(clippy::unnecessary_wraps)]
+    #[expect(clippy::unnecessary_wraps)]
     fn from_message(message: &Message) -> Result<Self> {
         let start_location = message.compute_start_location();
         let end_location = message.compute_end_location();
