@@ -31,7 +31,7 @@ The `TY_MAX_PARALLELISM` environment variable, meanwhile, can be used to control
 By default, ty will attempt to parallelize its work so that multiple files are checked simultaneously,
 but this can result in a confused logging output where messages from different threads are intertwined and non
 determinism.
-To switch off parallelism entirely and have more readable logs, use `TY_MAX_PARALLELSIM=1` (or `RAYON_NUM_THREADS=1`).
+To switch off parallelism entirely and have more readable logs, use `TY_MAX_PARALLELISM=1` (or `RAYON_NUM_THREADS=1`).
 
 ### Examples
 
