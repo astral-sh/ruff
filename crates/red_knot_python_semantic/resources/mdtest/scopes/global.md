@@ -177,3 +177,24 @@ def f():
 x = None
 global x  # error: [invalid-syntax] "name `x` is used prior to global declaration"
 ```
+
+## Tricky cases
+
+```py
+x = 42
+
+def f():
+    global x
+    reveal_type(x)  # revealed: Unknown | Literal[42]
+    x = "56"
+    reveal_type(x)  # revealed: Literal["56"]
+```
+
+```py
+x = 42
+
+def f():
+    print(x)  # error: [unresolved-reference] "Name `x` used when not defined"
+    x = "56"
+    print(x)
+```
