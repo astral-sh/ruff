@@ -4002,7 +4002,12 @@ impl<'db> TypeInferenceBuilder<'db> {
         let standalone_expression = self.index.expression(expression);
         let types = infer_expression_types(self.db(), standalone_expression);
         self.extend(types);
-        self.expression_type(expression)
+
+        // Instead of calling `self.expression_type(expr)` after extending here, we get
+        // the result from `types` directly because we might be in cycle recovery where
+        // `types.cycle_fallback_type` is `Some(fallback_ty)`, which we can retrieve by
+        // using `expression_type` on `types`:
+        types.expression_type(expression.scoped_expression_id(self.db(), self.scope()))
     }
 
     fn infer_expression_impl(&mut self, expression: &ast::Expr) -> Type<'db> {
