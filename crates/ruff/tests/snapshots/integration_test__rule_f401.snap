@@ -5,7 +5,6 @@ info:
   args:
     - rule
     - F401
-snapshot_kind: text
 ---
 success: true
 exit_code: 0
@@ -83,6 +82,11 @@ if find_spec("numpy") is not None:
 else:
     print("numpy is not installed")
 ```
+
+## Preview
+When [preview](https://docs.astral.sh/ruff/preview/) is enabled,
+the criterion for determining whether an import is first-party
+is stricter, which could affect the suggested fix. See [this FAQ section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) for more details.
 
 ## Options
 - `lint.ignore-init-module-imports`
