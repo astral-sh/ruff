@@ -9,7 +9,7 @@ discord.py  # some kind of hang, only when multi-threaded?
 freqtrade  # cycle panics (try_metaclass_)
 hydpy  # cycle panics (try_metaclass_)
 ibis  # cycle panics (try_metaclass_)
-manticore  # stack overflow
+manticore  # stack overflow, see https://github.com/astral-sh/ruff/issues/17863
 pandas  # slow
 pandas-stubs  # cycle panics (try_metaclass_)
 pandera  # cycle panics (try_metaclass_)
@@ -21,5 +21,4 @@ scikit-learn  # success, but mypy-primer hangs processing the output
 spack  # success, but mypy-primer hangs processing the output
 spark  # cycle panics (try_metaclass_)
 steam.py  # cycle panics (try_metaclass_), often hangs when multi-threaded
-sympy  # stack overflow
 xarray  # cycle panics (try_metaclass_)
