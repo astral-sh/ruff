@@ -157,6 +157,7 @@ WithDefaultU = TypeVar("WithDefaultU", default=int)
 
 class WithDefault(Generic[T, WithDefaultU]): ...
 
+reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 ```
 

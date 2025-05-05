@@ -138,6 +138,7 @@ If the type variable has a default, it can be omitted:
 ```py
 class WithDefault[T, U = int]: ...
 
+reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 ```
 
