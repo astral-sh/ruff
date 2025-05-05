@@ -305,6 +305,35 @@ c: C[int] = C[int]()
 reveal_type(c.method("string"))  # revealed: Literal["string"]
 ```
 
+## Specializations propagate
+
+In a specialized generic alias, the specialization is applied to the attributes and methods of the
+class.
+
+```py
+class LinkedList[T]: ...
+
+class C[T, U]:
+    x: T
+    y: U
+
+    def method1(self) -> T:
+        return self.x
+
+    def method2(self) -> U:
+        return self.y
+
+    def method3(self) -> LinkedList[T]:
+        return LinkedList[T]()
+
+c = C[int, str]()
+reveal_type(c.x)  # revealed: int
+reveal_type(c.y)  # revealed: str
+reveal_type(c.method1())  # revealed: int
+reveal_type(c.method2())  # revealed: str
+reveal_type(c.method3())  # revealed: LinkedList[int]
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification
