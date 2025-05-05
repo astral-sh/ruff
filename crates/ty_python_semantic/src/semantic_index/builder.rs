@@ -253,13 +253,15 @@ impl<'db> SemanticIndexBuilder<'db> {
             children_start..children_start,
             reachability,
         );
+        let is_class_scope = scope.kind().is_class();
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
         self.symbol_tables.push(SymbolTableBuilder::default());
         self.instance_attribute_tables
             .push(SymbolTableBuilder::default());
-        self.use_def_maps.push(UseDefMapBuilder::default());
+        self.use_def_maps
+            .push(UseDefMapBuilder::new(is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
 
         let scope_id = ScopeId::new(self.db, self.file, file_scope_id, countme::Count::default());
@@ -391,10 +393,6 @@ impl<'db> SemanticIndexBuilder<'db> {
         let (symbol_id, added) = self.current_symbol_table().add_symbol(name);
         if added {
             self.current_use_def_map_mut().add_symbol(symbol_id);
-            if self.scopes[self.current_scope()].kind().is_class() {
-                self.current_use_def_map_mut()
-                    .set_narrowing_constraint_at_use(symbol_id);
-            }
         }
         symbol_id
     }

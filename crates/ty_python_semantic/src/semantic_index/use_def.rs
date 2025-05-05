@@ -360,7 +360,9 @@ impl<'db> UseDefMap<'db> {
     ) -> ConstraintsIterator<'_, 'db> {
         let constraint = match constraint_key {
             ConstraintKey::NarrowingConstraint(constraint) => constraint,
-            ConstraintKey::UseId(use_id) => self.bindings_by_use[use_id].narrowing_constraint(),
+            ConstraintKey::UseId(use_id) => {
+                self.bindings_by_use[use_id].unbound_narrowing_constraint()
+            }
         };
         ConstraintsIterator {
             predicates: &self.predicates,
@@ -738,10 +740,13 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Snapshots of symbol states in this scope that can be used to resolve a reference in a
     /// nested eager scope.
     eager_snapshots: EagerSnapshots,
+
+    /// Is this a class scope?
+    is_class_scope: bool,
 }
 
-impl Default for UseDefMapBuilder<'_> {
-    fn default() -> Self {
+impl<'db> UseDefMapBuilder<'db> {
+    pub(super) fn new(is_class_scope: bool) -> Self {
         Self {
             all_definitions: IndexVec::from_iter([None]),
             predicates: PredicatesBuilder::default(),
@@ -756,11 +761,9 @@ impl Default for UseDefMapBuilder<'_> {
             symbol_states: IndexVec::new(),
             eager_snapshots: EagerSnapshots::default(),
             instance_attribute_states: IndexVec::new(),
+            is_class_scope,
         }
     }
-}
-
-impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn mark_unreachable(&mut self) {
         self.record_visibility_constraint(ScopedVisibilityConstraintId::ALWAYS_FALSE);
         self.reachability = ScopedVisibilityConstraintId::ALWAYS_FALSE;
@@ -771,12 +774,6 @@ impl<'db> UseDefMapBuilder<'db> {
             .symbol_states
             .push(SymbolState::undefined(self.scope_start_visibility));
         debug_assert_eq!(symbol, new_symbol);
-    }
-
-    /// When adding a new class symbol, `SymbolBindings::narrowing_constraint_at_use` needs to have a value
-    /// (see the doc comment for why it is necessary), so set it here.
-    pub(super) fn set_narrowing_constraint_at_use(&mut self, symbol: ScopedSymbolId) {
-        self.symbol_states[symbol].set_narrowing_constraint_at_use();
     }
 
     pub(super) fn add_attribute(&mut self, symbol: ScopedSymbolId) {
@@ -791,7 +788,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let symbol_state = &mut self.symbol_states[symbol];
         self.declarations_by_binding
             .insert(binding, symbol_state.declarations().clone());
-        symbol_state.record_binding(def_id, self.scope_start_visibility);
+        symbol_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
     }
 
     pub(super) fn record_attribute_binding(
@@ -803,7 +800,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let attribute_state = &mut self.instance_attribute_states[symbol];
         self.declarations_by_binding
             .insert(binding, attribute_state.declarations().clone());
-        attribute_state.record_binding(def_id, self.scope_start_visibility);
+        attribute_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
     }
 
     pub(super) fn add_predicate(&mut self, predicate: Predicate<'db>) -> ScopedPredicateId {
@@ -989,7 +986,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let def_id = self.all_definitions.push(Some(definition));
         let symbol_state = &mut self.symbol_states[symbol];
         symbol_state.record_declaration(def_id);
-        symbol_state.record_binding(def_id, self.scope_start_visibility);
+        symbol_state.record_binding(def_id, self.scope_start_visibility, self.is_class_scope);
     }
 
     pub(super) fn record_use(
@@ -1026,7 +1023,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.eager_snapshots.push(EagerSnapshot::Constraint(
                 self.symbol_states[enclosing_symbol]
                     .bindings()
-                    .narrowing_constraint(),
+                    .unbound_narrowing_constraint(),
             ))
         } else {
             self.eager_snapshots.push(EagerSnapshot::Bindings(

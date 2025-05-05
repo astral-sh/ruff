@@ -140,6 +140,30 @@ def f(x: str | Literal[1] | None):
             class D:
                 if g != 1:
                     reveal_type(g)  # revealed: str
+```
+
+### Narrowing constraints with bindings in class scope, and nested scopes
+
+```py
+from typing import Literal
+
+g: str | Literal[1] | None = "a"
+
+def f(flag: bool):
+    class C:
+        (g := None) if flag else (g := None)
+        # `g` is always bound here, so narrowing checks don't apply to nested scopes
+        if g is not None:
+            class F:
+                reveal_type(g)  # revealed: str | Literal[1] | None
+
+    class C:
+        # this conditional binding leaves "unbound" visible, so following narrowing checks apply
+        None if flag else (g := None)
+
+        if g is not None:
+            class F:
+                reveal_type(g)  # revealed: str | Literal[1]
 
             # This class variable is not visible from the nested class scope.
             g = None

@@ -65,6 +65,10 @@ impl ScopedDefinitionId {
     /// When creating a use-def-map builder, we always add an empty `None` definition
     /// at index 0, so this ID is always present.
     pub(super) const UNBOUND: ScopedDefinitionId = ScopedDefinitionId::from_u32(0);
+
+    fn is_unbound(self) -> bool {
+        self == Self::UNBOUND
+    }
 }
 
 /// Can keep inline this many live bindings or declarations per symbol at a given time; more will
@@ -192,20 +196,22 @@ pub(super) enum EagerSnapshot {
 /// with a set of narrowing constraints and a visibility constraint.
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update)]
 pub(super) struct SymbolBindings {
-    /// A narrowing constraint that applies when the symbol is used in a nested eager scope.
-    /// This has the same role as an unbound-binding narrowing constraint,
-    /// and is usually `None` (to avoid extra cost), but can be `Some` in a class scope.
-    /// This is because symbol bindings in a class scope are not visible in eager nested scopes,
-    /// so we need to know the narrowing applicable to the "unbound" binding, even if the unbound
-    /// binding is not visible.
-    narrowing_constraint_at_use: Option<ScopedNarrowingConstraint>,
+    /// The narrowing constraint applicable to the "unbound" binding, if we need access to it even
+    /// when it's not visible. This happens in class scopes, where local bindings are not visible
+    /// to nested scopes, but we still need to know what narrowing constraints were applied to the
+    /// "unbound" binding.
+    unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this symbol, sorted by their `ScopedDefinitionId`
     live_bindings: SmallVec<[LiveBinding; INLINE_DEFINITIONS_PER_SYMBOL]>,
 }
 
 impl SymbolBindings {
-    pub(super) fn narrowing_constraint(&self) -> ScopedNarrowingConstraint {
-        self.narrowing_constraint_at_use
+    pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
+        debug_assert!(
+            self.unbound_narrowing_constraint.is_some()
+                || self.live_bindings[0].binding.is_unbound()
+        );
+        self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
     }
 }
@@ -228,13 +234,9 @@ impl SymbolBindings {
             visibility_constraint: scope_start_visibility,
         };
         Self {
-            narrowing_constraint_at_use: None,
+            unbound_narrowing_constraint: None,
             live_bindings: smallvec![initial_binding],
         }
-    }
-
-    pub(super) fn set_narrowing_constraint_at_use(&mut self) {
-        self.narrowing_constraint_at_use = Some(self.live_bindings[0].narrowing_constraint);
     }
 
     /// Record a newly-encountered binding for this symbol.
@@ -242,7 +244,13 @@ impl SymbolBindings {
         &mut self,
         binding: ScopedDefinitionId,
         visibility_constraint: ScopedVisibilityConstraintId,
+        is_class_scope: bool,
     ) {
+        // If we are in a class scope, and the unbound binding was previously visible, but we will
+        // now replace it, record the narrowing constraints on it:
+        if is_class_scope && self.live_bindings[0].binding.is_unbound() {
+            self.unbound_narrowing_constraint = Some(self.live_bindings[0].narrowing_constraint);
+        }
         // The new binding replaces all previous live bindings in this path, and has no
         // constraints.
         self.live_bindings.clear();
@@ -259,9 +267,6 @@ impl SymbolBindings {
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         predicate: ScopedNarrowingConstraintPredicate,
     ) {
-        if let Some(constraint) = &mut self.narrowing_constraint_at_use {
-            *constraint = narrowing_constraints.add_predicate_to_constraint(*constraint, predicate);
-        }
         for binding in &mut self.live_bindings {
             binding.narrowing_constraint = narrowing_constraints
                 .add_predicate_to_constraint(binding.narrowing_constraint, predicate);
@@ -312,10 +317,10 @@ impl SymbolBindings {
         let a = std::mem::take(self);
 
         if let Some((a, b)) = a
-            .narrowing_constraint_at_use
-            .zip(b.narrowing_constraint_at_use)
+            .unbound_narrowing_constraint
+            .zip(b.unbound_narrowing_constraint)
         {
-            self.narrowing_constraint_at_use =
+            self.unbound_narrowing_constraint =
                 Some(narrowing_constraints.intersect_constraints(a, b));
         }
 
@@ -369,19 +374,16 @@ impl SymbolState {
         }
     }
 
-    pub(super) fn set_narrowing_constraint_at_use(&mut self) {
-        self.bindings.set_narrowing_constraint_at_use();
-    }
-
     /// Record a newly-encountered binding for this symbol.
     pub(super) fn record_binding(
         &mut self,
         binding_id: ScopedDefinitionId,
         visibility_constraint: ScopedVisibilityConstraintId,
+        is_class_scope: bool,
     ) {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
         self.bindings
-            .record_binding(binding_id, visibility_constraint);
+            .record_binding(binding_id, visibility_constraint, is_class_scope);
     }
 
     /// Add given constraint to all live bindings.
@@ -512,6 +514,7 @@ mod tests {
         sym.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            false,
         );
 
         assert_bindings(&narrowing_constraints, &sym, &["1<>"]);
@@ -524,6 +527,7 @@ mod tests {
         sym.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            false,
         );
         let predicate = ScopedPredicateId::from_u32(0).into();
         sym.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -541,6 +545,7 @@ mod tests {
         sym1a.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            false,
         );
         let predicate = ScopedPredicateId::from_u32(0).into();
         sym1a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -549,6 +554,7 @@ mod tests {
         sym1b.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            false,
         );
         let predicate = ScopedPredicateId::from_u32(0).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -566,6 +572,7 @@ mod tests {
         sym2a.record_binding(
             ScopedDefinitionId::from_u32(2),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            false,
         );
         let predicate = ScopedPredicateId::from_u32(1).into();
         sym2a.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -574,6 +581,7 @@ mod tests {
         sym1b.record_binding(
             ScopedDefinitionId::from_u32(2),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            false,
         );
         let predicate = ScopedPredicateId::from_u32(2).into();
         sym1b.record_narrowing_constraint(&mut narrowing_constraints, predicate);
@@ -591,6 +599,7 @@ mod tests {
         sym3a.record_binding(
             ScopedDefinitionId::from_u32(3),
             ScopedVisibilityConstraintId::ALWAYS_TRUE,
+            false,
         );
         let predicate = ScopedPredicateId::from_u32(3).into();
         sym3a.record_narrowing_constraint(&mut narrowing_constraints, predicate);

@@ -5162,8 +5162,8 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         // If we're inferring types of deferred expressions, always treat them as public symbols
-        let local_scope_symbol = if self.is_deferred() {
-            if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
+        let (local_scope_symbol, use_id) = if self.is_deferred() {
+            let symbol = if let Some(symbol_id) = symbol_table.symbol_id_by_name(symbol_name) {
                 symbol_from_bindings(db, use_def.public_bindings(symbol_id))
             } else {
                 assert!(
@@ -5171,10 +5171,12 @@ impl<'db> TypeInferenceBuilder<'db> {
                     "Expected the symbol table to create a symbol for every Name node"
                 );
                 Symbol::Unbound
-            }
+            };
+            (symbol, None)
         } else {
             let use_id = name_node.scoped_use_id(db, scope);
-            symbol_from_bindings(db, use_def.bindings_at_use(use_id))
+            let symbol = symbol_from_bindings(db, use_def.bindings_at_use(use_id));
+            (symbol, Some(use_id))
         };
 
         let symbol = SymbolAndQualifiers::from(local_scope_symbol).or_fall_back_to(db, || {
@@ -5202,7 +5204,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 return Symbol::Unbound.into();
             }
 
-            if let Some(use_id) = name_node.try_scoped_use_id(db, scope) {
+            if let Some(use_id) = use_id {
                 constraint_keys.push((file_scope_id, ConstraintKey::UseId(use_id)));
             }
 
@@ -5219,10 +5221,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                 // There is one exception to this rule: type parameter scopes can see
                 // names defined in an immediately-enclosing class scope.
                 let enclosing_scope_id = enclosing_scope_file_id.to_scope_id(db, current_file);
-
-                if let Some(use_id) = name_node.try_scoped_use_id(db, enclosing_scope_id) {
-                    constraint_keys.push((enclosing_scope_file_id, ConstraintKey::UseId(use_id)));
-                }
 
                 let is_immediately_enclosing_scope = scope.is_type_parameter(db)
                     && scope
