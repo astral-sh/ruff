@@ -3890,6 +3890,9 @@ impl<'db> Type<'db> {
                     );
                     Signatures::single(signature)
                 }
+                Some(KnownClass::Enum) => {
+                    Signatures::single(CallableSignature::todo("functional `Enum` syntax"))
+                }
 
                 Some(KnownClass::Super) => {
                     // ```py
@@ -4836,14 +4839,6 @@ impl<'db> Type<'db> {
                 Some(KnownClass::NamedTuple) => Ok(todo_type!(
                     "Support for functional `typing.NamedTuple` syntax"
                 )),
-                _ if instance
-                    .class()
-                    .iter_mro(db)
-                    .filter_map(ClassBase::into_class)
-                    .any(|class| class.is_known(db, KnownClass::Enum)) =>
-                {
-                    Ok(todo_type!("Support for functional `enum` syntax"))
-                }
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
                         *self
