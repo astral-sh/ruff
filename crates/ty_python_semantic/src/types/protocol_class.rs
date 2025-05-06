@@ -119,7 +119,7 @@ impl<'db> ProtocolInterface<'db> {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
-pub(crate) struct ProtocolMemberData<'db> {
+pub(super) struct ProtocolMemberData<'db> {
     ty: Type<'db>,
     qualifiers: TypeQualifiers,
 }

@@ -285,22 +285,15 @@ mod synthesized_protocol {
     /// The constructor method of this type maintains the invariant that a synthesized protocol type
     /// is always constructed from a *normalized* protocol interface.
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord)]
-    pub(in crate::types) struct SynthesizedProtocolType<'db>(SynthesizedProtocolTypeInner<'db>);
+    pub(in crate::types) struct SynthesizedProtocolType<'db>(ProtocolInterface<'db>);
 
     impl<'db> SynthesizedProtocolType<'db> {
         pub(super) fn new(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> Self {
-            Self(SynthesizedProtocolTypeInner {
-                interface: interface.normalized(db),
-            })
+            Self(interface.normalized(db))
         }
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
-            self.0.interface
+            self.0
         }
-    }
-
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord, Hash, salsa::Update)]
-    struct SynthesizedProtocolTypeInner<'db> {
-        interface: ProtocolInterface<'db>,
     }
 }
