@@ -1357,8 +1357,6 @@ def h(obj: InstanceAttrBool):
 A protocol is only fully static if all of its members are fully static:
 
 ```py
-from __future__ import annotations
-
 from typing import Protocol, Any
 from ty_extensions import is_fully_static, static_assert
 
@@ -1368,18 +1366,8 @@ class FullyStatic(Protocol):
 class NotFullyStatic(Protocol):
     x: Any
 
-class RecursiveFullyStatic(Protocol):
-    parent: RecursiveFullyStatic | None
-    x: int
-
-class RecursiveNonFullyStatic(Protocol):
-    parent: RecursiveNonFullyStatic | None
-    x: Any
-
 static_assert(is_fully_static(FullyStatic))
 static_assert(not is_fully_static(NotFullyStatic))
-static_assert(is_fully_static(RecursiveFullyStatic))
-static_assert(not is_fully_static(RecursiveNonFullyStatic))
 ```
 
 Non-fully-static protocols do not participate in subtyping or equivalence, only assignability and
@@ -1570,7 +1558,41 @@ def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
     c: Sized = some_sized
 ```
 
-## Regression test: narrowing with self-referential protocols
+## Recursive protocols
+
+### Properties
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, Any
+from ty_extensions import is_fully_static, static_assert, is_assignable_to, is_subtype_of, is_equivalent_to
+
+class RecursiveFullyStatic(Protocol):
+    parent: RecursiveFullyStatic | None
+    x: int
+
+class RecursiveNonFullyStatic(Protocol):
+    parent: RecursiveNonFullyStatic | None
+    x: Any
+
+static_assert(is_fully_static(RecursiveFullyStatic))
+static_assert(not is_fully_static(RecursiveNonFullyStatic))
+
+# static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
+# static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveFullyStatic))
+
+static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
+static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
+
+class AlsoRecursiveFullyStatic(Protocol):
+    parent: AlsoRecursiveFullyStatic | None
+    x: int
+
+# static_assert(is_equivalent_to(AlsoRecursiveFullyStatic, RecursiveFullyStatic))
+```
+
+### Regression test: narrowing with self-referential protocols
 
 This snippet caused us to panic on an early version of the implementation for protocols.
 
