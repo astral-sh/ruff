@@ -42,8 +42,7 @@ impl Display for DisplayType<'_> {
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::GenericAlias(_) => {
+            | Type::BytesLiteral(_) => {
                 write!(f, "Literal[{representation}]")
             }
             _ => representation.fmt(f),
@@ -104,7 +103,7 @@ impl Display for DisplayRepresentation<'_> {
             Type::ClassLiteral(class) => {
                 write!(f, "<class '{}'>", class.name(self.db))
             }
-            Type::GenericAlias(generic) => generic.display(self.db).fmt(f),
+            Type::GenericAlias(generic) => write!(f, "<class '{}'>", generic.display(self.db)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].

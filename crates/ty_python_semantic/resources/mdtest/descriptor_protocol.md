@@ -40,7 +40,7 @@ c.ten = 11
 ```
 
 When assigning to the `ten` attribute from the class object, we get an error. The descriptor
-protocol is _not_ triggered in this case. Since the attribute is declared as `Ten` in the class
+protocol is *not* triggered in this case. Since the attribute is declared as `Ten` in the class
 body, we do not allow these assignments, preventing users from accidentally overwriting the data
 descriptor, which is what would happen at runtime:
 
@@ -86,9 +86,9 @@ reveal_type(c.flexible_int)  # revealed: int | None
 
 ### Data and non-data descriptors
 
-Descriptors that define `__set__` or `__delete__` are called _data descriptors_. An example of a
+Descriptors that define `__set__` or `__delete__` are called *data descriptors*. An example of a
 data descriptor is a `property` with a setter and/or a deleter. Descriptors that only define
-`__get__`, meanwhile, are called _non-data descriptors_. Examples include functions, `classmethod`
+`__get__`, meanwhile, are called *non-data descriptors*. Examples include functions, `classmethod`
 or `staticmethod`.
 
 The precedence chain for attribute access is (1) data descriptors, (2) instance attributes, and (3)
@@ -274,7 +274,7 @@ C1.meta_data_descriptor = "invalid"
 ```
 
 When writing to a class-level data descriptor from the class object itself, the descriptor protocol
-is _not_ triggered (this is in contrast to what happens when you read class-level descriptor
+is *not* triggered (this is in contrast to what happens when you read class-level descriptor
 attributes!). So the following assignment does not call `__set__`. At runtime, the assignment would
 overwrite the data descriptor, but the attribute is declared as `DataDescriptor` in the class body,
 so we do not allow this:
@@ -284,7 +284,7 @@ so we do not allow this:
 C1.class_data_descriptor = 1
 ```
 
-We now demonstrate that a _metaclass data descriptor_ takes precedence over all class-level
+We now demonstrate that a *metaclass data descriptor* takes precedence over all class-level
 attributes:
 
 ```py

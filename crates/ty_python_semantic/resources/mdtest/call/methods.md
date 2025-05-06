@@ -25,9 +25,9 @@ object (in which case it is `None`), or from an instance (in which case it is th
 - `C().f` is equivalent to `getattr_static(C, "f").__get__(C(), C)`
 
 Here, `inspect.getattr_static` is used to bypass the descriptor protocol and directly access the
-function attribute. The way the special `__get__` method _on functions_ works is as follows. In the
+function attribute. The way the special `__get__` method *on functions* works is as follows. In the
 former case, if the `instance` argument is `None`, `__get__` simply returns the function itself. In
-the latter case, it returns a _bound method_ object:
+the latter case, it returns a *bound method* object:
 
 ```py
 from inspect import getattr_static

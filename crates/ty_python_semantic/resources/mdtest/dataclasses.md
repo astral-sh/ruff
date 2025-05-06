@@ -489,7 +489,7 @@ class DataWithDescription[T]:
     data: T
     description: str
 
-reveal_type(DataWithDescription[int])  # revealed: Literal[DataWithDescription[int]]
+reveal_type(DataWithDescription[int])  # revealed: <class 'DataWithDescription[int]'>
 
 d_int = DataWithDescription[int](1, "description")  # OK
 reveal_type(d_int.data)  # revealed: int

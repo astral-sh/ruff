@@ -89,8 +89,9 @@ class ListSubclass(typing.List): ...
 reveal_type(ListSubclass.__mro__)
 
 class DictSubclass(typing.Dict): ...
+
 # TODO: generic protocols
-# revealed: tuple[<class 'DictSubclass'>, Literal[dict[Unknown, Unknown]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], <class 'object'>]
+# revealed: tuple[<class 'DictSubclass'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], <class 'object'>]
 reveal_type(DictSubclass.__mro__)
 
 class SetSubclass(typing.Set): ...
@@ -112,19 +113,19 @@ reveal_type(FrozenSetSubclass.__mro__)
 class ChainMapSubclass(typing.ChainMap): ...
 
 # TODO: generic protocols
-# revealed: tuple[<class 'ChainMapSubclass'>, Literal[ChainMap[Unknown, Unknown]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], <class 'object'>]
+# revealed: tuple[<class 'ChainMapSubclass'>, <class 'ChainMap[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], <class 'object'>]
 reveal_type(ChainMapSubclass.__mro__)
 
 class CounterSubclass(typing.Counter): ...
 
 # TODO: Should be (CounterSubclass, Counter, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[<class 'CounterSubclass'>, Literal[Counter[Unknown]], Literal[dict[_T, int]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], typing.Generic[_T], <class 'object'>]
+# revealed: tuple[<class 'CounterSubclass'>, <class 'Counter[Unknown]'>, <class 'dict[Unknown, int]'>, <class 'MutableMapping[Unknown, int]'>, <class 'Mapping[Unknown, int]'>, <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], typing.Generic[_T], <class 'object'>]
 reveal_type(CounterSubclass.__mro__)
 
 class DefaultDictSubclass(typing.DefaultDict): ...
 
 # TODO: Should be (DefaultDictSubclass, defaultdict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[<class 'DefaultDictSubclass'>, Literal[defaultdict[Unknown, Unknown]], Literal[dict[_KT, _VT]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], <class 'object'>]
+# revealed: tuple[<class 'DefaultDictSubclass'>, <class 'defaultdict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], <class 'object'>]
 reveal_type(DefaultDictSubclass.__mro__)
 
 class DequeSubclass(typing.Deque): ...
@@ -136,5 +137,6 @@ reveal_type(DequeSubclass.__mro__)
 class OrderedDictSubclass(typing.OrderedDict): ...
 
 # TODO: Should be (OrderedDictSubclass, OrderedDict, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[<class 'OrderedDictSubclass'>, Literal[OrderedDict[Unknown, Unknown]], Literal[dict[_KT, _VT]], Literal[MutableMapping[_KT, _VT]], Literal[Mapping[_KT, _VT]], <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], <class 'object'>]
+# revealed: tuple[<class 'OrderedDictSubclass'>, <class 'OrderedDict[Unknown, Unknown]'>, <class 'dict[Unknown, Unknown]'>, <class 'MutableMapping[Unknown, Unknown]'>, <class 'Mapping[Unknown, Unknown]'>, <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], <class 'object'>]
 reveal_type(OrderedDictSubclass.__mro__)
+```

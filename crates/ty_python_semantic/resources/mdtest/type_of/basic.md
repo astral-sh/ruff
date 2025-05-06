@@ -74,7 +74,6 @@ def f(c: type[a.b.C]):
 `a/__init__.py`:
 
 ```py
-
 ```
 
 `a/b.py`:

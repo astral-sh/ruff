@@ -21,7 +21,6 @@ reveal_type(baz)  # revealed: Unknown
 `a.py`:
 
 ```py
-
 ```
 
 ```py

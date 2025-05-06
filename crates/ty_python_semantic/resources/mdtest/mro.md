@@ -2,7 +2,7 @@
 
 Tests that assert that we can infer the correct type for a class's `__mro__` attribute.
 
-This attribute is rarely accessed directly at runtime. However, it's extremely important for _us_ to
+This attribute is rarely accessed directly at runtime. However, it's extremely important for *us* to
 know the precise possible values of a class's Method Resolution Order, or we won't be able to infer
 the correct type of attributes accessed from instances.
 
@@ -150,7 +150,8 @@ class F(E, A): ...
 reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, Unknown, <class 'object'>]
 reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, <class 'A'>, Unknown, <class 'B'>, <class 'C'>, <class 'object'>]
 reveal_type(E.__mro__)  # revealed: tuple[<class 'E'>, <class 'B'>, <class 'C'>, <class 'object'>]
-reveal_type(F.__mro__)  # revealed: tuple[<class 'F'>, <class 'E'>, <class 'B'>, <class 'C'>, <class 'A'>, Unknown, <class 'object'>]
+# revealed: tuple[<class 'F'>, <class 'E'>, <class 'B'>, <class 'C'>, <class 'A'>, Unknown, <class 'object'>]
+reveal_type(F.__mro__)
 ```
 
 ## `__bases__` lists that cause errors at runtime

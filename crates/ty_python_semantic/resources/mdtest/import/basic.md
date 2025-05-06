@@ -41,7 +41,6 @@ reveal_type(a.b.C)  # revealed: <class 'C'>
 `a/__init__.py`:
 
 ```py
-
 ```
 
 `a/b.py`:
@@ -61,13 +60,11 @@ reveal_type(a.b.c.C)  # revealed: <class 'C'>
 `a/__init__.py`:
 
 ```py
-
 ```
 
 `a/b/__init__.py`:
 
 ```py
-
 ```
 
 `a/b/c.py`:
@@ -87,7 +84,6 @@ reveal_type(b.C)  # revealed: <class 'C'>
 `a/__init__.py`:
 
 ```py
-
 ```
 
 `a/b.py`:
@@ -107,13 +103,11 @@ reveal_type(c.C)  # revealed: <class 'C'>
 `a/__init__.py`:
 
 ```py
-
 ```
 
 `a/b/__init__.py`:
 
 ```py
-
 ```
 
 `a/b/c.py`:
@@ -145,7 +139,6 @@ import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.fo
 `a/__init__.py`:
 
 ```py
-
 ```
 
 ## Long paths

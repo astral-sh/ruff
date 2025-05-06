@@ -74,7 +74,7 @@ reveal_type(c_instance.declared_and_bound)  # revealed: bool
 
 #### Variable declared in class body and possibly bound in `__init__`
 
-The same rule applies even if the variable is _declared_ (not bound!) in the class body: it is still
+The same rule applies even if the variable is *declared* (not bound!) in the class body: it is still
 a pure instance variable.
 
 ```py
@@ -873,7 +873,7 @@ def _(flag: bool):
     reveal_type(C3.attr2)  # revealed: Literal["metaclass value", "class value"]
 ```
 
-If the _metaclass_ attribute is only partially defined, we emit a `possibly-unbound-attribute`
+If the *metaclass* attribute is only partially defined, we emit a `possibly-unbound-attribute`
 diagnostic:
 
 ```py
@@ -991,7 +991,7 @@ def _(flag: bool):
 In this example, the `x` attribute is not defined in the `C2` element of the union:
 
 ```py
-def  _(flag1: bool, flag2: bool):
+def _(flag1: bool, flag2: bool):
     class C1:
         x = 1
 
@@ -1376,7 +1376,7 @@ def _(a_and_b: Intersection[A, B]):
 
 The union of the set of types that `Any` could materialise to is equivalent to `object`. It follows
 from this that attribute access on `Any` resolves to `Any` if the attribute does not exist on
-`object` -- but if the attribute _does_ exist on `object`, the type of the attribute is
+`object` -- but if the attribute *does* exist on `object`, the type of the attribute is
 `<type as it exists on object> & Any`.
 
 ```py
@@ -1641,13 +1641,11 @@ for mod.global_symbol in IntIterable():
 `outer/__init__.py`:
 
 ```py
-
 ```
 
 `outer/nested/__init__.py`:
 
 ```py
-
 ```
 
 `outer/nested/inner.py`:
@@ -1992,7 +1990,7 @@ reveal_type(Foo.__members__)  # revealed: @Todo(Attribute access on enum classes
 
 ## References
 
-Some of the tests in the _Class and instance variables_ section draw inspiration from
+Some of the tests in the *Class and instance variables* section draw inspiration from
 [pyright's documentation] on this topic.
 
 [descriptor protocol tests]: descriptor_protocol.md

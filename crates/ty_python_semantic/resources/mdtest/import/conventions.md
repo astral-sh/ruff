@@ -68,7 +68,6 @@ from typing import Any as Any, Literal as Literal
 `foo.py`:
 
 ```py
-
 ```
 
 ## Non-exported symbols in stub files
