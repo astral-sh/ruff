@@ -285,17 +285,12 @@ pub(crate) fn global_symbol<'db>(
         .or_fall_back_to(db, || module_type_implicit_global_symbol(db, name))
 }
 
-// TODO: Maybe merge the following two functions with a single `is_star_import` parameter?
-
-/// Infers the public type of an imported symbol via a `from ... import *` statement.
-pub(crate) fn star_imported_symbol<'db>(
-    db: &'db dyn Db,
-    file: File,
-    name: &str,
-    // TODO: Should this be non-optional?
-    requires_explicit_reexport: Option<RequiresExplicitReExport>,
-) -> SymbolAndQualifiers<'db> {
-    imported_symbol_impl(db, file, name, requires_explicit_reexport)
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ImportedSymbolKind {
+    /// A named import (e.g. `from module import name`)
+    Named,
+    /// A star import (e.g. `from module import *`)
+    Star,
 }
 
 /// Infers the public type of an imported symbol.
@@ -303,26 +298,33 @@ pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     name: &str,
+    kind: ImportedSymbolKind,
 ) -> SymbolAndQualifiers<'db> {
-    let requires_explicit_reexport = if file.is_stub(db.upcast()) {
-        dunder_all_names(db, file).and_then(|all_names| {
-            all_names
-                .contains(name)
-                .then_some(RequiresExplicitReExport::No)
-        })
+    // First, check if the symbol is in the `__all__` list of the module.
+    let requires_explicit_reexport = if let Some(all_names) = dunder_all_names(db, file) {
+        match kind {
+            ImportedSymbolKind::Named => {
+                // For named imports, if the symbol is not in `__all__`, then we fallback to
+                // checking whether it's a stub file.
+                all_names
+                    .contains(name)
+                    .then_some(RequiresExplicitReExport::No)
+            }
+            ImportedSymbolKind::Star => {
+                if all_names.contains(name) {
+                    Some(RequiresExplicitReExport::No)
+                } else {
+                    // For star imports, if the symbol is not in `__all__`, then it's unbound.
+                    return Symbol::Unbound.into();
+                }
+            }
+        }
     } else {
         None
     };
 
-    imported_symbol_impl(db, file, name, requires_explicit_reexport)
-}
-
-pub(crate) fn imported_symbol_impl<'db>(
-    db: &'db dyn Db,
-    file: File,
-    name: &str,
-    requires_explicit_reexport: Option<RequiresExplicitReExport>,
-) -> SymbolAndQualifiers<'db> {
+    // If `__all__` is not present or the named symbol is not present in it, resolve to check if it
+    // is a stub file. If it is, we need to re-export it explicitly.
     let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
         if file.is_stub(db.upcast()) {
             RequiresExplicitReExport::Yes
@@ -393,7 +395,7 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
-        .map(|module| imported_symbol(db, module.file(), symbol))
+        .map(|module| imported_symbol(db, module.file(), symbol, ImportedSymbolKind::Named))
         .unwrap_or_default()
 }
 
