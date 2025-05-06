@@ -293,7 +293,7 @@ pub(crate) fn imported_symbol<'db>(
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> SymbolAndQualifiers<'db> {
     let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
-        if file.is_stub(db) {
+        if file.is_stub(db.upcast()) {
             RequiresExplicitReExport::Yes
         } else {
             RequiresExplicitReExport::No
