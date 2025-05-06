@@ -1142,9 +1142,7 @@ mod tests {
     )]
     #[test_case(
         "single_starred_assignment",
-        "
-        *a = [1, 2, 3, 4]
-        ",
+        "*a = [1, 2, 3, 4]",
         PythonVersion::PY310,
         "SingleStarredAssignment"
     )]
