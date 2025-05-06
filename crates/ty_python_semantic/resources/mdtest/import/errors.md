@@ -3,7 +3,7 @@
 ## Unresolved import statement
 
 ```py
-import bar  # error: "Cannot resolve import `bar`"
+import bar  # error: "Cannot resolve imported module `bar`"
 
 reveal_type(bar)  # revealed: Unknown
 ```
@@ -11,7 +11,7 @@ reveal_type(bar)  # revealed: Unknown
 ## Unresolved import from statement
 
 ```py
-from bar import baz  # error: "Cannot resolve import `bar`"
+from bar import baz  # error: "Cannot resolve imported module `bar`"
 
 reveal_type(baz)  # revealed: Unknown
 ```
@@ -34,7 +34,7 @@ reveal_type(thing)  # revealed: Unknown
 `a.py`:
 
 ```py
-import foo as foo  # error: "Cannot resolve import `foo`"
+import foo as foo  # error: "Cannot resolve imported module `foo`"
 
 reveal_type(foo)  # revealed: Unknown
 ```
