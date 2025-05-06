@@ -1373,17 +1373,18 @@ impl<'db> TypeInferenceBuilder<'db> {
 
         let file_scope_id = binding.file_scope(self.db());
         let symbol_table = self.index.symbol_table(file_scope_id);
-        let symbol_name = symbol_table.symbol(binding.symbol(self.db())).name();
         let use_def = self.index.use_def_map(file_scope_id);
         let mut bound_ty = ty;
+        let symbol_id = binding.symbol(self.db());
 
-        let is_global = self
-            .index
-            .globals_by_scope(file_scope_id)
-            .is_some_and(|globals| globals.contains(symbol_name));
+        let skip_non_global_scopes = !file_scope_id.is_global()
+            && self
+                .index
+                .symbol_is_global_in_scope(symbol_id, file_scope_id);
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
-        let declarations = if is_global && !file_scope_id.is_global() {
+        let declarations = if skip_non_global_scopes {
+            let symbol_name = symbol_table.symbol(symbol_id).name();
             match self
                 .index
                 .symbol_table(FileScopeId::global())
@@ -5211,12 +5212,15 @@ impl<'db> TypeInferenceBuilder<'db> {
 
             let current_file = self.file();
 
-            let is_global = self
-                .index
-                .globals_by_scope(file_scope_id)
-                .is_some_and(|globals| globals.contains(symbol_name));
+            let skip_non_global_scopes = !file_scope_id.is_global()
+                && symbol_table
+                    .symbol_id_by_name(symbol_name)
+                    .is_some_and(|symbol_id| {
+                        self.index
+                            .symbol_is_global_in_scope(symbol_id, file_scope_id)
+                    });
 
-            if is_global && !file_scope_id.is_global() {
+            if skip_non_global_scopes {
                 return symbol(
                     db,
                     FileScopeId::global().to_scope_id(db, current_file),

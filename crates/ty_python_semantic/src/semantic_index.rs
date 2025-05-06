@@ -43,8 +43,6 @@ pub(crate) use self::use_def::{
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
 
-type Globals = FxHashSet<ruff_python_ast::name::Name>;
-
 /// Returns the semantic index for `file`.
 ///
 /// Prefer using [`symbol_table`] when working with symbols from a single scope.
@@ -179,7 +177,7 @@ pub(crate) struct SemanticIndex<'db> {
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Map from the file-local [`FileScopeId`] to the [`Globals`] it contains.
-    globals_by_scope: FxHashMap<FileScopeId, Globals>,
+    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedSymbolId>>,
 
     /// Use-def map for each scope in this file.
     use_def_maps: IndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
@@ -260,8 +258,14 @@ impl<'db> SemanticIndex<'db> {
         self.scope_ids_by_scope.iter().copied()
     }
 
-    pub(crate) fn globals_by_scope(&self, scope_id: FileScopeId) -> Option<&Globals> {
-        self.globals_by_scope.get(&scope_id)
+    pub(crate) fn symbol_is_global_in_scope(
+        &self,
+        symbol: ScopedSymbolId,
+        scope: FileScopeId,
+    ) -> bool {
+        self.globals_by_scope
+            .get(&scope)
+            .is_some_and(|globals| globals.contains(&symbol))
     }
 
     /// Returns the id of the parent scope.

@@ -51,8 +51,6 @@ use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
-use super::Globals;
-
 mod except_handlers;
 
 #[derive(Clone, Debug, Default)]
@@ -108,7 +106,7 @@ pub(super) struct SemanticIndexBuilder<'db> {
     use_def_maps: IndexVec<FileScopeId, UseDefMapBuilder<'db>>,
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
     scopes_by_expression: FxHashMap<ExpressionNodeKey, FileScopeId>,
-    globals_by_scope: FxHashMap<FileScopeId, Globals>,
+    globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedSymbolId>>,
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
@@ -1089,6 +1087,7 @@ impl<'db> SemanticIndexBuilder<'db> {
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.eager_snapshots.shrink_to_fit();
+        self.globals_by_scope.shrink_to_fit();
 
         SemanticIndex {
             symbol_tables,
@@ -1904,12 +1903,11 @@ where
                 self.mark_unreachable();
             }
             ast::Stmt::Global(ast::StmtGlobal { range: _, names }) => {
-                let enclosing_scope_info = self.current_scope_info();
-                let enclosing_scope_id = enclosing_scope_info.file_scope_id;
-                let enclosing_symbol_table = &self.symbol_tables[enclosing_scope_id];
                 for name in names {
-                    let bound = enclosing_symbol_table.symbol_id_by_name(name).is_some();
-                    if bound {
+                    let symbol_id = self.add_symbol(name.id.clone());
+                    let symbol_table = self.current_symbol_table();
+                    let symbol = symbol_table.symbol(symbol_id);
+                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
                                 name: name.to_string(),
@@ -1923,7 +1921,16 @@ where
                     self.globals_by_scope
                         .entry(scope_id)
                         .or_default()
-                        .insert(name.id.clone());
+                        .insert(symbol_id);
+                }
+                walk_stmt(self, stmt);
+            }
+            ast::Stmt::Delete(ast::StmtDelete { targets, range: _ }) => {
+                for target in targets {
+                    if let ast::Expr::Name(ast::ExprName { id, .. }) = target {
+                        let symbol_id = self.add_symbol(id.clone());
+                        self.current_symbol_table().mark_symbol_used(symbol_id);
+                    }
                 }
                 walk_stmt(self, stmt);
             }
