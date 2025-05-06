@@ -1070,6 +1070,15 @@ impl<'db> ClassLiteral<'db> {
             // to any method with a `@classmethod` decorator. (`__init__` would remain a special
             // case, since it's an _instance_ method where we don't yet know the generic class's
             // specialization.)
+            if name == "new" {
+                if let Type::FunctionLiteral(func) = ty {
+                    let scope = func.body_scope(db);
+                    let node = scope.node(db);
+                    let func_def = node.expect_function();
+                    // TODO: infer and if there is self add generic context?
+                    for param in func_def.parameters.iter_non_variadic_params() {}
+                }
+            }
             match (self.generic_context(db), ty, specialization, name) {
                 (
                     Some(generic_context),
