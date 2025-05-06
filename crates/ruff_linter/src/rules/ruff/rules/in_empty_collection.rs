@@ -10,7 +10,19 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// If the collection is always empty, the check is unnecessary, and can be removed.
-
+///
+/// ## Example
+///
+/// ```python
+/// if 1 not in set():
+///     print("got it!")
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// print("got it!")
+/// ```
 #[derive(ViolationMetadata)]
 pub(crate) struct InEmptyCollection;
 
