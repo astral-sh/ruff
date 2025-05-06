@@ -5,7 +5,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::{
     declaration_type, KnownInstanceType, Type, TypeVarBoundOrConstraints, TypeVarInstance,
-    UnionType,
+    TypeVarVariance, UnionType,
 };
 use crate::{Db, FxOrderSet};
 
@@ -260,7 +260,7 @@ impl<'db> Specialization<'db> {
             return false;
         }
 
-        for ((_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
         {
@@ -268,13 +268,19 @@ impl<'db> Specialization<'db> {
                 return false;
             }
 
-            // TODO: We currently treat all typevars as invariant. Once we track the actual
-            // variance of each typevar, these checks should change:
+            // Subtyping of each type in the specialization depends on the variance of the
+            // corresponding typevar:
             //   - covariant: verify that self_type <: other_type
             //   - contravariant: verify that other_type <: self_type
             //   - invariant: verify that self_type == other_type
             //   - bivariant: skip, can't make subtyping false
-            if !self_type.is_equivalent_to(db, *other_type) {
+            let compatible = match typevar.variance(db) {
+                TypeVarVariance::Invariant => self_type.is_equivalent_to(db, *other_type),
+                TypeVarVariance::Covariant => self_type.is_subtype_of(db, *other_type),
+                TypeVarVariance::Contravariant => other_type.is_subtype_of(db, *self_type),
+                TypeVarVariance::Bivariant => true,
+            };
+            if !compatible {
                 return false;
             }
         }
@@ -288,7 +294,7 @@ impl<'db> Specialization<'db> {
             return false;
         }
 
-        for ((_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
         {
@@ -296,13 +302,19 @@ impl<'db> Specialization<'db> {
                 return false;
             }
 
-            // TODO: We currently treat all typevars as invariant. Once we track the actual
-            // variance of each typevar, these checks should change:
+            // Equivalence of each type in the specialization depends on the variance of the
+            // corresponding typevar:
             //   - covariant: verify that self_type == other_type
             //   - contravariant: verify that other_type == self_type
             //   - invariant: verify that self_type == other_type
             //   - bivariant: skip, can't make equivalence false
-            if !self_type.is_equivalent_to(db, *other_type) {
+            let compatible = match typevar.variance(db) {
+                TypeVarVariance::Invariant
+                | TypeVarVariance::Covariant
+                | TypeVarVariance::Contravariant => self_type.is_equivalent_to(db, *other_type),
+                TypeVarVariance::Bivariant => true,
+            };
+            if !compatible {
                 return false;
             }
         }
@@ -316,7 +328,7 @@ impl<'db> Specialization<'db> {
             return false;
         }
 
-        for ((_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
         {
@@ -324,13 +336,19 @@ impl<'db> Specialization<'db> {
                 continue;
             }
 
-            // TODO: We currently treat all typevars as invariant. Once we track the actual
-            // variance of each typevar, these checks should change:
+            // Assignability of each type in the specialization depends on the variance of the
+            // corresponding typevar:
             //   - covariant: verify that self_type <: other_type
             //   - contravariant: verify that other_type <: self_type
             //   - invariant: verify that self_type == other_type
             //   - bivariant: skip, can't make assignability false
-            if !self_type.is_gradual_equivalent_to(db, *other_type) {
+            let compatible = match typevar.variance(db) {
+                TypeVarVariance::Invariant => self_type.is_gradual_equivalent_to(db, *other_type),
+                TypeVarVariance::Covariant => self_type.is_assignable_to(db, *other_type),
+                TypeVarVariance::Contravariant => other_type.is_assignable_to(db, *self_type),
+                TypeVarVariance::Bivariant => true,
+            };
+            if !compatible {
                 return false;
             }
         }
@@ -348,17 +366,25 @@ impl<'db> Specialization<'db> {
             return false;
         }
 
-        for ((_typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
+        for ((typevar, self_type), other_type) in (generic_context.variables(db).into_iter())
             .zip(self.types(db))
             .zip(other.types(db))
         {
-            // TODO: We currently treat all typevars as invariant. Once we track the actual
-            // variance of each typevar, these checks should change:
+            // Equivalence of each type in the specialization depends on the variance of the
+            // corresponding typevar:
             //   - covariant: verify that self_type == other_type
             //   - contravariant: verify that other_type == self_type
             //   - invariant: verify that self_type == other_type
             //   - bivariant: skip, can't make equivalence false
-            if !self_type.is_gradual_equivalent_to(db, *other_type) {
+            let compatible = match typevar.variance(db) {
+                TypeVarVariance::Invariant
+                | TypeVarVariance::Covariant
+                | TypeVarVariance::Contravariant => {
+                    self_type.is_gradual_equivalent_to(db, *other_type)
+                }
+                TypeVarVariance::Bivariant => true,
+            };
+            if !compatible {
                 return false;
             }
         }
