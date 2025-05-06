@@ -90,6 +90,7 @@ error: lint:invalid-overload: Overloaded function `try_from2` does not use the `
 23 |     @overload
 24 |     @classmethod
    |
+info: `lint:invalid-overload` is enabled by default
 
 ```
 
