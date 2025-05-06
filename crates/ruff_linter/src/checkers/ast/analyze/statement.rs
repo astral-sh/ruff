@@ -1199,6 +1199,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.enabled(Rule::NeedlessElse) {
                 ruff::rules::needless_else(checker, if_.into());
             }
+            if checker.enabled(Rule::IfKeyNotInDictAssign) {
+                ruff::rules::if_key_not_in_dict_assign(checker, if_);
+            }
         }
         Stmt::Assert(
             assert_stmt @ ast::StmtAssert {
@@ -1579,6 +1582,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.enabled(Rule::NonPEP695TypeAlias) {
                 pyupgrade::rules::non_pep695_type_alias_type(checker, assign);
+            }
+            if checker.enabled(Rule::IfKeyNotInDictAssign) {
+                ruff::rules::if_key_not_in_dict_assign_via_get(checker, assign);
             }
         }
         Stmt::AnnAssign(
