@@ -4637,30 +4637,6 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
         }
 
-        // It might look odd here that we emit an error for class-literals and generic aliases but not
-        // `type[]` types. But it's deliberate! The typing spec explicitly mandates that `type[]` types
-        // can be called even though class-literals cannot. This is because even though a protocol class
-        // `SomeProtocol` is always an abstract class, `type[SomeProtocol]` can be a concrete subclass of
-        // that protocol -- and indeed, according to the spec, type checkers must disallow abstract
-        // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
-        // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
-        let possible_protocol_class = match callable_type {
-            Type::ClassLiteral(class) => Some(class),
-            Type::GenericAlias(generic) => Some(generic.origin(self.db())),
-            _ => None,
-        };
-
-        if let Some(protocol) =
-            possible_protocol_class.and_then(|class| class.into_protocol_class(self.db()))
-        {
-            report_attempted_protocol_instantiation(&self.context, call_expression, protocol);
-        }
-
-        // For class literals we model the entire class instantiation logic, so it is handled
-        // in a separate function. For some known classes we have manual signatures defined and use
-        // the `try_call` path below.
-        // TODO: it should be possible to move these special cases into the `try_call_constructor`
-        // path instead, or even remove some entirely once we support overloads fully.
         let class = match callable_type {
             Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
             Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
@@ -4669,6 +4645,32 @@ impl<'db> TypeInferenceBuilder<'db> {
         };
 
         if let Some(class) = class {
+            // It might look odd here that we emit an error for class-literals and generic aliases but not
+            // `type[]` types. But it's deliberate! The typing spec explicitly mandates that `type[]` types
+            // can be called even though class-literals cannot. This is because even though a protocol class
+            // `SomeProtocol` is always an abstract class, `type[SomeProtocol]` can be a concrete subclass of
+            // that protocol -- and indeed, according to the spec, type checkers must disallow abstract
+            // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
+            // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
+            if !callable_type.is_subclass_of() {
+                if let Some(protocol) = class
+                    .class_literal(self.db())
+                    .0
+                    .into_protocol_class(self.db())
+                {
+                    report_attempted_protocol_instantiation(
+                        &self.context,
+                        call_expression,
+                        protocol,
+                    );
+                }
+            }
+
+            // For class literals we model the entire class instantiation logic, so it is handled
+            // in a separate function. For some known classes we have manual signatures defined and use
+            // the `try_call` path below.
+            // TODO: it should be possible to move these special cases into the `try_call_constructor`
+            // path instead, or even remove some entirely once we support overloads fully.
             if !matches!(
                 class.known(self.db()),
                 Some(
