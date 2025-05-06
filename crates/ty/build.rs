@@ -9,6 +9,7 @@ fn main() {
     // https://github.com/rust-lang/cargo/issues/3946
     let workspace_root = Path::new(&std::env::var("CARGO_MANIFEST_DIR").unwrap())
         .join("..")
+        .join("..")
         .join("..");
 
     commit_info(&workspace_root);
@@ -48,7 +49,8 @@ fn commit_info(workspace_root: &Path) {
         .arg("-1")
         .arg("--date=short")
         .arg("--abbrev=9")
-        .arg("--format=%H %h %cd %(describe)")
+        .arg("--format=%H %h %cd %(describe:tags)")
+        .current_dir(workspace_root)
         .output()
     {
         Ok(output) if output.status.success() => output,
@@ -65,7 +67,9 @@ fn commit_info(workspace_root: &Path) {
     // https://git-scm.com/docs/pretty-formats#Documentation/pretty-formats.txt-emdescribeoptionsem
     if let Some(describe) = parts.next() {
         let mut describe_parts = describe.split('-');
-        let _last_tag = describe_parts.next().unwrap();
+        let last_tag = describe_parts.next().unwrap();
+
+        println!("cargo::rustc-env=TY_LAST_TAG={last_tag}");
 
         // If this is the tagged commit, this component will be missing
         println!(
