@@ -42,28 +42,6 @@ mod rdjson;
 mod sarif;
 mod text;
 
-macro_rules! ruff_span {
-    ($diag:expr) => {
-        $diag
-            .primary_span()
-            .expect("Expected a primary span for a ruff diagnostic")
-    };
-}
-
-macro_rules! ruff_annotation {
-    ($diag:expr) => {
-        $diag
-            .primary_annotation()
-            .expect("Expected a primary annotation for a ruff diagnostic")
-    };
-}
-
-macro_rules! ruff_file {
-    ($diag:expr) => {
-        ruff_span!($diag).file().expect_ruff()
-    };
-}
-
 /// Message represents either a diagnostic message corresponding to a rule violation or a syntax
 /// error message raised by the parser.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -220,7 +198,9 @@ impl Message {
     pub fn body(&self) -> &str {
         match self {
             Message::Diagnostic(m) => &m.kind.body,
-            Message::SyntaxError(m) => ruff_annotation!(m)
+            Message::SyntaxError(m) => m
+                .primary_annotation()
+                .expect("Expected a primary annotation for a ruff diagnostic")
                 .get_message()
                 .expect("Expected a message for a ruff diagnostic"),
         }
@@ -272,7 +252,13 @@ impl Message {
     pub fn filename(&self) -> Cow<'_, str> {
         match self {
             Message::Diagnostic(m) => Cow::Borrowed(m.file.name()),
-            Message::SyntaxError(diag) => Cow::Owned(ruff_file!(diag).name().to_string()),
+            Message::SyntaxError(diag) => Cow::Owned(
+                diag.expect_ruff_span()
+                    .file()
+                    .expect_ruff()
+                    .name()
+                    .to_string(),
+            ),
         }
     }
 
@@ -280,9 +266,12 @@ impl Message {
     pub fn compute_start_location(&self) -> LineColumn {
         match self {
             Message::Diagnostic(m) => m.file.to_source_code().line_column(m.range.start()),
-            Message::SyntaxError(diag) => {
-                ruff_file!(diag).to_source_code().line_column(self.start())
-            }
+            Message::SyntaxError(diag) => diag
+                .expect_ruff_span()
+                .file()
+                .expect_ruff()
+                .to_source_code()
+                .line_column(self.start()),
         }
     }
 
@@ -290,7 +279,12 @@ impl Message {
     pub fn compute_end_location(&self) -> LineColumn {
         match self {
             Message::Diagnostic(m) => m.file.to_source_code().line_column(m.range.end()),
-            Message::SyntaxError(diag) => ruff_file!(diag).to_source_code().line_column(self.end()),
+            Message::SyntaxError(diag) => diag
+                .expect_ruff_span()
+                .file()
+                .expect_ruff()
+                .to_source_code()
+                .line_column(self.end()),
         }
     }
 
@@ -298,7 +292,7 @@ impl Message {
     pub fn source_file(&self) -> SourceFile {
         match self {
             Message::Diagnostic(m) => m.file.clone(),
-            Message::SyntaxError(m) => ruff_file!(m).clone(),
+            Message::SyntaxError(m) => m.expect_ruff_span().file().expect_ruff().clone(),
         }
     }
 }
@@ -319,7 +313,10 @@ impl Ranged for Message {
     fn range(&self) -> TextRange {
         match self {
             Message::Diagnostic(m) => m.range,
-            Message::SyntaxError(m) => ruff_span!(m).range().expect("Expected range for ruff span"),
+            Message::SyntaxError(m) => m
+                .expect_ruff_span()
+                .range()
+                .expect("Expected range for ruff span"),
         }
     }
 }

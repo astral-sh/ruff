@@ -237,6 +237,11 @@ impl Diagnostic {
     pub fn primary_tags(&self) -> Option<&[DiagnosticTag]> {
         self.primary_annotation().map(|ann| ann.tags.as_slice())
     }
+
+    pub fn expect_ruff_span(&self) -> Span {
+        self.primary_span()
+            .expect("Expected a primary span for a ruff diagnostic")
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
