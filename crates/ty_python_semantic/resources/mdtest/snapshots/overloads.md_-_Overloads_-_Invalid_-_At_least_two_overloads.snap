@@ -47,7 +47,7 @@ error: lint:invalid-overload: Overloaded function `func` requires at least two o
   |     ^^^^
 8 |     return x
   |
-info: `lint:invalid-overload` is on by default
+info: `lint:invalid-overload` is enabled by default
 
 ```
 
@@ -62,6 +62,6 @@ error: lint:invalid-overload: Overloaded function `func` requires at least two o
   |     |
   |     Only one overload defined here
   |
-info: `lint:invalid-overload` is on by default
+info: `lint:invalid-overload` is enabled by default
 
 ```

@@ -36,7 +36,7 @@ warning: lint:possibly-unbound-attribute: Attribute `attr` on type `Literal[C]` 
 7 |
 8 |     instance = C()
   |
-info: `lint:possibly-unbound-attribute` is on by default
+info: `lint:possibly-unbound-attribute` is enabled by default
 
 ```
 
@@ -48,6 +48,6 @@ warning: lint:possibly-unbound-attribute: Attribute `attr` on type `C` is possib
 9 |     instance.attr = 1  # error: [possibly-unbound-attribute]
   |     ^^^^^^^^^^^^^
   |
-info: `lint:possibly-unbound-attribute` is on by default
+info: `lint:possibly-unbound-attribute` is enabled by default
 
 ```

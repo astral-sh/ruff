@@ -74,7 +74,7 @@ info: Type variable defined here
 5 |
 6 | def f(x: T) -> T:
   |
-info: `lint:invalid-argument-type` is on by default
+info: `lint:invalid-argument-type` is enabled by default
 
 ```
 

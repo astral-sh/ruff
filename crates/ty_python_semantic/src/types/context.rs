@@ -318,9 +318,11 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
         diag.sub(SubDiagnostic::new(
             Severity::Info,
             match self.source {
-                LintSource::Default => format!("`{}` is on by default", diag.id()),
-                LintSource::Cli => format!("`{}` is enabled on the command line", diag.id()),
-                LintSource::File => format!("`{}` is enabled in a configuration file", diag.id()),
+                LintSource::Default => format!("`{}` is enabled by default", diag.id()),
+                LintSource::Cli => format!("`{}` was selected on the command line", diag.id()),
+                LintSource::File => {
+                    format!("`{}` was selected in the configuration file", diag.id())
+                }
             },
         ));
 

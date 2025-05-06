@@ -36,7 +36,7 @@ error: lint:invalid-assignment: Object of type `Literal["wrong"]` is not assigna
 7 |
 8 | C.attr = 1  # fine
   |
-info: `lint:invalid-assignment` is on by default
+info: `lint:invalid-assignment` is enabled by default
 
 ```
 
@@ -48,6 +48,6 @@ error: lint:invalid-assignment: Object of type `Literal["wrong"]` is not assigna
 9 | C.attr = "wrong"  # error: [invalid-assignment]
   | ^^^^^^
   |
-info: `lint:invalid-assignment` is on by default
+info: `lint:invalid-assignment` is enabled by default
 
 ```

@@ -46,6 +46,6 @@ error: lint:invalid-assignment: Object of type `Literal[1]` is not assignable to
 12 |
 13 |     class C2:
    |
-info: `lint:invalid-assignment` is on by default
+info: `lint:invalid-assignment` is enabled by default
 
 ```

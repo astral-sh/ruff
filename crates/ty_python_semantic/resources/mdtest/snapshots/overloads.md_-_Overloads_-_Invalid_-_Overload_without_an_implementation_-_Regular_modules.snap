@@ -41,7 +41,7 @@ error: lint:invalid-overload: Overloaded non-stub function `func` must have an i
 8 |
 9 | class Foo:
   |
-info: `lint:invalid-overload` is on by default
+info: `lint:invalid-overload` is enabled by default
 
 ```
 
@@ -54,6 +54,6 @@ error: lint:invalid-overload: Overloaded non-stub function `method` must have an
 14 |     def method(self, x: str) -> str: ...
    |         ^^^^^^
    |
-info: `lint:invalid-overload` is on by default
+info: `lint:invalid-overload` is enabled by default
 
 ```
