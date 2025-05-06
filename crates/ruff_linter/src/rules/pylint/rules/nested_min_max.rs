@@ -20,6 +20,15 @@ pub(crate) enum MinMax {
 /// Nested `min` and `max` calls can be flattened into a single call to improve
 /// readability.
 ///
+/// ## Fix safety
+/// This fix is always unsafe. Flattening nested `min()` or `max()` may change
+/// code behavior when the inner call is the outer call’s only argument and the
+/// inner call has multiple arguments.
+/// ```python
+/// print(min(min([2, 3], [4, 1]))) # before: 2
+/// print(min([2, 3], [4, 1]))      # after: [2, 3]
+/// ```
+///
 /// ## Example
 /// ```python
 /// minimum = min(1, 2, min(3, 4, 5))
