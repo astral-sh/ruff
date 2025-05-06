@@ -188,8 +188,6 @@ impl Message {
     pub fn name(&self) -> &str {
         match self {
             Message::Diagnostic(m) => &m.kind.name,
-            // TODO(brent) something more like diag.id().as_str() and match on the result once we
-            // move past syntax errors
             Message::SyntaxError(_) => "SyntaxError",
         }
     }
@@ -226,8 +224,6 @@ impl Message {
     pub fn fix(&self) -> Option<&Fix> {
         match self {
             Message::Diagnostic(m) => m.fix.as_ref(),
-            // TODO(brent) db::Diagnostics don't currently have a concept of fixes, but we'll need
-            // to add them eventually
             Message::SyntaxError(_) => None,
         }
     }
@@ -241,9 +237,6 @@ impl Message {
     pub fn rule(&self) -> Option<Rule> {
         match self {
             Message::Diagnostic(m) => Some(m.kind.rule()),
-            // TODO(brent) syntax errors don't have Rules, but we'll need these for lint rules,
-            // obviously. I think we can just map the rule code back from the name like the Message
-            // version does under the hood
             Message::SyntaxError(_) => None,
         }
     }
