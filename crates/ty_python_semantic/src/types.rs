@@ -38,8 +38,7 @@ use crate::semantic_index::symbol::ScopeId;
 use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{
-    imported_symbol, symbol_from_bindings, Boundness, ImportedSymbolKind, Symbol,
-    SymbolAndQualifiers,
+    imported_symbol, symbol_from_bindings, Boundness, Symbol, SymbolAndQualifiers,
 };
 use crate::types::call::{Bindings, CallArgumentTypes, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
@@ -7337,7 +7336,7 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        imported_symbol(db, self.module(db).file(), name, ImportedSymbolKind::Named).symbol
+        imported_symbol(db, self.module(db).file(), name, None).symbol
     }
 }
 

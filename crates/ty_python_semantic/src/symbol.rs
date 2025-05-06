@@ -285,42 +285,20 @@ pub(crate) fn global_symbol<'db>(
         .or_fall_back_to(db, || module_type_implicit_global_symbol(db, name))
 }
 
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum ImportedSymbolKind {
-    /// A named import (e.g. `from module import name`)
-    Named,
-    /// A star import (e.g. `from module import *`)
-    Star,
-}
-
 /// Infers the public type of an imported symbol.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
     file: File,
     name: &str,
-    kind: ImportedSymbolKind,
+    requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> SymbolAndQualifiers<'db> {
-    let is_stub = file.is_stub(db.upcast());
-
-    let requires_explicit_reexport = if !is_stub && matches!(kind, ImportedSymbolKind::Named) {
-        // Optimization: Avoid looking up `__all__` in non-stub files using a named import.
-        RequiresExplicitReExport::No
-    } else if let Some(all_names) = dunder_all_names(db, file) {
-        if all_names.contains(name) {
-            RequiresExplicitReExport::No
-        } else if matches!(kind, ImportedSymbolKind::Star) {
-            // For star imports in both stub and non-stub file, if the symbol is not in `__all__`,
-            // then it's unbound.
-            return Symbol::Unbound.into();
-        } else {
+    let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
+        if file.is_stub(db) {
             RequiresExplicitReExport::Yes
+        } else {
+            RequiresExplicitReExport::No
         }
-    } else if is_stub {
-        // For a stub file not containing `__all__`, re-export convention is enforced.
-        RequiresExplicitReExport::Yes
-    } else {
-        RequiresExplicitReExport::No
-    };
+    });
 
     // If it's not found in the global scope, check if it's present as an instance on
     // `types.ModuleType` or `builtins.object`.
@@ -384,7 +362,7 @@ pub(crate) fn known_module_symbol<'db>(
     symbol: &str,
 ) -> SymbolAndQualifiers<'db> {
     resolve_module(db, &known_module.name())
-        .map(|module| imported_symbol(db, module.file(), symbol, ImportedSymbolKind::Named))
+        .map(|module| imported_symbol(db, module.file(), symbol, None))
         .unwrap_or_default()
 }
 
@@ -743,7 +721,17 @@ fn symbol_from_bindings_impl<'db>(
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
-        requires_explicit_reexport.is_yes() && !binding.is_reexported(db)
+        if requires_explicit_reexport.is_yes() && !binding.is_reexported(db) {
+            if let Some(all_names) = dunder_all_names(db, binding.file(db)) {
+                let table = symbol_table(db, binding.scope(db));
+                let symbol_name = table.symbol(binding.symbol(db)).name();
+                !all_names.contains(symbol_name)
+            } else {
+                true
+            }
+        } else {
+            false
+        }
     };
 
     let unbound_visibility_constraint = match bindings_with_constraints.peek() {
@@ -874,7 +862,17 @@ fn symbol_from_declarations_impl<'db>(
     let mut declarations = declarations.peekable();
 
     let is_non_exported = |declaration: Definition<'db>| {
-        requires_explicit_reexport.is_yes() && !declaration.is_reexported(db)
+        if requires_explicit_reexport.is_yes() && !declaration.is_reexported(db) {
+            if let Some(all_names) = dunder_all_names(db, declaration.file(db)) {
+                let table = symbol_table(db, declaration.scope(db));
+                let symbol_name = table.symbol(declaration.symbol(db)).name();
+                !all_names.contains(symbol_name)
+            } else {
+                true
+            }
+        } else {
+            false
+        }
     };
 
     let undeclared_visibility = match declarations.peek() {
@@ -1057,7 +1055,7 @@ mod implicit_globals {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-enum RequiresExplicitReExport {
+pub(crate) enum RequiresExplicitReExport {
     Yes,
     No,
 }
