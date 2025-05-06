@@ -6,7 +6,7 @@
 from b import C as D
 
 E = D
-reveal_type(E)  # revealed: Literal[C]
+reveal_type(E)  # revealed: <class 'C'>
 ```
 
 `b.py`:
@@ -21,7 +21,7 @@ class C: ...
 import b
 
 D = b.C
-reveal_type(D)  # revealed: Literal[C]
+reveal_type(D)  # revealed: <class 'C'>
 ```
 
 `b.py`:
@@ -35,12 +35,13 @@ class C: ...
 ```py
 import a.b
 
-reveal_type(a.b.C)  # revealed: Literal[C]
+reveal_type(a.b.C)  # revealed: <class 'C'>
 ```
 
 `a/__init__.py`:
 
 ```py
+
 ```
 
 `a/b.py`:
@@ -54,17 +55,19 @@ class C: ...
 ```py
 import a.b.c
 
-reveal_type(a.b.c.C)  # revealed: Literal[C]
+reveal_type(a.b.c.C)  # revealed: <class 'C'>
 ```
 
 `a/__init__.py`:
 
 ```py
+
 ```
 
 `a/b/__init__.py`:
 
 ```py
+
 ```
 
 `a/b/c.py`:
@@ -78,12 +81,13 @@ class C: ...
 ```py
 import a.b as b
 
-reveal_type(b.C)  # revealed: Literal[C]
+reveal_type(b.C)  # revealed: <class 'C'>
 ```
 
 `a/__init__.py`:
 
 ```py
+
 ```
 
 `a/b.py`:
@@ -97,17 +101,19 @@ class C: ...
 ```py
 import a.b.c as c
 
-reveal_type(c.C)  # revealed: Literal[C]
+reveal_type(c.C)  # revealed: <class 'C'>
 ```
 
 `a/__init__.py`:
 
 ```py
+
 ```
 
 `a/b/__init__.py`:
 
 ```py
+
 ```
 
 `a/b/c.py`:
@@ -139,6 +145,7 @@ import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.fo
 `a/__init__.py`:
 
 ```py
+
 ```
 
 ## Long paths

@@ -74,6 +74,7 @@ def f(c: type[a.b.C]):
 `a/__init__.py`:
 
 ```py
+
 ```
 
 `a/b.py`:
@@ -147,8 +148,8 @@ _: type[A, B]
 ```py
 class Foo(type[int]): ...
 
-# TODO: should be `tuple[Literal[Foo], Literal[type], Literal[object]]
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], @Todo(GenericAlias instance), Literal[object]]
+# TODO: should be `tuple[<class 'Foo'>, <class 'type'>, <class 'object'>]
+reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, @Todo(GenericAlias instance), <class 'object'>]
 ```
 
 ## `@final` classes
@@ -169,6 +170,6 @@ from typing import final
 class Foo: ...
 
 def _(x: type[Foo], y: type[EllipsisType]):
-    reveal_type(x)  # revealed: Literal[Foo]
+    reveal_type(x)  # revealed: <class 'Foo'>
     reveal_type(y)  # revealed: <class 'EllipsisType'>
 ```

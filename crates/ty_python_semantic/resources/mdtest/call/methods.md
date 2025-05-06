@@ -25,9 +25,9 @@ object (in which case it is `None`), or from an instance (in which case it is th
 - `C().f` is equivalent to `getattr_static(C, "f").__get__(C(), C)`
 
 Here, `inspect.getattr_static` is used to bypass the descriptor protocol and directly access the
-function attribute. The way the special `__get__` method *on functions* works is as follows. In the
+function attribute. The way the special `__get__` method _on functions_ works is as follows. In the
 former case, if the `instance` argument is `None`, `__get__` simply returns the function itself. In
-the latter case, it returns a *bound method* object:
+the latter case, it returns a _bound method_ object:
 
 ```py
 from inspect import getattr_static
@@ -270,7 +270,7 @@ class Meta(type):
 class C(metaclass=Meta):
     pass
 
-reveal_type(C.f)  # revealed: bound method Literal[C].f(arg: int) -> str
+reveal_type(C.f)  # revealed: bound method type[C].f(arg: int) -> str
 reveal_type(C.f(1))  # revealed: str
 ```
 
@@ -322,7 +322,7 @@ class C:
     def f(cls: type[C], x: int) -> str:
         return "a"
 
-reveal_type(C.f)  # revealed: bound method Literal[C].f(x: int) -> str
+reveal_type(C.f)  # revealed: bound method <class 'C'>.f(x: int) -> str
 reveal_type(C().f)  # revealed: bound method type[C].f(x: int) -> str
 ```
 
@@ -350,7 +350,7 @@ class D:
         # This function is wrongly annotated, it should be `type[D]` instead of `D`
         pass
 
-# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `D`, found `Literal[D]`"
+# error: [invalid-argument-type] "Argument to this function is incorrect: Expected `D`, found `<class 'D'>`"
 D.f()
 ```
 
@@ -360,7 +360,7 @@ When a class method is accessed on a derived class, it is bound to that derived 
 class Derived(C):
     pass
 
-reveal_type(Derived.f)  # revealed: bound method Literal[Derived].f(x: int) -> str
+reveal_type(Derived.f)  # revealed: bound method <class 'Derived'>.f(x: int) -> str
 reveal_type(Derived().f)  # revealed: bound method type[Derived].f(x: int) -> str
 
 reveal_type(Derived.f(1))  # revealed: str
@@ -386,15 +386,15 @@ reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get_
 But we correctly model how the `classmethod` descriptor works:
 
 ```py
-reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: bound method Literal[C].f() -> Unknown
-reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: bound method Literal[C].f() -> Unknown
+reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: bound method <class 'C'>.f() -> Unknown
+reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: bound method <class 'C'>.f() -> Unknown
 reveal_type(getattr_static(C, "f").__get__(C()))  # revealed: bound method type[C].f() -> Unknown
 ```
 
 The `owner` argument takes precedence over the `instance` argument:
 
 ```py
-reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: bound method Literal[C].f() -> Unknown
+reveal_type(getattr_static(C, "f").__get__("dummy", C))  # revealed: bound method <class 'C'>.f() -> Unknown
 ```
 
 ### Classmethods mixed with other decorators

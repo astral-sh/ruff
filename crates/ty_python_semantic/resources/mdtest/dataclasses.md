@@ -181,7 +181,7 @@ class D:
     class_literal: TypeOf[SomeClass]
     class_subtype_of: type[SomeClass]
 
-# revealed: (function_literal: def some_function() -> None, class_literal: Literal[SomeClass], class_subtype_of: type[SomeClass]) -> None
+# revealed: (function_literal: def some_function() -> None, class_literal: <class 'SomeClass'>, class_subtype_of: type[SomeClass]) -> None
 reveal_type(D.__init__)
 ```
 
@@ -675,7 +675,7 @@ from dataclasses import dataclass
 class C:
     x: int
 
-# error: [unresolved-attribute] "Attribute `x` can only be accessed on instances, not on the class object `Literal[C]` itself."
+# error: [unresolved-attribute] "Attribute `x` can only be accessed on instances, not on the class object `<class 'C'>` itself."
 C.x
 ```
 
@@ -715,8 +715,8 @@ class Person:
     name: str
     age: int | None = None
 
-reveal_type(type(Person))  # revealed: Literal[type]
-reveal_type(Person.__mro__)  # revealed: tuple[Literal[Person], Literal[object]]
+reveal_type(type(Person))  # revealed: <class 'type'>
+reveal_type(Person.__mro__)  # revealed: tuple[<class 'Person'>, <class 'object'>]
 ```
 
 The generated methods have the following signatures:

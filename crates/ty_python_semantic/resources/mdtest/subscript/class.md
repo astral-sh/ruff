@@ -79,7 +79,7 @@ def _(flag: bool):
     else:
         Eggs = 1
 
-    a = Eggs[42]  # error: "Cannot subscript object of type `Literal[Eggs] | Literal[1]` with no `__getitem__` method"
+    a = Eggs[42]  # error: "Cannot subscript object of type `Literal[<class 'Eggs'>] | Literal[1]` with no `__getitem__` method"
 
     # TODO: should _probably_ emit `str | Unknown`
     reveal_type(a)  # revealed: Unknown

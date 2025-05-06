@@ -17,7 +17,6 @@ pub(super) trait RequestHandler {
 /// This will block the main message receiver loop, meaning that no
 /// incoming requests or notifications will be handled while `run` is
 /// executing. Try to avoid doing any I/O or long-running computations.
-#[expect(dead_code)]
 pub(super) trait SyncRequestHandler: RequestHandler {
     fn run(
         session: &mut Session,

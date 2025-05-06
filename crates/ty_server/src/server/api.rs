@@ -85,7 +85,7 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
     })
 }
 
-fn _local_request_task<'a, R: traits::SyncRequestHandler>(
+fn local_request_task<'a, R: traits::SyncRequestHandler>(
     req: server::Request,
 ) -> super::Result<Task<'a>> {
     let (id, params) = cast_request::<R>(req)?;

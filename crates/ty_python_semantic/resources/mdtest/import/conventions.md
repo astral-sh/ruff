@@ -68,6 +68,7 @@ from typing import Any as Any, Literal as Literal
 `foo.py`:
 
 ```py
+
 ```
 
 ## Non-exported symbols in stub files
@@ -95,6 +96,7 @@ from typing import Any, Literal
 `foo.pyi`:
 
 ```pyi
+
 ```
 
 ## Nested non-exports
@@ -187,7 +189,7 @@ reveal_type(Foo)  # revealed: Unknown
 ```pyi
 from b import AnyFoo as Foo
 
-reveal_type(Foo)  # revealed: Literal[AnyFoo]
+reveal_type(Foo)  # revealed: <class 'AnyFoo'>
 ```
 
 `b.pyi`:
@@ -251,11 +253,13 @@ class Foo: ...
 `a/b/__init__.pyi`:
 
 ```pyi
+
 ```
 
 `a/b/c.pyi`:
 
 ```pyi
+
 ```
 
 ## Conditional re-export in stub file
@@ -281,7 +285,7 @@ def coinflip() -> bool: ...
 if coinflip():
     Foo: str = ...
 
-reveal_type(Foo)  # revealed: Literal[Foo] | str
+reveal_type(Foo)  # revealed: <class 'Foo'> | str
 ```
 
 `b.pyi`:
@@ -299,7 +303,7 @@ the other does not.
 # error: "Member `Foo` of module `a` is possibly unbound"
 from a import Foo
 
-reveal_type(Foo)  # revealed: Literal[Foo]
+reveal_type(Foo)  # revealed: <class 'Foo'>
 ```
 
 `a.pyi`:
@@ -312,7 +316,7 @@ if coinflip():
 else:
     from b import Foo as Foo
 
-reveal_type(Foo)  # revealed: Literal[Foo]
+reveal_type(Foo)  # revealed: <class 'Foo'>
 ```
 
 `b.pyi`:
@@ -327,7 +331,7 @@ class Foo: ...
 # error: "Member `Foo` of module `a` is possibly unbound"
 from a import Foo
 
-reveal_type(Foo)  # revealed: Literal[Foo]
+reveal_type(Foo)  # revealed: <class 'Foo'>
 ```
 
 `a.pyi`:

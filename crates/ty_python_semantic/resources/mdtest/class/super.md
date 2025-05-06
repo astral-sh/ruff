@@ -1,6 +1,6 @@
 # Super
 
-Python defines the terms *bound super object* and *unbound super object*.
+Python defines the terms _bound super object_ and _unbound super object_.
 
 An **unbound super object** is created when `super` is called with only one argument. (e.g.
 `super(A)`). This object may later be bound using the `super.__get__` method. However, this form is
@@ -30,24 +30,24 @@ class C(B):
     def c(self): ...
     cc: int = 3
 
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[B], Literal[A], Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>]
 
 super(C, C()).a
 super(C, C()).b
-# error: [unresolved-attribute] "Type `<super: Literal[C], C>` has no attribute `c`"
+# error: [unresolved-attribute] "Type `<super: <class 'C'>, C>` has no attribute `c`"
 super(C, C()).c
 
 super(B, C()).a
-# error: [unresolved-attribute] "Type `<super: Literal[B], C>` has no attribute `b`"
+# error: [unresolved-attribute] "Type `<super: <class 'B'>, C>` has no attribute `b`"
 super(B, C()).b
-# error: [unresolved-attribute] "Type `<super: Literal[B], C>` has no attribute `c`"
+# error: [unresolved-attribute] "Type `<super: <class 'B'>, C>` has no attribute `c`"
 super(B, C()).c
 
-# error: [unresolved-attribute] "Type `<super: Literal[A], C>` has no attribute `a`"
+# error: [unresolved-attribute] "Type `<super: <class 'A'>, C>` has no attribute `a`"
 super(A, C()).a
-# error: [unresolved-attribute] "Type `<super: Literal[A], C>` has no attribute `b`"
+# error: [unresolved-attribute] "Type `<super: <class 'A'>, C>` has no attribute `b`"
 super(A, C()).b
-# error: [unresolved-attribute] "Type `<super: Literal[A], C>` has no attribute `c`"
+# error: [unresolved-attribute] "Type `<super: <class 'A'>, C>` has no attribute `c`"
 super(A, C()).c
 
 reveal_type(super(C, C()).a)  # revealed: bound method C.a() -> Unknown
@@ -72,14 +72,14 @@ class A:
 
 class B(A):
     def __init__(self, a: int):
-        # TODO: Once `Self` is supported, this should be `<super: Literal[B], B>`
-        reveal_type(super())  # revealed: <super: Literal[B], Unknown>
+        # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, B>`
+        reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
         super().__init__(a)
 
     @classmethod
     def f(cls):
-        # TODO: Once `Self` is supported, this should be `<super: Literal[B], Literal[B]>`
-        reveal_type(super())  # revealed: <super: Literal[B], Unknown>
+        # TODO: Once `Self` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
+        reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
         super().f()
 
 super(B, B(42)).__init__(42)
@@ -88,7 +88,7 @@ super(B, B).f()
 
 ### Unbound Super Object
 
-Calling `super(cls)` without a second argument returns an *unbound super object*. This is treated as
+Calling `super(cls)` without a second argument returns an _unbound super object_. This is treated as
 a plain `super` instance and does not support name lookup via the MRO.
 
 ```py
@@ -115,7 +115,7 @@ class A:
 class B(A): ...
 
 reveal_type(super(B, B()).a)  # revealed: int
-# error: [invalid-assignment] "Cannot assign to attribute `a` on type `<super: Literal[B], B>`"
+# error: [invalid-assignment] "Cannot assign to attribute `a` on type `<super: <class 'B'>, B>`"
 super(B, B()).a = 3
 # error: [invalid-assignment] "Cannot assign to attribute `a` on type `super`"
 super(B).a = 5
@@ -134,7 +134,7 @@ def f(x):
     reveal_type(x)  # revealed: Unknown
 
     reveal_type(super(x, x))  # revealed: <super: Unknown, Unknown>
-    reveal_type(super(A, x))  # revealed: <super: Literal[A], Unknown>
+    reveal_type(super(A, x))  # revealed: <super: <class 'A'>, Literal[A]>
     reveal_type(super(x, A()))  # revealed: <super: Unknown, A>
 
     reveal_type(super(x, x).a)  # revealed: Unknown
@@ -149,29 +149,29 @@ from __future__ import annotations
 
 class A:
     def test(self):
-        reveal_type(super())  # revealed: <super: Literal[A], Unknown>
+        reveal_type(super())  # revealed: <super: <class 'A'>, Unknown>
 
     class B:
         def test(self):
-            reveal_type(super())  # revealed: <super: Literal[B], Unknown>
+            reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
 
             class C(A.B):
                 def test(self):
-                    reveal_type(super())  # revealed: <super: Literal[C], Unknown>
+                    reveal_type(super())  # revealed: <super: <class 'C'>, Unknown>
 
             def inner(t: C):
-                reveal_type(super())  # revealed: <super: Literal[B], C>
-            lambda x: reveal_type(super())  # revealed: <super: Literal[B], Unknown>
+                reveal_type(super())  # revealed: <super: <class 'B'>, C>
+            lambda x: reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
 ```
 
 ## Built-ins and Literals
 
 ```py
-reveal_type(super(bool, True))  # revealed: <super: Literal[bool], bool>
-reveal_type(super(bool, bool()))  # revealed: <super: Literal[bool], bool>
-reveal_type(super(int, bool()))  # revealed: <super: Literal[int], bool>
-reveal_type(super(int, 3))  # revealed: <super: Literal[int], int>
-reveal_type(super(str, ""))  # revealed: <super: Literal[str], str>
+reveal_type(super(bool, True))  # revealed: <super: <class 'bool'>, bool>
+reveal_type(super(bool, bool()))  # revealed: <super: <class 'bool'>, bool>
+reveal_type(super(int, bool()))  # revealed: <super: <class 'int'>, bool>
+reveal_type(super(int, 3))  # revealed: <super: <class 'int'>, int>
+reveal_type(super(str, ""))  # revealed: <super: <class 'str'>, str>
 ```
 
 ## Descriptor Behavior with Super
@@ -386,7 +386,7 @@ class B(A):
         # TODO: Once `Self` is supported, this should raise `unresolved-attribute` error
         super().a
 
-# error: [unresolved-attribute] "Type `<super: Literal[B], B>` has no attribute `a`"
+# error: [unresolved-attribute] "Type `<super: <class 'B'>, B>` has no attribute `a`"
 super(B, B(42)).a
 ```
 
@@ -405,6 +405,6 @@ class B(A): ...
 
 reveal_type(A()[0])  # revealed: int
 reveal_type(super(B, B()).__getitem__)  # revealed: bound method B.__getitem__(key: int) -> int
-# error: [non-subscriptable] "Cannot subscript object of type `<super: Literal[B], B>` with no `__getitem__` method"
+# error: [non-subscriptable] "Cannot subscript object of type `<super: <class 'B'>, B>` with no `__getitem__` method"
 super(B, B())[0]
 ```

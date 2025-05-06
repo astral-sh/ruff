@@ -20,14 +20,14 @@ have been taken from the perspective of code following this block. The inferred 
 block's conclusion is therefore the union of the type at the end of the `try` suite (`str`) and the
 type at the end of the `except` suite (`Literal[2]`).
 
-*Within* the `except` suite, we must infer a union of all possible "definition states" we could have
+_Within_ the `except` suite, we must infer a union of all possible "definition states" we could have
 been in at any point during the `try` suite. This is because control flow could have jumped to the
-`except` suite without any of the `try`-suite definitions successfully completing, with only *some*
-of the `try`-suite definitions successfully completing, or indeed with *all* of them successfully
+`except` suite without any of the `try`-suite definitions successfully completing, with only _some_
+of the `try`-suite definitions successfully completing, or indeed with _all_ of them successfully
 completing. The type of `x` at the beginning of the `except` suite in this example is therefore
 `Literal[1] | str`, taking into account that we might have jumped to the `except` suite before the
-`x = could_raise_returns_str()` redefinition, but we *also* could have jumped to the `except` suite
-*after* that redefinition.
+`x = could_raise_returns_str()` redefinition, but we _also_ could have jumped to the `except` suite
+_after_ that redefinition.
 
 ```py
 def could_raise_returns_str() -> str:
@@ -64,7 +64,7 @@ reveal_type(x)  # revealed: str
 ## A non-bare `except`
 
 For simple `try`/`except` blocks, an `except TypeError:` handler has the same control flow semantics
-as an `except:` handler. An `except TypeError:` handler will not catch *all* exceptions: if this is
+as an `except:` handler. An `except TypeError:` handler will not catch _all_ exceptions: if this is
 the only handler, it opens up the possibility that an exception might occur that would not be
 handled. However, as described in [the document on exception-handling semantics][1], that would lead
 to termination of the scope. It's therefore irrelevant to consider this possibility when it comes to
@@ -182,8 +182,8 @@ reveal_type(x)  # revealed: Literal[2, 3, 4]
 
 ## Exception handlers with `finally` branches (but no `except` branches)
 
-A `finally` suite is *always* executed. As such, if we reach the `reveal_type` call at the end of
-this example, we know that `x` *must* have been reassigned to `2` during the `finally` suite. The
+A `finally` suite is _always_ executed. As such, if we reach the `reveal_type` call at the end of
+this example, we know that `x` _must_ have been reassigned to `2` during the `finally` suite. The
 type of `x` at the end of the example is therefore `Literal[2]`:
 
 ```py
@@ -203,12 +203,12 @@ finally:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-If `x` was *not* redefined in the `finally` suite, however, things are somewhat more complicated. If
+If `x` was _not_ redefined in the `finally` suite, however, things are somewhat more complicated. If
 we reach the final `reveal_type` call, unlike the state when we're visiting the `finally` suite, we
 know that the `try`-block suite ran to completion. This means that there are fewer possible states
 at this point than there were when we were inside the `finally` block.
 
-(Our current model does *not* correctly infer the types *inside* `finally` suites, however; this is
+(Our current model does _not_ correctly infer the types _inside_ `finally` suites, however; this is
 still a TODO item for us.)
 
 ```py
@@ -227,18 +227,18 @@ reveal_type(x)  # revealed: str
 
 ## Combining an `except` branch with a `finally` branch
 
-As previously stated, we do not yet have accurate inference for types *inside* `finally` suites.
+As previously stated, we do not yet have accurate inference for types _inside_ `finally` suites.
 When we do, however, we will have to take account of the following possibilities inside `finally`
 suites:
 
 - The `try` suite could have run to completion
 - Or we could have jumped from halfway through the `try` suite to an `except` suite, and the
-    `except` suite ran to completion
+  `except` suite ran to completion
 - Or we could have jumped from halfway through the `try` suite straight to the `finally` suite due
-    to an unhandled exception
+  to an unhandled exception
 - Or we could have jumped from halfway through the `try` suite to an `except` suite, only for an
-    exception raised in the `except` suite to cause us to jump to the `finally` suite before the
-    `except` suite ran to completion
+  exception raised in the `except` suite to cause us to jump to the `finally` suite before the
+  `except` suite ran to completion
 
 ```py
 class A: ...
@@ -275,9 +275,9 @@ finally:
 reveal_type(x)  # revealed: Literal[2]
 ```
 
-Now for an example without a redefinition in the `finally` suite. As before, there *should* be fewer
+Now for an example without a redefinition in the `finally` suite. As before, there _should_ be fewer
 possibilities after completion of the `finally` suite than there were during the `finally` suite
-itself. (In some control-flow possibilities, some exceptions were merely *suspended* during the
+itself. (In some control-flow possibilities, some exceptions were merely _suspended_ during the
 `finally` suite; these lead to the scope's termination following the conclusion of the `finally`
 suite.)
 
@@ -342,7 +342,7 @@ reveal_type(x)  # revealed: A | C | E
 
 If the exception handler has an `else` branch, we must also take into account the possibility that
 control flow could have jumped to the `finally` suite from partway through the `else` suite due to
-an exception raised *there*.
+an exception raised _there_.
 
 ```py
 class A: ...
@@ -600,12 +600,12 @@ except:
         reveal_type(x)  # revealed: E
 
     x = Bar
-    reveal_type(x)  # revealed: Literal[Bar]
+    reveal_type(x)  # revealed: <class 'Bar'>
 finally:
     # TODO: should be `Literal[1] | Literal[foo] | Literal[Bar]`
-    reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | Literal[Bar]
+    reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | <class 'Bar'>
 
-reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | Literal[Bar]
+reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | <class 'Bar'>
 ```
 
 [1]: https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d

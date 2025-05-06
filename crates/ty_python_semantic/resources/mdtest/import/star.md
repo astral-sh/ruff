@@ -658,9 +658,9 @@ reveal_type(X)  # revealed: bool
 ## Visibility constraints
 
 If an `importer` module contains a `from exporter import *` statement in its global namespace, the
-statement will *not* necessarily import *all* symbols that have definitions in `exporter.py`'s
-global scope. For any given symbol in `exporter.py`'s global scope, that symbol will *only* be
-imported by the `*` import if at least one definition for that symbol is visible from the *end* of
+statement will _not_ necessarily import _all_ symbols that have definitions in `exporter.py`'s
+global scope. For any given symbol in `exporter.py`'s global scope, that symbol will _only_ be
+imported by the `*` import if at least one definition for that symbol is visible from the _end_ of
 `exporter.py`'s global scope.
 
 For example, say that `exporter.py` contains a symbol `X` in its global scope, and the definition
@@ -796,7 +796,7 @@ if coinflip():
 reveal_type(A)  # revealed: Unknown | Literal[1]
 ```
 
-### Visibility constraints in the exporting module *and* the importing module
+### Visibility constraints in the exporting module _and_ the importing module
 
 ```toml
 [environment]
@@ -850,6 +850,7 @@ Relative `*` imports are also supported by Python:
 `a/__init__.py`:
 
 ```py
+
 ```
 
 `a/foo.py`:
@@ -1010,8 +1011,8 @@ a wildcard import from module `a` will fail at runtime.
 TODO: Should we:
 
 1. Emit a diagnostic at the invalid definition of `__all__` (which will not fail at runtime)?
-1. Emit a diagnostic at the star-import from the module with the invalid `__all__` (which *will*
-    fail at runtime)?
+1. Emit a diagnostic at the star-import from the module with the invalid `__all__` (which _will_
+   fail at runtime)?
 1. Emit a diagnostic on both?
 
 `exporter.py`:
@@ -1318,7 +1319,7 @@ reveal_type(h)  # revealed: Unknown
 
 ## Cyclic star imports
 
-Believe it or not, this code does *not* raise an exception at runtime!
+Believe it or not, this code does _not_ raise an exception at runtime!
 
 `a.py`:
 
@@ -1353,7 +1354,7 @@ are present due to `*` imports.
 ```py
 import collections.abc
 
-reveal_type(collections.abc.Sequence)  # revealed: Literal[Sequence]
+reveal_type(collections.abc.Sequence)  # revealed: <class 'Sequence'>
 reveal_type(collections.abc.Callable)  # revealed: typing.Callable
 
 # TODO: false positive as it's only re-exported from `_collections.abc` due to presence in `__all__`

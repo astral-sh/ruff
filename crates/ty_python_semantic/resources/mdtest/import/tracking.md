@@ -4,19 +4,19 @@ These tests depend on how we track which modules have been imported. There are c
 characteristics of our module tracking that can lead to inaccuracies:
 
 - Imports are tracked on a per-file basis. At runtime, importing a submodule in one file makes that
-    submodule globally available via any reference to the containing package. We will flag an error
-    if a file tries to access a submodule without there being an import of that submodule _in that
-    same file_.
+  submodule globally available via any reference to the containing package. We will flag an error
+  if a file tries to access a submodule without there being an import of that submodule _in that
+  same file_.
 
-    This is a purposeful decision, and not one we plan to change. If a module wants to re-export some
-    other module that it imports, there are ways to do that (tested below) that are blessed by the
-    typing spec and that are visible to our file-scoped import tracking.
+  This is a purposeful decision, and not one we plan to change. If a module wants to re-export some
+  other module that it imports, there are ways to do that (tested below) that are blessed by the
+  typing spec and that are visible to our file-scoped import tracking.
 
 - Imports are tracked flow-insensitively: submodule accesses are allowed and resolved if that
-    submodule is imported _anywhere in the file_. This handles the common case where all imports are
-    grouped at the top of the file, and is easiest to implement. We might revisit this decision and
-    track submodule imports flow-sensitively, in which case we will have to update the assertions in
-    some of these tests.
+  submodule is imported _anywhere in the file_. This handles the common case where all imports are
+  grouped at the top of the file, and is easiest to implement. We might revisit this decision and
+  track submodule imports flow-sensitively, in which case we will have to update the assertions in
+  some of these tests.
 
 ## Import submodule later in file
 
@@ -27,7 +27,7 @@ has been imported.
 import a
 
 # Would be an error with flow-sensitive tracking
-reveal_type(a.b.C)  # revealed: Literal[C]
+reveal_type(a.b.C)  # revealed: <class 'C'>
 
 import a.b
 ```
@@ -35,6 +35,7 @@ import a.b
 `a/__init__.py`:
 
 ```py
+
 ```
 
 `a/b.py`:
@@ -53,15 +54,16 @@ submodule `b`, even though `a.b` is never imported in the main module.
 from q import a, b
 
 reveal_type(b)  # revealed: <module 'a.b'>
-reveal_type(b.C)  # revealed: Literal[C]
+reveal_type(b.C)  # revealed: <class 'C'>
 
 reveal_type(a.b)  # revealed: <module 'a.b'>
-reveal_type(a.b.C)  # revealed: Literal[C]
+reveal_type(a.b.C)  # revealed: <class 'C'>
 ```
 
 `a/__init__.py`:
 
 ```py
+
 ```
 
 `a/b.py`:
@@ -102,6 +104,7 @@ b = 1
 `sub/b.py`:
 
 ```py
+
 ```
 
 `attr/__init__.py`:
@@ -115,4 +118,5 @@ b = 1
 `attr/b.py`:
 
 ```py
+
 ```
