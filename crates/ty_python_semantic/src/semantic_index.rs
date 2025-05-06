@@ -176,7 +176,7 @@ pub(crate) struct SemanticIndex<'db> {
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
     scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
 
-    /// Map from the file-local [`FileScopeId`] to the [`Globals`] it contains.
+    /// Map from the file-local [`FileScopeId`] to the set of global names it contains.
     globals_by_scope: FxHashMap<FileScopeId, FxHashSet<ScopedSymbolId>>,
 
     /// Use-def map for each scope in this file.
