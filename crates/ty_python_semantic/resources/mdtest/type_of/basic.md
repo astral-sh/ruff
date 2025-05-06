@@ -170,5 +170,5 @@ class Foo: ...
 
 def _(x: type[Foo], y: type[EllipsisType]):
     reveal_type(x)  # revealed: Literal[Foo]
-    reveal_type(y)  # revealed: Literal[EllipsisType]
+    reveal_type(y)  # revealed: <class 'EllipsisType'>
 ```

@@ -43,7 +43,6 @@ impl Display for DisplayType<'_> {
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
-            | Type::ClassLiteral(_)
             | Type::GenericAlias(_) => {
                 write!(f, "Literal[{representation}]")
             }
@@ -102,8 +101,9 @@ impl Display for DisplayRepresentation<'_> {
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())
             }
-            // TODO functions and classes should display using a fully qualified name
-            Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
+            Type::ClassLiteral(class) => {
+                write!(f, "<class '{}'>", class.name(self.db))
+            }
             Type::GenericAlias(generic) => generic.display(self.db).fmt(f),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as

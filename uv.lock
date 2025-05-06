@@ -1,0 +1,8 @@
+version = 1
+revision = 2
+requires-python = ">=3.7"
+
+[[package]]
+name = "ruff"
+version = "0.11.8"
+source = { editable = "." }

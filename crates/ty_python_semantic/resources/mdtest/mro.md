@@ -212,7 +212,7 @@ reveal_type(x)  # revealed: Literal[A, B]
 # error: 11 [invalid-base] "Invalid class base with type `Literal[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Foo(x): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 ```
 
 ## `__bases__` includes multiple `Union`s
@@ -243,7 +243,7 @@ reveal_type(y)  # revealed: Literal[C, D]
 # error: 14 [invalid-base] "Invalid class base with type `Literal[C, D]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Foo(x, y): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 ```
 
 ## `__bases__` lists that cause errors... now with `Union`s
@@ -264,11 +264,11 @@ else:
 # error: 21 [invalid-base] "Invalid class base with type `Literal[Y, object]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class PossibleError(foo, X): ...
 
-reveal_type(PossibleError.__mro__)  # revealed: tuple[Literal[PossibleError], Unknown, Literal[object]]
+reveal_type(PossibleError.__mro__)  # revealed: tuple[<class 'PossibleError'>, Unknown, <class 'object'>]
 
 class A(X, Y): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], Literal[X], Literal[Y], Literal[O], Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>]
 
 if returns_bool():
     class B(X, Y): ...

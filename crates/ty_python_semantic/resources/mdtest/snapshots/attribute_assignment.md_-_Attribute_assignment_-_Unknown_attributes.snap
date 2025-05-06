@@ -23,7 +23,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
 # Diagnostics
 
 ```
-error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `Literal[C]`.
+error: lint:unresolved-attribute: Unresolved attribute `non_existent` on type `<class 'C'>`.
  --> src/mdtest_snippet.py:3:1
   |
 1 | class C: ...

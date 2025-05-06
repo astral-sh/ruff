@@ -85,7 +85,7 @@ class A(tuple[int, str]): ...
 
 # Runtime value: `(A, tuple, object)`
 # TODO: Generics
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], @Todo(GenericAlias instance), Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, @Todo(GenericAlias instance), <class 'object'>]
 ```
 
 ## `typing.Tuple`
