@@ -877,21 +877,18 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         range,
     );
 
-    match expr {
-        Expr::Name(_) => {
-            if let Replacement::AutoImport { module, name } = replacement {
-                diagnostic.try_set_fix(|| {
-                    let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                        &ImportRequest::import_from(module, name),
-                        expr.start(),
-                        checker.semantic(),
-                    )?;
-                    let replacement_edit = Edit::range_replacement(binding, range);
-                    Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-                });
-            }
+    if let Expr::Name(_) = expr {
+        if let Replacement::AutoImport { module, name } = replacement {
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import_from(module, name),
+                    expr.start(),
+                    checker.semantic(),
+                )?;
+                let replacement_edit = Edit::range_replacement(binding, range);
+                Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+            });
         }
-        _ => {}
     }
 
     checker.report_diagnostic(diagnostic);

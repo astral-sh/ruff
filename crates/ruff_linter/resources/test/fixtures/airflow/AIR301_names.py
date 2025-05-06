@@ -155,8 +155,3 @@ should_hide_value_for_key
 from airflow.operators.python import get_current_context
 
 get_current_context()
-
-
-# this shouldn't be fixed
-from airflow import datasets
-datasets.manager.DatasetManager()

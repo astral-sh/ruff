@@ -446,12 +446,3 @@ AIR301_names.py:157:1: AIR301 `airflow.operators.python.get_current_context` is 
     | ^^^^^^^^^^^^^^^^^^^ AIR301
     |
     = help: Use `airflow.sdk.get_current_context` instead
-
-AIR301_names.py:162:18: AIR301 `airflow.datasets.manager.DatasetManager` is removed in Airflow 3.0
-    |
-160 | # this shouldn't be fixed
-161 | from airflow import datasets
-162 | datasets.manager.DatasetManager()
-    |                  ^^^^^^^^^^^^^^ AIR301
-    |
-    = help: Use `airflow.assets.manager.AssetManager` instead

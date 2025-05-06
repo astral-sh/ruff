@@ -279,22 +279,24 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ranged.range(),
     );
 
-    if let ProviderReplacement::AutoImport {
-        module,
-        name,
-        provider: _,
-        version: _,
-    } = replacement
-    {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, ranged.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+    if let Expr::Name(_) = expr {
+        if let ProviderReplacement::AutoImport {
+            module,
+            name,
+            provider: _,
+            version: _,
+        } = replacement
+        {
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import_from(module, name),
+                    expr.start(),
+                    checker.semantic(),
+                )?;
+                let replacement_edit = Edit::range_replacement(binding, ranged.range());
+                Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+            });
+        }
     }
 
     checker.report_diagnostic(diagnostic);
