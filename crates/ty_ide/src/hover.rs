@@ -374,10 +374,10 @@ mod tests {
         );
 
         assert_snapshot!(test.hover(), @r"
-        T
+        ~T
         ---------------------------------------------
         ```text
-        T
+        ~T
         ```
         ---------------------------------------------
         info: lint:hover: Hovered content is
