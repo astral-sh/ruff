@@ -1,0 +1,51 @@
+---
+source: crates/ruff_linter/src/rules/pycodestyle/mod.rs
+---
+E12.py:180:5: E125 Continuation line with same indent as next logical line
+    |
+178 | #: E125
+179 | if foo is None and bar is "frop" and \
+180 |     blah == 'yeah':
+    |     ^^^^^^^^^^^^^^^ E125
+181 |     blah = 'yeahnah'
+182 | #: E125
+    |
+
+E12.py:188:5: E125 Continuation line with same indent as next logical line
+    |
+186 | def long_function_name(
+187 |     var_one, var_two, var_three,
+188 |     var_four):
+    |     ^^^^^^^^^^ E125
+189 |     print(var_one)
+190 | #
+    |
+
+E12.py:196:5: E125 Continuation line with same indent as next logical line
+    |
+194 | def qualify_by_address(
+195 |     self, cr, uid, ids, context=None,
+196 |     params_to_check=frozenset(QUALIF_BY_ADDRESS_PARAM)):
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E125
+197 |     """ This gets called by the web server """
+198 | #: E129 W503
+    |
+
+E12.py:351:5: E125 Continuation line with same indent as next logical line
+    |
+349 | #: E125:2:5 E125:8:5
+350 | if ("""
+351 |     """):
+    |     ^^^^^ E125
+352 |     pass
+    |
+
+E12.py:357:5: E125 Continuation line with same indent as next logical line
+    |
+355 |     abc
+356 |     123
+357 |     """.strip().split():
+    |     ^^^^^^^^^^^^^^^^^^^^ E125
+358 |     print(foo)
+359 | #: E122:6:5 E122:7:5 E122:8:1
+    |
