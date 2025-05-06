@@ -126,7 +126,9 @@ declare_lint! {
     /// Checks whether a variable has been declared as two conflicting types.
     ///
     /// ## Why is this bad
-    /// A variable with two conflicting declarations likely indicates a mistake. Moreover, it could lead to incorrect or ill-defined type inference for other code that relies on these variables.
+    /// A variable with two conflicting declarations likely indicates a mistake.
+    /// Moreover, it could lead to incorrect or ill-defined type inference for
+    /// other code that relies on these variables.
     pub(crate) static CONFLICTING_DECLARATIONS = {
         summary: "detects conflicting declarations",
         status: LintStatus::preview("1.0.0"),
@@ -288,7 +290,8 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for attempts to use an out of bounds index to get an item from a container.
+    /// Checks for attempts to use an out of bounds index to get an item from
+    /// a container.
     ///
     /// ## Why is this bad?
     /// Using an out of bounds index will raise an `IndexError` at runtime.
@@ -820,7 +823,8 @@ declare_lint! {
     /// Checks for imports of symbols that may be unbound.
     ///
     /// ## Why is this bad?
-    /// Importing an unbound module or name will raise a `ModuleNotFoundError` or `ImportError` at runtime.
+    /// Importing an unbound module or name will raise a `ModuleNotFoundError`
+    /// or `ImportError` at runtime.
     pub(crate) static POSSIBLY_UNBOUND_IMPORT = {
         summary: "detects possibly unbound imports",
         status: LintStatus::preview("1.0.0"),
@@ -1010,7 +1014,8 @@ declare_lint! {
     /// Checks for import statements for which the module cannot be resolved.
     ///
     /// ## Why is this bad?
-    /// Importing a module that cannot be resolved will raise an `ImportError` at runtime.
+    /// Importing a module that cannot be resolved will raise an `ImportError`
+    /// at runtime.
     pub(crate) static UNRESOLVED_IMPORT = {
         summary: "detects unresolved imports",
         status: LintStatus::preview("1.0.0"),
@@ -1039,10 +1044,12 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.
+    /// Checks for binary expressions, comparisons, and unary expressions where
+    /// the operands don't support the operator.
     ///
     /// ## Why is this bad?
-    /// Attempting to use an unsupported operator will raise a `TypeError` at runtime.
+    /// Attempting to use an unsupported operator will raise a `TypeError` at
+    /// runtime.
     pub(crate) static UNSUPPORTED_OPERATOR = {
         summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
         status: LintStatus::preview("1.0.0"),
