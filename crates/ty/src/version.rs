@@ -54,16 +54,20 @@ pub(crate) fn version() -> VersionInfo {
         last_tag: option_env_str!("TY_LAST_TAG"),
     });
 
-    let version = commit_info
-        .as_ref()
-        .and_then(|info| {
-            info.last_tag.as_ref().map(|tag| {
-                tag.strip_prefix("v")
-                    .map(std::string::ToString::to_string)
-                    .unwrap_or(tag.clone())
+    // The version is pulled from `dist-workspace.toml` and set by `build.rs`
+    let version = option_env_str!("TY_VERSION").unwrap_or_else(|| {
+        // If missing, using the last tag
+        commit_info
+            .as_ref()
+            .and_then(|info| {
+                info.last_tag.as_ref().map(|tag| {
+                    tag.strip_prefix("v")
+                        .map(std::string::ToString::to_string)
+                        .unwrap_or(tag.clone())
+                })
             })
-        })
-        .unwrap_or("unknown".to_string());
+            .unwrap_or("unknown".to_string())
+    });
 
     VersionInfo {
         version,
