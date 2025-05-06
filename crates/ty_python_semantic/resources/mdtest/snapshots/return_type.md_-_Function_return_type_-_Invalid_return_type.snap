@@ -84,7 +84,7 @@ info: `lint:invalid-return-type` is enabled by default
 ```
 
 ```
-error: lint:invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `T`
+error: lint:invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `~T`
   --> src/mdtest_snippet.py:18:16
    |
 17 | # error: [invalid-return-type]
