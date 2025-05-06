@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::visitor::{walk_stmt, Visitor};
+use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
 use ruff_python_ast::{self as ast, name::Name};
 
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
@@ -30,7 +30,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<&FxHashSet<Nam
     #[allow(clippy::ref_option)]
     #[salsa::tracked(return_ref, cycle_fn=dunder_all_names_cycle_recover, cycle_initial=dunder_all_names_cycle_initial)]
     fn dunder_all_names_impl(db: &dyn Db, file: File) -> Option<FxHashSet<Name>> {
-        let _span = tracing::trace_span!("dunder_all_names", ?file).entered();
+        let _span = tracing::trace_span!("dunder_all_names", file=?file.path(db)).entered();
 
         let module = parsed_module(db.upcast(), file);
         let index = semantic_index(db, file);
@@ -119,8 +119,7 @@ impl<'db> DunderAllNamesCollector<'db> {
                 let Some(module_literal) = ty.into_module_literal() else {
                     return;
                 };
-                // TODO: Do we need to check if the module is a submodule of the current
-                // module?
+                // TODO: Do we need to check if the module is a submodule of the current module?
                 let Some(module_dunder_all_names) =
                     dunder_all_names(self.db, module_literal.module(self.db).file())
                 else {
@@ -133,6 +132,24 @@ impl<'db> DunderAllNamesCollector<'db> {
         }
     }
 
+    /// Returns the names in `__all__` from the module imported from the given `import_from`
+    /// statement.
+    ///
+    /// Returns [`None`] if module resolution fails, invalid syntax, or if the module does not have
+    /// a `__all__` variable.
+    fn dunder_all_names_for_import_from(
+        &self,
+        import_from: &ast::StmtImportFrom,
+    ) -> Option<&'db FxHashSet<Name>> {
+        let module_name =
+            ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
+        let module = resolve_module(self.db, &module_name)?;
+        dunder_all_names(self.db, module.file())
+    }
+
+    /// Evaluate the given expression and return its truthiness.
+    ///
+    /// Returns [`None`] if the expression type doesn't implement `__bool__` correctly.
     fn evaluate_test_expr(&self, expr: &ast::Expr) -> Option<Truthiness> {
         infer_expression_types(self.db, self.index.expression(expr))
             .expression_type(expr.scoped_expression_id(self.db, self.scope))
@@ -140,6 +157,8 @@ impl<'db> DunderAllNamesCollector<'db> {
             .ok()
     }
 
+    /// Create and return a [`Name`] from the given expression, [`None`] if it is an valid
+    /// expression for a `__all__` element.
     fn create_name(&mut self, expr: &ast::Expr) -> Option<Name> {
         let Some(ast::ExprStringLiteral { value, .. }) = expr.as_string_literal_expr() else {
             self.contains_invalid_element = true;
@@ -152,6 +171,7 @@ impl<'db> DunderAllNamesCollector<'db> {
         Some(Name::new(value.to_str()))
     }
 
+    /// Add valid names to the set.
     fn add_names(&mut self, exprs: &[ast::Expr]) {
         for expr in exprs {
             let Some(name) = self.create_name(expr) else {
@@ -161,65 +181,72 @@ impl<'db> DunderAllNamesCollector<'db> {
         }
     }
 
-    fn into_names(mut self) -> Option<FxHashSet<Name>> {
+    /// Consumes `self` and returns the collected set of names.
+    ///
+    /// Returns [`None`] if `__all__` is not defined in the current module or if it contains
+    /// invalid elements.
+    fn into_names(self) -> Option<FxHashSet<Name>> {
         if self.contains_invalid_element {
-            tracing::trace!("`__all__` contains invalid elements");
-            return None;
+            tracing::trace!(
+                "`__all__` in `{}` contains invalid elements",
+                self.file.path(self.db)
+            );
+            None
+        } else {
+            Some(self.names)
         }
-
-        if let DunderAllOrigin::ExternalModule(external_module) = self.origin? {
-            // TODO: Should this be done eagerly instead of lazily?
-            if let Some(module) = resolve_module(self.db, &external_module) {
-                if let Some(all_names) = dunder_all_names(self.db, module.file()) {
-                    self.names.extend(all_names.iter().cloned());
-                }
-            }
-        }
-
-        Some(self.names)
     }
 }
 
-impl<'db> Visitor<'db> for DunderAllNamesCollector<'db> {
+impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
     fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
         match stmt {
             ast::Stmt::ImportFrom(import_from @ ast::StmtImportFrom { names, .. }) => {
                 for ast::Alias { name, asname, .. } in names {
                     // `from module import *` where `module` is a module with a top-level `__all__`
-                    // variable that contains the "__all__" name.
+                    // variable that contains the "__all__" element.
                     if name == "*" {
-                        let Ok(module_name) =
-                            ModuleName::from_import_statement(self.db, self.file, import_from)
-                        else {
-                            continue;
-                        };
-                        let Some(module) = resolve_module(self.db, &module_name) else {
-                            continue;
-                        };
                         // Here, we need to use the `dunder_all_names` query instead of the
                         // `exported_names` query because a `*`-import does not import the
                         // `__all__` attribute unless it is explicitly included in the `__all__` of
                         // the module.
-                        let Some(all_names) = dunder_all_names(self.db, module.file()) else {
+                        let Some(all_names) = self.dunder_all_names_for_import_from(import_from)
+                        else {
                             continue;
                         };
+
                         if all_names.contains(&Name::new_static("__all__")) {
                             self.update_origin(DunderAllOrigin::StarImport);
+                            self.names.extend(all_names.iter().cloned());
                         }
-                        continue;
-                    }
+                    } else {
+                        // `from module import __all__`
+                        // `from module import __all__ as __all__`
+                        if name != "__all__"
+                            || asname.as_ref().is_some_and(|asname| asname != "__all__")
+                        {
+                            continue;
+                        }
 
-                    // `from module import __all__`
-                    // `from module import __all__ as __all__`
-                    if name != "__all__"
-                        || asname.as_ref().is_some_and(|asname| asname != "__all__")
-                    {
-                        continue;
-                    }
-                    if let Ok(module_name) =
-                        ModuleName::from_import_statement(self.db, self.file, import_from)
-                    {
-                        self.update_origin(DunderAllOrigin::ExternalModule(module_name));
+                        // We could do the `__all__` lookup lazily in case it's not needed. This would
+                        // happen if a `__all__` is imported from another module but then the module
+                        // redefines it. For example:
+                        //
+                        // ```python
+                        // from module import __all__ as __all__
+                        //
+                        // __all__ = ["a", "b"]
+                        // ```
+                        //
+                        // I'm avoiding this for now because it doesn't seem likely to happen in
+                        // practice.
+                        let Some(all_names) = self.dunder_all_names_for_import_from(import_from)
+                        else {
+                            continue;
+                        };
+
+                        self.update_origin(DunderAllOrigin::ExternalModule);
+                        self.names.extend(all_names.iter().cloned());
                     }
                 }
             }
@@ -390,7 +417,7 @@ enum DunderAllOrigin {
     CurrentModule,
 
     /// The `__all__` variable is imported from another module.
-    ExternalModule(ModuleName),
+    ExternalModule,
 
     /// The `__all__` variable is imported from a module via a `*`-import.
     StarImport,
