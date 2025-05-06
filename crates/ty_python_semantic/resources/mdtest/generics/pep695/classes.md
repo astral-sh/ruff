@@ -290,10 +290,12 @@ class Parent[T]:
 
 class Child[U](Parent[U]): ...
 class Grandchild[V](Child[V]): ...
+class Greatgrandchild[W](Child[W]): ...
 
 reveal_type(Parent[int]().x)  # revealed: int
 reveal_type(Child[int]().x)  # revealed: int
 reveal_type(Grandchild[int]().x)  # revealed: int
+reveal_type(Greatgrandchild[int]().x)  # revealed: int
 ```
 
 ## Generic methods
