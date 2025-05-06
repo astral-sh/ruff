@@ -13,7 +13,7 @@ use crate::checkers::ast::Checker;
 /// The import alias is redundant and should be removed to avoid confusion.
 ///
 /// ## Fix safety
-/// This fix is sometimes unsafe. When an import with a useless alias is also
+/// This fix is always unsafe. When an import with a useless alias is also
 /// configured as a required import in isort settings, removing the alias would
 /// create a conflict which causes an infinite loop. Ruff detects this situation
 /// and suggest to "Change required import or disable rule".
