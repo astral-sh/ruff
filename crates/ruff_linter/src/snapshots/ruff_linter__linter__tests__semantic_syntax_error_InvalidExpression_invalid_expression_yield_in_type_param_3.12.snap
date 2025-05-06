@@ -1,0 +1,8 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+<filename>:2:12: SyntaxError: yield expression cannot be used within a TypeVar bound
+  |
+2 | type X[T: (yield 1)] = int
+  |            ^^^^^^^
+  |

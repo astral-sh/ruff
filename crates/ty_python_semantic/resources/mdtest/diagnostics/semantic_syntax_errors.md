@@ -228,6 +228,93 @@ for x in *range(10):
     pass
 ```
 
+## Irrefutable case pattern
+
+Irrefutable patterns, i.e. wildcard or capture patterns, must be the last case in a match statement.
+Following case statements are unreachable.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+value = 5
+
+match value:
+    # error: [invalid-syntax] "wildcard makes remaining patterns unreachable"
+    case _:  # Irrefutable wildcard pattern
+        pass
+    case 5:
+        pass
+
+match value:
+    # error: [invalid-syntax] "name capture `variable` makes remaining patterns unreachable"
+    case variable:  # Irrefutable capture pattern
+        pass
+    case 10:
+        pass
+```
+
+## Single starred assignment
+
+Starred assignment targets cannot appear by themselves. They must be in the context of a list or
+tuple.
+
+```py
+# error: [invalid-syntax] "starred assignment target must be in a list or tuple"
+*a = [1, 2, 3, 4]
+```
+
+## Write to debug
+
+The special Python builtin `__debug__` should not be modified.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+# error: [invalid-syntax] "cannot assign to `__debug__`"
+__debug__ = False
+
+# error: [invalid-syntax] "cannot assign to `__debug__`"
+def process(__debug__):
+    pass
+
+# error: [invalid-syntax] "cannot assign to `__debug__`"
+class Generic[__debug__]:
+    pass
+```
+
+## Invalid expression
+
+Certain expressions like `yield` or inlined walrus assignments are not valid in specific contexts.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```python
+# error: [invalid-syntax] "yield expression not allowed in type parameter bounds"
+type X[T: (yield 1)] = int
+
+# error: [invalid-syntax] "yield expression not allowed in type alias"
+type Y = (yield 1)
+
+# error: [invalid-syntax] "named expression not allowed in return annotation"
+def f[T](x: int) -> (y := 3):
+    return x
+```
+
+```python
+# error: [invalid-syntax] "yield from expression not allowed in base class list"
+class C[T]((yield from [object])):
+    pass
+```
+
 ## `await` outside async function
 
 This error includes `await`, `async for`, `async with`, and `async` comprehensions.
