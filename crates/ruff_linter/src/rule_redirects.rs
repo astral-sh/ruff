@@ -20,8 +20,6 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
         ("C9", "C90"),
         ("T1", "T10"),
         ("T2", "T20"),
-        // TODO(charlie): Remove by 2023-02-01.
-        ("R", "RET"),
         ("R5", "RET5"),
         ("R50", "RET50"),
         ("R501", "RET501"),
