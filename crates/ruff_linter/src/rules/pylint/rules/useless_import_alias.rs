@@ -13,10 +13,9 @@ use crate::checkers::ast::Checker;
 /// The import alias is redundant and should be removed to avoid confusion.
 ///
 /// ## Fix safety
-/// This fix is always unsafe. When an import with a useless alias is also
-/// configured as a required import in isort settings, removing the alias would
-/// create a conflict which causes an infinite loop. Ruff detects this situation
-/// and suggest to "Change required import or disable rule".
+/// This fix is marked as always unsafe because the user may be intentionally
+/// re-exporting the import. While statements like `import numpy as numpy`
+/// appear redundant, they can have semantic meaning in certain contexts.
 ///
 /// ## Example
 /// ```python
