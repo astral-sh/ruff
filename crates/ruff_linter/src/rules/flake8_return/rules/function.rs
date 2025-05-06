@@ -857,10 +857,6 @@ pub(crate) fn function(checker: &Checker, function_def: &ast::StmtFunctionDef) {
         if checker.enabled(Rule::ImplicitReturn) {
             implicit_return(checker, function_def, last_stmt);
         }
-
-        // if checker.enabled(Rule::UnnecessaryAssign) {
-        //     unnecessary_assign(checker, &stack);
-        // }
     } else {
         if checker.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
