@@ -117,7 +117,7 @@ impl<'db> Mro<'db> {
                     Ok(std::iter::once(ClassBase::Class(
                         class.apply_optional_specialization(db, specialization),
                     ))
-                    .chain(single_base.mro(db))
+                    .chain(single_base.mro(db, specialization))
                     .collect())
                 },
             ),
@@ -146,7 +146,7 @@ impl<'db> Mro<'db> {
                     class.apply_optional_specialization(db, specialization),
                 )])];
                 for base in &valid_bases {
-                    seqs.push(base.mro(db).collect());
+                    seqs.push(base.mro(db, specialization).collect());
                 }
                 seqs.push(valid_bases.iter().copied().collect());
 

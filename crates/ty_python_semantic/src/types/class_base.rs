@@ -1,4 +1,4 @@
-use crate::types::generics::GenericContext;
+use crate::types::generics::{GenericContext, Specialization};
 use crate::types::{
     todo_type, ClassType, DynamicType, KnownClass, KnownInstanceType, MroIterator, Type,
 };
@@ -203,7 +203,11 @@ impl<'db> ClassBase<'db> {
     }
 
     /// Iterate over the MRO of this base
-    pub(super) fn mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
+    pub(super) fn mro(
+        self,
+        db: &'db dyn Db,
+        additional_specialization: Option<Specialization<'db>>,
+    ) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
             ClassBase::Protocol => {
                 ClassBaseMroIterator::length_3(db, self, ClassBase::Generic(None))
@@ -214,7 +218,9 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(_) | ClassBase::Generic(_) => {
                 ClassBaseMroIterator::length_2(db, self)
             }
-            ClassBase::Class(class) => ClassBaseMroIterator::from_class(db, class),
+            ClassBase::Class(class) => {
+                ClassBaseMroIterator::from_class(db, class, additional_specialization)
+            }
         }
     }
 }
@@ -263,8 +269,12 @@ impl<'db> ClassBaseMroIterator<'db> {
     }
 
     /// Iterate over the MRO of an arbitrary class. The MRO may be of any length.
-    fn from_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        ClassBaseMroIterator::FromClass(class.iter_mro(db))
+    fn from_class(
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        additional_specialization: Option<Specialization<'db>>,
+    ) -> Self {
+        ClassBaseMroIterator::FromClass(class.iter_mro_specialized(db, additional_specialization))
     }
 }
 

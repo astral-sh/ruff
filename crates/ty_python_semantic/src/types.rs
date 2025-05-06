@@ -4948,6 +4948,19 @@ impl<'db> Type<'db> {
         }
     }
 
+    #[must_use]
+    pub fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Type<'db> {
+        if let Some(specialization) = specialization {
+            self.apply_specialization(db, specialization)
+        } else {
+            self
+        }
+    }
+
     /// Applies a specialization to this type, replacing any typevars with the types that they are
     /// specialized to.
     ///
@@ -7979,7 +7992,9 @@ pub enum SuperOwnerKind<'db> {
 impl<'db> SuperOwnerKind<'db> {
     fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            SuperOwnerKind::Dynamic(dynamic) => Either::Left(ClassBase::Dynamic(dynamic).mro(db)),
+            SuperOwnerKind::Dynamic(dynamic) => {
+                Either::Left(ClassBase::Dynamic(dynamic).mro(db, None))
+            }
             SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
             SuperOwnerKind::Instance(instance) => Either::Right(instance.class().iter_mro(db)),
         }
@@ -8106,7 +8121,7 @@ impl<'db> BoundSuperType<'db> {
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
-            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db));
+            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None));
         };
 
         let mut pivot_found = false;
