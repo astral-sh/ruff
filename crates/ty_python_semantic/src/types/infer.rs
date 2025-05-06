@@ -1383,7 +1383,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             .is_some_and(|globals| globals.contains(symbol_name));
 
         let global_use_def_map = self.index.use_def_map(FileScopeId::global());
-        let declarations = if is_global && file_scope_id != FileScopeId::global() {
+        let declarations = if is_global && !file_scope_id.is_global() {
             match self
                 .index
                 .symbol_table(FileScopeId::global())
@@ -5216,7 +5216,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 .globals_by_scope(file_scope_id)
                 .is_some_and(|globals| globals.contains(symbol_name));
 
-            if is_global && file_scope_id != FileScopeId::global() {
+            if is_global && !file_scope_id.is_global() {
                 return symbol(
                     db,
                     FileScopeId::global().to_scope_id(db, current_file),
