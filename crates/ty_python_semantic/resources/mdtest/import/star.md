@@ -1256,7 +1256,11 @@ Y: bool = True
 ```pyi
 from a import X, Y
 
-__all__ = ["X"]
+__all__ = ["X", "Z"]
+
+Z: bool = True
+
+Nope: bool = True
 ```
 
 `c.py`:
@@ -1268,10 +1272,17 @@ from b import *
 reveal_type(X)  # revealed: bool
 
 # This diagnostic is accurate: `Y` does not use the "redundant alias" convention in `b.pyi`,
-# nor is it included in `b.__all__`, so it is not exported from `b.pyi`
+# nor is it included in `b.__all__`, so it is not exported from `b.pyi`. It would still be
+# an error if it used the "redundant alias" convention as `__all__` would take precedence.
 #
 # error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
+
+# `Z` is defined in `b.pyi` and included in `__all__`
+reveal_type(Z)  # revealed: bool
+
+# error: [unresolved-reference]
+reveal_type(Nope)  # revealed: Unknown
 ```
 
 ## `global` statements in non-global scopes

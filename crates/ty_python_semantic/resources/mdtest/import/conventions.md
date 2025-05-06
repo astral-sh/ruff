@@ -221,6 +221,44 @@ __all__ = ['Foo']
 class Foo: ...
 ```
 
+## Re-exports with `__all__`
+
+If a symbol is re-exported via redundant alias but is not included in `__all__`, it shouldn't raise
+an error when using named import.
+
+`named_import.py`:
+
+```py
+from b import Foo
+
+reveal_type(Foo)  # revealed: Literal[Foo]
+```
+
+`a.pyi`:
+
+```pyi
+from b import Foo as Foo
+
+__all__ = []
+```
+
+`b.pyi`:
+
+```pyi
+class Foo: ...
+```
+
+However, a star import _would_ raise an error.
+
+`star_import.py`:
+
+```py
+from b import *
+
+# error: [unresolved-import] "Module `b` has no member `Foo`"
+reveal_type(Foo)  # revealed: Unknown
+```
+
 ## Re-exports in `__init__.pyi`
 
 Similarly, for an `__init__.pyi` (stub) file, importing a non-exported name should raise an error
