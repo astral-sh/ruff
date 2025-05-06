@@ -1,5 +1,5 @@
 use crate::importer::ImportRequest;
-use crate::rules::airflow::helpers::ProviderReplacement;
+use crate::rules::airflow::helpers::{is_guarded_by_try_except, ProviderReplacement};
 use ruff_diagnostics::{Diagnostic, Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{Expr, ExprAttribute};
@@ -937,22 +937,47 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         ranged.range(),
     );
 
-    if let ProviderReplacement::AutoImport {
-        module,
-        name,
-        provider: _,
-        version: _,
-    } = replacement
-    {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import_from(module, name),
-                expr.start(),
-                checker.semantic(),
-            )?;
-            let replacement_edit = Edit::range_replacement(binding, ranged.range());
-            Ok(Fix::safe_edits(import_edit, [replacement_edit]))
-        });
+    let semantic = checker.semantic();
+    match replacement {
+        ProviderReplacement::AutoImport {
+            module,
+            name,
+            provider: _,
+            version: _,
+        } => {
+            if is_guarded_by_try_except(expr, module, name, semantic) {
+                return;
+            }
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import_from(module, name),
+                    expr.start(),
+                    checker.semantic(),
+                )?;
+                let replacement_edit = Edit::range_replacement(binding, ranged.range());
+                Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+            });
+        }
+        ProviderReplacement::SourceModuleMovedToProvider {
+            module,
+            name,
+            provider: _,
+            version: _,
+        } => {
+            if is_guarded_by_try_except(expr, module, name.as_str(), semantic) {
+                return;
+            }
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = checker.importer().get_or_import_symbol(
+                    &ImportRequest::import_from(module, name.as_str()),
+                    expr.start(),
+                    checker.semantic(),
+                )?;
+                let replacement_edit = Edit::range_replacement(binding, ranged.range());
+                Ok(Fix::safe_edits(import_edit, [replacement_edit]))
+            });
+        }
+        _ => {}
     }
 
     checker.report_diagnostic(diagnostic);
