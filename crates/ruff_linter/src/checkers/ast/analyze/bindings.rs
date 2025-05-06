@@ -1,7 +1,7 @@
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_text_size::Ranged;
 
-use crate::checkers::ast::{self, Checker};
+use crate::checkers::ast::Checker;
 use crate::codes::Rule;
 use crate::rules::{
     flake8_import_conventions, flake8_pyi, flake8_pytest_style, flake8_return,
@@ -32,10 +32,11 @@ pub(crate) fn bindings(checker: &Checker) {
 
     for (binding_id, binding) in checker.semantic.bindings.iter_enumerated() {
         if checker.enabled(Rule::UnnecessaryAssign) {
-            if let Some(ast::Stmt::FunctionDef(function_def)) =
-                binding.statement(checker.semantic())
-            {
-                flake8_return::rules::unnecessary_assign(checker, function_def);
+            if binding.kind.is_function_definition() {
+                flake8_return::rules::unnecessary_assign(
+                    checker,
+                    binding.statement(checker.semantic()).unwrap(),
+                );
             }
         }
         if checker.enabled(Rule::UnusedVariable) {

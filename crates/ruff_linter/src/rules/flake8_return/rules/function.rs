@@ -562,7 +562,10 @@ fn implicit_return(checker: &Checker, function_def: &ast::StmtFunctionDef, stmt:
 }
 
 /// RET504
-pub(crate) fn unnecessary_assign(checker: &Checker, function_def: &ast::StmtFunctionDef) {
+pub(crate) fn unnecessary_assign(checker: &Checker, function_stmt: &Stmt) {
+    let Stmt::FunctionDef(function_def) = function_stmt else {
+        unreachable!();
+    };
     let Some(stack) = create_stack(checker, function_def) else {
         return;
     };
