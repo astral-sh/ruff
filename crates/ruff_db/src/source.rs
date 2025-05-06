@@ -46,7 +46,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     }
 }
 
-pub(crate) fn is_notebook(path: &FilePath) -> bool {
+fn is_notebook(path: &FilePath) -> bool {
     match path {
         FilePath::System(system) => system.extension().is_some_and(|extension| {
             PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
