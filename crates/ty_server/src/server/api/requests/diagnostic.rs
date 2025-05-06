@@ -76,8 +76,8 @@ fn to_lsp_diagnostic(
     encoding: crate::PositionEncoding,
 ) -> Diagnostic {
     let range = if let Some(span) = diagnostic.primary_span() {
-        let index = line_index(db.upcast(), span.file().expect_file());
-        let source = source_text(db.upcast(), span.file().expect_file());
+        let index = line_index(db.upcast(), span.file().expect_ty());
+        let source = source_text(db.upcast(), span.file().expect_ty());
 
         span.range()
             .map(|range| range.to_lsp_range(&source, &index, encoding))

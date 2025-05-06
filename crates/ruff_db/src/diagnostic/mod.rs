@@ -612,35 +612,35 @@ impl std::fmt::Display for DiagnosticId {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnifiedFile {
-    RedKnot(File),
+    Ty(File),
     Ruff(SourceFile),
 }
 
 impl UnifiedFile {
     pub fn file_path<'a>(&'a self, db: &'a dyn Db) -> &'a str {
         match self {
-            UnifiedFile::RedKnot(file) => file.path(db).as_str(),
+            UnifiedFile::Ty(file) => file.path(db).as_str(),
             UnifiedFile::Ruff(file) => file.name(),
         }
     }
 
     fn path<'a>(&'a self, resolver: &'a FileResolver<'a>) -> &'a str {
         match self {
-            UnifiedFile::RedKnot(file) => resolver.path(*file),
+            UnifiedFile::Ty(file) => resolver.path(*file),
             UnifiedFile::Ruff(file) => file.name(),
         }
     }
 
     fn input(&self, resolver: &FileResolver) -> Input {
         match self {
-            UnifiedFile::RedKnot(file) => resolver.input(*file),
+            UnifiedFile::Ty(file) => resolver.input(*file),
             UnifiedFile::Ruff(file) => Input::from(file),
         }
     }
 
-    pub fn expect_file(&self) -> File {
+    pub fn expect_ty(&self) -> File {
         match self {
-            UnifiedFile::RedKnot(file) => *file,
+            UnifiedFile::Ty(file) => *file,
             UnifiedFile::Ruff(_) => panic!("Expected a `File`, found `RuffFile`"),
         }
     }
@@ -648,7 +648,7 @@ impl UnifiedFile {
     pub fn expect_ruff(&self) -> &SourceFile {
         match self {
             UnifiedFile::Ruff(source_file) => source_file,
-            UnifiedFile::RedKnot(_) => panic!("Expected a ruff file, found a red-knot file"),
+            UnifiedFile::Ty(_) => panic!("Expected a ruff file, found a red-knot file"),
         }
     }
 }
@@ -691,14 +691,14 @@ impl From<&SourceFile> for SourceText {
 impl UnifiedFile {
     fn source_text(&self, db: &dyn Db) -> SourceText {
         match self {
-            UnifiedFile::RedKnot(file) => crate::source::source_text(db, *file),
+            UnifiedFile::Ty(file) => crate::source::source_text(db, *file),
             UnifiedFile::Ruff(file) => SourceText::from(file),
         }
     }
 
     fn line_index(&self, db: &dyn Db) -> ruff_source_file::LineIndex {
         match self {
-            UnifiedFile::RedKnot(file) => crate::source::line_index(db, *file),
+            UnifiedFile::Ty(file) => crate::source::line_index(db, *file),
             UnifiedFile::Ruff(file) => file.index().clone(),
         }
     }
@@ -743,7 +743,7 @@ impl Span {
 
 impl From<File> for Span {
     fn from(file: File) -> Span {
-        let file = UnifiedFile::RedKnot(file);
+        let file = UnifiedFile::Ty(file);
         Span { file, range: None }
     }
 }
