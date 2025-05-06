@@ -1,7 +1,6 @@
 use std::iter::FusedIterator;
 use std::sync::Arc;
 
-use globals::Globals;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
@@ -30,7 +29,6 @@ pub mod ast_ids;
 mod builder;
 pub mod definition;
 pub mod expression;
-pub mod globals;
 pub(crate) mod narrowing_constraints;
 pub(crate) mod predicate;
 mod re_exports;
@@ -44,6 +42,8 @@ pub(crate) use self::use_def::{
 };
 
 type SymbolMap = hashbrown::HashMap<ScopedSymbolId, (), FxBuildHasher>;
+
+type Globals = FxHashSet<ruff_python_ast::name::Name>;
 
 /// Returns the semantic index for `file`.
 ///

@@ -51,7 +51,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
-use super::globals::Globals;
+use super::Globals;
 
 mod except_handlers;
 
