@@ -51,6 +51,7 @@ error: lint:not-iterable: Object of type `Iterable1` is not iterable
    |
 info: Its `__iter__` method returns an object of type `Iterator1`, which has an invalid `__next__` method
 info: Expected signature for `__next__` is `def __next__(self): ...`
+info: `lint:not-iterable` is enabled by default
 
 ```
 
@@ -78,6 +79,7 @@ error: lint:not-iterable: Object of type `Iterable2` is not iterable
 24 |     reveal_type(y)  # revealed: Unknown
    |
 info: Its `__iter__` method returns an object of type `Iterator2`, which has a `__next__` attribute that is not callable
+info: `lint:not-iterable` is enabled by default
 
 ```
 
