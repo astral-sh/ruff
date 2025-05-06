@@ -300,38 +300,27 @@ pub(crate) fn imported_symbol<'db>(
     name: &str,
     kind: ImportedSymbolKind,
 ) -> SymbolAndQualifiers<'db> {
-    // First, check if the symbol is in the `__all__` list of the module.
-    let requires_explicit_reexport = if let Some(all_names) = dunder_all_names(db, file) {
-        match kind {
-            ImportedSymbolKind::Named => {
-                // For named imports, if the symbol is not in `__all__`, then we fallback to
-                // checking whether it's a stub file.
-                all_names
-                    .contains(name)
-                    .then_some(RequiresExplicitReExport::No)
-            }
-            ImportedSymbolKind::Star => {
-                if all_names.contains(name) {
-                    Some(RequiresExplicitReExport::No)
-                } else {
-                    // For star imports, if the symbol is not in `__all__`, then it's unbound.
-                    return Symbol::Unbound.into();
-                }
-            }
-        }
-    } else {
-        None
-    };
+    let is_stub = file.is_stub(db.upcast());
 
-    // If `__all__` is not present or the named symbol is not present in it, resolve to check if it
-    // is a stub file. If it is, we need to re-export it explicitly.
-    let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
-        if file.is_stub(db.upcast()) {
-            RequiresExplicitReExport::Yes
-        } else {
+    let requires_explicit_reexport = if !is_stub && matches!(kind, ImportedSymbolKind::Named) {
+        // Optimization: Avoid looking up `__all__` in non-stub files using a named import.
+        RequiresExplicitReExport::No
+    } else if let Some(all_names) = dunder_all_names(db, file) {
+        if all_names.contains(name) {
             RequiresExplicitReExport::No
+        } else if matches!(kind, ImportedSymbolKind::Star) {
+            // For star imports in both stub and non-stub file, if the symbol is not in `__all__`,
+            // then it's unbound.
+            return Symbol::Unbound.into();
+        } else {
+            RequiresExplicitReExport::Yes
         }
-    });
+    } else if is_stub {
+        // For a stub file not containing `__all__`, re-export convention is enforced.
+        RequiresExplicitReExport::Yes
+    } else {
+        RequiresExplicitReExport::No
+    };
 
     // If it's not found in the global scope, check if it's present as an instance on
     // `types.ModuleType` or `builtins.object`.
