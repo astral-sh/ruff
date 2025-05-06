@@ -369,7 +369,25 @@ To do
 
 ### `frozen`
 
-To do
+If true (the default is False), assigning to fields will generate a diagnostic. If __setattr__() or
+__delattr__() is defined in the class, we should emit a diagnostic.
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Frozen:
+    x: int
+
+    # TODO: Emit a diagnostic here
+    def __setattr__(self, name: str, value: object) -> None: ...
+
+    # TODO: Emit a diagnostic here
+    def __delattr__(self, name: str) -> None: ...
+
+frozen = Frozen(1)
+frozen.x = 2  # error: [invalid-assignment]
+```
 
 ### `match_args`
 
