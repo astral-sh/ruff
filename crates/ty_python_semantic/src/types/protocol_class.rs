@@ -37,7 +37,7 @@ impl<'db> ProtocolClassLiteral<'db> {
     /// It is illegal for a protocol class to have any instance attributes that are not declared
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
-    pub(super) fn interface(self, db: &'db dyn Db) -> &'db ProtocolInterface<'db> {
+    pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
         cached_protocol_interface(db, *self)
     }
@@ -57,21 +57,31 @@ impl<'db> Deref for ProtocolClassLiteral<'db> {
 }
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
-#[derive(Debug, PartialEq, Eq, salsa::Update, Default, Clone, Hash)]
-pub(super) struct ProtocolInterface<'db>(BTreeMap<Name, ProtocolMemberData<'db>>);
+#[salsa::interned(debug)]
+pub(super) struct ProtocolInterface<'db> {
+    #[return_ref]
+    _members: BTreeMap<Name, ProtocolMemberData<'db>>,
+}
 
 impl<'db> ProtocolInterface<'db> {
     /// Iterate over the members of this protocol.
-    pub(super) fn members<'a>(&'a self) -> impl ExactSizeIterator<Item = ProtocolMember<'a, 'db>> {
-        self.0.iter().map(|(name, data)| ProtocolMember {
+    pub(super) fn members<'a>(
+        &'a self,
+        db: &'db dyn Db,
+    ) -> impl ExactSizeIterator<Item = ProtocolMember<'a, 'db>> {
+        self._members(db).iter().map(|(name, data)| ProtocolMember {
             name,
             ty: data.ty,
             qualifiers: data.qualifiers,
         })
     }
 
-    pub(super) fn member_by_name<'a>(&self, name: &'a str) -> Option<ProtocolMember<'a, 'db>> {
-        self.0.get(name).map(|data| ProtocolMember {
+    pub(super) fn member_by_name<'a>(
+        self,
+        db: &'db dyn Db,
+        name: &'a str,
+    ) -> Option<ProtocolMember<'a, 'db>> {
+        self._members(db).get(name).map(|data| ProtocolMember {
             name,
             ty: data.ty,
             qualifiers: data.qualifiers,
@@ -79,36 +89,37 @@ impl<'db> ProtocolInterface<'db> {
     }
 
     /// Return `true` if all members of this protocol are fully static.
-    pub(super) fn is_fully_static(&self, db: &'db dyn Db) -> bool {
-        self.members().all(|member| member.ty.is_fully_static(db))
+    pub(super) fn is_fully_static(self, db: &'db dyn Db) -> bool {
+        cached_is_fully_static(db, self)
     }
 
     /// Return `true` if if all members on `self` are also members of `other`.
     ///
     /// TODO: this method should consider the types of the members as well as their names.
-    pub(super) fn is_sub_interface_of(&self, other: &Self) -> bool {
-        self.0
+    pub(super) fn is_sub_interface_of(self, db: &'db dyn Db, other: Self) -> bool {
+        self._members(db)
             .keys()
-            .all(|member_name| other.0.contains_key(member_name))
+            .all(|member_name| other._members(db).contains_key(member_name))
     }
 
     /// Return `true` if any of the members of this protocol type contain any `Todo` types.
-    pub(super) fn contains_todo(&self, db: &'db dyn Db) -> bool {
-        self.members().any(|member| member.ty.contains_todo(db))
+    pub(super) fn contains_todo(self, db: &'db dyn Db) -> bool {
+        self.members(db).any(|member| member.ty.contains_todo(db))
     }
 
     pub(super) fn normalized(self, db: &'db dyn Db) -> Self {
-        Self(
-            self.0
-                .into_iter()
-                .map(|(name, data)| (name, data.normalized(db)))
-                .collect(),
+        Self::new(
+            db,
+            self._members(db)
+                .iter()
+                .map(|(name, data)| (name.clone(), data.clone().normalized(db)))
+                .collect::<BTreeMap<_, _>>(),
         )
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, salsa::Update)]
-struct ProtocolMemberData<'db> {
+pub(crate) struct ProtocolMemberData<'db> {
     ty: Type<'db>,
     qualifiers: TypeQualifiers,
 }
@@ -184,7 +195,7 @@ fn excluded_from_proto_members(member: &str) -> bool {
 }
 
 /// Inner Salsa query for [`ProtocolClassLiteral::interface`].
-#[salsa::tracked(return_ref, cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial)]
+#[salsa::tracked(cycle_fn=proto_interface_cycle_recover, cycle_initial=proto_interface_cycle_initial)]
 fn cached_protocol_interface<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
@@ -240,9 +251,10 @@ fn cached_protocol_interface<'db>(
         );
     }
 
-    ProtocolInterface(members)
+    ProtocolInterface::new(db, members)
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
 fn proto_interface_cycle_recover<'db>(
     _db: &dyn Db,
     _value: &ProtocolInterface<'db>,
@@ -253,8 +265,33 @@ fn proto_interface_cycle_recover<'db>(
 }
 
 fn proto_interface_cycle_initial<'db>(
-    _db: &dyn Db,
+    db: &'db dyn Db,
     _class: ClassLiteral<'db>,
 ) -> ProtocolInterface<'db> {
-    ProtocolInterface::default()
+    ProtocolInterface::new(db, BTreeMap::default())
+}
+
+#[salsa::tracked(cycle_fn=is_fully_static_cycle_recover, cycle_initial=is_fully_static_cycle_initial)]
+fn cached_is_fully_static<'db>(db: &'db dyn Db, interface: ProtocolInterface<'db>) -> bool {
+    interface
+        .members(db)
+        .all(|member| member.ty.is_fully_static(db))
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_fully_static_cycle_recover(
+    _db: &dyn Db,
+    _value: &bool,
+    _count: u32,
+    _interface: ProtocolInterface<'_>,
+) -> salsa::CycleRecoveryAction<bool> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn is_fully_static_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _interface: ProtocolInterface<'db>,
+) -> bool {
+    // Assume that the protocol is fully static until we find members that indicate otherwise.
+    true
 }

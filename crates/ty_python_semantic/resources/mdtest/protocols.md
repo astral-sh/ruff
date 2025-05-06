@@ -1357,6 +1357,8 @@ def h(obj: InstanceAttrBool):
 A protocol is only fully static if all of its members are fully static:
 
 ```py
+from __future__ import annotations
+
 from typing import Protocol, Any
 from ty_extensions import is_fully_static, static_assert
 
@@ -1366,8 +1368,18 @@ class FullyStatic(Protocol):
 class NotFullyStatic(Protocol):
     x: Any
 
+class RecursiveFullyStatic(Protocol):
+    parent: RecursiveFullyStatic | None
+    x: int
+
+class RecursiveNonFullyStatic(Protocol):
+    parent: RecursiveNonFullyStatic | None
+    x: Any
+
 static_assert(is_fully_static(FullyStatic))
 static_assert(not is_fully_static(NotFullyStatic))
+static_assert(is_fully_static(RecursiveFullyStatic))
+static_assert(not is_fully_static(RecursiveNonFullyStatic))
 ```
 
 Non-fully-static protocols do not participate in subtyping or equivalence, only assignability and
