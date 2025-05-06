@@ -661,7 +661,7 @@ impl<'src> Parser<'src> {
         let mut seen_keyword_argument = false; // foo = 1
         let mut seen_keyword_unpacking = false; // **foo
 
-        let trailing_comma_range =
+        let has_trailing_comma =
             self.parse_comma_separated_list(RecoveryContextKind::Arguments, |parser| {
                 let argument_start = parser.node_start();
                 if parser.eat(TokenKind::DoubleStar) {
@@ -784,7 +784,7 @@ impl<'src> Parser<'src> {
             keywords: keywords.into_boxed_slice(),
         };
 
-        self.validate_arguments(&arguments, trailing_comma_range);
+        self.validate_arguments(&arguments, has_trailing_comma);
 
         arguments
     }
@@ -2526,11 +2526,7 @@ impl<'src> Parser<'src> {
     /// 1. There aren't any duplicate keyword argument
     /// 2. If there are more than one argument (positional or keyword), all generator expressions
     ///    present should be parenthesized.
-    fn validate_arguments(
-        &mut self,
-        arguments: &ast::Arguments,
-        trailing_comma_range: Option<TextRange>,
-    ) {
+    fn validate_arguments(&mut self, arguments: &ast::Arguments, has_trailing_comma: bool) {
         let mut all_arg_names =
             FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
 
@@ -2548,7 +2544,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        if (trailing_comma_range.is_some() && arguments.len() == 1) || arguments.len() > 1 {
+        if (has_trailing_comma && arguments.len() == 1) || arguments.len() > 1 {
             for arg in &*arguments.args {
                 if let Some(ast::ExprGenerator {
                     range,
