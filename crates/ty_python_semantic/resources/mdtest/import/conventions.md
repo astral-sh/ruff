@@ -229,7 +229,7 @@ an error when using named import.
 `named_import.py`:
 
 ```py
-from b import Foo
+from a import Foo
 
 reveal_type(Foo)  # revealed: Literal[Foo]
 ```
@@ -253,9 +253,9 @@ However, a star import _would_ raise an error.
 `star_import.py`:
 
 ```py
-from b import *
+from a import *
 
-# error: [unresolved-import] "Module `b` has no member `Foo`"
+# error: [unresolved-reference] "Name `Foo` used when not defined"
 reveal_type(Foo)  # revealed: Unknown
 ```
 

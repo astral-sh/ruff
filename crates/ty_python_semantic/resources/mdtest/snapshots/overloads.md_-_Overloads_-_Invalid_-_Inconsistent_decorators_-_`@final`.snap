@@ -92,6 +92,7 @@ error: lint:invalid-overload: `@final` decorator should be applied only to the o
    |         Implementation defined here
 28 |         return x
    |
+info: `lint:invalid-overload` is enabled by default
 
 ```
 

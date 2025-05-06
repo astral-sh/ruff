@@ -1,9 +1,11 @@
 # `__all__`
 
-Reference: <https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols>
+Reference:
+<https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols>
 
-NOTE: This file only includes the usage of `__all__` for named-imports i.e., `from module import symbol`.
-For the usage of `__all__` in wildcard imports, refer to [star.md](star.md).
+NOTE: This file only includes the usage of `__all__` for named-imports i.e.,
+`from module import symbol`. For the usage of `__all__` in wildcard imports, refer to
+[star.md](star.md).
 
 ## Undefined
 
@@ -34,14 +36,11 @@ from the local scope of a function or class.
 ```py
 __all__ = ["A"]
 
-
 def foo():
     __all__.append("B")
 
-
 class Foo:
     __all__ += ["C"]
-
 
 class A: ...
 class B: ...
@@ -462,13 +461,14 @@ elif sys.version_info >= (3, 11):
 else:
     __all__ += ["Python310"]
 
-
 class AllVersion: ...
 
 if sys.version_info >= (3, 12):
     class Python312: ...
+
 elif sys.version_info >= (3, 11):
     class Python311: ...
+
 else:
     class Python310: ...
 ```
@@ -504,13 +504,14 @@ elif sys.version_info >= (3, 11):
 else:
     __all__ += ["Python310"]
 
-
 class AllVersion: ...
 
 if sys.version_info >= (3, 12):
     class Python312: ...
+
 elif sys.version_info >= (3, 11):
     class Python311: ...
+
 else:
     class Python310: ...
 ```
@@ -546,13 +547,14 @@ elif sys.version_info >= (3, 11):
 else:
     __all__ += ["Python310"]
 
-
 class AllVersion: ...
 
 if sys.version_info >= (3, 12):
     class Python312: ...
+
 elif sys.version_info >= (3, 11):
     class Python311: ...
+
 else:
     class Python310: ...
 ```
