@@ -2,8 +2,9 @@ use rustc_hash::FxHashSet;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{walk_stmt, StatementVisitor};
-use ruff_python_ast::{self as ast, name::Name};
+use ruff_python_ast::{self as ast};
 
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
 use crate::semantic_index::symbol::ScopeId;
@@ -26,6 +27,8 @@ fn dunder_all_names_cycle_initial(_db: &dyn Db, _file: File) -> Option<FxHashSet
     None
 }
 
+/// Returns a set of names in the `__all__` variable for `file`, [`None`] if it is not defined or
+/// if it contains invalid elements.
 pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<&FxHashSet<Name>> {
     #[allow(clippy::ref_option)]
     #[salsa::tracked(return_ref, cycle_fn=dunder_all_names_cycle_recover, cycle_initial=dunder_all_names_cycle_initial)]
@@ -42,6 +45,7 @@ pub(crate) fn dunder_all_names(db: &dyn Db, file: File) -> Option<&FxHashSet<Nam
     dunder_all_names_impl(db, file).as_ref()
 }
 
+/// A visitor that collects the names in the `__all__` variable of a module.
 struct DunderAllNamesCollector<'db> {
     db: &'db dyn Db,
     file: File,
@@ -91,6 +95,8 @@ impl<'db> DunderAllNamesCollector<'db> {
         self.origin = Some(origin);
     }
 
+    /// Extends the current set of names with the names from the given expression which can be
+    /// either a list of names or a submodule's `__all__` variable.
     fn extend_from_list_or_submodule(&mut self, expr: &ast::Expr) {
         match expr {
             // `__all__ += [...]`
@@ -297,6 +303,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 if !is_dunder_all(target) {
                     return;
                 }
+                // TODO: Should we include tuple here as well?
                 // `__all__: list[str] = [...]`
                 if let ast::Expr::List(ast::ExprList { elts, .. }) = &**value {
                     self.update_origin(DunderAllOrigin::CurrentModule);
@@ -426,6 +433,7 @@ enum DunderAllOrigin {
     StarImport,
 }
 
+/// Checks if the given expression is a name expression for `__all__`.
 fn is_dunder_all(expr: &ast::Expr) -> bool {
     matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
 }
