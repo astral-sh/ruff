@@ -21,12 +21,14 @@ pub(crate) enum MinMax {
 /// readability.
 ///
 /// ## Fix safety
-/// This fix is always unsafe. Flattening nested `min()` or `max()` may change
-/// code behavior when the inner call is the outer call’s only argument and the
-/// inner call has multiple arguments.
+/// This fix is always unsafe. The `min` fix is unsafe when `__lt__` is not commutative,
+/// while the `max` fix is unsafe when `__gt__` is not commutative.
 /// ```python
-/// print(min(min([2, 3], [4, 1]))) # before: 2
-/// print(min([2, 3], [4, 1]))      # after: [2, 3]
+/// print(min(2.0, min(float("nan"), 1.0))) # before fix: 2.0
+/// print(min(2.0, *"nan", 1.0))            # after fix: 1.0
+///
+/// print(max(1.0, max(float("nan"), 2.0))) # before fix: 1.0
+/// print(max(1.0, *"nan", 2.0))            # after fix: 2.0
 /// ```
 ///
 /// ## Example
