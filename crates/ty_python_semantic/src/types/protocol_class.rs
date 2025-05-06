@@ -112,7 +112,7 @@ impl<'db> ProtocolInterface<'db> {
             db,
             self._members(db)
                 .iter()
-                .map(|(name, data)| (name.clone(), data.clone().normalized(db)))
+                .map(|(name, data)| (name.clone(), data.normalized(db)))
                 .collect::<BTreeMap<_, _>>(),
         )
     }
@@ -125,7 +125,7 @@ pub(crate) struct ProtocolMemberData<'db> {
 }
 
 impl<'db> ProtocolMemberData<'db> {
-    fn normalized(self, db: &'db dyn Db) -> Self {
+    fn normalized(&self, db: &'db dyn Db) -> Self {
         Self {
             ty: self.ty.normalized(db),
             qualifiers: self.qualifiers,
