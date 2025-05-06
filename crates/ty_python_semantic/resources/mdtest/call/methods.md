@@ -270,7 +270,7 @@ class Meta(type):
 class C(metaclass=Meta):
     pass
 
-reveal_type(C.f)  # revealed: bound method type[C].f(arg: int) -> str
+reveal_type(C.f)  # revealed: bound method <class 'C'>.f(arg: int) -> str
 reveal_type(C.f(1))  # revealed: str
 ```
 

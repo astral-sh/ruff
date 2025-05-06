@@ -605,7 +605,6 @@ impl Display for DisplayLiteralGroup<'_> {
 /// For example, `Literal[1] | Literal[2] | Literal["s"]` is displayed as `"Literal[1, 2, "s"]"`.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum CondensedDisplayTypeKind {
-    Class,
     LiteralExpression,
 }
 
@@ -614,7 +613,6 @@ impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
 
     fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
         match value {
-            Type::ClassLiteral(_) => Ok(Self::Class),
             Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)

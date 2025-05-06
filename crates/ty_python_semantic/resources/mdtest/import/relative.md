@@ -5,6 +5,7 @@
 `package/__init__.py`:
 
 ```py
+
 ```
 
 `package/bar.py`:
@@ -20,6 +21,7 @@ reveal_type(X)  # revealed: Unknown
 `package/__init__.py`:
 
 ```py
+
 ```
 
 `package/foo.py`:
@@ -41,6 +43,7 @@ reveal_type(X)  # revealed: int
 `package/__init__.py`:
 
 ```py
+
 ```
 
 `package/foo/bar/baz.py`:
@@ -114,6 +117,7 @@ reveal_type(X)  # revealed: Unknown
 `package/__init__.py`:
 
 ```py
+
 ```
 
 `package/foo.py`:
@@ -135,6 +139,7 @@ reveal_type(X)  # revealed: int
 `package/__init__.py`:
 
 ```py
+
 ```
 
 `package/foo.py`:
@@ -156,6 +161,7 @@ reveal_type(x)  # revealed: Unknown
 `package/__init__.py`:
 
 ```py
+
 ```
 
 `package/foo.py`:
@@ -180,6 +186,7 @@ nor an attribute of `package`.
 `package/__init__.py`:
 
 ```py
+
 ```
 
 `package/bar.py`:
@@ -201,6 +208,7 @@ submodule via the attribute on its parent package.
 `package/__init__.py`:
 
 ```py
+
 ```
 
 `package/foo.py`:
@@ -255,7 +263,7 @@ python-version = "3.13"
 ```py
 from foo import A
 
-reveal_type(A)  # revealed: Literal[A]
+reveal_type(A)  # revealed: <class 'A'>
 ```
 
 `/src/.venv/<path-to-site-packages>/foo/__init__.py`:

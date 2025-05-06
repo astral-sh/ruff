@@ -1,6 +1,6 @@
 # Boundness and declaredness: public uses
 
-This document demonstrates how type-inference and diagnostics work for *public* uses of a symbol,
+This document demonstrates how type-inference and diagnostics work for _public_ uses of a symbol,
 that is, a use of a symbol from another scope. If a symbol has a declared type in its local scope
 (e.g. `int`), we use that as the symbol's "public type" (the type of the symbol from the perspective
 of other scopes) even if there is a more precise local inferred type for the symbol (`Literal[1]`).
@@ -60,7 +60,7 @@ reveal_type(d)  # revealed: int
 
 ### Declared and possibly unbound
 
-If a symbol is declared and *possibly* unbound, we trust that other module and use the declared type
+If a symbol is declared and _possibly_ unbound, we trust that other module and use the declared type
 without raising an error.
 
 `mod.py`:
@@ -220,7 +220,7 @@ a = None
 
 ### Undeclared but bound
 
-If a symbol is *undeclared*, we use the union of `Unknown` with the inferred type. Note that we
+If a symbol is _undeclared_, we use the union of `Unknown` with the inferred type. Note that we
 treat this case differently from the case where a symbol is implicitly declared with `Unknown`,
 possibly due to the usage of an unknown name in the annotation:
 
@@ -246,7 +246,7 @@ a = None
 
 ### Undeclared and possibly unbound
 
-If a symbol is undeclared and *possibly* unbound, we currently do not raise an error. This seems
+If a symbol is undeclared and _possibly_ unbound, we currently do not raise an error. This seems
 inconsistent when compared to the "possibly-undeclared-and-possibly-unbound" case.
 
 `mod.py`:
@@ -274,7 +274,7 @@ a = None
 
 ### Undeclared and unbound
 
-If a symbol is undeclared *and* unbound, we infer `Unknown` and raise an error.
+If a symbol is undeclared _and_ unbound, we infer `Unknown` and raise an error.
 
 `mod.py`:
 
@@ -312,8 +312,8 @@ class C:
 ```py
 from mod import MyInt, C
 
-reveal_type(MyInt)  # revealed: Literal[int]
-reveal_type(C.MyStr)  # revealed: Literal[str]
+reveal_type(MyInt)  # revealed: <class 'int'>
+reveal_type(C.MyStr)  # revealed: <class 'str'>
 ```
 
 ### Undeclared and possibly unbound
@@ -336,8 +336,8 @@ if flag():
 # error: [possibly-unbound-import]
 from mod import MyInt, C
 
-reveal_type(MyInt)  # revealed: Literal[int]
-reveal_type(C.MyStr)  # revealed: Literal[str]
+reveal_type(MyInt)  # revealed: <class 'int'>
+reveal_type(C.MyStr)  # revealed: <class 'str'>
 ```
 
 ### Undeclared and unbound

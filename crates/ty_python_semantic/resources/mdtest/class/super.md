@@ -134,7 +134,7 @@ def f(x):
     reveal_type(x)  # revealed: Unknown
 
     reveal_type(super(x, x))  # revealed: <super: Unknown, Unknown>
-    reveal_type(super(A, x))  # revealed: <super: <class 'A'>, Literal[A]>
+    reveal_type(super(A, x))  # revealed: <super: <class 'A'>, Unknown>
     reveal_type(super(x, A()))  # revealed: <super: Unknown, A>
 
     reveal_type(super(x, x).a)  # revealed: Unknown
@@ -195,7 +195,7 @@ reveal_type(super(B, B()).a2)  # revealed: bound method type[B].a2() -> Unknown
 # A.__dict__["a1"].__get__(None, B)
 reveal_type(super(B, B).a1)  # revealed: def a1(self) -> Unknown
 # A.__dict__["a2"].__get__(None, B)
-reveal_type(super(B, B).a2)  # revealed: bound method Literal[B].a2() -> Unknown
+reveal_type(super(B, B).a2)  # revealed: bound method <class 'B'>.a2() -> Unknown
 ```
 
 ## Union of Supers
@@ -213,22 +213,22 @@ class C(A, B): ...
 class D(B, A): ...
 
 def f(x: C | D):
-    reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[A], Literal[B], Literal[object]]
-    reveal_type(D.__mro__)  # revealed: tuple[Literal[D], Literal[B], Literal[A], Literal[object]]
+    reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>]
+    reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, <class 'B'>, <class 'A'>, <class 'object'>]
 
     s = super(A, x)
-    reveal_type(s)  # revealed: <super: Literal[A], C> | <super: Literal[A], D>
+    reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
 
-    # error: [possibly-unbound-attribute] "Attribute `b` on type `<super: Literal[A], C> | <super: Literal[A], D>` is possibly unbound"
+    # error: [possibly-unbound-attribute] "Attribute `b` on type `<super: <class 'A'>, C> | <super: <class 'A'>, D>` is possibly unbound"
     s.b
 
 def f(flag: bool):
     x = str() if flag else str("hello")
     reveal_type(x)  # revealed: Literal["", "hello"]
-    reveal_type(super(str, x))  # revealed: <super: Literal[str], str>
+    reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
 
 def f(x: int | str):
-    # error: [invalid-super-argument] "`str` is not an instance or subclass of `Literal[int]` in `super(Literal[int], str)` call"
+    # error: [invalid-super-argument] "`str` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, str)` call"
     super(int, x)
 ```
 
@@ -254,12 +254,12 @@ def f(flag: bool):
         class D(C): ...
         s = super(D, D())
 
-    reveal_type(s)  # revealed: <super: Literal[B], B> | <super: Literal[D], D>
+    reveal_type(s)  # revealed: <super: <class 'B'>, B> | <super: <class 'D'>, D>
 
     reveal_type(s.x)  # revealed: Unknown | Literal[1, 2]
     reveal_type(s.y)  # revealed: int | str
 
-    # error: [possibly-unbound-attribute] "Attribute `a` on type `<super: Literal[B], B> | <super: Literal[D], D>` is possibly unbound"
+    # error: [possibly-unbound-attribute] "Attribute `a` on type `<super: <class 'B'>, B> | <super: <class 'D'>, D>` is possibly unbound"
     reveal_type(s.a)  # revealed: str
 ```
 
@@ -339,30 +339,30 @@ def f(x: int):
     # error: [invalid-super-argument] "`typing.TypeAliasType` is not a valid class"
     super(IntAlias, 0)
 
-# error: [invalid-super-argument] "`Literal[""]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[""])` call"
+# error: [invalid-super-argument] "`Literal[""]` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, Literal[""])` call"
 # revealed: Unknown
 reveal_type(super(int, str()))
 
-# error: [invalid-super-argument] "`Literal[str]` is not an instance or subclass of `Literal[int]` in `super(Literal[int], Literal[str])` call"
+# error: [invalid-super-argument] "`<class 'str'>` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, <class 'str'>)` call"
 # revealed: Unknown
 reveal_type(super(int, str))
 
 class A: ...
 class B(A): ...
 
-# error: [invalid-super-argument] "`A` is not an instance or subclass of `Literal[B]` in `super(Literal[B], A)` call"
+# error: [invalid-super-argument] "`A` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, A)` call"
 # revealed: Unknown
 reveal_type(super(B, A()))
 
-# error: [invalid-super-argument] "`object` is not an instance or subclass of `Literal[B]` in `super(Literal[B], object)` call"
+# error: [invalid-super-argument] "`object` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, object)` call"
 # revealed: Unknown
 reveal_type(super(B, object()))
 
-# error: [invalid-super-argument] "`Literal[A]` is not an instance or subclass of `Literal[B]` in `super(Literal[B], Literal[A])` call"
+# error: [invalid-super-argument] "`<class 'A'>` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, <class 'A'>)` call"
 # revealed: Unknown
 reveal_type(super(B, A))
 
-# error: [invalid-super-argument] "`Literal[object]` is not an instance or subclass of `Literal[B]` in `super(Literal[B], Literal[object])` call"
+# error: [invalid-super-argument] "`<class 'object'>` is not an instance or subclass of `<class 'B'>` in `super(<class 'B'>, <class 'object'>)` call"
 # revealed: Unknown
 reveal_type(super(B, object))
 

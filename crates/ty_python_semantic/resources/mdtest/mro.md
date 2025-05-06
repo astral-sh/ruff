@@ -207,9 +207,9 @@ if returns_bool():
 else:
     x = B
 
-reveal_type(x)  # revealed: Literal[A, B]
+reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
 
-# error: 11 [invalid-base] "Invalid class base with type `Literal[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 11 [invalid-base] "Invalid class base with type `<class 'A'> | <class 'B'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Foo(x): ...
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
@@ -236,11 +236,11 @@ if returns_bool():
 else:
     y = D
 
-reveal_type(x)  # revealed: Literal[A, B]
-reveal_type(y)  # revealed: Literal[C, D]
+reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
+reveal_type(y)  # revealed: <class 'C'> | <class 'D'>
 
-# error: 11 [invalid-base] "Invalid class base with type `Literal[A, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
-# error: 14 [invalid-base] "Invalid class base with type `Literal[C, D]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 11 [invalid-base] "Invalid class base with type `<class 'A'> | <class 'B'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 14 [invalid-base] "Invalid class base with type `<class 'C'> | <class 'D'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Foo(x, y): ...
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
@@ -261,7 +261,7 @@ if returns_bool():
 else:
     foo = object
 
-# error: 21 [invalid-base] "Invalid class base with type `Literal[Y, object]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 21 [invalid-base] "Invalid class base with type `<class 'Y'> | <class 'object'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class PossibleError(foo, X): ...
 
 reveal_type(PossibleError.__mro__)  # revealed: tuple[<class 'PossibleError'>, Unknown, <class 'object'>]
@@ -276,13 +276,13 @@ if returns_bool():
 else:
     class B(Y, X): ...
 
-# revealed: tuple[Literal[B], Literal[X], Literal[Y], Literal[O], Literal[object]] | tuple[Literal[B], Literal[Y], Literal[X], Literal[O], Literal[object]]
+# revealed: tuple[<class 'B'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>] | tuple[<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>]
 reveal_type(B.__mro__)
 
-# error: 12 [invalid-base] "Invalid class base with type `Literal[B, B]` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
+# error: 12 [invalid-base] "Invalid class base with type `<class 'B'> | <class 'B'>` (all bases must be a class, `Any`, `Unknown` or `Todo`)"
 class Z(A, B): ...
 
-reveal_type(Z.__mro__)  # revealed: tuple[Literal[Z], Unknown, Literal[object]]
+reveal_type(Z.__mro__)  # revealed: tuple[<class 'Z'>, Unknown, <class 'object'>]
 ```
 
 ## `__bases__` lists with duplicate bases

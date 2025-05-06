@@ -372,7 +372,7 @@ def _(flag: bool):
     # wrong, but they could be subsumed under a higher-level diagnostic.
 
     # error: [invalid-assignment] "Invalid assignment to data descriptor attribute `meta_data_descriptor1` on type `<class 'C5'>` with custom `__set__` method"
-    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal['value on class']`"
+    # error: [invalid-assignment] "Object of type `None` is not assignable to attribute `meta_data_descriptor1` of type `Literal["value on class"]`"
     C5.meta_data_descriptor1 = None
 
     # error: [possibly-unbound-attribute]
@@ -724,13 +724,13 @@ def _(flag: bool):
             non_data: NonDataDescriptor = NonDataDescriptor()
             data: DataDescriptor = DataDescriptor()
 
-    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `<class 'Literal[PossiblyUnbound]'>` is possibly unbound"
+    # error: [possibly-unbound-attribute] "Attribute `non_data` on type `<class 'PossiblyUnbound'>` is possibly unbound"
     reveal_type(PossiblyUnbound.non_data)  # revealed: int
 
     # error: [possibly-unbound-attribute] "Attribute `non_data` on type `PossiblyUnbound` is possibly unbound"
     reveal_type(PossiblyUnbound().non_data)  # revealed: int
 
-    # error: [possibly-unbound-attribute] "Attribute `data` on type `<class 'Literal[PossiblyUnbound]'>` is possibly unbound"
+    # error: [possibly-unbound-attribute] "Attribute `data` on type `<class 'PossiblyUnbound'>` is possibly unbound"
     reveal_type(PossiblyUnbound.data)  # revealed: int
 
     # error: [possibly-unbound-attribute] "Attribute `data` on type `PossiblyUnbound` is possibly unbound"
