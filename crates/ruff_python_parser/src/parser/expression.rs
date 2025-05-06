@@ -2558,7 +2558,7 @@ impl<'src> Parser<'src> {
                 {
                     // test_ok args_unparenthesized_generator
                     // sum(x for x in range(10))
-                    // sum((x for x in range(10),)
+                    // sum((x for x in range(10)),)
 
                     // test_err args_unparenthesized_generator
                     // sum(x for x in range(10), 5)
