@@ -3088,6 +3088,23 @@ impl<'db> TypeInferenceBuilder<'db> {
             | Type::TypeVar(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => {
+                if let Type::NominalInstance(instance) = object_ty {
+                    let dataclass_params = match instance.class() {
+                        ClassType::NonGeneric(cls) => cls.dataclass_params(self.db()),
+                        ClassType::Generic(_) => None,
+                    };
+                    let frozen = dataclass_params
+                        .is_some_and(|params| params.contains(DataclassParams::FROZEN));
+                    if frozen && emit_diagnostics {
+                        if let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Property `{attribute}` defined in `{ty}` is read-only",
+                                ty = object_ty.display(self.db()),
+                            ));
+                        }
+                    }
+                }
                 match object_ty.class_member(db, attribute.into()) {
                     meta_attr @ SymbolAndQualifiers { .. } if meta_attr.is_class_var() => {
                         if emit_diagnostics {
