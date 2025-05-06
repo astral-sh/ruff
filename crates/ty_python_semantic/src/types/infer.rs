@@ -89,8 +89,8 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature,
     Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, UnionBuilder,
-    UnionType,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    UnionBuilder, UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -2504,6 +2504,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             name.id.clone(),
             definition,
             bound_or_constraint,
+            TypeVarVariance::Invariant, // TODO: infer this
             default_ty,
             TypeVarKind::Pep695,
         )));
@@ -4990,10 +4991,28 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             continue;
                                         };
 
-                                        let [Some(name_param), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
+                                        let [Some(name_param), constraints, bound, default, contravariant, covariant, _infer_variance] =
                                             overload.parameter_types()
                                         else {
                                             continue;
+                                        };
+
+                                        let variance = match (contravariant, covariant) {
+                                            (Some(_), Some(_)) => {
+                                                if let Some(builder) = self.context.report_lint(
+                                                    &INVALID_LEGACY_TYPE_VARIABLE,
+                                                    call_expression,
+                                                ) {
+                                                    builder.into_diagnostic(format_args!(
+                                                        "A legacy `typing.TypeVar` cannot be \
+                                                        both covariant and contravariant",
+                                                    ));
+                                                }
+                                                continue;
+                                            }
+                                            (Some(_), None) => TypeVarVariance::Contravariant,
+                                            (None, Some(_)) => TypeVarVariance::Covariant,
+                                            (None, None) => TypeVarVariance::Invariant,
                                         };
 
                                         let name_param = name_param
@@ -5062,6 +5081,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                 target.id.clone(),
                                                 containing_assignment,
                                                 bound_or_constraint,
+                                                variance,
                                                 *default,
                                                 TypeVarKind::Legacy,
                                             )),

@@ -932,6 +932,7 @@ impl<'db> Type<'db> {
                         typevar.name(db).clone(),
                         typevar.definition(db),
                         Some(TypeVarBoundOrConstraints::UpperBound(bound.normalized(db))),
+                        typevar.variance(db),
                         typevar.default_ty(db),
                         typevar.kind(db),
                     ))
@@ -942,6 +943,7 @@ impl<'db> Type<'db> {
                         typevar.name(db).clone(),
                         typevar.definition(db),
                         Some(TypeVarBoundOrConstraints::Constraints(union.normalized(db))),
+                        typevar.variance(db),
                         typevar.default_ty(db),
                         typevar.kind(db),
                     ))
@@ -5618,6 +5620,9 @@ pub struct TypeVarInstance<'db> {
     /// The upper bound or constraint on the type of this TypeVar
     bound_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
 
+    /// The variance of the TypeVar
+    variance: TypeVarVariance,
+
     /// The default type for this TypeVar
     default_ty: Option<Type<'db>>,
 
@@ -5644,6 +5649,14 @@ impl<'db> TypeVarInstance<'db> {
             None
         }
     }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
+pub enum TypeVarVariance {
+    Invariant,
+    Covariant,
+    Contravariant,
+    Bivariant,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
