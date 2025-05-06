@@ -19,32 +19,28 @@ use ruff_python_ast::PythonVersion;
 /// This fix is always unsafe. When replacing dunder method calls with operators
 /// or builtins, the behavior can change in the following ways:
 ///
-/// 1. Fix may change the execution precedence. `-a.__sub__(b)` is parsed as `-(a - b)`,
-///    but replacing `__sub__` with an operator produces `-a - b`, which can yield a
-///    different result.
-///
-/// 2. Types may implement only a subset of related dunder methods. Calling a
+/// 1. Types may implement only a subset of related dunder methods. Calling a
 ///    missing dunder method directly returns `NotImplemented`, but using the
 ///    equivalent operator raises a `TypeError`.
 ///    ```python
 ///    class C: pass
 ///    c = C()
-///    c.__gt__(1)  # NotImplemented
+///    c.__gt__(1)  # before fix: NotImplemented
 ///    c > 1        # after fix: raises TypeError
 ///    ```
-/// 3. Instance-assigned dunder methods are ignored by operators and builtins.
+/// 2. Instance-assigned dunder methods are ignored by operators and builtins.
 ///    ```python
 ///    class C: pass
 ///    c = C()
-///    c.__str__ = lambda: "c"
-///    c.__str__()  # c
-///    str(c)       # after fix: <__main__.C
+///    c.__bool__ = lambda: False
+///    c.__bool__() # before fix: False
+///    bool(c)      # after fix: True
 ///    ```
 ///
-/// 4. Even with built-in types, behavior can differ.
+/// 3. Even with built-in types, behavior can differ.
 ///    ```python
-///    (1).__gt__(1.0)  # NotImplemented
-///    1 > 1.0          # False
+///    (1).__gt__(1.0)  # before fix: NotImplemented
+///    1 > 1.0          # after fix: False
 ///    ```
 ///
 /// ## Example
