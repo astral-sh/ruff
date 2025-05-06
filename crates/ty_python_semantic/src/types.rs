@@ -3890,6 +3890,9 @@ impl<'db> Type<'db> {
                     );
                     Signatures::single(signature)
                 }
+                Some(KnownClass::Enum) => {
+                    Signatures::single(CallableSignature::todo("functional `Enum` syntax"))
+                }
 
                 Some(KnownClass::Super) => {
                     // ```py
@@ -4833,6 +4836,9 @@ impl<'db> Type<'db> {
                 Some(KnownClass::UnionType) => Ok(todo_type!(
                     "Support for `types.UnionType` instances in type expressions"
                 )),
+                Some(KnownClass::NamedTuple) => Ok(todo_type!(
+                    "Support for functional `typing.NamedTuple` syntax"
+                )),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
                         *self
@@ -4962,19 +4968,15 @@ impl<'db> Type<'db> {
                 Type::FunctionLiteral(function.apply_specialization(db, specialization))
             }
 
-            // Note that we don't need to apply the specialization to `self_instance`, since it
-            // must either be a non-generic class literal (which cannot have any typevars to
-            // specialize) or a generic alias (which has already been fully specialized). For a
-            // generic alias, the specialization being applied here must be for some _other_
-            // generic context nested within the generic alias's class literal, which the generic
-            // alias's context cannot refer to. (The _method_ does need to be specialized, since it
-            // might be a nested generic method, whose generic context is what is now being
-            // specialized.)
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
                 method.function(db).apply_specialization(db, specialization),
-                method.self_instance(db),
+                method.self_instance(db).apply_specialization(db, specialization),
             )),
+
+            Type::NominalInstance(instance) => Type::NominalInstance(
+                instance.apply_specialization(db, specialization),
+            ),
 
             Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(function)) => {
                 Type::MethodWrapper(MethodWrapperKind::FunctionTypeDunderGet(
@@ -5060,9 +5062,6 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::SliceLiteral(_)
             | Type::BoundSuper(_)
-            // `NominalInstance` contains a ClassType, which has already been specialized if needed,
-            // like above with BoundMethod's self_instance.
-            | Type::NominalInstance(_)
             // Same for `ProtocolInstance`
             | Type::ProtocolInstance(_)
             | Type::KnownInstance(_) => self,
@@ -6495,6 +6494,11 @@ impl<'db> FunctionSignature<'db> {
     pub(crate) fn iter(&self) -> Iter<Signature<'db>> {
         self.as_slice().iter()
     }
+
+    /// Returns the "bottom" signature (subtype of all fully-static signatures.)
+    pub(crate) fn bottom(db: &'db dyn Db) -> Self {
+        Self::Single(Signature::bottom(db))
+    }
 }
 
 impl<'db> IntoIterator for &'db FunctionSignature<'db> {
@@ -6639,7 +6643,7 @@ impl<'db> FunctionType<'db> {
     ///
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
-    #[salsa::tracked(return_ref)]
+    #[salsa::tracked(return_ref, cycle_fn=signature_cycle_recover, cycle_initial=signature_cycle_initial)]
     pub(crate) fn signature(self, db: &'db dyn Db) -> FunctionSignature<'db> {
         if let Some(overloaded) = self.to_overloaded(db) {
             FunctionSignature::Overloaded(
@@ -6847,6 +6851,22 @@ impl<'db> FunctionType<'db> {
         // function once it's supported.
         to_overloaded_impl(db, self).as_ref()
     }
+}
+
+fn signature_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _value: &FunctionSignature<'db>,
+    _count: u32,
+    _function: FunctionType<'db>,
+) -> salsa::CycleRecoveryAction<FunctionSignature<'db>> {
+    salsa::CycleRecoveryAction::Iterate
+}
+
+fn signature_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _function: FunctionType<'db>,
+) -> FunctionSignature<'db> {
+    FunctionSignature::bottom(db)
 }
 
 /// Non-exhaustive enumeration of known functions (e.g. `builtins.reveal_type`, ...) that might
@@ -7060,10 +7080,7 @@ impl<'db> CallableType<'db> {
     /// `(*args: object, **kwargs: object) -> Never`.
     #[cfg(test)]
     pub(crate) fn bottom(db: &'db dyn Db) -> Type<'db> {
-        Type::Callable(CallableType::single(
-            db,
-            Signature::new(Parameters::object(db), Some(Type::Never)),
-        ))
+        Type::Callable(CallableType::single(db, Signature::bottom(db)))
     }
 
     /// Return a "normalized" version of this `Callable` type.

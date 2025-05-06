@@ -1504,6 +1504,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.enabled(Rule::NanComparison) {
                 pylint::rules::nan_comparison(checker, left, comparators);
             }
+            if checker.enabled(Rule::InEmptyCollection) {
+                ruff::rules::in_empty_collection(checker, compare);
+            }
             if checker.enabled(Rule::InDictKeys) {
                 flake8_simplify::rules::key_in_dict_compare(checker, compare);
             }

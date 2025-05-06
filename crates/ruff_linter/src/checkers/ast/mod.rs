@@ -72,7 +72,7 @@ use crate::rules::pyflakes::rules::{
 };
 use crate::rules::pylint::rules::{AwaitOutsideAsync, LoadBeforeGlobalDeclaration};
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
-use crate::settings::{flags, LinterSettings};
+use crate::settings::{flags, LinterSettings, TargetVersion};
 use crate::{docstrings, noqa, Locator};
 
 mod analyze;
@@ -232,7 +232,7 @@ pub(crate) struct Checker<'a> {
     /// A state describing if a docstring is expected or not.
     docstring_state: DocstringState,
     /// The target [`PythonVersion`] for version-dependent checks.
-    target_version: PythonVersion,
+    target_version: TargetVersion,
     /// Helper visitor for detecting semantic syntax errors.
     #[expect(clippy::struct_field_names)]
     semantic_checker: SemanticSyntaxChecker,
@@ -257,7 +257,7 @@ impl<'a> Checker<'a> {
         source_type: PySourceType,
         cell_offsets: Option<&'a CellOffsets>,
         notebook_index: Option<&'a NotebookIndex>,
-        target_version: PythonVersion,
+        target_version: TargetVersion,
     ) -> Checker<'a> {
         let semantic = SemanticModel::new(&settings.typing_modules, path, module);
         Self {
@@ -523,9 +523,16 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Return the [`PythonVersion`] to use for version-related checks.
-    pub(crate) const fn target_version(&self) -> PythonVersion {
-        self.target_version
+    /// Return the [`PythonVersion`] to use for version-related lint rules.
+    ///
+    /// If the user did not provide a target version, this defaults to the lowest supported Python
+    /// version ([`PythonVersion::default`]).
+    ///
+    /// Note that this method should not be used for version-related syntax errors emitted by the
+    /// parser or the [`SemanticSyntaxChecker`], which should instead default to the _latest_
+    /// supported Python version.
+    pub(crate) fn target_version(&self) -> PythonVersion {
+        self.target_version.linter_version()
     }
 
     fn with_semantic_checker(&mut self, f: impl FnOnce(&mut SemanticSyntaxChecker, &Checker)) {
@@ -583,7 +590,10 @@ impl TypingImporter<'_, '_> {
 
 impl SemanticSyntaxContext for Checker<'_> {
     fn python_version(&self) -> PythonVersion {
-        self.target_version
+        // Reuse `parser_version` here, which should default to `PythonVersion::latest` instead of
+        // `PythonVersion::default` to minimize version-related semantic syntax errors when
+        // `target_version` is unset.
+        self.target_version.parser_version()
     }
 
     fn global(&self, name: &str) -> Option<TextRange> {
@@ -1366,7 +1376,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             // we can't defer again, or we'll infinitely recurse!
             && !self.semantic.in_deferred_type_definition()
             && self.semantic.in_type_definition()
-            && (self.semantic.future_annotations_or_stub()||self.target_version.defers_annotations())
+            && (self.semantic.future_annotations_or_stub()||self.target_version().defers_annotations())
             && (self.semantic.in_annotation() || self.source_type.is_stub())
         {
             if let Expr::StringLiteral(string_literal) = expr {
@@ -2594,7 +2604,7 @@ impl<'a> Checker<'a> {
                 // annotations` is active, or they are type definitions in a stub file.
                 debug_assert!(
                     (self.semantic.future_annotations_or_stub()
-                        || self.target_version.defers_annotations())
+                        || self.target_version().defers_annotations())
                         && (self.source_type.is_stub() || self.semantic.in_annotation())
                 );
 
@@ -2932,7 +2942,7 @@ pub(crate) fn check_ast(
     source_type: PySourceType,
     cell_offsets: Option<&CellOffsets>,
     notebook_index: Option<&NotebookIndex>,
-    target_version: PythonVersion,
+    target_version: TargetVersion,
 ) -> (Vec<Diagnostic>, Vec<SemanticSyntaxError>) {
     let module_path = package
         .map(PackageRoot::path)

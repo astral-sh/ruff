@@ -8,8 +8,8 @@ use crate::semantic_index::{
     symbol_table, BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator,
 };
 use crate::types::{
-    binding_type, declaration_type, infer_narrowing_constraint, todo_type, IntersectionBuilder,
-    KnownClass, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType,
+    binding_type, declaration_type, todo_type, KnownClass, Truthiness, Type, TypeAndQualifiers,
+    TypeQualifiers, UnionBuilder, UnionType,
 };
 use crate::{resolve_module, Db, KnownModule, Program};
 
@@ -791,24 +791,8 @@ fn symbol_from_bindings_impl<'db>(
                 return None;
             }
 
-            let constraint_tys: Vec<_> = narrowing_constraint
-                .filter_map(|constraint| infer_narrowing_constraint(db, constraint, binding))
-                .collect();
-
             let binding_ty = binding_type(db, binding);
-            if constraint_tys.is_empty() {
-                Some(binding_ty)
-            } else {
-                let intersection_ty = constraint_tys
-                    .into_iter()
-                    .rev()
-                    .fold(
-                        IntersectionBuilder::new(db).add_positive(binding_ty),
-                        IntersectionBuilder::add_positive,
-                    )
-                    .build();
-                Some(intersection_ty)
-            }
+            Some(narrowing_constraint.narrow(db, binding_ty, binding.symbol(db)))
         },
     );
 

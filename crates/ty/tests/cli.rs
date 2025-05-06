@@ -1,6 +1,7 @@
 use anyhow::Context;
 use insta::internals::SettingsBindDropGuard;
 use insta_cmd::{assert_cmd_snapshot, get_cargo_bin};
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
@@ -275,7 +276,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `utils`
+    error: lint:unresolved-import: Cannot resolve imported module `utils`
      --> test.py:2:6
       |
     2 | from utils import add
@@ -451,7 +452,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `does_not_exit`
+    error: lint:unresolved-import: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -498,7 +499,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: lint:unresolved-import: Cannot resolve import `does_not_exit`
+    warning: lint:unresolved-import: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -1052,7 +1053,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |     ^^^^^
       |
 
-    error: lint:unresolved-import: Cannot resolve import `main2`
+    error: lint:unresolved-import: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
     2 | from main2 import z  # error: unresolved-import
@@ -1061,7 +1062,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     4 | print(z)
       |
 
-    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
+    error: lint:unresolved-import: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import
@@ -1082,7 +1083,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `main2`
+    error: lint:unresolved-import: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
     2 | from main2 import z  # error: unresolved-import
@@ -1091,7 +1092,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     4 | print(z)
       |
 
-    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
+    error: lint:unresolved-import: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import
@@ -1191,6 +1192,42 @@ fn concise_revealed_type() -> anyhow::Result<()> {
 
     ----- stderr -----
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
+    let mut content = String::new();
+    writeln!(
+        &mut content,
+        "
+        from typing_extensions import reveal_type
+        total = 1{plus_one_repeated}
+        reveal_type(total)
+        ",
+        plus_one_repeated = " + 1".repeat(2000 - 1)
+    )?;
+
+    let case = TestCase::with_file("test.py", &ruff_python_trivia::textwrap::dedent(&content))?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    info: revealed-type: Revealed type
+     --> test.py:4:1
+      |
+    2 | from typing_extensions import reveal_type
+    3 | total = 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1...
+    4 | reveal_type(total)
+      | ^^^^^^^^^^^^^^^^^^ `Literal[2000]`
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }

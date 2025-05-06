@@ -146,6 +146,19 @@ impl<'db> GenericAlias<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         self.origin(db).definition(db)
     }
+
+    pub(super) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        Self::new(
+            db,
+            self.origin(db),
+            self.specialization(db)
+                .apply_specialization(db, specialization),
+        )
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
@@ -208,6 +221,19 @@ impl<'db> ClassType<'db> {
     /// Return `true` if this class represents the builtin class `object`
     pub(crate) fn is_object(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Object)
+    }
+
+    pub(super) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        match self {
+            Self::NonGeneric(_) => self,
+            Self::Generic(generic) => {
+                Self::Generic(generic.apply_specialization(db, specialization))
+            }
+        }
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.
@@ -1839,6 +1865,8 @@ pub enum KnownClass {
     MethodWrapperType,
     WrapperDescriptorType,
     UnionType,
+    GeneratorType,
+    AsyncGeneratorType,
     // Typeshed
     NoneType, // Part of `types` for Python >= 3.10
     // Typing
@@ -1903,6 +1931,8 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::WrapperDescriptorType
             | Self::UnionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
             | Self::MethodWrapperType => Truthiness::AlwaysTrue,
 
             Self::NoneType => Truthiness::AlwaysFalse,
@@ -1987,6 +2017,8 @@ impl<'db> KnownClass {
             | Self::BaseExceptionGroup
             | Self::Classmethod
             | Self::GenericAlias
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
             | Self::ModuleType
             | Self::FunctionType
             | Self::MethodType
@@ -2049,6 +2081,8 @@ impl<'db> KnownClass {
             Self::UnionType => "UnionType",
             Self::MethodWrapperType => "MethodWrapperType",
             Self::WrapperDescriptorType => "WrapperDescriptorType",
+            Self::GeneratorType => "GeneratorType",
+            Self::AsyncGeneratorType => "AsyncGeneratorType",
             Self::NamedTuple => "NamedTuple",
             Self::NoneType => "NoneType",
             Self::SpecialForm => "_SpecialForm",
@@ -2090,7 +2124,7 @@ impl<'db> KnownClass {
         }
     }
 
-    fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
+    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         struct KnownClassDisplay<'db> {
             db: &'db dyn Db,
             class: KnownClass,
@@ -2267,6 +2301,8 @@ impl<'db> KnownClass {
             | Self::ModuleType
             | Self::FunctionType
             | Self::MethodType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
             | Self::MethodWrapperType
             | Self::UnionType
             | Self::WrapperDescriptorType => KnownModule::Types,
@@ -2348,6 +2384,8 @@ impl<'db> KnownClass {
             | Self::GenericAlias
             | Self::ModuleType
             | Self::FunctionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType
@@ -2408,6 +2446,8 @@ impl<'db> KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::WrapperDescriptorType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
             | Self::SpecialForm
             | Self::ChainMap
             | Self::Counter
@@ -2465,6 +2505,8 @@ impl<'db> KnownClass {
             "GenericAlias" => Self::GenericAlias,
             "NoneType" => Self::NoneType,
             "ModuleType" => Self::ModuleType,
+            "GeneratorType" => Self::GeneratorType,
+            "AsyncGeneratorType" => Self::AsyncGeneratorType,
             "FunctionType" => Self::FunctionType,
             "MethodType" => Self::MethodType,
             "UnionType" => Self::UnionType,
@@ -2548,6 +2590,8 @@ impl<'db> KnownClass {
             | Self::Super
             | Self::NotImplementedType
             | Self::UnionType
+            | Self::GeneratorType
+            | Self::AsyncGeneratorType
             | Self::WrapperDescriptorType => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm

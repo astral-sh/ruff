@@ -121,7 +121,7 @@ class C: ...
 <!-- snapshot-diagnostics -->
 
 ```py
-import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzqzqzqzqzqzq`"
+import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve imported module `zqzqzqzqzqzqzq`"
 ```
 
 ## Unresolvable submodule imports
@@ -130,10 +130,10 @@ import zqzqzqzqzqzqzq  # error: [unresolved-import] "Cannot resolve import `zqzq
 
 ```py
 # Topmost component resolvable, submodule not resolvable:
-import a.foo  # error: [unresolved-import] "Cannot resolve import `a.foo`"
+import a.foo  # error: [unresolved-import] "Cannot resolve imported module `a.foo`"
 
 # Topmost component unresolvable:
-import b.foo  # error: [unresolved-import] "Cannot resolve import `b.foo`"
+import b.foo  # error: [unresolved-import] "Cannot resolve imported module `b.foo`"
 ```
 
 `a/__init__.py`:
@@ -163,4 +163,16 @@ from AveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongPathAveryLongP
 )
 
 reveal_type(Foo())  # revealed: Foo
+```
+
+## Multiple objects imported from an unresolved module
+
+<!-- snapshot-diagnostics -->
+
+If multiple members are imported from a module that cannot be resolved, only a single diagnostic is
+emitted for the `import from` statement:
+
+```py
+# error: [unresolved-import]
+from does_not_exist import foo, bar, baz
 ```

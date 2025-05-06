@@ -1,4 +1,5 @@
 AutoSplit
+Expression
 PyGithub
 PyWinCtl
 SinbadCogs
@@ -56,6 +57,7 @@ mkdocs
 mkosi
 mongo-python-driver
 more-itertools
+mypy
 mypy-protobuf
 mypy_primer
 nionutils
@@ -83,6 +85,7 @@ pylox
 pyodide
 pyp
 pyppeteer
+pytest
 pytest-robotframework
 python-chess
 python-htmlgen
@@ -101,7 +104,10 @@ starlette
 static-frame
 stone
 strawberry
+streamlit
+sympy
 tornado
+trio
 twine
 typeshed-stats
 urllib3
