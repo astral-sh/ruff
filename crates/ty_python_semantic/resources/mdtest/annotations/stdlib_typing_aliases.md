@@ -119,7 +119,7 @@ reveal_type(ChainMapSubclass.__mro__)
 class CounterSubclass(typing.Counter): ...
 
 # TODO: Should be (CounterSubclass, Counter, dict, MutableMapping, Mapping, Collection, Sized, Iterable, Container, Generic, object)
-# revealed: tuple[Literal[CounterSubclass], Literal[Counter[Unknown]], Literal[dict[Unknown, int]], Literal[MutableMapping[Unknown, int]], Literal[Mapping[Unknown, int]], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], Literal[dict[_T, int]], typing.Generic[_T], Literal[object]]
+# revealed: tuple[Literal[CounterSubclass], Literal[Counter[Unknown]], Literal[dict[Unknown, int]], Literal[MutableMapping[Unknown, int]], Literal[Mapping[Unknown, int]], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, typing.Generic[_KT, _VT_co], typing.Generic[_T], Literal[object]]
 reveal_type(CounterSubclass.__mro__)
 
 class DefaultDictSubclass(typing.DefaultDict): ...

@@ -202,6 +202,29 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        match self {
+            Self::Class(class) => Self::Class(class.apply_specialization(db, specialization)),
+            Self::Dynamic(_) | Self::Generic(_) | Self::Protocol => self,
+        }
+    }
+
+    pub(crate) fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Self {
+        if let Some(specialization) = specialization {
+            self.apply_specialization(db, specialization)
+        } else {
+            self
+        }
+    }
+
     /// Iterate over the MRO of this base
     pub(super) fn mro(
         self,
