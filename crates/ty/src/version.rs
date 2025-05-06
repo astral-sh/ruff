@@ -35,6 +35,12 @@ impl fmt::Display for VersionInfo {
     }
 }
 
+impl From<VersionInfo> for clap::builder::Str {
+    fn from(val: VersionInfo) -> Self {
+        val.to_string().into()
+    }
+}
+
 /// Returns information about ty's version.
 pub(crate) fn version() -> VersionInfo {
     // Environment variables are only read at compile-time
