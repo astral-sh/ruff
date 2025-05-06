@@ -340,16 +340,27 @@ propagate through:
 from typing import Generic, TypeVar
 
 T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+W = TypeVar("W")
 
-class Base(Generic[T]):
-    x: T | None = None
+class Parent(Generic[T]):
+    x: T
 
-class ExplicitlyGenericSub(Base[T], Generic[T]): ...
-class ImplicitlyGenericSub(Base[T]): ...
+class ExplicitlyGenericChild(Parent[U], Generic[U]): ...
+class ExplicitlyGenericGrandchild(ExplicitlyGenericChild[V], Generic[V]): ...
+class ExplicitlyGenericGreatgrandchild(ExplicitlyGenericGrandchild[W], Generic[W]): ...
+class ImplicitlyGenericChild(Parent[U]): ...
+class ImplicitlyGenericGrandchild(ImplicitlyGenericChild[V]): ...
+class ImplicitlyGenericGreatgrandchild(ImplicitlyGenericGrandchild[W]): ...
 
-reveal_type(Base[int].x)  # revealed: int | None
-reveal_type(ExplicitlyGenericSub[int].x)  # revealed: int | None
-reveal_type(ImplicitlyGenericSub[int].x)  # revealed: int | None
+reveal_type(Parent[int]().x)  # revealed: int
+reveal_type(ExplicitlyGenericChild[int]().x)  # revealed: int
+reveal_type(ImplicitlyGenericChild[int]().x)  # revealed: int
+reveal_type(ExplicitlyGenericGrandchild[int]().x)  # revealed: int
+reveal_type(ImplicitlyGenericGrandchild[int]().x)  # revealed: int
+reveal_type(ExplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
+reveal_type(ImplicitlyGenericGreatgrandchild[int]().x)  # revealed: int
 ```
 
 ## Generic methods

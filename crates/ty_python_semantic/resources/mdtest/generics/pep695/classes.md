@@ -285,13 +285,17 @@ When a generic subclass fills its superclass's type parameter with one of its ow
 propagate through:
 
 ```py
-class Base[T]:
-    x: T | None = None
+class Parent[T]:
+    x: T
 
-class Sub[U](Base[U]): ...
+class Child[U](Parent[U]): ...
+class Grandchild[V](Child[V]): ...
+class Greatgrandchild[W](Child[W]): ...
 
-reveal_type(Base[int].x)  # revealed: int | None
-reveal_type(Sub[int].x)  # revealed: int | None
+reveal_type(Parent[int]().x)  # revealed: int
+reveal_type(Child[int]().x)  # revealed: int
+reveal_type(Grandchild[int]().x)  # revealed: int
+reveal_type(Greatgrandchild[int]().x)  # revealed: int
 ```
 
 ## Generic methods
