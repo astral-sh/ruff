@@ -320,6 +320,17 @@ def two_final_constrained[T: (FinalClass, AnotherFinalClass), U: (FinalClass, An
     static_assert(not is_subtype_of(U, T))
 ```
 
+A bound or constrained typevar is a subtype of itself in a union:
+
+```py
+def union[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
+    static_assert(is_assignable_to(T, T | None))
+    static_assert(is_assignable_to(U, U | None))
+
+    static_assert(is_subtype_of(T, T | None))
+    static_assert(is_subtype_of(U, U | None))
+```
+
 ## Singletons and single-valued types
 
 (Note: for simplicity, all of the prose in this section refers to _singleton_ types, but all of the

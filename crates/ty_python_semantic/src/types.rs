@@ -850,6 +850,13 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub const fn into_typevar(self) -> Option<TypeVarInstance<'db>> {
+        match self {
+            Type::TypeVar(typevar) => Some(typevar),
+            _ => None,
+        }
+    }
+
     pub const fn is_boolean_literal(&self) -> bool {
         matches!(self, Type::BooleanLiteral(..))
     }
@@ -980,7 +987,7 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        match (self, target) {
+        let result = match (self, target) {
             // We should have handled these immediately above.
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => {
                 unreachable!("Non-fully-static types do not participate in subtyping!")
@@ -994,30 +1001,6 @@ impl<'db> Type<'db> {
 
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
-
-            // A fully static typevar is always a subtype of itself, and is never a subtype of any
-            // other typevar, since there is no guarantee that they will be specialized to the same
-            // type. (This is true even if both typevars are bounded by the same final class, since
-            // you can specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
-                self_typevar == other_typevar
-            }
-
-            // A fully static typevar is a subtype of its upper bound, and to something similar to
-            // the union of its constraints. An unbound, unconstrained, fully static typevar has an
-            // implicit upper bound of `object` (which is handled above).
-            (Type::TypeVar(typevar), _) if typevar.bound_or_constraints(db).is_some() => {
-                match typevar.bound_or_constraints(db) {
-                    None => unreachable!(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.is_subtype_of(db, target)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .elements(db)
-                        .iter()
-                        .all(|constraint| constraint.is_subtype_of(db, target)),
-                }
-            }
 
             (Type::Union(union), _) => union
                 .elements(db)
@@ -1284,7 +1267,33 @@ impl<'db> Type<'db> {
             // Other than the special cases enumerated above, `Instance` types and typevars are
             // never subtypes of any other variants
             (Type::NominalInstance(_) | Type::TypeVar(_), _) => false,
+        };
+
+        // A fully static typevar is a subtype of its upper bound, and to something similar to
+        // the union of its constraints. An unbound, unconstrained, fully static typevar has an
+        // implicit upper bound of `object` (which is handled above).
+        //
+        // This must be handled here, only if the above failed, because a typevar `T: int` needs to
+        // both a subtype of `int` and a subtype of e.g. `T | None`, so we need to also try
+        // treating it as its bound, if treating it as itself failed.
+        if !result {
+            if let Some(typevar) = self.into_typevar() {
+                match typevar.bound_or_constraints(db) {
+                    None => {}
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        return bound.is_subtype_of(db, target);
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        return constraints
+                            .elements(db)
+                            .iter()
+                            .all(|constraint| constraint.is_subtype_of(db, target));
+                    }
+                }
+            }
         }
+
+        result
     }
 
     /// Return true if this type is [assignable to] type `target`.
@@ -1295,7 +1304,7 @@ impl<'db> Type<'db> {
             return true;
         }
 
-        match (self, target) {
+        let result = match (self, target) {
             // Never can be assigned to any type.
             (Type::Never, _) => true,
 
@@ -1306,30 +1315,6 @@ impl<'db> Type<'db> {
             // All types are assignable to `object`.
             // TODO this special case might be removable once the below cases are comprehensive
             (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
-
-            // A typevar is always assignable to itself, and is never assignable to any other
-            // typevar, since there is no guarantee that they will be specialized to the same
-            // type. (This is true even if both typevars are bounded by the same final class, since
-            // you can specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
-                self_typevar == other_typevar
-            }
-
-            // A typevar is assignable to its upper bound, and to something similar to the union of
-            // its constraints. An unbound, unconstrained typevar has an implicit upper bound of
-            // `object` (which is handled above).
-            (Type::TypeVar(typevar), _) if typevar.bound_or_constraints(db).is_some() => {
-                match typevar.bound_or_constraints(db) {
-                    None => unreachable!(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.is_assignable_to(db, target)
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .elements(db)
-                        .iter()
-                        .all(|constraint| constraint.is_assignable_to(db, target)),
-                }
-            }
 
             // A union is assignable to a type T iff every element of the union is assignable to T.
             (Type::Union(union), ty) => union
@@ -1510,7 +1495,33 @@ impl<'db> Type<'db> {
 
             // TODO other types containing gradual forms
             _ => self.is_subtype_of(db, target),
+        };
+
+        // A typevar is assignable to its upper bound, and to something similar to the union of
+        // its constraints. An unbound, unconstrained typevar has an implicit upper bound of
+        // `object` (which is handled above).
+        //
+        // This must be handled here, only if the above failed, because a typevar `T: int` needs to
+        // both assignable to `int` and to e.g. `T | None`, so we need to also try treating it as
+        // its bound, if treating it as itself failed.
+        if !result {
+            if let Some(typevar) = self.into_typevar() {
+                match typevar.bound_or_constraints(db) {
+                    None => {}
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        return bound.is_assignable_to(db, target);
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        return constraints
+                            .elements(db)
+                            .iter()
+                            .all(|constraint| constraint.is_assignable_to(db, target));
+                    }
+                }
+            }
         }
+
+        result
     }
 
     /// Return true if this type is [equivalent to] type `other`.
@@ -1528,6 +1539,11 @@ impl<'db> Type<'db> {
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
             (Type::Callable(left), Type::Callable(right)) => left.is_equivalent_to(db, right),
+            // A fully static typevar is always equivalent to itself, and not any other typevar,
+            // since there is no guarantee that they will be specialized to the same type. (This is
+            // true even if both typevars are bounded by the same final class, since you can
+            // specialize the typevars to `Never` in addition to that final class.)
+            (Type::TypeVar(first), Type::TypeVar(second)) => first == second,
             (Type::NominalInstance(left), Type::NominalInstance(right)) => {
                 left.is_equivalent_to(db, right)
             }
@@ -1570,6 +1586,10 @@ impl<'db> Type<'db> {
                 }
             }
 
+            // A typevar is always gradually equivalent to itself, and not to any other typevar,
+            // since there is no guarantee that they will be specialized to the same type. (This is
+            // true even if both typevars are bounded by the same final class, since you can
+            // specialize the typevars to `Never` in addition to that final class.)
             (Type::TypeVar(first), Type::TypeVar(second)) => first == second,
 
             (Type::NominalInstance(first), Type::NominalInstance(second)) => {
