@@ -1,9 +1,0 @@
----
-source: crates/ruff_linter/src/linter.rs
----
-<filename>:2:9: SyntaxError: Yield expression cannot be used here
-  |
-2 | class C(yield from [object]):
-  |         ^
-3 |     pass
-  |
