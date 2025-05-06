@@ -4997,8 +4997,44 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             continue;
                                         };
 
+                                        let covariant = match covariant {
+                                            Some(ty) => ty.bool(self.db()),
+                                            None => Truthiness::AlwaysFalse,
+                                        };
+
+                                        let contravariant = match contravariant {
+                                            Some(ty) => ty.bool(self.db()),
+                                            None => Truthiness::AlwaysFalse,
+                                        };
+
                                         let variance = match (contravariant, covariant) {
-                                            (Some(_), Some(_)) => {
+                                            (Truthiness::Ambiguous, _) => {
+                                                if let Some(builder) = self.context.report_lint(
+                                                    &INVALID_LEGACY_TYPE_VARIABLE,
+                                                    call_expression,
+                                                ) {
+                                                    builder.into_diagnostic(format_args!(
+                                                        "The `contravariant` parameter of \
+                                                        a legacy `typing.TypeVar` cannot have \
+                                                        an ambiguous value",
+                                                    ));
+                                                }
+                                                continue;
+                                            }
+                                            (_, Truthiness::Ambiguous) => {
+                                                if let Some(builder) = self.context.report_lint(
+                                                    &INVALID_LEGACY_TYPE_VARIABLE,
+                                                    call_expression,
+                                                ) {
+                                                    builder.into_diagnostic(format_args!(
+                                                        "The `convariant` parameter of \
+                                                        a legacy `typing.TypeVar` cannot have \
+                                                        an ambiguous value",
+                                                    ));
+                                                }
+                                                continue;
+                                            }
+                                            (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => {
                                                 if let Some(builder) = self.context.report_lint(
                                                     &INVALID_LEGACY_TYPE_VARIABLE,
                                                     call_expression,
@@ -5010,9 +5046,15 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                 }
                                                 continue;
                                             }
-                                            (Some(_), None) => TypeVarVariance::Contravariant,
-                                            (None, Some(_)) => TypeVarVariance::Covariant,
-                                            (None, None) => TypeVarVariance::Invariant,
+                                            (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse) => {
+                                                TypeVarVariance::Contravariant
+                                            }
+                                            (Truthiness::AlwaysFalse, Truthiness::AlwaysTrue) => {
+                                                TypeVarVariance::Covariant
+                                            }
+                                            (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {
+                                                TypeVarVariance::Invariant
+                                            }
                                         };
 
                                         let name_param = name_param
