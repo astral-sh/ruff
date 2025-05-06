@@ -306,6 +306,10 @@ impl MainLoop {
                                 if diagnostics_count > 1 { "s" } else { "" }
                             )?;
 
+                            if max_severity.is_fatal() {
+                                tracing::warn!("A fatal occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details.");
+                            }
+
                             if self.watcher.is_none() {
                                 return Ok(match max_severity {
                                     Severity::Info => ExitStatus::Success,
