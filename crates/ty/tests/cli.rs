@@ -276,7 +276,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `utils`
+    error: lint:unresolved-import: Cannot resolve imported module `utils`
      --> test.py:2:6
       |
     2 | from utils import add
@@ -452,7 +452,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `does_not_exit`
+    error: lint:unresolved-import: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -499,7 +499,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning: lint:unresolved-import: Cannot resolve import `does_not_exit`
+    warning: lint:unresolved-import: Cannot resolve imported module `does_not_exit`
      --> test.py:2:8
       |
     2 | import does_not_exit
@@ -1053,7 +1053,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
       |     ^^^^^
       |
 
-    error: lint:unresolved-import: Cannot resolve import `main2`
+    error: lint:unresolved-import: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
     2 | from main2 import z  # error: unresolved-import
@@ -1062,7 +1062,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     4 | print(z)
       |
 
-    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
+    error: lint:unresolved-import: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import
@@ -1083,7 +1083,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    error: lint:unresolved-import: Cannot resolve import `main2`
+    error: lint:unresolved-import: Cannot resolve imported module `main2`
      --> project/other.py:2:6
       |
     2 | from main2 import z  # error: unresolved-import
@@ -1092,7 +1092,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     4 | print(z)
       |
 
-    error: lint:unresolved-import: Cannot resolve import `does_not_exist`
+    error: lint:unresolved-import: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
       |
     2 | import does_not_exist  # error: unresolved-import

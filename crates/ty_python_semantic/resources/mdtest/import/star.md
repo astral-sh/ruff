@@ -1369,7 +1369,7 @@ If the module is unresolved, we emit a diagnostic just like for any other unreso
 
 ```py
 # TODO: not a great error message
-from foo import *  # error: [unresolved-import] "Cannot resolve import `foo`"
+from foo import *  # error: [unresolved-import] "Cannot resolve imported module `foo`"
 ```
 
 ### Nested scope

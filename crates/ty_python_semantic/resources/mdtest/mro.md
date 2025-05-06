@@ -313,7 +313,6 @@ reveal_type(Omelette.__mro__)  # revealed: tuple[Literal[Omelette], Unknown, Lit
 
 ```py
 # error: [unresolved-import]
-# error: [unresolved-import]
 from does_not_exist import unknown_object_1, unknown_object_2
 
 reveal_type(unknown_object_1)  # revealed: Unknown
