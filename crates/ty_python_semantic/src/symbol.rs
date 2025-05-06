@@ -717,11 +717,11 @@ fn symbol_impl<'db>(
     name: &str,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> SymbolAndQualifiers<'db> {
-    let file = scope.file(db);
-    let _span = tracing::trace_span!("symbol", ?name, ?file).entered();
+    let _span = tracing::trace_span!("symbol", ?name).entered();
 
     if name == "platform"
-        && file_to_module(db, file).is_some_and(|module| module.is_known(KnownModule::Sys))
+        && file_to_module(db, scope.file(db))
+            .is_some_and(|module| module.is_known(KnownModule::Sys))
     {
         match Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
@@ -1068,7 +1068,7 @@ mod implicit_globals {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub(crate) enum RequiresExplicitReExport {
+enum RequiresExplicitReExport {
     Yes,
     No,
 }
