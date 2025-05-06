@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use crate::args::{Args, CheckCommand, Command, TerminalColor};
 use crate::logging::setup_tracing;
 use anyhow::{anyhow, Context};
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
@@ -68,6 +68,10 @@ fn run() -> anyhow::Result<ExitStatus> {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
         Command::Version => version().map(|()| ExitStatus::Success),
+        Command::GenerateShellCompletion { shell } => {
+            shell.generate(&mut Args::command(), &mut stdout());
+            Ok(ExitStatus::Success)
+        }
     }
 }
 

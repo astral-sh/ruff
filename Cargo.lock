@@ -3955,6 +3955,7 @@ dependencies = [
  "anyhow",
  "argfile",
  "clap",
+ "clap_complete_command",
  "colored 3.0.0",
  "countme",
  "crossbeam",

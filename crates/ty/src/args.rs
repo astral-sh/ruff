@@ -24,6 +24,10 @@ pub(crate) enum Command {
 
     /// Display ty's version
     Version,
+
+    /// Generate shell completion
+    #[clap(hide = true)]
+    GenerateShellCompletion { shell: clap_complete_command::Shell },
 }
 
 #[derive(Debug, Parser)]
