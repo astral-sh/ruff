@@ -54,7 +54,7 @@ struct DunderAllNamesCollector<'db> {
     /// The semantic index for the module.
     index: &'db SemanticIndex<'db>,
 
-    /// The origin of the `__all__` variable in the current module.
+    /// The origin of the `__all__` variable in the current module, [`None`] if it is not defined.
     origin: Option<DunderAllOrigin>,
 
     /// A flag indicating whether there are any invalid elements in `__all__`.
@@ -186,7 +186,10 @@ impl<'db> DunderAllNamesCollector<'db> {
     /// Returns [`None`] if `__all__` is not defined in the current module or if it contains
     /// invalid elements.
     fn into_names(self) -> Option<FxHashSet<Name>> {
-        if self.contains_invalid_element {
+        if self.origin.is_none() {
+            tracing::trace!("`__all__` is not defined in `{}`", self.file.path(self.db));
+            None
+        } else if self.contains_invalid_element {
             tracing::trace!(
                 "`__all__` in `{}` contains invalid elements",
                 self.file.path(self.db)
