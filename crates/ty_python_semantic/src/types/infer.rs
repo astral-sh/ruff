@@ -89,16 +89,8 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature,
     Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
-<<<<<<< HEAD
-    TypeDefinition, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, UnionBuilder, UnionType,
-||||||| parent of 9a23d28d6 (Pass context to in_type_expression)
-    TypeDefinition, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance,
     UnionBuilder, UnionType,
-=======
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, UnionBuilder,
-    UnionType,
->>>>>>> 9a23d28d6 (Pass context to in_type_expression)
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -107,21 +99,10 @@ use crate::{Db, FxOrderSet};
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
     report_attempted_protocol_instantiation, report_bad_argument_to_get_protocol_members,
-<<<<<<< HEAD
     report_duplicate_bases, report_index_out_of_bounds, report_invalid_exception_caught,
     report_invalid_exception_cause, report_invalid_exception_raised,
     report_invalid_type_checking_constant, report_non_subscriptable,
     report_possibly_unresolved_reference,
-||||||| parent of 9a23d28d6 (Pass context to in_type_expression)
-    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_self_usage,
-    report_invalid_type_checking_constant, report_non_subscriptable,
-    report_possibly_unresolved_reference,
-=======
-    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference,
->>>>>>> 9a23d28d6 (Pass context to in_type_expression)
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference, INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL,
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
@@ -7334,36 +7315,6 @@ impl<'db> TypeInferenceBuilder<'db> {
                         }
                         Type::KnownInstance(KnownInstanceType::Final) => {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
-                        }
-                        Type::KnownInstance(KnownInstanceType::TypingSelf) => {
-                            let scope = self.scope();
-                            if let Some(class_ty) = self.enclosing_class_symbol(scope) {
-                                let class = class_ty.expect_class_literal();
-                                if let TypeDefinition::Class(d) =
-                                    class_ty.definition(self.db()).unwrap()
-                                {
-                                    let ty = Type::TypeVar(TypeVarInstance::new(
-                                        self.db(),
-                                        class.name(self.db()),
-                                        d,
-                                        Some(TypeVarBoundOrConstraints::UpperBound(
-                                            Type::instance(
-                                                self.db(),
-                                                class_ty.expect_class_type(self.db()),
-                                            ),
-                                        )),
-                                        TypeVarVariance::Invariant,
-                                        None,
-                                        TypeVarKind::Legacy,
-                                    ));
-                                    TypeAndQualifiers::new(ty, TypeQualifiers::empty())
-                                } else {
-                                    TypeAndQualifiers::unknown()
-                                }
-                            } else {
-                                report_invalid_self_usage(&self.context, annotation);
-                                TypeAndQualifiers::unknown()
-                            }
                         }
                         _ => name_expr_ty
                             .in_type_expression(self.db(), self.scope())
