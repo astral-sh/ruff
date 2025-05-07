@@ -72,23 +72,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
 # Diagnostics
 
 ```
-error: lint:invalid-overload: Overloaded function `try_from3` does not use the `@classmethod` decorator consistently
-  --> src/mdtest_snippet.py:40:9
-   |
-38 |     def try_from3(cls, x: str) -> None: ...
-39 |     # error: [invalid-overload]
-40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
-   |         ---------
-   |         |
-   |         Missing here
-41 |         if isinstance(x, int):
-42 |             return cls(x)
-   |
-info: `lint:invalid-overload` is enabled by default
-
-```
-
-```
 error: lint:invalid-overload: Overloaded function `try_from1` does not use the `@classmethod` decorator consistently
   --> src/mdtest_snippet.py:13:9
    |
@@ -125,6 +108,23 @@ error: lint:invalid-overload: Overloaded function `try_from2` does not use the `
    |         --------- Missing here
 23 |     @overload
 24 |     @classmethod
+   |
+info: `lint:invalid-overload` is enabled by default
+
+```
+
+```
+error: lint:invalid-overload: Overloaded function `try_from3` does not use the `@classmethod` decorator consistently
+  --> src/mdtest_snippet.py:40:9
+   |
+38 |     def try_from3(cls, x: str) -> None: ...
+39 |     # error: [invalid-overload]
+40 |     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
+   |         ---------
+   |         |
+   |         Missing here
+41 |         if isinstance(x, int):
+42 |             return cls(x)
    |
 info: `lint:invalid-overload` is enabled by default
 

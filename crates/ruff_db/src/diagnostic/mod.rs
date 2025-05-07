@@ -232,6 +232,18 @@ impl Diagnostic {
     pub fn primary_tags(&self) -> Option<&[DiagnosticTag]> {
         self.primary_annotation().map(|ann| ann.tags.as_slice())
     }
+
+    /// Returns a key that can be used to sort two diagnostics into the canonical order
+    /// in which they should appear when rendered.
+    pub fn rendering_sort_key<'a, 'db>(&'a self, db: &'db dyn Db) -> impl Ord + 'a
+    where
+        'db: 'a,
+    {
+        RenderingSortKey {
+            db,
+            diagnostic: self,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -242,6 +254,64 @@ struct DiagnosticInner {
     annotations: Vec<Annotation>,
     subs: Vec<SubDiagnostic>,
 }
+
+struct RenderingSortKey<'db, 'a> {
+    db: &'db dyn Db,
+    diagnostic: &'a Diagnostic,
+}
+
+impl Ord for RenderingSortKey<'_, '_> {
+    // We sort diagnostics in a way that keeps them in source order
+    // and grouped by file. After that, we fall back to severity
+    // (with fatal messages sorting before info messages) and then
+    // finally the diagnostic ID.
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if let (Some(span1), Some(span2)) = (
+            self.diagnostic.primary_span(),
+            other.diagnostic.primary_span(),
+        ) {
+            let order = span1
+                .file()
+                .path(self.db)
+                .as_str()
+                .cmp(span2.file().path(self.db).as_str());
+            if order.is_ne() {
+                return order;
+            }
+
+            if let (Some(range1), Some(range2)) = (span1.range(), span2.range()) {
+                let order = range1.start().cmp(&range2.start());
+                if order.is_ne() {
+                    return order;
+                }
+            }
+        }
+        // Reverse so that, e.g., Fatal sorts before Info.
+        let order = self
+            .diagnostic
+            .severity()
+            .cmp(&other.diagnostic.severity())
+            .reverse();
+        if order.is_ne() {
+            return order;
+        }
+        self.diagnostic.id().cmp(&other.diagnostic.id())
+    }
+}
+
+impl PartialOrd for RenderingSortKey<'_, '_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for RenderingSortKey<'_, '_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl Eq for RenderingSortKey<'_, '_> {}
 
 /// A collection of information subservient to a diagnostic.
 ///
