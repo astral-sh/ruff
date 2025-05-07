@@ -50,7 +50,7 @@ pub(crate) struct RedundantLiteralUnion {
 }
 
 impl Violation for RedundantLiteralUnion {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Always;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
