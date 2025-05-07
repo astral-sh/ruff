@@ -31,20 +31,19 @@ use super::{
 ///   values. When using Salsa, this most commonly corresponds to the lifetime
 ///   of a Salsa `Db`.
 /// * The lifetime of the diagnostic being rendered.
-#[derive(Debug)]
-pub struct DisplayDiagnostic<'a, R> {
+pub struct DisplayDiagnostic<'a> {
     config: &'a DisplayDiagnosticConfig,
-    resolver: R,
+    resolver: &'a dyn FileResolver,
     annotate_renderer: AnnotateRenderer,
     diag: &'a Diagnostic,
 }
 
-impl<'a, R> DisplayDiagnostic<'a, R> {
+impl<'a> DisplayDiagnostic<'a> {
     pub(crate) fn new(
-        resolver: R,
+        resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
         diag: &'a Diagnostic,
-    ) -> DisplayDiagnostic<'a, R> {
+    ) -> DisplayDiagnostic<'a> {
         let annotate_renderer = if config.color {
             AnnotateRenderer::styled()
         } else {
@@ -60,10 +59,7 @@ impl<'a, R> DisplayDiagnostic<'a, R> {
     }
 }
 
-impl<R> std::fmt::Display for DisplayDiagnostic<'_, R>
-where
-    R: FileResolver,
-{
+impl std::fmt::Display for DisplayDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let stylesheet = if self.config.color {
             DiagnosticStylesheet::styled()
@@ -90,10 +86,10 @@ where
                 write!(
                     f,
                     " {path}",
-                    path = fmt_styled(span.file().path(&self.resolver), stylesheet.emphasis)
+                    path = fmt_styled(span.file().path(self.resolver), stylesheet.emphasis)
                 )?;
                 if let Some(range) = span.range() {
-                    let diagnostic_source = span.file().diagnostic_source(&self.resolver);
+                    let diagnostic_source = span.file().diagnostic_source(self.resolver);
                     let start = diagnostic_source
                         .as_source_code()
                         .line_column(range.start());
@@ -121,7 +117,7 @@ where
             .emphasis(stylesheet.emphasis)
             .none(stylesheet.none);
 
-        let resolved = Resolved::new(&self.resolver, self.diag);
+        let resolved = Resolved::new(self.resolver, self.diag);
         let renderable = resolved.to_renderable(self.config.context);
         for diag in renderable.diagnostics.iter() {
             writeln!(f, "{}", renderer.render(diag.to_annotate()))?;
@@ -150,7 +146,7 @@ struct Resolved<'a> {
 
 impl<'a> Resolved<'a> {
     /// Creates a new resolved set of diagnostics.
-    fn new(resolver: &'a impl FileResolver, diag: &'a Diagnostic) -> Resolved<'a> {
+    fn new(resolver: &'a dyn FileResolver, diag: &'a Diagnostic) -> Resolved<'a> {
         let mut diagnostics = vec![];
         diagnostics.push(ResolvedDiagnostic::from_diagnostic(resolver, diag));
         for sub in &diag.inner.subs {
@@ -188,7 +184,7 @@ struct ResolvedDiagnostic<'a> {
 impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
-        resolver: &'a impl FileResolver,
+        resolver: &'a dyn FileResolver,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -222,7 +218,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 
     /// Resolve a single sub-diagnostic.
     fn from_sub_diagnostic(
-        resolver: &'a impl FileResolver,
+        resolver: &'a dyn FileResolver,
         diag: &'a SubDiagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -2238,7 +2234,7 @@ watermelon
         ///
         /// (This will set the "printed" flag on `Diagnostic`.)
         fn render(&self, diag: &Diagnostic) -> String {
-            diag.display(self.db.upcast(), &self.config).to_string()
+            diag.display(&self.db.upcast(), &self.config).to_string()
         }
     }
 

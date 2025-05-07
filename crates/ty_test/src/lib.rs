@@ -465,7 +465,7 @@ fn create_diagnostic_snapshot(
             writeln!(snapshot).unwrap();
         }
         writeln!(snapshot, "```").unwrap();
-        write!(snapshot, "{}", diag.display(db.upcast(), &display_config)).unwrap();
+        write!(snapshot, "{}", diag.display(&db.upcast(), &display_config)).unwrap();
         writeln!(snapshot, "```").unwrap();
     }
     snapshot

@@ -774,7 +774,7 @@ mod tests {
                 .message("Cursor offset"),
             );
 
-            write!(buf, "{}", diagnostic.display(self.db.upcast(), &config)).unwrap();
+            write!(buf, "{}", diagnostic.display(&self.db.upcast(), &config)).unwrap();
 
             buf
         }

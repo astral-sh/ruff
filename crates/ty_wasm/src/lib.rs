@@ -383,7 +383,7 @@ impl Diagnostic {
     pub fn display(&self, workspace: &Workspace) -> JsString {
         let config = DisplayDiagnosticConfig::default().color(false);
         self.inner
-            .display(workspace.db.upcast(), &config)
+            .display(&workspace.db.upcast(), &config)
             .to_string()
             .into()
     }

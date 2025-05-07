@@ -113,11 +113,11 @@ impl Diagnostic {
     ///
     /// Note that this `Display` impl includes a trailing line terminator, so
     /// callers should prefer using this with `write!` instead of `writeln!`.
-    pub fn display<'a, R>(
+    pub fn display<'a>(
         &'a self,
-        resolver: R,
+        resolver: &'a dyn FileResolver,
         config: &'a DisplayDiagnosticConfig,
-    ) -> DisplayDiagnostic<'a, R> {
+    ) -> DisplayDiagnostic<'a> {
         DisplayDiagnostic::new(resolver, config, self)
     }
 
@@ -693,14 +693,14 @@ pub enum UnifiedFile {
 }
 
 impl UnifiedFile {
-    pub fn path<'a>(&'a self, resolver: &'a impl FileResolver) -> &'a str {
+    pub fn path<'a>(&'a self, resolver: &'a dyn FileResolver) -> &'a str {
         match self {
             UnifiedFile::Ty(file) => resolver.path(*file),
             UnifiedFile::Ruff(file) => file.name(),
         }
     }
 
-    fn diagnostic_source(&self, resolver: &impl FileResolver) -> DiagnosticSource {
+    fn diagnostic_source(&self, resolver: &dyn FileResolver) -> DiagnosticSource {
         match self {
             UnifiedFile::Ty(file) => DiagnosticSource::Ty(resolver.input(*file)),
             UnifiedFile::Ruff(file) => DiagnosticSource::Ruff(file.clone()),

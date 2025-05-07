@@ -286,7 +286,7 @@ mod tests {
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
                 let diag = diagnostic.into_diagnostic();
-                write!(buf, "{}", diag.display(self.db.upcast(), &config)).unwrap();
+                write!(buf, "{}", diag.display(&self.db.upcast(), &config)).unwrap();
             }
 
             buf

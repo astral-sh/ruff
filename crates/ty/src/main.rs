@@ -302,7 +302,7 @@ impl MainLoop {
                                 write!(
                                     stdout,
                                     "{}",
-                                    diagnostic.display(db.upcast(), &display_config)
+                                    diagnostic.display(&db.upcast(), &display_config)
                                 )?;
 
                                 max_severity = max_severity.max(diagnostic.severity());
