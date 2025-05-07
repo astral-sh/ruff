@@ -1643,6 +1643,13 @@ impl<'db> Type<'db> {
                 false
             }
 
+            (tvar @ Type::TypeVar(_), Type::Intersection(intersection))
+            | (Type::Intersection(intersection), tvar @ Type::TypeVar(_))
+                if intersection.negative(db).contains(&tvar) =>
+            {
+                true
+            }
+
             // An unbounded typevar is never disjoint from any other type, since it might be
             // specialized to any type. A bounded typevar is not disjoint from its bound, and is
             // only disjoint from other types if its bound is. A constrained typevar is disjoint
