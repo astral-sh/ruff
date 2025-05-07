@@ -189,6 +189,9 @@ pub struct FormatterSettings {
 
     pub docstring_code_format: DocstringCode,
     pub docstring_code_line_width: DocstringCodeLineWidth,
+
+    pub pragma_tags: Vec<String>,
+    pub pragma_tags_case_insensitive: Vec<String>,
 }
 
 impl FormatterSettings {
@@ -234,6 +237,8 @@ impl FormatterSettings {
             .with_line_width(self.line_width)
             .with_docstring_code(self.docstring_code_format)
             .with_docstring_code_line_width(self.docstring_code_line_width)
+            .with_pragma_tags(self.pragma_tags.clone())
+            .with_pragma_tags_case_insensitive(self.pragma_tags_case_insensitive.clone())
     }
 
     /// Resolve the [`PythonVersion`] to use for formatting.
@@ -266,6 +271,8 @@ impl Default for FormatterSettings {
             magic_trailing_comma: default_options.magic_trailing_comma(),
             docstring_code_format: default_options.docstring_code(),
             docstring_code_line_width: default_options.docstring_code_line_width(),
+            pragma_tags: default_options.pragma_tags().clone(),
+            pragma_tags_case_insensitive: default_options.pragma_tags_case_insensitive().clone(),
         }
     }
 }
@@ -289,6 +296,8 @@ impl fmt::Display for FormatterSettings {
                 self.magic_trailing_comma,
                 self.docstring_code_format,
                 self.docstring_code_line_width,
+                self.pragma_tags | array,
+                self.pragma_tags_case_insensitive | array,
             ]
         }
         Ok(())

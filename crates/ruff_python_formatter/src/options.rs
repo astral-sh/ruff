@@ -6,6 +6,7 @@ use ruff_formatter::printer::{LineEnding, PrinterOptions, SourceMapGeneration};
 use ruff_formatter::{FormatOptions, IndentStyle, IndentWidth, LineWidth};
 use ruff_macros::CacheKey;
 use ruff_python_ast::{self as ast, PySourceType};
+use ruff_python_trivia::{default_pragma_tags, default_pragma_tags_case_insensitive};
 
 /// Resolved options for formatting one individual file. The difference to `FormatterSettings`
 /// is that `FormatterSettings` stores the settings for multiple files (the entire project, a subdirectory, ..)
@@ -62,6 +63,17 @@ pub struct PyFormatOptions {
 
     /// Whether preview style formatting is enabled or not
     preview: PreviewMode,
+
+    /// A list of pragma tags to be ignored for line-too-long by the formatter.
+    #[cfg_attr(feature = "serde", serde(default = "default_pragma_tags"))]
+    pragma_tags: Vec<String>,
+
+    /// A list of pragma tags to be ignored for line-too-long by the formatter, with case-insensitive matching.
+    #[cfg_attr(
+        feature = "serde",
+        serde(default = "default_pragma_tags_case_insensitive")
+    )]
+    pragma_tags_case_insensitive: Vec<String>,
 }
 
 fn default_line_width() -> LineWidth {
@@ -91,6 +103,8 @@ impl Default for PyFormatOptions {
             docstring_code: DocstringCode::default(),
             docstring_code_line_width: DocstringCodeLineWidth::default(),
             preview: PreviewMode::default(),
+            pragma_tags: default_pragma_tags(),
+            pragma_tags_case_insensitive: default_pragma_tags_case_insensitive(),
         }
     }
 }
@@ -142,6 +156,14 @@ impl PyFormatOptions {
 
     pub const fn preview(&self) -> PreviewMode {
         self.preview
+    }
+
+    pub const fn pragma_tags(&self) -> &Vec<String> {
+        &self.pragma_tags
+    }
+
+    pub const fn pragma_tags_case_insensitive(&self) -> &Vec<String> {
+        &self.pragma_tags_case_insensitive
     }
 
     #[must_use]
@@ -201,6 +223,21 @@ impl PyFormatOptions {
     #[must_use]
     pub fn with_preview(mut self, preview: PreviewMode) -> Self {
         self.preview = preview;
+        self
+    }
+
+    #[must_use]
+    pub fn with_pragma_tags(mut self, pragma_tags: Vec<String>) -> Self {
+        self.pragma_tags = pragma_tags;
+        self
+    }
+
+    #[must_use]
+    pub fn with_pragma_tags_case_insensitive(
+        mut self,
+        pragma_tags_case_insensitive: Vec<String>,
+    ) -> Self {
+        self.pragma_tags_case_insensitive = pragma_tags_case_insensitive;
         self
     }
 

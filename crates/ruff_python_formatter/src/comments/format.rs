@@ -377,7 +377,11 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
         let normalized_comment = normalize_comment(self.comment, source)?;
 
         // Don't reserve width for excluded pragma comments.
-        let reserved_width = if is_pragma_comment(&normalized_comment) {
+        let reserved_width = if is_pragma_comment(
+            &normalized_comment,
+            f.options().pragma_tags(),
+            f.options().pragma_tags_case_insensitive(),
+        ) {
             0
         } else {
             // Start with 2 because of the two leading spaces.
