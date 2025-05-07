@@ -7,7 +7,8 @@ use std::panic::PanicInfo;
 
 use lsp_server::Message;
 use lsp_types::{
-    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability,
+    ClientCapabilities, DiagnosticOptions, DiagnosticServerCapabilities,
+    DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, HoverProviderCapability,
     InlayHintOptions, InlayHintServerCapabilities, MessageType, ServerCapabilities,
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TypeDefinitionProviderCapability, Url,
@@ -24,6 +25,7 @@ mod connection;
 mod schedule;
 
 use crate::message::try_show_message;
+use crate::server::schedule::Task;
 pub(crate) use connection::ClientSender;
 
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
@@ -170,12 +172,79 @@ impl Server {
 
     fn event_loop(
         connection: &Connection,
-        _client_capabilities: &ClientCapabilities,
+        client_capabilities: &ClientCapabilities,
         mut session: Session,
         worker_threads: NonZeroUsize,
     ) -> crate::Result<()> {
         let mut scheduler =
             schedule::Scheduler::new(&mut session, worker_threads, connection.make_sender());
+
+        let fs_watcher = client_capabilities
+            .workspace
+            .as_ref()
+            .and_then(|workspace| workspace.did_change_watched_files?.dynamic_registration)
+            .unwrap_or_default();
+
+        if fs_watcher {
+            let registration = lsp_types::Registration {
+                id: "workspace/didChangeWatchedFiles".to_owned(),
+                method: "workspace/didChangeWatchedFiles".to_owned(),
+                register_options: Some(
+                    serde_json::to_value(DidChangeWatchedFilesRegistrationOptions {
+                        watchers: vec![
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/ty.toml".into()),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String(
+                                    "**/.gitignore".into(),
+                                ),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/.ignore".into()),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String(
+                                    "**/pyproject.toml".into(),
+                                ),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/*.py".into()),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/*.pyi".into()),
+                                kind: None,
+                            },
+                            FileSystemWatcher {
+                                glob_pattern: lsp_types::GlobPattern::String("**/*.ipynb".into()),
+                                kind: None,
+                            },
+                        ],
+                    })
+                    .unwrap(),
+                ),
+            };
+            let response_handler = |()| {
+                tracing::info!("File watcher successfully registered");
+                Task::nothing()
+            };
+
+            if let Err(err) = scheduler.request::<lsp_types::request::RegisterCapability>(
+                lsp_types::RegistrationParams {
+                    registrations: vec![registration],
+                },
+                response_handler,
+            ) {
+                tracing::error!("An error occurred when trying to register the configuration file watcher: {err}");
+            }
+        } else {
+            tracing::warn!("The client does not support file system watching.");
+        }
 
         for msg in connection.incoming() {
             if connection.handle_shutdown(&msg)? {

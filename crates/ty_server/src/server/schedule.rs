@@ -57,7 +57,6 @@ impl<'s> Scheduler<'s> {
     /// Immediately sends a request of kind `R` to the client, with associated parameters.
     /// The task provided by `response_handler` will be dispatched as soon as the response
     /// comes back from the client.
-    #[expect(dead_code)]
     pub(super) fn request<R>(
         &mut self,
         params: R::Params,
