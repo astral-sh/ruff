@@ -85,7 +85,7 @@ class A(tuple[int, str]): ...
 
 # Runtime value: `(A, tuple, object)`
 # TODO: Generics
-reveal_type(A.__mro__)  # revealed: tuple[Literal[A], @Todo(GenericAlias instance), Literal[object]]
+reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, @Todo(GenericAlias instance), <class 'object'>]
 ```
 
 ## `typing.Tuple`
@@ -116,6 +116,6 @@ from typing import Tuple
 class C(Tuple): ...
 
 # TODO: generic protocols
-# revealed: tuple[Literal[C], Literal[tuple], Literal[Sequence], Literal[Reversible], Literal[Collection], Literal[Iterable], Literal[Container], @Todo(`Protocol[]` subscript), typing.Generic, Literal[object]]
+# revealed: tuple[<class 'C'>, <class 'tuple'>, <class 'Sequence'>, <class 'Reversible'>, <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, <class 'object'>]
 reveal_type(C.__mro__)
 ```

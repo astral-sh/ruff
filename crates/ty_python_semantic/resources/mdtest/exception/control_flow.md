@@ -600,12 +600,12 @@ except:
         reveal_type(x)  # revealed: E
 
     x = Bar
-    reveal_type(x)  # revealed: Literal[Bar]
+    reveal_type(x)  # revealed: <class 'Bar'>
 finally:
-    # TODO: should be `Literal[1] | Literal[foo] | Literal[Bar]`
-    reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | Literal[Bar]
+    # TODO: should be `Literal[1] | <class 'foo'> | <class 'Bar'>`
+    reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | <class 'Bar'>
 
-reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | Literal[Bar]
+reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | <class 'Bar'>
 ```
 
 [1]: https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d

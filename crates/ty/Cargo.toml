@@ -22,6 +22,7 @@ ty_server = { workspace = true }
 anyhow = { workspace = true }
 argfile = { workspace = true }
 clap = { workspace = true, features = ["wrap_help", "string"] }
+clap_complete_command = { workspace = true }
 colored = { workspace = true }
 countme = { workspace = true, features = ["enable"] }
 crossbeam = { workspace = true }
