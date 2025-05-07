@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
 ---
-PYI051.pyi:4:18: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
+PYI051.pyi:4:18: PYI051 `Literal["foo"]` is redundant in a union with `str`
   |
 2 | from typing import Literal, TypeAlias, Union
 3 |
@@ -12,17 +12,7 @@ PYI051.pyi:4:18: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
   |
   = help: Replace `Literal["foo"] | str` with `str`
 
-ℹ Safe fix
-1 1 | import typing
-2 2 | from typing import Literal, TypeAlias, Union
-3 3 | 
-4   |-A: str | Literal["foo"]
-  4 |+A: str
-5 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
-6 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
-7 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-
-PYI051.pyi:5:37: PYI051 [*] `Literal[b"bar"]` is redundant in a union with `bytes`
+PYI051.pyi:5:37: PYI051 `Literal[b"bar"]` is redundant in a union with `bytes`
   |
 4 | A: str | Literal["foo"]
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
@@ -30,19 +20,9 @@ PYI051.pyi:5:37: PYI051 [*] `Literal[b"bar"]` is redundant in a union with `byte
 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
   |
-  = help: Replace `Literal[b"bar"] | bytes` with `bytes`
+  = help: Replace `typing.Union[Literal[b"bar"], bytes]` with `bytes`
 
-ℹ Safe fix
-2 2 | from typing import Literal, TypeAlias, Union
-3 3 | 
-4 4 | A: str | Literal["foo"]
-5   |-B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
-  5 |+B: TypeAlias = bytes | str
-6 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
-7 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-8 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
-
-PYI051.pyi:5:45: PYI051 [*] `Literal[b"foo"]` is redundant in a union with `bytes`
+PYI051.pyi:5:45: PYI051 `Literal[b"foo"]` is redundant in a union with `bytes`
   |
 4 | A: str | Literal["foo"]
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
@@ -50,19 +30,9 @@ PYI051.pyi:5:45: PYI051 [*] `Literal[b"foo"]` is redundant in a union with `byte
 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
   |
-  = help: Replace `Literal[b"foo"] | bytes` with `bytes`
+  = help: Replace `typing.Union[Literal[b"foo"], bytes]` with `bytes`
 
-ℹ Safe fix
-2 2 | from typing import Literal, TypeAlias, Union
-3 3 | 
-4 4 | A: str | Literal["foo"]
-5   |-B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
-  5 |+B: TypeAlias = bytes | str
-6 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
-7 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-8 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
-
-PYI051.pyi:6:37: PYI051 [*] `Literal[5]` is redundant in a union with `int`
+PYI051.pyi:6:37: PYI051 `Literal[5]` is redundant in a union with `int`
   |
 4 | A: str | Literal["foo"]
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
@@ -71,19 +41,9 @@ PYI051.pyi:6:37: PYI051 [*] `Literal[5]` is redundant in a union with `int`
 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
   |
-  = help: Replace `Literal[5] | int` with `int`
+  = help: Replace `typing.Union[Literal[5], int]` with `int`
 
-ℹ Safe fix
-3 3 | 
-4 4 | A: str | Literal["foo"]
-5 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
-6   |-C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
-  6 |+C: TypeAlias = int | str
-7 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-8 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
-9 9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-
-PYI051.pyi:6:67: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
+PYI051.pyi:6:67: PYI051 `Literal["foo"]` is redundant in a union with `str`
   |
 4 | A: str | Literal["foo"]
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
@@ -92,19 +52,9 @@ PYI051.pyi:6:67: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
   |
-  = help: Replace `Literal["foo"] | str` with `str`
+  = help: Replace `typing.Union[Literal["foo"], str]` with `str`
 
-ℹ Safe fix
-3 3 | 
-4 4 | A: str | Literal["foo"]
-5 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
-6   |-C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
-  6 |+C: TypeAlias = int | str
-7 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-8 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
-9 9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-
-PYI051.pyi:7:37: PYI051 [*] `Literal[b"str_bytes"]` is redundant in a union with `bytes`
+PYI051.pyi:7:37: PYI051 `Literal[b"str_bytes"]` is redundant in a union with `bytes`
   |
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
@@ -113,19 +63,9 @@ PYI051.pyi:7:37: PYI051 [*] `Literal[b"str_bytes"]` is redundant in a union with
 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
 9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
   |
-  = help: Replace `Literal[b"str_bytes"] | bytes` with `bytes`
+  = help: Replace `typing.Union[Literal[b"str_bytes"], bytes]` with `bytes`
 
-ℹ Safe fix
-4 4 | A: str | Literal["foo"]
-5 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
-6 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
-7   |-D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-  7 |+D: TypeAlias = bytes | int
-8 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
-9 9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-10 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-
-PYI051.pyi:7:51: PYI051 [*] `Literal[42]` is redundant in a union with `int`
+PYI051.pyi:7:51: PYI051 `Literal[42]` is redundant in a union with `int`
   |
 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
@@ -134,19 +74,9 @@ PYI051.pyi:7:51: PYI051 [*] `Literal[42]` is redundant in a union with `int`
 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
 9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
   |
-  = help: Replace `Literal[42] | int` with `int`
+  = help: Replace `typing.Union[Literal[42], int]` with `int`
 
-ℹ Safe fix
-4 4 | A: str | Literal["foo"]
-5 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
-6 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
-7   |-D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-  7 |+D: TypeAlias = bytes | int
-8 8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
-9 9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-10 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-
-PYI051.pyi:8:76: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
+PYI051.pyi:8:76: PYI051 `Literal["foo"]` is redundant in a union with `str`
    |
  6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
  7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
@@ -155,19 +85,9 @@ PYI051.pyi:8:76: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
  9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
    |
-   = help: Replace `Literal["foo"] | str` with `str`
+   = help: Replace `typing.Union[Literal["foo"], str]` with `str`
 
-ℹ Safe fix
-5 5 | B: TypeAlias = typing.Union[Literal[b"bar", b"foo"], bytes, str]
-6 6 | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
-7 7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-8   |-E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
-  8 |+E: TypeAlias = str
-9 9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-10 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-11 11 | 
-
-PYI051.pyi:9:81: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
+PYI051.pyi:9:81: PYI051 `Literal["foo"]` is redundant in a union with `str`
    |
  7 | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
  8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
@@ -175,19 +95,9 @@ PYI051.pyi:9:81: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
    |                                                                                 ^^^^^ PYI051
 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
    |
-   = help: Replace `Literal["foo"] | str` with `str`
+   = help: Replace `typing.Union[Literal["foo"], str]` with `str`
 
-ℹ Safe fix
-6  6  | C: TypeAlias = typing.Union[Literal[5], int, typing.Union[Literal["foo"], str]]
-7  7  | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-8  8  | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
-9     |-F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-   9  |+F: TypeAlias = str | int
-10 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-11 11 | 
-12 12 | def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
-
-PYI051.pyi:10:69: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
+PYI051.pyi:10:69: PYI051 `Literal["foo"]` is redundant in a union with `str`
    |
  8 | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
  9 | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
@@ -196,19 +106,9 @@ PYI051.pyi:10:69: PYI051 [*] `Literal["foo"]` is redundant in a union with `str`
 11 |
 12 | def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
    |
-   = help: Replace `Literal["foo"] | str` with `str`
+   = help: Replace `typing.Union[Literal["foo"], str]` with `str`
 
-ℹ Safe fix
-7  7  | D: TypeAlias = typing.Union[Literal[b"str_bytes", 42], bytes, int]
-8  8  | E: TypeAlias = typing.Union[typing.Union[typing.Union[typing.Union[Literal["foo"], str]]]]
-9  9  | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-10    |-G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-   10 |+G: str | int
-11 11 | 
-12 12 | def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
-13 13 | 
-
-PYI051.pyi:12:31: PYI051 [*] `Literal[1J]` is redundant in a union with `complex`
+PYI051.pyi:12:31: PYI051 `Literal[1J]` is redundant in a union with `complex`
    |
 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
 11 |
@@ -219,17 +119,7 @@ PYI051.pyi:12:31: PYI051 [*] `Literal[1J]` is redundant in a union with `complex
    |
    = help: Replace `Literal[1J] | complex` with `complex`
 
-ℹ Safe fix
-9  9  | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-10 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-11 11 | 
-12    |-def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
-   12 |+def func(x: complex, y: Union[Literal[3.14], float]): ...
-13 13 | 
-14 14 | # OK
-15 15 | A: Literal["foo"]
-
-PYI051.pyi:12:53: PYI051 [*] `Literal[3.14]` is redundant in a union with `float`
+PYI051.pyi:12:53: PYI051 `Literal[3.14]` is redundant in a union with `float`
    |
 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
 11 |
@@ -238,14 +128,4 @@ PYI051.pyi:12:53: PYI051 [*] `Literal[3.14]` is redundant in a union with `float
 13 |
 14 | # OK
    |
-   = help: Replace `Literal[3.14] | float` with `float`
-
-ℹ Safe fix
-9  9  | F: TypeAlias = typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-10 10 | G: typing.Union[str, typing.Union[typing.Union[typing.Union[Literal["foo"], int]]]]
-11 11 | 
-12    |-def func(x: complex | Literal[1J], y: Union[Literal[3.14], float]): ...
-   12 |+def func(x: complex | Literal[1J], y: float): ...
-13 13 | 
-14 14 | # OK
-15 15 | A: Literal["foo"]
+   = help: Replace `typing.Union[Literal[3.14], float]` with `float`
