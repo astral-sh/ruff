@@ -128,8 +128,7 @@ impl<'db> DunderAllNamesCollector<'db> {
                     dunder_all_names(self.db, module_literal.module(self.db).file())
                 else {
                     // The module either does not have a `__all__` variable or it is invalid.
-                    // TODO: Should we return `false` here?
-                    return true;
+                    return false;
                 };
                 self.names.extend(module_dunder_all_names.iter().cloned());
                 true
