@@ -112,7 +112,7 @@ use super::string_annotation::{
     parse_string_annotation, BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION,
 };
 use super::subclass_of::SubclassOfInner;
-use super::{BoundSuperError, BoundSuperType, ClassBase};
+use super::{BoundSuperError, BoundSuperType, ClassBase, TypeExpressionContext};
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
@@ -7311,7 +7311,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             TypeAndQualifiers::new(Type::unknown(), TypeQualifiers::FINAL)
                         }
                         _ => name_expr_ty
-                            .in_type_expression(self.db())
+                            .in_type_expression(self.db(), TypeExpressionContext::empty())
                             .unwrap_or_else(|error| {
                                 error.into_fallback_type(
                                     &self.context,
@@ -7491,7 +7491,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Name(name) => match name.ctx {
                 ast::ExprContext::Load => self
                     .infer_name_expression(name)
-                    .in_type_expression(self.db())
+                    .in_type_expression(self.db(), TypeExpressionContext::empty())
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -7508,7 +7508,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             ast::Expr::Attribute(attribute_expression) => match attribute_expression.ctx {
                 ast::ExprContext::Load => self
                     .infer_attribute_expression(attribute_expression)
-                    .in_type_expression(self.db())
+                    .in_type_expression(self.db(), TypeExpressionContext::empty())
                     .unwrap_or_else(|error| {
                         error.into_fallback_type(
                             &self.context,
@@ -7898,28 +7898,13 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// Given the slice of a `type[]` annotation, return the type that the annotation represents
     fn infer_subclass_of_type_expression(&mut self, slice: &ast::Expr) -> Type<'db> {
         match slice {
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
-                let name_ty = self.infer_expression(slice);
-                match name_ty {
-                    Type::ClassLiteral(class_literal) => {
-                        if class_literal.is_known(self.db(), KnownClass::Any) {
-                            SubclassOfType::subclass_of_any()
-                        } else {
-                            SubclassOfType::from(
-                                self.db(),
-                                class_literal.default_specialization(self.db()),
-                            )
-                        }
-                    }
-                    Type::KnownInstance(KnownInstanceType::Any) => {
-                        SubclassOfType::subclass_of_any()
-                    }
-                    Type::KnownInstance(KnownInstanceType::Unknown) => {
-                        SubclassOfType::subclass_of_unknown()
-                    }
-                    _ => todo_type!("unsupported type[X] special form"),
-                }
-            }
+            ast::Expr::Name(_) | ast::Expr::Attribute(_) => self
+                .infer_expression(slice)
+                .in_type_expression(self.db(), TypeExpressionContext::SUBCLASS_OF)
+                .unwrap_or_else(|error| {
+                    error.into_fallback_type(&self.context, slice, self.is_reachable(slice))
+                })
+                .to_meta_type(self.db()),
             ast::Expr::BinOp(binary) if binary.op == ast::Operator::BitOr => {
                 let union_ty = UnionType::from_elements(
                     self.db(),
@@ -8010,7 +7995,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                             generic_context,
                         );
                         specialized_class
-                            .in_type_expression(self.db())
+                            .in_type_expression(self.db(), TypeExpressionContext::empty())
                             .unwrap_or(Type::unknown())
                     }
                     None => {

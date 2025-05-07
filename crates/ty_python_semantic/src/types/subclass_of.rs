@@ -44,13 +44,6 @@ impl<'db> SubclassOfType<'db> {
         })
     }
 
-    /// Return a [`Type`] instance representing the type `type[Any]`.
-    pub(crate) const fn subclass_of_any() -> Type<'db> {
-        Type::SubclassOf(SubclassOfType {
-            subclass_of: SubclassOfInner::Dynamic(DynamicType::Any),
-        })
-    }
-
     /// Return the inner [`SubclassOfInner`] value wrapped by this `SubclassOfType`.
     pub(crate) const fn subclass_of(self) -> SubclassOfInner<'db> {
         self.subclass_of
@@ -155,6 +148,12 @@ impl<'db> SubclassOfInner<'db> {
 impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     fn from(value: ClassType<'db>) -> Self {
         SubclassOfInner::Class(value)
+    }
+}
+
+impl From<DynamicType> for SubclassOfInner<'_> {
+    fn from(value: DynamicType) -> Self {
+        SubclassOfInner::Dynamic(value)
     }
 }
 

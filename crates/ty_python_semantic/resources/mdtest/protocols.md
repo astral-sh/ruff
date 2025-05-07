@@ -229,12 +229,10 @@ And it is also an error to use `Protocol` in type expressions:
 
 def f(
     x: Protocol,  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
-    y: type[Protocol],  # TODO: should emit `[invalid-type-form]` here too
+    y: type[Protocol],  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
 ):
     reveal_type(x)  # revealed: Unknown
-
-    # TODO: should be `type[Unknown]`
-    reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+    reveal_type(y)  # revealed: type[Unknown]
 
 # fmt: on
 ```
