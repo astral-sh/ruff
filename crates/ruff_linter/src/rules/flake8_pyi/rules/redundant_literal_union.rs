@@ -268,7 +268,7 @@ fn generate_pep604_fix(
             Edit::range_replacement(checker.generator().expr(new_expr), union.range()),
             applicability,
         ));
-    };
+    }
 
     let new_expr = new_exprs.iter().fold(None, |acc, right| {
         if let Some(left) = acc {
