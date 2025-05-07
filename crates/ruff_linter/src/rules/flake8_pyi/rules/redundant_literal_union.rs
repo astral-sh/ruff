@@ -8,7 +8,7 @@ use ruff_diagnostics::{Applicability, Diagnostic, Edit, Fix, FixAvailability, Vi
 use ruff_macros::{derive_message_formats, ViolationMetadata};
 use ruff_python_ast::{
     self as ast, Expr, ExprBinOp, ExprContext, ExprName, ExprSubscript, LiteralExpressionRef,
-    Operator, PythonVersion,
+    Operator,
 };
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_python_semantic::SemanticModel;
@@ -93,12 +93,19 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
     let mut builtin_types_in_union = FxHashSet::default();
     let mut literal_subscript = None;
     let mut literal_exprs = Vec::new();
-    let union_kind =
-        if checker.target_version() >= PythonVersion::PY310 || checker.source_type.is_stub() {
-            UnionKind::PEP604
-        } else {
+    let subscript = union.as_subscript_expr();
+    let union_kind = match subscript {
+        Some(subscript) => {
+            if !checker
+                .semantic()
+                .match_typing_expr(&subscript.value, "Union")
+            {
+                return;
+            }
             UnionKind::TypingUnion
-        };
+        }
+        None => UnionKind::PEP604,
+    };
 
     // Adds a member to `literal_exprs` for each value in a `Literal`, and any builtin types
     // to `builtin_types_in_union`.
@@ -154,6 +161,11 @@ pub(crate) fn redundant_literal_union<'a>(checker: &Checker, union: &'a Expr) {
         } else {
             non_redundant_literal_types.push(typing_literal_expr);
         }
+    }
+
+    if checker.settings.preview.is_disabled() {
+        checker.report_diagnostics(diagnostics);
+        return;
     }
 
     let mut new_literal_expr_types: Vec<LiteralExprType<'a>> = Vec::new();
@@ -251,12 +263,12 @@ fn generate_pep604_fix(
     union: &Expr,
     applicability: Applicability,
 ) -> Option<Fix> {
-    if new_exprs.len() == 1 {
+    if let [new_expr] = new_exprs {
         return Some(Fix::applicable_edit(
-            Edit::range_replacement(checker.generator().expr(&new_exprs[0]), union.range()),
+            Edit::range_replacement(checker.generator().expr(new_expr), union.range()),
             applicability,
         ));
-    }
+    };
 
     let new_expr = new_exprs.iter().fold(None, |acc, right| {
         if let Some(left) = acc {
