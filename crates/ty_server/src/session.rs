@@ -210,6 +210,10 @@ impl Session {
             index,
         }
     }
+
+    pub(crate) fn client_capabilities(&self) -> &ResolvedClientCapabilities {
+        &self.resolved_client_capabilities
+    }
 }
 
 /// A guard that holds the only reference to the index and allows modifying it.
