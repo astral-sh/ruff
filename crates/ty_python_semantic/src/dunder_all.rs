@@ -94,17 +94,17 @@ impl<'db> DunderAllNamesCollector<'db> {
     }
 
     /// Extends the current set of names with the names from the given expression which can be
-    /// either a list of names or a submodule's `__all__` variable.
+    /// either a list of names or a module's `__all__` variable.
     ///
-    /// Returns `true` if the expression is a valid list or submodule `__all__`, `false` otherwise.
-    fn extend_from_list_or_submodule(&mut self, expr: &ast::Expr) -> bool {
+    /// Returns `true` if the expression is a valid list or module `__all__`, `false` otherwise.
+    fn extend_from_list_or_module(&mut self, expr: &ast::Expr) -> bool {
         match expr {
             // `__all__ += [...]`
             // `__all__.extend([...])`
             ast::Expr::List(ast::ExprList { elts, .. }) => self.add_names(elts),
 
-            // `__all__ += submodule.__all__`
-            // `__all__.extend(submodule.__all__)`
+            // `__all__ += module.__all__`
+            // `__all__.extend(module.__all__)`
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 if attr != "__all__" {
                     return false;
@@ -123,7 +123,6 @@ impl<'db> DunderAllNamesCollector<'db> {
                 let Some(module_literal) = ty.into_module_literal() else {
                     return false;
                 };
-                // TODO: Do we need to check if the module is a submodule of the current module?
                 let Some(module_dunder_all_names) =
                     dunder_all_names(self.db, module_literal.module(self.db).file())
                 else {
@@ -154,9 +153,9 @@ impl<'db> DunderAllNamesCollector<'db> {
         };
         match function_name.as_str() {
             // `__all__.extend([...])`
-            // `__all__.extend(submodule.__all__)`
+            // `__all__.extend(module.__all__)`
             "extend" => {
-                if !self.extend_from_list_or_submodule(argument) {
+                if !self.extend_from_list_or_module(argument) {
                     return false;
                 }
             }
@@ -331,7 +330,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 if !is_dunder_all(target) {
                     return;
                 }
-                if !self.extend_from_list_or_submodule(value) {
+                if !self.extend_from_list_or_module(value) {
                     self.invalid = true;
                 }
             }
