@@ -61,6 +61,40 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 47 | ): ...
 48 | 
 49 | # fmt: off
+50 | # fmt: off
+51 | 
+52 | class A: ...
+53 | 
+54 | class B(  # type: ignore[duplicate-base]
+55 |     A,
+56 |     A,
+57 | ): ...
+58 | 
+59 | class C(
+60 |     A,
+61 |     A
+62 | ):  # type: ignore[duplicate-base]
+63 |     x: int
+64 | 
+65 | # fmt: on
+66 | # fmt: off
+67 | 
+68 | # error: [duplicate-base]
+69 | class D(
+70 |     A,
+71 |     # error: [unused-ignore-comment]
+72 |     A,  # type: ignore[duplicate-base]
+73 | ): ...
+74 | 
+75 | # error: [duplicate-base]
+76 | class E(
+77 |     A,
+78 |     A
+79 | ):
+80 |     # error: [unused-ignore-comment]
+81 |     x: int  # type: ignore[duplicate-base]
+82 | 
+83 | # fmt: on
 ```
 
 # Diagnostics
@@ -104,33 +138,6 @@ info: revealed-type: Revealed type
 33 |
 34 | # fmt: off
    |
-
-```
-
-```
-error: lint:duplicate-base: Duplicate base class `str`
- --> src/mdtest_snippet.py:3:7
-  |
-1 | from typing_extensions import reveal_type
-2 |
-3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
-  |       ^^^^^^^^^^^^^
-4 |
-5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
-  |
-info: The definition of class `Foo` will raise `TypeError` at runtime
- --> src/mdtest_snippet.py:3:11
-  |
-1 | from typing_extensions import reveal_type
-2 |
-3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
-  |           ---  ^^^ Class `str` later repeated here
-  |           |
-  |           Class `str` first included in bases list here
-4 |
-5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
-  |
-info: `lint:duplicate-base` is enabled by default
 
 ```
 
@@ -210,6 +217,67 @@ info: `lint:duplicate-base` is enabled by default
 ```
 
 ```
+error: lint:duplicate-base: Duplicate base class `A`
+  --> src/mdtest_snippet.py:76:7
+   |
+75 |   # error: [duplicate-base]
+76 |   class E(
+   |  _______^
+77 | |     A,
+78 | |     A
+79 | | ):
+   | |_^
+80 |       # error: [unused-ignore-comment]
+81 |       x: int  # type: ignore[duplicate-base]
+   |
+info: The definition of class `E` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:77:5
+   |
+75 | # error: [duplicate-base]
+76 | class E(
+77 |     A,
+   |     - Class `A` first included in bases list here
+78 |     A
+   |     ^ Class `A` later repeated here
+79 | ):
+80 |     # error: [unused-ignore-comment]
+   |
+info: `lint:duplicate-base` is enabled by default
+
+```
+
+```
+error: lint:duplicate-base: Duplicate base class `A`
+  --> src/mdtest_snippet.py:69:7
+   |
+68 |   # error: [duplicate-base]
+69 |   class D(
+   |  _______^
+70 | |     A,
+71 | |     # error: [unused-ignore-comment]
+72 | |     A,  # type: ignore[duplicate-base]
+73 | | ): ...
+   | |_^
+74 |
+75 |   # error: [duplicate-base]
+   |
+info: The definition of class `D` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:70:5
+   |
+68 | # error: [duplicate-base]
+69 | class D(
+70 |     A,
+   |     - Class `A` first included in bases list here
+71 |     # error: [unused-ignore-comment]
+72 |     A,  # type: ignore[duplicate-base]
+   |     ^ Class `A` later repeated here
+73 | ): ...
+   |
+info: `lint:duplicate-base` is enabled by default
+
+```
+
+```
 error: lint:duplicate-base: Duplicate base class `Mushrooms`
   --> src/mdtest_snippet.py:30:7
    |
@@ -276,5 +344,59 @@ info: The definition of class `VeryEggyOmelette` will raise `TypeError` at runti
 47 | ): ...
    |
 info: `lint:duplicate-base` is enabled by default
+
+```
+
+```
+error: lint:duplicate-base: Duplicate base class `str`
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import reveal_type
+2 |
+3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
+  |       ^^^^^^^^^^^^^
+4 |
+5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+  |
+info: The definition of class `Foo` will raise `TypeError` at runtime
+ --> src/mdtest_snippet.py:3:11
+  |
+1 | from typing_extensions import reveal_type
+2 |
+3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
+  |           ---  ^^^ Class `str` later repeated here
+  |           |
+  |           Class `str` first included in bases list here
+4 |
+5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+  |
+info: `lint:duplicate-base` is enabled by default
+
+```
+
+```
+warning: lint:unused-ignore-comment
+  --> src/mdtest_snippet.py:72:9
+   |
+70 |     A,
+71 |     # error: [unused-ignore-comment]
+72 |     A,  # type: ignore[duplicate-base]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused blanket `type: ignore` directive
+73 | ): ...
+   |
+
+```
+
+```
+warning: lint:unused-ignore-comment
+  --> src/mdtest_snippet.py:81:13
+   |
+79 | ):
+80 |     # error: [unused-ignore-comment]
+81 |     x: int  # type: ignore[duplicate-base]
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused blanket `type: ignore` directive
+82 |
+83 | # fmt: on
+   |
 
 ```

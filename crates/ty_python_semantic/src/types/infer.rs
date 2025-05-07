@@ -761,7 +761,7 @@ impl<'db> TypeInferenceBuilder<'db> {
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
     fn check_class_definitions(&mut self) {
-        let mut class_definitions: Vec<(ClassLiteral, &ast::StmtClassDef)> = self
+        let class_definitions = self
             .types
             .declarations
             .iter()
@@ -774,11 +774,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                 } else {
                     None
                 }
-            })
-            .collect();
-
-        // Ensure diagnostics appear in the same order as the class definitions in the source code.
-        class_definitions.sort_unstable_by_key(|(_, node)| node.start());
+            });
 
         // Iterate through all class definitions in this scope.
         for (class, class_node) in class_definitions {

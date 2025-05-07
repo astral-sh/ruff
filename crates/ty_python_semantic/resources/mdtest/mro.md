@@ -342,6 +342,53 @@ class VeryEggyOmelette(
 # fmt: off
 ```
 
+A `type: ignore` comment can suppress `duplicate-bases` errors if it is on the first or last line of
+the class "header":
+
+```py
+# fmt: off
+
+class A: ...
+
+class B(  # type: ignore[duplicate-base]
+    A,
+    A,
+): ...
+
+class C(
+    A,
+    A
+):  # type: ignore[duplicate-base]
+    x: int
+
+# fmt: on
+```
+
+But it will not suppress the error if it occurs in the class body, or on the duplicate base itself.
+The justification for this is that it is the class definition as a whole that will raise an
+exception at runtime, not a sub-expression in the class's bases list.
+
+```py
+# fmt: off
+
+# error: [duplicate-base]
+class D(
+    A,
+    # error: [unused-ignore-comment]
+    A,  # type: ignore[duplicate-base]
+): ...
+
+# error: [duplicate-base]
+class E(
+    A,
+    A
+):
+    # error: [unused-ignore-comment]
+    x: int  # type: ignore[duplicate-base]
+
+# fmt: on
+```
+
 ## `__bases__` lists with duplicate `Unknown` bases
 
 ```py
