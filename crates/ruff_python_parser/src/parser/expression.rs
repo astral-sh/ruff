@@ -2553,6 +2553,7 @@ impl<'src> Parser<'src> {
                 }) = arg.as_generator_expr()
                 {
                     // test_ok args_unparenthesized_generator
+                    // zip((x for x in range(10)), (y for y in range(10)))
                     // sum(x for x in range(10))
                     // sum((x for x in range(10)),)
 
