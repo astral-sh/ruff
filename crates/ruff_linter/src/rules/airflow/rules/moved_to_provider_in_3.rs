@@ -936,7 +936,7 @@ fn check_names_moved_to_provider(checker: &Checker, expr: &Expr, ranged: TextRan
         },
         ranged.range(),
     );
-    if let Expr::Name(_) = expr {
+    if expr.is_name_expr() {
         if let ProviderReplacement::AutoImport {
             module,
             name,
