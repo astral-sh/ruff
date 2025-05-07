@@ -77,7 +77,11 @@ impl MessageKind {
 }
 
 impl Message {
-    pub fn syntax_error(message: String, range: TextRange, file: SourceFile) -> Message {
+    pub fn syntax_error(
+        message: impl std::fmt::Display,
+        range: TextRange,
+        file: SourceFile,
+    ) -> Message {
         let mut diag = db::Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
         let span = Span::from(file).with_range(range);
         diag.annotate(Annotation::primary(span).message(message));
@@ -116,7 +120,7 @@ impl Message {
             .map_or(TextSize::new(0), TextLen::text_len);
 
         Message::syntax_error(
-            format!(
+            format_args!(
                 "SyntaxError: {}",
                 DisplayParseErrorType::new(&parse_error.error)
             ),
@@ -131,7 +135,7 @@ impl Message {
         file: SourceFile,
     ) -> Message {
         Message::syntax_error(
-            format!("SyntaxError: {unsupported_syntax_error}"),
+            format_args!("SyntaxError: {unsupported_syntax_error}"),
             unsupported_syntax_error.range,
             file,
         )
@@ -143,7 +147,7 @@ impl Message {
         file: SourceFile,
     ) -> Message {
         Message::syntax_error(
-            format!("SyntaxError: {semantic_syntax_error}"),
+            format_args!("SyntaxError: {semantic_syntax_error}"),
             semantic_syntax_error.range,
             file,
         )

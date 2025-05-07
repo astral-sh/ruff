@@ -102,11 +102,7 @@ impl Diagnostics {
                 let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                 let dummy = SourceFileBuilder::new(name, "").finish();
                 Self::new(
-                    vec![Message::syntax_error(
-                        err.to_string(),
-                        TextRange::default(),
-                        dummy,
-                    )],
+                    vec![Message::syntax_error(err, TextRange::default(), dummy)],
                     FxHashMap::default(),
                 )
             }
