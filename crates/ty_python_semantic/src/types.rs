@@ -1,3 +1,4 @@
+use infer::enclosing_class_symbol;
 use itertools::Either;
 
 use std::slice::Iter;
@@ -35,7 +36,7 @@ use crate::module_resolver::{file_to_module, resolve_module, KnownModule};
 use crate::semantic_index::ast_ids::{HasScopedExpressionId, HasScopedUseId};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::symbol::ScopeId;
-use crate::semantic_index::{imported_modules, semantic_index, SemanticIndex};
+use crate::semantic_index::{imported_modules, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::symbol::{
     imported_symbol, symbol_from_bindings, Boundness, Symbol, SymbolAndQualifiers,
@@ -4678,7 +4679,7 @@ impl<'db> Type<'db> {
     pub fn in_type_expression(
         &self,
         db: &'db dyn Db,
-        context: TypeExpressionContext<'db>,
+        scope_id: ScopeId,
     ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
         match self {
             // Special cases for `float` and `complex`
@@ -4764,8 +4765,8 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
 
                 KnownInstanceType::TypingSelf => {
-                    let scope = context.scope_id;
-                    let Some(class_ty) = context.index.enclosing_class_symbol(db, scope) else {
+                    let index = semantic_index(db, scope_id.file(db));
+                    let Some(class_ty) = enclosing_class_symbol(db, index, scope_id) else {
                         return Err(InvalidTypeExpressionError {
                             fallback_type: Type::unknown(),
                             invalid_expressions: smallvec::smallvec![
@@ -4860,7 +4861,7 @@ impl<'db> Type<'db> {
                 let mut builder = UnionBuilder::new(db);
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
-                    match element.in_type_expression(db, context) {
+                    match element.in_type_expression(db, scope_id) {
                         Ok(type_expr) => builder = builder.add(type_expr),
                         Err(InvalidTypeExpressionError {
                             fallback_type,
@@ -5579,12 +5580,6 @@ impl<'db> InvalidTypeExpressionError<'db> {
         }
         fallback_type
     }
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct TypeExpressionContext<'db> {
-    scope_id: ScopeId<'db>,
-    index: &'db SemanticIndex<'db>,
 }
 
 /// Enumeration of various types that are invalid in type-expression contexts
