@@ -59,3 +59,12 @@ DatasetOrTimeSchedule()
 
 # airflow.utils.dag_parsing_context
 get_parsing_context()
+
+
+from airflow.models import (
+    Connection,
+    Variable,
+)
+
+Connection()
+Variable()

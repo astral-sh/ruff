@@ -335,3 +335,21 @@ AIR311_names.py:61:1: AIR311 `airflow.utils.dag_parsing_context.get_parsing_cont
    | ^^^^^^^^^^^^^^^^^^^ AIR311
    |
    = help: Use `airflow.sdk.get_parsing_context` instead
+
+AIR311_names.py:69:1: AIR311 `airflow.models.Connection` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+67 | )
+68 |
+69 | Connection()
+   | ^^^^^^^^^^ AIR311
+70 | Variable()
+   |
+   = help: Use `airflow.sdk.Connection` instead
+
+AIR311_names.py:70:1: AIR311 `airflow.models.Variable` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   |
+69 | Connection()
+70 | Variable()
+   | ^^^^^^^^ AIR311
+   |
+   = help: Use `airflow.sdk.Variable` instead

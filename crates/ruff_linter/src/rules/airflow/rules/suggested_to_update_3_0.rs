@@ -242,6 +242,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             name: "attach".to_string(),
         },
 
+        // airflow.models
+        ["airflow", "models", rest @ ("Connection" | "Variable")] => {
+            Replacement::SourceModuleMoved {
+                module: "airflow.sdk",
+                name: (*rest).to_string(),
+            }
+        }
+
         // airflow.models.baseoperator
         ["airflow", "models", "baseoperator", rest] => match *rest {
             "chain" | "chain_linear" | "cross_downstream" => Replacement::SourceModuleMoved {
