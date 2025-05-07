@@ -5,8 +5,8 @@ relations. Much more detail can be found in the [spec]. To summarize, each typev
 **covariant**, **contravariant**, **invariant**, or **bivariant**. (Note that bivariance is not
 currently mentioned in the typing spec, but is a fourth case that we must consider.)
 
-For all of the examples below, we will consider a typevar `T`, a generic class using that typevar
-`C[T]`, and two types `A` and `B`.
+For all of the examples below, we will consider typevars `T` and `U`, two generic classes using
+those typevars `C[T]` and `D[U]`, and two types `A` and `B`.
 
 (Note that dynamic types like `Any` never participate in subtyping, so `C[Any]` is neither a subtype
 nor supertype of any other specialization of `C`, regardless of `T`'s variance. It is, however,
@@ -14,8 +14,8 @@ assignable to any specialization of `C`, regardless of variance, via materializa
 
 ## Covariance
 
-With a covariant typevar, subtyping and assignability are in "alignment": if `A <: B`, then
-`C[A] <: C[B]`.
+With a covariant typevar, subtyping and assignability are in "alignment": if `A <: B` and `C <: D`,
+then `C[A] <: C[B]` and `C[A] <: D[B]`.
 
 Types that "produce" data on demand are covariant in their typevar. If you expect a sequence of
 `int`s, someone can safely provide a sequence of `bool`s, since each `bool` element that you would
@@ -29,10 +29,14 @@ class A: ...
 class B(A): ...
 
 T = TypeVar("T", covariant=True)
+U = TypeVar("U", covariant=True)
 
 class C(Generic[T]):
     def receive(self) -> T:
         raise ValueError
+
+class D(C[U]):
+    pass
 
 static_assert(is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
@@ -41,12 +45,26 @@ static_assert(is_assignable_to(C[B], C[Any]))
 static_assert(is_assignable_to(C[Any], C[A]))
 static_assert(is_assignable_to(C[Any], C[B]))
 
+static_assert(is_assignable_to(D[B], C[A]))
+static_assert(not is_assignable_to(D[A], C[B]))
+static_assert(is_assignable_to(D[A], C[Any]))
+static_assert(is_assignable_to(D[B], C[Any]))
+static_assert(is_assignable_to(D[Any], C[A]))
+static_assert(is_assignable_to(D[Any], C[B]))
+
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
+
+static_assert(is_subtype_of(D[B], C[A]))
+static_assert(not is_subtype_of(D[A], C[B]))
+static_assert(not is_subtype_of(D[A], C[Any]))
+static_assert(not is_subtype_of(D[B], C[Any]))
+static_assert(not is_subtype_of(D[Any], C[A]))
+static_assert(not is_subtype_of(D[Any], C[B]))
 
 static_assert(is_equivalent_to(C[A], C[A]))
 static_assert(is_equivalent_to(C[B], C[B]))
@@ -56,6 +74,15 @@ static_assert(not is_equivalent_to(C[A], C[Any]))
 static_assert(not is_equivalent_to(C[B], C[Any]))
 static_assert(not is_equivalent_to(C[Any], C[A]))
 static_assert(not is_equivalent_to(C[Any], C[B]))
+
+static_assert(not is_equivalent_to(D[A], C[A]))
+static_assert(not is_equivalent_to(D[B], C[B]))
+static_assert(not is_equivalent_to(D[B], C[A]))
+static_assert(not is_equivalent_to(D[A], C[B]))
+static_assert(not is_equivalent_to(D[A], C[Any]))
+static_assert(not is_equivalent_to(D[B], C[Any]))
+static_assert(not is_equivalent_to(D[Any], C[A]))
+static_assert(not is_equivalent_to(D[Any], C[B]))
 
 static_assert(is_gradual_equivalent_to(C[A], C[A]))
 static_assert(is_gradual_equivalent_to(C[B], C[B]))
@@ -67,12 +94,23 @@ static_assert(not is_gradual_equivalent_to(C[A], C[Any]))
 static_assert(not is_gradual_equivalent_to(C[B], C[Any]))
 static_assert(not is_gradual_equivalent_to(C[Any], C[A]))
 static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
+
+static_assert(not is_gradual_equivalent_to(D[A], C[A]))
+static_assert(not is_gradual_equivalent_to(D[B], C[B]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[Any]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[Unknown]))
+static_assert(not is_gradual_equivalent_to(D[B], C[A]))
+static_assert(not is_gradual_equivalent_to(D[A], C[B]))
+static_assert(not is_gradual_equivalent_to(D[A], C[Any]))
+static_assert(not is_gradual_equivalent_to(D[B], C[Any]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[A]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[B]))
 ```
 
 ## Contravariance
 
-With a contravariant typevar, subtyping and assignability are in "opposition": if `A <: B`, then
-`C[B] <: C[A]`.
+With a contravariant typevar, subtyping and assignability are in "opposition": if `A <: B` and
+`C <: D`, then `C[B] <: C[A]` and `D[B] <: C[A]`.
 
 Types that "consume" data are contravariant in their typevar. If you expect a consumer that receives
 `bool`s, someone can safely provide a consumer that expects to receive `int`s, since each `bool`
@@ -86,9 +124,13 @@ class A: ...
 class B(A): ...
 
 T = TypeVar("T", contravariant=True)
+U = TypeVar("U", contravariant=True)
 
 class C(Generic[T]):
     def send(self, value: T): ...
+
+class D(C[U]):
+    pass
 
 static_assert(not is_assignable_to(C[B], C[A]))
 static_assert(is_assignable_to(C[A], C[B]))
@@ -97,12 +139,26 @@ static_assert(is_assignable_to(C[B], C[Any]))
 static_assert(is_assignable_to(C[Any], C[A]))
 static_assert(is_assignable_to(C[Any], C[B]))
 
+static_assert(not is_assignable_to(D[B], C[A]))
+static_assert(is_assignable_to(D[A], C[B]))
+static_assert(is_assignable_to(D[A], C[Any]))
+static_assert(is_assignable_to(D[B], C[Any]))
+static_assert(is_assignable_to(D[Any], C[A]))
+static_assert(is_assignable_to(D[Any], C[B]))
+
 static_assert(not is_subtype_of(C[B], C[A]))
 static_assert(is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
+
+static_assert(not is_subtype_of(D[B], C[A]))
+static_assert(is_subtype_of(D[A], C[B]))
+static_assert(not is_subtype_of(D[A], C[Any]))
+static_assert(not is_subtype_of(D[B], C[Any]))
+static_assert(not is_subtype_of(D[Any], C[A]))
+static_assert(not is_subtype_of(D[Any], C[B]))
 
 static_assert(is_equivalent_to(C[A], C[A]))
 static_assert(is_equivalent_to(C[B], C[B]))
@@ -112,6 +168,15 @@ static_assert(not is_equivalent_to(C[A], C[Any]))
 static_assert(not is_equivalent_to(C[B], C[Any]))
 static_assert(not is_equivalent_to(C[Any], C[A]))
 static_assert(not is_equivalent_to(C[Any], C[B]))
+
+static_assert(not is_equivalent_to(D[A], C[A]))
+static_assert(not is_equivalent_to(D[B], C[B]))
+static_assert(not is_equivalent_to(D[B], C[A]))
+static_assert(not is_equivalent_to(D[A], C[B]))
+static_assert(not is_equivalent_to(D[A], C[Any]))
+static_assert(not is_equivalent_to(D[B], C[Any]))
+static_assert(not is_equivalent_to(D[Any], C[A]))
+static_assert(not is_equivalent_to(D[Any], C[B]))
 
 static_assert(is_gradual_equivalent_to(C[A], C[A]))
 static_assert(is_gradual_equivalent_to(C[B], C[B]))
@@ -123,6 +188,17 @@ static_assert(not is_gradual_equivalent_to(C[A], C[Any]))
 static_assert(not is_gradual_equivalent_to(C[B], C[Any]))
 static_assert(not is_gradual_equivalent_to(C[Any], C[A]))
 static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
+
+static_assert(not is_gradual_equivalent_to(D[A], C[A]))
+static_assert(not is_gradual_equivalent_to(D[B], C[B]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[Any]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[Unknown]))
+static_assert(not is_gradual_equivalent_to(D[B], C[A]))
+static_assert(not is_gradual_equivalent_to(D[A], C[B]))
+static_assert(not is_gradual_equivalent_to(D[A], C[Any]))
+static_assert(not is_gradual_equivalent_to(D[B], C[Any]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[A]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[B]))
 ```
 
 ## Invariance
@@ -155,11 +231,15 @@ class A: ...
 class B(A): ...
 
 T = TypeVar("T")
+U = TypeVar("U")
 
 class C(Generic[T]):
     def send(self, value: T): ...
     def receive(self) -> T:
         raise ValueError
+
+class D(C[U]):
+    pass
 
 static_assert(not is_assignable_to(C[B], C[A]))
 static_assert(not is_assignable_to(C[A], C[B]))
@@ -168,12 +248,26 @@ static_assert(is_assignable_to(C[B], C[Any]))
 static_assert(is_assignable_to(C[Any], C[A]))
 static_assert(is_assignable_to(C[Any], C[B]))
 
+static_assert(not is_assignable_to(D[B], C[A]))
+static_assert(not is_assignable_to(D[A], C[B]))
+static_assert(is_assignable_to(D[A], C[Any]))
+static_assert(is_assignable_to(D[B], C[Any]))
+static_assert(is_assignable_to(D[Any], C[A]))
+static_assert(is_assignable_to(D[Any], C[B]))
+
 static_assert(not is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))
 static_assert(not is_subtype_of(C[A], C[Any]))
 static_assert(not is_subtype_of(C[B], C[Any]))
 static_assert(not is_subtype_of(C[Any], C[A]))
 static_assert(not is_subtype_of(C[Any], C[B]))
+
+static_assert(not is_subtype_of(D[B], C[A]))
+static_assert(not is_subtype_of(D[A], C[B]))
+static_assert(not is_subtype_of(D[A], C[Any]))
+static_assert(not is_subtype_of(D[B], C[Any]))
+static_assert(not is_subtype_of(D[Any], C[A]))
+static_assert(not is_subtype_of(D[Any], C[B]))
 
 static_assert(is_equivalent_to(C[A], C[A]))
 static_assert(is_equivalent_to(C[B], C[B]))
@@ -183,6 +277,15 @@ static_assert(not is_equivalent_to(C[A], C[Any]))
 static_assert(not is_equivalent_to(C[B], C[Any]))
 static_assert(not is_equivalent_to(C[Any], C[A]))
 static_assert(not is_equivalent_to(C[Any], C[B]))
+
+static_assert(not is_equivalent_to(D[A], C[A]))
+static_assert(not is_equivalent_to(D[B], C[B]))
+static_assert(not is_equivalent_to(D[B], C[A]))
+static_assert(not is_equivalent_to(D[A], C[B]))
+static_assert(not is_equivalent_to(D[A], C[Any]))
+static_assert(not is_equivalent_to(D[B], C[Any]))
+static_assert(not is_equivalent_to(D[Any], C[A]))
+static_assert(not is_equivalent_to(D[Any], C[B]))
 
 static_assert(is_gradual_equivalent_to(C[A], C[A]))
 static_assert(is_gradual_equivalent_to(C[B], C[B]))
@@ -194,6 +297,17 @@ static_assert(not is_gradual_equivalent_to(C[A], C[Any]))
 static_assert(not is_gradual_equivalent_to(C[B], C[Any]))
 static_assert(not is_gradual_equivalent_to(C[Any], C[A]))
 static_assert(not is_gradual_equivalent_to(C[Any], C[B]))
+
+static_assert(not is_gradual_equivalent_to(D[A], C[A]))
+static_assert(not is_gradual_equivalent_to(D[B], C[B]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[Any]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[Unknown]))
+static_assert(not is_gradual_equivalent_to(D[B], C[A]))
+static_assert(not is_gradual_equivalent_to(D[A], C[B]))
+static_assert(not is_gradual_equivalent_to(D[A], C[Any]))
+static_assert(not is_gradual_equivalent_to(D[B], C[Any]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[A]))
+static_assert(not is_gradual_equivalent_to(D[Any], C[B]))
 ```
 
 ## Bivariance
