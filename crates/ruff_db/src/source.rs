@@ -124,14 +124,14 @@ impl std::fmt::Debug for SourceText {
 }
 
 #[derive(Eq, PartialEq)]
-pub(crate) struct SourceTextInner {
-    pub(crate) count: Count<SourceText>,
-    pub(crate) kind: SourceTextKind,
-    pub(crate) read_error: Option<SourceTextError>,
+struct SourceTextInner {
+    count: Count<SourceText>,
+    kind: SourceTextKind,
+    read_error: Option<SourceTextError>,
 }
 
 #[derive(Eq, PartialEq)]
-pub(crate) enum SourceTextKind {
+enum SourceTextKind {
     Text(String),
     Notebook(Notebook),
 }
