@@ -196,17 +196,15 @@ fn benchmark_cold(criterion: &mut Criterion) {
 
 #[track_caller]
 fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDiagnosticFields]) {
-    // container for paths so that we can turn them into &str for comparison
-    let mut paths = Vec::new();
     let normalized: Vec<_> = diagnostics
         .iter()
         .map(|diagnostic| {
             (
                 diagnostic.id(),
-                diagnostic.primary_span().map(|span| {
-                    paths.push(span.file().file_path(db).to_string());
-                    paths.len() - 1
-                }),
+                diagnostic
+                    .primary_span()
+                    .map(|span| span.expect_ty_file())
+                    .map(|file| file.path(db).as_str()),
                 diagnostic
                     .primary_span()
                     .and_then(|span| span.range())
@@ -215,11 +213,6 @@ fn assert_diagnostics(db: &dyn Db, diagnostics: &[Diagnostic], expected: &[KeyDi
                 diagnostic.severity(),
             )
         })
-        .collect();
-
-    let normalized: Vec<_> = normalized
-        .into_iter()
-        .map(|(a, b, c, d, e)| (a, b.map(|b| paths[b].as_str()), c, d, e))
         .collect();
 
     assert_eq!(&normalized, expected);
