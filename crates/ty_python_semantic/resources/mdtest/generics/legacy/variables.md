@@ -19,7 +19,7 @@ in newer Python releases.
 from typing import TypeVar
 
 T = TypeVar("T")
-reveal_type(type(T))  # revealed: Literal[TypeVar]
+reveal_type(type(T))  # revealed: <class 'TypeVar'>
 reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
@@ -121,6 +121,34 @@ from typing import TypeVar
 
 # TODO: error: [invalid-type-variable-constraints]
 T = TypeVar("T", int)
+```
+
+### Cannot be both covariant and contravariant
+
+> To facilitate the declaration of container types where covariant or contravariant type checking is
+> acceptable, type variables accept keyword arguments `covariant=True` or `contravariant=True`. At
+> most one of these may be passed.
+
+```py
+from typing import TypeVar
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar("T", covariant=True, contravariant=True)
+```
+
+### Variance parameters must be unambiguous
+
+```py
+from typing import TypeVar
+
+def cond() -> bool:
+    return True
+
+# error: [invalid-legacy-type-variable]
+T = TypeVar("T", covariant=cond())
+
+# error: [invalid-legacy-type-variable]
+U = TypeVar("U", contravariant=cond())
 ```
 
 [generics]: https://typing.python.org/en/latest/spec/generics.html

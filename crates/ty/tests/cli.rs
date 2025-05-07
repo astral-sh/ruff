@@ -150,6 +150,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
       |
+    info: `lint:unresolved-attribute` is enabled by default
 
     Found 1 diagnostic
 
@@ -284,6 +285,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     3 |
     4 | stat = add(10, 15)
       |
+    info: `lint:unresolved-import` is enabled by default
 
     Found 1 diagnostic
 
@@ -384,6 +386,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `lint:division-by-zero` is enabled by default
 
     warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> test.py:7:7
@@ -393,6 +396,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     7 | print(x)  # possibly-unresolved-reference
       |       ^
       |
+    info: `lint:possibly-unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -420,6 +424,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `lint:division-by-zero` was selected in the configuration file
 
     Found 1 diagnostic
 
@@ -460,6 +465,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
+    info: `lint:unresolved-import` is enabled by default
 
     error: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
@@ -471,6 +477,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     5 |
     6 | for a in range(0, int(y)):
       |
+    info: `lint:division-by-zero` is enabled by default
 
     warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> test.py:9:7
@@ -480,6 +487,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     9 | print(x)  # possibly-unresolved-reference
       |       ^
       |
+    info: `lint:possibly-unresolved-reference` is enabled by default
 
     Found 3 diagnostics
 
@@ -507,6 +515,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     3 |
     4 | y = 4 / 0
       |
+    info: `lint:unresolved-import` was selected on the command line
 
     warning: lint:division-by-zero: Cannot divide object of type `Literal[4]` by zero
      --> test.py:4:5
@@ -518,6 +527,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     5 |
     6 | for a in range(0, int(y)):
       |
+    info: `lint:division-by-zero` was selected on the command line
 
     Found 2 diagnostics
 
@@ -558,6 +568,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `lint:division-by-zero` is enabled by default
 
     warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> test.py:7:7
@@ -567,6 +578,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     7 | print(x)  # possibly-unresolved-reference
       |       ^
       |
+    info: `lint:possibly-unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -595,6 +607,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `lint:division-by-zero` was selected on the command line
 
     Found 1 diagnostic
 
@@ -672,6 +685,7 @@ fn exit_code_only_warnings() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -755,6 +769,7 @@ fn exit_code_no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -787,6 +802,7 @@ fn exit_code_no_errors_but_error_on_warning_is_enabled_in_configuration() -> any
     1 | print(x)  # [unresolved-reference]
       |       ^
       |
+    info: `lint:unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
@@ -817,6 +833,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
+    info: `lint:unresolved-reference` is enabled by default
 
     error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -825,6 +842,7 @@ fn exit_code_both_warnings_and_errors() -> anyhow::Result<()> {
     3 | print(4[1])  # [non-subscriptable]
       |       ^
       |
+    info: `lint:non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -855,6 +873,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
+    info: `lint:unresolved-reference` is enabled by default
 
     error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -863,6 +882,7 @@ fn exit_code_both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::
     3 | print(4[1])  # [non-subscriptable]
       |       ^
       |
+    info: `lint:non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -893,6 +913,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
       |       ^
     3 | print(4[1])  # [non-subscriptable]
       |
+    info: `lint:unresolved-reference` is enabled by default
 
     error: lint:non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
@@ -901,6 +922,7 @@ fn exit_code_exit_zero_is_true() -> anyhow::Result<()> {
     3 | print(4[1])  # [non-subscriptable]
       |       ^
       |
+    info: `lint:non-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -954,6 +976,7 @@ fn user_configuration() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `lint:division-by-zero` was selected in the configuration file
 
     warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> main.py:7:7
@@ -963,6 +986,7 @@ fn user_configuration() -> anyhow::Result<()> {
     7 | print(x)
       |       ^
       |
+    info: `lint:possibly-unresolved-reference` is enabled by default
 
     Found 2 diagnostics
 
@@ -996,6 +1020,7 @@ fn user_configuration() -> anyhow::Result<()> {
     3 |
     4 | for a in range(0, int(y)):
       |
+    info: `lint:division-by-zero` was selected in the configuration file
 
     error: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
      --> main.py:7:7
@@ -1005,6 +1030,7 @@ fn user_configuration() -> anyhow::Result<()> {
     7 | print(x)
       |       ^
       |
+    info: `lint:possibly-unresolved-reference` was selected in the configuration file
 
     Found 2 diagnostics
 
@@ -1052,6 +1078,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | y = 4 / 0  # error: division-by-zero
       |     ^^^^^
       |
+    info: `lint:division-by-zero` is enabled by default
 
     error: lint:unresolved-import: Cannot resolve imported module `main2`
      --> project/other.py:2:6
@@ -1061,6 +1088,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: `lint:unresolved-import` is enabled by default
 
     error: lint:unresolved-import: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
@@ -1068,6 +1096,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: `lint:unresolved-import` is enabled by default
 
     Found 3 diagnostics
 
@@ -1091,6 +1120,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     3 |
     4 | print(z)
       |
+    info: `lint:unresolved-import` is enabled by default
 
     error: lint:unresolved-import: Cannot resolve imported module `does_not_exist`
      --> project/tests/test_main.py:2:8
@@ -1098,6 +1128,7 @@ fn check_specific_paths() -> anyhow::Result<()> {
     2 | import does_not_exist  # error: unresolved-import
       |        ^^^^^^^^^^^^^^
       |
+    info: `lint:unresolved-import` is enabled by default
 
     Found 2 diagnostics
 

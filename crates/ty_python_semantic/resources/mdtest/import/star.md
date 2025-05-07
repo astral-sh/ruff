@@ -899,8 +899,8 @@ reveal_type(__protected)  # revealed: bool
 reveal_type(__dunder__)  # revealed: bool
 reveal_type(___thunder___)  # revealed: bool
 
-# TODO: should emit [unresolved-reference] diagnostic & reveal `Unknown`
-reveal_type(Y)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
 ```
 
 ### Simple list `__all__`
@@ -921,8 +921,8 @@ from exporter import *
 
 reveal_type(X)  # revealed: bool
 
-# TODO: should emit [unresolved-reference] diagnostic & reveal `Unknown`
-reveal_type(Y)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
 ```
 
 ### `__all__` with additions later on in the global scope
@@ -949,15 +949,13 @@ __all__ = ["A"]
 __all__ += ["B"]
 __all__.append("C")
 __all__.extend(["D"])
-__all__.extend(("E",))
 __all__.extend(a.__all__)
 
 A: bool = True
 B: bool = True
 C: bool = True
 D: bool = True
-E: bool = True
-F: bool = False
+E: bool = False
 ```
 
 `c.py`:
@@ -969,11 +967,10 @@ reveal_type(A)  # revealed: bool
 reveal_type(B)  # revealed: bool
 reveal_type(C)  # revealed: bool
 reveal_type(D)  # revealed: bool
-reveal_type(E)  # revealed: bool
 reveal_type(FOO)  # revealed: bool
 
-# TODO should error with [unresolved-reference] & reveal `Unknown`
-reveal_type(F)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(E)  # revealed: Unknown
 ```
 
 ### `__all__` with subtractions later on in the global scope
@@ -985,7 +982,7 @@ one way of subtracting from `__all__` that type checkers are required to support
 
 ```py
 __all__ = ["A", "B"]
-__all__.remove("A")
+__all__.remove("B")
 
 A: bool = True
 B: bool = True
@@ -998,8 +995,8 @@ from exporter import *
 
 reveal_type(A)  # revealed: bool
 
-# TODO should emit an [unresolved-reference] diagnostic & reveal `Unknown`
-reveal_type(B)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(B)  # revealed: Unknown
 ```
 
 ### Invalid `__all__`
@@ -1125,8 +1122,8 @@ else:
 ```py
 from exporter import *
 
-# TODO: should reveal `Unknown` and emit `[unresolved-reference]`
-reveal_type(X)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(X)  # revealed: Unknown
 
 # error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
@@ -1199,8 +1196,8 @@ else:
 ```py
 from exporter import *
 
-# TODO: should reveal `Unknown` & emit `[unresolved-reference]
-reveal_type(X)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(X)  # revealed: Unknown
 
 # error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
@@ -1235,9 +1232,11 @@ __all__ = []
 from a import *
 from b import *
 
-# TODO: both of these should have [unresolved-reference] diagnostics and reveal `Unknown`
-reveal_type(X)  # revealed: bool
-reveal_type(Y)  # revealed: bool
+# error: [unresolved-reference]
+reveal_type(X)  # revealed: Unknown
+
+# error: [unresolved-reference]
+reveal_type(Y)  # revealed: Unknown
 ```
 
 ### `__all__` in a stub file
@@ -1257,7 +1256,11 @@ Y: bool = True
 ```pyi
 from a import X, Y
 
-__all__ = ["X"]
+__all__ = ["X", "Z"]
+
+Z: bool = True
+
+Nope: bool = True
 ```
 
 `c.py`:
@@ -1265,18 +1268,21 @@ __all__ = ["X"]
 ```py
 from b import *
 
-# TODO: should not error, should reveal `bool`
-# (`X` is re-exported from `b.pyi` due to presence in `__all__`)
-# See https://github.com/astral-sh/ruff/issues/16159
-#
-# error: [unresolved-reference]
-reveal_type(X)  # revealed: Unknown
+# `X` is re-exported from `b.pyi` due to presence in `__all__`
+reveal_type(X)  # revealed: bool
 
 # This diagnostic is accurate: `Y` does not use the "redundant alias" convention in `b.pyi`,
-# nor is it included in `b.__all__`, so it is not exported from `b.pyi`
+# nor is it included in `b.__all__`, so it is not exported from `b.pyi`. It would still be
+# an error if it used the "redundant alias" convention as `__all__` would take precedence.
 #
 # error: [unresolved-reference]
 reveal_type(Y)  # revealed: Unknown
+
+# `Z` is defined in `b.pyi` and included in `__all__`
+reveal_type(Z)  # revealed: bool
+
+# error: [unresolved-reference]
+reveal_type(Nope)  # revealed: Unknown
 ```
 
 ## `global` statements in non-global scopes
@@ -1353,12 +1359,9 @@ are present due to `*` imports.
 ```py
 import collections.abc
 
-reveal_type(collections.abc.Sequence)  # revealed: Literal[Sequence]
+reveal_type(collections.abc.Sequence)  # revealed: <class 'Sequence'>
 reveal_type(collections.abc.Callable)  # revealed: typing.Callable
-
-# TODO: false positive as it's only re-exported from `_collections.abc` due to presence in `__all__`
-# error: [unresolved-attribute]
-reveal_type(collections.abc.Set)  # revealed: Unknown
+reveal_type(collections.abc.Set)  # revealed: <class 'AbstractSet'>
 ```
 
 ## Invalid `*` imports

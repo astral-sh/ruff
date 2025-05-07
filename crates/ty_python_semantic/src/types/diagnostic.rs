@@ -1,4 +1,5 @@
 use super::context::InferContext;
+use super::mro::DuplicateBaseError;
 use super::{ClassLiteral, KnownClass};
 use crate::db::Db;
 use crate::declare_lint;
@@ -102,7 +103,8 @@ declare_lint! {
     /// ## What it does
     /// Checks for calls to possibly unbound methods.
     ///
-    /// TODO #14889
+    /// ## Why is this bad?
+    /// Calling an unbound method will raise an `AttributeError` at runtime.
     pub(crate) static CALL_POSSIBLY_UNBOUND_METHOD = {
         summary: "detects calls to possibly unbound methods",
         status: LintStatus::preview("1.0.0"),
@@ -121,7 +123,13 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks whether a variable has been declared as two conflicting types.
+    ///
+    /// ## Why is this bad
+    /// A variable with two conflicting declarations likely indicates a mistake.
+    /// Moreover, it could lead to incorrect or ill-defined type inference for
+    /// other code that relies on these variables.
     pub(crate) static CONFLICTING_DECLARATIONS = {
         summary: "detects conflicting declarations",
         status: LintStatus::preview("1.0.0"),
@@ -170,7 +178,11 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for class definitions with duplicate bases.
+    ///
+    /// ## Why is this bad?
+    /// Class definitions with duplicate bases raise a `TypeError` at runtime.
     pub(crate) static DUPLICATE_BASE = {
         summary: "detects class definitions with duplicate bases",
         status: LintStatus::preview("1.0.0"),
@@ -265,7 +277,11 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for classes with an inconsistent method resolution order (MRO).
+    ///
+    /// ## Why is this bad?
+    /// Classes with an inconsistent MRO will raise a `TypeError` at runtime.
     pub(crate) static INCONSISTENT_MRO = {
         summary: "detects class definitions with an inconsistent MRO",
         status: LintStatus::preview("1.0.0"),
@@ -275,7 +291,11 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// TODO #14889
+    /// Checks for attempts to use an out of bounds index to get an item from
+    /// a container.
+    ///
+    /// ## Why is this bad?
+    /// Using an out of bounds index will raise an `IndexError` at runtime.
     pub(crate) static INDEX_OUT_OF_BOUNDS = {
         summary: "detects index out of bounds errors",
         status: LintStatus::preview("1.0.0"),
@@ -790,7 +810,8 @@ declare_lint! {
     /// ## What it does
     /// Checks for possibly unbound attributes.
     ///
-    /// TODO #14889
+    /// ## Why is this bad?
+    /// Attempting to access an unbound attribute will raise an `AttributeError` at runtime.
     pub(crate) static POSSIBLY_UNBOUND_ATTRIBUTE = {
         summary: "detects references to possibly unbound attributes",
         status: LintStatus::preview("1.0.0"),
@@ -799,7 +820,12 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for imports of symbols that may be unbound.
+    ///
+    /// ## Why is this bad?
+    /// Importing an unbound module or name will raise a `ModuleNotFoundError`
+    /// or `ImportError` at runtime.
     pub(crate) static POSSIBLY_UNBOUND_IMPORT = {
         summary: "detects possibly unbound imports",
         status: LintStatus::preview("1.0.0"),
@@ -975,7 +1001,8 @@ declare_lint! {
     /// ## What it does
     /// Checks for unresolved attributes.
     ///
-    /// TODO #14889
+    /// ## Why is this bad?
+    /// Accessing an unbound attribute will raise an `AttributeError` at runtime. An unresolved attribute is not guaranteed to exist from the type alone, so this could also indicate that the object is not of the type that the user expects.
     pub(crate) static UNRESOLVED_ATTRIBUTE = {
         summary: "detects references to unresolved attributes",
         status: LintStatus::preview("1.0.0"),
@@ -988,7 +1015,8 @@ declare_lint! {
     /// Checks for import statements for which the module cannot be resolved.
     ///
     /// ## Why is this bad?
-    /// Importing a module that cannot be resolved will raise an `ImportError` at runtime.
+    /// Importing a module that cannot be resolved will raise an `ImportError`
+    /// at runtime.
     pub(crate) static UNRESOLVED_IMPORT = {
         summary: "detects unresolved imports",
         status: LintStatus::preview("1.0.0"),
@@ -1017,9 +1045,12 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for binary expressions, comparisons, and unary expressions where the operands don't support the operator.
+    /// Checks for binary expressions, comparisons, and unary expressions where
+    /// the operands don't support the operator.
     ///
-    /// TODO #14889
+    /// ## Why is this bad?
+    /// Attempting to use an unsupported operator will raise a `TypeError` at
+    /// runtime.
     pub(crate) static UNSUPPORTED_OPERATOR = {
         summary: "detects binary, unary, or comparison expressions where the operands don't support the operator",
         status: LintStatus::preview("1.0.0"),
@@ -1564,4 +1595,52 @@ pub(crate) fn report_attempted_protocol_instantiation(
             .message(format_args!("`{class_name}` declared as a protocol here")),
     );
     diagnostic.sub(class_def_diagnostic);
+}
+
+pub(crate) fn report_duplicate_bases(
+    context: &InferContext,
+    class: ClassLiteral,
+    duplicate_base_error: &DuplicateBaseError,
+    bases_list: &[ast::Expr],
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
+        return;
+    };
+
+    let DuplicateBaseError {
+        duplicate_base,
+        first_index,
+        later_indices,
+    } = duplicate_base_error;
+
+    let duplicate_name = duplicate_base.name(db);
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`",));
+
+    let mut sub_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        format_args!(
+            "The definition of class `{}` will raise `TypeError` at runtime",
+            class.name(db)
+        ),
+    );
+    sub_diagnostic.annotate(
+        Annotation::secondary(
+            Span::from(context.file()).with_range(bases_list[*first_index].range()),
+        )
+        .message(format_args!(
+            "Class `{duplicate_name}` first included in bases list here"
+        )),
+    );
+    for index in later_indices {
+        sub_diagnostic.annotate(
+            Annotation::primary(Span::from(context.file()).with_range(bases_list[*index].range()))
+                .message(format_args!("Class `{duplicate_name}` later repeated here")),
+        );
+    }
+
+    diagnostic.sub(sub_diagnostic);
 }

@@ -42,19 +42,6 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 # Diagnostics
 
 ```
-error: lint:call-non-callable: Object of type `typing.Protocol` is not callable
- --> src/mdtest_snippet.py:4:13
-  |
-3 | # error: [call-non-callable]
-4 | reveal_type(Protocol())  # revealed: Unknown
-  |             ^^^^^^^^^^
-5 |
-6 | class MyProtocol(Protocol):
-  |
-
-```
-
-```
 info: revealed-type: Revealed type
  --> src/mdtest_snippet.py:4:1
   |
@@ -64,6 +51,33 @@ info: revealed-type: Revealed type
 5 |
 6 | class MyProtocol(Protocol):
   |
+
+```
+
+```
+error: lint:call-non-callable: Object of type `typing.Protocol` is not callable
+ --> src/mdtest_snippet.py:4:13
+  |
+3 | # error: [call-non-callable]
+4 | reveal_type(Protocol())  # revealed: Unknown
+  |             ^^^^^^^^^^
+5 |
+6 | class MyProtocol(Protocol):
+  |
+info: `lint:call-non-callable` is enabled by default
+
+```
+
+```
+info: revealed-type: Revealed type
+  --> src/mdtest_snippet.py:10:1
+   |
+ 9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
+10 | reveal_type(MyProtocol())  # revealed: MyProtocol
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ `MyProtocol`
+11 |
+12 | class GenericProtocol[T](Protocol):
+   |
 
 ```
 
@@ -86,18 +100,18 @@ info: Protocol classes cannot be instantiated
   |       ^^^^^^^^^^^^^^^^^^^^ `MyProtocol` declared as a protocol here
 7 |     x: int
   |
+info: `lint:call-non-callable` is enabled by default
 
 ```
 
 ```
 info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:10:1
+  --> src/mdtest_snippet.py:16:1
    |
- 9 | # error: [call-non-callable] "Cannot instantiate class `MyProtocol`"
-10 | reveal_type(MyProtocol())  # revealed: MyProtocol
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^ `MyProtocol`
-11 |
-12 | class GenericProtocol[T](Protocol):
+15 | # error: [call-non-callable] "Cannot instantiate class `GenericProtocol`"
+16 | reveal_type(GenericProtocol[int]())  # revealed: GenericProtocol[int]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `GenericProtocol[int]`
+17 | class SubclassOfMyProtocol(MyProtocol): ...
    |
 
 ```
@@ -120,18 +134,7 @@ info: Protocol classes cannot be instantiated
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `GenericProtocol` declared as a protocol here
 13 |     x: T
    |
-
-```
-
-```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:16:1
-   |
-15 | # error: [call-non-callable] "Cannot instantiate class `GenericProtocol`"
-16 | reveal_type(GenericProtocol[int]())  # revealed: GenericProtocol[int]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `GenericProtocol[int]`
-17 | class SubclassOfMyProtocol(MyProtocol): ...
-   |
+info: `lint:call-non-callable` is enabled by default
 
 ```
 

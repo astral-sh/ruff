@@ -72,9 +72,9 @@ use crate::types::diagnostic::{
     report_invalid_attribute_assignment, report_invalid_generator_function_return_type,
     report_invalid_return_type, report_possibly_unbound_attribute, TypeCheckDiagnostics,
     CALL_NON_CALLABLE, CALL_POSSIBLY_UNBOUND_METHOD, CONFLICTING_DECLARATIONS,
-    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_BASE,
-    INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
-    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
+    CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, DIVISION_BY_ZERO, INCONSISTENT_MRO,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_PARAMETER_DEFAULT, INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_CONSTRAINTS,
     POSSIBLY_UNBOUND_IMPORT, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_IMPORT,
     UNSUPPORTED_OPERATOR,
@@ -89,8 +89,8 @@ use crate::types::{
     MemberLookupPolicy, MetaclassCandidate, Parameter, ParameterForm, Parameters, Signature,
     Signatures, SliceLiteralType, StringLiteralType, SubclassOfType, Symbol, SymbolAndQualifiers,
     Truthiness, TupleType, Type, TypeAliasType, TypeAndQualifiers, TypeArrayDisplay,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, UnionBuilder,
-    UnionType,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    UnionBuilder, UnionType,
 };
 use crate::unpack::{Unpack, UnpackPosition};
 use crate::util::subscript::{PyIndex, PySlice};
@@ -99,9 +99,10 @@ use crate::{Db, FxOrderSet};
 use super::context::{InNoTypeCheck, InferContext};
 use super::diagnostic::{
     report_attempted_protocol_instantiation, report_bad_argument_to_get_protocol_members,
-    report_index_out_of_bounds, report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_type_checking_constant,
-    report_non_subscriptable, report_possibly_unresolved_reference,
+    report_duplicate_bases, report_index_out_of_bounds, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_type_checking_constant, report_non_subscriptable,
+    report_possibly_unresolved_reference,
     report_runtime_check_against_non_runtime_checkable_protocol, report_slice_step_size_zero,
     report_unresolved_reference, INVALID_METACLASS, INVALID_OVERLOAD, INVALID_PROTOCOL,
     REDUNDANT_CAST, STATIC_ASSERT_ERROR, SUBCLASS_OF_FINAL_CLASS, TYPE_ASSERTION_FAILURE,
@@ -855,17 +856,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     match mro_error.reason() {
                         MroErrorKind::DuplicateBases(duplicates) => {
                             let base_nodes = class_node.bases();
-                            for (index, duplicate) in duplicates {
-                                let Some(builder) = self
-                                    .context
-                                    .report_lint(&DUPLICATE_BASE, &base_nodes[*index])
-                                else {
-                                    continue;
-                                };
-                                builder.into_diagnostic(format_args!(
-                                    "Duplicate base class `{}`",
-                                    duplicate.name(self.db())
-                                ));
+                            for duplicate in duplicates {
+                                report_duplicate_bases(&self.context, class, duplicate, base_nodes);
                             }
                         }
                         MroErrorKind::InvalidBases(bases) => {
@@ -2121,6 +2113,17 @@ impl<'db> TypeInferenceBuilder<'db> {
             }
 
             if let Type::FunctionLiteral(f) = decorator_ty {
+                // We do not yet detect or flag `@dataclass_transform` applied to more than one
+                // overload, or an overload and the implementation both. Nevertheless, this is not
+                // allowed. We do not try to treat the offenders intelligently -- just use the
+                // params of the last seen usage of `@dataclass_transform`
+                if let Some(overloaded) = f.to_overloaded(self.db()) {
+                    overloaded.overloads.iter().for_each(|overload| {
+                        if let Some(params) = overload.dataclass_transformer_params(self.db()) {
+                            dataclass_params = Some(params.into());
+                        }
+                    });
+                }
                 if let Some(params) = f.dataclass_transformer_params(self.db()) {
                     dataclass_params = Some(params.into());
                     continue;
@@ -2504,6 +2507,7 @@ impl<'db> TypeInferenceBuilder<'db> {
             name.id.clone(),
             definition,
             bound_or_constraint,
+            TypeVarVariance::Invariant, // TODO: infer this
             default_ty,
             TypeVarKind::Pep695,
         )));
@@ -4990,10 +4994,70 @@ impl<'db> TypeInferenceBuilder<'db> {
                                             continue;
                                         };
 
-                                        let [Some(name_param), constraints, bound, default, _contravariant, _covariant, _infer_variance] =
+                                        let [Some(name_param), constraints, bound, default, contravariant, covariant, _infer_variance] =
                                             overload.parameter_types()
                                         else {
                                             continue;
+                                        };
+
+                                        let covariant = match covariant {
+                                            Some(ty) => ty.bool(self.db()),
+                                            None => Truthiness::AlwaysFalse,
+                                        };
+
+                                        let contravariant = match contravariant {
+                                            Some(ty) => ty.bool(self.db()),
+                                            None => Truthiness::AlwaysFalse,
+                                        };
+
+                                        let variance = match (contravariant, covariant) {
+                                            (Truthiness::Ambiguous, _) => {
+                                                if let Some(builder) = self.context.report_lint(
+                                                    &INVALID_LEGACY_TYPE_VARIABLE,
+                                                    call_expression,
+                                                ) {
+                                                    builder.into_diagnostic(format_args!(
+                                                        "The `contravariant` parameter of \
+                                                        a legacy `typing.TypeVar` cannot have \
+                                                        an ambiguous value",
+                                                    ));
+                                                }
+                                                continue;
+                                            }
+                                            (_, Truthiness::Ambiguous) => {
+                                                if let Some(builder) = self.context.report_lint(
+                                                    &INVALID_LEGACY_TYPE_VARIABLE,
+                                                    call_expression,
+                                                ) {
+                                                    builder.into_diagnostic(format_args!(
+                                                        "The `covariant` parameter of \
+                                                        a legacy `typing.TypeVar` cannot have \
+                                                        an ambiguous value",
+                                                    ));
+                                                }
+                                                continue;
+                                            }
+                                            (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => {
+                                                if let Some(builder) = self.context.report_lint(
+                                                    &INVALID_LEGACY_TYPE_VARIABLE,
+                                                    call_expression,
+                                                ) {
+                                                    builder.into_diagnostic(format_args!(
+                                                        "A legacy `typing.TypeVar` cannot be \
+                                                        both covariant and contravariant",
+                                                    ));
+                                                }
+                                                continue;
+                                            }
+                                            (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse) => {
+                                                TypeVarVariance::Contravariant
+                                            }
+                                            (Truthiness::AlwaysFalse, Truthiness::AlwaysTrue) => {
+                                                TypeVarVariance::Covariant
+                                            }
+                                            (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {
+                                                TypeVarVariance::Invariant
+                                            }
                                         };
 
                                         let name_param = name_param
@@ -5062,6 +5126,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                 target.id.clone(),
                                                 containing_assignment,
                                                 bound_or_constraint,
+                                                variance,
                                                 *default,
                                                 TypeVarKind::Legacy,
                                             )),

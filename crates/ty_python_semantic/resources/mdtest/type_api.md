@@ -105,7 +105,7 @@ def explicit_unknown(x: Unknown, y: tuple[str, Unknown], z: Unknown = 1) -> None
 ```py
 class C(Unknown): ...
 
-# revealed: tuple[Literal[C], Unknown, Literal[object]]
+# revealed: tuple[<class 'C'>, Unknown, <class 'object'>]
 reveal_type(C.__mro__)
 
 # error: "Special form `ty_extensions.Unknown` expected no type parameter"

@@ -191,6 +191,26 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Returns the class literal and specialization for this class, with an additional
+    /// specialization applied if the class is generic.
+    pub(crate) fn class_literal_specialized(
+        self,
+        db: &'db dyn Db,
+        additional_specialization: Option<Specialization<'db>>,
+    ) -> (ClassLiteral<'db>, Option<Specialization<'db>>) {
+        match self {
+            Self::NonGeneric(non_generic) => (non_generic, None),
+            Self::Generic(generic) => (
+                generic.origin(db),
+                Some(
+                    generic
+                        .specialization(db)
+                        .apply_optional_specialization(db, additional_specialization),
+                ),
+            ),
+        }
+    }
+
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         let (class_literal, _) = self.class_literal(db);
         class_literal.name(db)
@@ -204,13 +224,6 @@ impl<'db> ClassType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let (class_literal, _) = self.class_literal(db);
         class_literal.definition(db)
-    }
-
-    fn specialize_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        match self {
-            Self::NonGeneric(_) => ty,
-            Self::Generic(generic) => ty.apply_specialization(db, generic.specialization(db)),
-        }
     }
 
     /// Return `true` if this class represents `known_class`
@@ -246,6 +259,18 @@ impl<'db> ClassType<'db> {
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
     pub(super) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
         let (class_literal, specialization) = self.class_literal(db);
+        class_literal.iter_mro(db, specialization)
+    }
+
+    /// Iterate over the method resolution order ("MRO") of the class, optionally applying an
+    /// additional specialization to it if the class is generic.
+    pub(super) fn iter_mro_specialized(
+        self,
+        db: &'db dyn Db,
+        additional_specialization: Option<Specialization<'db>>,
+    ) -> MroIterator<'db> {
+        let (class_literal, specialization) =
+            self.class_literal_specialized(db, additional_specialization);
         class_literal.iter_mro(db, specialization)
     }
 
@@ -372,8 +397,10 @@ impl<'db> ClassType<'db> {
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
     pub(super) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
-        let (class_literal, _) = self.class_literal(db);
-        self.specialize_type(db, class_literal.metaclass(db))
+        let (class_literal, specialization) = self.class_literal(db);
+        class_literal
+            .metaclass(db)
+            .apply_optional_specialization(db, specialization)
     }
 
     /// Return a type representing "the set of all instances of the metaclass of this class".
@@ -396,9 +423,7 @@ impl<'db> ClassType<'db> {
         policy: MemberLookupPolicy,
     ) -> SymbolAndQualifiers<'db> {
         let (class_literal, specialization) = self.class_literal(db);
-        class_literal
-            .class_member_inner(db, specialization, name, policy)
-            .map_type(|ty| self.specialize_type(db, ty))
+        class_literal.class_member_inner(db, specialization, name, policy)
     }
 
     /// Returns the inferred type of the class member named `name`. Only bound members
@@ -411,7 +436,7 @@ impl<'db> ClassType<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
             .own_class_member(db, specialization, name)
-            .map_type(|ty| self.specialize_type(db, ty))
+            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
 
     /// Returns the `name` attribute of an instance of this class.
@@ -424,16 +449,16 @@ impl<'db> ClassType<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
             .instance_member(db, specialization, name)
-            .map_type(|ty| self.specialize_type(db, ty))
+            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> SymbolAndQualifiers<'db> {
-        let (class_literal, _) = self.class_literal(db);
+        let (class_literal, specialization) = self.class_literal(db);
         class_literal
             .own_instance_member(db, name)
-            .map_type(|ty| self.specialize_type(db, ty))
+            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
     }
 }
 
@@ -1774,26 +1799,32 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
-    /// Returns the [`Span`] of the class's "header": the class name
+    /// Returns a [`Span`] with the range of the class's header.
+    ///
+    /// See [`Self::header_range`] for more details.
+    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+        Span::from(self.file(db)).with_range(self.header_range(db))
+    }
+
+    /// Returns the range of the class's "header": the class name
     /// and any arguments passed to the `class` statement. E.g.
     ///
     /// ```ignore
     /// class Foo(Bar, metaclass=Baz): ...
     ///       ^^^^^^^^^^^^^^^^^^^^^^^
     /// ```
-    pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
+    pub(super) fn header_range(self, db: &'db dyn Db) -> TextRange {
         let class_scope = self.body_scope(db);
         let class_node = class_scope.node(db).expect_class();
         let class_name = &class_node.name;
-        let header_range = TextRange::new(
+        TextRange::new(
             class_name.start(),
             class_node
                 .arguments
                 .as_deref()
                 .map(Ranged::end)
                 .unwrap_or_else(|| class_name.end()),
-        );
-        Span::from(class_scope.file(db)).with_range(header_range)
+        )
     }
 }
 

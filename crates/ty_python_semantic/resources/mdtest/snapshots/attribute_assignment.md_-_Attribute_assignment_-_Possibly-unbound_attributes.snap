@@ -26,7 +26,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/attribute_as
 # Diagnostics
 
 ```
-warning: lint:possibly-unbound-attribute: Attribute `attr` on type `Literal[C]` is possibly unbound
+warning: lint:possibly-unbound-attribute: Attribute `attr` on type `<class 'C'>` is possibly unbound
  --> src/mdtest_snippet.py:6:5
   |
 4 |             attr: int = 0
@@ -36,6 +36,7 @@ warning: lint:possibly-unbound-attribute: Attribute `attr` on type `Literal[C]` 
 7 |
 8 |     instance = C()
   |
+info: `lint:possibly-unbound-attribute` is enabled by default
 
 ```
 
@@ -47,5 +48,6 @@ warning: lint:possibly-unbound-attribute: Attribute `attr` on type `C` is possib
 9 |     instance.attr = 1  # error: [possibly-unbound-attribute]
   |     ^^^^^^^^^^^^^
   |
+info: `lint:possibly-unbound-attribute` is enabled by default
 
 ```

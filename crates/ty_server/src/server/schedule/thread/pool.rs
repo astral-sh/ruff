@@ -59,7 +59,7 @@ impl Pool {
         for i in 0..threads {
             let handle = Builder::new(INITIAL_PRIORITY)
                 .stack_size(STACK_SIZE)
-                .name(format!("ruff:worker:{i}"))
+                .name(format!("ty:worker:{i}"))
                 .spawn({
                     let extant_tasks = Arc::clone(&extant_tasks);
                     let job_receiver: Receiver<Job> = job_receiver.clone();

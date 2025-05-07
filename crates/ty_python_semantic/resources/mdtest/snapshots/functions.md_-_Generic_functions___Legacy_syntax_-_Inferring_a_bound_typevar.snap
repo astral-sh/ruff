@@ -56,6 +56,18 @@ info: revealed-type: Revealed type
 ```
 
 ```
+info: revealed-type: Revealed type
+  --> src/mdtest_snippet.py:12:1
+   |
+10 | reveal_type(f(True))  # revealed: Literal[True]
+11 | # error: [invalid-argument-type]
+12 | reveal_type(f("string"))  # revealed: Unknown
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ `Unknown`
+   |
+
+```
+
+```
 error: lint:invalid-argument-type: Argument to this function is incorrect
   --> src/mdtest_snippet.py:12:15
    |
@@ -74,17 +86,6 @@ info: Type variable defined here
 5 |
 6 | def f(x: T) -> T:
   |
-
-```
-
-```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:12:1
-   |
-10 | reveal_type(f(True))  # revealed: Literal[True]
-11 | # error: [invalid-argument-type]
-12 | reveal_type(f("string"))  # revealed: Unknown
-   | ^^^^^^^^^^^^^^^^^^^^^^^^ `Unknown`
-   |
+info: `lint:invalid-argument-type` is enabled by default
 
 ```

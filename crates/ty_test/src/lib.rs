@@ -359,6 +359,7 @@ fn run_test(
                 }
             };
             diagnostics.extend(type_diagnostics.into_iter().cloned());
+            diagnostics.sort_by(|left, right|left.rendering_sort_key(db).cmp(&right.rendering_sort_key(db)));
 
             let failure = match matcher::match_file(db, test_file.file, &diagnostics) {
                 Ok(()) => None,
