@@ -61,10 +61,9 @@ struct DunderAllNamesCollector<'db> {
     /// The origin of the `__all__` variable in the current module, [`None`] if it is not defined.
     origin: Option<DunderAllOrigin>,
 
-    /// A flag indicating whether there are any invalid elements in `__all__`.
-    ///
-    /// An invalid element is any element that is not a string literal.
-    contains_invalid_element: bool,
+    /// A flag indicating whether the module uses unrecognized `__all__` idioms or there are any
+    /// invalid elements in `__all__`.
+    invalid: bool,
 
     /// A set of names found in `__all__` for the current module.
     names: FxHashSet<Name>,
@@ -78,7 +77,7 @@ impl<'db> DunderAllNamesCollector<'db> {
             scope: global_scope(db, file),
             index,
             origin: None,
-            contains_invalid_element: false,
+            invalid: false,
             names: FxHashSet::default(),
         }
     }
@@ -96,22 +95,22 @@ impl<'db> DunderAllNamesCollector<'db> {
 
     /// Extends the current set of names with the names from the given expression which can be
     /// either a list of names or a submodule's `__all__` variable.
-    fn extend_from_list_or_submodule(&mut self, expr: &ast::Expr) {
+    ///
+    /// Returns `true` if the expression is a valid list or submodule `__all__`, `false` otherwise.
+    fn extend_from_list_or_submodule(&mut self, expr: &ast::Expr) -> bool {
         match expr {
             // `__all__ += [...]`
             // `__all__.extend([...])`
-            ast::Expr::List(ast::ExprList { elts, .. }) => {
-                self.add_names(elts);
-            }
+            ast::Expr::List(ast::ExprList { elts, .. }) => self.add_names(elts),
 
             // `__all__ += submodule.__all__`
             // `__all__.extend(submodule.__all__)`
             ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
                 if attr != "__all__" {
-                    return;
+                    return false;
                 }
                 let Some(name_node) = value.as_name_expr() else {
-                    return;
+                    return false;
                 };
                 let Symbol::Type(ty, Boundness::Bound) = symbol_from_bindings(
                     self.db,
@@ -119,22 +118,69 @@ impl<'db> DunderAllNamesCollector<'db> {
                         .use_def_map(self.scope.file_scope_id(self.db))
                         .bindings_at_use(name_node.scoped_use_id(self.db, self.scope)),
                 ) else {
-                    return;
+                    return false;
                 };
                 let Some(module_literal) = ty.into_module_literal() else {
-                    return;
+                    return false;
                 };
                 // TODO: Do we need to check if the module is a submodule of the current module?
                 let Some(module_dunder_all_names) =
                     dunder_all_names(self.db, module_literal.module(self.db).file())
                 else {
-                    return;
+                    // The module either does not have a `__all__` variable or it is invalid.
+                    // TODO: Should we return `false` here?
+                    return true;
                 };
                 self.names.extend(module_dunder_all_names.iter().cloned());
+                true
             }
 
-            _ => {}
+            _ => false,
         }
+    }
+
+    /// Processes a call idiom for `__all__` and updates the set of names accordingly.
+    ///
+    /// Returns `true` if the call idiom is recognized and valid, `false` otherwise.
+    fn process_call_idiom(
+        &mut self,
+        function_name: &ast::Identifier,
+        arguments: &ast::Arguments,
+    ) -> bool {
+        if arguments.len() != 1 {
+            return false;
+        }
+        let Some(argument) = arguments.find_positional(0) else {
+            return false;
+        };
+        match function_name.as_str() {
+            // `__all__.extend([...])`
+            // `__all__.extend(submodule.__all__)`
+            "extend" => {
+                if !self.extend_from_list_or_submodule(argument) {
+                    return false;
+                }
+            }
+
+            // `__all__.append(...)`
+            "append" => {
+                let Some(name) = create_name(argument) else {
+                    return false;
+                };
+                self.names.insert(name);
+            }
+
+            // `__all__.remove(...)`
+            "remove" => {
+                let Some(name) = create_name(argument) else {
+                    return false;
+                };
+                self.names.remove(&name);
+            }
+
+            _ => return false,
+        }
+        true
     }
 
     /// Returns the names in `__all__` from the module imported from the given `import_from`
@@ -162,24 +208,17 @@ impl<'db> DunderAllNamesCollector<'db> {
             .ok()
     }
 
-    /// Create and return a [`Name`] from the given expression, [`None`] if it is an invalid
-    /// expression for a `__all__` element.
-    fn create_name(&mut self, expr: &ast::Expr) -> Option<Name> {
-        let Some(ast::ExprStringLiteral { value, .. }) = expr.as_string_literal_expr() else {
-            self.contains_invalid_element = true;
-            return None;
-        };
-        Some(Name::new(value.to_str()))
-    }
-
     /// Add valid names to the set.
-    fn add_names(&mut self, exprs: &[ast::Expr]) {
+    ///
+    /// Returns `false` if any of the names are invalid.
+    fn add_names(&mut self, exprs: &[ast::Expr]) -> bool {
         for expr in exprs {
-            let Some(name) = self.create_name(expr) else {
-                continue;
+            let Some(name) = create_name(expr) else {
+                return false;
             };
             self.names.insert(name);
         }
+        true
     }
 
     /// Consumes `self` and returns the collected set of names.
@@ -189,11 +228,8 @@ impl<'db> DunderAllNamesCollector<'db> {
     fn into_names(self) -> Option<FxHashSet<Name>> {
         if self.origin.is_none() {
             None
-        } else if self.contains_invalid_element {
-            tracing::debug!(
-                "`__all__` in `{}` contains invalid elements",
-                self.file.path(self.db)
-            );
+        } else if self.invalid {
+            tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
             None
         } else {
             Some(self.names)
@@ -203,6 +239,10 @@ impl<'db> DunderAllNamesCollector<'db> {
 
 impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
     fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
+        if self.invalid {
+            return;
+        }
+
         match stmt {
             ast::Stmt::ImportFrom(import_from @ ast::StmtImportFrom { names, .. }) => {
                 for ast::Alias { name, asname, .. } in names {
@@ -267,9 +307,13 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                     ast::Expr::List(ast::ExprList { elts, .. })
                     | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                         self.update_origin(DunderAllOrigin::CurrentModule);
-                        self.add_names(elts);
+                        if !self.add_names(elts) {
+                            self.invalid = true;
+                        }
                     }
-                    _ => {}
+                    _ => {
+                        self.invalid = true;
+                    }
                 }
             }
 
@@ -286,7 +330,9 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 if !is_dunder_all(target) {
                     return;
                 }
-                self.extend_from_list_or_submodule(value);
+                if !self.extend_from_list_or_submodule(value) {
+                    self.invalid = true;
+                }
             }
 
             ast::Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -297,11 +343,19 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 if !is_dunder_all(target) {
                     return;
                 }
-                // TODO: Should we include tuple here as well?
-                // `__all__: list[str] = [...]`
-                if let ast::Expr::List(ast::ExprList { elts, .. }) = &**value {
-                    self.update_origin(DunderAllOrigin::CurrentModule);
-                    self.add_names(elts);
+                match &**value {
+                    // `__all__: list[str] = [...]`
+                    // `__all__: tuple[str, ...] = (...)`
+                    ast::Expr::List(ast::ExprList { elts, .. })
+                    | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                        self.update_origin(DunderAllOrigin::CurrentModule);
+                        if !self.add_names(elts) {
+                            self.invalid = true;
+                        }
+                    }
+                    _ => {
+                        self.invalid = true;
+                    }
                 }
             }
 
@@ -325,34 +379,11 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 else {
                     return;
                 };
-                if arguments.len() != 1 || !is_dunder_all(value) {
+                if !is_dunder_all(value) {
                     return;
                 }
-                let Some(argument) = arguments.find_positional(0) else {
-                    return;
-                };
-                match attr.as_str() {
-                    // `__all__.extend([...])`
-                    // `__all__.extend(submodule.__all__)`
-                    "extend" => self.extend_from_list_or_submodule(argument),
-
-                    // `__all__.append(...)`
-                    "append" => {
-                        let Some(name) = self.create_name(argument) else {
-                            return;
-                        };
-                        self.names.insert(name);
-                    }
-
-                    // `__all__.remove(...)`
-                    "remove" => {
-                        let Some(name) = self.create_name(argument) else {
-                            return;
-                        };
-                        self.names.remove(&name);
-                    }
-
-                    _ => {}
+                if !self.process_call_idiom(attr, arguments) {
+                    self.invalid = true;
                 }
             }
 
@@ -430,4 +461,10 @@ enum DunderAllOrigin {
 /// Checks if the given expression is a name expression for `__all__`.
 fn is_dunder_all(expr: &ast::Expr) -> bool {
     matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "__all__")
+}
+
+/// Create and return a [`Name`] from the given expression, [`None`] if it is an invalid expression
+/// for a `__all__` element.
+fn create_name(expr: &ast::Expr) -> Option<Name> {
+    Some(Name::new(expr.as_string_literal_expr()?.value.to_str()))
 }

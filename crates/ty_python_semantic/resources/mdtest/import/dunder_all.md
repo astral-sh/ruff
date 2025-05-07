@@ -316,9 +316,8 @@ reveal_type(dunder_all_names(exporter))
 
 ### Unsupported idioms
 
-Idioms that are not mentioned in the [specification] are not recognized by `ty` and ignored for the
-purpose of adding / removing symbols from `__all__`. Other valid idioms are still recognized and use
-to determine the symbols in `__all__`.
+Idioms that are not mentioned in the [specification] are not recognized by `ty` and if they're used,
+`__all__` is considered to be undefined for that module. This is to avoid false positives.
 
 `bar.py`:
 
@@ -381,15 +380,14 @@ class D: ...
 import exporter
 from ty_extensions import dunder_all_names
 
-# revealed: tuple[Literal["C"]]
+# revealed: None
 reveal_type(dunder_all_names(exporter))
 ```
 
 ### Non-string elements
 
-On the other hand, for any non-string elements in a valid `__all__` idiom, we will consider
-`__all__` to not be defined for that module as we cannot determine the symbols in `__all__`. This is
-to avoid false positives.
+Similarly, if `__all__` contains any non-string elements, we will consider `__all__` to not be
+defined for that module. This is also to avoid false positives.
 
 `subexporter.py`:
 
