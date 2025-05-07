@@ -254,6 +254,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                         // the module.
                         let Some(all_names) = self.dunder_all_names_for_import_from(import_from)
                         else {
+                            self.invalid = true;
                             continue;
                         };
 
@@ -284,6 +285,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                         // practice.
                         let Some(all_names) = self.dunder_all_names_for_import_from(import_from)
                         else {
+                            self.invalid = true;
                             continue;
                         };
 
