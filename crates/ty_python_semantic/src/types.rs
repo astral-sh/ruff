@@ -587,6 +587,87 @@ impl<'db> Type<'db> {
         matches!(self, Type::Dynamic(DynamicType::Todo(_)))
     }
 
+    pub fn contains_recursive_reference(&self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::ProtocolInstance(protocol) => protocol.contains_recursive_reference(db),
+
+            Self::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.contains_recursive_reference(db)),
+
+            Self::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|ty| ty.contains_recursive_reference(db))
+                    || intersection
+                        .negative(db)
+                        .iter()
+                        .any(|ty| ty.contains_recursive_reference(db))
+            }
+
+            Self::Tuple(tuple) => tuple
+                .elements(db)
+                .iter()
+                .any(|ty| ty.contains_recursive_reference(db)),
+
+            Self::GenericAlias(generic) => generic
+                .specialization(db)
+                .types(db)
+                .iter()
+                .any(|ty| ty.contains_recursive_reference(db)),
+
+            Self::Callable(callable) => {
+                let signatures = callable.signatures(db);
+                signatures.iter().any(|signature| {
+                    signature.parameters().iter().any(|param| {
+                        param
+                            .annotated_type()
+                            .is_some_and(|ty| ty.contains_recursive_reference(db))
+                    }) || signature
+                        .return_ty
+                        .is_some_and(|ty| ty.contains_recursive_reference(db))
+                })
+            }
+
+            Self::TypeVar(typevar) => match typevar.bound_or_constraints(db) {
+                None => false,
+                Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                    bound.contains_recursive_reference(db)
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                    .elements(db)
+                    .iter()
+                    .any(|constraint| constraint.contains_recursive_reference(db)),
+            },
+
+            Self::Dynamic(_)
+            | Self::AlwaysFalsy
+            | Self::AlwaysTruthy
+            | Self::Never
+            | Self::BooleanLiteral(_)
+            | Self::BytesLiteral(_)
+            | Self::FunctionLiteral(_)
+            | Self::NominalInstance(_)
+            | Self::ModuleLiteral(_)
+            | Self::ClassLiteral(_)
+            | Self::KnownInstance(_)
+            | Self::PropertyInstance(_)
+            | Self::StringLiteral(_)
+            | Self::IntLiteral(_)
+            | Self::LiteralString
+            | Self::SliceLiteral(_)
+            | Self::BoundMethod(_)
+            | Self::WrapperDescriptor(_)
+            | Self::MethodWrapper(_)
+            | Self::DataclassDecorator(_)
+            | Self::DataclassTransformer(_)
+            | Self::SubclassOf(_)
+            | Self::BoundSuper(_) => false,
+        }
+    }
+
     pub fn contains_todo(&self, db: &'db dyn Db) -> bool {
         match self {
             Self::Dynamic(DynamicType::Todo(_) | DynamicType::SubscriptedProtocol) => true,

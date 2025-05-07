@@ -1569,11 +1569,11 @@ from typing import Protocol, Any
 from ty_extensions import is_fully_static, static_assert, is_assignable_to, is_subtype_of, is_equivalent_to
 
 class RecursiveFullyStatic(Protocol):
-    parent: RecursiveFullyStatic | None
+    parent: RecursiveFullyStatic
     x: int
 
 class RecursiveNonFullyStatic(Protocol):
-    parent: RecursiveNonFullyStatic | None
+    parent: RecursiveNonFullyStatic
     x: Any
 
 static_assert(is_fully_static(RecursiveFullyStatic))
@@ -1582,16 +1582,27 @@ static_assert(not is_fully_static(RecursiveNonFullyStatic))
 static_assert(not is_subtype_of(RecursiveFullyStatic, RecursiveNonFullyStatic))
 static_assert(not is_subtype_of(RecursiveNonFullyStatic, RecursiveFullyStatic))
 
-# TODO: currently leads to a stack overflow
-# static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
-# static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveFullyStatic))
+static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveNonFullyStatic))
+static_assert(is_assignable_to(RecursiveFullyStatic, RecursiveNonFullyStatic))
+static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveFullyStatic))
 
 class AlsoRecursiveFullyStatic(Protocol):
-    parent: AlsoRecursiveFullyStatic | None
+    parent: AlsoRecursiveFullyStatic
     x: int
 
-# TODO: currently leads to a stack overflow
-# static_assert(is_equivalent_to(AlsoRecursiveFullyStatic, RecursiveFullyStatic))
+static_assert(is_equivalent_to(AlsoRecursiveFullyStatic, RecursiveFullyStatic))
+
+class RecursiveOptionalParent(Protocol):
+    parent: RecursiveOptionalParent | None
+
+static_assert(is_fully_static(RecursiveOptionalParent))
+
+static_assert(is_assignable_to(RecursiveOptionalParent, RecursiveOptionalParent))
+
+static_assert(is_assignable_to(RecursiveNonFullyStatic, RecursiveOptionalParent))
+# TODO: this should not be an error
+# error: [static-assert-error]
+static_assert(not is_assignable_to(RecursiveOptionalParent, RecursiveNonFullyStatic))
 ```
 
 ### Regression test: narrowing with self-referential protocols
