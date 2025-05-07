@@ -73,7 +73,7 @@ class E(Concatenate): ...  # error: [invalid-base]
 class F(Callable): ...
 class G(Generic): ...  # error: [invalid-base] "Cannot inherit from plain `Generic`"
 
-reveal_type(F.__mro__)  # revealed: tuple[Literal[F], @Todo(Support for Callable as a base class), Literal[object]]
+reveal_type(F.__mro__)  # revealed: tuple[<class 'F'>, @Todo(Support for Callable as a base class), <class 'object'>]
 ```
 
 ## Subscriptability

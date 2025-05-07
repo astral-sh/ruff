@@ -41,7 +41,7 @@ info: `lint:invalid-assignment` is enabled by default
 ```
 
 ```
-error: lint:invalid-attribute-access: Cannot assign to instance attribute `attr` from the class object `Literal[C]`
+error: lint:invalid-attribute-access: Cannot assign to instance attribute `attr` from the class object `<class 'C'>`
  --> src/mdtest_snippet.py:9:1
   |
 7 | instance.attr = "wrong"  # error: [invalid-assignment]

@@ -362,7 +362,7 @@ Here, `Sub` is not a generic class, since it fills its superclass's type paramet
 class Base[T]: ...
 class Sub(Base[Sub]): ...
 
-reveal_type(Sub)  # revealed: Literal[Sub]
+reveal_type(Sub)  # revealed: <class 'Sub'>
 ```
 
 #### With string forward references
@@ -373,7 +373,7 @@ A similar case can work in a non-stub file, if forward references are stringifie
 class Base[T]: ...
 class Sub(Base["Sub"]): ...
 
-reveal_type(Sub)  # revealed: Literal[Sub]
+reveal_type(Sub)  # revealed: <class 'Sub'>
 ```
 
 #### Without string forward references

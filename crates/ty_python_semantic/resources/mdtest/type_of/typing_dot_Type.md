@@ -28,5 +28,5 @@ class C(Type): ...
 
 # Runtime value: `(C, type, typing.Generic, object)`
 # TODO: Add `Generic` to the MRO
-reveal_type(C.__mro__)  # revealed: tuple[Literal[C], Literal[type], Literal[object]]
+reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'type'>, <class 'object'>]
 ```

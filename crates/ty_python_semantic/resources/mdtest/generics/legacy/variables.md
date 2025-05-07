@@ -19,7 +19,7 @@ in newer Python releases.
 from typing import TypeVar
 
 T = TypeVar("T")
-reveal_type(type(T))  # revealed: Literal[TypeVar]
+reveal_type(type(T))  # revealed: <class 'TypeVar'>
 reveal_type(T)  # revealed: typing.TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```

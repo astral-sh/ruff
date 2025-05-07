@@ -28,7 +28,7 @@ from typing import Protocol
 
 class MyProtocol(Protocol): ...
 
-reveal_type(MyProtocol.__mro__)  # revealed: tuple[Literal[MyProtocol], typing.Protocol, typing.Generic, Literal[object]]
+reveal_type(MyProtocol.__mro__)  # revealed: tuple[<class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 ```
 
 Just like for any other class base, it is an error for `Protocol` to appear multiple times in a
@@ -37,7 +37,7 @@ class's bases:
 ```py
 class Foo(Protocol, Protocol): ...  # error: [inconsistent-mro]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[Literal[Foo], Unknown, Literal[object]]
+reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 ```
 
 Protocols can also be generic, either by including `Generic[]` in the bases list, subscripting
@@ -71,7 +71,7 @@ class DuplicateBases(Protocol, Protocol[T]):
     x: T
 
 # TODO: should not have `Protocol` multiple times
-# revealed: tuple[Literal[DuplicateBases], typing.Protocol, @Todo(`Protocol[]` subscript), typing.Generic, Literal[object]]
+# revealed: tuple[<class 'DuplicateBases'>, typing.Protocol, @Todo(`Protocol[]` subscript), typing.Generic, <class 'object'>]
 reveal_type(DuplicateBases.__mro__)
 ```
 
@@ -107,7 +107,7 @@ it is not sufficient for it to have `Protocol` in its MRO.
 ```py
 class SubclassOfMyProtocol(MyProtocol): ...
 
-# revealed: tuple[Literal[SubclassOfMyProtocol], Literal[MyProtocol], typing.Protocol, typing.Generic, Literal[object]]
+# revealed: tuple[<class 'SubclassOfMyProtocol'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(SubclassOfMyProtocol.__mro__)
 
 reveal_type(is_protocol(SubclassOfMyProtocol))  # revealed: Literal[False]
@@ -126,7 +126,7 @@ class OtherProtocol(Protocol):
 
 class ComplexInheritance(SubProtocol, OtherProtocol, Protocol): ...
 
-# revealed: tuple[Literal[ComplexInheritance], Literal[SubProtocol], Literal[MyProtocol], Literal[OtherProtocol], typing.Protocol, typing.Generic, Literal[object]]
+# revealed: tuple[<class 'ComplexInheritance'>, <class 'SubProtocol'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(ComplexInheritance.__mro__)
 
 reveal_type(is_protocol(ComplexInheritance))  # revealed: Literal[True]
@@ -139,13 +139,13 @@ or `TypeError` is raised at runtime when the class is created.
 # error: [invalid-protocol] "Protocol class `Invalid` cannot inherit from non-protocol class `NotAProtocol`"
 class Invalid(NotAProtocol, Protocol): ...
 
-# revealed: tuple[Literal[Invalid], Literal[NotAProtocol], typing.Protocol, typing.Generic, Literal[object]]
+# revealed: tuple[<class 'Invalid'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(Invalid.__mro__)
 
 # error: [invalid-protocol] "Protocol class `AlsoInvalid` cannot inherit from non-protocol class `NotAProtocol`"
 class AlsoInvalid(MyProtocol, OtherProtocol, NotAProtocol, Protocol): ...
 
-# revealed: tuple[Literal[AlsoInvalid], Literal[MyProtocol], Literal[OtherProtocol], Literal[NotAProtocol], typing.Protocol, typing.Generic, Literal[object]]
+# revealed: tuple[<class 'AlsoInvalid'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
 reveal_type(AlsoInvalid.__mro__)
 ```
 
@@ -163,7 +163,7 @@ T = TypeVar("T")
 # type checkers.
 class Fine(Protocol, object): ...
 
-reveal_type(Fine.__mro__)  # revealed: tuple[Literal[Fine], typing.Protocol, typing.Generic, Literal[object]]
+reveal_type(Fine.__mro__)  # revealed: tuple[<class 'Fine'>, typing.Protocol, typing.Generic, <class 'object'>]
 
 class StillFine(Protocol, Generic[T], object): ...
 class EvenThis[T](Protocol, object): ...
@@ -177,7 +177,7 @@ And multiple inheritance from a mix of protocol and non-protocol classes is fine
 ```py
 class FineAndDandy(MyProtocol, OtherProtocol, NotAProtocol): ...
 
-# revealed: tuple[Literal[FineAndDandy], Literal[MyProtocol], Literal[OtherProtocol], typing.Protocol, typing.Generic, Literal[NotAProtocol], Literal[object]]
+# revealed: tuple[<class 'FineAndDandy'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'NotAProtocol'>, <class 'object'>]
 reveal_type(FineAndDandy.__mro__)
 ```
 

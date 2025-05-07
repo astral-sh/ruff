@@ -1353,7 +1353,7 @@ are present due to `*` imports.
 ```py
 import collections.abc
 
-reveal_type(collections.abc.Sequence)  # revealed: Literal[Sequence]
+reveal_type(collections.abc.Sequence)  # revealed: <class 'Sequence'>
 reveal_type(collections.abc.Callable)  # revealed: typing.Callable
 
 # TODO: false positive as it's only re-exported from `_collections.abc` due to presence in `__all__`

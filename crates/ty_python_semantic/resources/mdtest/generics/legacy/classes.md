@@ -29,7 +29,7 @@ class RepeatedTypevar(Generic[T, T]): ...
 You can only specialize `typing.Generic` with typevars (TODO: or param specs or typevar tuples).
 
 ```py
-# error: [invalid-argument-type] "`Literal[int]` is not a valid argument to `typing.Generic`"
+# error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `typing.Generic`"
 class GenericOfType(Generic[int]): ...
 ```
 
@@ -436,7 +436,7 @@ T = TypeVar("T")
 class Base(Generic[T]): ...
 class Sub(Base[Sub]): ...
 
-reveal_type(Sub)  # revealed: Literal[Sub]
+reveal_type(Sub)  # revealed: <class 'Sub'>
 ```
 
 #### With string forward references
@@ -451,7 +451,7 @@ T = TypeVar("T")
 class Base(Generic[T]): ...
 class Sub(Base["Sub"]): ...
 
-reveal_type(Sub)  # revealed: Literal[Sub]
+reveal_type(Sub)  # revealed: <class 'Sub'>
 ```
 
 #### Without string forward references
