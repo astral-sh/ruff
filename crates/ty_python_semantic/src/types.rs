@@ -5651,7 +5651,7 @@ impl<'db> TypeVarInstance<'db> {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
 pub enum TypeVarVariance {
     Invariant,
     Covariant,
@@ -5659,7 +5659,7 @@ pub enum TypeVarVariance {
     Bivariant,
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update)]
 pub enum TypeVarBoundOrConstraints<'db> {
     UpperBound(Type<'db>),
     Constraints(UnionType<'db>),
