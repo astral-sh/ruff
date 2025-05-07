@@ -288,19 +288,34 @@ reveal_type(Z.__mro__)  # revealed: tuple[<class 'Z'>, Unknown, <class 'object'>
 
 ## `__bases__` lists with duplicate bases
 
+<!-- snapshot-diagnostics -->
+
 ```py
-class Foo(str, str): ...  # error: 16 [duplicate-base] "Duplicate base class `str`"
+from typing_extensions import reveal_type
+
+class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
 
 reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
 
 class Spam: ...
 class Eggs: ...
+class Bar: ...
+class Baz: ...
+
+# fmt: off
+
+# error: [duplicate-base] "Duplicate base class `Spam`"
+# error: [duplicate-base] "Duplicate base class `Eggs`"
 class Ham(
     Spam,
     Eggs,
-    Spam,  # error: [duplicate-base] "Duplicate base class `Spam`"
-    Eggs,  # error: [duplicate-base] "Duplicate base class `Eggs`"
+    Bar,
+    Baz,
+    Spam,
+    Eggs,
 ): ...
+
+# fmt: on
 
 reveal_type(Ham.__mro__)  # revealed: tuple[<class 'Ham'>, Unknown, <class 'object'>]
 

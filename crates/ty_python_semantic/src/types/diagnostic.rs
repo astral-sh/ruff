@@ -1595,3 +1595,39 @@ pub(crate) fn report_attempted_protocol_instantiation(
     );
     diagnostic.sub(class_def_diagnostic);
 }
+
+pub(crate) fn report_duplicate_bases(
+    context: &InferContext,
+    class: ClassLiteral,
+    duplicate_name: &str,
+    base_1: &ast::Expr,
+    base_2: &ast::Expr,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
+        return;
+    };
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`",));
+
+    let mut sub_diagnostic = SubDiagnostic::new(
+        Severity::Info,
+        format_args!(
+            "The definition of class `{}` will raise `TypeError` at runtime",
+            class.name(db)
+        ),
+    );
+    sub_diagnostic.annotate(
+        Annotation::secondary(Span::from(context.file()).with_range(base_1.range())).message(
+            format_args!("Class `{duplicate_name}` first included in bases list here"),
+        ),
+    );
+    sub_diagnostic.annotate(
+        Annotation::primary(Span::from(context.file()).with_range(base_2.range()))
+            .message(format_args!("Class `{duplicate_name}` later repeated here")),
+    );
+
+    diagnostic.sub(sub_diagnostic);
+}
