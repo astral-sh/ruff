@@ -83,7 +83,8 @@ python-version = "3.9"
 ```py
 class A(tuple[int, str]): ...
 
-reveal_type(A.__mro__)  # revealed: tuple[<class 'A'>, <class 'tuple[@Todo(Generic tuple specializations), ...]'>, <class 'Sequence[@Todo(Generic tuple specializations)]'>, <class 'Reversible[@Todo(Generic tuple specializations)]'>, <class 'Collection[@Todo(Generic tuple specializations)]'>, <class 'Iterable[@Todo(Generic tuple specializations)]'>, <class 'Container[@Todo(Generic tuple specializations)]'>, typing.Protocol[_T_co], typing.Generic[_T_co], <class 'object'>]
+# revealed: tuple[<class 'A'>, <class 'tuple[@Todo(Generic tuple specializations), ...]'>, <class 'Sequence[@Todo(Generic tuple specializations)]'>, <class 'Reversible[@Todo(Generic tuple specializations)]'>, <class 'Collection[@Todo(Generic tuple specializations)]'>, <class 'Iterable[@Todo(Generic tuple specializations)]'>, <class 'Container[@Todo(Generic tuple specializations)]'>, typing.Protocol[_T_co], typing.Generic[_T_co], <class 'object'>]
+reveal_type(A.__mro__)
 ```
 
 ## `typing.Tuple`

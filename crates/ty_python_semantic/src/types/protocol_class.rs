@@ -147,16 +147,22 @@ impl<'db> ProtocolInterface<'db> {
         }
     }
 
-    pub(super) fn apply_specialization(
+    pub(super) fn specialized_and_normalized(
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
     ) -> Self {
-        Self(
-            self.0
-                .into_iter()
-                .map(|(name, data)| (name, data.apply_specialization(db, specialization)))
-                .collect(),
+        Self::new(
+            db,
+            self._members(db)
+                .iter()
+                .map(|(name, data)| {
+                    (
+                        name.clone(),
+                        data.apply_specialization(db, specialization).normalized(db),
+                    )
+                })
+                .collect::<BTreeMap<_, _>>(),
         )
     }
 }
@@ -175,7 +181,7 @@ impl<'db> ProtocolMemberData<'db> {
         }
     }
 
-    fn apply_specialization(self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+    fn apply_specialization(&self, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
         Self {
             ty: self.ty.apply_specialization(db, specialization),
             qualifiers: self.qualifiers,

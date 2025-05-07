@@ -43,9 +43,9 @@ def f(
     reveal_type(set_parametrized)  # revealed: set[Unknown]
 
     # TODO: revealed: frozenset[Unknown]
-    reveal_type(frozen_set_bare)  # revealed: frozenset
+    reveal_type(frozen_set_bare)  # revealed: frozenset[Unknown]
     # TODO: revealed: frozenset[str]
-    reveal_type(frozen_set_parametrized)  # revealed: frozenset
+    reveal_type(frozen_set_parametrized)  # revealed: frozenset[Unknown]
 
     reveal_type(chain_map_bare)  # revealed: ChainMap[Unknown, Unknown]
     # TODO: revealed: ChainMap[str, int]
@@ -97,8 +97,7 @@ reveal_type(SetSubclass.__mro__)
 
 class FrozenSetSubclass(typing.FrozenSet): ...
 
-# TODO: generic protocols
-# revealed: tuple[<class 'FrozenSetSubclass'>, <class 'frozenset'>, <class 'AbstractSet'>, <class 'Collection'>, <class 'Iterable'>, <class 'Container'>, @Todo(`Protocol[]` subscript), typing.Generic, <class 'object'>]
+# revealed: tuple[<class 'FrozenSetSubclass'>, <class 'frozenset[Unknown]'>, <class 'AbstractSet[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol[_T_co], typing.Generic[_T_co], <class 'object'>]
 reveal_type(FrozenSetSubclass.__mro__)
 
 ####################
