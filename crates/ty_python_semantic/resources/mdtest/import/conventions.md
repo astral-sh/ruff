@@ -204,7 +204,7 @@ Here, the symbol is re-exported using the `__all__` variable.
 ```py
 from a import Foo
 
-reveal_type(Foo)  # revealed: Literal[Foo]
+reveal_type(Foo)  # revealed: <class 'Foo'>
 ```
 
 `a.pyi`:
@@ -231,7 +231,7 @@ an error when using named import.
 ```py
 from a import Foo
 
-reveal_type(Foo)  # revealed: Literal[Foo]
+reveal_type(Foo)  # revealed: <class 'Foo'>
 ```
 
 `a.pyi`:
