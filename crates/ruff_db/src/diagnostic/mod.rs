@@ -627,7 +627,7 @@ impl UnifiedFile {
         }
     }
 
-    fn path<'a>(&'a self, resolver: &'a FileResolver<'a>) -> &'a str {
+    fn path<'a>(&'a self, resolver: &FileResolver<'a>) -> &'a str {
         match self {
             UnifiedFile::Ty(file) => resolver.path(*file),
             UnifiedFile::Ruff(file) => file.name(),

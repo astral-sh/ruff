@@ -182,7 +182,7 @@ struct ResolvedDiagnostic<'a> {
 impl<'a> ResolvedDiagnostic<'a> {
     /// Resolve a single diagnostic.
     fn from_diagnostic(
-        resolver: &'a FileResolver<'a>,
+        resolver: &FileResolver<'a>,
         diag: &'a Diagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
@@ -216,7 +216,7 @@ impl<'a> ResolvedDiagnostic<'a> {
 
     /// Resolve a single sub-diagnostic.
     fn from_sub_diagnostic(
-        resolver: &'a FileResolver<'a>,
+        resolver: &FileResolver<'a>,
         diag: &'a SubDiagnostic,
     ) -> ResolvedDiagnostic<'a> {
         let annotations: Vec<_> = diag
