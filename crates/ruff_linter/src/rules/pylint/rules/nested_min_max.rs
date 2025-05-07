@@ -21,14 +21,16 @@ pub(crate) enum MinMax {
 /// readability.
 ///
 /// ## Fix safety
-/// This fix is always unsafe. The `min` fix is unsafe when `__lt__` is not commutative,
-/// while the `max` fix is unsafe when `__gt__` is not commutative.
+/// This fix is always unsafe and may change the program's behavior in cases where
+/// `min()` or `max()` calls are nested. The underlying dunder methods (`__lt__`
+/// for `min` and `__gt__` for `max`) are not associative, particularly when dealing
+/// with special floating-point values like `NaN` (Not a Number).
 /// ```python
 /// print(min(2.0, min(float("nan"), 1.0))) # before fix: 2.0
-/// print(min(2.0, *"nan", 1.0))            # after fix: 1.0
+/// print(min(2.0, float("nan"), 1.0))      # after fix: 1.0
 ///
 /// print(max(1.0, max(float("nan"), 2.0))) # before fix: 1.0
-/// print(max(1.0, *"nan", 2.0))            # after fix: 2.0
+/// print(max(1.0, float("nan"), 2.0))      # after fix: 2.0
 /// ```
 ///
 /// ## Example
