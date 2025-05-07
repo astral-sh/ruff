@@ -1353,7 +1353,7 @@ are present due to `*` imports.
 ```py
 import collections.abc
 
-reveal_type(collections.abc.Sequence)  # revealed: Literal[Sequence]
+reveal_type(collections.abc.Sequence)  # revealed: <class 'Sequence'>
 reveal_type(collections.abc.Callable)  # revealed: typing.Callable
 
 # TODO: false positive as it's only re-exported from `_collections.abc` due to presence in `__all__`
@@ -1369,7 +1369,7 @@ If the module is unresolved, we emit a diagnostic just like for any other unreso
 
 ```py
 # TODO: not a great error message
-from foo import *  # error: [unresolved-import] "Cannot resolve import `foo`"
+from foo import *  # error: [unresolved-import] "Cannot resolve imported module `foo`"
 ```
 
 ### Nested scope

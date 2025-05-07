@@ -202,6 +202,19 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types)
     }
 
+    /// Applies an optional specialization to this specialization.
+    pub(crate) fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        other: Option<Specialization<'db>>,
+    ) -> Self {
+        if let Some(other) = other {
+            self.apply_specialization(db, other)
+        } else {
+            self
+        }
+    }
+
     /// Combines two specializations of the same generic context. If either specialization maps a
     /// typevar to `Type::Unknown`, the other specialization's mapping is used. If both map the
     /// typevar to a known type, those types are unioned together.

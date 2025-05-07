@@ -27,5 +27,8 @@ fn check() {
         diagnostic.to_range(&workspace).unwrap().start,
         Position { line: 1, column: 8 }
     );
-    assert_eq!(diagnostic.message(), "Cannot resolve import `random22`");
+    assert_eq!(
+        diagnostic.message(),
+        "Cannot resolve imported module `random22`"
+    );
 }

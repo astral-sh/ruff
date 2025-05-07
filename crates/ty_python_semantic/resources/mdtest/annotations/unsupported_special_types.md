@@ -8,9 +8,8 @@ import collections
 import enum
 import typing
 
-# TODO: should not error (requires understanding metaclass `__call__`)
-MyEnum = enum.Enum("MyEnum", ["foo", "bar", "baz"])  # error: [too-many-positional-arguments]
-
+MyEnum = enum.Enum("MyEnum", ["foo", "bar", "baz"])
+MyIntEnum = enum.IntEnum("MyIntEnum", ["foo", "bar", "baz"])
 MyTypedDict = typing.TypedDict("MyTypedDict", {"foo": int})
 MyNamedTuple1 = typing.NamedTuple("MyNamedTuple1", [("foo", int)])
 MyNamedTuple2 = collections.namedtuple("MyNamedTuple2", ["foo"])

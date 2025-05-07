@@ -76,6 +76,7 @@ error: lint:invalid-overload: `@final` decorator should be applied only to the o
    |         Implementation defined here
 28 |         return x
    |
+info: `lint:invalid-overload` is enabled by default
 
 ```
 
@@ -91,6 +92,7 @@ error: lint:invalid-overload: `@final` decorator should be applied only to the o
    |         Implementation defined here
 19 |         return x
    |
+info: `lint:invalid-overload` is enabled by default
 
 ```
 
@@ -107,5 +109,6 @@ error: lint:invalid-overload: `@final` decorator should be applied only to the f
 15 |     def method2(self, x: str) -> str: ...
    |         ^^^^^^^
    |
+info: `lint:invalid-overload` is enabled by default
 
 ```

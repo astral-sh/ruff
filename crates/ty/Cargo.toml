@@ -5,7 +5,8 @@ edition.workspace = true
 rust-version.workspace = true
 homepage.workspace = true
 documentation.workspace = true
-repository.workspace = true
+# Releases occur in this other repository!
+repository = "https://github.com/astral-sh/ty/"
 authors.workspace = true
 license.workspace = true
 
@@ -20,7 +21,7 @@ ty_server = { workspace = true }
 
 anyhow = { workspace = true }
 argfile = { workspace = true }
-clap = { workspace = true, features = ["wrap_help"] }
+clap = { workspace = true, features = ["wrap_help", "string"] }
 clap_complete_command = { workspace = true }
 colored = { workspace = true }
 countme = { workspace = true, features = ["enable"] }

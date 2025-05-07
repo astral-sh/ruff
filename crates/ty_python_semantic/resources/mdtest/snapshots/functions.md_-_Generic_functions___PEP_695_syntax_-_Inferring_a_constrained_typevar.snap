@@ -85,6 +85,7 @@ info: Type variable defined here
   |       ^^^^^^^^^^^^^^
 4 |     return x
   |
+info: `lint:invalid-argument-type` is enabled by default
 
 ```
 

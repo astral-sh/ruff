@@ -505,6 +505,10 @@ impl RuleSelection {
         self.lints.get(&lint).map(|(severity, _)| *severity)
     }
 
+    pub fn get(&self, lint: LintId) -> Option<(Severity, LintSource)> {
+        self.lints.get(&lint).copied()
+    }
+
     /// Returns `true` if the `lint` is enabled.
     pub fn is_enabled(&self, lint: LintId) -> bool {
         self.severity(lint).is_some()

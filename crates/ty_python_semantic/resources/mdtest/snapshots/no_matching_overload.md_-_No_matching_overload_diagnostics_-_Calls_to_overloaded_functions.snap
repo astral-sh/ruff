@@ -24,5 +24,6 @@ error: lint:no-matching-overload: No overload of class `type` matches arguments
 1 | type("Foo", ())  # error: [no-matching-overload]
   | ^^^^^^^^^^^^^^^
   |
+info: `lint:no-matching-overload` is enabled by default
 
 ```

@@ -63,6 +63,7 @@ error: lint:invalid-return-type: Return type does not match returned value
    |
 info: Function is inferred as returning `types.GeneratorType` because it is a generator function
 info: See https://docs.python.org/3/glossary.html#term-generator for more details
+info: `lint:invalid-return-type` is enabled by default
 
 ```
 
@@ -78,5 +79,6 @@ error: lint:invalid-return-type: Return type does not match returned value
    |
 info: Function is inferred as returning `types.AsyncGeneratorType` because it is an async generator function
 info: See https://docs.python.org/3/glossary.html#term-asynchronous-generator for more details
+info: `lint:invalid-return-type` is enabled by default
 
 ```

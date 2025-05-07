@@ -80,12 +80,14 @@ impl<'db> Mro<'db> {
             ));
         }
 
+        let class_type = class.apply_optional_specialization(db, specialization);
+
         match class_bases {
             // `builtins.object` is the special case:
             // the only class in Python that has an MRO with length <2
             [] if class.is_object(db) => Ok(Self::from([
                 // object is not generic, so the default specialization should be a no-op
-                ClassBase::Class(class.apply_optional_specialization(db, specialization)),
+                ClassBase::Class(class_type),
             ])),
 
             // All other classes in Python have an MRO with length >=2.
@@ -102,7 +104,7 @@ impl<'db> Mro<'db> {
             // (<class '__main__.Foo'>, <class 'object'>)
             // ```
             [] => Ok(Self::from([
-                ClassBase::Class(class.apply_optional_specialization(db, specialization)),
+                ClassBase::Class(class_type),
                 ClassBase::object(db),
             ])),
 
@@ -114,11 +116,9 @@ impl<'db> Mro<'db> {
             [single_base] => ClassBase::try_from_type(db, *single_base).map_or_else(
                 || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                 |single_base| {
-                    Ok(std::iter::once(ClassBase::Class(
-                        class.apply_optional_specialization(db, specialization),
-                    ))
-                    .chain(single_base.mro(db))
-                    .collect())
+                    Ok(std::iter::once(ClassBase::Class(class_type))
+                        .chain(single_base.mro(db, specialization))
+                        .collect())
                 },
             ),
 
@@ -142,13 +142,16 @@ impl<'db> Mro<'db> {
                     return Err(MroErrorKind::InvalidBases(invalid_bases.into_boxed_slice()));
                 }
 
-                let mut seqs = vec![VecDeque::from([ClassBase::Class(
-                    class.apply_optional_specialization(db, specialization),
-                )])];
+                let mut seqs = vec![VecDeque::from([ClassBase::Class(class_type)])];
                 for base in &valid_bases {
-                    seqs.push(base.mro(db).collect());
+                    seqs.push(base.mro(db, specialization).collect());
                 }
-                seqs.push(valid_bases.iter().copied().collect());
+                seqs.push(
+                    valid_bases
+                        .iter()
+                        .map(|base| base.apply_optional_specialization(db, specialization))
+                        .collect(),
+                );
 
                 c3_merge(seqs).ok_or_else(|| {
                     let mut seen_bases = FxHashSet::default();

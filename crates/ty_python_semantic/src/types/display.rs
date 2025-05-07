@@ -42,9 +42,7 @@ impl Display for DisplayType<'_> {
             Type::IntLiteral(_)
             | Type::BooleanLiteral(_)
             | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::ClassLiteral(_)
-            | Type::GenericAlias(_) => {
+            | Type::BytesLiteral(_) => {
                 write!(f, "Literal[{representation}]")
             }
             _ => representation.fmt(f),
@@ -102,9 +100,10 @@ impl Display for DisplayRepresentation<'_> {
             Type::ModuleLiteral(module) => {
                 write!(f, "<module '{}'>", module.module(self.db).name())
             }
-            // TODO functions and classes should display using a fully qualified name
-            Type::ClassLiteral(class) => f.write_str(class.name(self.db)),
-            Type::GenericAlias(generic) => generic.display(self.db).fmt(f),
+            Type::ClassLiteral(class) => {
+                write!(f, "<class '{}'>", class.name(self.db))
+            }
+            Type::GenericAlias(generic) => write!(f, "<class '{}'>", generic.display(self.db)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 // Only show the bare class name here; ClassBase::display would render this as
                 // type[<class 'Foo'>] instead of type[Foo].
@@ -605,7 +604,6 @@ impl Display for DisplayLiteralGroup<'_> {
 /// For example, `Literal[1] | Literal[2] | Literal["s"]` is displayed as `"Literal[1, 2, "s"]"`.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 enum CondensedDisplayTypeKind {
-    Class,
     LiteralExpression,
 }
 
@@ -614,7 +612,6 @@ impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
 
     fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
         match value {
-            Type::ClassLiteral(_) => Ok(Self::Class),
             Type::IntLiteral(_)
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)

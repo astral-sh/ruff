@@ -32,5 +32,6 @@ error: lint:unsupported-bool-conversion: Boolean conversion is unsupported for t
   |        ^
   |
 info: `__bool__` on `NotBoolable` must be callable
+info: `lint:unsupported-bool-conversion` is enabled by default
 
 ```

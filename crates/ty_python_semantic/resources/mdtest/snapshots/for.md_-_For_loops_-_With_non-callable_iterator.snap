@@ -42,6 +42,7 @@ error: lint:not-iterable: Object of type `NotIterable` is not iterable
 12 |         pass
    |
 info: Its `__iter__` attribute has type `int | None`, which is not callable
+info: `lint:not-iterable` is enabled by default
 
 ```
 
@@ -54,6 +55,7 @@ warning: lint:possibly-unresolved-reference: Name `x` used when possibly not def
 16 |     reveal_type(x)
    |                 ^
    |
+info: `lint:possibly-unresolved-reference` is enabled by default
 
 ```
 

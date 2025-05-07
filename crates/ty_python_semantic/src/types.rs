@@ -3890,6 +3890,9 @@ impl<'db> Type<'db> {
                     );
                     Signatures::single(signature)
                 }
+                Some(KnownClass::Enum) => {
+                    Signatures::single(CallableSignature::todo("functional `Enum` syntax"))
+                }
 
                 Some(KnownClass::Super) => {
                     // ```py
@@ -4836,14 +4839,6 @@ impl<'db> Type<'db> {
                 Some(KnownClass::NamedTuple) => Ok(todo_type!(
                     "Support for functional `typing.NamedTuple` syntax"
                 )),
-                _ if instance
-                    .class()
-                    .iter_mro(db)
-                    .filter_map(ClassBase::into_class)
-                    .any(|class| class.is_known(db, KnownClass::Enum)) =>
-                {
-                    Ok(todo_type!("Support for functional `enum` syntax"))
-                }
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec![InvalidTypeExpression::InvalidType(
                         *self
@@ -4950,6 +4945,19 @@ impl<'db> Type<'db> {
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
+        }
+    }
+
+    #[must_use]
+    pub fn apply_optional_specialization(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Type<'db> {
+        if let Some(specialization) = specialization {
+            self.apply_specialization(db, specialization)
+        } else {
+            self
         }
     }
 
@@ -7984,7 +7992,9 @@ pub enum SuperOwnerKind<'db> {
 impl<'db> SuperOwnerKind<'db> {
     fn iter_mro(self, db: &'db dyn Db) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            SuperOwnerKind::Dynamic(dynamic) => Either::Left(ClassBase::Dynamic(dynamic).mro(db)),
+            SuperOwnerKind::Dynamic(dynamic) => {
+                Either::Left(ClassBase::Dynamic(dynamic).mro(db, None))
+            }
             SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
             SuperOwnerKind::Instance(instance) => Either::Right(instance.class().iter_mro(db)),
         }
@@ -8111,7 +8121,7 @@ impl<'db> BoundSuperType<'db> {
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> {
         let Some(pivot_class) = self.pivot_class(db).into_class() else {
-            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db));
+            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None));
         };
 
         let mut pivot_found = false;

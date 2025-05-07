@@ -99,6 +99,7 @@ mod tests {
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_1.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_2.py"))]
     #[test_case(Rule::UnusedUnpackedVariable, Path::new("RUF059_3.py"))]
+    #[test_case(Rule::InEmptyCollection, Path::new("RUF060.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -135,7 +136,7 @@ mod tests {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
                 },
-                unresolved_target_version: PythonVersion::PY310,
+                unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
         )?;
