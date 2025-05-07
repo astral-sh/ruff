@@ -52,6 +52,7 @@ reveal_type(Foo(1))  # revealed: Foo
 ```
 
 ## `__new__` present on the class itself
+
 ```py
 class Foo:
     def __new__(cls, x: int) -> "Foo":
