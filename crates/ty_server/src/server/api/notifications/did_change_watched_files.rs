@@ -24,7 +24,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         requester: &mut Requester,
         params: types::DidChangeWatchedFilesParams,
     ) -> Result<()> {
-        let mut by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
+        let mut events_by_db: FxHashMap<_, Vec<ChangeEvent>> = FxHashMap::default();
 
         for change in params.changes {
             let path = match url_to_any_system_path(&change.uri) {
@@ -75,17 +75,17 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                 }
             };
 
-            by_db
+            events_by_db
                 .entry(db.project().root(db).to_path_buf())
                 .or_default()
                 .push(change_event);
         }
 
-        if by_db.is_empty() {
+        if events_by_db.is_empty() {
             return Ok(());
         }
 
-        for (root, changes) in by_db {
+        for (root, changes) in events_by_db {
             tracing::debug!("Applying changes to `{root}`");
             let db = session.project_db_for_path_mut(&*root).unwrap();
 

@@ -74,7 +74,9 @@ pub(super) fn notification<'a>(notif: server::Notification) -> Task<'a> {
         notification::DidCloseNotebookHandler::METHOD => {
             local_notification_task::<notification::DidCloseNotebookHandler>(notif)
         }
-        notification::DidChangeWatchedFiles::METHOD => local_notification_task::<notification::DidChangeWatchedFiles>(notif),
+        notification::DidChangeWatchedFiles::METHOD => {
+            local_notification_task::<notification::DidChangeWatchedFiles>(notif)
+        }
         lsp_types::notification::SetTrace::METHOD => {
             tracing::trace!("Ignoring `setTrace` notification");
             return Task::nothing();
