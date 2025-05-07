@@ -5027,7 +5027,7 @@ impl<'db> TypeInferenceBuilder<'db> {
                                                     call_expression,
                                                 ) {
                                                     builder.into_diagnostic(format_args!(
-                                                        "The `convariant` parameter of \
+                                                        "The `covariant` parameter of \
                                                         a legacy `typing.TypeVar` cannot have \
                                                         an ambiguous value",
                                                     ));
