@@ -334,10 +334,19 @@ static_assert(is_subtype_of(TypeOf[typing], ModuleType))
 
 ### Slice literals
 
+The type of a slice literal is currently inferred as `slice`, which is a generic type whose default
+specialization includes `Any`. Slice literals therefore do not participate in the subtyping
+relationship.
+
+TODO: Infer a specialized type for the slice literal
+
 ```py
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
-static_assert(is_subtype_of(TypeOf[1:2:3], slice))
+static_assert(not is_subtype_of(TypeOf[1:2:3], slice))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[1:2:3], slice[int]))
 ```
 
 ### Special forms

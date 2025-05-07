@@ -1515,6 +1515,10 @@ impl<'db> Type<'db> {
                 false
             }
 
+            (Type::SliceLiteral(_), _) => KnownClass::Slice
+                .to_instance(db)
+                .is_assignable_to(db, target),
+
             (Type::FunctionLiteral(self_function_literal), Type::Callable(_)) => {
                 self_function_literal
                     .into_callable_type(db)
