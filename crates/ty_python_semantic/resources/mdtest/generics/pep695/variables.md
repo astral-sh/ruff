@@ -345,11 +345,10 @@ def inter[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
     static_assert(is_assignable_to(Intersection[U, A], U))
     static_assert(is_subtype_of(Intersection[U, A], U))
 
-    # TODO: these should pass
-    static_assert(is_disjoint_from(Not[T], T))  # error: [static-assert-error]
-    static_assert(is_disjoint_from(T, Not[T]))  # error: [static-assert-error]
-    static_assert(is_disjoint_from(Not[U], U))  # error: [static-assert-error]
-    static_assert(is_disjoint_from(U, Not[U]))  # error: [static-assert-error]
+    static_assert(is_disjoint_from(Not[T], T))
+    static_assert(is_disjoint_from(T, Not[T]))
+    static_assert(is_disjoint_from(Not[U], U))
+    static_assert(is_disjoint_from(U, Not[U]))
 ```
 
 ## Equivalence
