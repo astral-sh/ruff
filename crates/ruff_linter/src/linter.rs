@@ -1199,7 +1199,7 @@ mod tests {
     #[test_case(
         "invalid_expression_yield_from_in_base_class",
         "
-        class C[T](yield from [object]):
+        class C[T]((yield from [object])):
             pass
         ",
         PythonVersion::PY312,
