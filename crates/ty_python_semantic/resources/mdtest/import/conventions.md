@@ -202,9 +202,9 @@ class AnyFoo: ...
 Here, the symbol is re-exported using the `__all__` variable.
 
 ```py
-# TODO: This should *not* be an error but we don't understand `__all__` yet.
-# error: "Module `a` has no member `Foo`"
 from a import Foo
+
+reveal_type(Foo)  # revealed: <class 'Foo'>
 ```
 
 `a.pyi`:
@@ -219,6 +219,44 @@ __all__ = ['Foo']
 
 ```pyi
 class Foo: ...
+```
+
+## Re-exports with `__all__`
+
+If a symbol is re-exported via redundant alias but is not included in `__all__`, it shouldn't raise
+an error when using named import.
+
+`named_import.py`:
+
+```py
+from a import Foo
+
+reveal_type(Foo)  # revealed: <class 'Foo'>
+```
+
+`a.pyi`:
+
+```pyi
+from b import Foo as Foo
+
+__all__ = []
+```
+
+`b.pyi`:
+
+```pyi
+class Foo: ...
+```
+
+However, a star import _would_ raise an error.
+
+`star_import.py`:
+
+```py
+from a import *
+
+# error: [unresolved-reference] "Name `Foo` used when not defined"
+reveal_type(Foo)  # revealed: Unknown
 ```
 
 ## Re-exports in `__init__.pyi`

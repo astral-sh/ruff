@@ -6992,6 +6992,8 @@ pub enum KnownFunction {
     IsSingleValued,
     /// `ty_extensions.generic_context`
     GenericContext,
+    /// `ty_extensions.dunder_all_names`
+    DunderAllNames,
 }
 
 impl KnownFunction {
@@ -7048,6 +7050,7 @@ impl KnownFunction {
             | Self::IsSingleton
             | Self::IsSubtypeOf
             | Self::GenericContext
+            | Self::DunderAllNames
             | Self::StaticAssert => module.is_ty_extensions(),
         }
     }
@@ -7355,7 +7358,7 @@ impl<'db> ModuleLiteralType<'db> {
             }
         }
 
-        imported_symbol(db, self.module(db).file(), name).symbol
+        imported_symbol(db, self.module(db).file(), name, None).symbol
     }
 }
 
@@ -8444,6 +8447,7 @@ pub(crate) mod tests {
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
+                | KnownFunction::DunderAllNames
                 | KnownFunction::StaticAssert
                 | KnownFunction::IsFullyStatic
                 | KnownFunction::IsDisjointFrom
