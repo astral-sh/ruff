@@ -430,3 +430,21 @@ def outer() -> list[object]:
 
     layout = [...]
     return layout
+
+def outer() -> list[object]:
+    with open("") as f:
+        async def inner() -> None:
+            print(layout)
+
+    layout = [...]
+    return layout
+
+
+def outer() -> list[object]:
+    def inner():
+        with open("") as f:
+            async def inner_inner() -> None:
+                print(layout)
+
+    layout = [...]
+    return layout
