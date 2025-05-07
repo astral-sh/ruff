@@ -286,6 +286,9 @@ pub(crate) fn global_symbol<'db>(
 }
 
 /// Infers the public type of an imported symbol.
+///
+/// If `requires_explicit_reexport` is [`None`], it will be inferred from the file's source type.
+/// For stub files, explicit re-export will be required, while for non-stub files, it will not.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
     file: File,
