@@ -237,7 +237,13 @@ impl Diagnostic {
         self.primary_annotation().map(|ann| ann.tags.as_slice())
     }
 
-    pub fn expect_span(&self) -> Span {
+    /// Returns the "primary" span of this diagnostic, panicking if it does not exist.
+    ///
+    /// This should typically only be used when working with diagnostics in Ruff, where diagnostics
+    /// are currently required to have a primary span.
+    ///
+    /// See [`Diagnostic::primary_span`] for more details.
+    pub fn expect_primary_span(&self) -> Span {
         self.primary_span().expect("Expected a primary span")
     }
 }
