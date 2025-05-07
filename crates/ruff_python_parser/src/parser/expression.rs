@@ -2524,8 +2524,8 @@ impl<'src> Parser<'src> {
 
     /// Performs the following validations on the function call arguments:
     /// 1. There aren't any duplicate keyword argument
-    /// 2. If there are more than one argument (positional or keyword), all generator expressions
-    ///    present should be parenthesized.
+    /// 2. If there are more than one argument (positional or keyword) or a single argument with a
+    ///    trailing comma, all generator expressions present should be parenthesized.
     fn validate_arguments(&mut self, arguments: &ast::Arguments, has_trailing_comma: bool) {
         let mut all_arg_names =
             FxHashSet::with_capacity_and_hasher(arguments.keywords.len(), FxBuildHasher);
@@ -2544,7 +2544,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        if (has_trailing_comma && arguments.len() == 1) || arguments.len() > 1 {
+        if has_trailing_comma || arguments.len() > 1 {
             for arg in &*arguments.args {
                 if let Some(ast::ExprGenerator {
                     range,
