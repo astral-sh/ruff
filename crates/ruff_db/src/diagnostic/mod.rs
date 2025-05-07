@@ -652,7 +652,7 @@ impl UnifiedFile {
     pub fn expect_ruff(&self) -> &SourceFile {
         match self {
             UnifiedFile::Ruff(source_file) => source_file,
-            UnifiedFile::Ty(_) => panic!("Expected a ruff file, found a red-knot file"),
+            UnifiedFile::Ty(_) => panic!("Expected a ruff file, found a ty file"),
         }
     }
 }
