@@ -1215,3 +1215,36 @@ impl Violation for OsListdir {
         "Use `pathlib.Path.iterdir()` instead.".to_string()
     }
 }
+
+/// ## What it does
+/// Checks for uses of `os.scandir`.
+///
+/// ## Why is this bad?
+/// `pathlib` offers a high-level API for path manipulation, as compared to
+/// the lower-level API offered by `os`. When possible, using `pathlib`'s
+/// `Path.iterdir()` can improve readability over  `os`'s `scandir()`.
+///
+/// ## Example
+///
+/// ```python
+/// p = "."
+/// for d in os.scandir(p):
+///     ...
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// p = Path(".")
+/// for d in p.iterdir():
+///     ...
+/// ```
+#[derive(ViolationMetadata)]
+pub(crate) struct OsScandir;
+
+impl Violation for OsScandir {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Use `pathlib.Path.iterdir()` instead.".to_string()
+    }
+}

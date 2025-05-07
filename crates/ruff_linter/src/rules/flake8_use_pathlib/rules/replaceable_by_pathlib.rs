@@ -13,7 +13,7 @@ use crate::rules::flake8_use_pathlib::violations::{
     BuiltinOpen, Joiner, OsChmod, OsGetcwd, OsListdir, OsMakedirs, OsMkdir, OsPathAbspath,
     OsPathBasename, OsPathDirname, OsPathExists, OsPathExpanduser, OsPathIsabs, OsPathIsdir,
     OsPathIsfile, OsPathIslink, OsPathJoin, OsPathSamefile, OsPathSplitext, OsReadlink, OsRemove,
-    OsRename, OsReplace, OsRmdir, OsStat, OsUnlink, PyPath,
+    OsRename, OsReplace, OsRmdir, OsScandir, OsStat, OsUnlink, PyPath,
 };
 use ruff_python_ast::PythonVersion;
 
@@ -186,6 +186,8 @@ pub(crate) fn replaceable_by_pathlib(checker: &Checker, call: &ExprCall) {
             }
             OsListdir.into()
         }
+        // PTH209
+        ["os", "scandir"] => OsScandir.into(),
         _ => return,
     };
 
