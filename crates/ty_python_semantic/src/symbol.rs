@@ -721,17 +721,7 @@ fn symbol_from_bindings_impl<'db>(
     let mut bindings_with_constraints = bindings_with_constraints.peekable();
 
     let is_non_exported = |binding: Definition<'db>| {
-        if requires_explicit_reexport.is_yes() && !binding.is_reexported(db) {
-            if let Some(all_names) = dunder_all_names(db, binding.file(db)) {
-                let table = symbol_table(db, binding.scope(db));
-                let symbol_name = table.symbol(binding.symbol(db)).name();
-                !all_names.contains(symbol_name)
-            } else {
-                true
-            }
-        } else {
-            false
-        }
+        requires_explicit_reexport.is_yes() && !is_reexported(db, binding)
     };
 
     let unbound_visibility_constraint = match bindings_with_constraints.peek() {
@@ -862,17 +852,7 @@ fn symbol_from_declarations_impl<'db>(
     let mut declarations = declarations.peekable();
 
     let is_non_exported = |declaration: Definition<'db>| {
-        if requires_explicit_reexport.is_yes() && !declaration.is_reexported(db) {
-            if let Some(all_names) = dunder_all_names(db, declaration.file(db)) {
-                let table = symbol_table(db, declaration.scope(db));
-                let symbol_name = table.symbol(declaration.symbol(db)).name();
-                !all_names.contains(symbol_name)
-            } else {
-                true
-            }
-        } else {
-            false
-        }
+        requires_explicit_reexport.is_yes() && !is_reexported(db, declaration)
     };
 
     let undeclared_visibility = match declarations.peek() {
@@ -948,6 +928,27 @@ fn symbol_from_declarations_impl<'db>(
     } else {
         Ok(Symbol::Unbound.into())
     }
+}
+
+// Returns `true` if the `definition` is re-exported.
+//
+// This will first check if the definition is using the "redundant alias" pattern like `import foo
+// as foo` or `from foo import bar as bar`. If it's not, it will check whether the symbol is being
+// exported via `__all__`.
+fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
+    // This information is computed by the semantic index builder.
+    if definition.is_reexported(db) {
+        return true;
+    }
+    // At this point, the definition should either be an `import` or `from ... import` statement.
+    // This is because the default value of `is_reexported` is `true` for any other kind of
+    // definition.
+    let Some(all_names) = dunder_all_names(db, definition.file(db)) else {
+        return false;
+    };
+    let table = symbol_table(db, definition.scope(db));
+    let symbol_name = table.symbol(definition.symbol(db)).name();
+    all_names.contains(symbol_name)
 }
 
 mod implicit_globals {

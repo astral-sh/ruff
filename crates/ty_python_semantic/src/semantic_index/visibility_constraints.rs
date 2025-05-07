@@ -664,7 +664,7 @@ impl VisibilityConstraints {
                             Some(RequiresExplicitReExport::No)
                         } else {
                             tracing::debug!(
-                                "Symbol `{}` is not in `__all__` of `{}`",
+                                "Symbol `{}` (via star import) not found in `__all__` of `{}`",
                                 symbol_name,
                                 referenced_file.path(db)
                             );
