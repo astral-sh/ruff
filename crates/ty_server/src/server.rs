@@ -148,7 +148,7 @@ impl Server {
             writeln!(stderr, "{panic_info}\n{backtrace}").ok();
 
             try_show_message(
-                "The Ruff language server exited with a panic. See the logs for more details."
+                "The ty language server exited with a panic. See the logs for more details."
                     .to_string(),
                 MessageType::ERROR,
             )
