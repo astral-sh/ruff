@@ -235,10 +235,7 @@ impl Diagnostic {
 
     /// Returns a key that can be used to sort two diagnostics into the canonical order
     /// in which they should appear when rendered.
-    pub fn rendering_sort_key<'a, 'db>(&'a self, db: &'db dyn Db) -> impl Ord + 'a
-    where
-        'db: 'a,
-    {
+    pub fn rendering_sort_key<'a>(&'a self, db: &'a dyn Db) -> impl Ord + 'a {
         RenderingSortKey {
             db,
             diagnostic: self,
@@ -255,12 +252,12 @@ struct DiagnosticInner {
     subs: Vec<SubDiagnostic>,
 }
 
-struct RenderingSortKey<'db, 'a> {
-    db: &'db dyn Db,
+struct RenderingSortKey<'a> {
+    db: &'a dyn Db,
     diagnostic: &'a Diagnostic,
 }
 
-impl Ord for RenderingSortKey<'_, '_> {
+impl Ord for RenderingSortKey<'_> {
     // We sort diagnostics in a way that keeps them in source order
     // and grouped by file. After that, we fall back to severity
     // (with fatal messages sorting before info messages) and then
@@ -299,19 +296,19 @@ impl Ord for RenderingSortKey<'_, '_> {
     }
 }
 
-impl PartialOrd for RenderingSortKey<'_, '_> {
+impl PartialOrd for RenderingSortKey<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl PartialEq for RenderingSortKey<'_, '_> {
+impl PartialEq for RenderingSortKey<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other).is_eq()
     }
 }
 
-impl Eq for RenderingSortKey<'_, '_> {}
+impl Eq for RenderingSortKey<'_> {}
 
 /// A collection of information subservient to a diagnostic.
 ///
