@@ -345,7 +345,7 @@ def f(cond: bool) -> str:
 
 <!-- snapshot-diagnostics -->
 
-A function with a `yield` statement anywhere in its body is a
+A function with a `yield` or `yield from` expression anywhere in its body is a
 [generator function](https://docs.python.org/3/glossary.html#term-generator). A generator function
 implicitly returns an instance of `types.GeneratorType` even if it does not contain any `return`
 statements.
@@ -365,6 +365,9 @@ def h() -> typing.Iterator:
 
 def i() -> typing.Iterable:
     yield 42
+
+def i2() -> typing.Generator:
+    yield from i()
 
 def j() -> str:  # error: [invalid-return-type]
     yield 42

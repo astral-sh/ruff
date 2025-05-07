@@ -27,39 +27,56 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 13 | def i() -> typing.Iterable:
 14 |     yield 42
 15 | 
-16 | def j() -> str:  # error: [invalid-return-type]
-17 |     yield 42
-18 | import types
-19 | import typing
-20 | 
-21 | async def f() -> types.AsyncGeneratorType:
-22 |     yield 42
+16 | def i2() -> typing.Generator:
+17 |     yield from i()
+18 | 
+19 | def j() -> str:  # error: [invalid-return-type]
+20 |     yield 42
+21 | import types
+22 | import typing
 23 | 
-24 | async def g() -> typing.AsyncGenerator:
+24 | async def f() -> types.AsyncGeneratorType:
 25 |     yield 42
 26 | 
-27 | async def h() -> typing.AsyncIterator:
+27 | async def g() -> typing.AsyncGenerator:
 28 |     yield 42
 29 | 
-30 | async def i() -> typing.AsyncIterable:
+30 | async def h() -> typing.AsyncIterator:
 31 |     yield 42
 32 | 
-33 | async def j() -> str:  # error: [invalid-return-type]
+33 | async def i() -> typing.AsyncIterable:
 34 |     yield 42
+35 | 
+36 | async def j() -> str:  # error: [invalid-return-type]
+37 |     yield 42
 ```
 
 # Diagnostics
 
 ```
-error: lint:invalid-return-type: Return type does not match returned value
-  --> src/mdtest_snippet.py:16:12
+error: lint:invalid-return-type: Function can implicitly return `None`, which is not assignable to return type `Generator`
+  --> src/mdtest_snippet.py:16:13
    |
 14 |     yield 42
 15 |
-16 | def j() -> str:  # error: [invalid-return-type]
+16 | def i2() -> typing.Generator:
+   |             ^^^^^^^^^^^^^^^^
+17 |     yield from i()
+   |
+info: `lint:invalid-return-type` is enabled by default
+
+```
+
+```
+error: lint:invalid-return-type: Return type does not match returned value
+  --> src/mdtest_snippet.py:19:12
+   |
+17 |     yield from i()
+18 |
+19 | def j() -> str:  # error: [invalid-return-type]
    |            ^^^ Expected `str`, found `types.GeneratorType`
-17 |     yield 42
-18 | import types
+20 |     yield 42
+21 | import types
    |
 info: Function is inferred as returning `types.GeneratorType` because it is a generator function
 info: See https://docs.python.org/3/glossary.html#term-generator for more details
@@ -69,13 +86,13 @@ info: `lint:invalid-return-type` is enabled by default
 
 ```
 error: lint:invalid-return-type: Return type does not match returned value
-  --> src/mdtest_snippet.py:33:18
+  --> src/mdtest_snippet.py:36:18
    |
-31 |     yield 42
-32 |
-33 | async def j() -> str:  # error: [invalid-return-type]
-   |                  ^^^ Expected `str`, found `types.AsyncGeneratorType`
 34 |     yield 42
+35 |
+36 | async def j() -> str:  # error: [invalid-return-type]
+   |                  ^^^ Expected `str`, found `types.AsyncGeneratorType`
+37 |     yield 42
    |
 info: Function is inferred as returning `types.AsyncGeneratorType` because it is an async generator function
 info: See https://docs.python.org/3/glossary.html#term-asynchronous-generator for more details
