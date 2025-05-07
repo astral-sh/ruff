@@ -47,6 +47,18 @@ info: `lint:not-iterable` is enabled by default
 ```
 
 ```
+info: revealed-type: Revealed type
+  --> src/mdtest_snippet.py:16:5
+   |
+14 |     # revealed: Unknown
+15 |     # error: [possibly-unresolved-reference]
+16 |     reveal_type(x)
+   |     ^^^^^^^^^^^^^^ `Unknown`
+   |
+
+```
+
+```
 warning: lint:possibly-unresolved-reference: Name `x` used when possibly not defined
   --> src/mdtest_snippet.py:16:17
    |
@@ -56,17 +68,5 @@ warning: lint:possibly-unresolved-reference: Name `x` used when possibly not def
    |                 ^
    |
 info: `lint:possibly-unresolved-reference` is enabled by default
-
-```
-
-```
-info: revealed-type: Revealed type
-  --> src/mdtest_snippet.py:16:5
-   |
-14 |     # revealed: Unknown
-15 |     # error: [possibly-unresolved-reference]
-16 |     reveal_type(x)
-   |     ^^^^^^^^^^^^^^ `Unknown`
-   |
 
 ```
