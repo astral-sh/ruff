@@ -15,7 +15,6 @@ use crate::types::{
     UnionType, WrapperDescriptorKind,
 };
 use crate::{Db, FxOrderSet};
-use rustc_hash::FxHashMap;
 
 impl<'db> Type<'db> {
     pub fn display(&self, db: &'db dyn Db) -> DisplayType {
@@ -537,31 +536,35 @@ struct DisplayUnionType<'db> {
 
 impl Display for DisplayUnionType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        fn is_condensable(ty: Type<'_>) -> bool {
+            matches!(
+                ty,
+                Type::IntLiteral(_)
+                    | Type::StringLiteral(_)
+                    | Type::BytesLiteral(_)
+                    | Type::BooleanLiteral(_)
+            )
+        }
+
         let elements = self.ty.elements(self.db);
 
-        // Group condensed-display types by kind.
-        let mut grouped_condensed_kinds = FxHashMap::default();
-
-        for element in elements {
-            if let Ok(kind) = CondensedDisplayTypeKind::try_from(*element) {
-                grouped_condensed_kinds
-                    .entry(kind)
-                    .or_insert_with(Vec::new)
-                    .push(*element);
-            }
-        }
+        let condensed_types = elements
+            .iter()
+            .copied()
+            .filter(|element| is_condensable(*element))
+            .collect::<Vec<_>>();
 
         let mut join = f.join(" | ");
 
+        let mut condensed_types = Some(condensed_types);
         for element in elements {
-            if let Ok(kind) = CondensedDisplayTypeKind::try_from(*element) {
-                let Some(condensed_kind) = grouped_condensed_kinds.remove(&kind) else {
-                    continue;
-                };
-                join.entry(&DisplayLiteralGroup {
-                    literals: condensed_kind,
-                    db: self.db,
-                });
+            if is_condensable(*element) {
+                if let Some(condensed_types) = condensed_types.take() {
+                    join.entry(&DisplayLiteralGroup {
+                        literals: condensed_types,
+                        db: self.db,
+                    });
+                }
             } else {
                 join.entry(&DisplayMaybeParenthesizedType {
                     ty: *element,
@@ -571,8 +574,6 @@ impl Display for DisplayUnionType<'_> {
         }
 
         join.finish()?;
-
-        debug_assert!(grouped_condensed_kinds.is_empty());
 
         Ok(())
     }
@@ -596,28 +597,6 @@ impl Display for DisplayLiteralGroup<'_> {
             .entries(self.literals.iter().map(|ty| ty.representation(self.db)))
             .finish()?;
         f.write_str("]")
-    }
-}
-
-/// Enumeration of literal types that are displayed in a "condensed way" inside `Literal` slices.
-///
-/// For example, `Literal[1] | Literal[2] | Literal["s"]` is displayed as `"Literal[1, 2, "s"]"`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-enum CondensedDisplayTypeKind {
-    LiteralExpression,
-}
-
-impl TryFrom<Type<'_>> for CondensedDisplayTypeKind {
-    type Error = ();
-
-    fn try_from(value: Type<'_>) -> Result<Self, Self::Error> {
-        match value {
-            Type::IntLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::BooleanLiteral(_) => Ok(Self::LiteralExpression),
-            _ => Err(()),
-        }
     }
 }
 
