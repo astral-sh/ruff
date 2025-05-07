@@ -15,7 +15,7 @@ use lsp_types::{
 
 use self::connection::{Connection, ConnectionInitializer};
 use self::schedule::event_loop_thread;
-use crate::session::{AllSettings, ClientSettings, Session};
+use crate::session::{AllSettings, ClientSettings, Experimental, Session};
 use crate::PositionEncoding;
 
 mod api;
@@ -41,19 +41,6 @@ impl Server {
 
         let (id, init_params) = connection.initialize_start()?;
 
-        let client_capabilities = init_params.capabilities;
-        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities = Self::server_capabilities(position_encoding);
-
-        let connection = connection.initialize_finish(
-            id,
-            &server_capabilities,
-            crate::SERVER_NAME,
-            crate::version(),
-        )?;
-
-        crate::message::init_messenger(connection.make_sender());
-
         let AllSettings {
             global_settings,
             mut workspace_settings,
@@ -63,6 +50,19 @@ impl Server {
                 .unwrap_or_else(|| serde_json::Value::Object(serde_json::Map::default())),
         );
 
+        let client_capabilities = init_params.capabilities;
+        let position_encoding = Self::find_best_position_encoding(&client_capabilities);
+        let server_capabilities =
+            Self::server_capabilities(position_encoding, global_settings.experimental.as_ref());
+
+        let connection = connection.initialize_finish(
+            id,
+            &server_capabilities,
+            crate::SERVER_NAME,
+            crate::version(),
+        )?;
+
+        crate::message::init_messenger(connection.make_sender());
         crate::logging::init_logging(
             global_settings.tracing.log_level.unwrap_or_default(),
             global_settings.tracing.log_file.as_deref(),
@@ -206,7 +206,10 @@ impl Server {
             .unwrap_or_default()
     }
 
-    fn server_capabilities(position_encoding: PositionEncoding) -> ServerCapabilities {
+    fn server_capabilities(
+        position_encoding: PositionEncoding,
+        experimental: Option<&Experimental>,
+    ) -> ServerCapabilities {
         ServerCapabilities {
             position_encoding: Some(position_encoding.into()),
             diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
@@ -226,9 +229,11 @@ impl Server {
             inlay_hint_provider: Some(lsp_types::OneOf::Right(
                 InlayHintServerCapabilities::Options(InlayHintOptions::default()),
             )),
-            completion_provider: Some(lsp_types::CompletionOptions {
-                ..Default::default()
-            }),
+            completion_provider: experimental
+                .is_some_and(Experimental::is_completions_enabled)
+                .then_some(lsp_types::CompletionOptions {
+                    ..Default::default()
+                }),
             ..Default::default()
         }
     }

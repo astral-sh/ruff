@@ -21,6 +21,7 @@ pub(crate) use self::capabilities::ResolvedClientCapabilities;
 pub use self::index::DocumentQuery;
 pub(crate) use self::settings::AllSettings;
 pub use self::settings::ClientSettings;
+pub(crate) use self::settings::Experimental;
 
 mod capabilities;
 pub(crate) mod index;
