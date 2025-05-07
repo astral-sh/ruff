@@ -619,6 +619,15 @@ impl std::fmt::Display for DiagnosticId {
     }
 }
 
+/// A unified file representation for both ruff and ty.
+///
+/// Such a representation is needed for rendering [`Diagnostic`]s that can optionally contain
+/// [`Annotation`]s with [`Span`]s that need to refer to the text of a file. However, ty and ruff
+/// use very different file types: a `Copy`-able salsa-interned [`File`], and a heavier-weight
+/// [`SourceFile`], respectively.
+///
+/// This enum presents a unified interface to these two types for the sake of creating [`Span`]s and
+/// emitting diagnostics from both ty and ruff.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UnifiedFile {
     Ty(File),
