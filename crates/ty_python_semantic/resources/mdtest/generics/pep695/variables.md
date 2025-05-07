@@ -352,6 +352,75 @@ def inter[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
     static_assert(is_disjoint_from(U, Not[U]))  # error: [static-assert-error]
 ```
 
+## Equivalence
+
+A fully static `TypeVar` is always equivalent to itself, but never to another `TypeVar`, since there
+is no guarantee that they will be specialized to the same type. (This is true even if both typevars
+are bounded by the same final class, since you can specialize the typevars to `Never` in addition to
+that final class.)
+
+```py
+from typing import final
+from ty_extensions import is_equivalent_to, static_assert, is_gradual_equivalent_to
+
+@final
+class FinalClass: ...
+
+@final
+class SecondFinalClass: ...
+
+def f[A, B, C: FinalClass, D: FinalClass, E: (FinalClass, SecondFinalClass), F: (FinalClass, SecondFinalClass)]():
+    static_assert(is_equivalent_to(A, A))
+    static_assert(is_equivalent_to(B, B))
+    static_assert(is_equivalent_to(C, C))
+    static_assert(is_equivalent_to(D, D))
+    static_assert(is_equivalent_to(E, E))
+    static_assert(is_equivalent_to(F, F))
+
+    static_assert(is_gradual_equivalent_to(A, A))
+    static_assert(is_gradual_equivalent_to(B, B))
+    static_assert(is_gradual_equivalent_to(C, C))
+    static_assert(is_gradual_equivalent_to(D, D))
+    static_assert(is_gradual_equivalent_to(E, E))
+    static_assert(is_gradual_equivalent_to(F, F))
+
+    static_assert(not is_equivalent_to(A, B))
+    static_assert(not is_equivalent_to(C, D))
+    static_assert(not is_equivalent_to(E, F))
+
+    static_assert(not is_gradual_equivalent_to(A, B))
+    static_assert(not is_gradual_equivalent_to(C, D))
+    static_assert(not is_gradual_equivalent_to(E, F))
+```
+
+TypeVars which have non-fully-static bounds or constraints do not participate in equivalence
+relations, but do participate in gradual equivalence relations.
+
+```py
+from typing import final, Any
+from ty_extensions import is_equivalent_to, static_assert, is_gradual_equivalent_to
+
+# fmt: off
+
+def f[
+    A: tuple[Any],
+    B: tuple[Any],
+    C: (tuple[Any], tuple[Any, Any]),
+    D: (tuple[Any], tuple[Any, Any])
+]():
+    static_assert(not is_equivalent_to(A, A))
+    static_assert(not is_equivalent_to(B, B))
+    static_assert(not is_equivalent_to(C, C))
+    static_assert(not is_equivalent_to(D, D))
+
+    static_assert(is_gradual_equivalent_to(A, A))
+    static_assert(is_gradual_equivalent_to(B, B))
+    static_assert(is_gradual_equivalent_to(C, C))
+    static_assert(is_gradual_equivalent_to(D, D))
+
+# fmt: on
+```
+
 ## Singletons and single-valued types
 
 (Note: for simplicity, all of the prose in this section refers to _singleton_ types, but all of the

@@ -995,14 +995,6 @@ impl<'db> Type<'db> {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
 
-            // A fully static typevar is always a subtype of itself, and is never a subtype of any
-            // other typevar, since there is no guarantee that they will be specialized to the same
-            // type. (This is true even if both typevars are bounded by the same final class, since
-            // you can specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
-                self_typevar == other_typevar
-            }
-
             // In general, a TypeVar `T` is not a subtype of a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is a subtype of `S`.
             //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
@@ -1327,14 +1319,6 @@ impl<'db> Type<'db> {
             // TODO this special case might be removable once the below cases are comprehensive
             (_, Type::NominalInstance(instance)) if instance.class().is_object(db) => true,
 
-            // A typevar is always assignable to itself, and is never assignable to any other
-            // typevar, since there is no guarantee that they will be specialized to the same
-            // type. (This is true even if both typevars are bounded by the same final class, since
-            // you can specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar)) => {
-                self_typevar == other_typevar
-            }
-
             // In general, a TypeVar `T` is not assignable to a type `S` unless one of the two conditions is satisfied:
             // 1. `T` is a bound TypeVar and `T`'s upper bound is assignable to `S`.
             //    TypeVars without an explicit upper bound are treated as having an implicit upper bound of `object`.
@@ -1568,11 +1552,6 @@ impl<'db> Type<'db> {
             }
             (Type::Tuple(left), Type::Tuple(right)) => left.is_equivalent_to(db, right),
             (Type::Callable(left), Type::Callable(right)) => left.is_equivalent_to(db, right),
-            // A fully static typevar is always equivalent to itself, and not any other typevar,
-            // since there is no guarantee that they will be specialized to the same type. (This is
-            // true even if both typevars are bounded by the same final class, since you can
-            // specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(first), Type::TypeVar(second)) => first == second,
             (Type::NominalInstance(left), Type::NominalInstance(right)) => {
                 left.is_equivalent_to(db, right)
             }
@@ -1614,12 +1593,6 @@ impl<'db> Type<'db> {
                     _ => false,
                 }
             }
-
-            // A typevar is always gradually equivalent to itself, and not to any other typevar,
-            // since there is no guarantee that they will be specialized to the same type. (This is
-            // true even if both typevars are bounded by the same final class, since you can
-            // specialize the typevars to `Never` in addition to that final class.)
-            (Type::TypeVar(first), Type::TypeVar(second)) => first == second,
 
             (Type::NominalInstance(first), Type::NominalInstance(second)) => {
                 first.is_gradual_equivalent_to(db, second)
