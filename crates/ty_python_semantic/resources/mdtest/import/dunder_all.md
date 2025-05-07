@@ -74,14 +74,27 @@ class A: ...
 class B: ...
 ```
 
+`exporter_annotated.py`:
+
+```py
+__all__: list[str] = ["C", "D"]
+
+class C: ...
+class D: ...
+```
+
 `importer.py`:
 
 ```py
 import exporter
+import exporter_annotated
 from ty_extensions import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["B"]]
 reveal_type(dunder_all_names(exporter))
+
+# revealed: tuple[Literal["C"], Literal["D"]]
+reveal_type(dunder_all_names(exporter_annotated))
 ```
 
 ### List assignment (shadowed)
@@ -100,14 +113,31 @@ class C: ...
 class D: ...
 ```
 
+`exporter_annotated.py`:
+
+```py
+__all__ = ["X"]
+
+class X: ...
+
+__all__: list[str] = ["Y", "Z"]
+
+class Y: ...
+class Z: ...
+```
+
 `importer.py`:
 
 ```py
 import exporter
+import exporter_annotated
 from ty_extensions import dunder_all_names
 
 # revealed: tuple[Literal["C"], Literal["D"]]
 reveal_type(dunder_all_names(exporter))
+
+# revealed: tuple[Literal["Y"], Literal["Z"]]
+reveal_type(dunder_all_names(exporter_annotated))
 ```
 
 ### Tuple assignment
@@ -121,14 +151,27 @@ class A: ...
 class B: ...
 ```
 
+`exporter_annotated.py`:
+
+```py
+__all__: tuple[str, ...] = ("C", "D")
+
+class C: ...
+class D: ...
+```
+
 `importer.py`:
 
 ```py
 import exporter
+import exporter_annotated
 from ty_extensions import dunder_all_names
 
 # revealed: tuple[Literal["A"], Literal["B"]]
 reveal_type(dunder_all_names(exporter))
+
+# revealed: tuple[Literal["C"], Literal["D"]]
+reveal_type(dunder_all_names(exporter_annotated))
 ```
 
 ### Tuple assignment (shadowed)
@@ -147,14 +190,31 @@ class C: ...
 class D: ...
 ```
 
+`exporter_annotated.py`:
+
+```py
+__all__ = ("X",)
+
+class X: ...
+
+__all__: tuple[str, ...] = ("Y", "Z")
+
+class Y: ...
+class Z: ...
+```
+
 `importer.py`:
 
 ```py
 import exporter
+import exporter_annotated
 from ty_extensions import dunder_all_names
 
 # revealed: tuple[Literal["C"], Literal["D"]]
 reveal_type(dunder_all_names(exporter))
+
+# revealed: tuple[Literal["Y"], Literal["Z"]]
+reveal_type(dunder_all_names(exporter_annotated))
 ```
 
 ### Augmenting list with a list or submodule `__all__`
