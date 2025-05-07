@@ -715,8 +715,8 @@ impl UnifiedFile {
 /// [`DiagnosticSource::as_source_code`] method to produce a [`SourceCode`] with the appropriate
 /// lifetimes.
 ///
-/// See [`UnifiedFile::source`] for a way to obtain a [`DiagnosticSource`] from a file and
-/// [`FileResolver`].
+/// See [`UnifiedFile::diagnostic_source`] for a way to obtain a [`DiagnosticSource`] from a file
+/// and [`FileResolver`].
 #[derive(Clone, Debug)]
 enum DiagnosticSource {
     Ty(Input),
