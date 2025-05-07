@@ -93,8 +93,10 @@ where
                     path = fmt_styled(span.file().path(&self.resolver), stylesheet.emphasis)
                 )?;
                 if let Some(range) = span.range() {
-                    let input = span.file().diagnostic_source(&self.resolver);
-                    let start = input.as_source_code().line_column(range.start());
+                    let diagnostic_source = span.file().diagnostic_source(&self.resolver);
+                    let start = diagnostic_source
+                        .as_source_code()
+                        .line_column(range.start());
 
                     write!(
                         f,
@@ -195,8 +197,8 @@ impl<'a> ResolvedDiagnostic<'a> {
             .iter()
             .filter_map(|ann| {
                 let path = ann.span.file.path(resolver);
-                let input = ann.span.file.diagnostic_source(resolver);
-                ResolvedAnnotation::new(path, &input, ann)
+                let diagnostic_source = ann.span.file.diagnostic_source(resolver);
+                ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
         let message = if diag.inner.message.as_str().is_empty() {
@@ -229,8 +231,8 @@ impl<'a> ResolvedDiagnostic<'a> {
             .iter()
             .filter_map(|ann| {
                 let path = ann.span.file.path(resolver);
-                let input = ann.span.file.diagnostic_source(resolver);
-                ResolvedAnnotation::new(path, &input, ann)
+                let diagnostic_source = ann.span.file.diagnostic_source(resolver);
+                ResolvedAnnotation::new(path, &diagnostic_source, ann)
             })
             .collect();
         ResolvedDiagnostic {
