@@ -19,6 +19,8 @@ b'c' in b""
 b"a" in bytearray()
 b"a" in bytes()
 1 in frozenset()
+1 in set(set())
+2 in frozenset([])
 
 # OK
 1 in [2]
@@ -35,3 +37,5 @@ b'c' in b"x"
 b"a" in bytearray([2])
 b"a" in bytes("a", "utf-8")
 1 in frozenset("c")
+1 in set(set((1,2)))
+1 in set(set([1]))
