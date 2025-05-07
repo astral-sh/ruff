@@ -44,6 +44,23 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
 31 | 
 32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+33 | 
+34 | # fmt: off
+35 | 
+36 | # error: [duplicate-base] "Duplicate base class `Eggs`"
+37 | class VeryEggyOmelette(
+38 |     Eggs,
+39 |     Ham,
+40 |     Spam,
+41 |     Eggs,
+42 |     Mushrooms,
+43 |     Bar,
+44 |     Eggs,
+45 |     Baz,
+46 |     Eggs,
+47 | ): ...
+48 | 
+49 | # fmt: off
 ```
 
 # Diagnostics
@@ -84,6 +101,8 @@ info: revealed-type: Revealed type
 31 |
 32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `tuple[<class 'Omelette'>, Unknown, <class 'object'>]`
+33 |
+34 | # fmt: off
    |
 
 ```
@@ -210,6 +229,51 @@ info: The definition of class `Omelette` will raise `TypeError` at runtime
    |                            Class `Mushrooms` first included in bases list here
 31 |
 32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+   |
+info: `lint:duplicate-base` is enabled by default
+
+```
+
+```
+error: lint:duplicate-base: Duplicate base class `Eggs`
+  --> src/mdtest_snippet.py:37:7
+   |
+36 |   # error: [duplicate-base] "Duplicate base class `Eggs`"
+37 |   class VeryEggyOmelette(
+   |  _______^
+38 | |     Eggs,
+39 | |     Ham,
+40 | |     Spam,
+41 | |     Eggs,
+42 | |     Mushrooms,
+43 | |     Bar,
+44 | |     Eggs,
+45 | |     Baz,
+46 | |     Eggs,
+47 | | ): ...
+   | |_^
+48 |
+49 |   # fmt: off
+   |
+info: The definition of class `VeryEggyOmelette` will raise `TypeError` at runtime
+  --> src/mdtest_snippet.py:38:5
+   |
+36 | # error: [duplicate-base] "Duplicate base class `Eggs`"
+37 | class VeryEggyOmelette(
+38 |     Eggs,
+   |     ---- Class `Eggs` first included in bases list here
+39 |     Ham,
+40 |     Spam,
+41 |     Eggs,
+   |     ^^^^ Class `Eggs` later repeated here
+42 |     Mushrooms,
+43 |     Bar,
+44 |     Eggs,
+   |     ^^^^ Class `Eggs` later repeated here
+45 |     Baz,
+46 |     Eggs,
+   |     ^^^^ Class `Eggs` later repeated here
+47 | ): ...
    |
 info: `lint:duplicate-base` is enabled by default
 

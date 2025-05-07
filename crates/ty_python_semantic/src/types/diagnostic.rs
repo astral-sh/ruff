@@ -1,4 +1,5 @@
 use super::context::InferContext;
+use super::mro::DuplicateBaseError;
 use super::{ClassLiteral, KnownClass};
 use crate::db::Db;
 use crate::declare_lint;
@@ -1599,15 +1600,22 @@ pub(crate) fn report_attempted_protocol_instantiation(
 pub(crate) fn report_duplicate_bases(
     context: &InferContext,
     class: ClassLiteral,
-    duplicate_name: &str,
-    base_1: &ast::Expr,
-    base_2: &ast::Expr,
+    duplicate_base_error: &DuplicateBaseError,
+    bases_list: &[ast::Expr],
 ) {
     let db = context.db();
 
     let Some(builder) = context.report_lint(&DUPLICATE_BASE, class.header_range(db)) else {
         return;
     };
+
+    let DuplicateBaseError {
+        duplicate_base,
+        first_index,
+        later_indices,
+    } = duplicate_base_error;
+
+    let duplicate_name = duplicate_base.name(db);
 
     let mut diagnostic =
         builder.into_diagnostic(format_args!("Duplicate base class `{duplicate_name}`",));
@@ -1620,14 +1628,19 @@ pub(crate) fn report_duplicate_bases(
         ),
     );
     sub_diagnostic.annotate(
-        Annotation::secondary(Span::from(context.file()).with_range(base_1.range())).message(
-            format_args!("Class `{duplicate_name}` first included in bases list here"),
-        ),
+        Annotation::secondary(
+            Span::from(context.file()).with_range(bases_list[*first_index].range()),
+        )
+        .message(format_args!(
+            "Class `{duplicate_name}` first included in bases list here"
+        )),
     );
-    sub_diagnostic.annotate(
-        Annotation::primary(Span::from(context.file()).with_range(base_2.range()))
-            .message(format_args!("Class `{duplicate_name}` later repeated here")),
-    );
+    for index in later_indices {
+        sub_diagnostic.annotate(
+            Annotation::primary(Span::from(context.file()).with_range(bases_list[*index].range()))
+                .message(format_args!("Class `{duplicate_name}` later repeated here")),
+        );
+    }
 
     diagnostic.sub(sub_diagnostic);
 }

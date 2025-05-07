@@ -323,6 +323,23 @@ class Mushrooms: ...
 class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
 
 reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+
+# fmt: off
+
+# error: [duplicate-base] "Duplicate base class `Eggs`"
+class VeryEggyOmelette(
+    Eggs,
+    Ham,
+    Spam,
+    Eggs,
+    Mushrooms,
+    Bar,
+    Eggs,
+    Baz,
+    Eggs,
+): ...
+
+# fmt: off
 ```
 
 ## `__bases__` lists with duplicate `Unknown` bases

@@ -860,14 +860,8 @@ impl<'db> TypeInferenceBuilder<'db> {
                     match mro_error.reason() {
                         MroErrorKind::DuplicateBases(duplicates) => {
                             let base_nodes = class_node.bases();
-                            for (index1, index2, duplicate) in duplicates {
-                                report_duplicate_bases(
-                                    &self.context,
-                                    class,
-                                    duplicate.name(self.db()),
-                                    &base_nodes[*index1],
-                                    &base_nodes[*index2],
-                                );
+                            for duplicate in duplicates {
+                                report_duplicate_bases(&self.context, class, duplicate, base_nodes);
                             }
                         }
                         MroErrorKind::InvalidBases(bases) => {
